@@ -27,7 +27,7 @@ def test_b039_sspd_decimal_ln_failure(monkeypatch):
     def fail(**_kwargs):
         raise FormulaCalculationError("F13_DECIMAL_LN_FAILURE")
 
-    monkeypatch.setattr(validation_module, "evaluate_pressure_drop", fail)
+    monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
     assert "SSPD_DECIMAL_LN_FAILURE" in {item.code for item in result.blockers}
     assert result.blocked_result is not None
@@ -38,7 +38,7 @@ def test_b040_sspd_decimal_exp_failure(monkeypatch):
     def fail(**_kwargs):
         raise FormulaCalculationError("F13_DECIMAL_EXP_FAILURE")
 
-    monkeypatch.setattr(validation_module, "evaluate_pressure_drop", fail)
+    monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
     assert "SSPD_DECIMAL_EXP_FAILURE" in {item.code for item in result.blockers}
     assert result.blocked_result is not None
@@ -49,7 +49,7 @@ def test_b041_sspd_decimal_power_failure(monkeypatch):
     def fail(**_kwargs):
         raise FormulaCalculationError("F13_DECIMAL_POWER_FAILURE")
 
-    monkeypatch.setattr(validation_module, "evaluate_pressure_drop", fail)
+    monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
     assert "SSPD_DECIMAL_POWER_FAILURE" in {item.code for item in result.blockers}
     assert result.blocked_result is not None
@@ -83,3 +83,73 @@ def test_real_formula_operation_failure_routes_to_friction_stage():
         assert failure.operation == "F13_DECIMAL_LN_FAILURE"
     else:
         raise AssertionError("invalid Reynolds input did not fail in the real formula path")
+
+
+def test_s09_runtime_target_is_verify_wall_property_authority(monkeypatch):
+    calls = []
+    original = validation_module.verify_wall_property_authority
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "verify_wall_property_authority", spy)
+    result = validate_request(make_valid_raw_request())
+    assert calls
+    assert result.status == "VALID"
+
+
+def test_s12_runtime_target_is_validate_engineering_inputs(monkeypatch):
+    calls = []
+    original = validation_module.validate_engineering_inputs
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "validate_engineering_inputs", spy)
+    result = validate_request(make_valid_raw_request())
+    assert calls
+    assert result.status == "VALID"
+
+
+def test_s13_runtime_target_is_evaluate_friction_and_wall_correction(monkeypatch):
+    calls = []
+    original = validation_module.evaluate_friction_and_wall_correction
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", spy)
+    result = validate_request(make_valid_raw_request())
+    assert calls
+    assert result.status == "VALID"
+
+
+def test_s14_runtime_target_is_evaluate_pressure_drop(monkeypatch):
+    calls = []
+    original = validation_module.evaluate_pressure_drop
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "evaluate_pressure_drop", spy)
+    result = validate_request(make_valid_raw_request())
+    assert calls
+    assert result.status == "VALID"
+
+
+def test_s15_runtime_target_is_quantize_public_pressure_drop(monkeypatch):
+    calls = []
+    original = validation_module.quantize_public_pressure_drop
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "quantize_public_pressure_drop", spy)
+    result = validate_request(make_valid_raw_request())
+    assert calls
+    assert result.status == "VALID"

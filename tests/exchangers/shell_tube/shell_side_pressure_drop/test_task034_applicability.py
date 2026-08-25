@@ -11,6 +11,7 @@ from hexagent.exchangers.shell_tube.shell_side_pressure_drop.authority import (
     replay_task032_and_upstreams,
     verify_applicability,
 )
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import task033_request_hash
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.schema import parse_request
 from tests.exchangers.shell_tube.shell_side_pressure_drop.test_task034_success_contract import (
     make_valid_raw_request,
@@ -36,6 +37,7 @@ def _missing_upstream_field(field: str):
         raw["task033_upstream_evidence"]["task032_flow_state"].pop(field)
     else:
         raw["task033_upstream_evidence"].pop(field)
+    raw["task033_request_hash"] = task033_request_hash(raw["task033_upstream_evidence"])
     result = validate_request(raw)
     assert result.status == "BLOCKED"
     assert result.blocked_result is not None

@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, DecimalException
+from typing import Any
 
-from .decimal_quantization import engineering_context, quantize_public
+from .decimal_quantization import engineering_context, finite_decimal, quantize_public
 
 FORMULA_OPERATION_COUNT = 20
 FORMULA_OPERATIONS: tuple[str, ...] = (
@@ -49,9 +50,16 @@ def _step(operation: str, calculation: Callable[[], Decimal]) -> Decimal:
 
 
 @dataclass(frozen=True)
+class FrictionAndWallCorrection:
+    mu_ratio: Decimal
+    phi_s: Decimal
+    f_s: Decimal
+
+
+@dataclass(frozen=True)
 class PressureDropEvaluation:
     raw: Decimal
-    public: Decimal
+    public: Decimal | None
     mu_ratio: Decimal
     phi_s: Decimal
     f_s: Decimal
@@ -59,20 +67,39 @@ class PressureDropEvaluation:
     denominator: Decimal
 
 
-def evaluate_pressure_drop(
-    *,
-    Re_s: Decimal,
-    G_s: Decimal,
-    rho_s: Decimal,
-    D_s: Decimal,
-    D_e: Decimal,
-    N_b: int,
-    mu_b: Decimal,
-    mu_w: Decimal,
-) -> PressureDropEvaluation:
+class EngineeringInputDomainError(ValueError):
+    """Raised when the S12 formula input domain is not accepted."""
+
+
+def validate_engineering_inputs(**values: object) -> dict[str, Any]:
+    """Validate and normalize the finite positive S12 engineering inputs."""
+    decimal_names = ("Re_s", "G_s", "rho_s", "D_s", "D_e", "mu_b", "mu_w")
+    try:
+        normalized: dict[str, Any] = {name: Decimal(str(values[name])) for name in decimal_names}
+        normalized["N_b"] = values["N_b"]
+    except (ArithmeticError, KeyError, TypeError, ValueError) as exc:
+        raise EngineeringInputDomainError("engineering_inputs") from exc
+
+    if any(not finite_decimal(normalized[name]) for name in decimal_names):
+        raise EngineeringInputDomainError("engineering_inputs")
+    n_b = normalized["N_b"]
+    if type(n_b) is not int:
+        raise EngineeringInputDomainError("engineering_inputs")
+    if (
+        any(
+            normalized[name] <= 0 for name in ("Re_s", "G_s", "rho_s", "D_s", "D_e", "mu_b", "mu_w")
+        )
+        or n_b < 0
+    ):
+        raise EngineeringInputDomainError("engineering_inputs")
+    return normalized
+
+
+def evaluate_friction_and_wall_correction(
+    *, Re_s: Decimal, mu_b: Decimal, mu_w: Decimal
+) -> FrictionAndWallCorrection:
+    """Execute the frozen S13 friction-factor and wall-correction operations."""
     context = engineering_context()
-    # Every operation is wrapped with its frozen failure token while the
-    # evaluation order remains exactly the 20-operation contract.
     mu_ratio = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.divide(mu_b, mu_w))
     ratio_ln = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.ln(mu_ratio))
     ratio_ln_times_7 = _step(
@@ -90,6 +117,38 @@ def evaluate_pressure_drop(
         "F13_DECIMAL_POWER_FAILURE", lambda: context.subtract(Decimal("0.576"), friction_term)
     )
     f_s = _step("F13_DECIMAL_EXP_FAILURE", lambda: context.exp(friction_exp_arg))
+    return FrictionAndWallCorrection(mu_ratio=mu_ratio, phi_s=phi_s, f_s=f_s)
+
+
+def evaluate_pressure_drop(
+    *,
+    G_s: Decimal,
+    rho_s: Decimal,
+    D_s: Decimal,
+    D_e: Decimal,
+    N_b: int,
+    f_s: Decimal | None = None,
+    phi_s: Decimal | None = None,
+    mu_ratio: Decimal | None = None,
+    Re_s: Decimal | None = None,
+    mu_b: Decimal | None = None,
+    mu_w: Decimal | None = None,
+) -> PressureDropEvaluation:
+    """Evaluate S14 raw pressure drop, with a legacy public facade for callers."""
+    legacy_facade = f_s is None or phi_s is None
+    correction = None
+    if legacy_facade:
+        if Re_s is None or mu_b is None or mu_w is None:
+            raise FormulaCalculationError("F13_DECIMAL_POWER_FAILURE")
+        correction = evaluate_friction_and_wall_correction(Re_s=Re_s, mu_b=mu_b, mu_w=mu_w)
+        f_s = correction.f_s
+        phi_s = correction.phi_s
+    assert f_s is not None
+    assert phi_s is not None
+    context = engineering_context()
+    mu_ratio = correction.mu_ratio if correction is not None else mu_ratio
+    if mu_ratio is None:
+        mu_ratio = Decimal("0")
     g_s_squared = _step("F14_PRESSURE_DROP", lambda: context.multiply(G_s, G_s))
     n_b_decimal = _step("F14_PRESSURE_DROP", lambda: context.create_decimal(str(N_b)))
     n_b_plus_one = _step("F14_PRESSURE_DROP", lambda: context.add(n_b_decimal, Decimal("1")))
@@ -105,7 +164,11 @@ def evaluate_pressure_drop(
         lambda: context.multiply(denominator_two_rho_de, phi_s),
     )
     delta_p_raw = _step("F14_PRESSURE_DROP", lambda: context.divide(numerator, denominator))
-    delta_p_public = _step("F15_PUBLIC_QUANTIZATION", lambda: quantize_public(delta_p_raw))
+    delta_p_public = (
+        _step("F15_PUBLIC_QUANTIZATION", lambda: quantize_public(delta_p_raw))
+        if legacy_facade
+        else None
+    )
     return PressureDropEvaluation(
         raw=delta_p_raw,
         public=delta_p_public,
@@ -117,4 +180,12 @@ def evaluate_pressure_drop(
     )
 
 
-__all__ = ["FormulaCalculationError", "PressureDropEvaluation", "evaluate_pressure_drop"]
+__all__ = [
+    "EngineeringInputDomainError",
+    "FormulaCalculationError",
+    "FrictionAndWallCorrection",
+    "PressureDropEvaluation",
+    "evaluate_friction_and_wall_correction",
+    "evaluate_pressure_drop",
+    "validate_engineering_inputs",
+]

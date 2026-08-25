@@ -14,7 +14,7 @@ from .authority import (
     verify_auxiliary_bindings,
     verify_engineering_authority,
     verify_same_case,
-    verify_wall_property,
+    verify_wall_property_authority,
 )
 from .blocker_registry import BlockerCode, make_blocker, sort_blockers
 from .canonical import (
@@ -24,7 +24,10 @@ from .canonical import (
     task034_request_hash,
     typed_blocked_result_hash,
 )
-from .decimal_quantization import finite_decimal
+from .decimal_quantization import (
+    PublicQuantizationError,
+    quantize_public_pressure_drop,
+)
 from .engineering_authority_snapshot import (
     CORRELATION_ID,
     ENGINEERING_SOURCE_AUTHORITY_RECORD_ID,
@@ -32,7 +35,13 @@ from .engineering_authority_snapshot import (
     SOURCE_LOCATION,
     SOURCE_VERSION,
 )
-from .formulas import FormulaCalculationError, evaluate_pressure_drop
+from .formulas import (
+    EngineeringInputDomainError,
+    FormulaCalculationError,
+    evaluate_friction_and_wall_correction,
+    evaluate_pressure_drop,
+    validate_engineering_inputs,
+)
 from .models import (
     BLOCKED_RESULT_SCHEMA_VERSION,
     DEFERRED_CAPABILITIES,
@@ -241,12 +250,40 @@ def _failure(
     )
 
 
+def _formula_failure(
+    exc: FormulaCalculationError,
+    *,
+    request: Task034Request,
+    identity: ReplayIdentity,
+) -> ShellSidePressureDropValidationResult:
+    code = BlockerCode.SSPD_PRESSURE_DROP_CALCULATION_FAILURE
+    stage = "S14"
+    if exc.operation == "F13_DECIMAL_LN_FAILURE":
+        code = BlockerCode.SSPD_DECIMAL_LN_FAILURE
+        stage = "S13"
+    elif exc.operation == "F13_DECIMAL_EXP_FAILURE":
+        code = BlockerCode.SSPD_DECIMAL_EXP_FAILURE
+        stage = "S13"
+    elif exc.operation == "F13_DECIMAL_POWER_FAILURE":
+        code = BlockerCode.SSPD_DECIMAL_POWER_FAILURE
+        stage = "S13"
+    elif exc.operation == "F15_PUBLIC_QUANTIZATION":
+        code = BlockerCode.SSPD_PUBLIC_QUANTIZATION_FAILURE
+        stage = "S15"
+    return _typed_blocked(
+        stage=stage,
+        request=request,
+        blockers=(make_blocker(code, stage=stage, field_path=exc.operation),),
+        identity=identity,
+    )
+
+
 def validate_typed_request(request: Task034Request) -> ShellSidePressureDropValidationResult:
     identity: ReplayIdentity | None = None
     try:
         identity = replay_task032_and_upstreams(request)
-        verify_auxiliary_bindings(request, identity)
-        verify_wall_property(request)
+        identity = verify_auxiliary_bindings(request, identity)
+        verify_wall_property_authority(request)
         verify_same_case(request, identity)
         verify_applicability(request, identity)
         verify_engineering_authority(request)
@@ -267,17 +304,8 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
             "mu_b": Decimal(str(snapshot.get("dynamic_viscosity_pa_s"))),
             "mu_w": request.shell_side_wall_dynamic_viscosity_pa_s,
         }
-        if (
-            not all(finite_decimal(value) for key, value in values.items() if key != "N_b")
-            or type(values["N_b"]) is not int
-        ):
-            raise ValueError("formula input domain")
-        if (
-            any(values[key] <= 0 for key in ("Re_s", "G_s", "rho_s", "D_s", "D_e", "mu_b", "mu_w"))
-            or values["N_b"] < 0
-        ):
-            raise ValueError("formula input domain")
-    except (TypeError, ValueError, ArithmeticError):
+        values = validate_engineering_inputs(**values)
+    except EngineeringInputDomainError:
         return _typed_blocked(
             stage="S12",
             request=request,
@@ -291,26 +319,41 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
             identity=identity,
         )
     try:
-        evaluation = evaluate_pressure_drop(**values)
+        correction = evaluate_friction_and_wall_correction(
+            Re_s=values["Re_s"],
+            mu_b=values["mu_b"],
+            mu_w=values["mu_w"],
+        )
     except FormulaCalculationError as exc:
-        code = BlockerCode.SSPD_PRESSURE_DROP_CALCULATION_FAILURE
-        stage = "S14"
-        if exc.operation == "F13_DECIMAL_LN_FAILURE":
-            code = BlockerCode.SSPD_DECIMAL_LN_FAILURE
-            stage = "S13"
-        elif exc.operation == "F13_DECIMAL_EXP_FAILURE":
-            code = BlockerCode.SSPD_DECIMAL_EXP_FAILURE
-            stage = "S13"
-        elif exc.operation == "F13_DECIMAL_POWER_FAILURE":
-            code = BlockerCode.SSPD_DECIMAL_POWER_FAILURE
-            stage = "S13"
-        elif exc.operation == "F15_PUBLIC_QUANTIZATION":
-            code = BlockerCode.SSPD_PUBLIC_QUANTIZATION_FAILURE
-            stage = "S15"
+        return _formula_failure(exc, request=request, identity=identity)
+    try:
+        evaluation = evaluate_pressure_drop(
+            G_s=values["G_s"],
+            rho_s=values["rho_s"],
+            D_s=values["D_s"],
+            D_e=values["D_e"],
+            N_b=values["N_b"],
+            f_s=correction.f_s,
+            phi_s=correction.phi_s,
+            mu_ratio=correction.mu_ratio,
+        )
+    except FormulaCalculationError as exc:
+        return _formula_failure(exc, request=request, identity=identity)
+    try:
+        public_pressure_drop = quantize_public_pressure_drop(evaluation.raw)
+    except FormulaCalculationError as exc:
+        return _formula_failure(exc, request=request, identity=identity)
+    except PublicQuantizationError:
         return _typed_blocked(
-            stage=stage,
+            stage="S15",
             request=request,
-            blockers=(make_blocker(code, stage=stage, field_path=exc.operation),),
+            blockers=(
+                make_blocker(
+                    BlockerCode.SSPD_PUBLIC_QUANTIZATION_FAILURE,
+                    stage="S15",
+                    field_path="F15_PUBLIC_QUANTIZATION",
+                ),
+            ),
             identity=identity,
         )
 
@@ -383,7 +426,7 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
         wall_property_source_version=_string(request.wall_property_source_version),
         wall_property_snapshot_hash=_string(request.wall_property_snapshot_hash),
         wall_property_authority_hash=_string(request.wall_property_authority_hash),
-        modeled_shell_side_pressure_drop_pa=evaluation.public,
+        modeled_shell_side_pressure_drop_pa=public_pressure_drop,
         request_hash=request_hash,
         result_hash="",
         result_id="",

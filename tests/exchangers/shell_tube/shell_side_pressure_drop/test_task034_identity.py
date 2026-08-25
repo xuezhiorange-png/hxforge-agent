@@ -1,6 +1,9 @@
 """Same-case and upstream identity bindings."""
 
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop import authority as authority_module
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validate_request
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validation as validation_module
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import task033_request_hash
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.models import (
     TYPED_BLOCKED_RESULT_FIELDS,
 )
@@ -160,6 +163,136 @@ def test_precedence_case_g_s10_precedes_s11():
     raw = make_valid_raw_request()
     raw["shell_side_case_id"] = "wrong"
     raw["task033_upstream_evidence"]["task032_flow_state"]["phase_region"] = "SINGLE_PHASE_GAS"
+    raw["task033_request_hash"] = task033_request_hash(raw["task033_upstream_evidence"])
     blocker, stage = _first_blocker(raw)
     assert blocker.code == "SSPD_CASE_ID_MISMATCH"
     assert stage == "S10"
+
+
+def _s05_request_identity_with_upstream_fault(field: str):
+    raw = make_valid_raw_request()
+    flow = raw["task033_upstream_evidence"]["task032_flow_state"]
+    if field in {"phase_region", "rheology_model"}:
+        flow.pop(field)
+    elif field == "reynolds":
+        flow["shell_side_reynolds_number"] = "400"
+    else:
+        raw["task033_upstream_evidence"].pop(field)
+    raw["task033_request_hash"] = "0" * 64
+    return _first_blocker(raw)
+
+
+def test_s05_request_identity_precedes_missing_phase():
+    blocker, stage = _s05_request_identity_with_upstream_fault("phase_region")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_rheology():
+    blocker, stage = _s05_request_identity_with_upstream_fault("rheology_model")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_construction_family():
+    blocker, stage = _s05_request_identity_with_upstream_fault("construction_family")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_shell_pass():
+    blocker, stage = _s05_request_identity_with_upstream_fault("shell_pass_count")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_baffle_type():
+    blocker, stage = _s05_request_identity_with_upstream_fault("baffle_type")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_pattern_family():
+    blocker, stage = _s05_request_identity_with_upstream_fault("pattern_family")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_missing_baffle_cut():
+    blocker, stage = _s05_request_identity_with_upstream_fault("baffle_cut")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_s05_request_identity_precedes_reynolds_domain_failure():
+    blocker, stage = _s05_request_identity_with_upstream_fault("reynolds")
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_b018_runtime_target_is_validate_task032_identity_join(monkeypatch):
+    calls = []
+    original = authority_module.validate_task032_identity_join
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(authority_module, "validate_task032_identity_join", spy)
+    raw = make_valid_raw_request()
+    raw["task032_result_id"] = "wrong"
+    blocker, stage = _first_blocker(raw)
+    assert calls
+    assert blocker.code == "SSPD_TASK032_RESULT_ID_MISMATCH"
+    assert stage == "S04"
+
+
+def test_b019_runtime_target_is_validate_task032_identity_join(monkeypatch):
+    calls = []
+    original = authority_module.validate_task032_identity_join
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(authority_module, "validate_task032_identity_join", spy)
+    raw = make_valid_raw_request()
+    raw["task032_result_hash"] = "0" * 64
+    blocker, stage = _first_blocker(raw)
+    assert calls
+    assert blocker.code == "SSPD_TASK032_RESULT_HASH_MISMATCH"
+    assert stage == "S04"
+
+
+def test_b024_runtime_target_is_verify_auxiliary_bindings(monkeypatch):
+    calls = []
+    original = validation_module.verify_auxiliary_bindings
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "verify_auxiliary_bindings", spy)
+    raw = make_valid_raw_request()
+    raw["property_snapshot_hash"] = "0" * 64
+    blocker, stage = _first_blocker(raw)
+    assert calls
+    assert blocker.code == "SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH"
+    assert stage == "S08"
+
+
+def test_b025_runtime_target_is_verify_auxiliary_bindings(monkeypatch):
+    calls = []
+    original = validation_module.verify_auxiliary_bindings
+
+    def spy(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(validation_module, "verify_auxiliary_bindings", spy)
+    raw = make_valid_raw_request()
+    raw["mass_flow_authority_hash"] = "0" * 64
+    blocker, stage = _first_blocker(raw)
+    assert calls
+    assert blocker.code == "SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH"
+    assert stage == "S08"

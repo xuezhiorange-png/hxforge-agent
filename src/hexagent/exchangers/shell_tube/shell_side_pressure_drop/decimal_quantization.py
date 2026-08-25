@@ -7,6 +7,7 @@ from decimal import (  # noqa: F401
     Clamped,
     Context,
     Decimal,
+    DecimalException,
     DivisionByZero,
     FloatOperation,
     Inexact,
@@ -54,6 +55,18 @@ def quantize_public(value: Decimal) -> Decimal:
         return normalize_negative_zero(result)
 
 
+class PublicQuantizationError(ValueError):
+    """Raised when the S15 public pressure-drop quantization fails."""
+
+
+def quantize_public_pressure_drop(value: Decimal) -> Decimal:
+    """Own the frozen S15 public quantization stage."""
+    try:
+        return quantize_public(value)
+    except (DecimalException, ArithmeticError, TypeError, ValueError) as exc:
+        raise PublicQuantizationError("F15_PUBLIC_QUANTIZATION") from exc
+
+
 def quantization_collision(value: Decimal) -> bool:
     return finite_decimal(value) and quantize_public(value) == Decimal("0.000") and value != 0
 
@@ -64,5 +77,7 @@ __all__ = [
     "positive_decimal",
     "normalize_negative_zero",
     "quantize_public",
+    "PublicQuantizationError",
+    "quantize_public_pressure_drop",
     "quantization_collision",
 ]

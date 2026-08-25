@@ -176,23 +176,6 @@ def validate_task033_result_identity(
     ):
         raise _fail("S04", BlockerCode.SSPD_TASK033_RESULT_HASH_MISMATCH, "task033_result_hash")
 
-    result_payload = upstream.get("result")
-    result_payload = result_payload if type(result_payload) is dict else {}
-    task032_result_hash_value = flow.get("result_hash")
-    task032_result_id_value = flow.get("result_id")
-    if (
-        task032_result_id_value is None
-        or task032_result_id_value != result_payload.get("task032_result_id")
-        or request.task032_result_id != task032_result_id_value
-    ):
-        raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_ID_MISMATCH, "task032_result_id")
-    if (
-        task032_result_hash_value is None
-        or task032_result_hash_value != result_payload.get("task032_result_hash")
-        or request.task032_result_hash != task032_result_hash_value
-    ):
-        raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_HASH_MISMATCH, "task032_result_hash")
-
     return _identity(
         request,
         upstream,
@@ -209,34 +192,7 @@ def validate_task033_request_identity(
     """Validate S05 TASK033 request identity."""
     expected_task033_request = task033_request_hash(request.task033_upstream_evidence)
     if expected_task033_request != request.task033_request_hash:
-        upstream = request.task033_upstream_evidence
-        flow = identity.flow
-        applicability_fields = (
-            (flow.get("phase_region"), SUPPORTED_PHASE),
-            (flow.get("rheology_model"), SUPPORTED_RHEOLOGY),
-            (upstream.get("construction_family"), SUPPORTED_SHELL_TYPE),
-            (upstream.get("shell_pass_count"), SUPPORTED_SHELL_PASS_COUNT),
-            (upstream.get("baffle_type"), SUPPORTED_BAFFLE_TYPE),
-            (upstream.get("pattern_family"), SUPPORTED_TUBE_LAYOUT),
-            (upstream.get("baffle_cut"), SUPPORTED_BAFFLE_CUT),
-        )
-        # A malformed applicability authority is intentionally allowed to reach
-        # S11, where its frozen semantic blocker is emitted.  This prevents the
-        # upstream request hash from masking the more specific fail-closed
-        # applicability result while preserving S05 for an otherwise valid
-        # authority graph.
-        if all(actual == expected for actual, expected in applicability_fields):
-            try:
-                reynolds = Decimal(str(flow["shell_side_reynolds_number"]))
-                applicability_valid = reynolds.is_finite() and Decimal("400") < reynolds < Decimal(
-                    "1000000"
-                )
-            except (ArithmeticError, KeyError, TypeError, ValueError):
-                applicability_valid = False
-            if applicability_valid:
-                raise _fail(
-                    "S05", BlockerCode.SSPD_TASK033_REQUEST_HASH_MISMATCH, "task033_request_hash"
-                )
+        raise _fail("S05", BlockerCode.SSPD_TASK033_REQUEST_HASH_MISMATCH, "task033_request_hash")
     return identity
 
 
@@ -307,9 +263,55 @@ def replay_task031_geometry(request: Task034Request, identity: ReplayIdentity) -
 
 
 def validate_task032_identity_join(
-    request: Task034Request, identity: ReplayIdentity
+    request: Task034Request,
+    identity: ReplayIdentity,
+    *,
+    validate_result_identity: bool = True,
 ) -> ReplayIdentity:
-    """Validate S08 property/mass-flow joins after geometry replay."""
+    """Validate accepted TASK032 result identity at its frozen owner."""
+    if validate_result_identity:
+        upstream = request.task033_upstream_evidence
+        result_payload = upstream.get("result")
+        result_payload = result_payload if type(result_payload) is dict else {}
+        task032_result_hash_value = identity.flow.get("result_hash")
+        task032_result_id_value = identity.flow.get("result_id")
+        if (
+            task032_result_id_value is None
+            or task032_result_id_value != result_payload.get("task032_result_id")
+            or request.task032_result_id != task032_result_id_value
+        ):
+            raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_ID_MISMATCH, "task032_result_id")
+        if (
+            task032_result_hash_value is None
+            or task032_result_hash_value != result_payload.get("task032_result_hash")
+            or request.task032_result_hash != task032_result_hash_value
+        ):
+            raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_HASH_MISMATCH, "task032_result_hash")
+    return identity
+
+
+def replay_task032_and_upstreams(request: Task034Request) -> ReplayIdentity:
+    """Compatibility facade executing the frozen S03-S08 sequence."""
+    upstream_parts = validate_task033_upstream_boundary(request)
+    identity = validate_task033_result_identity(request, upstream_parts)
+    identity = validate_task032_identity_join(request, identity)
+    identity = validate_task033_request_identity(request, identity)
+    identity = replay_task031_request(request, identity)
+    identity = replay_task031_geometry(request, identity)
+    return validate_task032_identity_join(request, identity, validate_result_identity=False)
+
+
+def _task031_request_hash(evidence: dict[str, Any]) -> str:
+    return canonical_task031_request_hash(evidence)
+
+
+def task031_request_hash(evidence: dict[str, Any]) -> str:
+    """Replay the frozen TASK-031 request evidence projection."""
+    return _task031_request_hash(evidence)
+
+
+def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity) -> ReplayIdentity:
+    """Verify property/mass-flow hashes and auxiliary geometry bindings at S08."""
     snapshot = identity.task032_request_evidence.get("property_snapshot")
     if type(snapshot) is not dict:
         raise _fail("S08", BlockerCode.SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH, "property_snapshot")
@@ -348,33 +350,7 @@ def validate_task032_identity_join(
         raise _fail(
             "S08", BlockerCode.SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH, "mass_flow_authority_hash"
         )
-    return replace(
-        identity,
-        property_hash=expected_property_hash,
-        mass_flow_hash=expected_mass_flow_hash,
-    )
 
-
-def replay_task032_and_upstreams(request: Task034Request) -> ReplayIdentity:
-    """Compatibility facade executing the frozen S03-S08 sequence."""
-    upstream_parts = validate_task033_upstream_boundary(request)
-    identity = validate_task033_result_identity(request, upstream_parts)
-    identity = validate_task033_request_identity(request, identity)
-    identity = replay_task031_request(request, identity)
-    identity = replay_task031_geometry(request, identity)
-    return validate_task032_identity_join(request, identity)
-
-
-def _task031_request_hash(evidence: dict[str, Any]) -> str:
-    return canonical_task031_request_hash(evidence)
-
-
-def task031_request_hash(evidence: dict[str, Any]) -> str:
-    """Replay the frozen TASK-031 request evidence projection."""
-    return _task031_request_hash(evidence)
-
-
-def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity) -> None:
     geometry = identity.task032_request_evidence.get("task031_result", {}).get("geometry", {})
     if type(geometry) is not dict:
         geometry = {}
@@ -459,9 +435,14 @@ def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity)
     for actual, expected_value, code, field in expected:
         if expected_value is None or actual != expected_value:
             raise _fail("S08", code, field)
+    return replace(
+        identity,
+        property_hash=expected_property_hash,
+        mass_flow_hash=expected_mass_flow_hash,
+    )
 
 
-def verify_wall_property(request: Task034Request) -> None:
+def verify_wall_property_authority(request: Task034Request) -> None:
     if (
         not isinstance(request.shell_side_wall_dynamic_viscosity_pa_s, Decimal)
         or not request.shell_side_wall_dynamic_viscosity_pa_s.is_finite()
@@ -480,6 +461,9 @@ def verify_wall_property(request: Task034Request) -> None:
         raise _fail(
             "S09", BlockerCode.SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH, "wall_property_authority_hash"
         )
+
+
+verify_wall_property = verify_wall_property_authority
 
 
 def verify_same_case(request: Task034Request, identity: ReplayIdentity) -> None:
@@ -601,6 +585,7 @@ __all__ = [
     "replay_task032_and_upstreams",
     "task031_request_hash",
     "verify_auxiliary_bindings",
+    "verify_wall_property_authority",
     "verify_wall_property",
     "verify_same_case",
     "verify_applicability",
