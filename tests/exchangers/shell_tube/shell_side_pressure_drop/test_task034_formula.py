@@ -1,7 +1,8 @@
 """Frozen Eq. 15-17 operation and input-domain coverage."""
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop import formulas as formulas_module
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validate_request
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validation as validation_module
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.decimal_quantization import (
@@ -29,7 +30,7 @@ def test_b038_sspd_formula_input_invalid(monkeypatch):
 
 def test_b039_sspd_decimal_ln_failure(monkeypatch):
     def fail(**_kwargs):
-        raise FormulaCalculationError("F13_DECIMAL_LN_FAILURE")
+        raise FormulaCalculationError("F13_DECIMAL_LN_RE")
 
     monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
@@ -40,7 +41,7 @@ def test_b039_sspd_decimal_ln_failure(monkeypatch):
 
 def test_b040_sspd_decimal_exp_failure(monkeypatch):
     def fail(**_kwargs):
-        raise FormulaCalculationError("F13_DECIMAL_EXP_FAILURE")
+        raise FormulaCalculationError("F13_DECIMAL_EXP_FRICTION")
 
     monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
@@ -51,7 +52,7 @@ def test_b040_sspd_decimal_exp_failure(monkeypatch):
 
 def test_b041_sspd_decimal_power_failure(monkeypatch):
     def fail(**_kwargs):
-        raise FormulaCalculationError("F13_DECIMAL_POWER_FAILURE")
+        raise FormulaCalculationError("F13_DECIMAL_PHI_POWER")
 
     monkeypatch.setattr(validation_module, "evaluate_friction_and_wall_correction", fail)
     result = validate_request(make_valid_raw_request())
@@ -79,7 +80,7 @@ def test_real_formula_operation_failure_routes_to_friction_stage():
             mu_w=Decimal("0.00082"),
         )
     except FormulaCalculationError as failure:
-        assert failure.operation == "F13_DECIMAL_LN_FAILURE"
+        assert failure.operation == "F13_DECIMAL_LN_RE"
     else:
         raise AssertionError("invalid Reynolds input did not fail in the real formula path")
 
@@ -102,6 +103,92 @@ def test_s14_is_raw_only_and_requires_explicit_s13_and_s15_composition():
     )
     assert evaluation.public is None
     assert quantize_public_pressure_drop(evaluation.raw) == Decimal("86505.427")
+
+
+class _FailingEngineeringContext:
+    def __init__(
+        self,
+        context,
+        *,
+        fail_multiply_call=None,
+        fail_subtract=False,
+        fail_exp_call=None,
+    ):
+        self._context = context
+        self._fail_multiply_call = fail_multiply_call
+        self._fail_subtract = fail_subtract
+        self._fail_exp_call = fail_exp_call
+        self._multiply_calls = 0
+        self._exp_calls = 0
+
+    def __getattr__(self, name):
+        return getattr(self._context, name)
+
+    def multiply(self, left, right):
+        self._multiply_calls += 1
+        if self._multiply_calls == self._fail_multiply_call:
+            raise InvalidOperation
+        return self._context.multiply(left, right)
+
+    def subtract(self, left, right):
+        if self._fail_subtract:
+            raise InvalidOperation
+        return self._context.subtract(left, right)
+
+    def exp(self, value):
+        self._exp_calls += 1
+        if self._exp_calls == self._fail_exp_call:
+            raise InvalidOperation
+        return self._context.exp(value)
+
+
+def _assert_s13_blocker(result, *, code, operation):
+    assert result.status == "BLOCKED"
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S13"
+    blocker = next(item for item in result.blockers if item.code == code)
+    assert blocker.field_path == operation
+
+
+def test_operation_7_real_failure_uses_frozen_friction_exp_ownership(monkeypatch):
+    context = _FailingEngineeringContext(
+        formulas_module.engineering_context(), fail_multiply_call=2
+    )
+    monkeypatch.setattr(formulas_module, "engineering_context", lambda: context)
+
+    result = validate_request(make_valid_raw_request())
+
+    _assert_s13_blocker(
+        result,
+        code="SSPD_DECIMAL_EXP_FAILURE",
+        operation="F13_DECIMAL_EXP_FRICTION",
+    )
+
+
+def test_operation_8_real_failure_uses_frozen_friction_exp_ownership(monkeypatch):
+    context = _FailingEngineeringContext(formulas_module.engineering_context(), fail_subtract=True)
+    monkeypatch.setattr(formulas_module, "engineering_context", lambda: context)
+
+    result = validate_request(make_valid_raw_request())
+
+    _assert_s13_blocker(
+        result,
+        code="SSPD_DECIMAL_EXP_FAILURE",
+        operation="F13_DECIMAL_EXP_FRICTION",
+    )
+
+
+def test_operation_9_real_failure_uses_frozen_friction_exp_ownership(monkeypatch):
+    context = _FailingEngineeringContext(formulas_module.engineering_context(), fail_exp_call=2)
+    monkeypatch.setattr(formulas_module, "engineering_context", lambda: context)
+
+    result = validate_request(make_valid_raw_request())
+
+    _assert_s13_blocker(
+        result,
+        code="SSPD_DECIMAL_EXP_FAILURE",
+        operation="F13_DECIMAL_EXP_FRICTION",
+    )
 
 
 def test_s09_runtime_target_is_verify_wall_property_authority(monkeypatch):

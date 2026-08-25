@@ -100,23 +100,24 @@ def evaluate_friction_and_wall_correction(
 ) -> FrictionAndWallCorrection:
     """Execute the frozen S13 friction-factor and wall-correction operations."""
     context = engineering_context()
-    mu_ratio = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.divide(mu_b, mu_w))
-    ratio_ln = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.ln(mu_ratio))
+    mu_ratio = _step("F13_DECIMAL_PHI_POWER", lambda: context.divide(mu_b, mu_w))
+    ratio_ln = _step("F13_DECIMAL_PHI_POWER", lambda: context.ln(mu_ratio))
     ratio_ln_times_7 = _step(
-        "F13_DECIMAL_POWER_FAILURE", lambda: context.multiply(ratio_ln, Decimal("7"))
+        "F13_DECIMAL_PHI_POWER", lambda: context.multiply(ratio_ln, Decimal("7"))
     )
     ratio_exp_arg = _step(
-        "F13_DECIMAL_POWER_FAILURE", lambda: context.divide(ratio_ln_times_7, Decimal("50"))
+        "F13_DECIMAL_PHI_POWER", lambda: context.divide(ratio_ln_times_7, Decimal("50"))
     )
-    phi_s = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.exp(ratio_exp_arg))
-    re_ln = _step("F13_DECIMAL_LN_FAILURE", lambda: context.ln(Re_s))
+    phi_s = _step("F13_DECIMAL_PHI_POWER", lambda: context.exp(ratio_exp_arg))
+    re_ln = _step("F13_DECIMAL_LN_RE", lambda: context.ln(Re_s))
     friction_term = _step(
-        "F13_DECIMAL_POWER_FAILURE", lambda: context.multiply(Decimal("0.19"), re_ln)
+        "F13_DECIMAL_EXP_FRICTION", lambda: context.multiply(Decimal("0.19"), re_ln)
     )
     friction_exp_arg = _step(
-        "F13_DECIMAL_POWER_FAILURE", lambda: context.subtract(Decimal("0.576"), friction_term)
+        "F13_DECIMAL_EXP_FRICTION",
+        lambda: context.subtract(Decimal("0.576"), friction_term),
     )
-    f_s = _step("F13_DECIMAL_EXP_FAILURE", lambda: context.exp(friction_exp_arg))
+    f_s = _step("F13_DECIMAL_EXP_FRICTION", lambda: context.exp(friction_exp_arg))
     return FrictionAndWallCorrection(mu_ratio=mu_ratio, phi_s=phi_s, f_s=f_s)
 
 

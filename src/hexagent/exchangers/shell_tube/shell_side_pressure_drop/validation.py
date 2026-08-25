@@ -258,13 +258,13 @@ def _formula_failure(
 ) -> ShellSidePressureDropValidationResult:
     code = BlockerCode.SSPD_PRESSURE_DROP_CALCULATION_FAILURE
     stage = "S14"
-    if exc.operation == "F13_DECIMAL_LN_FAILURE":
+    if exc.operation == "F13_DECIMAL_LN_RE":
         code = BlockerCode.SSPD_DECIMAL_LN_FAILURE
         stage = "S13"
-    elif exc.operation == "F13_DECIMAL_EXP_FAILURE":
+    elif exc.operation == "F13_DECIMAL_EXP_FRICTION":
         code = BlockerCode.SSPD_DECIMAL_EXP_FAILURE
         stage = "S13"
-    elif exc.operation == "F13_DECIMAL_POWER_FAILURE":
+    elif exc.operation == "F13_DECIMAL_PHI_POWER":
         code = BlockerCode.SSPD_DECIMAL_POWER_FAILURE
         stage = "S13"
     elif exc.operation == "F15_PUBLIC_QUANTIZATION":
