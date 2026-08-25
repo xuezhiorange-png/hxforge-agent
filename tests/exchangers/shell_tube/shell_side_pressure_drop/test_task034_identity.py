@@ -13,6 +13,14 @@ def _codes(raw):
     return {item.code for item in validate_request(raw).blockers}
 
 
+def _first_blocker(raw):
+    result = validate_request(raw)
+    assert result.status == "BLOCKED"
+    assert result.blocked_result is not None
+    assert len(result.blocked_result.blockers) == 1
+    return result.blocked_result.blockers[0], result.blocked_result.failure_stage
+
+
 def test_b018_sspd_task032_result_id_mismatch():
     raw = make_valid_raw_request()
     raw["task032_result_id"] = "wrong"
@@ -92,3 +100,66 @@ def test_x008_typed_blocked_hash_self_exclusion():
     assert "blocked_result_hash" not in tuple(
         field for field in TYPED_BLOCKED_RESULT_FIELDS if field != "blocked_result_hash"
     )
+
+
+def test_precedence_case_a_s04_precedes_s05():
+    raw = make_valid_raw_request()
+    raw["task033_result_hash"] = "0" * 64
+    raw["task033_request_hash"] = "1" * 64
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_TASK033_RESULT_HASH_MISMATCH"
+    assert stage == "S04"
+
+
+def test_precedence_case_b_s05_precedes_s06():
+    raw = make_valid_raw_request()
+    raw["task033_request_hash"] = "0" * 64
+    raw["task031_request_hash"] = "1" * 64
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_TASK033_REQUEST_HASH_MISMATCH"
+    assert stage == "S05"
+
+
+def test_precedence_case_c_s06_precedes_s07():
+    raw = make_valid_raw_request()
+    raw["task031_request_hash"] = "0" * 64
+    raw["task031_geometry_hash"] = "1" * 64
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_TASK031_REQUEST_HASH_MISMATCH"
+    assert stage == "S06"
+
+
+def test_precedence_case_d_s07_precedes_s08():
+    raw = make_valid_raw_request()
+    raw["task031_geometry_hash"] = "0" * 64
+    raw["shell_inside_diameter_m"] = "1.201"
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_TASK031_GEOMETRY_HASH_MISMATCH"
+    assert stage == "S07"
+
+
+def test_precedence_case_e_s08_precedes_s09():
+    raw = make_valid_raw_request()
+    raw["shell_inside_diameter_m"] = "1.201"
+    raw["wall_property_authority_hash"] = "0" * 64
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_SHELL_INSIDE_DIAMETER_MISMATCH"
+    assert stage == "S08"
+
+
+def test_precedence_case_f_s09_precedes_s10():
+    raw = make_valid_raw_request()
+    raw["wall_property_authority_hash"] = "0" * 64
+    raw["shell_side_case_id"] = "wrong"
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH"
+    assert stage == "S09"
+
+
+def test_precedence_case_g_s10_precedes_s11():
+    raw = make_valid_raw_request()
+    raw["shell_side_case_id"] = "wrong"
+    raw["task033_upstream_evidence"]["task032_flow_state"]["phase_region"] = "SINGLE_PHASE_GAS"
+    blocker, stage = _first_blocker(raw)
+    assert blocker.code == "SSPD_CASE_ID_MISMATCH"
+    assert stage == "S10"

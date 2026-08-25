@@ -10,6 +10,14 @@ def _codes(raw):
     return {item.code for item in validate_request(raw).blockers}
 
 
+def _single_blocker(raw):
+    result = validate_request(raw)
+    assert result.status == "BLOCKED"
+    assert result.blocked_result is not None
+    assert len(result.blocked_result.blockers) == 1
+    return result.blocked_result.blockers[0], result.blocked_result.failure_stage
+
+
 def test_b008_sspd_source_authority_mismatch():
     raw = make_valid_raw_request()
     raw["task033_upstream_evidence"]["engineering_source_authority_record_id"] = "wrong"
@@ -26,6 +34,22 @@ def test_b010_sspd_task033_upstream_invalid():
     raw = make_valid_raw_request()
     raw["task033_upstream_evidence"]["status"] = "BLOCKED"
     assert "SSPD_TASK033_UPSTREAM_INVALID" in _codes(raw)
+
+
+def test_task033_status_missing_blocks_at_s03():
+    raw = make_valid_raw_request()
+    raw["task033_upstream_evidence"].pop("status")
+    blocker, stage = _single_blocker(raw)
+    assert blocker.code == "SSPD_TASK033_UPSTREAM_INVALID"
+    assert stage == "S03"
+
+
+def test_task033_source_authority_missing_blocks_at_s03():
+    raw = make_valid_raw_request()
+    raw["task033_upstream_evidence"].pop("engineering_source_authority_record_id")
+    blocker, stage = _single_blocker(raw)
+    assert blocker.code == "SSPD_SOURCE_AUTHORITY_MISMATCH"
+    assert stage == "S03"
 
 
 def test_b011_sspd_task033_request_hash_mismatch():

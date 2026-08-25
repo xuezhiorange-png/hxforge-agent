@@ -22,3 +22,5 @@ def test_b043_sspd_public_quantization_failure_token_is_frozen(monkeypatch):
     monkeypatch.setattr(validation_module, "evaluate_pressure_drop", fail)
     result = validate_request(make_valid_raw_request())
     assert "SSPD_PUBLIC_QUANTIZATION_FAILURE" in {item.code for item in result.blockers}
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S15"

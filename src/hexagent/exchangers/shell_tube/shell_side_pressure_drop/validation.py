@@ -294,18 +294,23 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
         evaluation = evaluate_pressure_drop(**values)
     except FormulaCalculationError as exc:
         code = BlockerCode.SSPD_PRESSURE_DROP_CALCULATION_FAILURE
+        stage = "S14"
         if exc.operation == "F13_DECIMAL_LN_FAILURE":
             code = BlockerCode.SSPD_DECIMAL_LN_FAILURE
+            stage = "S13"
         elif exc.operation == "F13_DECIMAL_EXP_FAILURE":
             code = BlockerCode.SSPD_DECIMAL_EXP_FAILURE
+            stage = "S13"
         elif exc.operation == "F13_DECIMAL_POWER_FAILURE":
             code = BlockerCode.SSPD_DECIMAL_POWER_FAILURE
+            stage = "S13"
         elif exc.operation == "F15_PUBLIC_QUANTIZATION":
             code = BlockerCode.SSPD_PUBLIC_QUANTIZATION_FAILURE
+            stage = "S15"
         return _typed_blocked(
-            stage="S13",
+            stage=stage,
             request=request,
-            blockers=(make_blocker(code, stage="S13", field_path=exc.operation),),
+            blockers=(make_blocker(code, stage=stage, field_path=exc.operation),),
             identity=identity,
         )
 

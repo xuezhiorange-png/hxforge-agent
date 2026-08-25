@@ -83,9 +83,11 @@ def evaluate_pressure_drop(
     )
     phi_s = _step("F13_DECIMAL_POWER_FAILURE", lambda: context.exp(ratio_exp_arg))
     re_ln = _step("F13_DECIMAL_LN_FAILURE", lambda: context.ln(Re_s))
-    friction_term = _step("F14_PRESSURE_DROP", lambda: context.multiply(Decimal("0.19"), re_ln))
+    friction_term = _step(
+        "F13_DECIMAL_POWER_FAILURE", lambda: context.multiply(Decimal("0.19"), re_ln)
+    )
     friction_exp_arg = _step(
-        "F14_PRESSURE_DROP", lambda: context.subtract(Decimal("0.576"), friction_term)
+        "F13_DECIMAL_POWER_FAILURE", lambda: context.subtract(Decimal("0.576"), friction_term)
     )
     f_s = _step("F13_DECIMAL_EXP_FAILURE", lambda: context.exp(friction_exp_arg))
     g_s_squared = _step("F14_PRESSURE_DROP", lambda: context.multiply(G_s, G_s))
