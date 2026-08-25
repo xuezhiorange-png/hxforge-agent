@@ -159,6 +159,18 @@ shards:
       - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_schema.py
       - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_single_phase.py
       - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_validation.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py
+      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
