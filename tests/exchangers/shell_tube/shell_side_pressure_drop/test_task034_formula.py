@@ -4,8 +4,12 @@ from decimal import Decimal
 
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validate_request
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validation as validation_module
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.decimal_quantization import (
+    quantize_public_pressure_drop,
+)
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.formulas import (
     FormulaCalculationError,
+    evaluate_friction_and_wall_correction,
     evaluate_pressure_drop,
 )
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.schema import parse_request
@@ -69,13 +73,8 @@ def test_b042_sspd_pressure_drop_calculation_failure(monkeypatch):
 
 def test_real_formula_operation_failure_routes_to_friction_stage():
     try:
-        evaluate_pressure_drop(
+        evaluate_friction_and_wall_correction(
             Re_s=Decimal("-1"),
-            G_s=Decimal("1200"),
-            rho_s=Decimal("998"),
-            D_s=Decimal("1.2"),
-            D_e=Decimal("0.041"),
-            N_b=12,
             mu_b=Decimal("0.001"),
             mu_w=Decimal("0.00082"),
         )
@@ -83,6 +82,26 @@ def test_real_formula_operation_failure_routes_to_friction_stage():
         assert failure.operation == "F13_DECIMAL_LN_FAILURE"
     else:
         raise AssertionError("invalid Reynolds input did not fail in the real formula path")
+
+
+def test_s14_is_raw_only_and_requires_explicit_s13_and_s15_composition():
+    correction = evaluate_friction_and_wall_correction(
+        Re_s=Decimal("12000"),
+        mu_b=Decimal("0.001"),
+        mu_w=Decimal("0.00082"),
+    )
+    evaluation = evaluate_pressure_drop(
+        G_s=Decimal("1250"),
+        rho_s=Decimal("998"),
+        D_s=Decimal("1.2"),
+        D_e=Decimal("0.041"),
+        N_b=12,
+        f_s=correction.f_s,
+        phi_s=correction.phi_s,
+        mu_ratio=correction.mu_ratio,
+    )
+    assert evaluation.public is None
+    assert quantize_public_pressure_drop(evaluation.raw) == Decimal("86505.427")
 
 
 def test_s09_runtime_target_is_verify_wall_property_authority(monkeypatch):

@@ -2,7 +2,13 @@
 
 from decimal import Decimal
 
-from hexagent.exchangers.shell_tube.shell_side_pressure_drop.formulas import evaluate_pressure_drop
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.decimal_quantization import (
+    quantize_public_pressure_drop,
+)
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.formulas import (
+    evaluate_friction_and_wall_correction,
+    evaluate_pressure_drop,
+)
 
 ORACLE_DECIMAL_PRECISION = 120
 ORACLE_VECTOR_RUNTIME_EXTERNAL_DEPENDENCY = False
@@ -57,13 +63,23 @@ ORACLE_VECTORS = (
 
 
 def _evaluate(values):
-    names = ("Re_s", "G_s", "rho_s", "D_s", "D_e", "N_b", "mu_b", "mu_w")
-    return evaluate_pressure_drop(
-        **{
-            name: value if name == "N_b" else Decimal(value)
-            for name, value in zip(names, values, strict=True)
-        }
+    re_s, g_s, rho_s, d_s, d_e, n_b, mu_b, mu_w = values
+    correction = evaluate_friction_and_wall_correction(
+        Re_s=Decimal(re_s),
+        mu_b=Decimal(mu_b),
+        mu_w=Decimal(mu_w),
     )
+    evaluation = evaluate_pressure_drop(
+        G_s=Decimal(g_s),
+        rho_s=Decimal(rho_s),
+        D_s=Decimal(d_s),
+        D_e=Decimal(d_e),
+        N_b=n_b,
+        f_s=correction.f_s,
+        phi_s=correction.phi_s,
+        mu_ratio=correction.mu_ratio,
+    )
+    return quantize_public_pressure_drop(evaluation.raw)
 
 
 def test_x004_external_oracle_vector_set():
@@ -71,8 +87,8 @@ def test_x004_external_oracle_vector_set():
     for vector_id, inputs, expected in ORACLE_VECTORS:
         assert vector_id.startswith("T034-ORACLE-")
         if expected is not None:
-            assert _evaluate(inputs).public == Decimal(expected)
+            assert _evaluate(inputs) == Decimal(expected)
 
 
 def test_x011_success_oracle_output_binding():
-    assert _evaluate(ORACLE_VECTORS[0][1]).public == Decimal(ORACLE_VECTORS[0][2])
+    assert _evaluate(ORACLE_VECTORS[0][1]) == Decimal(ORACLE_VECTORS[0][2])

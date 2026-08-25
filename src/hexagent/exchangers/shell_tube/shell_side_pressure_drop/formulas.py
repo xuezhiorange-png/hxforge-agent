@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from decimal import Decimal, DecimalException
 from typing import Any
 
-from .decimal_quantization import engineering_context, finite_decimal, quantize_public
+from .decimal_quantization import engineering_context, finite_decimal
 
 FORMULA_OPERATION_COUNT = 20
 FORMULA_OPERATIONS: tuple[str, ...] = (
@@ -127,28 +127,12 @@ def evaluate_pressure_drop(
     D_s: Decimal,
     D_e: Decimal,
     N_b: int,
-    f_s: Decimal | None = None,
-    phi_s: Decimal | None = None,
-    mu_ratio: Decimal | None = None,
-    Re_s: Decimal | None = None,
-    mu_b: Decimal | None = None,
-    mu_w: Decimal | None = None,
+    f_s: Decimal,
+    phi_s: Decimal,
+    mu_ratio: Decimal,
 ) -> PressureDropEvaluation:
-    """Evaluate S14 raw pressure drop, with a legacy public facade for callers."""
-    legacy_facade = f_s is None or phi_s is None
-    correction = None
-    if legacy_facade:
-        if Re_s is None or mu_b is None or mu_w is None:
-            raise FormulaCalculationError("F13_DECIMAL_POWER_FAILURE")
-        correction = evaluate_friction_and_wall_correction(Re_s=Re_s, mu_b=mu_b, mu_w=mu_w)
-        f_s = correction.f_s
-        phi_s = correction.phi_s
-    assert f_s is not None
-    assert phi_s is not None
+    """Evaluate only the frozen S14 raw pressure-drop arithmetic."""
     context = engineering_context()
-    mu_ratio = correction.mu_ratio if correction is not None else mu_ratio
-    if mu_ratio is None:
-        mu_ratio = Decimal("0")
     g_s_squared = _step("F14_PRESSURE_DROP", lambda: context.multiply(G_s, G_s))
     n_b_decimal = _step("F14_PRESSURE_DROP", lambda: context.create_decimal(str(N_b)))
     n_b_plus_one = _step("F14_PRESSURE_DROP", lambda: context.add(n_b_decimal, Decimal("1")))
@@ -164,14 +148,9 @@ def evaluate_pressure_drop(
         lambda: context.multiply(denominator_two_rho_de, phi_s),
     )
     delta_p_raw = _step("F14_PRESSURE_DROP", lambda: context.divide(numerator, denominator))
-    delta_p_public = (
-        _step("F15_PUBLIC_QUANTIZATION", lambda: quantize_public(delta_p_raw))
-        if legacy_facade
-        else None
-    )
     return PressureDropEvaluation(
         raw=delta_p_raw,
-        public=delta_p_public,
+        public=None,
         mu_ratio=mu_ratio,
         phi_s=phi_s,
         f_s=f_s,
