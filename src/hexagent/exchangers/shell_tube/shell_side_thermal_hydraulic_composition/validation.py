@@ -412,13 +412,13 @@ def parse_request(raw_request: Any) -> Task035Request:
         raise ValueError("S01_UNKNOWN")
     if not _valid_evidence_refs(raw_request.get("evidence_refs")):
         raise ValueError("S01_EVIDENCE")
-    missing = [field for field in REQUEST_FIELDS if field not in raw_request]
-    if missing:
-        raise ValueError("S02_REQUIRED")
     if raw_request.get("schema_version") != REQUEST_SCHEMA_VERSION:
         raise ValueError("S02_SCHEMA")
     if raw_request.get("profile_id") != PROFILE_ID:
         raise ValueError("S02_PROFILE")
+    missing = [field for field in REQUEST_FIELDS if field not in raw_request]
+    if missing:
+        raise ValueError("S02_REQUIRED")
     return _request_from_raw(raw_request)
 
 
@@ -943,16 +943,6 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
         return _raw_blocked(raw_request, "SSTHC_UNKNOWN_FIELD", "raw_request")
     if not _valid_evidence_refs(raw_request.get("evidence_refs")):
         return _raw_blocked(raw_request, "SSTHC_EVIDENCE_REFS_INVALID", "evidence_refs")
-    missing = [field for field in REQUEST_FIELDS if field not in raw_request]
-    if missing:
-        request = _request_from_raw(raw_request)
-        return _bad(
-            request,
-            "S02",
-            "SSTHC_REQUIRED_FIELD_MISSING",
-            _Accepted(),
-            field_path="request",
-        )
     if raw_request.get("schema_version") != REQUEST_SCHEMA_VERSION:
         request = _request_from_raw(raw_request)
         return _bad(
@@ -970,6 +960,16 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
             "SSTHC_PROFILE_ID_UNSUPPORTED",
             _Accepted(),
             field_path="profile_id",
+        )
+    missing = [field for field in REQUEST_FIELDS if field not in raw_request]
+    if missing:
+        request = _request_from_raw(raw_request)
+        return _bad(
+            request,
+            "S02",
+            "SSTHC_REQUIRED_FIELD_MISSING",
+            _Accepted(),
+            field_path="request",
         )
     request = _request_from_raw(raw_request)
     accepted = _Accepted()

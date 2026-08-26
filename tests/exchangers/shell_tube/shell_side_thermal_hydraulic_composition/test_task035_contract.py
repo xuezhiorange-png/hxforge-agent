@@ -318,6 +318,29 @@ def _codes(result: Any) -> tuple[str, ...]:
     return tuple(entry.code for entry in result.blockers)
 
 
+def _assert_primary(result: Any, code: str) -> None:
+    assert _codes(result) == (code,)
+    assert result.blockers
+    row = blocker_registry.row_for_code(code)
+    primary = result.blockers[0]
+    assert primary.stage == row.earliest_stage
+    assert primary.field_path == row.exact_field_path
+
+
+def _precedence_case(
+    result: Any,
+    expected_code: str,
+    *later_codes: str,
+) -> tuple[tuple[Any, ...], str]:
+    """Pair a returned primary blocker with simultaneous later candidates."""
+
+    _assert_primary(result, expected_code)
+    return (
+        tuple(result.blockers) + tuple(blocker_registry.make_blocker(code) for code in later_codes),
+        expected_code,
+    )
+
+
 def _rebuild_task033(request: dict[str, Any]) -> None:
     payload = request["task033_result"]["heat_transfer"]
     payload["result_hash"] = task033_success_hash(payload)
@@ -389,14 +412,22 @@ def _blocked_producer(
     }
 
 
-def _reachability_observations() -> list[tuple[Any, ...]]:
+def _reachability_observations() -> tuple[list[tuple[Any, ...]], dict[str, str]]:
     """Exercise every frozen blocker through the validation pipeline."""
 
     observations: list[tuple[Any, ...]] = []
+    classifications: dict[str, str] = {}
 
-    def add(code: str, request: Any) -> None:
+    def add(
+        code: str,
+        request: Any,
+        *,
+        classification: str = "NATURAL_INPUT_REACHABLE",
+    ) -> None:
         result = validate_request(request)
         assert _codes(result) == (code,), (code, _codes(result))
+        assert code not in classifications
+        classifications[code] = classification
         observations.append(tuple(result.blockers))
 
     add("SSTHC_RAW_TYPE_INVALID", [])
@@ -521,7 +552,11 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
         patch.object(validation_module, "_identity_task033", return_value=True),
         patch.object(validation_module, "_identity_task034", return_value=True),
     ):
-        add("SSTHC_TASK031_GEOMETRY_MISMATCH", request)
+        add(
+            "SSTHC_TASK031_GEOMETRY_MISMATCH",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     request["task034_result"]["pressure_drop"]["property_snapshot_hash"] = _hex("0")
@@ -576,7 +611,11 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
     )
     request = _valid_request()
     with patch.object(validation_module, "_completeness_ledger", return_value=complete_ledger):
-        add("SSTHC_REQUIRED_CAPABILITY_MISSING", request)
+        add(
+            "SSTHC_REQUIRED_CAPABILITY_MISSING",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     blocked_ledger = (
         ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
@@ -592,7 +631,11 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
     )
     request = _valid_request()
     with patch.object(validation_module, "_completeness_ledger", return_value=blocked_ledger):
-        add("SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED", request)
+        add(
+            "SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     with patch.object(
@@ -600,14 +643,22 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
         "_compose_success_payload",
         side_effect=CanonicalizationError("composition test fault"),
     ):
-        add("SSTHC_SUCCESS_PAYLOAD_COMPOSITION_FAILED", request)
+        add(
+            "SSTHC_SUCCESS_PAYLOAD_COMPOSITION_FAILED",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     request["task033_result"]["heat_transfer"][
         "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
     ] = Decimal("0")
     _rebuild_chain(request)
-    add("SSTHC_PARTIAL_SUCCESS_FORBIDDEN", request)
+    add(
+        "SSTHC_PARTIAL_SUCCESS_FORBIDDEN",
+        request,
+        classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+    )
 
     request = _valid_request()
     with patch.object(
@@ -615,7 +666,11 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
         "build_provenance",
         side_effect=CanonicalizationError("provenance test fault"),
     ):
-        add("SSTHC_PROVENANCE_CANONICALIZATION_FAILED", request)
+        add(
+            "SSTHC_PROVENANCE_CANONICALIZATION_FAILED",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     with patch.object(
@@ -623,7 +678,11 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
         "success_result_hash",
         side_effect=CanonicalizationError("canonical test fault"),
     ):
-        add("SSTHC_CANONICALIZATION_FAILED", request)
+        add(
+            "SSTHC_CANONICALIZATION_FAILED",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     with patch.object(
@@ -631,9 +690,305 @@ def _reachability_observations() -> list[tuple[Any, ...]]:
         "_finalize_result_identity",
         side_effect=lambda payload: dataclasses.replace(payload, result_hash="bad", result_id=""),
     ):
-        add("SSTHC_RESULT_IDENTITY_FINALIZATION_FAILED", request)
+        add(
+            "SSTHC_RESULT_IDENTITY_FINALIZATION_FAILED",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
-    return observations
+    return observations, classifications
+
+
+def _same_stage_precedence_observations() -> list[tuple[tuple[Any, ...], str]]:
+    """Exercise one simultaneous-fault precedence case for every multi-row stage."""
+
+    cases: list[tuple[tuple[Any, ...], str]] = []
+
+    request: dict[str, Any] = {
+        "unexpected": "value",
+        "evidence_refs": ["duplicate", "duplicate"],
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_UNKNOWN_FIELD",
+            "SSTHC_EVIDENCE_REFS_INVALID",
+        )
+    )
+
+    request = _valid_request()
+    del request["task034_result"]
+    request["schema_version"] = "unsupported.v1"
+    request["profile_id"] = "unsupported-profile.v1"
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_SCHEMA_VERSION_UNSUPPORTED",
+            "SSTHC_PROFILE_ID_UNSUPPORTED",
+            "SSTHC_REQUIRED_FIELD_MISSING",
+        )
+    )
+
+    request = _valid_request()
+    request["task031_result"] = {"status": "BLOCKED"}
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_TASK031_RESULT_INVALID",
+            "SSTHC_TASK031_RESULT_BLOCKED",
+        )
+    )
+
+    request = _valid_request()
+    request["task032_result"] = {
+        "status": "BLOCKED",
+        "flow_state": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_TASK032_RESULT_INVALID",
+            "SSTHC_TASK032_RESULT_BLOCKED",
+        )
+    )
+
+    request = _valid_request()
+    request["task033_result"] = {
+        "status": "BLOCKED",
+        "heat_transfer": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_TASK033_RESULT_INVALID",
+            "SSTHC_TASK033_RESULT_BLOCKED",
+        )
+    )
+
+    request = _valid_request()
+    request["task034_result"] = {
+        "status": "BLOCKED",
+        "pressure_drop": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_TASK034_RESULT_INVALID",
+            "SSTHC_TASK034_RESULT_BLOCKED",
+        )
+    )
+
+    request = _valid_request()
+    geometry = request["task031_result"]["geometry"]
+    geometry["task021_layout_hash"] = "invalid"
+    geometry["task024_geometry_hash"] = "invalid"
+    _rebuild_chain(request)
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["task020_configuration_id"] = "other-configuration"
+    pressure["task020_configuration_hash"] = _hex("0")
+    _rebuild_task034(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_CONFIGURATION_MISMATCH",
+            "SSTHC_TASK021_LAYOUT_MISMATCH",
+            "SSTHC_TASK024_GEOMETRY_MISMATCH",
+            "SSTHC_TASK031_GEOMETRY_MISMATCH",
+        )
+    )
+
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["property_snapshot_hash"] = _hex("0")
+    pressure["mass_flow_authority_hash"] = _hex("0")
+    _rebuild_task034(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_PROPERTY_SNAPSHOT_MISMATCH",
+            "SSTHC_MASS_FLOW_AUTHORITY_MISMATCH",
+        )
+    )
+
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["shell_side_case_id"] = "other-case"
+    pressure["shell_side_stream_id"] = "other-stream"
+    pressure["shell_side_fluid_id"] = "other-fluid"
+    _rebuild_task034(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_CASE_IDENTITY_MISMATCH",
+            "SSTHC_STREAM_IDENTITY_MISMATCH",
+            "SSTHC_FLUID_IDENTITY_MISMATCH",
+        )
+    )
+
+    request = _valid_request()
+    heat = request["task033_result"]["heat_transfer"]
+    heat["profile_id"] = "other-profile"
+    heat["heat_transfer_surface"] = "INNER_TUBE_SURFACE"
+    heat["correlation_id"] = "other-correlation"
+    _rebuild_chain(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_PROFILE_COMPATIBILITY_MISMATCH",
+            "SSTHC_HEAT_TRANSFER_SURFACE_MISMATCH",
+            "SSTHC_CORRELATION_IDENTITY_MISMATCH",
+        )
+    )
+
+    incomplete_and_blocked_ledger = (
+        ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
+        (
+            "required_producers",
+            (
+                ("TASK031", "DELIVERED_AND_PRESENT"),
+                ("TASK032", "DELIVERED_AND_PRESENT"),
+                ("TASK033", "DELIVERED_BUT_BLOCKED"),
+            ),
+        ),
+    )
+    request = _valid_request()
+    with patch.object(
+        validation_module,
+        "_completeness_ledger",
+        return_value=incomplete_and_blocked_ledger,
+    ):
+        result = validate_request(request)
+    cases.append(
+        _precedence_case(
+            result,
+            "SSTHC_REQUIRED_CAPABILITY_MISSING",
+            "SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED",
+        )
+    )
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"][
+        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
+    ] = Decimal("0")
+    _rebuild_chain(request)
+    with patch.object(
+        validation_module,
+        "_compose_success_payload",
+        side_effect=CanonicalizationError("composition precedence fault"),
+    ):
+        result = validate_request(request)
+    cases.append(
+        _precedence_case(
+            result,
+            "SSTHC_SUCCESS_PAYLOAD_COMPOSITION_FAILED",
+            "SSTHC_PARTIAL_SUCCESS_FORBIDDEN",
+        )
+    )
+
+    request = _valid_request()
+    with (
+        patch.object(
+            validation_module,
+            "build_provenance",
+            side_effect=CanonicalizationError("provenance precedence fault"),
+        ),
+        patch.object(
+            validation_module,
+            "success_result_hash",
+            side_effect=CanonicalizationError("canonical precedence fault"),
+        ),
+    ):
+        result = validate_request(request)
+    cases.append(
+        _precedence_case(
+            result,
+            "SSTHC_PROVENANCE_CANONICALIZATION_FAILED",
+            "SSTHC_CANONICALIZATION_FAILED",
+        )
+    )
+
+    return cases
+
+
+def _earliest_stage_precedence_observations() -> list[tuple[tuple[Any, ...], str]]:
+    """Exercise first-failure precedence across non-adjacent pipeline stages."""
+
+    cases: list[tuple[tuple[Any, ...], str]] = []
+
+    request: dict[str, Any] = {
+        "unexpected": "value",
+        "schema_version": "unsupported.v1",
+        "evidence_refs": [],
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_UNKNOWN_FIELD",
+            "SSTHC_SCHEMA_VERSION_UNSUPPORTED",
+        )
+    )
+
+    request = _valid_request()
+    request["schema_version"] = "unsupported.v1"
+    request["task031_result"] = {"status": "VALID"}
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_SCHEMA_VERSION_UNSUPPORTED",
+            "SSTHC_TASK031_RESULT_INVALID",
+        )
+    )
+
+    request = _valid_request()
+    request["task031_result"] = {"status": "VALID"}
+    request["task032_result"] = {
+        "status": "VALID",
+        "flow_state": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_TASK031_RESULT_INVALID",
+            "SSTHC_TASK032_RESULT_INVALID",
+        )
+    )
+
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["task020_configuration_id"] = "other-configuration"
+    pressure["task020_configuration_hash"] = _hex("0")
+    pressure["property_snapshot_hash"] = _hex("0")
+    _rebuild_task034(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_CONFIGURATION_MISMATCH",
+            "SSTHC_PROPERTY_SNAPSHOT_MISMATCH",
+        )
+    )
+
+    request = _valid_request()
+    heat = request["task033_result"]["heat_transfer"]
+    heat["profile_id"] = "other-profile"
+    heat["applicability_context"][1][1] = "SINGLE_PHASE_GAS"
+    _rebuild_chain(request)
+    cases.append(
+        _precedence_case(
+            validate_request(request),
+            "SSTHC_PROFILE_COMPATIBILITY_MISMATCH",
+            "SSTHC_APPLICABILITY_INCOMPATIBLE",
+        )
+    )
+
+    return cases
 
 
 def test_T035_001_raw_boundary_deterministic_projection() -> None:
@@ -673,11 +1028,26 @@ def test_T035_001_raw_boundary_deterministic_projection() -> None:
     assert projection["unsupported"] == {
         RAW_UNSUPPORTED_TOKEN: f"{NoRepr.__module__}.{NoRepr.__qualname__}"
     }
-    assert projection["decimal"] == {"__task035_decimal__": "12.3400"}
+    assert projection["decimal"] == "12.3400"
+    assert not isinstance(projection["decimal"], dict)
     assert projection["bytes"] == {
         RAW_UNSUPPORTED_TOKEN: "builtins.bytes",
     }
     assert projection["cycle"] == [{RAW_UNSUPPORTED_TOKEN: "cycle"}]
+
+    decimal_blocked = validate_request({"unexpected": Decimal("12.3400")})
+    decimal_blocked_again = validate_request({"unexpected": Decimal("12.3400")})
+    assert decimal_blocked.raw_boundary_blocked_result is not None
+    assert decimal_blocked_again.raw_boundary_blocked_result is not None
+    assert (
+        decimal_blocked.raw_boundary_blocked_result.raw_request_projection["projection"][
+            "unexpected"
+        ]
+        == "12.3400"
+    )
+    assert decimal_blocked.raw_boundary_blocked_result.blocked_result_hash == (
+        decimal_blocked_again.raw_boundary_blocked_result.blocked_result_hash
+    )
 
     large_mapping_a = {f"key-{index:03d}": index for index in range(80)}
     large_mapping_b = {f"key-{index:03d}": index for index in reversed(range(80))}
@@ -720,9 +1090,24 @@ def test_T035_002_request_schema_profile() -> None:
     result = validate_request(request)
     assert _codes(result) == ("SSTHC_PROFILE_ID_UNSUPPORTED",)
 
+    request = _valid_request()
+    del request["task034_result"]
+    request["schema_version"] = "unsupported.v1"
+    request["profile_id"] = "unsupported-profile.v1"
+    _assert_primary(validate_request(request), "SSTHC_SCHEMA_VERSION_UNSUPPORTED")
+
+    request = _valid_request()
+    del request["task034_result"]
+    request["profile_id"] = "unsupported-profile.v1"
+    _assert_primary(validate_request(request), "SSTHC_PROFILE_ID_UNSUPPORTED")
+
 
 def test_T035_003_TASK031_success_contract() -> None:
     """A valid TASK031 public geometry envelope is accepted and replayed."""
+
+    request = _valid_request()
+    request["task031_result"] = {"status": "BLOCKED"}
+    _assert_primary(validate_request(request), "SSTHC_TASK031_RESULT_INVALID")
 
     result = validate_request(_valid_request())
     assert result.success_result is not None
@@ -749,6 +1134,15 @@ def test_T035_004_TASK031_blocked_propagation() -> None:
 
 def test_T035_005_TASK032_success_contract() -> None:
     """A valid TASK032 flow-state envelope is accepted."""
+
+    request = _valid_request()
+    request["task032_result"] = {
+        "status": "BLOCKED",
+        "flow_state": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    _assert_primary(validate_request(request), "SSTHC_TASK032_RESULT_INVALID")
 
     result = validate_request(_valid_request())
     assert result.success_result is not None
@@ -777,6 +1171,15 @@ def test_T035_006_TASK032_blocked_propagation() -> None:
 
 def test_T035_007_TASK033_success_contract() -> None:
     """A valid TASK033 heat-transfer envelope is accepted."""
+
+    request = _valid_request()
+    request["task033_result"] = {
+        "status": "BLOCKED",
+        "heat_transfer": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    _assert_primary(validate_request(request), "SSTHC_TASK033_RESULT_INVALID")
 
     result = validate_request(_valid_request())
     assert result.success_result is not None
@@ -812,6 +1215,15 @@ def test_T035_008_TASK033_blocked_propagation() -> None:
 
 def test_T035_009_TASK034_success_contract() -> None:
     """A valid TASK034 pressure-drop envelope is accepted."""
+
+    request = _valid_request()
+    request["task034_result"] = {
+        "status": "BLOCKED",
+        "pressure_drop": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    _assert_primary(validate_request(request), "SSTHC_TASK034_RESULT_INVALID")
 
     result = validate_request(_valid_request())
     assert result.success_result is not None
@@ -920,6 +1332,17 @@ def test_T035_013_TASK031_TASK021_TASK024_configuration_ancestry() -> None:
     result = validate_request(request)
     assert _codes(result) == ("SSTHC_CONFIGURATION_MISMATCH",)
 
+    request = _valid_request()
+    geometry = request["task031_result"]["geometry"]
+    geometry["task021_layout_hash"] = "invalid"
+    geometry["task024_geometry_hash"] = "invalid"
+    _rebuild_chain(request)
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["task020_configuration_id"] = "other"
+    pressure["task020_configuration_hash"] = _hex("0")
+    _rebuild_task034(request)
+    _assert_primary(validate_request(request), "SSTHC_CONFIGURATION_MISMATCH")
+
 
 def test_T035_014_property_snapshot_and_mass_flow_identity_join() -> None:
     """PropertySnapshot and mass-flow authority identities must join exactly."""
@@ -936,6 +1359,13 @@ def test_T035_014_property_snapshot_and_mass_flow_identity_join() -> None:
     result = validate_request(request)
     assert _codes(result) == ("SSTHC_MASS_FLOW_AUTHORITY_MISMATCH",)
 
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["property_snapshot_hash"] = _hex("0")
+    pressure["mass_flow_authority_hash"] = _hex("0")
+    _rebuild_task034(request)
+    _assert_primary(validate_request(request), "SSTHC_PROPERTY_SNAPSHOT_MISMATCH")
+
 
 def test_T035_015_case_stream_fluid_join() -> None:
     """Case, stream, and fluid identities are cross-producer joins."""
@@ -950,6 +1380,14 @@ def test_T035_015_case_stream_fluid_join() -> None:
         _rebuild_task034(request)
         result = validate_request(request)
         assert _codes(result) == (code,)
+
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["shell_side_case_id"] = "other-case"
+    pressure["shell_side_stream_id"] = "other-stream"
+    pressure["shell_side_fluid_id"] = "other-fluid"
+    _rebuild_task034(request)
+    _assert_primary(validate_request(request), "SSTHC_CASE_IDENTITY_MISMATCH")
 
 
 def test_T035_016_producer_profile_compatibility() -> None:
@@ -976,6 +1414,14 @@ def test_T035_016_producer_profile_compatibility() -> None:
     _rebuild_task034(request)
     result = validate_request(request)
     assert _codes(result) == ("SSTHC_CORRELATION_IDENTITY_MISMATCH",)
+
+    request = _valid_request()
+    heat = request["task033_result"]["heat_transfer"]
+    heat["profile_id"] = "wrong-profile"
+    heat["heat_transfer_surface"] = "INNER_TUBE_SURFACE"
+    heat["correlation_id"] = "wrong-correlation"
+    _rebuild_chain(request)
+    _assert_primary(validate_request(request), "SSTHC_PROFILE_COMPATIBILITY_MISMATCH")
 
 
 def test_T035_017_applicability_intersection() -> None:
@@ -1005,6 +1451,27 @@ def test_T035_018_completeness_success_ledger() -> None:
     assert ledger["applicability_profile_id"] == APPLICABILITY_PROFILE_ID
     assert ledger["completeness_profile_id"] == COMPLETENESS_PROFILE_ID
     assert ledger["deferred_capabilities"] == DEFERRED_CAPABILITIES
+
+    incomplete_and_blocked_ledger = (
+        ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
+        (
+            "required_producers",
+            (
+                ("TASK031", "DELIVERED_AND_PRESENT"),
+                ("TASK032", "DELIVERED_AND_PRESENT"),
+                ("TASK033", "DELIVERED_BUT_BLOCKED"),
+            ),
+        ),
+    )
+    with patch.object(
+        validation_module,
+        "_completeness_ledger",
+        return_value=incomplete_and_blocked_ledger,
+    ):
+        _assert_primary(
+            validate_request(_valid_request()),
+            "SSTHC_REQUIRED_CAPABILITY_MISSING",
+        )
 
 
 def test_T035_019_completeness_blocked_not_applicable_propagation() -> None:
@@ -1063,10 +1530,33 @@ def test_T035_020_canonical_hash_result_id_graph() -> None:
     assert success.result_id == result_id(success.result_hash)
     assert success.result_hash == success_result_hash(deepcopy(success))
 
-    observations = _reachability_observations()
+    observations, classifications = _reachability_observations()
     assert len(observations) == BLOCKER_COUNT
     assert {entry.code for observed in observations for entry in observed} == set(BLOCKER_CODES)
-    assert blocker_registry.audit_blocker_reachability(observations)
+    assert set(classifications) == set(BLOCKER_CODES)
+    assert set(classifications.values()) <= {
+        "NATURAL_INPUT_REACHABLE",
+        "CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+    }
+    assert sum(value == "NATURAL_INPUT_REACHABLE" for value in classifications.values()) == 34
+    assert (
+        sum(
+            value == "CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE"
+            for value in classifications.values()
+        )
+        == 8
+    )
+
+    same_stage_cases = _same_stage_precedence_observations()
+    earliest_stage_cases = _earliest_stage_precedence_observations()
+    assert len(same_stage_cases) == 13
+    assert len(earliest_stage_cases) == 5
+    assert not blocker_registry.audit_blocker_reachability(observations)
+    assert blocker_registry.audit_blocker_reachability(
+        observations,
+        same_stage_precedence_observations=same_stage_cases,
+        earliest_stage_precedence_observations=earliest_stage_cases,
+    )
 
 
 def test_T035_021_provenance_dag_and_no_self_edge() -> None:

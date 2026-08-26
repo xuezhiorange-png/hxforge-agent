@@ -40,9 +40,7 @@ def _project(value: Any, *, depth: int, active: set[int] | None = None) -> Any:
     if value is None or type(value) is bool or type(value) is int or type(value) is str:
         return value
     if isinstance(value, Decimal):
-        if value.is_finite():
-            return {"__task035_decimal__": str(value)}
-        return {"__task035_decimal__": "non-finite"}
+        return str(value)
     if isinstance(value, float):
         return {RAW_FLOAT_TOKEN: type(value).__name__}
     if isinstance(value, Enum):

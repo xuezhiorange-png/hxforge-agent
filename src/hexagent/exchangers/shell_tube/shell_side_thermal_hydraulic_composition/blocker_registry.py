@@ -488,6 +488,11 @@ BLOCKER_REACHABILITY_AUDIT_HAS_NEW_TEST_ID = False
 
 _STAGE_ORDER = {stage: index for index, (stage, _name) in enumerate(VALIDATION_STAGES)}
 _BY_CODE = {row.code: row for row in BLOCKER_ROWS}
+_MULTI_BLOCKER_STAGES = frozenset(
+    stage
+    for stage in {row.earliest_stage for row in BLOCKER_ROWS}
+    if sum(row.earliest_stage == stage for row in BLOCKER_ROWS) > 1
+)
 
 
 def row_for_code(code: Any) -> BlockerRow:
@@ -533,13 +538,22 @@ def sort_blockers(
 
 def audit_blocker_reachability(
     observations: Iterable[tuple[BlockerEntry, ...] | list[BlockerEntry]],
+    *,
+    same_stage_precedence_observations: Iterable[
+        tuple[tuple[BlockerEntry, ...] | list[BlockerEntry], str]
+    ] = (),
+    earliest_stage_precedence_observations: Iterable[
+        tuple[tuple[BlockerEntry, ...] | list[BlockerEntry], str]
+    ] = (),
 ) -> bool:
-    """Verify runtime blocker observations against every frozen matrix row.
+    """Verify reachability and explicit precedence evidence.
 
     The caller supplies blockers returned by real validation executions.  This
     intentionally does not treat registry membership alone as reachability:
     each row must be observed with its frozen stage/path, and every observed
-    multi-fault result must already be in precedence order.
+    multi-fault result must already be in precedence order.  The two explicit
+    precedence collections are required so singleton observations cannot
+    falsely claim coverage of the frozen within-stage and earliest-stage rules.
     """
 
     observed_codes: set[str] = set()
@@ -554,7 +568,54 @@ def audit_blocker_reachability(
             if blocker.stage != row.earliest_stage or blocker.field_path != row.exact_field_path:
                 return False
             observed_codes.add(blocker.code)
-    return observed_codes == set(BLOCKER_CODES)
+    if observed_codes != set(BLOCKER_CODES):
+        return False
+
+    same_stage_cases = tuple(same_stage_precedence_observations)
+    if not same_stage_cases:
+        return False
+    covered_stages: set[str] = set()
+    for observed, expected_code in same_stage_cases:
+        ordered = tuple(observed)
+        if len(ordered) < 2 or ordered != sort_blockers(ordered):
+            return False
+        rows = [_BY_CODE.get(blocker.code) for blocker in ordered]
+        if any(row is None for row in rows):
+            return False
+        if any(
+            blocker.stage != row.earliest_stage or blocker.field_path != row.exact_field_path
+            for blocker, row in zip(ordered, rows, strict=True)
+            if row is not None
+        ):
+            return False
+        stages = {row.earliest_stage for row in rows if row is not None}
+        if len(stages) != 1 or ordered[0].code != expected_code:
+            return False
+        covered_stages.update(stages)
+    if not _MULTI_BLOCKER_STAGES.issubset(covered_stages):
+        return False
+
+    earliest_stage_cases = tuple(earliest_stage_precedence_observations)
+    if not earliest_stage_cases:
+        return False
+    for observed, expected_code in earliest_stage_cases:
+        ordered = tuple(observed)
+        if len(ordered) < 2 or ordered != sort_blockers(ordered):
+            return False
+        rows = [_BY_CODE.get(blocker.code) for blocker in ordered]
+        if any(row is None for row in rows):
+            return False
+        if any(
+            blocker.stage != row.earliest_stage or blocker.field_path != row.exact_field_path
+            for blocker, row in zip(ordered, rows, strict=True)
+            if row is not None
+        ):
+            return False
+        if len({row.earliest_stage for row in rows if row is not None}) < 2:
+            return False
+        if ordered[0].code != expected_code:
+            return False
+    return True
 
 
 def blocker_codes() -> tuple[str, ...]:
