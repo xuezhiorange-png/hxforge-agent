@@ -1203,4 +1203,4 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
     return Task035ValidationResult(ValidationStatus.VALID, success, None, None)
 
 
-__all__ = ["parse_request", "validate_request"]
+__all__ = ["validate_request"]

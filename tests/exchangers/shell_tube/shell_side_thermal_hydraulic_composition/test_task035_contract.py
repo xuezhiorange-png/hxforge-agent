@@ -9,6 +9,7 @@ from hashlib import sha256
 from typing import Any
 from unittest.mock import patch
 
+import hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition as package
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
     blocker_registry,
     validate_request,
@@ -1085,6 +1086,12 @@ def test_T035_001_raw_boundary_deterministic_projection() -> None:
 
 def test_T035_002_request_schema_profile() -> None:
     """The seven-field request rejects unsupported schema and profile identities."""
+
+    assert package.__all__ == ["validate_request"]
+    assert "parse_request" not in package.__all__
+    assert package.validate_request is validate_request
+    assert validation_module.__all__ == ["validate_request"]
+    assert "parse_request" not in validation_module.__all__
 
     request = _valid_request()
     request["schema_version"] = "unsupported.v1"
