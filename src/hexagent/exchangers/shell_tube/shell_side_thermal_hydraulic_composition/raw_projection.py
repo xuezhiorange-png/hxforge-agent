@@ -1,0 +1,140 @@
+"""Deterministic, bounded projection for the raw TASK-035 boundary."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from decimal import Decimal
+from enum import Enum
+from typing import Any
+
+RAW_PROJECTION_NAMESPACE = "task035.raw-projection.v1"
+RAW_MAX_DEPTH = 8
+RAW_MAX_MAPPING_ITEMS = 64
+RAW_MAX_SEQUENCE_ITEMS = 64
+RAW_TRUNCATION_TOKEN = "__task035_truncated__"
+RAW_FLOAT_TOKEN = "__task035_float__"
+RAW_UNSUPPORTED_TOKEN = "__task035_unsupported__"
+
+RAW_PROJECTION_FIELDS: tuple[str, ...] = (
+    "projection_kind",
+    "projection",
+)
+RAW_PROJECTION_FIELD_COUNT = len(RAW_PROJECTION_FIELDS)
+
+
+def _type_name(value: Any) -> str:
+    value_type = type(value)
+    return f"{value_type.__module__}.{value_type.__qualname__}"
+
+
+def _truncated(value: Any, count: int | None = None) -> dict[str, Any]:
+    result: dict[str, Any] = {"type": _type_name(value)}
+    if count is not None:
+        result["count"] = count
+    return {RAW_TRUNCATION_TOKEN: result}
+
+
+def _project(value: Any, *, depth: int, active: set[int] | None = None) -> Any:
+    if depth > RAW_MAX_DEPTH:
+        return _truncated(value)
+    if value is None or type(value) is bool or type(value) is int or type(value) is str:
+        return value
+    if isinstance(value, Decimal):
+        if value.is_finite():
+            return {"__task035_decimal__": str(value)}
+        return {"__task035_decimal__": "non-finite"}
+    if isinstance(value, float):
+        return {RAW_FLOAT_TOKEN: type(value).__name__}
+    if isinstance(value, Enum):
+        return {RAW_UNSUPPORTED_TOKEN: _type_name(value)}
+    if isinstance(value, bytes | bytearray | memoryview):
+        return {RAW_UNSUPPORTED_TOKEN: _type_name(value)}
+    if isinstance(value, (set, frozenset)):
+        return {
+            RAW_UNSUPPORTED_TOKEN: _type_name(value),
+            "count": len(value),
+        }
+
+    if active is None:
+        active = set()
+    if isinstance(value, (Mapping, list, tuple)):
+        identity = id(value)
+        if identity in active:
+            return {RAW_UNSUPPORTED_TOKEN: "cycle"}
+        active.add(identity)
+        try:
+            if isinstance(value, Mapping):
+                items = sorted(
+                    list(value.items())[:RAW_MAX_MAPPING_ITEMS],
+                    key=lambda pair: (
+                        0 if type(pair[0]) is str else 1,
+                        pair[0] if type(pair[0]) is str else _type_name(pair[0]),
+                    ),
+                )
+                projected: dict[str, Any] = {}
+                for key, item in items:
+                    if type(key) is str:
+                        normalized_key = key
+                    else:
+                        # Do not call str/repr on arbitrary mapping keys.
+                        normalized_key = f"{RAW_UNSUPPORTED_TOKEN}:key:{_type_name(key)}"
+                    projected_item = _project(item, depth=depth + 1, active=active)
+                    if normalized_key in projected:
+                        existing = projected[normalized_key]
+                        if isinstance(existing, list):
+                            existing.append(projected_item)
+                        else:
+                            projected[normalized_key] = [existing, projected_item]
+                    else:
+                        projected[normalized_key] = projected_item
+                if len(value) > RAW_MAX_MAPPING_ITEMS:
+                    projected[RAW_TRUNCATION_TOKEN] = {"count": len(value)}
+                return {key: projected[key] for key in sorted(projected)}
+
+            items = list(value)
+            result = [
+                _project(item, depth=depth + 1, active=active)
+                for item in items[:RAW_MAX_SEQUENCE_ITEMS]
+            ]
+            if len(items) > RAW_MAX_SEQUENCE_ITEMS:
+                result.append({RAW_TRUNCATION_TOKEN: {"count": len(items)}})
+            return result
+        finally:
+            active.remove(identity)
+    return {RAW_UNSUPPORTED_TOKEN: _type_name(value)}
+
+
+def project_raw_request(raw_request: Any) -> dict[str, Any]:
+    """Return a bounded projection without invoking ``repr`` or object hooks."""
+
+    projected = _project(raw_request, depth=0, active=set())
+    if isinstance(projected, dict):
+        return {
+            "projection_kind": "TASK035_RAW_REQUEST",
+            "projection": projected,
+        }
+    return {
+        "projection_kind": "TASK035_RAW_REQUEST",
+        "projection": projected,
+    }
+
+
+def projection_primitive(value: Any) -> Any:
+    """Return the already-sanitized projection for canonical hashing."""
+
+    return _project(value, depth=0, active=set())
+
+
+__all__ = [
+    "RAW_FLOAT_TOKEN",
+    "RAW_MAX_DEPTH",
+    "RAW_MAX_MAPPING_ITEMS",
+    "RAW_MAX_SEQUENCE_ITEMS",
+    "RAW_PROJECTION_FIELD_COUNT",
+    "RAW_PROJECTION_FIELDS",
+    "RAW_PROJECTION_NAMESPACE",
+    "RAW_TRUNCATION_TOKEN",
+    "RAW_UNSUPPORTED_TOKEN",
+    "project_raw_request",
+    "projection_primitive",
+]
