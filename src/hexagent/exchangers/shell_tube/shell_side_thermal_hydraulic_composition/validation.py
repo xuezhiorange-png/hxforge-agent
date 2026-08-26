@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from .blocker_registry import make_blocker
@@ -36,7 +37,7 @@ from .models import (
     ValidationStatus,
 )
 from .provenance import build_provenance
-from .raw_projection import RAW_MAX_DEPTH, project_raw_request
+from .raw_projection import project_raw_request
 from .schema import (
     APPLICABILITY_LEDGER_FIELDS,
     APPLICABILITY_PROFILE_ID,
@@ -93,6 +94,19 @@ _TASK034_FIRST_SLICE_PROFILE = (
     "TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1"
 )
 _TASK034_CORRELATION = _TASK034_FIRST_SLICE_PROFILE
+_DECIMAL_SUCCESS_FIELDS: dict[str, frozenset[str]] = {
+    _TASK032_RESULT_SCHEMA: frozenset(
+        {
+            "shell_side_mass_flow_rate_kg_s",
+            "shell_side_mass_velocity_kg_m2_s",
+            "shell_side_bulk_velocity_m_s",
+            "shell_side_reynolds_number",
+            "shell_side_prandtl_number",
+        }
+    ),
+    _TASK033_RESULT_SCHEMA: frozenset({"modeled_shell_side_heat_transfer_coefficient_w_m2_k"}),
+    _TASK034_RESULT_SCHEMA: frozenset({"modeled_shell_side_pressure_drop_pa"}),
+}
 
 
 @dataclass(frozen=True)
@@ -225,10 +239,16 @@ def _valid_success(value: Any, fields: tuple[str, ...], schema: str) -> dict[str
         "applicability_context",
         "physical_boundary_context",
     }
-    if any(
-        not _nonempty_text(payload.get(field)) for field in fields if field not in structured_fields
-    ):
-        return None
+    decimal_fields = _DECIMAL_SUCCESS_FIELDS.get(schema, frozenset())
+    for field in fields:
+        if field in structured_fields:
+            continue
+        if field in decimal_fields:
+            value_at_field = payload.get(field)
+            if not isinstance(value_at_field, Decimal) or not value_at_field.is_finite():
+                return None
+        elif not _nonempty_text(payload.get(field)):
+            return None
     for field in ("applicability_context", "physical_boundary_context"):
         if field in fields and _pair_dict(payload.get(field)) is None:
             return None
@@ -363,41 +383,6 @@ def _validate_producer(
     return ("blocked", payload) if payload is not None else ("invalid", None)
 
 
-def _raw_contains_unsupported(value: Any, *, depth: int = 0, seen: set[int] | None = None) -> bool:
-    """Detect raw values that cannot enter the deterministic boundary."""
-
-    if depth > RAW_MAX_DEPTH:
-        return False
-    if type(value) is float or isinstance(value, (bytes, bytearray, memoryview, set, frozenset)):
-        return True
-    if seen is None:
-        seen = set()
-    if dataclasses.is_dataclass(value):
-        return True
-    if isinstance(value, Mapping) and type(value) is not dict:
-        return True
-    if isinstance(value, (list, tuple)) and type(value) not in {list, tuple}:
-        return True
-    if isinstance(value, (Mapping, list, tuple)):
-        identity = id(value)
-        if identity in seen:
-            return True
-        seen.add(identity)
-        try:
-            if isinstance(value, Mapping):
-                return any(
-                    type(key) is not str
-                    or _raw_contains_unsupported(item, depth=depth + 1, seen=seen)
-                    for key, item in value.items()
-                )
-            return any(
-                _raw_contains_unsupported(item, depth=depth + 1, seen=seen) for item in value
-            )
-        finally:
-            seen.remove(identity)
-    return False
-
-
 def _valid_evidence_refs(value: Any) -> bool:
     return (
         isinstance(value, list)
@@ -422,8 +407,6 @@ def parse_request(raw_request: Any) -> Task035Request:
     """Parse only the exact seven-field TASK035 request shape."""
 
     if type(raw_request) is not dict:
-        raise ValueError("S01")
-    if _raw_contains_unsupported(raw_request):
         raise ValueError("S01")
     if set(raw_request) - set(REQUEST_FIELDS):
         raise ValueError("S01_UNKNOWN")
@@ -956,10 +939,8 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
 
     if type(raw_request) is not dict:
         return _raw_blocked(raw_request, "SSTHC_RAW_TYPE_INVALID", "raw_request")
-    if _raw_contains_unsupported(raw_request):
-        return _raw_blocked(raw_request, "SSTHC_RAW_TYPE_INVALID", "raw_request")
     if set(raw_request) - set(REQUEST_FIELDS):
-        return _raw_blocked(raw_request, "SSTHC_UNKNOWN_FIELD", "raw_request.keys")
+        return _raw_blocked(raw_request, "SSTHC_UNKNOWN_FIELD", "raw_request")
     if not _valid_evidence_refs(raw_request.get("evidence_refs")):
         return _raw_blocked(raw_request, "SSTHC_EVIDENCE_REFS_INVALID", "evidence_refs")
     missing = [field for field in REQUEST_FIELDS if field not in raw_request]
@@ -1193,11 +1174,11 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
         return _bad(request, "S15", "SSTHC_APPLICABILITY_INCOMPATIBLE", accepted)
 
     completeness = _completeness_ledger()
-    if not completeness or any(
-        value != "DELIVERED_AND_PRESENT"
-        for producer, value in dict(dict(completeness).get("required_producers", ())).items()
-        if producer in {"TASK031", "TASK032", "TASK033", "TASK034"}
-    ):
+    required_producers = dict(dict(completeness).get("required_producers", ()))
+    required_names = {"TASK031", "TASK032", "TASK033", "TASK034"}
+    if not completeness or any(producer not in required_producers for producer in required_names):
+        return _bad(request, "S16", "SSTHC_REQUIRED_CAPABILITY_MISSING", accepted)
+    if any(required_producers[producer] != "DELIVERED_AND_PRESENT" for producer in required_names):
         return _bad(request, "S16", "SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED", accepted)
     if any(producer is None for producer in (task031, task032, task033, task034)):
         return _bad(request, "S16", "SSTHC_REQUIRED_CAPABILITY_MISSING", accepted)

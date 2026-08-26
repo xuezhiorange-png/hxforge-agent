@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import json
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -57,28 +57,40 @@ def _project(value: Any, *, depth: int, active: set[int] | None = None) -> Any:
 
     if active is None:
         active = set()
-    if isinstance(value, (Mapping, list, tuple)):
+    if type(value) is dict or type(value) is list or type(value) is tuple:
         identity = id(value)
         if identity in active:
             return {RAW_UNSUPPORTED_TOKEN: "cycle"}
         active.add(identity)
         try:
-            if isinstance(value, Mapping):
-                items = sorted(
-                    list(value.items())[:RAW_MAX_MAPPING_ITEMS],
-                    key=lambda pair: (
-                        0 if type(pair[0]) is str else 1,
-                        pair[0] if type(pair[0]) is str else _type_name(pair[0]),
-                    ),
-                )
-                projected: dict[str, Any] = {}
-                for key, item in items:
+            if type(value) is dict:
+                # Project every item before truncating.  Sorting first is part
+                # of the raw contract: insertion order cannot select which
+                # entries survive the bounded projection.
+                sortable_items: list[tuple[tuple[Any, ...], str, Any]] = []
+                for key, item in value.items():
                     if type(key) is str:
                         normalized_key = key
+                        sort_key: tuple[Any, ...] = (0, key)
                     else:
-                        # Do not call str/repr on arbitrary mapping keys.
                         normalized_key = f"{RAW_UNSUPPORTED_TOKEN}:key:{_type_name(key)}"
-                    projected_item = _project(item, depth=depth + 1, active=active)
+                        sort_key = (
+                            1,
+                            _type_name(key),
+                            json.dumps(
+                                _project(item, depth=depth + 1, active=active),
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                                sort_keys=True,
+                            ),
+                        )
+                    sortable_items.append(
+                        (sort_key, normalized_key, _project(item, depth=depth + 1, active=active))
+                    )
+                sortable_items.sort(key=lambda item: item[0])
+                items = sortable_items[:RAW_MAX_MAPPING_ITEMS]
+                projected: dict[str, Any] = {}
+                for _sort_key, normalized_key, projected_item in items:
                     if normalized_key in projected:
                         existing = projected[normalized_key]
                         if isinstance(existing, list):
@@ -87,7 +99,7 @@ def _project(value: Any, *, depth: int, active: set[int] | None = None) -> Any:
                             projected[normalized_key] = [existing, projected_item]
                     else:
                         projected[normalized_key] = projected_item
-                if len(value) > RAW_MAX_MAPPING_ITEMS:
+                if len(sortable_items) > RAW_MAX_MAPPING_ITEMS:
                     projected[RAW_TRUNCATION_TOKEN] = {"count": len(value)}
                 return {key: projected[key] for key in sorted(projected)}
 

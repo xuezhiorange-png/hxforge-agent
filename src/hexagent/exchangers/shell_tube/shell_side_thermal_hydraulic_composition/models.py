@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, TypeAlias
 
@@ -99,8 +100,8 @@ class Task035SuccessResult:
     task033_correlation_id: str
     task034_correlation_id: str
     heat_transfer_surface: str
-    modeled_shell_side_heat_transfer_coefficient_w_m2_k: Any
-    modeled_shell_side_pressure_drop_pa: Any
+    modeled_shell_side_heat_transfer_coefficient_w_m2_k: Decimal
+    modeled_shell_side_pressure_drop_pa: Decimal
     applicability_ledger: LedgerProjection
     completeness_ledger: LedgerProjection
     request_hash: str

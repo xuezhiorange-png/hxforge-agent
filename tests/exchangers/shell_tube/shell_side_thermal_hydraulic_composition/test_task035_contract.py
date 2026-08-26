@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+import dataclasses
 from copy import deepcopy
+from decimal import Decimal
+from hashlib import sha256
 from typing import Any
+from unittest.mock import patch
 
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
+    blocker_registry,
     validate_request,
 )
+from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
+    validation as validation_module,
+)
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.canonical import (
+    CanonicalizationError,
     canonical_bytes,
+    provenance_hash,
+    provenance_prehash_projection,
     request_canonical_projection,
     request_hash,
     result_id,
@@ -27,8 +38,16 @@ from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.can
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.provenance import (
     verify_provenance,
 )
+from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.raw_projection import (
+    RAW_FLOAT_TOKEN,
+    RAW_TRUNCATION_TOKEN,
+    RAW_UNSUPPORTED_TOKEN,
+    project_raw_request,
+)
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.schema import (
     APPLICABILITY_PROFILE_ID,
+    BLOCKER_CODES,
+    BLOCKER_COUNT,
     COMPLETENESS_CLASSIFICATION_UNIVERSE,
     COMPLETENESS_PROFILE_ID,
     DEFERRED_CAPABILITIES,
@@ -47,6 +66,13 @@ from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.sch
 
 def _hex(digit: str) -> str:
     return digit * 64
+
+
+GOLDEN_REQUEST_CANONICAL_SHA256 = "9fc67fd05d26be188f1bb2d62d9067bbf14b3efc2b783bf7c3665aebaa37992c"
+GOLDEN_SUCCESS_CANONICAL_SHA256 = "c8ad2e7a4e452d1a10906620e39ecfa0003ab7c01629d3796407e9cd111499be"
+GOLDEN_PROVENANCE_CANONICAL_SHA256 = (
+    "8459541e706b1ad2825bb2a0d8be9774d8aa0fb4f792d8313c410c09feb9a191"
+)
 
 
 def _geometry() -> dict[str, Any]:
@@ -102,11 +128,11 @@ def _flow(geometry: dict[str, Any]) -> dict[str, Any]:
         "flow_model": "SINGLE_BULK_PROPERTY_SNAPSHOT_ALGEBRAIC_FLOW_STATE_SCREENING",
         "phase_region": "SINGLE_PHASE_LIQUID",
         "rheology_model": "NEWTONIAN",
-        "shell_side_mass_flow_rate_kg_s": "1.000",
-        "shell_side_mass_velocity_kg_m2_s": "100.000",
-        "shell_side_bulk_velocity_m_s": "2.000",
-        "shell_side_reynolds_number": "4000.000",
-        "shell_side_prandtl_number": "5.000",
+        "shell_side_mass_flow_rate_kg_s": Decimal("1.000"),
+        "shell_side_mass_velocity_kg_m2_s": Decimal("100.000"),
+        "shell_side_bulk_velocity_m_s": Decimal("2.000"),
+        "shell_side_reynolds_number": Decimal("4000.000"),
+        "shell_side_prandtl_number": Decimal("5.000"),
         "request_hash": _hex("a"),
         "result_hash": "",
         "result_id": "",
@@ -145,7 +171,7 @@ def _heat(geometry: dict[str, Any], flow: dict[str, Any]) -> dict[str, Any]:
         "correlation_id": "TASK033_KERN_KHARAJI_2021_EQ58_NO_WALL_CORRECTION_V1",
         "engineering_source_authority_record_id": "task033-authority-001",
         "heat_transfer_surface": "OUTER_TUBE_SURFACE",
-        "modeled_shell_side_heat_transfer_coefficient_w_m2_k": "125.000",
+        "modeled_shell_side_heat_transfer_coefficient_w_m2_k": Decimal("125.000"),
         "request_hash": _hex("b"),
         "result_hash": "",
         "result_id": "",
@@ -203,7 +229,7 @@ def _pressure(
         "wall_property_source_version": "wall-source-version-1",
         "wall_property_snapshot_hash": _hex("c"),
         "wall_property_authority_hash": _hex("d"),
-        "modeled_shell_side_pressure_drop_pa": "10.000",
+        "modeled_shell_side_pressure_drop_pa": Decimal("10.000"),
         "request_hash": _hex("e"),
         "result_hash": "",
         "result_id": "",
@@ -304,6 +330,312 @@ def _rebuild_task034(request: dict[str, Any]) -> None:
     payload["result_id"] = task034_result_id(payload["result_hash"])
 
 
+def _rebuild_task032(request: dict[str, Any]) -> None:
+    payload = request["task032_result"]["flow_state"]
+    geometry = request["task031_result"]["geometry"]
+    payload["task031_geometry_id"] = geometry["geometry_id"]
+    payload["task031_geometry_hash"] = geometry["geometry_hash"]
+    payload["result_hash"] = task032_success_hash(payload)
+    payload["result_id"] = task032_result_id(payload["result_hash"])
+
+
+def _rebuild_chain(request: dict[str, Any]) -> None:
+    geometry = request["task031_result"]["geometry"]
+    geometry["geometry_hash"] = task031_geometry_hash(geometry)
+    geometry["geometry_id"] = task031_geometry_id(geometry["geometry_hash"])
+    flow = request["task032_result"]["flow_state"]
+    flow["task031_geometry_id"] = geometry["geometry_id"]
+    flow["task031_geometry_hash"] = geometry["geometry_hash"]
+    _rebuild_task032(request)
+    heat = request["task033_result"]["heat_transfer"]
+    heat["task031_geometry_id"] = geometry["geometry_id"]
+    heat["task031_geometry_hash"] = geometry["geometry_hash"]
+    heat["task032_request_hash"] = flow["request_hash"]
+    heat["task032_result_hash"] = flow["result_hash"]
+    heat["task032_result_id"] = flow["result_id"]
+    _rebuild_task033(request)
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["task031_request_hash"] = geometry["request_hash"]
+    pressure["task031_geometry_id"] = geometry["geometry_id"]
+    pressure["task031_geometry_hash"] = geometry["geometry_hash"]
+    pressure["task032_request_hash"] = flow["request_hash"]
+    pressure["task032_result_hash"] = flow["result_hash"]
+    pressure["task032_result_id"] = flow["result_id"]
+    pressure["task033_request_hash"] = heat["request_hash"]
+    pressure["task033_result_hash"] = heat["result_hash"]
+    pressure["task033_result_id"] = heat["result_id"]
+    _rebuild_task034(request)
+
+
+def _blocked_task031() -> dict[str, Any]:
+    return {
+        "status": "BLOCKED",
+        "geometry": None,
+        "warnings": [],
+        "blockers": [{"code": "SSHG_UPSTREAM_BLOCKED"}],
+        "deferred_capabilities": [],
+        "blocked_result_hash": _hex("f"),
+    }
+
+
+def _blocked_producer(
+    fields: tuple[str, ...], schema_version: str, hash_field: str, payload_field: str
+) -> dict[str, Any]:
+    return {
+        "status": "BLOCKED",
+        payload_field: None,
+        "blocked_result": _typed_blocked_payload(fields, schema_version, hash_field),
+        "raw_boundary_blocked_result": None,
+    }
+
+
+def _reachability_observations() -> list[tuple[Any, ...]]:
+    """Exercise every frozen blocker through the validation pipeline."""
+
+    observations: list[tuple[Any, ...]] = []
+
+    def add(code: str, request: Any) -> None:
+        result = validate_request(request)
+        assert _codes(result) == (code,), (code, _codes(result))
+        observations.append(tuple(result.blockers))
+
+    add("SSTHC_RAW_TYPE_INVALID", [])
+    add("SSTHC_UNKNOWN_FIELD", {"unexpected": "value"})
+    request = _valid_request()
+    request["evidence_refs"] = ["duplicate", "duplicate"]
+    add("SSTHC_EVIDENCE_REFS_INVALID", request)
+    request = _valid_request()
+    request["schema_version"] = "unsupported.v1"
+    add("SSTHC_SCHEMA_VERSION_UNSUPPORTED", request)
+    request = _valid_request()
+    request["profile_id"] = "unsupported.v1"
+    add("SSTHC_PROFILE_ID_UNSUPPORTED", request)
+    request = _valid_request()
+    del request["task034_result"]
+    add("SSTHC_REQUIRED_FIELD_MISSING", request)
+    request = _valid_request()
+    request["task031_result"] = None
+    add("SSTHC_TASK031_RESULT_MISSING", request)
+    request = _valid_request()
+    request["task031_result"] = {"status": "VALID"}
+    add("SSTHC_TASK031_RESULT_INVALID", request)
+    request = _valid_request()
+    request["task031_result"] = _blocked_task031()
+    add("SSTHC_TASK031_RESULT_BLOCKED", request)
+    request = _valid_request()
+    request["task031_result"]["geometry"]["request_hash"] = _hex("0")
+    add("SSTHC_TASK031_IDENTITY_MISMATCH", request)
+    request = _valid_request()
+    request["task032_result"] = None
+    add("SSTHC_TASK032_RESULT_MISSING", request)
+    request = _valid_request()
+    request["task032_result"] = {
+        "status": "VALID",
+        "flow_state": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    add("SSTHC_TASK032_RESULT_INVALID", request)
+    request = _valid_request()
+    request["task032_result"] = _blocked_producer(
+        TASK032_TYPED_BLOCKED_RESULT_FIELDS,
+        "task032.shell-side-flow-state-blocked.v1",
+        "result_hash",
+        "flow_state",
+    )
+    add("SSTHC_TASK032_RESULT_BLOCKED", request)
+    request = _valid_request()
+    request["task032_result"]["flow_state"]["task031_geometry_id"] = "wrong-geometry"
+    add("SSTHC_TASK032_IDENTITY_MISMATCH", request)
+    request = _valid_request()
+    request["task033_result"] = None
+    add("SSTHC_TASK033_RESULT_MISSING", request)
+    request = _valid_request()
+    request["task033_result"] = {
+        "status": "VALID",
+        "heat_transfer": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    add("SSTHC_TASK033_RESULT_INVALID", request)
+    request = _valid_request()
+    request["task033_result"] = _blocked_producer(
+        TASK033_TYPED_BLOCKED_RESULT_FIELDS,
+        "task033.shell-side-heat-transfer-blocked.v1",
+        "blocked_result_hash",
+        "heat_transfer",
+    )
+    add("SSTHC_TASK033_RESULT_BLOCKED", request)
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"]["request_hash"] = _hex("0")
+    add("SSTHC_TASK033_IDENTITY_MISMATCH", request)
+    request = _valid_request()
+    request["task034_result"] = None
+    add("SSTHC_TASK034_RESULT_MISSING", request)
+    request = _valid_request()
+    request["task034_result"] = {
+        "status": "VALID",
+        "pressure_drop": None,
+        "blocked_result": None,
+        "raw_boundary_blocked_result": None,
+    }
+    add("SSTHC_TASK034_RESULT_INVALID", request)
+    request = _valid_request()
+    request["task034_result"] = _blocked_producer(
+        TASK034_TYPED_BLOCKED_RESULT_FIELDS,
+        "task034.shell-side-pressure-drop-blocked.v1",
+        "blocked_result_hash",
+        "pressure_drop",
+    )
+    add("SSTHC_TASK034_RESULT_BLOCKED", request)
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["request_hash"] = _hex("0")
+    add("SSTHC_TASK034_IDENTITY_MISMATCH", request)
+
+    request = _valid_request()
+    pressure = request["task034_result"]["pressure_drop"]
+    pressure["task020_configuration_id"] = "other-configuration"
+    pressure["task020_configuration_hash"] = _hex("0")
+    _rebuild_task034(request)
+    add("SSTHC_CONFIGURATION_MISMATCH", request)
+
+    request = _valid_request()
+    request["task031_result"]["geometry"]["task021_layout_hash"] = "invalid"
+    _rebuild_chain(request)
+    add("SSTHC_TASK021_LAYOUT_MISMATCH", request)
+
+    request = _valid_request()
+    request["task031_result"]["geometry"]["task024_geometry_hash"] = "invalid"
+    _rebuild_chain(request)
+    add("SSTHC_TASK024_GEOMETRY_MISMATCH", request)
+
+    request = _valid_request()
+    request["task032_result"]["flow_state"]["task031_geometry_id"] = "other-geometry"
+    request["task032_result"]["flow_state"]["task031_geometry_hash"] = _hex("0")
+    request["task033_result"]["heat_transfer"]["task031_geometry_id"] = "other-geometry"
+    request["task033_result"]["heat_transfer"]["task031_geometry_hash"] = _hex("0")
+    request["task034_result"]["pressure_drop"]["task031_geometry_id"] = "other-geometry"
+    request["task034_result"]["pressure_drop"]["task031_geometry_hash"] = _hex("0")
+    with (
+        patch.object(validation_module, "_identity_task032", return_value=True),
+        patch.object(validation_module, "_identity_task033", return_value=True),
+        patch.object(validation_module, "_identity_task034", return_value=True),
+    ):
+        add("SSTHC_TASK031_GEOMETRY_MISMATCH", request)
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["property_snapshot_hash"] = _hex("0")
+    _rebuild_task034(request)
+    add("SSTHC_PROPERTY_SNAPSHOT_MISMATCH", request)
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["mass_flow_authority_hash"] = _hex("0")
+    _rebuild_task034(request)
+    add("SSTHC_MASS_FLOW_AUTHORITY_MISMATCH", request)
+
+    for field, code in (
+        ("shell_side_case_id", "SSTHC_CASE_IDENTITY_MISMATCH"),
+        ("shell_side_stream_id", "SSTHC_STREAM_IDENTITY_MISMATCH"),
+        ("shell_side_fluid_id", "SSTHC_FLUID_IDENTITY_MISMATCH"),
+    ):
+        request = _valid_request()
+        request["task034_result"]["pressure_drop"][field] = "other"
+        _rebuild_task034(request)
+        add(code, request)
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"]["profile_id"] = "other-profile"
+    _rebuild_chain(request)
+    add("SSTHC_PROFILE_COMPATIBILITY_MISMATCH", request)
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"]["heat_transfer_surface"] = "INNER_TUBE_SURFACE"
+    _rebuild_chain(request)
+    add("SSTHC_HEAT_TRANSFER_SURFACE_MISMATCH", request)
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"]["correlation_id"] = "other-correlation"
+    _rebuild_chain(request)
+    add("SSTHC_CORRELATION_IDENTITY_MISMATCH", request)
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["applicability_context"][1][1] = "SINGLE_PHASE_GAS"
+    _rebuild_task034(request)
+    add("SSTHC_APPLICABILITY_INCOMPATIBLE", request)
+
+    complete_ledger = (
+        ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
+        (
+            "required_producers",
+            (
+                ("TASK031", "DELIVERED_AND_PRESENT"),
+                ("TASK032", "DELIVERED_AND_PRESENT"),
+                ("TASK033", "DELIVERED_AND_PRESENT"),
+            ),
+        ),
+    )
+    request = _valid_request()
+    with patch.object(validation_module, "_completeness_ledger", return_value=complete_ledger):
+        add("SSTHC_REQUIRED_CAPABILITY_MISSING", request)
+
+    blocked_ledger = (
+        ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
+        (
+            "required_producers",
+            (
+                ("TASK031", "DELIVERED_AND_PRESENT"),
+                ("TASK032", "DELIVERED_AND_PRESENT"),
+                ("TASK033", "DELIVERED_BUT_BLOCKED"),
+                ("TASK034", "DELIVERED_AND_PRESENT"),
+            ),
+        ),
+    )
+    request = _valid_request()
+    with patch.object(validation_module, "_completeness_ledger", return_value=blocked_ledger):
+        add("SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED", request)
+
+    request = _valid_request()
+    with patch.object(
+        validation_module,
+        "_compose_success_payload",
+        side_effect=CanonicalizationError("composition test fault"),
+    ):
+        add("SSTHC_SUCCESS_PAYLOAD_COMPOSITION_FAILED", request)
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"][
+        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
+    ] = Decimal("0")
+    _rebuild_chain(request)
+    add("SSTHC_PARTIAL_SUCCESS_FORBIDDEN", request)
+
+    request = _valid_request()
+    with patch.object(
+        validation_module,
+        "build_provenance",
+        side_effect=CanonicalizationError("provenance test fault"),
+    ):
+        add("SSTHC_PROVENANCE_CANONICALIZATION_FAILED", request)
+
+    request = _valid_request()
+    with patch.object(
+        validation_module,
+        "success_result_hash",
+        side_effect=CanonicalizationError("canonical test fault"),
+    ):
+        add("SSTHC_CANONICALIZATION_FAILED", request)
+
+    request = _valid_request()
+    with patch.object(
+        validation_module,
+        "_finalize_result_identity",
+        side_effect=lambda payload: dataclasses.replace(payload, result_hash="bad", result_id=""),
+    ):
+        add("SSTHC_RESULT_IDENTITY_FINALIZATION_FAILED", request)
+
+    return observations
+
+
 def test_T035_001_raw_boundary_deterministic_projection() -> None:
     """Raw-boundary projection is bounded, typed, and repeatable."""
 
@@ -319,6 +651,60 @@ def test_T035_001_raw_boundary_deterministic_projection() -> None:
         second.raw_boundary_blocked_result.blocked_result_hash
     )
     assert _codes(first) == ("SSTHC_UNKNOWN_FIELD",)
+
+    non_dict = validate_request([])
+    assert _codes(non_dict) == ("SSTHC_RAW_TYPE_INVALID",)
+
+    class NoRepr:
+        def __repr__(self) -> str:
+            raise AssertionError("raw projection must not call repr")
+
+    cycle: list[Any] = []
+    nested: dict[str, Any] = {
+        "float": 1.5,
+        "unsupported": NoRepr(),
+        "decimal": Decimal("12.3400"),
+        "bytes": b"not-projected-as-raw-bytes",
+        "cycle": cycle,
+    }
+    cycle.append(cycle)
+    projection = project_raw_request(nested)["projection"]
+    assert projection["float"] == {RAW_FLOAT_TOKEN: "float"}
+    assert projection["unsupported"] == {
+        RAW_UNSUPPORTED_TOKEN: f"{NoRepr.__module__}.{NoRepr.__qualname__}"
+    }
+    assert projection["decimal"] == {"__task035_decimal__": "12.3400"}
+    assert projection["bytes"] == {
+        RAW_UNSUPPORTED_TOKEN: "builtins.bytes",
+    }
+    assert projection["cycle"] == [{RAW_UNSUPPORTED_TOKEN: "cycle"}]
+
+    large_mapping_a = {f"key-{index:03d}": index for index in range(80)}
+    large_mapping_b = {f"key-{index:03d}": index for index in reversed(range(80))}
+    projection_a = project_raw_request(large_mapping_a)
+    projection_b = project_raw_request(large_mapping_b)
+    assert projection_a == projection_b
+    assert projection_a["projection"][RAW_TRUNCATION_TOKEN] == {"count": 80}
+    assert "key-063" in projection_a["projection"]
+    assert "key-064" not in projection_a["projection"]
+
+    large_sequence = project_raw_request(list(range(80)))
+    assert large_sequence["projection"][-1] == {RAW_TRUNCATION_TOKEN: {"count": 80}}
+    assert len(large_sequence["projection"]) == 65
+
+    keyed = project_raw_request({2: "integer-key", "a": "string-key"})
+    assert keyed["projection"]["__task035_unsupported__:key:builtins.int"] == "integer-key"
+
+    repeated = validate_request({"unexpected": large_mapping_a})
+    repeated_again = validate_request({"unexpected": large_mapping_b})
+    assert repeated.raw_boundary_blocked_result is not None
+    assert repeated_again.raw_boundary_blocked_result is not None
+    assert repeated.raw_boundary_blocked_result.raw_request_projection == (
+        repeated_again.raw_boundary_blocked_result.raw_request_projection
+    )
+    assert repeated.raw_boundary_blocked_result.blocked_result_hash == (
+        repeated_again.raw_boundary_blocked_result.blocked_result_hash
+    )
 
 
 def test_T035_002_request_schema_profile() -> None:
@@ -395,6 +781,13 @@ def test_T035_007_TASK033_success_contract() -> None:
     result = validate_request(_valid_request())
     assert result.success_result is not None
     assert result.success_result.heat_transfer_surface == "OUTER_TUBE_SURFACE"
+    assert result.success_result.modeled_shell_side_heat_transfer_coefficient_w_m2_k == Decimal(
+        "125.000"
+    )
+    assert isinstance(
+        result.success_result.modeled_shell_side_heat_transfer_coefficient_w_m2_k,
+        Decimal,
+    )
     assert result.success_result.task033_correlation_id
 
 
@@ -422,7 +815,8 @@ def test_T035_009_TASK034_success_contract() -> None:
 
     result = validate_request(_valid_request())
     assert result.success_result is not None
-    assert result.success_result.modeled_shell_side_pressure_drop_pa == "10.000"
+    assert result.success_result.modeled_shell_side_pressure_drop_pa == Decimal("10.000")
+    assert isinstance(result.success_result.modeled_shell_side_pressure_drop_pa, Decimal)
     assert result.success_result.task034_correlation_id
 
 
@@ -487,6 +881,45 @@ def test_T035_013_TASK031_TASK021_TASK024_configuration_ancestry() -> None:
     result = validate_request(request)
     assert _codes(result) == ("SSTHC_CONFIGURATION_MISMATCH",)
 
+    request = _valid_request()
+    request["task031_result"]["geometry"]["task021_layout_hash"] = "invalid"
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK021_LAYOUT_MISMATCH",)
+
+    request = _valid_request()
+    request["task031_result"]["geometry"]["task024_geometry_hash"] = "invalid"
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK024_GEOMETRY_MISMATCH",)
+
+    request = _valid_request()
+    for payload_name in ("flow_state", "heat_transfer", "pressure_drop"):
+        payload = request[
+            {
+                "flow_state": "task032_result",
+                "heat_transfer": "task033_result",
+                "pressure_drop": "task034_result",
+            }[payload_name]
+        ][payload_name]
+        payload["task031_geometry_id"] = "other-geometry"
+        payload["task031_geometry_hash"] = _hex("0")
+    with (
+        patch.object(validation_module, "_identity_task032", return_value=True),
+        patch.object(validation_module, "_identity_task033", return_value=True),
+        patch.object(validation_module, "_identity_task034", return_value=True),
+    ):
+        result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK031_GEOMETRY_MISMATCH",)
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["task020_configuration_id"] = "other"
+    request["task034_result"]["pressure_drop"]["task020_configuration_hash"] = _hex("0")
+    request["task034_result"]["pressure_drop"]["shell_side_case_id"] = "other-case"
+    _rebuild_task034(request)
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_CONFIGURATION_MISMATCH",)
+
 
 def test_T035_014_property_snapshot_and_mass_flow_identity_join() -> None:
     """PropertySnapshot and mass-flow authority identities must join exactly."""
@@ -507,28 +940,42 @@ def test_T035_014_property_snapshot_and_mass_flow_identity_join() -> None:
 def test_T035_015_case_stream_fluid_join() -> None:
     """Case, stream, and fluid identities are cross-producer joins."""
 
-    request = _valid_request()
-    request["task034_result"]["pressure_drop"]["shell_side_case_id"] = "other-case"
-    _rebuild_task034(request)
-    result = validate_request(request)
-    assert _codes(result) == ("SSTHC_CASE_IDENTITY_MISMATCH",)
+    for field, code in (
+        ("shell_side_case_id", "SSTHC_CASE_IDENTITY_MISMATCH"),
+        ("shell_side_stream_id", "SSTHC_STREAM_IDENTITY_MISMATCH"),
+        ("shell_side_fluid_id", "SSTHC_FLUID_IDENTITY_MISMATCH"),
+    ):
+        request = _valid_request()
+        request["task034_result"]["pressure_drop"][field] = "other"
+        _rebuild_task034(request)
+        result = validate_request(request)
+        assert _codes(result) == (code,)
 
 
 def test_T035_016_producer_profile_compatibility() -> None:
     """Producer profile and first-slice authorities are independently checked."""
 
+    for field, code in (
+        ("profile_id", "SSTHC_PROFILE_COMPATIBILITY_MISMATCH"),
+        ("first_slice_profile_id", "SSTHC_PROFILE_COMPATIBILITY_MISMATCH"),
+    ):
+        request = _valid_request()
+        request["task033_result"]["heat_transfer"][field] = "wrong-profile"
+        _rebuild_chain(request)
+        result = validate_request(request)
+        assert _codes(result) == (code,)
+
     request = _valid_request()
-    request["task033_result"]["heat_transfer"]["first_slice_profile_id"] = "wrong-profile"
-    _rebuild_task033(request)
-    request["task034_result"]["pressure_drop"]["task033_result_hash"] = request["task033_result"][
-        "heat_transfer"
-    ]["result_hash"]
-    request["task034_result"]["pressure_drop"]["task033_result_id"] = request["task033_result"][
-        "heat_transfer"
-    ]["result_id"]
+    request["task033_result"]["heat_transfer"]["heat_transfer_surface"] = "INNER_TUBE_SURFACE"
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_HEAT_TRANSFER_SURFACE_MISMATCH",)
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["correlation_id"] = "wrong-correlation"
     _rebuild_task034(request)
     result = validate_request(request)
-    assert _codes(result) == ("SSTHC_PROFILE_COMPATIBILITY_MISMATCH",)
+    assert _codes(result) == ("SSTHC_CORRELATION_IDENTITY_MISMATCH",)
 
 
 def test_T035_017_applicability_intersection() -> None:
@@ -579,6 +1026,30 @@ def test_T035_019_completeness_blocked_not_applicable_propagation() -> None:
     assert result.success_result is None
     assert result.blocked_result is not None
 
+    incomplete_ledger = (
+        ("classification_universe", COMPLETENESS_CLASSIFICATION_UNIVERSE),
+        (
+            "required_producers",
+            (
+                ("TASK031", "DELIVERED_AND_PRESENT"),
+                ("TASK032", "DELIVERED_AND_PRESENT"),
+                ("TASK033", "NOT_APPLICABLE"),
+                ("TASK034", "DELIVERED_AND_PRESENT"),
+            ),
+        ),
+    )
+    with patch.object(validation_module, "_completeness_ledger", return_value=incomplete_ledger):
+        result = validate_request(_valid_request())
+    assert _codes(result) == ("SSTHC_REQUIRED_PRODUCER_NOT_DELIVERED",)
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"][
+        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
+    ] = Decimal("0")
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_PARTIAL_SUCCESS_FORBIDDEN",)
+
 
 def test_T035_020_canonical_hash_result_id_graph() -> None:
     """Request/result hashes and UUID result identities replay deterministically."""
@@ -591,6 +1062,11 @@ def test_T035_020_canonical_hash_result_id_graph() -> None:
     assert success.result_hash == success_result_hash(success)
     assert success.result_id == result_id(success.result_hash)
     assert success.result_hash == success_result_hash(deepcopy(success))
+
+    observations = _reachability_observations()
+    assert len(observations) == BLOCKER_COUNT
+    assert {entry.code for observed in observations for entry in observed} == set(BLOCKER_CODES)
+    assert blocker_registry.audit_blocker_reachability(observations)
 
 
 def test_T035_021_provenance_dag_and_no_self_edge() -> None:
@@ -614,7 +1090,7 @@ def test_T035_021_provenance_dag_and_no_self_edge() -> None:
 
 
 def test_T035_022_python311_python312_repeat_run_canonical_byte_identity() -> None:
-    """The same request produces identical canonical bytes on every repeat run."""
+    """Both supported Python runtimes replay one frozen canonical byte digest."""
 
     request = _valid_request()
     first_request_bytes = canonical_bytes(
@@ -624,9 +1100,27 @@ def test_T035_022_python311_python312_repeat_run_canonical_byte_identity() -> No
         "task035.request.v1", request_canonical_projection(deepcopy(request))
     )
     assert first_request_bytes == second_request_bytes
+    assert sha256(first_request_bytes).hexdigest() == GOLDEN_REQUEST_CANONICAL_SHA256
     first = validate_request(request).success_result
     second = validate_request(deepcopy(request)).success_result
     assert first is not None and second is not None
-    assert canonical_bytes(
+    first_success_bytes = canonical_bytes(
         "task035.success-result.v1", success_result_canonical_projection(first)
-    ) == canonical_bytes("task035.success-result.v1", success_result_canonical_projection(second))
+    )
+    second_success_bytes = canonical_bytes(
+        "task035.success-result.v1", success_result_canonical_projection(second)
+    )
+    assert first_success_bytes == second_success_bytes
+    assert sha256(first_success_bytes).hexdigest() == GOLDEN_SUCCESS_CANONICAL_SHA256
+
+    first_provenance_bytes = canonical_bytes(
+        "task035.provenance.v1", provenance_prehash_projection(first.provenance)
+    )
+    second_provenance_bytes = canonical_bytes(
+        "task035.provenance.v1", provenance_prehash_projection(second.provenance)
+    )
+    assert first_provenance_bytes == second_provenance_bytes
+    assert sha256(first_provenance_bytes).hexdigest() == GOLDEN_PROVENANCE_CANONICAL_SHA256
+    assert request_hash(request) == GOLDEN_REQUEST_CANONICAL_SHA256
+    assert success_result_hash(first) == GOLDEN_SUCCESS_CANONICAL_SHA256
+    assert provenance_hash(first.provenance) == GOLDEN_PROVENANCE_CANONICAL_SHA256

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -57,7 +58,7 @@ BLOCKER_ROWS: tuple[BlockerRow, ...] = (
         "SSTHC_RAW_TYPE_INVALID",
         "S01",
         1,
-        "raw_request is not an exact built-in mapping or contains an unsupported raw primitive",
+        "raw_request is not an exact built-in dict at the public raw boundary",
         "raw_request",
         "NONE",
         "T035-001",
@@ -68,7 +69,7 @@ BLOCKER_ROWS: tuple[BlockerRow, ...] = (
         "S01",
         2,
         "raw_request contains a top-level key outside the seven frozen request fields",
-        "raw_request.keys",
+        "raw_request",
         "NONE",
         "T035-001",
     ),
@@ -482,6 +483,8 @@ BLOCKER_REACHABILITY_MATRIX = BLOCKER_ROWS
 BLOCKER_COUNT = len(BLOCKER_ROWS)
 BLOCKER_REACHABILITY_ROW_COUNT = len(BLOCKER_ROWS)
 BLOCKER_CODES_UNIQUE = len({row.code for row in BLOCKER_ROWS})
+BLOCKER_REACHABILITY_AUDIT = "CROSS_CUTTING_ASSERTION_OVER_T035_001_TO_T035_021"
+BLOCKER_REACHABILITY_AUDIT_HAS_NEW_TEST_ID = False
 
 _STAGE_ORDER = {stage: index for index, (stage, _name) in enumerate(VALIDATION_STAGES)}
 _BY_CODE = {row.code: row for row in BLOCKER_ROWS}
@@ -528,6 +531,32 @@ def sort_blockers(
     return tuple(sorted(blockers, key=key))
 
 
+def audit_blocker_reachability(
+    observations: Iterable[tuple[BlockerEntry, ...] | list[BlockerEntry]],
+) -> bool:
+    """Verify runtime blocker observations against every frozen matrix row.
+
+    The caller supplies blockers returned by real validation executions.  This
+    intentionally does not treat registry membership alone as reachability:
+    each row must be observed with its frozen stage/path, and every observed
+    multi-fault result must already be in precedence order.
+    """
+
+    observed_codes: set[str] = set()
+    for observed in observations:
+        ordered = tuple(observed)
+        if ordered != sort_blockers(ordered):
+            return False
+        for blocker in ordered:
+            row = _BY_CODE.get(blocker.code)
+            if row is None:
+                return False
+            if blocker.stage != row.earliest_stage or blocker.field_path != row.exact_field_path:
+                return False
+            observed_codes.add(blocker.code)
+    return observed_codes == set(BLOCKER_CODES)
+
+
 def blocker_codes() -> tuple[str, ...]:
     return tuple(row.code for row in BLOCKER_ROWS)
 
@@ -536,17 +565,21 @@ assert blocker_codes() == BLOCKER_CODES
 assert BLOCKER_COUNT == 42
 assert BLOCKER_CODES_UNIQUE == 42
 assert BLOCKER_REACHABILITY_ROW_COUNT == 42
+assert BLOCKER_REACHABILITY_AUDIT_HAS_NEW_TEST_ID is False
 
 
 __all__ = [
     "BLOCKER_CODES_UNIQUE",
     "BLOCKER_COUNT",
     "BLOCKER_REACHABILITY_MATRIX",
+    "BLOCKER_REACHABILITY_AUDIT",
+    "BLOCKER_REACHABILITY_AUDIT_HAS_NEW_TEST_ID",
     "BLOCKER_REACHABILITY_ROW_COUNT",
     "BLOCKER_REGISTRY",
     "BLOCKER_ROWS",
     "BlockerRow",
     "blocker_codes",
+    "audit_blocker_reachability",
     "make_blocker",
     "row_for_code",
     "sort_blockers",

@@ -97,6 +97,68 @@ def _primitive(value: Any) -> Any:
     raise CanonicalizationError(f"unsupported canonical value: {type(value).__name__}")
 
 
+def _structural(value: Any, active: set[int] | None = None) -> Any:
+    """Detach a public object without changing its Decimal value type.
+
+    Structural validation and canonical serialization are separate boundaries.
+    In particular, a public engineering Decimal must remain a Decimal until
+    ``_primitive`` is called by the canonical byte/hash projection.
+    """
+
+    if value is None or type(value) is bool or type(value) is int or type(value) is str:
+        return value
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, float):
+        return value
+    if isinstance(value, Enum):
+        return _structural(value.value, active)
+
+    if active is None:
+        active = set()
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        identity = id(value)
+        if identity in active:
+            raise CanonicalizationError("cyclic structural object")
+        active.add(identity)
+        try:
+            return {
+                item.name: _structural(getattr(value, item.name), active)
+                for item in dataclasses.fields(value)
+            }
+        finally:
+            active.remove(identity)
+
+    if isinstance(value, Mapping):
+        identity = id(value)
+        if identity in active:
+            raise CanonicalizationError("cyclic structural mapping")
+        active.add(identity)
+        try:
+            result: dict[str, Any] = {}
+            for key, item in value.items():
+                if type(key) is not str:
+                    raise CanonicalizationError("structural mapping keys must be strings")
+                result[key] = _structural(item, active)
+            return result
+        finally:
+            active.remove(identity)
+
+    if isinstance(value, (tuple, list)):
+        identity = id(value)
+        if identity in active:
+            raise CanonicalizationError("cyclic structural sequence")
+        active.add(identity)
+        try:
+            return [_structural(item, active) for item in value]
+        finally:
+            active.remove(identity)
+
+    if isinstance(value, (set, frozenset)):
+        raise CanonicalizationError("unordered structural collection")
+    raise CanonicalizationError(f"unsupported structural value: {type(value).__name__}")
+
+
 def primitive(value: Any) -> Any:
     """Reduce an accepted public value to JSON-compatible primitives."""
 
@@ -134,9 +196,9 @@ def hash_projection(namespace: str, projection: Any) -> str:
 
 
 def mapping(value: Any) -> dict[str, Any]:
-    """Detach a dataclass or mapping into a public structural mapping."""
+    """Detach a public mapping while preserving Decimal values for validation."""
 
-    reduced = _primitive(value)
+    reduced = _structural(value)
     if not isinstance(reduced, dict):
         raise CanonicalizationError("expected a mapping or dataclass")
     return reduced
