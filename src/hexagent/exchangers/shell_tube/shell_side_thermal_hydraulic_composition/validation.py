@@ -1186,9 +1186,9 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
         payload = _compose_success_payload(request, accepted)
     except CanonicalizationError:
         return _bad(request, "S17", "SSTHC_SUCCESS_PAYLOAD_COMPOSITION_FAILED", accepted)
-    if payload.blockers or not payload.modeled_shell_side_heat_transfer_coefficient_w_m2_k:
+    if payload.blockers or payload.modeled_shell_side_heat_transfer_coefficient_w_m2_k is None:
         return _bad(request, "S17", "SSTHC_PARTIAL_SUCCESS_FORBIDDEN", accepted)
-    if not payload.modeled_shell_side_pressure_drop_pa:
+    if payload.modeled_shell_side_pressure_drop_pa is None:
         return _bad(request, "S17", "SSTHC_PARTIAL_SUCCESS_FORBIDDEN", accepted)
     try:
         with_provenance = _finalize_provenance(request, accepted, payload)

@@ -650,15 +650,25 @@ def _reachability_observations() -> tuple[list[tuple[Any, ...]], dict[str, str]]
         )
 
     request = _valid_request()
-    request["task033_result"]["heat_transfer"][
-        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
-    ] = Decimal("0")
-    _rebuild_chain(request)
-    add(
-        "SSTHC_PARTIAL_SUCCESS_FORBIDDEN",
-        request,
-        classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
-    )
+    original_compose = validation_module._compose_success_payload
+
+    def compose_with_absent_quantity(request: Any, accepted: Any) -> Any:
+        payload = original_compose(request, accepted)
+        return dataclasses.replace(
+            payload,
+            modeled_shell_side_heat_transfer_coefficient_w_m2_k=None,
+        )
+
+    with patch.object(
+        validation_module,
+        "_compose_success_payload",
+        side_effect=compose_with_absent_quantity,
+    ):
+        add(
+            "SSTHC_PARTIAL_SUCCESS_FORBIDDEN",
+            request,
+            classification="CONTROLLED_INTERNAL_FAULT_INJECTION_REACHABLE",
+        )
 
     request = _valid_request()
     with patch.object(
@@ -873,10 +883,6 @@ def _same_stage_precedence_observations() -> list[tuple[tuple[Any, ...], str]]:
     )
 
     request = _valid_request()
-    request["task033_result"]["heat_transfer"][
-        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
-    ] = Decimal("0")
-    _rebuild_chain(request)
     with patch.object(
         validation_module,
         "_compose_success_payload",
@@ -1515,7 +1521,29 @@ def test_T035_019_completeness_blocked_not_applicable_propagation() -> None:
     ] = Decimal("0")
     _rebuild_chain(request)
     result = validate_request(request)
-    assert _codes(result) == ("SSTHC_PARTIAL_SUCCESS_FORBIDDEN",)
+    assert result.success_result is not None
+    assert result.success_result.modeled_shell_side_heat_transfer_coefficient_w_m2_k == Decimal("0")
+    assert _codes(result) == ()
+
+    request = _valid_request()
+    request["task034_result"]["pressure_drop"]["modeled_shell_side_pressure_drop_pa"] = Decimal("0")
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert result.success_result is not None
+    assert result.success_result.modeled_shell_side_pressure_drop_pa == Decimal("0")
+    assert _codes(result) == ()
+
+    request = _valid_request()
+    request["task033_result"]["heat_transfer"][
+        "modeled_shell_side_heat_transfer_coefficient_w_m2_k"
+    ] = Decimal("0")
+    request["task034_result"]["pressure_drop"]["modeled_shell_side_pressure_drop_pa"] = Decimal("0")
+    _rebuild_chain(request)
+    result = validate_request(request)
+    assert result.success_result is not None
+    assert result.success_result.modeled_shell_side_heat_transfer_coefficient_w_m2_k == Decimal("0")
+    assert result.success_result.modeled_shell_side_pressure_drop_pa == Decimal("0")
+    assert _codes(result) == ()
 
 
 def test_T035_020_canonical_hash_result_id_graph() -> None:
