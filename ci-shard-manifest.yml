@@ -171,6 +171,7 @@ shards:
       - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py
       - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py
       - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py
+      - tests/exchangers/shell_tube/shell_side_thermal_hydraulic_composition/test_task035_contract.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
