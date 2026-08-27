@@ -3,7 +3,12 @@
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import authority as authority_module
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validate_request
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import validation as validation_module
-from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import task033_request_hash
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import (
+    task033_request_hash,
+    task033_result_hash,
+    task033_result_id,
+    wall_property_authority_hash,
+)
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.models import (
     TYPED_BLOCKED_RESULT_FIELDS,
 )
@@ -24,6 +29,11 @@ def _first_blocker(raw):
     return result.blocked_result.blockers[0], result.blocked_result.failure_stage
 
 
+def _refresh_wall_property_hash(raw):
+    raw["wall_property_authority_hash"] = wall_property_authority_hash(raw)
+    return raw
+
+
 def test_b018_sspd_task032_result_id_mismatch():
     raw = make_valid_raw_request()
     raw["task032_result_id"] = "wrong"
@@ -39,18 +49,21 @@ def test_b019_sspd_task032_result_hash_mismatch():
 def test_b020_sspd_case_id_mismatch():
     raw = make_valid_raw_request()
     raw["shell_side_case_id"] = "wrong"
+    _refresh_wall_property_hash(raw)
     assert "SSPD_CASE_ID_MISMATCH" in _codes(raw)
 
 
 def test_b021_sspd_stream_id_mismatch():
     raw = make_valid_raw_request()
     raw["shell_side_stream_id"] = "wrong"
+    _refresh_wall_property_hash(raw)
     assert "SSPD_STREAM_ID_MISMATCH" in _codes(raw)
 
 
 def test_b022_sspd_fluid_id_mismatch():
     raw = make_valid_raw_request()
     raw["shell_side_fluid_id"] = "wrong"
+    _refresh_wall_property_hash(raw)
     assert "SSPD_FLUID_ID_MISMATCH" in _codes(raw)
 
 
@@ -87,6 +100,7 @@ def test_b027_sspd_wall_property_authority_mismatch():
 def test_b028_sspd_wall_viscosity_invalid():
     raw = make_valid_raw_request()
     raw["shell_side_wall_dynamic_viscosity_pa_s"] = "0"
+    _refresh_wall_property_hash(raw)
     assert "SSPD_WALL_VISCOSITY_INVALID" in _codes(raw)
 
 
@@ -162,8 +176,17 @@ def test_precedence_case_f_s09_precedes_s10():
 def test_precedence_case_g_s10_precedes_s11():
     raw = make_valid_raw_request()
     raw["shell_side_case_id"] = "wrong"
-    raw["task033_upstream_evidence"]["task032_flow_state"]["phase_region"] = "SINGLE_PHASE_GAS"
-    raw["task033_request_hash"] = task033_request_hash(raw["task033_upstream_evidence"])
+    _refresh_wall_property_hash(raw)
+    task033_request = raw["task033_upstream_evidence"]["task033_request_evidence"]
+    task033_request["task032_flow_state"]["phase_region"] = "SINGLE_PHASE_GAS"
+    raw["task033_request_hash"] = task033_request_hash(task033_request)
+    task033_result = raw["task033_upstream_evidence"]["task033_validation_result"]["heat_transfer"]
+    task033_result["request_hash"] = raw["task033_request_hash"]
+    result_hash = task033_result_hash(task033_result)
+    task033_result["result_hash"] = result_hash
+    task033_result["result_id"] = task033_result_id(result_hash)
+    raw["task033_result_hash"] = result_hash
+    raw["task033_result_id"] = task033_result["result_id"]
     blocker, stage = _first_blocker(raw)
     assert blocker.code == "SSPD_CASE_ID_MISMATCH"
     assert stage == "S10"
@@ -171,13 +194,28 @@ def test_precedence_case_g_s10_precedes_s11():
 
 def _s05_request_identity_with_upstream_fault(field: str):
     raw = make_valid_raw_request()
-    flow = raw["task033_upstream_evidence"]["task032_flow_state"]
+    task033_request = raw["task033_upstream_evidence"]["task033_request_evidence"]
+    flow = task033_request["task032_flow_state"]
     if field in {"phase_region", "rheology_model"}:
         flow.pop(field)
     elif field == "reynolds":
         flow["shell_side_reynolds_number"] = "400"
     else:
-        raw["task033_upstream_evidence"].pop(field)
+        task032_evidence = task033_request["task032_request_evidence"]
+        # The public TASK-032 request evidence carries the public TASK-031
+        # result projection, not TASK-024's private/raw geometry object.
+        # Corrupt one actual public geometry field for each historical
+        # precedence case; S05 must reject the changed producer request
+        # identity before later semantic replay stages inspect it.
+        public_geometry = task032_evidence["task031_result"]["geometry"]
+        mutation_field = {
+            "construction_family": "task020_configuration_id",
+            "shell_pass_count": "task020_configuration_hash",
+            "baffle_type": "pattern_family",
+            "pattern_family": "central_inter_baffle_spacing_m",
+            "baffle_cut": "central_crossflow_flow_area_m2",
+        }[field]
+        public_geometry.pop(mutation_field)
     raw["task033_request_hash"] = "0" * 64
     return _first_blocker(raw)
 

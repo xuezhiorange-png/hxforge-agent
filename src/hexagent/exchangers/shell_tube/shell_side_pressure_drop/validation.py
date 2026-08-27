@@ -139,6 +139,11 @@ def _typed_blocked(
     identity: ReplayIdentity | None = None,
 ) -> ShellSidePressureDropValidationResult:
     flow = None if identity is None else identity.flow
+    authority = (
+        request.shell_type_authority
+        if request is not None and type(request.shell_type_authority) is dict
+        else {}
+    )
     ordered = sort_blockers(blockers)
     warnings = all_warnings()
     provisional = ShellSidePressureDropBlockedResult(
@@ -155,6 +160,29 @@ def _typed_blocked(
         task020_configuration_hash=None
         if flow is None
         else _string(flow.get("task020_configuration_hash")),
+        shell_type=(
+            identity.shell_type if identity is not None else _string(authority.get("shell_type"))
+        ),
+        shell_type_authority_hash=(
+            identity.shell_type_authority_hash
+            if identity is not None
+            else _string(authority.get("authority_hash"))
+        ),
+        shell_type_authority_record_id=(
+            identity.shell_type_authority_record_id
+            if identity is not None
+            else _string(authority.get("authority_record_id"))
+        ),
+        shell_type_authority_source_id=(
+            identity.shell_type_authority_source_id
+            if identity is not None
+            else _string(authority.get("authority_source_id"))
+        ),
+        shell_type_authority_source_version=(
+            identity.shell_type_authority_source_version
+            if identity is not None
+            else _string(authority.get("authority_source_version"))
+        ),
         task031_request_hash=None if identity is None else identity.task031_request_hash,
         task031_geometry_id=None if identity is None else identity.task031_geometry_id,
         task031_geometry_hash=None if identity is None else identity.task031_geometry_hash,
@@ -285,7 +313,7 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
         identity = verify_auxiliary_bindings(request, identity)
         verify_wall_property_authority(request)
         verify_same_case(request, identity)
-        verify_applicability(request, identity)
+        identity = verify_applicability(request, identity)
         verify_engineering_authority(request)
     except AuthorityFailure as failure:
         return _failure(failure, request=request, identity=identity)
@@ -405,6 +433,11 @@ def validate_typed_request(request: Task034Request) -> ShellSidePressureDropVali
         shell_side_fluid_id=_string(flow.get("shell_side_fluid_id")),
         task020_configuration_id=_string(flow.get("task020_configuration_id")),
         task020_configuration_hash=_string(flow.get("task020_configuration_hash")),
+        shell_type=identity.shell_type,
+        shell_type_authority_hash=identity.shell_type_authority_hash,
+        shell_type_authority_record_id=identity.shell_type_authority_record_id,
+        shell_type_authority_source_id=identity.shell_type_authority_source_id,
+        shell_type_authority_source_version=identity.shell_type_authority_source_version,
         task031_request_hash=identity.task031_request_hash,
         task031_geometry_id=identity.task031_geometry_id,
         task031_geometry_hash=identity.task031_geometry_hash,

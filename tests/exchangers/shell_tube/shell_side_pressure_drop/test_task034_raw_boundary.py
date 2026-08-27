@@ -69,4 +69,4 @@ def test_x012_raw_boundary_8_field_schema():
         "deferred_capabilities",
         "raw_projection",
     )
-    assert len(BLOCKER_CODES) == 53
+    assert len(BLOCKER_CODES) == 58
