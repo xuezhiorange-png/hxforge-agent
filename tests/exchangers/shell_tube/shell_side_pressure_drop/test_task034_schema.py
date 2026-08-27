@@ -22,3 +22,16 @@ def test_b007_sspd_profile_id_mismatch():
     raw = make_valid_raw_request()
     raw["profile_id"] = "wrong"
     assert "SSPD_PROFILE_ID_MISMATCH" in {b.code for b in validate_request(raw).blockers}
+
+
+def test_b058_sspd_shell_type_authority_required_field_missing():
+    raw = make_valid_raw_request()
+    raw.pop("shell_type_authority")
+    result = validate_request(raw)
+    assert result.status.value == "BLOCKED"
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S02"
+    assert [blocker.code for blocker in result.blocked_result.blockers] == [
+        "SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING"
+    ]
+    assert "shell_type_authority" not in raw

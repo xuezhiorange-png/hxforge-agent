@@ -58,6 +58,11 @@ BLOCKER_CODES: tuple[str, ...] = (
     "SSPD_TUBE_PITCH_MISMATCH",
     "SSPD_TUBE_OUTER_DIAMETER_MISMATCH",
     "SSPD_PATTERN_FAMILY_MISMATCH",
+    "SSPD_SHELL_TYPE_AUTHORITY_MISSING",
+    "SSPD_SHELL_TYPE_AUTHORITY_INVALID",
+    "SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH",
+    "SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH",
+    "SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING",
 )
 
 
@@ -78,7 +83,29 @@ for _code in BLOCKER_CODES:
 
 # The validation pipeline supplies the exact earliest stage for each emitted
 # blocker.  The registry itself remains closed and deterministic.
-BLOCKER_STAGE: dict[str, str] = {code: "S17" for code in BLOCKER_CODES}
+BLOCKER_STAGE: dict[str, str] = {
+    code: stage
+    for stage, codes in (
+        ("S01", BLOCKER_CODES[:4]),
+        ("S02", BLOCKER_CODES[4:7] + (BLOCKER_CODES[-1],)),
+        ("S03", BLOCKER_CODES[7:10]),
+        ("S05", (BLOCKER_CODES[10],)),
+        ("S04", BLOCKER_CODES[11:13] + BLOCKER_CODES[17:19]),
+        ("S06", BLOCKER_CODES[13:15]),
+        ("S07", BLOCKER_CODES[15:17]),
+        ("S10", BLOCKER_CODES[19:23]),
+        ("S09", BLOCKER_CODES[25:28]),
+        ("S11", BLOCKER_CODES[28:37] + BLOCKER_CODES[-5:-1]),
+        ("S12", (BLOCKER_CODES[37],)),
+        ("S13", BLOCKER_CODES[38:41]),
+        ("S14", (BLOCKER_CODES[41],)),
+        ("S15", (BLOCKER_CODES[42],)),
+        ("S16", (BLOCKER_CODES[43],)),
+        ("S17", BLOCKER_CODES[44:47]),
+        ("S08", BLOCKER_CODES[23:25] + BLOCKER_CODES[47:53]),
+    )
+    for code in codes
+}
 
 
 def validate_blocker_token(token: str) -> str:

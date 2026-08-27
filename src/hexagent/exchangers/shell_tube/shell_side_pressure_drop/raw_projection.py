@@ -14,10 +14,11 @@ RAW_PROJECTION_FIELDS: tuple[str, ...] = (
     "profile_id_projection",
     "task033_upstream_evidence_type",
     "task031_request_evidence_type",
+    "shell_type_authority_presence_and_value_projection",
     "wall_property_fields_projection",
     "evidence_refs_projection",
 )
-RAW_PROJECTION_FIELD_COUNT = 8
+RAW_PROJECTION_FIELD_COUNT = 9
 
 
 def _type_token(value: Any) -> str:
@@ -37,6 +38,13 @@ def project_raw_request(raw_request: Any) -> tuple[Any, ...]:
         None if type(raw_request) is not dict else raw_request.get("task033_upstream_evidence")
     )
     task031 = None if type(raw_request) is not dict else raw_request.get("task031_request_evidence")
+    if type(raw_request) is not dict or "shell_type_authority" not in raw_request:
+        shell_type_authority = ("MISSING", None)
+    else:
+        shell_type_authority = (
+            "PRESENT",
+            projection_primitive(raw_request.get("shell_type_authority")),
+        )
     wall = (
         None
         if type(raw_request) is not dict
@@ -58,6 +66,7 @@ def project_raw_request(raw_request: Any) -> tuple[Any, ...]:
         profile,
         _type_token(upstream),
         _type_token(task031),
+        shell_type_authority,
         wall,
         refs,
     )

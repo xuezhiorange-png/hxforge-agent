@@ -1,4 +1,4 @@
-"""Fail-closed public request parser for TASK-034."""
+"""Fail-closed public request parser for TASK-034 v2."""
 
 from __future__ import annotations
 
@@ -25,74 +25,95 @@ def _decimal(value: Any) -> Decimal:
     return result
 
 
-def _dict(value: Any) -> dict[str, Any]:
-    if type(value) is not dict:
-        raise ValueError("nested evidence must be built-in dict")
-    if any(type(key) is not str for key in value):
-        raise ValueError("nested evidence keys must be strings")
-    return value
+def _string_refs(value: Any) -> tuple[str, ...]:
+    if type(value) not in (list, tuple):
+        raise ValueError("evidence refs must be a sequence")
+    refs = tuple(value)
+    if any(type(item) is not str for item in refs):
+        raise ValueError("evidence refs must be strings")
+    return refs
+
+
+def _missing_blockers(missing: set[str]) -> tuple[Any, ...]:
+    """Return schema blockers without conflating the v2 shell authority key."""
+    blockers: list[Any] = []
+    if "shell_type_authority" in missing:
+        blockers.append(
+            make_blocker(
+                BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING,
+                stage="S02",
+                field_path="shell_type_authority",
+            )
+        )
+    if missing - {"shell_type_authority"}:
+        blockers.append(
+            make_blocker(
+                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH,
+                stage="S02",
+                field_path="request",
+            )
+        )
+    return tuple(blockers)
 
 
 def parse_request(raw_request: Any) -> Task034Request:
+    """Parse only the TASK034 top-level shape; upstream evidence is replayed later."""
     if type(raw_request) is not dict:
         raise SchemaFailure(
             "S01",
             make_blocker(
-                BlockerCode.SSPD_RAW_REQUEST_TYPE_INVALID, stage="S01", field_path="raw_request"
+                BlockerCode.SSPD_RAW_REQUEST_TYPE_INVALID,
+                stage="S01",
+                field_path="raw_request",
             ),
         )
+
     keys = set(raw_request)
     unknown = keys - set(REQUEST_FIELDS)
     if unknown:
         raise SchemaFailure(
             "S02",
             make_blocker(
-                BlockerCode.SSPD_UNKNOWN_REQUEST_FIELD, stage="S02", field_path="request.keys"
+                BlockerCode.SSPD_UNKNOWN_REQUEST_FIELD,
+                stage="S02",
+                field_path="request.keys",
             ),
         )
     missing = set(REQUEST_FIELDS) - keys
     if missing:
-        raise SchemaFailure(
-            "S02",
-            make_blocker(
-                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH, stage="S02", field_path="request"
-            ),
-        )
+        raise SchemaFailure("S02", *_missing_blockers(missing))
     if raw_request["schema_version"] != REQUEST_SCHEMA_VERSION:
         raise SchemaFailure(
             "S02",
             make_blocker(
-                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH, stage="S02", field_path="schema_version"
+                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH,
+                stage="S02",
+                field_path="schema_version",
             ),
         )
     if raw_request["profile_id"] != PROFILE_ID:
         raise SchemaFailure(
             "S02",
             make_blocker(
-                BlockerCode.SSPD_PROFILE_ID_MISMATCH, stage="S02", field_path="profile_id"
+                BlockerCode.SSPD_PROFILE_ID_MISMATCH,
+                stage="S02",
+                field_path="profile_id",
             ),
         )
+
     try:
-        upstream = (
-            None
-            if raw_request["task033_upstream_evidence"] is None
-            else _dict(raw_request["task033_upstream_evidence"])
-        )
-        task031 = (
-            None
-            if raw_request["task031_request_evidence"] is None
-            else _dict(raw_request["task031_request_evidence"])
-        )
-        spacing = tuple(_decimal(item) for item in raw_request["uniform_spacing_sequence_m"])
-        refs = tuple(raw_request["wall_property_evidence_refs"])
-        evidence_refs = tuple(raw_request["evidence_refs"])
-        if any(type(item) is not str for item in refs + evidence_refs):
-            raise ValueError("evidence refs must be strings")
+        spacing_raw = raw_request["uniform_spacing_sequence_m"]
+        if type(spacing_raw) not in (list, tuple):
+            raise ValueError("spacing must be a sequence")
+        spacing = tuple(_decimal(item) for item in spacing_raw)
+        wall_refs = _string_refs(raw_request["wall_property_evidence_refs"])
+        evidence_refs = _string_refs(raw_request["evidence_refs"])
         return Task034Request(
             schema_version=raw_request["schema_version"],
             profile_id=raw_request["profile_id"],
-            task033_upstream_evidence=upstream,
-            task031_request_evidence=task031,
+            task033_upstream_evidence=raw_request["task033_upstream_evidence"],
+            task031_request_evidence=raw_request["task031_request_evidence"],
+            shell_type_authority=raw_request["shell_type_authority"],
             task031_request_hash=raw_request["task031_request_hash"],
             shell_inside_diameter_m=_decimal(raw_request["shell_inside_diameter_m"]),
             baffle_count=raw_request["baffle_count"],
@@ -106,7 +127,7 @@ def parse_request(raw_request: Any) -> Task034Request:
             wall_property_schema_version=raw_request["wall_property_schema_version"],
             wall_property_source_id=raw_request["wall_property_source_id"],
             wall_property_source_version=raw_request["wall_property_source_version"],
-            wall_property_evidence_refs=refs,
+            wall_property_evidence_refs=wall_refs,
             wall_property_snapshot_hash=raw_request["wall_property_snapshot_hash"],
             wall_property_authority_hash=raw_request["wall_property_authority_hash"],
             correlation_id=raw_request["correlation_id"],
@@ -131,7 +152,9 @@ def parse_request(raw_request: Any) -> Task034Request:
         raise SchemaFailure(
             "S02",
             make_blocker(
-                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH, stage="S02", field_path="request"
+                BlockerCode.SSPD_REQUEST_SCHEMA_MISMATCH,
+                stage="S02",
+                field_path="request",
             ),
         ) from exc
 

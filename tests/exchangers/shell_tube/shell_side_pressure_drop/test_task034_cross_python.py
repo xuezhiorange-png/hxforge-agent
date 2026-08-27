@@ -1,6 +1,15 @@
 """Shared frozen expected canonical-byte probes for Python 3.11 and 3.12."""
 
-from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import canonical_bytes
+import hashlib
+
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.canonical import (
+    SHELL_TYPE_AUTHORITY_HASH_NAMESPACE,
+    canonical_bytes,
+    shell_type_authority_hash,
+)
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop.models import (
+    SHELL_TYPE_AUTHORITY_PREHASH_FIELDS,
+)
 
 EXPECTED_ARTIFACT_SET_ID = "TASK034_XPY_FROZEN_EXPECTED_CANONICAL_ARTIFACT_SET_V2"
 EXPECTED_ARTIFACT_SET_SHA256 = "f39261016d5bca4a00e35a8c41babdee0a74edbf5be7637bf683e0911a92865a"
@@ -81,3 +90,27 @@ def test_x014_xpy_v2_artifact_replay():
     assert EXPECTED_ARTIFACT_SET_ID.endswith("V2")
     assert len(EXPECTED_ARTIFACT_SET_SHA256) == 64
     assert ZERO_TOLERANCE is True
+
+
+def test_x015_corrected_v2_shell_type_authority_artifact_replay():
+    authority = {
+        "schema_version": "task034.shell-type-authority.v2",
+        "shell_type": "E_SHELL",
+        "task020_configuration_id": "config-034",
+        "task020_configuration_hash": "a" * 64,
+        "authority_source_id": "TASK034-CALLER-SHELL-TYPE",
+        "authority_source_version": "v1",
+        "authority_record_id": "CASE-034-SHELL-TYPE",
+        "evidence_refs": ["task034-shell-type-evidence"],
+        "authority_hash": "",
+    }
+    prehash = [[field, authority[field]] for field in SHELL_TYPE_AUTHORITY_PREHASH_FIELDS]
+    expected_bytes = (
+        b'["task034.shell-type-authority.v2",[["schema_version","task034.shell-type-authority.v2"],'
+        b'["shell_type","E_SHELL"],["task020_configuration_id","config-034"],'
+        b'["task020_configuration_hash","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],'
+        b'["authority_source_id","TASK034-CALLER-SHELL-TYPE"],["authority_source_version","v1"],'
+        b'["authority_record_id","CASE-034-SHELL-TYPE"],["evidence_refs",["task034-shell-type-evidence"]]]]'
+    )
+    assert canonical_bytes(SHELL_TYPE_AUTHORITY_HASH_NAMESPACE, prehash) == expected_bytes
+    assert shell_type_authority_hash(authority) == hashlib.sha256(expected_bytes).hexdigest()

@@ -14,9 +14,11 @@ from typing import Any, cast
 from .models import (
     RAW_BOUNDARY_BLOCKED_RESULT_FIELDS,
     REQUEST_FIELDS,
+    SHELL_TYPE_AUTHORITY_PREHASH_FIELDS,
     SUCCESS_RESULT_FIELDS,
     TASK032_FLOW_STATE_EVIDENCE_FIELDS,
     TYPED_BLOCKED_RESULT_FIELDS,
+    WALL_PROPERTY_AUTHORITY_PREHASH_FIELDS,
     BlockerEntry,
     ShellSidePressureDropBlockedResult,
     ShellSidePressureDropRawBoundaryBlockedResult,
@@ -25,15 +27,16 @@ from .models import (
     WarningEntry,
 )
 
-REQUEST_HASH_NAMESPACE = "task034.request.v1"
-SUCCESS_RESULT_HASH_NAMESPACE = "task034.success-result.v1"
-TYPED_BLOCKED_RESULT_HASH_NAMESPACE = "task034.typed-blocked-result.v1"
-RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE = "task034.raw-boundary-blocked-result.v1"
-PROVENANCE_NAMESPACE = "task034.provenance.v1"
-RAW_PROJECTION_NAMESPACE = "task034.raw-projection.v1"
-WALL_PROPERTY_AUTHORITY_NAMESPACE = "task034.wall-property-authority.v1"
-RESULT_ID_NAMESPACE = uuid.UUID("c8f1c1c4-a11b-596b-88ad-6e851a22b9fc")
-RESULT_ID_NAME_PREFIX = "task034-shell-side-pressure-drop-id.v1:"
+REQUEST_HASH_NAMESPACE = "task034.request.v2"
+SUCCESS_RESULT_HASH_NAMESPACE = "task034.success-result.v2"
+TYPED_BLOCKED_RESULT_HASH_NAMESPACE = "task034.typed-blocked-result.v2"
+RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE = "task034.raw-boundary-blocked-result.v2"
+PROVENANCE_NAMESPACE = "task034.provenance.v2"
+RAW_PROJECTION_NAMESPACE = "task034.raw-projection.v2"
+WALL_PROPERTY_AUTHORITY_NAMESPACE = "task034.wall-property-authority.v2"
+SHELL_TYPE_AUTHORITY_HASH_NAMESPACE = "task034.shell-type-authority.v2"
+RESULT_ID_NAMESPACE = uuid.UUID("c8f1c1c4-a11b-596b-88ad-6e851a22b9fd")
+RESULT_ID_NAME_PREFIX = "task034-shell-side-pressure-drop-id.v2:"
 
 TASK032_REQUEST_HASH_NAMESPACE = "task032.request.v1"
 TASK032_SUCCESS_RESULT_HASH_NAMESPACE = "task032.success-result.v1"
@@ -106,6 +109,11 @@ PROVENANCE_FIELDS: tuple[str, ...] = (
     "shell_side_fluid_id",
     "task020_configuration_id",
     "task020_configuration_hash",
+    "shell_type",
+    "shell_type_authority_hash",
+    "shell_type_authority_record_id",
+    "shell_type_authority_source_id",
+    "shell_type_authority_source_version",
     "task031_request_hash",
     "task031_geometry_id",
     "task031_geometry_hash",
@@ -229,6 +237,116 @@ def _message(value: Any) -> Any:
     return primitive(value)
 
 
+def _mapping_pairs(value: Any, *, name: str) -> dict[str, Any]:
+    """Return a public mapping or ordered pair mapping without inventing fields."""
+    if isinstance(value, Mapping):
+        result = dict(value)
+    elif isinstance(value, (tuple, list)):
+        if any(
+            not isinstance(item, (tuple, list)) or len(item) != 2 or type(item[0]) is not str
+            for item in value
+        ):
+            raise CanonicalizationError(f"invalid {name} pair mapping")
+        result = {item[0]: item[1] for item in value}
+    else:
+        raise CanonicalizationError(f"invalid {name} mapping")
+    if any(type(key) is not str for key in result):
+        raise CanonicalizationError(f"invalid {name} mapping keys")
+    return result
+
+
+def _task020_case_authority_primitive(case: Any) -> dict[str, Any]:
+    values = _mapping_pairs(case, name="TASK020 case authority")
+    return {
+        key: primitive(values[key])
+        for key in ("revision_id", "payload_hash", "domain_snapshot_hash", "revision_status")
+    }
+
+
+def _task021_source_binding_primitive(source: Any) -> dict[str, Any]:
+    values = _mapping_pairs(source, name="TASK021 geometry source binding")
+    return {
+        key: primitive(values[key])
+        for key in (
+            "source_id",
+            "source_type",
+            "source_revision",
+            "source_location",
+            "evidence_ref",
+            "approved_by",
+            "approved_at",
+        )
+    }
+
+
+def _task021_rule_pack_identity_primitive(identity: Any) -> dict[str, Any]:
+    values = _mapping_pairs(identity, name="TASK021 rule-pack identity")
+    return {
+        key: primitive(values[key])
+        for key in ("rule_pack_id", "rule_pack_version", "rule_pack_canonical_hash")
+    }
+
+
+def _layout_provenance_pre_hash(layout: Mapping[str, Any]) -> dict[str, Any]:
+    """Reproduce TASK031's internal provenance projection from public evidence."""
+    provenance = _mapping_pairs(layout.get("provenance"), name="TASK021 provenance")
+    try:
+        rule_pack_raw = provenance["rule_pack_identity"]
+        warnings_raw = provenance["warnings"]
+        exclusion_refs_raw = provenance["exclusion_zone_evidence_refs"]
+    except KeyError as exc:
+        raise CanonicalizationError("incomplete TASK021 provenance") from exc
+    if not isinstance(warnings_raw, (tuple, list)):
+        raise CanonicalizationError("TASK021 provenance warnings must be a sequence")
+    warnings = []
+    for item in warnings_raw:
+        warning = _mapping_pairs(item, name="TASK021 provenance warning")
+        warnings.append(
+            {
+                key: primitive(warning[key])
+                for key in ("code", "field_path", "message_key", "evidence_refs", "details")
+            }
+        )
+    if not isinstance(exclusion_refs_raw, (tuple, list)):
+        raise CanonicalizationError("TASK021 exclusion evidence refs must be a sequence")
+    return {
+        "task_id": primitive(provenance["task_id"]),
+        "design_contract_path": primitive(provenance["design_contract_path"]),
+        "task020_configuration_id": primitive(provenance["task020_configuration_id"]),
+        "task020_configuration_hash": primitive(provenance["task020_configuration_hash"]),
+        "task020_case_authority": _task020_case_authority_primitive(
+            provenance["task020_case_authority"]
+        ),
+        "geometry_id": primitive(provenance["geometry_id"]),
+        "geometry_revision": primitive(provenance["geometry_revision"]),
+        "geometry_record_hash": primitive(provenance["geometry_record_hash"]),
+        "tube_geometry_snapshot_hash": primitive(provenance["tube_geometry_snapshot_hash"]),
+        "geometry_source_binding": _task021_source_binding_primitive(
+            provenance["geometry_source_binding"]
+        ),
+        "layout_rule_profile_id": primitive(provenance["layout_rule_profile_id"]),
+        "layout_rule_id": primitive(provenance["layout_rule_id"]),
+        "layout_rule_version": primitive(provenance["layout_rule_version"]),
+        "rule_artifact_canonical_hash": primitive(provenance["rule_artifact_canonical_hash"]),
+        "layout_rule_snapshot_hash": primitive(provenance["layout_rule_snapshot_hash"]),
+        "source_class": primitive(provenance["source_class"]),
+        "approval_status": primitive(provenance["approval_status"]),
+        "provenance_edge_ids": primitive(provenance["provenance_edge_ids"]),
+        "layout_rule_evidence_refs": primitive(provenance["layout_rule_evidence_refs"]),
+        "rule_pack_identity": (
+            None if rule_pack_raw is None else _task021_rule_pack_identity_primitive(rule_pack_raw)
+        ),
+        "envelope_evidence_refs": primitive(provenance["envelope_evidence_refs"]),
+        "exclusion_zone_evidence_refs": [primitive(refs) for refs in exclusion_refs_raw],
+        "u_tube_pairing_evidence_refs": primitive(provenance["u_tube_pairing_evidence_refs"]),
+        "software_version": primitive(provenance["software_version"]),
+        "git_commit": primitive(provenance["git_commit"]),
+        "request_hash": primitive(provenance["request_hash"]),
+        "warnings": warnings,
+        "deferred_capabilities": primitive(provenance["deferred_capabilities"]),
+    }
+
+
 def _geometry_projection(geometry: Mapping[str, Any]) -> list[Any]:
     return [
         geometry.get("schema_version"),
@@ -330,7 +448,7 @@ def task032_request_projection(evidence: Mapping[str, Any]) -> list[Any]:
         evidence.get("property_snapshot_hash"),
         property_snapshot_projection(evidence.get("property_snapshot", {})),
         mass_flow_authority_projection(evidence.get("mass_flow_authority", {})),
-        list(evidence.get("evidence_refs", [])),
+        sorted(evidence.get("evidence_refs", [])),
     ]
 
 
@@ -339,9 +457,16 @@ def task032_request_hash(evidence: Mapping[str, Any]) -> str:
 
 
 def _task031_tube_layout_projection(layout: Mapping[str, Any]) -> dict[str, Any]:
-    if not all(field in layout for field in TASK031_TUBE_LAYOUT_PUBLIC_FIELDS):
+    required_fields = set(TASK031_TUBE_LAYOUT_PUBLIC_FIELDS) - {"provenance_pre_hash"}
+    if not required_fields.issubset(layout) or "provenance" not in layout:
         raise CanonicalizationError("incomplete TASK031 tube-layout projection")
-    return {field: primitive(layout[field]) for field in TASK031_TUBE_LAYOUT_PUBLIC_FIELDS}
+    projected = {
+        field: primitive(layout[field])
+        for field in TASK031_TUBE_LAYOUT_PUBLIC_FIELDS
+        if field != "provenance_pre_hash"
+    }
+    projected["provenance_pre_hash"] = primitive(_layout_provenance_pre_hash(layout))
+    return projected
 
 
 def _task031_result_binding_projection(result: Mapping[str, Any]) -> list[Any]:
@@ -527,22 +652,35 @@ def task031_geometry_id(geometry_hash_value: str) -> str:
 
 
 def _task033_payload(evidence: Mapping[str, Any]) -> Mapping[str, Any]:
+    validation_result = evidence.get("task033_validation_result")
+    if isinstance(validation_result, Mapping):
+        payload = validation_result.get("heat_transfer")
+        if not isinstance(payload, Mapping):
+            raise CanonicalizationError("TASK033 validation result has no success payload")
+        return payload
+    payload = evidence.get("heat_transfer")
+    if isinstance(payload, Mapping):
+        return payload
     payload = evidence.get("result", evidence)
     return cast(Mapping[str, Any], payload) if isinstance(payload, Mapping) else evidence
 
 
 def task033_request_hash(evidence: Mapping[str, Any]) -> str:
-    flow = evidence.get("task032_flow_state", evidence.get("flow_state", {}))
     request_evidence = evidence.get(
         "task032_request_evidence", evidence.get("request_evidence", {})
     )
+    if isinstance(request_evidence, Mapping):
+        request_evidence = dict(request_evidence)
+        if isinstance(request_evidence.get("evidence_refs"), (list, tuple)):
+            request_evidence["evidence_refs"] = sorted(request_evidence["evidence_refs"])
+    flow = evidence.get("task032_flow_state", evidence.get("flow_state", {}))
     return sha256_hex(
         [
             "task033.shell-side-heat-transfer-request.v1",
             "hxforge.shell_tube.shell_side_heat_transfer.v1",
             primitive(flow),
             primitive(request_evidence),
-            list(evidence.get("evidence_refs", [])),
+            sorted(evidence.get("evidence_refs", [])),
         ]
     )
 
@@ -579,7 +717,7 @@ def task033_result_hash(evidence: Mapping[str, Any]) -> str:
     )
     return sha256_hex(
         [
-            "task033.shell-side-heat-transfer-success.v1",
+            "task033.shell-side-heat-transfer.v1",
             [primitive(result.get(field)) for field in fields],
         ]
     )
@@ -636,20 +774,36 @@ def _frame_record(namespace: str, fields: tuple[tuple[str, bytes, str], ...]) ->
     return output
 
 
+def shell_type_authority_hash(authority: Mapping[str, Any]) -> str:
+    values = _mapping_pairs(authority, name="shell-type authority")
+    return hash_projection(
+        SHELL_TYPE_AUTHORITY_HASH_NAMESPACE,
+        [[field, primitive(values.get(field))] for field in SHELL_TYPE_AUTHORITY_PREHASH_FIELDS],
+    )
+
+
 def wall_property_authority_hash(request: Task034Request | Mapping[str, Any]) -> str:
     get = request.get if isinstance(request, Mapping) else lambda key: getattr(request, key)
-    fields = [
-        get(name)
-        for name in (
-            "shell_side_wall_dynamic_viscosity_pa_s",
-            "wall_property_schema_version",
-            "wall_property_source_id",
-            "wall_property_source_version",
-            "wall_property_evidence_refs",
-            "wall_property_snapshot_hash",
-        )
-    ]
-    return hash_projection(WALL_PROPERTY_AUTHORITY_NAMESPACE, fields)
+    values = {
+        "schema_version": get("wall_property_schema_version"),
+        "shell_side_case_id": get("shell_side_case_id"),
+        "shell_side_stream_id": get("shell_side_stream_id"),
+        "shell_side_fluid_id": get("shell_side_fluid_id"),
+        "task031_geometry_id": get("task031_geometry_id"),
+        "task031_geometry_hash": get("task031_geometry_hash"),
+        "task032_result_id": get("task032_result_id"),
+        "task032_result_hash": get("task032_result_hash"),
+        "property_snapshot_hash": get("property_snapshot_hash"),
+        "shell_side_wall_dynamic_viscosity_pa_s": get("shell_side_wall_dynamic_viscosity_pa_s"),
+        "source_id": get("wall_property_source_id"),
+        "source_version": get("wall_property_source_version"),
+        "evidence_refs": get("wall_property_evidence_refs"),
+        "wall_property_snapshot_hash": get("wall_property_snapshot_hash"),
+    }
+    return hash_projection(
+        WALL_PROPERTY_AUTHORITY_NAMESPACE,
+        [[field, primitive(values[field])] for field in WALL_PROPERTY_AUTHORITY_PREHASH_FIELDS],
+    )
 
 
 def task034_request_projection(request: Task034Request) -> list[Any]:

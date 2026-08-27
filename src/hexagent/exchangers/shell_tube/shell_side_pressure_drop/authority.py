@@ -10,6 +10,7 @@ from .blocker_registry import BlockerCode, make_blocker
 from .canonical import (
     mass_flow_authority_hash,
     property_snapshot_hash,
+    shell_type_authority_hash,
     task031_geometry_hash,
     task031_geometry_id,
     task032_request_hash,
@@ -17,13 +18,10 @@ from .canonical import (
     task033_result_hash,
     task033_result_id,
 )
-from .canonical import (
-    task031_request_hash as canonical_task031_request_hash,
-)
+from .canonical import task031_request_hash as canonical_task031_request_hash
 from .engineering_authority_snapshot import (
     CORRELATION_ID,
     ENGINEERING_SOURCE_AUTHORITY_RECORD_ID,
-    SUPPORTED_BAFFLE_CUT,
     SUPPORTED_BAFFLE_TYPE,
     SUPPORTED_PHASE,
     SUPPORTED_RHEOLOGY,
@@ -31,7 +29,9 @@ from .engineering_authority_snapshot import (
     SUPPORTED_SHELL_TYPE,
     SUPPORTED_TUBE_LAYOUT,
 )
-from .models import Task034Request
+from .models import SHELL_TYPE_AUTHORITY_FIELDS, Task034Request
+
+SHELL_TYPE_AUTHORITY_SCHEMA_VERSION = "task034.shell-type-authority.v2"
 
 
 class AuthorityFailure(ValueError):
@@ -54,66 +54,82 @@ class ReplayIdentity:
     task031_geometry_id: str | None
     property_hash: str | None
     mass_flow_hash: str | None
+    shell_type: str | None
+    shell_type_authority_hash: str | None
+    shell_type_authority_record_id: str | None
+    shell_type_authority_source_id: str | None
+    shell_type_authority_source_version: str | None
     flow: dict[str, Any]
     task032_request_evidence: dict[str, Any]
     task031_request_evidence: dict[str, Any]
-
-
-def _nested(mapping: Any, *keys: str) -> Any:
-    value = mapping
-    for key in keys:
-        if not isinstance(value, dict):
-            return None
-        value = value.get(key)
-    return value
-
-
-def _upstream_parts(
-    upstream: dict[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    flow = upstream.get("task032_flow_state", upstream.get("flow_state", {}))
-    request_evidence = upstream.get(
-        "task032_request_evidence", upstream.get("request_evidence", {})
-    )
-    task031_evidence = (
-        request_evidence.get("task031_result", {}).get("request_evidence", {})
-        if isinstance(request_evidence, dict)
-        else {}
-    )
-    return (
-        flow if isinstance(flow, dict) else {},
-        request_evidence if isinstance(request_evidence, dict) else {},
-        task031_evidence if isinstance(task031_evidence, dict) else {},
-    )
 
 
 def _fail(stage: str, code: str, field: str) -> AuthorityFailure:
     return AuthorityFailure(stage, make_blocker(code, stage=stage, field_path=field))
 
 
+def _task033_success_result(upstream: dict[str, Any]) -> dict[str, Any]:
+    validation_result = upstream.get("task033_validation_result")
+    if type(validation_result) is not dict:
+        return {}
+    result = validation_result.get("heat_transfer")
+    return result if type(result) is dict else {}
+
+
+def _upstream_parts(
+    upstream: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    """Extract the public TASK033 request's TASK032 evidence without reshaping it."""
+    task033_request_evidence = upstream.get("task033_request_evidence")
+    if type(task033_request_evidence) is not dict:
+        return {}, {}, {}
+    flow = task033_request_evidence.get("task032_flow_state")
+    request_evidence = task033_request_evidence.get("task032_request_evidence")
+    task031_evidence = (
+        request_evidence.get("task031_request_evidence", {})
+        if type(request_evidence) is dict
+        else {}
+    )
+    return (
+        flow if type(flow) is dict else {},
+        request_evidence if type(request_evidence) is dict else {},
+        task031_evidence if type(task031_evidence) is dict else {},
+    )
+
+
 def validate_task033_upstream_boundary(
     request: Task034Request,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Validate the S03 accepted TASK033 upstream boundary."""
+    """Validate the S03 accepted TASK033 public validation-result envelope."""
     upstream = request.task033_upstream_evidence
     if upstream is None:
         raise _fail("S03", BlockerCode.SSPD_TASK033_UPSTREAM_MISSING, "task033_upstream_evidence")
     if type(upstream) is not dict:
         raise _fail("S03", BlockerCode.SSPD_TASK033_UPSTREAM_INVALID, "task033_upstream_evidence")
+    task033_request_evidence = upstream.get("task033_request_evidence")
+    validation_result = upstream.get("task033_validation_result")
+    result = _task033_success_result(upstream)
     if (
-        upstream.get("engineering_source_authority_record_id")
+        type(task033_request_evidence) is not dict
+        or type(validation_result) is not dict
+        or validation_result.get("status") != "VALID"
+        or not result
+    ):
+        raise _fail(
+            "S03",
+            BlockerCode.SSPD_TASK033_UPSTREAM_INVALID,
+            "task033_upstream_evidence.task033_validation_result",
+        )
+    if (
+        result.get("engineering_source_authority_record_id")
         != ENGINEERING_SOURCE_AUTHORITY_RECORD_ID
     ):
         raise _fail(
             "S03",
             BlockerCode.SSPD_SOURCE_AUTHORITY_MISMATCH,
-            "task033_upstream_evidence.engineering_source_authority_record_id",
+            "task033_upstream_evidence.task033_validation_result.heat_transfer.engineering_source_authority_record_id",
         )
-    if "status" not in upstream or upstream["status"] != "SUCCESS":
-        raise _fail(
-            "S03", BlockerCode.SSPD_TASK033_UPSTREAM_INVALID, "task033_upstream_evidence.status"
-        )
-    flow, request_evidence, _ = _upstream_parts(upstream)
+    flow, request_evidence, task031_evidence = _upstream_parts(upstream)
     if not flow or not request_evidence:
         raise _fail("S03", BlockerCode.SSPD_TASK033_UPSTREAM_INVALID, "task033_upstream_evidence")
     return upstream, flow, request_evidence
@@ -145,10 +161,15 @@ def _identity(
         task031_geometry_id=task031_geometry_id_value,
         property_hash=property_hash_value,
         mass_flow_hash=mass_flow_hash_value,
+        shell_type=None,
+        shell_type_authority_hash=None,
+        shell_type_authority_record_id=None,
+        shell_type_authority_source_id=None,
+        shell_type_authority_source_version=None,
         flow=flow,
         task032_request_evidence=request_evidence,
         task031_request_evidence=request.task031_request_evidence
-        if isinstance(request.task031_request_evidence, dict)
+        if type(request.task031_request_evidence) is dict
         else {},
     )
 
@@ -157,60 +178,76 @@ def validate_task033_result_identity(
     request: Task034Request,
     upstream_parts: tuple[dict[str, Any], dict[str, Any], dict[str, Any]],
 ) -> ReplayIdentity:
-    """Validate S04 TASK033 and accepted TASK032 result identities."""
+    """Validate S04 against the actual TASK033 success-result projection."""
     upstream, flow, request_evidence = upstream_parts
-
-    expected_task033_result_hash = task033_result_hash(upstream)
-    task033_result_hash_value = upstream.get("result_hash", upstream.get("task033_result_hash"))
-    task033_result_id_value = upstream.get("result_id", upstream.get("task033_result_id"))
+    result = _task033_success_result(upstream)
+    try:
+        expected_hash = task033_result_hash(result)
+    except Exception as exc:
+        raise _fail(
+            "S04", BlockerCode.SSPD_TASK033_RESULT_HASH_MISMATCH, "task033_result_hash"
+        ) from exc
+    result_hash_value = result.get("result_hash")
+    result_id_value = result.get("result_id")
     if (
-        task033_result_id_value is None
-        or request.task033_result_id != task033_result_id_value
-        or task033_result_id(str(task033_result_hash_value)) != task033_result_id_value
+        type(result_hash_value) is not str
+        or type(result_id_value) is not str
+        or request.task033_result_id != result_id_value
+        or task033_result_id(result_hash_value) != result_id_value
     ):
         raise _fail("S04", BlockerCode.SSPD_TASK033_RESULT_ID_MISMATCH, "task033_result_id")
-    if (
-        task033_result_hash_value is None
-        or request.task033_result_hash != task033_result_hash_value
-        or expected_task033_result_hash != task033_result_hash_value
-    ):
+    if request.task033_result_hash != result_hash_value or expected_hash != result_hash_value:
         raise _fail("S04", BlockerCode.SSPD_TASK033_RESULT_HASH_MISMATCH, "task033_result_hash")
-
     return _identity(
         request,
         upstream,
         flow,
         request_evidence,
-        task033_result_hash_value=task033_result_hash_value,
-        task033_result_id_value=task033_result_id_value,
+        task033_result_hash_value=result_hash_value,
+        task033_result_id_value=result_id_value,
     )
 
 
 def validate_task033_request_identity(
     request: Task034Request, identity: ReplayIdentity
 ) -> ReplayIdentity:
-    """Validate S05 TASK033 request identity."""
-    expected_task033_request = task033_request_hash(request.task033_upstream_evidence)
-    if expected_task033_request != request.task033_request_hash:
+    """Validate S05 against the actual public TASK033 request evidence."""
+    task033_request_evidence = request.task033_upstream_evidence.get("task033_request_evidence")
+    if type(task033_request_evidence) is not dict:
+        raise _fail("S05", BlockerCode.SSPD_TASK033_REQUEST_HASH_MISMATCH, "task033_request_hash")
+    try:
+        expected_hash = task033_request_hash(task033_request_evidence)
+    except Exception as exc:
+        raise _fail(
+            "S05", BlockerCode.SSPD_TASK033_REQUEST_HASH_MISMATCH, "task033_request_hash"
+        ) from exc
+    task033_result = _task033_success_result(request.task033_upstream_evidence)
+    actual_result_request_hash = task033_result.get("request_hash")
+    if (
+        type(actual_result_request_hash) is not str
+        or expected_hash != actual_result_request_hash
+        or actual_result_request_hash != request.task033_request_hash
+    ):
         raise _fail("S05", BlockerCode.SSPD_TASK033_REQUEST_HASH_MISMATCH, "task033_request_hash")
     return identity
 
 
 def replay_task031_request(request: Task034Request, identity: ReplayIdentity) -> ReplayIdentity:
-    """Replay S06 TASK031 request and nested TASK032 request identities."""
+    """Replay S06 from the original public TASK031 request shape."""
     if type(request.task031_request_evidence) is not dict:
         raise _fail(
             "S06", BlockerCode.SSPD_TASK031_REQUEST_EVIDENCE_MISSING, "task031_request_evidence"
         )
     try:
-        task031_request_hash_value = _task031_request_hash(request.task031_request_evidence)
+        task031_request_hash_value = canonical_task031_request_hash(
+            request.task031_request_evidence
+        )
     except Exception as exc:
         raise _fail(
             "S06", BlockerCode.SSPD_TASK031_REQUEST_HASH_MISMATCH, "task031_request_hash"
         ) from exc
     if task031_request_hash_value != request.task031_request_hash:
         raise _fail("S06", BlockerCode.SSPD_TASK031_REQUEST_HASH_MISMATCH, "task031_request_hash")
-
     try:
         expected_task032_request_hash = task032_request_hash(identity.task032_request_evidence)
     except Exception as exc:
@@ -225,16 +262,17 @@ def replay_task031_request(request: Task034Request, identity: ReplayIdentity) ->
 
 
 def replay_task031_geometry(request: Task034Request, identity: ReplayIdentity) -> ReplayIdentity:
-    """Replay S07 TASK031 geometry identity without recomputing geometry values."""
+    """Replay S07 TASK031 geometry identity from accepted TASK032 evidence."""
+    task033_result = _task033_success_result(request.task033_upstream_evidence)
     task031_result = identity.task032_request_evidence.get("task031_result")
     if type(task031_result) is not dict or task031_result.get("status") != "VALID":
         raise _fail(
-            "S06", BlockerCode.SSPD_TASK031_REQUEST_EVIDENCE_MISSING, "task031_request_evidence"
+            "S07", BlockerCode.SSPD_TASK031_REQUEST_EVIDENCE_MISSING, "task031_request_evidence"
         )
     geometry = task031_result.get("geometry")
     if type(geometry) is not dict:
         raise _fail(
-            "S06", BlockerCode.SSPD_TASK031_REQUEST_EVIDENCE_MISSING, "task031_request_evidence"
+            "S07", BlockerCode.SSPD_TASK031_REQUEST_EVIDENCE_MISSING, "task031_request_evidence"
         )
     try:
         geometry_hash = task031_geometry_hash(geometry)
@@ -242,24 +280,22 @@ def replay_task031_geometry(request: Task034Request, identity: ReplayIdentity) -
         raise _fail(
             "S07", BlockerCode.SSPD_TASK031_GEOMETRY_HASH_MISMATCH, "task031_geometry_hash"
         ) from exc
-    if (
-        geometry_hash != geometry.get("geometry_hash")
-        or geometry_hash != identity.flow.get("task031_geometry_hash")
-        or geometry_hash != request.task031_geometry_hash
-    ):
-        raise _fail("S07", BlockerCode.SSPD_TASK031_GEOMETRY_HASH_MISMATCH, "task031_geometry_hash")
     geometry_id = task031_geometry_id(geometry_hash)
     if (
         geometry_id != geometry.get("geometry_id")
         or geometry_id != identity.flow.get("task031_geometry_id")
         or geometry_id != request.task031_geometry_id
+        or geometry_id != task033_result.get("task031_geometry_id")
     ):
         raise _fail("S07", BlockerCode.SSPD_TASK031_GEOMETRY_ID_MISMATCH, "task031_geometry_id")
-    return replace(
-        identity,
-        task031_geometry_hash=geometry_hash,
-        task031_geometry_id=geometry_id,
-    )
+    if (
+        geometry_hash != geometry.get("geometry_hash")
+        or geometry_hash != identity.flow.get("task031_geometry_hash")
+        or geometry_hash != request.task031_geometry_hash
+        or geometry_hash != task033_result.get("task031_geometry_hash")
+    ):
+        raise _fail("S07", BlockerCode.SSPD_TASK031_GEOMETRY_HASH_MISMATCH, "task031_geometry_hash")
+    return replace(identity, task031_geometry_hash=geometry_hash, task031_geometry_id=geometry_id)
 
 
 def validate_task032_identity_join(
@@ -268,50 +304,52 @@ def validate_task032_identity_join(
     *,
     validate_result_identity: bool = True,
 ) -> ReplayIdentity:
-    """Validate accepted TASK032 result identity at its frozen owner."""
+    """Validate TASK032 result identity carried by the actual TASK033 result."""
     if validate_result_identity:
-        upstream = request.task033_upstream_evidence
-        result_payload = upstream.get("result")
-        result_payload = result_payload if type(result_payload) is dict else {}
-        task032_result_hash_value = identity.flow.get("result_hash")
-        task032_result_id_value = identity.flow.get("result_id")
+        result = _task033_success_result(request.task033_upstream_evidence)
+        flow = identity.flow
         if (
-            task032_result_id_value is None
-            or task032_result_id_value != result_payload.get("task032_result_id")
-            or request.task032_result_id != task032_result_id_value
+            type(flow.get("result_id")) is not str
+            or flow.get("result_id") != result.get("task032_result_id")
+            or request.task032_result_id != flow.get("result_id")
         ):
             raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_ID_MISMATCH, "task032_result_id")
         if (
-            task032_result_hash_value is None
-            or task032_result_hash_value != result_payload.get("task032_result_hash")
-            or request.task032_result_hash != task032_result_hash_value
+            type(flow.get("result_hash")) is not str
+            or flow.get("result_hash") != result.get("task032_result_hash")
+            or request.task032_result_hash != flow.get("result_hash")
         ):
             raise _fail("S04", BlockerCode.SSPD_TASK032_RESULT_HASH_MISMATCH, "task032_result_hash")
     return identity
 
 
 def replay_task032_and_upstreams(request: Task034Request) -> ReplayIdentity:
-    """Compatibility facade executing the frozen S03-S08 sequence."""
+    """Execute the frozen S03-S07 upstream replay sequence."""
     upstream_parts = validate_task033_upstream_boundary(request)
     identity = validate_task033_result_identity(request, upstream_parts)
     identity = validate_task032_identity_join(request, identity)
     identity = validate_task033_request_identity(request, identity)
     identity = replay_task031_request(request, identity)
-    identity = replay_task031_geometry(request, identity)
-    return validate_task032_identity_join(request, identity, validate_result_identity=False)
-
-
-def _task031_request_hash(evidence: dict[str, Any]) -> str:
-    return canonical_task031_request_hash(evidence)
+    return replay_task031_geometry(request, identity)
 
 
 def task031_request_hash(evidence: dict[str, Any]) -> str:
-    """Replay the frozen TASK-031 request evidence projection."""
-    return _task031_request_hash(evidence)
+    """Replay the frozen TASK-031 public request hash projection."""
+    return canonical_task031_request_hash(evidence)
+
+
+def _decimal_value(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    try:
+        converted = Decimal(str(value))
+    except (ArithmeticError, TypeError, ValueError):
+        return None
+    return converted if converted.is_finite() else None
 
 
 def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity) -> ReplayIdentity:
-    """Verify property/mass-flow hashes and auxiliary geometry bindings at S08."""
+    """Verify S08 authorities, including the frozen TASK031 request-evidence diameter path."""
     snapshot = identity.task032_request_evidence.get("property_snapshot")
     if type(snapshot) is not dict:
         raise _fail("S08", BlockerCode.SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH, "property_snapshot")
@@ -351,53 +389,41 @@ def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity)
             "S08", BlockerCode.SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH, "mass_flow_authority_hash"
         )
 
-    geometry = identity.task032_request_evidence.get("task031_result", {}).get("geometry", {})
-    if type(geometry) is not dict:
-        geometry = {}
-    design = (
-        request.task031_request_evidence.get("baffle_geometry_result", {})
-        .get("geometry", {})
-        .get("design_authority", {})
-    )
-    tube = request.task031_request_evidence.get("tube_layout", {})
+    task031_request = request.task031_request_evidence
+    if type(task031_request) is not dict:
+        raise _fail(
+            "S08", BlockerCode.SSPD_SHELL_INSIDE_DIAMETER_MISMATCH, "shell_inside_diameter_m"
+        )
+    baffle_result = task031_request.get("baffle_geometry_result")
+    baffle_geometry = baffle_result.get("geometry") if type(baffle_result) is dict else None
+    design = baffle_geometry.get("design_authority") if type(baffle_geometry) is dict else None
+    tube = task031_request.get("tube_layout")
+    layout_rule_authority = tube.get("layout_rule_authority") if type(tube) is dict else None
+    tube_geometry = tube.get("tube_geometry") if type(tube) is dict else None
+    if type(baffle_geometry) is not dict:
+        baffle_geometry = {}
     if type(design) is not dict:
         design = {}
-    if type(tube) is not dict:
-        tube = {}
-
-    def decimal_value(value: Any) -> Decimal | None:
-        if value is None:
-            return None
-        try:
-            converted = Decimal(str(value))
-        except (ArithmeticError, TypeError, ValueError):
-            return None
-        return converted if converted.is_finite() else None
-
-    spacing_value = design.get("spacing_sequence_m")
-    if isinstance(spacing_value, (list, tuple)):
-        try:
-            expected_spacing: tuple[Decimal, ...] | None = tuple(
-                Decimal(str(value)) for value in spacing_value
-            )
-            if expected_spacing is not None and not all(
-                value.is_finite() for value in expected_spacing
-            ):
-                expected_spacing = None
-        except (ArithmeticError, TypeError, ValueError):
-            expected_spacing = None
-    else:
-        expected_spacing = None
-    layout_rule_authority = tube.get("layout_rule_authority", {})
-    tube_geometry = tube.get("tube_geometry", {})
     if type(layout_rule_authority) is not dict:
         layout_rule_authority = {}
     if type(tube_geometry) is not dict:
         tube_geometry = {}
+
+    spacing_value = design.get("spacing_sequence_m")
+    expected_spacing: tuple[Decimal, ...] | None
+    if isinstance(spacing_value, (list, tuple)):
+        try:
+            values = tuple(Decimal(str(value)) for value in spacing_value)
+            expected_spacing = values if all(value.is_finite() for value in values) else None
+        except (ArithmeticError, TypeError, ValueError):
+            expected_spacing = None
+    else:
+        expected_spacing = None
+
     expected = (
         (
             request.shell_inside_diameter_m,
-            decimal_value(geometry.get("shell_inside_diameter_m")),
+            _decimal_value(baffle_geometry.get("shell_inside_diameter_m")),
             BlockerCode.SSPD_SHELL_INSIDE_DIAMETER_MISMATCH,
             "shell_inside_diameter_m",
         ),
@@ -415,13 +441,13 @@ def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity)
         ),
         (
             request.tube_pitch_m,
-            decimal_value(layout_rule_authority.get("pitch_m")),
+            _decimal_value(layout_rule_authority.get("pitch_m")),
             BlockerCode.SSPD_TUBE_PITCH_MISMATCH,
             "tube_pitch_m",
         ),
         (
             request.tube_outer_diameter_m,
-            decimal_value(tube_geometry.get("outer_diameter_m")),
+            _decimal_value(tube_geometry.get("outer_diameter_m")),
             BlockerCode.SSPD_TUBE_OUTER_DIAMETER_MISMATCH,
             "tube_outer_diameter_m",
         ),
@@ -436,21 +462,12 @@ def verify_auxiliary_bindings(request: Task034Request, identity: ReplayIdentity)
         if expected_value is None or actual != expected_value:
             raise _fail("S08", code, field)
     return replace(
-        identity,
-        property_hash=expected_property_hash,
-        mass_flow_hash=expected_mass_flow_hash,
+        identity, property_hash=expected_property_hash, mass_flow_hash=expected_mass_flow_hash
     )
 
 
 def verify_wall_property_authority(request: Task034Request) -> None:
-    if (
-        not isinstance(request.shell_side_wall_dynamic_viscosity_pa_s, Decimal)
-        or not request.shell_side_wall_dynamic_viscosity_pa_s.is_finite()
-        or request.shell_side_wall_dynamic_viscosity_pa_s <= 0
-    ):
-        raise _fail(
-            "S09", BlockerCode.SSPD_WALL_VISCOSITY_INVALID, "shell_side_wall_dynamic_viscosity_pa_s"
-        )
+    """Replay the v2 wall-property authority before accepting viscosity."""
     if request.wall_property_authority_hash is None:
         raise _fail(
             "S09", BlockerCode.SSPD_WALL_PROPERTY_AUTHORITY_MISSING, "wall_property_authority_hash"
@@ -460,6 +477,14 @@ def verify_wall_property_authority(request: Task034Request) -> None:
     if wall_property_authority_hash(request) != request.wall_property_authority_hash:
         raise _fail(
             "S09", BlockerCode.SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH, "wall_property_authority_hash"
+        )
+    if (
+        not isinstance(request.shell_side_wall_dynamic_viscosity_pa_s, Decimal)
+        or not request.shell_side_wall_dynamic_viscosity_pa_s.is_finite()
+        or request.shell_side_wall_dynamic_viscosity_pa_s <= 0
+    ):
+        raise _fail(
+            "S09", BlockerCode.SSPD_WALL_VISCOSITY_INVALID, "shell_side_wall_dynamic_viscosity_pa_s"
         )
 
 
@@ -497,59 +522,159 @@ def verify_same_case(request: Task034Request, identity: ReplayIdentity) -> None:
             raise _fail("S10", code, field)
 
 
-def verify_applicability(request: Task034Request, identity: ReplayIdentity) -> None:
-    flow = identity.flow
-    upstream = request.task033_upstream_evidence
-    for actual, expected, code, field in (
+def _validate_shell_type_authority(request: Task034Request) -> dict[str, Any]:
+    authority = request.shell_type_authority
+    if authority is None:
+        raise _fail("S11", BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_MISSING, "shell_type_authority")
+    if type(authority) is not dict or set(authority) != set(SHELL_TYPE_AUTHORITY_FIELDS):
+        raise _fail("S11", BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID, "shell_type_authority")
+    if authority.get("schema_version") != SHELL_TYPE_AUTHORITY_SCHEMA_VERSION:
+        raise _fail(
+            "S11",
+            BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID,
+            "shell_type_authority.schema_version",
+        )
+    for field in (
+        "shell_type",
+        "task020_configuration_id",
+        "task020_configuration_hash",
+        "authority_source_id",
+        "authority_source_version",
+        "authority_record_id",
+    ):
+        if type(authority.get(field)) is not str or not authority[field]:
+            raise _fail(
+                "S11",
+                BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID,
+                f"shell_type_authority.{field}",
+            )
+    for field in ("task020_configuration_hash", "authority_hash"):
+        value = authority.get(field)
+        if (
+            type(value) is not str
+            or len(value) != 64
+            or any(char not in "0123456789abcdef" for char in value)
+        ):
+            raise _fail(
+                "S11",
+                BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID,
+                f"shell_type_authority.{field}",
+            )
+    refs = authority.get("evidence_refs")
+    if (
+        type(refs) not in (list, tuple)
+        or not refs
+        or any(type(ref) is not str or not ref for ref in refs)
+        or len(set(refs)) != len(refs)
+    ):
+        raise _fail(
+            "S11",
+            BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID,
+            "shell_type_authority.evidence_refs",
+        )
+    try:
+        expected_hash = shell_type_authority_hash(authority)
+    except Exception as exc:
+        raise _fail(
+            "S11", BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_INVALID, "shell_type_authority"
+        ) from exc
+    if expected_hash != authority.get("authority_hash"):
+        raise _fail(
+            "S11",
+            BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH,
+            "shell_type_authority.authority_hash",
+        )
+    if (
+        authority["task020_configuration_id"] != request.task020_configuration_id
+        or authority["task020_configuration_hash"] != request.task020_configuration_hash
+    ):
+        raise _fail(
+            "S11",
+            BlockerCode.SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH,
+            "shell_type_authority.task020_configuration_id",
+        )
+    return authority
+
+
+def verify_applicability(request: Task034Request, identity: ReplayIdentity) -> ReplayIdentity:
+    """Verify explicit shell-type authority and frozen applicability predicates at S11."""
+    authority = _validate_shell_type_authority(request)
+    if authority["shell_type"] != SUPPORTED_SHELL_TYPE:
+        raise _fail(
+            "S11", BlockerCode.SSPD_UNSUPPORTED_SHELL_TYPE, "shell_type_authority.shell_type"
+        )
+
+    task031_request = request.task031_request_evidence
+    baffle_result = (
+        task031_request.get("baffle_geometry_result") if type(task031_request) is dict else None
+    )
+    baffle_geometry = baffle_result.get("geometry") if type(baffle_result) is dict else None
+    design = baffle_geometry.get("design_authority") if type(baffle_geometry) is dict else None
+    tube = task031_request.get("tube_layout") if type(task031_request) is dict else None
+    layout_rule_authority = tube.get("layout_rule_authority") if type(tube) is dict else None
+    if type(baffle_geometry) is not dict:
+        baffle_geometry = {}
+    if type(design) is not dict:
+        design = {}
+    if type(layout_rule_authority) is not dict:
+        layout_rule_authority = {}
+
+    checks = (
         (
-            flow.get("phase_region"),
+            identity.flow.get("phase_region"),
             SUPPORTED_PHASE,
             BlockerCode.SSPD_UNSUPPORTED_PHASE,
             "phase_region",
         ),
         (
-            flow.get("rheology_model"),
+            identity.flow.get("rheology_model"),
             SUPPORTED_RHEOLOGY,
             BlockerCode.SSPD_UNSUPPORTED_RHEOLOGY,
             "rheology_model",
         ),
         (
-            upstream.get("construction_family"),
-            SUPPORTED_SHELL_TYPE,
-            BlockerCode.SSPD_UNSUPPORTED_SHELL_TYPE,
-            "construction_family",
-        ),
-        (
-            upstream.get("shell_pass_count"),
+            baffle_geometry.get("shell_pass_count"),
             SUPPORTED_SHELL_PASS_COUNT,
             BlockerCode.SSPD_UNSUPPORTED_SHELL_PASS_COUNT,
             "shell_pass_count",
         ),
         (
-            upstream.get("baffle_type"),
+            design.get("baffle_type"),
             SUPPORTED_BAFFLE_TYPE,
             BlockerCode.SSPD_UNSUPPORTED_BAFFLE_TYPE,
             "baffle_type",
         ),
         (
-            upstream.get("pattern_family"),
+            layout_rule_authority.get("pattern_family"),
             SUPPORTED_TUBE_LAYOUT,
             BlockerCode.SSPD_UNSUPPORTED_TUBE_LAYOUT,
             "pattern_family",
         ),
         (
-            upstream.get("baffle_cut"),
-            SUPPORTED_BAFFLE_CUT,
+            design.get("baffle_cut_fraction"),
+            "0.25",
             BlockerCode.SSPD_UNSUPPORTED_BAFFLE_CUT,
             "baffle_cut",
         ),
-    ):
-        if actual != expected:
+    )
+    for actual, expected, code, field in checks:
+        if field == "baffle_cut":
+            if actual != "0.25":
+                raise _fail("S11", code, field)
+        elif field == "pattern_family":
+            # TASK-031's public PatternFamily token is TRIANGULAR.  The
+            # TASK-034 authority names the same supported semantic as
+            # TRIANGULAR_PITCH; preserve the upstream token at S08 and admit
+            # only that exact public producer token at S11.
+            if actual not in {expected, "TRIANGULAR"}:
+                raise _fail("S11", code, field)
+        elif actual != expected:
             raise _fail("S11", code, field)
+
     spacing = request.uniform_spacing_sequence_m
     if (
         type(spacing) is not tuple
-        or len(spacing) < 1
+        or not spacing
         or any(
             not isinstance(item, Decimal) or not item.is_finite() or item <= 0 for item in spacing
         )
@@ -559,13 +684,21 @@ def verify_applicability(request: Task034Request, identity: ReplayIdentity) -> N
             "S11", BlockerCode.SSPD_UNSUPPORTED_BAFFLE_SPACING, "uniform_spacing_sequence_m"
         )
     try:
-        reynolds = Decimal(str(flow["shell_side_reynolds_number"]))
+        reynolds = Decimal(str(identity.flow["shell_side_reynolds_number"]))
     except (ArithmeticError, KeyError, TypeError, ValueError):
         raise _fail(
             "S11", BlockerCode.SSPD_REYNOLDS_OUTSIDE_DOMAIN, "shell_side_reynolds_number"
         ) from None
     if not reynolds.is_finite() or not Decimal("400") < reynolds < Decimal("1000000"):
         raise _fail("S11", BlockerCode.SSPD_REYNOLDS_OUTSIDE_DOMAIN, "shell_side_reynolds_number")
+    return replace(
+        identity,
+        shell_type=authority["shell_type"],
+        shell_type_authority_hash=authority["authority_hash"],
+        shell_type_authority_record_id=authority["authority_record_id"],
+        shell_type_authority_source_id=authority["authority_source_id"],
+        shell_type_authority_source_version=authority["authority_source_version"],
+    )
 
 
 def verify_engineering_authority(request: Task034Request) -> None:

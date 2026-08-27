@@ -1,14 +1,14 @@
-# TASK034 Shell-Side Modeled Pressure-Drop Design Contract
+# TASK034 Shell-Side Modeled Pressure-Drop Design Contract — R5 Design Candidate
 
-TASK=TASK034_DESIGN_CONTRACT_AUTHORING_ONLY
-MODE=CONTROLLED_DESIGN_CONTRACT_AUTHORING_ONLY
+TASK=TASK034_R5_DESIGN_SEMANTIC_CONVERGENCE_AUTHORING_ONLY
+MODE=CONTROLLED_R5_DESIGN_CANDIDATE_AUTHORING_ONLY
 REPOSITORY=xuezhiorange-png/hxforge-agent
 ISSUE_NUMBER=199
-TASK034_STATUS=DESIGN_CONTRACT
-TASK034_DESIGN_SOURCE_AUTHORITY=5403427791
-TASK034_DESIGN_DEFINITION_REVIEW_RESULT=PASS
-TASK034_DESIGN_DEFINITION_COMPLETE=true
-TASK034_DESIGN_REVIEWED=true
+TASK034_STATUS=R5_DESIGN_CANDIDATE
+TASK034_DESIGN_SOURCE_AUTHORITY=ORIGIN_MAIN_PLUS_ISSUE_HISTORY_AND_REVIEW_FINDINGS
+TASK034_DESIGN_DEFINITION_REVIEW_RESULT=HISTORICAL_R1_R2_R3_R4_REVIEW_HISTORY
+TASK034_DESIGN_DEFINITION_COMPLETE=false
+TASK034_DESIGN_REVIEWED=false
 TASK034_DESIGN_FROZEN=false
 TASK034_DIRECT_UPSTREAM=TASK033
 TASK031_TASK032_STATUS=TRANSITIVE_ACCEPTED_EVIDENCE
@@ -17,16 +17,34 @@ PHYSICAL_MODEL=SINGLE_EMPIRICAL_MODELED_AGGREGATE
 PUBLIC_QUANTITY=modeled_shell_side_pressure_drop_pa
 THIS_IS_NOT_TOTAL_SHELL_SIDE_PRESSURE_DROP=true
 NO_STEP_IMPLIES_THE_NEXT=true
+CURRENT_EFFECTIVE_DESIGN_SECTION=R5 effective semantic-convergence Design candidate
+HISTORICAL_R4_PREDECESSOR_CANDIDATE_EFFECTIVE=false
+R5_EFFECTIVE_DESIGN_SECTION_IS_CURRENT_CANDIDATE=true
+HISTORICAL_R4_PREDECESSOR_CANDIDATE_START=true
 
 ## Baseline and evidence authority
-AUTHORIZED_MAIN_SHA=f7acfc2972a295a12e556f8a4dd55db94992bdcb
-AUTHORIZED_MAIN_TREE_SHA=3ea4ae7426ec8c6e60f96d5a00e0b8032e85339d
+AUTHORIZED_MAIN_SHA=cbb2aaf27411a2247e843105d22a3e272e16dfe8
+AUTHORIZED_MAIN_TREE_SHA=fa566d04b0de4873923092619b4d5c4a1f1655d2
 BASELINE_DRIFT=false
-REVIEWED_FIXUP_EVIDENCE_DIGEST_VALID=true
-REVIEWED_FIXUP_EVIDENCE_SHA256=cc14c4679c02b8f85c8e4767a1b2409bdfe498787d6329ef446c2aef6781438c
+R4_IS_RECOVERY_OF_R3=false
+R4_CLAIMS_BYTE_CONTINUITY_WITH_R3=false
+R4_DESIGN_RECONSTRUCTED_FROM_ORIGIN_MAIN=true
+R4_AUTHORITY_SOURCE=ORIGIN_MAIN_TASK034_BASELINE_PLUS_FORMAL_TASK034_ISSUE_HISTORY_PLUS_FORMAL_R1_R2_R3_REVIEW_FINDINGS_PLUS_ACCEPTED_REQUIRED_FIELD_GAP_DEFINITION_PLUS_CURRENT_GOVERNANCE_DECISIONS
+TASK034_R5_DESIGN_AUTHORITY_SOURCE=ORIGIN_MAIN_TASK034_BASELINE_PLUS_FORMAL_TASK034_ISSUE_HISTORY_PLUS_FORMAL_R1_R2_R3_R4_REVIEW_FINDINGS_PLUS_ACCEPTED_REQUIRED_FIELD_GAP_DEFINITION_PLUS_CURRENT_GOVERNANCE_DECISIONS
+R4_RECOVERED_R3_TEXT=false
+R4_RECOVERED_IMPLEMENTATION_WIP=false
+CURRENT_REMOTE_TASK034_CONTRACT=MERGED_V1
+MERGED_TASK034_V1_CONTRACT_STATUS=HISTORICAL_SUPERSEDED_BY_R4_CANDIDATE
 SOURCE_DEFINITION_REOPEN_REQUIRED=false
 ENGINEERING_SOURCE_CORRELATION_REOPEN_REQUIRED=false
-DETERMINISTIC_SCHEMA_REOPEN_REQUIRED=false
+DETERMINISTIC_SCHEMA_REOPEN_REQUIRED=true
+CORRECTED_TASK034_CONTRACT_VERSIONED=true
+CORRECTED_TASK034_CONTRACT_VERSION=v2
+NO_STEP_IMPLIES_THE_NEXT=true
+
+HISTORICAL_MERGED_V1_CONTRACT_START=true
+HISTORICAL_MERGED_V1_CONTRACT_EFFECTIVE=false
+HISTORICAL_MERGED_V1_SCOPE=ALL_ORIGIN_MAIN_TEXT_OUTSIDE_R4_EFFECTIVE_CONTRACT_IS_RETAINED_AS_SUPERSEDED_V1_EVIDENCE_ONLY
 
 ## Engineering authority
 CORRELATION_ID=TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1
@@ -5113,6 +5131,1715 @@ TASK034_CI_MANIFEST_PATH=ci-shard-manifest.yml
 TASK034_WORKFLOW_MUTATION_REQUIRED=false
 TASK034_IMPLEMENTATION_AUTHORIZED=false
 
+HISTORICAL_R4_PREDECESSOR_CANDIDATE_END=true
+HISTORICAL_MERGED_V1_LEADING_TEXT_END=true
+
+## R5 effective semantic-convergence Design candidate
+R4_EFFECTIVE_CONTRACT_START=true
+R4_EFFECTIVE_CONTRACT_STATUS=HISTORICAL_SUPERSEDED_BY_R5
+R4_EFFECTIVE_CONTRACT_CURRENT=false
+R5_EFFECTIVE_CONTRACT_START=true
+R5_EFFECTIVE_CONTRACT_STATUS=HISTORICAL_PREDECESSOR_TO_R5_C1
+R5_EFFECTIVE_CONTRACT_IS_SELF_CONTAINED=true
+R5_EFFECTIVE_CONTRACT_CURRENT=false
+R5_C1_EFFECTIVE_CONTRACT_STATUS=AUTHORED_UNREVIEWED_UNACCEPTED
+R5_C1_EFFECTIVE_CONTRACT_IS_SELF_CONTAINED=true
+R4_EFFECTIVE_CONTRACT_IS_SELF_CONTAINED=true
+R4_EFFECTIVE_CONTRACT_CONTENT_STATUS=HISTORICAL_PREDECESSOR_ONLY
+TASK034_R5_DESIGN_SELF_CONTAINED=true
+R5_DESIGN_SELF_CONTAINED=true
+R5_REQUIRES_LOST_R3_TEXT=false
+R5_REQUIRES_LOST_IMPLEMENTATION_WIP=false
+DESIGN_REVISION=R5-C1
+TASK034_CONTRACT_VERSION=v2
+R5_C1_IS_NEW_REVIEW_TARGET=true
+R5_C1_CLAIMS_BYTE_IDENTITY_WITH_R5=false
+R5_C1_SCOPE=TASK033_PUBLIC_SUCCESS_IDENTITY_INVENTORY_AND_HASH_PREIMAGE_ONLY
+R5_C1_RECONSTRUCTION_BASE=R5_EFFECTIVE_LOCAL_CANDIDATE
+R5_IS_RECOVERY_OF_R4_SEMANTIC_CONVERGENCE_FINDINGS=true
+R5_CLAIMS_BYTE_CONTINUITY_WITH_R4=false
+R5_CLAIMS_IMPLEMENTATION_WIP_CONTINUITY=false
+R5_RECONSTRUCTION_BASE=R4_EFFECTIVE_LOCAL_CANDIDATE_WITH_FORMAL_R5_AUTHORITY_FREEZE
+R5_RECONSTRUCTION_METHOD=R4_PLUS_A1_A2_A3_A4_A5_PLUS_R5_SEMANTIC_CONVERGENCE_CORRECTIONS
+R5_UNEXPLAINED_LOCAL_DESIGN_DRIFT_REUSED=false
+R5_LOST_R4_CANDIDATE_REQUIRED=false
+R5_LOST_IMPLEMENTATION_WIP_REQUIRED=false
+
+### R5 authority and lifecycle boundary
+TASK034_R5_DESIGN_AUTHORITY_SOURCE=ORIGIN_MAIN_TASK034_BASELINE_PLUS_FORMAL_TASK034_ISSUE_HISTORY_PLUS_FORMAL_R1_R2_R3_R4_REVIEW_FINDINGS_PLUS_ACCEPTED_REQUIRED_FIELD_GAP_DEFINITION_PLUS_CURRENT_GOVERNANCE_DECISIONS
+CURRENT_REMOTE_TASK034_CONTRACT=MERGED_TASK034_V1
+MERGED_TASK034_V1_EXISTS=true
+MERGED_TASK034_V1_IS_CURRENT_REMOTE_CONTRACT=true
+MERGED_TASK034_V1_CONTRACT_REDEFINED=false
+MERGED_TASK034_V1_CONTRACT_STATUS=HISTORICAL_SUPERSEDED
+TASK034_REMOTE_DESIGN_FROZEN=false
+TASK034_V2_ALREADY_FROZEN=false
+TASK034_V2_ALREADY_ACCEPTED=false
+TASK034_V2_CURRENT_REMOTE_AUTHORITY=false
+LOCAL_TASK034_V2_DESIGN_CORRECTION_AUTHORED=true
+LOCAL_TASK034_V2_DESIGN_CORRECTION_REVIEWED=false
+LOCAL_TASK034_V2_DESIGN_CORRECTION_ACCEPTED=false
+R5_DESIGN_CANDIDATE_IS_NOT_REMOTE_AUTHORITY=true
+R5_DESIGN_CANDIDATE_REVIEW_REQUIRED=true
+R5_DESIGN_CANDIDATE_ACCEPTANCE_REQUIRED=true
+
+R4_FORMAL_SOURCE_AUTHORITY_COMMENT_ID=5403427791
+R4_DEFECT_A_DEFINITION_COMMENT_ID=5424569187
+R4_DEFECT_A_REVIEW_COMMENT_ID=5424616645
+R4_DEFECT_B_DEFINITION_COMMENT_ID=5425077656
+R4_DEFECT_B_REVIEW_COMMENT_ID=5425329658
+R4_DEFECT_C_DEFINITION_COMMENT_ID=5425911217
+R4_DEFECT_C_REVIEW_COMMENT_ID=5425988520
+R4_SHELL_TYPE_GAP_DEFINITION_COMMENT_ID=5427294833
+R4_SHELL_TYPE_GAP_REVIEW_COMMENT_ID=5427345331
+R4_REQUIRED_FIELD_GAP_DEFINITION_R1_COMMENT_ID=5432177088
+R4_REQUIRED_FIELD_GAP_REVIEW_R1_COMMENT_ID=5432223423
+R4_R1_DESIGN_REVIEW_COMMENT_ID=5428120739
+R4_R2_DESIGN_REVIEW_COMMENT_ID=5429836733
+R4_FORMAL_R3_DESIGN_REVIEW_COMMENT_ID=5432501423
+R1_REVIEWED=true
+R1_REVIEW_RESULT=CHANGES_REQUIRED
+R1_ACCEPTED=false
+R2_REVIEWED=true
+R2_REVIEW_RESULT=CHANGES_REQUIRED
+R2_ACCEPTED=false
+R3_FORMAL_REVIEW_HISTORY_PRESENT=true
+R3_FORMAL_REVIEW_RESULT=CHANGES_REQUIRED
+R4_R3_RETRY_CANDIDATE_LOCATABLE=false
+R4_R3_RETRY_CANDIDATE_ACCEPTED=false
+R4_R3_RETRY_HISTORY_CONTINUATION=false
+R3_RETRY_AUTHORED_HISTORY_PRESENT=true
+R3_RETRY_CURRENT_CANDIDATE_LOCATABLE=false
+R3_RETRY_ACCEPTED=false
+R3_RETRY_CONTINUATION_ALLOWED=false
+FORMAL_ISSUE_HISTORY_LOADED=true
+CURRENT_GOVERNANCE_DECISIONS_LOADED=true
+CURRENT_GOVERNANCE_DECISIONS_ARE_DESIGN_ACCEPTANCE=false
+TASK034_LOST_IMPLEMENTATION_WIP_GOVERNANCE_DECISION_ONLY=PASS
+TASK034_MISSING_R3_DESIGN_CANDIDATE_GOVERNANCE_DECISION_ONLY=PASS
+TASK034_HISTORICAL_IMPLEMENTATION_WIP_PRESERVATION_REQUIREMENT_RETIRED=true
+CURRENTLY_REQUIRED_HISTORICAL_WIP_PRESERVATION=false
+TASK034_R3_DESIGN_CANDIDATE_CURRENTLY_LOCATABLE=false
+TASK034_R3_DESIGN_CANDIDATE_BYTE_IDENTITY_RECOVERABLE=false
+TASK034_R3_DESIGN_CANDIDATE_CURRENT_REVIEW_TARGET_VALID=false
+TASK034_R3_DESIGN_CANDIDATE_ACCEPTED=false
+TASK034_R3_DESIGN_CANDIDATE_BYTE_CONTINUITY_REQUIREMENT_RETIRED=true
+TASK034_R3_RETRY_CONTINUATION_ALLOWED=false
+NEXT_TASK034_DESIGN_REVISION=R5-C1
+
+### R5 corrected version identifiers
+CORRECTED_TASK034_CONTRACT_VERSIONED=true
+CORRECTED_TASK034_CONTRACT_VERSION=v2
+DETERMINISTIC_SCHEMA_REOPEN_REQUIRED=true
+REQUEST_SCHEMA_VERSION=task034.shell-side-pressure-drop-request.v2
+SUCCESS_SCHEMA_VERSION=task034.shell-side-pressure-drop-success.v2
+TYPED_BLOCKED_SCHEMA_VERSION=task034.shell-side-pressure-drop-blocked.v2
+RAW_BOUNDARY_BLOCKED_SCHEMA_VERSION=task034.shell-side-pressure-drop-raw-boundary-blocked.v2
+PROVENANCE_NAMESPACE=task034.provenance.v2
+RAW_PROJECTION_NAMESPACE=task034.raw-projection.v2
+REQUEST_HASH_NAMESPACE=task034.request.v2
+SUCCESS_RESULT_HASH_NAMESPACE=task034.success-result.v2
+TYPED_BLOCKED_RESULT_HASH_NAMESPACE=task034.typed-blocked-result.v2
+RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE=task034.raw-boundary-blocked-result.v2
+PUBLIC_PROFILE_ID=hxforge.shell_tube.shell_side_pressure_drop.v2
+IMPLEMENTATION_SOFTWARE_VERSION=task034.shell-side-pressure-drop-impl-v2
+RESULT_ID_NAME_PREFIX=task034-shell-side-pressure-drop-id.v2:
+RESULT_UUID_NAMESPACE=c8f1c1c4-a11b-596b-88ad-6e851a22b9fd
+HISTORICAL_V1_IDENTIFIERS_REMAIN_HISTORICAL_ONLY=true
+V1_AND_V2_MUST_NOT_SHARE_DETERMINISTIC_MEANING=true
+
+### R5 source and engineering boundary
+SOURCE_REOPEN_REQUIRED=false
+ENGINEERING_CORRELATION_REOPEN_REQUIRED=false
+FORMULA_REOPEN_REQUIRED=false
+APPLICABILITY_LITERAL_REOPEN_REQUIRED=false
+CORRELATION_ID=TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1
+SOURCE_ID=SRC-MDPI-ENERGIES-2017-1156-BAYRAM-SEVILGEN
+SOURCE_VERSION=2018-01-10_UPDATED_VERSION_OF_RECORD
+SOURCE_LOCATION=Section_2.1.1_Equations_15_16_17_pages_3_4
+SUPPORTED_PHASES=(SINGLE_PHASE_LIQUID)
+SUPPORTED_RHEOLOGY=NEWTONIAN
+SUPPORTED_SHELL_TYPE=E_SHELL
+SUPPORTED_SHELL_PASS_COUNT=1
+SUPPORTED_CONSTRUCTION_FAMILY=DEFERRED_NOT_SOURCE_AUTHORIZED
+FIXED_TUBESHEET_NOT_SOURCE_AUTHORIZED=true
+NO_HIDDEN_FIXED_TUBESHEET_REQUIREMENT=true
+SHELL_TYPE_DISTINCT_FROM_CONSTRUCTION_FAMILY=true
+CONSTRUCTION_FAMILY_IS_NOT_SHELL_TYPE_AUTHORITY=true
+CONSTRUCTION_FAMILY_E_SHELL_ACCEPTANCE_SUBSTITUTION_ALLOWED=false
+SHELL_PASS_COUNT_IS_NOT_SHELL_TYPE_AUTHORITY=true
+COMPONENT_TOKEN_IS_NOT_SHELL_TYPE_AUTHORITY=true
+NO_SHELL_TYPE_INFERENCE=true
+ENGINEERING_FORMULA_CHANGED=false
+CORRELATION_CHANGED=false
+APPLICABILITY_LITERAL_CHANGED=false
+PUBLIC_QUANTITY=modeled_shell_side_pressure_drop_pa
+PRESSURE_DROP_PHYSICS_CHANGED=false
+REYNOLDS_DOMAIN=400 < shell_side_reynolds_number < 1000000
+PHYSICAL_BOUNDARY=SHELL_SIDE_CROSS_FLOW_BUNDLE_ONLY
+EXCLUDED_PHENOMENA=(SHELL_SIDE_NOZZLE_LOSS,SHELL_SIDE_ENTRANCE_EXIT_LOSS,SHELL_SIDE_REAR_END_LOSS,SHELL_SIDE_PRESSURE_DROP_ACCESSORIES)
+WARNING_REGISTRY_COUNT=5
+WARNING_REGISTRY=(
+1. SSPD_SCREENING_AGGREGATE_ONLY
+2. SSPD_IDEALIZED_CROSS_FLOW_MODEL
+3. SSPD_LEAKAGE_BYPASS_EXCLUDED
+4. SSPD_NON_TOTAL_PRESSURE_DROP_OUTPUT
+5. SSPD_CONSTRUCTION_FAMILY_DEFERRED
+)
+DEFERRED_CAPABILITY_COUNT=16
+DEFERRED_REGISTRY=(
+1. SINGLE_PHASE_GAS_NOT_COMPUTABLE
+2. CONSTRUCTION_FAMILY_RESTRICTION_NOT_COMPUTABLE
+3. NOZZLE_PRESSURE_DROP_NOT_COMPUTABLE
+4. STATIC_HEAD_NOT_COMPUTABLE
+5. ACCELERATION_PRESSURE_DROP_NOT_COMPUTABLE
+6. LEAKAGE_CORRECTIONS_NOT_COMPUTABLE
+7. BYPASS_CORRECTIONS_NOT_COMPUTABLE
+8. BELL_DELAWARE_NOT_COMPUTABLE
+9. UNEQUAL_BAFFLE_SPACING_NOT_COMPUTABLE
+10. TOTAL_SHELL_SIDE_PRESSURE_DROP_NOT_COMPUTABLE
+11. OVERALL_U_NOT_COMPUTABLE
+12. UA_NOT_COMPUTABLE
+13. HEAT_DUTY_NOT_COMPUTABLE
+14. OUTLET_TEMPERATURES_NOT_COMPUTABLE
+15. FULL_EXCHANGER_RATING_NOT_COMPUTABLE
+16. THERMAL_SIZING_NOT_COMPUTABLE
+)
+EXTERNAL_ORACLE_VECTOR_COUNT=12
+EXTERNAL_ORACLE_VECTOR_SET=ORIGIN_MAIN_VECTOR_SET_UNCHANGED
+EXTERNAL_ORACLE_RUNTIME_DEPENDENCY=false
+EXTERNAL_ORACLE_EXPECTED_OUTPUTS_ARE_NOT_V2_IDENTITY_ACCEPTANCE=true
+
+### R5 TASK033 public consumer evidence carrier
+TASK034_TASK033_EVIDENCE_MODEL=EXACT_PUBLIC_TASK033_REQUEST_PLUS_EXACT_PUBLIC_TASK033_VALIDATION_RESULT
+TASK033_PUBLIC_SUCCESS_STATUS_VALUE=VALID
+TASK034_USES_SYNTHETIC_SUCCESS_LITERAL=false
+TASK033_EFFECTIVE_UPSTREAM_ENVELOPE_DEFINED=true
+TASK033_UPSTREAM_EVIDENCE_REQUEST_FIELD=task033_upstream_evidence
+TASK033_UPSTREAM_EVIDENCE_CARRIER_FIELDS=(task033_request_evidence, task033_validation_result)
+TASK033_REQUEST_EVIDENCE=exact original public TASK033 request
+TASK033_VALIDATION_RESULT=exact public ShellSideHeatTransferValidationResult
+TASK033_REQUEST_EVIDENCE_PUBLIC_SCHEMA=ShellSideHeatTransferRequest
+TASK033_REQUEST_EVIDENCE_PUBLIC_FIELD_COUNT=5
+TASK033_REQUEST_EVIDENCE_PUBLIC_FIELDS=(schema_version, profile_id, task032_flow_state, task032_request_evidence, evidence_refs)
+TASK033_REQUEST_EVIDENCE_TASK032_FLOW_STATE_PATH=task033_upstream_evidence.task033_request_evidence.task032_flow_state
+TASK033_REQUEST_EVIDENCE_TASK032_FLOW_STATE_FIELD_COUNT=29
+TASK033_REQUEST_EVIDENCE_TASK032_FLOW_STATE_FIELDS=(schema_version, profile_id, implementation_software_version, shell_side_case_id, shell_side_stream_id, shell_side_fluid_id, task020_configuration_id, task020_configuration_hash, task031_geometry_id, task031_geometry_hash, property_snapshot_hash, mass_flow_authority_hash, engineering_authority_id, engineering_authority_hash, flow_model, phase_region, rheology_model, shell_side_mass_flow_rate_kg_s, shell_side_mass_velocity_kg_m2_s, shell_side_bulk_velocity_m_s, shell_side_reynolds_number, shell_side_prandtl_number, request_hash, result_hash, result_id, warnings, blockers, deferred_capabilities, provenance)
+TASK033_REQUEST_EVIDENCE_TASK032_REQUEST_EVIDENCE_PATH=task033_upstream_evidence.task033_request_evidence.task032_request_evidence
+TASK033_REQUEST_EVIDENCE_TASK032_REQUEST_EVIDENCE_FIELD_COUNT=7
+TASK033_REQUEST_EVIDENCE_TASK032_REQUEST_EVIDENCE_FIELDS=(schema_version, profile_id, task031_result, property_snapshot_hash, property_snapshot, mass_flow_authority, evidence_refs)
+TASK033_VALIDATION_RESULT_PUBLIC_SCHEMA=ShellSideHeatTransferValidationResult
+TASK033_VALIDATION_RESULT_PUBLIC_FIELD_COUNT=4
+TASK033_VALIDATION_RESULT_PUBLIC_FIELDS=(status, heat_transfer, blocked_result, raw_boundary_blocked_result)
+TASK033_VALIDATION_RESULT_PATH=task033_upstream_evidence.task033_validation_result
+TASK033_SUCCESS_ADMISSION=task033_upstream_evidence.task033_validation_result.status == VALID and task033_upstream_evidence.task033_validation_result.heat_transfer is not None
+TASK033_SUCCESS_RESULT_PATH=task033_upstream_evidence.task033_validation_result.heat_transfer
+TASK033_RESULT_IDENTITY_SOURCE=task033_upstream_evidence.task033_validation_result.heat_transfer
+TASK033_REQUEST_HASH_REPLAY=hash_task033_request(task033_upstream_evidence.task033_request_evidence) == task033_upstream_evidence.task033_validation_result.heat_transfer.request_hash
+TASK033_PUBLIC_SUCCESS_RESULT_SCHEMA=ShellSideHeatTransferResult.SUCCESS_RESULT_FIELDS
+TASK033_PUBLIC_SUCCESS_RESULT_FIELD_COUNT=28
+TASK033_PUBLIC_SUCCESS_RESULT_DECLARED_COUNT=28
+TASK033_PUBLIC_SUCCESS_RESULT_ENUMERATED_COUNT=28
+TASK033_PUBLIC_SUCCESS_RESULT_UNIQUE_COUNT=28
+TASK033_PUBLIC_SUCCESS_RESULT_DUPLICATE_COUNT=0
+TASK033_PUBLIC_SUCCESS_RESULT_FIELDS_ORDERED=(schema_version, profile_id, first_slice_profile_id, implementation_software_version, shell_side_case_id, shell_side_stream_id, shell_side_fluid_id, task020_configuration_id, task020_configuration_hash, task031_geometry_id, task031_geometry_hash, property_snapshot_hash, mass_flow_authority_hash, task032_request_hash, task032_result_hash, task032_result_id, correlation_id, engineering_source_authority_record_id, heat_transfer_surface, modeled_shell_side_heat_transfer_coefficient_w_m2_k, request_hash, result_hash, result_id, warnings, blockers, deferred_capabilities, applicability_context, provenance)
+TASK033_PUBLIC_SUCCESS_RESULT_FIELDS=TASK033_PUBLIC_SUCCESS_RESULT_FIELDS_ORDERED
+TASK033_PUBLIC_SUCCESS_RESULT_FIELDS_ARE_NOT_SYNTHETIC=true
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_FIELD_COUNT=26
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_DECLARED_COUNT=26
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_ENUMERATED_COUNT=26
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_UNIQUE_COUNT=26
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_DUPLICATE_COUNT=0
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_FIELDS_ORDERED=(schema_version, profile_id, first_slice_profile_id, implementation_software_version, shell_side_case_id, shell_side_stream_id, shell_side_fluid_id, task020_configuration_id, task020_configuration_hash, task031_geometry_id, task031_geometry_hash, property_snapshot_hash, mass_flow_authority_hash, task032_request_hash, task032_result_hash, task032_result_id, correlation_id, engineering_source_authority_record_id, heat_transfer_surface, modeled_shell_side_heat_transfer_coefficient_w_m2_k, request_hash, warnings, blockers, deferred_capabilities, applicability_context, provenance)
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_FIELDS=TASK033_SUCCESS_RESULT_HASH_PREIMAGE_FIELDS_ORDERED
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_EQUALS_PUBLIC_SUCCESS_FIELDS_MINUS_RESULT_HASH_AND_RESULT_ID=true
+TASK033_RESULT_HASH_EXCLUDED_FROM_HASH_PREIMAGE=true
+TASK033_RESULT_ID_EXCLUDED_FROM_HASH_PREIMAGE=true
+TASK034_CONSUMED_TASK033_IDENTITY_FIELD_COUNT=15
+TASK034_CONSUMED_TASK033_IDENTITY_FIELDS_ORDERED=(request_hash, result_hash, result_id, task031_geometry_id, task031_geometry_hash, task032_result_id, task032_result_hash, shell_side_case_id, shell_side_stream_id, shell_side_fluid_id, task020_configuration_id, task020_configuration_hash, property_snapshot_hash, mass_flow_authority_hash, engineering_source_authority_record_id)
+TASK034_CONSUMED_TASK033_IDENTITY_PROJECTION=TASK034_CONSUMED_TASK033_IDENTITY_FIELDS_ORDERED
+TASK034_CONSUMED_SUBSET_IS_COMPLETE_TASK033_SCHEMA=false
+TASK034_CONSUMED_SUBSET_IS_TASK033_HASH_PREIMAGE=false
+TASK033_PUBLIC_VALIDATION_RESULT_STATUS_REQUIRED=true
+TASK033_PUBLIC_VALIDATION_RESULT_STATUS_SUCCESS_LITERAL_ALLOWED=false
+TASK033_PUBLIC_NESTED_TASK032_EVIDENCE_PATHS_ARE_EXPLICIT=true
+TASK033_PUBLIC_NESTED_TASK032_EVIDENCE_PATHS_ARE_NOT_BARE_ALIASES=true
+A1_TASK033_PUBLIC_CONSUMER_EVIDENCE_APPLIED=true
+
+### R5 caller-owned shell-type authority carrier
+SHELL_TYPE_CARRIER=EXPLICIT_TASK034_SHELL_TYPE_AUTHORITY_OBJECT
+SHELL_TYPE_AUTHORITY_IS_CALLER_OWNED=true
+SHELL_TYPE_AUTHORITY_IS_IMPLEMENTATION_GENERATED=false
+SHELL_TYPE_AUTHORITY_RUNTIME_SELECTION=false
+SHELL_TYPE_STRUCTURAL_TYPE=CANONICAL_NON_EMPTY_STRING_TOKEN
+SHELL_TYPE_AUTHORITY_SCHEMA_VERSION=task034.shell-type-authority.v2
+SHELL_TYPE_AUTHORITY_HASH_NAMESPACE=task034.shell-type-authority.v2
+SHELL_TYPE_AUTHORITY_FIELD_COUNT=9
+SHELL_TYPE_AUTHORITY_FIELDS=(
+1. schema_version | string | required
+2. shell_type | CANONICAL_NON_EMPTY_STRING_TOKEN | required
+3. task020_configuration_id | string | required
+4. task020_configuration_hash | sha256_hex | required
+5. authority_source_id | string | required
+6. authority_source_version | string | required
+7. authority_record_id | string | required
+8. evidence_refs | ordered_non_empty_sequence[string] | required
+9. authority_hash | sha256_hex | required
+)
+SHELL_TYPE_AUTHORITY_PREHASH_FIELD_COUNT=8
+SHELL_TYPE_AUTHORITY_PREHASH_FIELDS=(
+1. schema_version
+2. shell_type
+3. task020_configuration_id
+4. task020_configuration_hash
+5. authority_source_id
+6. authority_source_version
+7. authority_record_id
+8. evidence_refs
+)
+SHELL_TYPE_AUTHORITY_HASH_SELF_EXCLUSIONS=(authority_hash)
+SHELL_TYPE_AUTHORITY_HASH_COMPUTATION=SHA256(CANONICAL_BYTES(SHELL_TYPE_AUTHORITY_HASH_NAMESPACE,SHELL_TYPE_AUTHORITY_PREHASH_FIELDS_IN_DECLARED_ORDER))
+SHELL_TYPE_AUTHORITY_HASH_PREHASH_ORDER_EXPLICIT=true
+SHELL_TYPE_AUTHORITY_HASH_EXCLUDES_SELF=true
+SHELL_TYPE_AUTHORITY_HASH_REPAIR=false
+SHELL_TYPE_AUTHORITY_IDENTITY_BACKFILL=false
+SHELL_TYPE_AUTHORITY_EVIDENCE_REFS_ORDERED=true
+SHELL_TYPE_AUTHORITY_EVIDENCE_REFS_NON_EMPTY=true
+SHELL_TYPE_AUTHORITY_SOURCE_IS_NOT_ENGINEERING_LITERAL_ONLY=true
+SHELL_TYPE_ENGINEERING_APPLICABILITY_AUTHORITY=Issue_199_effective_source_authority
+SHELL_TYPE_CASE_CONFIGURATION_EVIDENCE_AUTHORITY=CALLER_OWNED_VERSIONED_AUTHORITY_OBJECT
+SHELL_TYPE_CASE_CONFIGURATION_ASSERTION_MUST_BIND_TO_TASK020=true
+SHELL_TYPE_AUTHORITY_CONFIGURATION_JOIN=EXACT
+SHELL_TYPE_AUTHORITY_CONFIGURATION_TOLERANCE_ALLOWED=false
+SHELL_TYPE_AUTHORITY_CONFIGURATION_PARTIAL_MATCH_ALLOWED=false
+SHELL_TYPE_AUTHORITY_CONFIGURATION_JOIN_FIELDS=(
+shell_type_authority.task020_configuration_id = request.task020_configuration_id
+shell_type_authority.task020_configuration_hash = request.task020_configuration_hash
+)
+SHELL_TYPE_AUTHORITY_S11_PREDICATE=shell_type_authority.shell_type == "E_SHELL"
+SHELL_TYPE_AUTHORITY_STRUCTURAL_ADMISSION=type(shell_type) is str and shell_type is non-empty after canonical string validation
+SHELL_TYPE_AUTHORITY_STRUCTURAL_DOMAIN_IS_NOT_ENGINEERING_SUPPORT_ENUM=true
+TASK034_SUPPORTED_SHELL_TYPE_SET={"E_SHELL"}
+STRUCTURALLY_VALID_UNSUPPORTED_SHELL_TYPE_WITNESS=UNSUPPORTED_SHELL_TYPE
+STRUCTURALLY_VALID_UNSUPPORTED_SHELL_TYPE_REACHES_B031=true
+STRUCTURALLY_VALID_UNSUPPORTED_SHELL_TYPE_REACHES_B055=false
+S11_CONSTRUCTION_FAMILY_PROXY_ALLOWED=false
+S11_SHELL_TYPE_AUTHORITY_REPLAY_REQUIRED=true
+S11_SHELL_TYPE_AUTHORITY_REPLAY_IS_NON_FALLBACK=true
+A4_TASK033_SHELL_TYPE_STRUCTURAL_DOMAIN_AND_B031_REACHABILITY_APPLIED=true
+
+### R5 wall-property authority replay contract
+WALL_PROPERTY_AUTHORITY_SCHEMA=TASK034_WALL_PROPERTY_AUTHORITY_V2
+WALL_PROPERTY_AUTHORITY_SCHEMA_VERSION=TASK034_WALL_PROPERTY_AUTHORITY_V2
+WALL_PROPERTY_AUTHORITY_CARRIER=EXPLICIT_CANONICAL_WALL_PROPERTY_AUTHORITY_PROJECTION_FROM_PUBLIC_REQUEST_FIELDS_AND_ACCEPTED_UPSTREAM_IDENTITIES
+WALL_PROPERTY_AUTHORITY_IS_SEPARATE_TOP_LEVEL_REQUEST_FIELD=false
+WALL_PROPERTY_AUTHORITY_FIELD_COUNT=15
+WALL_PROPERTY_AUTHORITY_PREHASH_FIELD_COUNT=14
+WALL_PROPERTY_AUTHORITY_FINAL_FIELD_COUNT=15
+WALL_PROPERTY_AUTHORITY_FINAL_UNIQUE_FIELD_COUNT=15
+WALL_PROPERTY_AUTHORITY_FINAL_FIELDS=(
+1. schema_version | exact_string(TASK034_WALL_PROPERTY_AUTHORITY_V2) | required
+2. shell_side_case_id | canonical_non_empty_string | required
+3. shell_side_stream_id | canonical_non_empty_string | required
+4. shell_side_fluid_id | canonical_non_empty_string | required
+5. task031_geometry_id | canonical_string | required
+6. task031_geometry_hash | sha256_hex | required
+7. task032_result_id | canonical_string | required
+8. task032_result_hash | sha256_hex | required
+9. property_snapshot_hash | sha256_hex | required
+10. shell_side_wall_dynamic_viscosity_pa_s | finite_decimal | required
+11. source_id | canonical_non_empty_string | required
+12. source_version | canonical_non_empty_string | required
+13. evidence_refs | ordered_non_empty_sequence[string] | required
+14. wall_property_snapshot_hash | sha256_hex | required
+15. wall_property_authority_hash | sha256_hex | required
+)
+WALL_PROPERTY_AUTHORITY_PREHASH_FIELD_COUNT=14
+WALL_PROPERTY_AUTHORITY_PREHASH_UNIQUE_FIELD_COUNT=14
+WALL_PROPERTY_AUTHORITY_PREHASH_FIELDS=(
+1. schema_version
+2. shell_side_case_id
+3. shell_side_stream_id
+4. shell_side_fluid_id
+5. task031_geometry_id
+6. task031_geometry_hash
+7. task032_result_id
+8. task032_result_hash
+9. property_snapshot_hash
+10. shell_side_wall_dynamic_viscosity_pa_s
+11. source_id
+12. source_version
+13. evidence_refs
+14. wall_property_snapshot_hash
+)
+WALL_PROPERTY_PREHASH_EQUALS_FINAL_MINUS_AUTHORITY_HASH=true
+WALL_PROPERTY_AUTHORITY_NAMESPACE=task034.wall-property-authority.v2
+WALL_PROPERTY_AUTHORITY_CANONICAL_ENCODING=UTF8_CANONICAL_JSON
+WALL_PROPERTY_AUTHORITY_HASH_ALGORITHM=SHA-256
+WALL_PROPERTY_AUTHORITY_HASH_SELF_EXCLUSIONS=(wall_property_authority_hash)
+WALL_PROPERTY_AUTHORITY_HASH_PREHASH_ORDER_EXPLICIT=true
+WALL_PROPERTY_AUTHORITY_HASH_COMPUTATION=SHA256(UTF8_CANONICAL_JSON([WALL_PROPERTY_AUTHORITY_NAMESPACE,[[field_name,field_value] in WALL_PROPERTY_AUTHORITY_PREHASH_FIELDS declared order]]))
+WALL_PROPERTY_AUTHORITY_HASH_REPAIR=false
+WALL_PROPERTY_AUTHORITY_IDENTITY_BACKFILL=false
+WALL_PROPERTY_AUTHORITY_UPSTREAM_FLOW_STATE_PATH=task033_upstream_evidence.task033_request_evidence.task032_flow_state
+WALL_PROPERTY_AUTHORITY_UPSTREAM_TASK032_REQUEST_EVIDENCE_PATH=task033_upstream_evidence.task033_request_evidence.task032_request_evidence
+WALL_PROPERTY_AUTHORITY_REQUEST_FIELD_BINDINGS=(
+schema_version <- request.wall_property_schema_version
+shell_side_case_id <- request.shell_side_case_id
+shell_side_stream_id <- request.shell_side_stream_id
+shell_side_fluid_id <- request.shell_side_fluid_id
+task031_geometry_id <- replayed task031 geometry identity
+task031_geometry_hash <- replayed task031 geometry identity
+task032_result_id <- accepted task032 flow-state identity
+task032_result_hash <- accepted task032 flow-state identity
+property_snapshot_hash <- request.property_snapshot_hash
+shell_side_wall_dynamic_viscosity_pa_s <- request.shell_side_wall_dynamic_viscosity_pa_s
+source_id <- request.wall_property_source_id
+source_version <- request.wall_property_source_version
+evidence_refs <- request.wall_property_evidence_refs
+wall_property_snapshot_hash <- request.wall_property_snapshot_hash
+wall_property_authority_hash <- request.wall_property_authority_hash
+)
+WALL_PROPERTY_AUTHORITY_SAME_CASE_JOIN=EXACT
+WALL_PROPERTY_AUTHORITY_SAME_CASE_JOIN_FIELDS=(
+shell_side_case_id = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_case_id
+shell_side_stream_id = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_stream_id
+shell_side_fluid_id = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_fluid_id
+task031_geometry_id = replayed task031 geometry_id
+task031_geometry_hash = replayed task031 geometry_hash
+task032_result_id = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_id
+task032_result_hash = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_hash
+property_snapshot_hash = accepted task033_upstream_evidence.task033_request_evidence.task032_flow_state.property_snapshot_hash
+)
+WALL_PROPERTY_AUTHORITY_SAME_CASE_TOLERANCE_ALLOWED=false
+WALL_PROPERTY_AUTHORITY_SAME_CASE_PARTIAL_MATCH_ALLOWED=false
+WALL_PROPERTY_AUTHORITY_REPLAY_ORDER=(
+1. required public wall-property fields are present and typed
+2. exact 15-field canonical record is assembled from request fields and accepted identities
+3. wall_property_authority_hash is recomputed from the 14-field prehash
+4. recomputed hash is compared exactly with request.wall_property_authority_hash
+5. finite positive wall viscosity guard runs after authority replay
+)
+WALL_PROPERTY_AUTHORITY_BLOCKER_MAPPING=(
+SSPD_WALL_PROPERTY_AUTHORITY_MISSING -> missing wall_property_authority_hash at WALL_PROPERTY_AUTHORITY_REPLAY
+SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH -> recomputed v2 14-field hash differs at WALL_PROPERTY_AUTHORITY_REPLAY
+SSPD_WALL_VISCOSITY_INVALID -> finite positive viscosity guard fails after wall authority replay
+)
+WALL_PROPERTY_AUTHORITY_TEST_IDS=(
+T034-B026_SSPD_WALL_PROPERTY_AUTHORITY_MISSING
+T034-B027_SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH
+T034-B028_SSPD_WALL_VISCOSITY_INVALID
+T034-X010_C5_SCHEMA_CONTRACT
+)
+WALL_PROPERTY_FINAL_FIELD_COUNT=15
+WALL_PROPERTY_FINAL_UNIQUE_FIELD_COUNT=15
+WALL_PROPERTY_PREHASH_FIELD_COUNT=14
+WALL_PROPERTY_PREHASH_UNIQUE_FIELD_COUNT=14
+WALL_PROPERTY_PREHASH_EQUALS_FINAL_MINUS_AUTHORITY_HASH=true
+A3_WALL_PROPERTY_V2_REPLAY_CONTRACT_APPLIED=true
+
+### R5 request schema and canonical projection
+SHELL_TYPE_AUTHORITY_TOP_LEVEL_FIELD_REQUIRED=true
+SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_NAME=shell_type_authority
+REQUEST_SCHEMA_PRECEDES_S11=true
+S11_RECEIVES_ONLY_REQUESTS_ADMITTED_BY_REQUEST_SCHEMA=true
+CASE_A_TOP_LEVEL_KEY_ABSENT="shell_type_authority" not in request.keys()
+CASE_B_TOP_LEVEL_KEY_PRESENT_NULL="shell_type_authority" in request.keys() and request["shell_type_authority"] is None
+CASE_C_TOP_LEVEL_KEY_PRESENT_NON_NULL_INVALID="shell_type_authority" in request.keys() and request["shell_type_authority"] is not None and value fails exact shell-type-authority schema/type/unknown-field validation
+CASE_A_FAILURE_STAGE=REQUEST_SCHEMA
+CASE_A_BLOCKER=SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING
+TOP_LEVEL_SHELL_TYPE_AUTHORITY_ABSENT_STAGE=REQUEST_SCHEMA
+TOP_LEVEL_SHELL_TYPE_AUTHORITY_ABSENT_BLOCKER=B058
+CASE_B_FAILURE_STAGE=CORRELATION_AUTHORITY_AND_APPLICABILITY
+CASE_B_BLOCKER=SSPD_SHELL_TYPE_AUTHORITY_MISSING
+PRESENT_NULL_SHELL_TYPE_AUTHORITY_STAGE=S11
+PRESENT_NULL_SHELL_TYPE_AUTHORITY_BLOCKER=B054
+CASE_C_FAILURE_STAGE=CORRELATION_AUTHORITY_AND_APPLICABILITY
+CASE_C_BLOCKER=SSPD_SHELL_TYPE_AUTHORITY_INVALID
+PRESENT_INVALID_SHELL_TYPE_AUTHORITY_STAGE=S11
+PRESENT_INVALID_SHELL_TYPE_AUTHORITY_BLOCKER=B055
+ABSENT_RAW_FIELD_AND_PRESENT_NULL_TYPED_VALUE_ARE_DISTINCT=true
+ABSENT_SHELL_TYPE_AUTHORITY_KEY_CANNOT_REACH_S11=true
+PRESENT_NULL_SHELL_TYPE_AUTHORITY_CAN_REACH_S11=true
+REQUEST_FIELD_COUNT=36
+REQUEST_FIELDS=(
+1. schema_version
+2. profile_id
+3. task033_upstream_evidence
+4. task031_request_evidence
+5. shell_type_authority
+6. task031_request_hash
+7. shell_inside_diameter_m
+8. baffle_count
+9. uniform_spacing_sequence_m
+10. tube_pitch_m
+11. tube_outer_diameter_m
+12. pattern_family
+13. shell_side_wall_dynamic_viscosity_pa_s
+14. wall_property_schema_version
+15. wall_property_source_id
+16. wall_property_source_version
+17. wall_property_evidence_refs
+18. wall_property_snapshot_hash
+19. wall_property_authority_hash
+20. correlation_id
+21. shell_side_case_id
+22. shell_side_stream_id
+23. shell_side_fluid_id
+24. task020_configuration_id
+25. task020_configuration_hash
+26. task031_geometry_id
+27. task031_geometry_hash
+28. task032_request_hash
+29. task032_result_id
+30. task032_result_hash
+31. task033_request_hash
+32. task033_result_id
+33. task033_result_hash
+34. property_snapshot_hash
+35. mass_flow_authority_hash
+36. evidence_refs
+)
+REQUEST_PREHASH_FIELD_COUNT=36
+REQUEST_PREHASH_FIELDS=(
+1. schema_version
+2. profile_id
+3. task033_upstream_evidence
+4. task031_request_evidence
+5. shell_type_authority
+6. task031_request_hash
+7. shell_inside_diameter_m
+8. baffle_count
+9. uniform_spacing_sequence_m
+10. tube_pitch_m
+11. tube_outer_diameter_m
+12. pattern_family
+13. shell_side_wall_dynamic_viscosity_pa_s
+14. wall_property_schema_version
+15. wall_property_source_id
+16. wall_property_source_version
+17. wall_property_evidence_refs
+18. wall_property_snapshot_hash
+19. wall_property_authority_hash
+20. correlation_id
+21. shell_side_case_id
+22. shell_side_stream_id
+23. shell_side_fluid_id
+24. task020_configuration_id
+25. task020_configuration_hash
+26. task031_geometry_id
+27. task031_geometry_hash
+28. task032_request_hash
+29. task032_result_id
+30. task032_result_hash
+31. task033_request_hash
+32. task033_result_id
+33. task033_result_hash
+34. property_snapshot_hash
+35. mass_flow_authority_hash
+36. evidence_refs
+)
+REQUEST_HASH_COMPUTATION=SHA256(CANONICAL_BYTES(REQUEST_HASH_NAMESPACE,REQUEST_PREHASH_FIELDS_IN_DECLARED_ORDER))
+REQUEST_HASH_INCLUDES_SHELL_TYPE_AUTHORITY=true
+REQUEST_HASH_INCLUDES_AUTHORITY_HASH=true
+REQUEST_HASH_NO_LEGACY_V1_ACCEPTANCE=true
+
+SUCCESS_FIELD_COUNT=45
+SUCCESS_FIELDS=(
+1. schema_version
+2. profile_id
+3. first_slice_profile_id
+4. implementation_software_version
+5. shell_side_case_id
+6. shell_side_stream_id
+7. shell_side_fluid_id
+8. task020_configuration_id
+9. task020_configuration_hash
+10. shell_type
+11. shell_type_authority_hash
+12. shell_type_authority_record_id
+13. shell_type_authority_source_id
+14. shell_type_authority_source_version
+15. task031_request_hash
+16. task031_geometry_id
+17. task031_geometry_hash
+18. property_snapshot_hash
+19. mass_flow_authority_hash
+20. task032_request_hash
+21. task032_result_hash
+22. task032_result_id
+23. task033_request_hash
+24. task033_result_hash
+25. task033_result_id
+26. correlation_id
+27. engineering_source_authority_record_id
+28. source_id
+29. source_version
+30. source_location
+31. wall_property_schema_version
+32. wall_property_source_id
+33. wall_property_source_version
+34. wall_property_snapshot_hash
+35. wall_property_authority_hash
+36. modeled_shell_side_pressure_drop_pa
+37. request_hash
+38. result_hash
+39. result_id
+40. warnings
+41. blockers
+42. deferred_capabilities
+43. applicability_context
+44. physical_boundary_context
+45. provenance
+)
+SUCCESS_PREHASH_FIELD_COUNT=43
+SUCCESS_PREHASH_FIELDS=(
+1. schema_version
+2. profile_id
+3. first_slice_profile_id
+4. implementation_software_version
+5. shell_side_case_id
+6. shell_side_stream_id
+7. shell_side_fluid_id
+8. task020_configuration_id
+9. task020_configuration_hash
+10. shell_type
+11. shell_type_authority_hash
+12. shell_type_authority_record_id
+13. shell_type_authority_source_id
+14. shell_type_authority_source_version
+15. task031_request_hash
+16. task031_geometry_id
+17. task031_geometry_hash
+18. property_snapshot_hash
+19. mass_flow_authority_hash
+20. task032_request_hash
+21. task032_result_hash
+22. task032_result_id
+23. task033_request_hash
+24. task033_result_hash
+25. task033_result_id
+26. correlation_id
+27. engineering_source_authority_record_id
+28. source_id
+29. source_version
+30. source_location
+31. wall_property_schema_version
+32. wall_property_source_id
+33. wall_property_source_version
+34. wall_property_snapshot_hash
+35. wall_property_authority_hash
+36. modeled_shell_side_pressure_drop_pa
+37. request_hash
+38. warnings
+39. blockers
+40. deferred_capabilities
+41. applicability_context
+42. physical_boundary_context
+43. provenance
+)
+SUCCESS_RESULT_HASH_SELF_EXCLUSIONS=(result_hash,result_id)
+
+TYPED_BLOCKED_FIELD_COUNT=36
+TYPED_BLOCKED_FIELDS=(
+1. schema_version
+2. profile_id
+3. implementation_software_version
+4. failure_stage
+5. shell_side_case_id
+6. shell_side_stream_id
+7. shell_side_fluid_id
+8. task020_configuration_id
+9. task020_configuration_hash
+10. shell_type
+11. shell_type_authority_hash
+12. shell_type_authority_record_id
+13. shell_type_authority_source_id
+14. shell_type_authority_source_version
+15. task031_request_hash
+16. task031_geometry_id
+17. task031_geometry_hash
+18. property_snapshot_hash
+19. mass_flow_authority_hash
+20. task032_request_hash
+21. task032_result_hash
+22. task032_result_id
+23. task033_request_hash
+24. task033_result_hash
+25. task033_result_id
+26. wall_property_schema_version
+27. wall_property_source_id
+28. wall_property_source_version
+29. wall_property_snapshot_hash
+30. wall_property_authority_hash
+31. request_hash
+32. blocked_result_hash
+33. warnings
+34. blockers
+35. deferred_capabilities
+36. provenance
+)
+TYPED_BLOCKED_PREHASH_FIELD_COUNT=35
+TYPED_BLOCKED_PREHASH_FIELDS=(
+1. schema_version
+2. profile_id
+3. implementation_software_version
+4. failure_stage
+5. shell_side_case_id
+6. shell_side_stream_id
+7. shell_side_fluid_id
+8. task020_configuration_id
+9. task020_configuration_hash
+10. shell_type
+11. shell_type_authority_hash
+12. shell_type_authority_record_id
+13. shell_type_authority_source_id
+14. shell_type_authority_source_version
+15. task031_request_hash
+16. task031_geometry_id
+17. task031_geometry_hash
+18. property_snapshot_hash
+19. mass_flow_authority_hash
+20. task032_request_hash
+21. task032_result_hash
+22. task032_result_id
+23. task033_request_hash
+24. task033_result_hash
+25. task033_result_id
+26. wall_property_schema_version
+27. wall_property_source_id
+28. wall_property_source_version
+29. wall_property_snapshot_hash
+30. wall_property_authority_hash
+31. request_hash
+32. warnings
+33. blockers
+34. deferred_capabilities
+35. provenance
+)
+TYPED_BLOCKED_RESULT_HASH_SELF_EXCLUSIONS=(blocked_result_hash)
+TYPED_BLOCKED_PREHASH_SET_INVARIANT=set(TYPED_BLOCKED_PREHASH_FIELDS)=set(TYPED_BLOCKED_FIELDS)-{"blocked_result_hash"}
+TYPED_BLOCKED_PREHASH_ORDER_IS_FINAL_ORDER_WITH_SELF_EXCLUSION=true
+
+RAW_BOUNDARY_BLOCKED_FIELD_COUNT=8
+RAW_BOUNDARY_BLOCKED_FIELDS=(
+1. schema_version
+2. profile_id
+3. request_hash
+4. blocked_result_hash
+5. blockers
+6. warnings
+7. deferred_capabilities
+8. raw_projection
+)
+RAW_BOUNDARY_BLOCKED_PREHASH_FIELD_COUNT=7
+RAW_BOUNDARY_BLOCKED_PREHASH_FIELDS=(
+1. schema_version
+2. profile_id
+3. request_hash
+4. blockers
+5. warnings
+6. deferred_capabilities
+7. raw_projection
+)
+RAW_BOUNDARY_BLOCKED_RESULT_HASH_SELF_EXCLUSIONS=(blocked_result_hash)
+
+PROVENANCE_FIELD_COUNT=49
+PROVENANCE_FIELDS=(
+1. task_id
+2. profile_id
+3. design_contract_path
+4. implementation_software_version
+5. request_hash
+6. shell_side_case_id
+7. shell_side_stream_id
+8. shell_side_fluid_id
+9. task020_configuration_id
+10. task020_configuration_hash
+11. shell_type
+12. shell_type_authority_hash
+13. shell_type_authority_record_id
+14. shell_type_authority_source_id
+15. shell_type_authority_source_version
+16. task031_request_hash
+17. task031_geometry_id
+18. task031_geometry_hash
+19. task032_request_hash
+20. task032_result_hash
+21. task032_result_id
+22. task033_request_hash
+23. task033_result_hash
+24. task033_result_id
+25. property_snapshot_hash
+26. mass_flow_authority_hash
+27. wall_property_schema_version
+28. wall_property_source_id
+29. wall_property_source_version
+30. wall_property_snapshot_hash
+31. wall_property_authority_hash
+32. correlation_id
+33. engineering_source_authority_record_id
+34. source_id
+35. source_version
+36. source_location
+37. frozen_source_artifact
+38. applicability_profile
+39. physical_boundary
+40. excluded_phenomena
+41. modeled_quantity
+42. formula_identity
+43. deterministic_algorithm_ids
+44. warnings
+45. deferred_capabilities
+46. evidence_refs
+47. source_definition_issue
+48. source_definition_freeze_comment_id
+49. provenance_hash
+)
+PROVENANCE_PREHASH_FIELD_COUNT=48
+PROVENANCE_PREHASH_FIELDS=(
+1. task_id
+2. profile_id
+3. design_contract_path
+4. implementation_software_version
+5. request_hash
+6. shell_side_case_id
+7. shell_side_stream_id
+8. shell_side_fluid_id
+9. task020_configuration_id
+10. task020_configuration_hash
+11. shell_type
+12. shell_type_authority_hash
+13. shell_type_authority_record_id
+14. shell_type_authority_source_id
+15. shell_type_authority_source_version
+16. task031_request_hash
+17. task031_geometry_id
+18. task031_geometry_hash
+19. task032_request_hash
+20. task032_result_hash
+21. task032_result_id
+22. task033_request_hash
+23. task033_result_hash
+24. task033_result_id
+25. property_snapshot_hash
+26. mass_flow_authority_hash
+27. wall_property_schema_version
+28. wall_property_source_id
+29. wall_property_source_version
+30. wall_property_snapshot_hash
+31. wall_property_authority_hash
+32. correlation_id
+33. engineering_source_authority_record_id
+34. source_id
+35. source_version
+36. source_location
+37. frozen_source_artifact
+38. applicability_profile
+39. physical_boundary
+40. excluded_phenomena
+41. modeled_quantity
+42. formula_identity
+43. deterministic_algorithm_ids
+44. warnings
+45. deferred_capabilities
+46. evidence_refs
+47. source_definition_issue
+48. source_definition_freeze_comment_id
+)
+PROVENANCE_HASH_SELF_EXCLUSIONS=(provenance_hash)
+SUCCESS_PROVENANCE_INCLUDES_SHELL_TYPE_AUTHORITY=true
+TYPED_BLOCKED_PROVENANCE_INCLUDES_SHELL_TYPE_AUTHORITY=true
+
+RAW_PROJECTION_FIELD_COUNT=9
+RAW_PROJECTION_FIELDS=(
+1. top_level_type
+2. sorted_top_level_keys
+3. schema_version_projection
+4. profile_id_projection
+5. task033_upstream_evidence_type
+6. task031_request_evidence_type
+7. shell_type_authority_presence_and_value_projection
+8. wall_property_fields_projection
+9. evidence_refs_projection
+)
+RAW_PROJECTION_FIELD_ORDER_IS_EXPLICIT=true
+RAW_PROJECTION_NAMESPACE=task034.raw-projection.v2
+RAW_PROJECTION_MISSING_AUTHORITY_ENCODING=[MISSING,null]
+RAW_PROJECTION_MISSING_MARKER_IS_NOT_TYPED_REQUEST_BACKFILL=true
+RAW_PROJECTION_DOES_NOT_REPAIR_MISSING_REQUIRED_FIELD=true
+RAW_PROJECTION_DOES_NOT_CREATE_SHELL_TYPE_AUTHORITY_FIELD=true
+RAW_PROJECTION_DOES_NOT_NORMALIZE_ABSENT_TO_PRESENT_NULL=true
+RAW_PROJECTION_SERIALIZATION=canonical_ordered_list_of_field_name_and_public_raw_value_pairs
+RAW_REPR_SERIALIZATION=false
+RAW_MAPPING_ORDER_DEPENDENT_SERIALIZATION=false
+
+### R5 identity computation and DAGs
+HASH_ALGORITHM=SHA-256
+RESULT_ID_ALGORITHM=UUID5
+CANONICAL_BYTES=JSON_UTF8([namespace,projection])
+CANONICAL_JSON_ENSURE_ASCII=false
+CANONICAL_JSON_SEPARATORS=(,,:)
+CANONICAL_JSON_SORT_KEYS=true
+DECIMAL_CANONICAL_VALUE=fixed_point_lexical_decimal
+CANONICAL_FIELD_ORDER_SOURCE=declared_tuple_order
+AUTHORITY_HASH_PREHASH_ORDER_EXPLICIT=true
+AUTHORITY_HASH_PREHASH_SELF_EXCLUSION_EXPLICIT=true
+SUCCESS_HASH_SELF_EXCLUSIONS_EXPLICIT=true
+TYPED_BLOCKED_HASH_SELF_EXCLUSIONS_EXPLICIT=true
+RAW_BOUNDARY_HASH_SELF_EXCLUSIONS_EXPLICIT=true
+PROVENANCE_HASH_SELF_EXCLUSION_EXPLICIT=true
+SUCCESS_IDENTITY_DAG=typed_request_projection -> request_bytes -> request_hash -> provenance_48_field_prehash -> provenance_bytes -> provenance_hash -> success_43_field_prehash -> result_hash -> UUID5_result_id -> success_45_field_final
+TYPED_BLOCKED_IDENTITY_DAG=typed_request_projection -> request_bytes -> request_hash -> typed_blocked_provenance_48_field_prehash -> provenance_bytes -> provenance_hash -> typed_blocked_35_field_prehash -> blocked_result_hash -> typed_blocked_36_field_final
+RAW_BOUNDARY_BLOCKED_IDENTITY_DAG=safe_raw_projection -> raw_projection_bytes -> raw_projection_hash -> raw_boundary_7_field_prehash -> blocked_result_hash -> raw_boundary_8_field_final
+AUTHORITY_IDENTITY_DAG=shell_type_authority_8_field_prehash -> authority_hash
+SHELL_TYPE_AUTHORITY_TO_REQUEST_DAG=shell_type_authority -> authority_hash -> request_hash
+SHELL_TYPE_AUTHORITY_TO_SUCCESS_DAG=shell_type_authority -> authority_hash -> request_hash -> provenance -> result_hash -> result_id
+SHELL_TYPE_AUTHORITY_TO_TYPED_BLOCKED_DAG=shell_type_authority -> authority_hash -> request_hash -> provenance -> blocked_result_hash
+DAG_ACYCLIC=true
+DAG_BRANCHES_SEPARATE=true
+HASH_REPAIR=false
+GUESSED_IDENTITY=false
+IDENTITY_BACKFILL=false
+IDENTITY_ADAPTER_OR_REWRITE=false
+
+### R5 validation stages and authority ordering
+VALIDATION_STAGE_COUNT=17
+VALIDATION_STAGES=(
+1. RAW_BOUNDARY
+2. REQUEST_SCHEMA
+3. UPSTREAM_TYPED_BOUNDARY
+4. TASK033_RESULT_IDENTITY
+5. TASK033_REQUEST_IDENTITY
+6. TASK031_REQUEST_REPLAY
+7. TASK031_GEOMETRY_REPLAY
+8. AUXILIARY_VALUE_BINDING
+9. WALL_PROPERTY_AUTHORITY_REPLAY
+10. SAME_CASE_BINDING
+11. CORRELATION_AUTHORITY_AND_APPLICABILITY
+12. ENGINEERING_INPUT_DOMAIN
+13. FRICTION_FACTOR_AND_WALL_CORRECTION
+14. PRESSURE_DROP_EVALUATION
+15. PUBLIC_QUANTIZATION
+16. PROVENANCE_CANONICALIZATION
+17. RESULT_IDENTITY_FINALIZATION
+)
+VALIDATION_STAGE_INVENTORY_EXACT=true
+REQUEST_SCHEMA_PRECEDES_S11=true
+S11_RECEIVES_ONLY_REQUESTS_ADMITTED_BY_REQUEST_SCHEMA=true
+S11_ORDERED_SUBSTEPS=(
+1. present-null shell_type_authority check -> B054
+2. non-null exact nine-field authority schema/type/unknown-field check -> B055
+3. authority_hash recomputation and exact replay -> B056
+4. exact TASK020 configuration ID/hash join -> B057
+5. supported shell_type predicate -> B031
+6. supported phase predicate -> B029
+7. supported rheology predicate -> B030
+8. supported shell pass count predicate -> B032
+9. supported baffle type predicate -> B033
+10. supported tube layout predicate -> B034
+11. supported baffle cut predicate -> B035
+12. supported uniform spacing predicate -> B036
+13. strict Reynolds domain predicate -> B037
+)
+S11_B054_PRECEDES_B055=true
+S11_B055_PRECEDES_B056=true
+S11_B056_PRECEDES_B057=true
+S11_B057_PRECEDES_B031=true
+ABSENT_SHELL_TYPE_AUTHORITY_KEY_CANNOT_REACH_S11=true
+PRESENT_NULL_SHELL_TYPE_AUTHORITY_CAN_REACH_S11=true
+B031_SEMANTIC_REACHABILITY=true
+B031_PUBLIC_WITNESS_SATISFIABLE=true
+B031_PUBLIC_WITNESS=structurally valid shell_type_authority with shell_type=UNSUPPORTED_SHELL_TYPE, valid authority_hash, and exact TASK020 configuration join
+B031_PRECONDITIONS=(authority_non_null, authority_structurally_valid, authority_hash_replay_pass, exact_task020_configuration_join_pass)
+B054_REACHABILITY_PRESENT_NULL_ONLY=true
+B054_REACHABILITY_REQUIRES_TOP_LEVEL_FIELD_PRESENT=true
+B054_REACHABILITY_TOP_LEVEL_FIELD_ABSENT=false
+B055_REACHABILITY_PRESENT_NON_NULL_INVALID_ONLY=true
+B055_REACHABILITY_TOP_LEVEL_FIELD_ABSENT=false
+B055_REACHABILITY_PRESENT_NULL=false
+SHELL_TYPE_ROUTING_EXHAUSTIVE=true
+SHELL_TYPE_ROUTING_MUTUALLY_EXCLUSIVE=true
+SHELL_TYPE_ROUTING=(
+absent top-level shell_type_authority key -> REQUEST_SCHEMA -> B058
+present shell_type_authority key with null value -> S11 -> B054
+present non-null structurally invalid authority -> S11 -> B055
+present structurally valid authority with failed authority_hash replay -> S11 -> B056
+present structurally valid authority with failed exact configuration join -> S11 -> B057
+present structurally valid authority with passed replay/join and shell_type != "E_SHELL" -> S11 -> B031
+present structurally valid authority with passed replay/join and shell_type == "E_SHELL" -> remaining supported applicability checks
+)
+
+INTRA_STAGE_GUARD_ORDER_FULLY_SPECIFIED=true
+ALL_STAGE_GUARD_ORDER_EXPLICIT=true
+VALIDATION_STAGE_GUARD_ORDER=(
+S01 RAW_BOUNDARY: B001 -> B002 -> B003 -> B004
+S02 REQUEST_SCHEMA: B005 -> B006 -> B007 -> B058
+S03 UPSTREAM_TYPED_BOUNDARY: B009 -> B010 -> B008
+S04 TASK033_RESULT_IDENTITY: B012 -> B013 -> B018 -> B019
+S05 TASK033_REQUEST_IDENTITY: B011
+S06 TASK031_REQUEST_REPLAY: B014 -> B015
+S07 TASK031_GEOMETRY_REPLAY: B016 -> B017
+S08 AUXILIARY_VALUE_BINDING: B024 -> B025 -> B048 -> B049 -> B050 -> B051 -> B052 -> B053
+S09 WALL_PROPERTY_AUTHORITY_REPLAY: B026 -> B027 -> B028
+S10 SAME_CASE_BINDING: B020 -> B021 -> B022 -> B023
+S11 CORRELATION_AUTHORITY_AND_APPLICABILITY: B054 -> B055 -> B056 -> B057 -> B031 -> B029 -> B030 -> B032 -> B033 -> B034 -> B035 -> B036 -> B037
+S12 ENGINEERING_INPUT_DOMAIN: B038
+S13 FRICTION_FACTOR_AND_WALL_CORRECTION: B039 -> B040 -> B041
+S14 PRESSURE_DROP_EVALUATION: B042
+S15 PUBLIC_QUANTIZATION: B043
+S16 PROVENANCE_CANONICALIZATION: B044
+S17 RESULT_IDENTITY_FINALIZATION: B046 -> B047 -> B045
+)
+STAGE_ORDER_CONTRADICTION_COUNT=0
+S08_B026_B027_B028_ORDER_DISJOINT=true
+S12_B038_REQUIRES_ALL_S08_S11_GUARDS_PASS=true
+S11_B037_PRECEDES_S12_B038=true
+S13_B039_B040_B041_OPERATION_ORDER_DISJOINT=true
+S17_B046_PRECEDES_B047_PRECEDES_B045=true
+VALIDATION_GUARD_EXECUTION_RULE=within each stage evaluate the listed guards in declared order; a later guard is eligible only after every earlier guard in that stage is false; the first true guard is the sole primary blocker and later guards are not evaluated
+VALIDATION_GUARD_ACCESS_RULE=a guard may dereference only fields admitted by its earlier-stage and same-stage prerequisites; missing or invalid prerequisite containers are handled by their earlier guard
+SAME_STAGE_EFFECTIVE_PRIMARY_TRIGGER=declared_predicate AND all_prior_same_stage_predicates_are_false
+SAME_STAGE_PREDICATE_OVERLAP_IS_REMOVED_BY_ORDERED_GUARD_PRECONDITIONS=true
+S02_B006_REQUIRES_B005_FALSE=true
+S02_B007_REQUIRES_B005_AND_B006_FALSE=true
+S02_B058_REQUIRES_B005_B006_AND_B007_FALSE=true
+S03_B010_REQUIRES_B009_FALSE=true
+S03_B008_REQUIRES_B009_AND_B010_FALSE=true
+S04_B013_REQUIRES_B012_FALSE=true
+S04_B019_REQUIRES_B012_B013_AND_B018_FALSE=true
+S06_B015_REQUIRES_B014_FALSE=true
+S07_B017_REQUIRES_B016_FALSE=true
+S08_B025_REQUIRES_B024_FALSE=true
+S08_B049_REQUIRES_B024_B025_B048_FALSE=true
+S08_B050_REQUIRES_B024_B025_B048_B049_FALSE=true
+S08_B051_REQUIRES_B024_B025_B048_B049_B050_FALSE=true
+S08_B052_REQUIRES_B024_B025_B048_B049_B050_B051_FALSE=true
+S08_B053_REQUIRES_B024_B025_B048_B049_B050_B051_B052_FALSE=true
+S09_B027_REQUIRES_B026_FALSE=true
+S09_B028_REQUIRES_B026_AND_B027_FALSE=true
+S10_B021_REQUIRES_B020_FALSE=true
+S10_B022_REQUIRES_B020_AND_B021_FALSE=true
+S10_B023_REQUIRES_B020_B021_AND_B022_FALSE=true
+S11_EACH_LATER_APPLICABILITY_GUARD_REQUIRES_ALL_PRIOR_S11_GUARDS_FALSE=true
+S17_B047_REQUIRES_B046_FALSE=true
+S17_B045_REQUIRES_B046_AND_B047_FALSE=true
+OVERLAPPING_PRIMARY_PREDICATE_COUNT=0
+MULTI_PRIMARY_TRIGGER_WITNESS_COUNT=0
+A5_TASK034_APPLICABILITY_PUBLIC_PATHS_APPLIED=true
+
+### R5 auxiliary and upstream replay corrections
+DEFECT_A_TASK033_RESULT_IDENTITY_REPLAY_CORRECTION_REQUIRED=true
+TASK033_PRODUCER_SUCCESS_HASH_NAMESPACE=task033.shell-side-heat-transfer.v1
+TASK034_TASK033_REPLAY_NAMESPACE=task033.shell-side-heat-transfer.v1
+TASK034_OLD_TASK033_REPLAY_NAMESPACE_ACCEPTED=false
+DEFECT_B_TASK031_PUBLIC_REQUEST_CANONICAL_REPLAY_CORRECTION_REQUIRED=true
+TASK031_PUBLIC_REQUEST_REPLAY_USES_PROVENANCE=true
+TASK031_INTERNAL_PROVENANCE_PREHASH_DERIVATION=true
+TASK031_CALLER_PROVENANCE_PREHASH_REQUIRED=false
+DEFECT_C_TASK031_SHELL_INSIDE_DIAMETER_BINDING_CORRECTION_REQUIRED=true
+TASK034_SHELL_INSIDE_DIAMETER_AUTHORITY_PATH=task031_request_evidence.baffle_geometry_result.geometry.shell_inside_diameter_m
+TASK034_SHELL_INSIDE_DIAMETER_DERIVATION=false
+TASK034_SHELL_INSIDE_DIAMETER_FALLBACK=false
+TASK034_SHELL_INSIDE_DIAMETER_EXPECTED_VALUE=request.task031_request_evidence.baffle_geometry_result.geometry.shell_inside_diameter_m
+TASK034_AUXILIARY_BINDING_FIELDS=(
+shell_inside_diameter_m -> task031_request_evidence.baffle_geometry_result.geometry.shell_inside_diameter_m
+baffle_count -> task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_count
+uniform_spacing_sequence_m -> task031_request_evidence.baffle_geometry_result.geometry.design_authority.spacing_sequence_m
+tube_pitch_m -> task031_request_evidence.tube_layout.layout_rule_authority.pitch_m
+tube_outer_diameter_m -> task031_request_evidence.tube_layout.tube_geometry.outer_diameter_m
+pattern_family -> task031_request_evidence.tube_layout.layout_rule_authority.pattern_family
+property_snapshot_hash -> task033_upstream_evidence.task033_request_evidence.task032_request_evidence.property_snapshot_hash
+mass_flow_authority_hash -> task033_upstream_evidence.task033_request_evidence.task032_request_evidence.mass_flow_authority.authority_hash
+)
+TASK034_AUXILIARY_TASK032_PROPERTY_PATH=task033_upstream_evidence.task033_request_evidence.task032_request_evidence.property_snapshot_hash
+TASK034_AUXILIARY_TASK032_MASS_FLOW_AUTHORITY_PATH=task033_upstream_evidence.task033_request_evidence.task032_request_evidence.mass_flow_authority.authority_hash
+TASK034_AUXILIARY_BINDINGS_ARE_PUBLIC_INPUT_REPLAY_PATHS=true
+TASK034_AUXILIARY_BINDINGS_USE_TASK031_SUCCESS_GEOMETRY_FOR_SHELL_DIAMETER=false
+TASK034_AUXILIARY_BINDING_WITNESS_RULE=each B048-B053 witness changes only the corresponding TASK034 consumer auxiliary copy while all accepted upstream evidence remains unchanged
+TASK034_NO_UPSTREAM_ENGINEERING_RECOMPUTATION=true
+TASK034_NO_UPSTREAM_MUTATION=true
+A2_TASK034_AUXILIARY_PUBLIC_PATHS_APPLIED=true
+
+### R5 blocker registry
+BLOCKER_REGISTRY_COUNT=58
+BLOCKER_REGISTRY_ORDER_IS_CANONICAL=true
+BLOCKER_REGISTRY=(
+1. SSPD_RAW_REQUEST_TYPE_INVALID
+2. SSPD_RAW_BINARY_FLOAT_FORBIDDEN
+3. SSPD_RAW_UNSUPPORTED_PRIMITIVE
+4. SSPD_RAW_CANONICALIZATION_FAILURE
+5. SSPD_UNKNOWN_REQUEST_FIELD
+6. SSPD_REQUEST_SCHEMA_MISMATCH
+7. SSPD_PROFILE_ID_MISMATCH
+8. SSPD_SOURCE_AUTHORITY_MISMATCH
+9. SSPD_TASK033_UPSTREAM_MISSING
+10. SSPD_TASK033_UPSTREAM_INVALID
+11. SSPD_TASK033_REQUEST_HASH_MISMATCH
+12. SSPD_TASK033_RESULT_ID_MISMATCH
+13. SSPD_TASK033_RESULT_HASH_MISMATCH
+14. SSPD_TASK031_REQUEST_EVIDENCE_MISSING
+15. SSPD_TASK031_REQUEST_HASH_MISMATCH
+16. SSPD_TASK031_GEOMETRY_ID_MISMATCH
+17. SSPD_TASK031_GEOMETRY_HASH_MISMATCH
+18. SSPD_TASK032_RESULT_ID_MISMATCH
+19. SSPD_TASK032_RESULT_HASH_MISMATCH
+20. SSPD_CASE_ID_MISMATCH
+21. SSPD_STREAM_ID_MISMATCH
+22. SSPD_FLUID_ID_MISMATCH
+23. SSPD_CONFIGURATION_ID_MISMATCH
+24. SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH
+25. SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH
+26. SSPD_WALL_PROPERTY_AUTHORITY_MISSING
+27. SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH
+28. SSPD_WALL_VISCOSITY_INVALID
+29. SSPD_UNSUPPORTED_PHASE
+30. SSPD_UNSUPPORTED_RHEOLOGY
+31. SSPD_UNSUPPORTED_SHELL_TYPE
+32. SSPD_UNSUPPORTED_SHELL_PASS_COUNT
+33. SSPD_UNSUPPORTED_BAFFLE_TYPE
+34. SSPD_UNSUPPORTED_TUBE_LAYOUT
+35. SSPD_UNSUPPORTED_BAFFLE_CUT
+36. SSPD_UNSUPPORTED_BAFFLE_SPACING
+37. SSPD_REYNOLDS_OUTSIDE_DOMAIN
+38. SSPD_FORMULA_INPUT_INVALID
+39. SSPD_DECIMAL_LN_FAILURE
+40. SSPD_DECIMAL_EXP_FAILURE
+41. SSPD_DECIMAL_POWER_FAILURE
+42. SSPD_PRESSURE_DROP_CALCULATION_FAILURE
+43. SSPD_PUBLIC_QUANTIZATION_FAILURE
+44. SSPD_PROVENANCE_CANONICALIZATION_FAILURE
+45. SSPD_RESULT_ID_FINALIZATION_FAILURE
+46. SSPD_PARTIAL_RESULT_FORBIDDEN
+47. SSPD_DEFERRED_CAPABILITY_TOKEN_INVALID
+48. SSPD_SHELL_INSIDE_DIAMETER_MISMATCH
+49. SSPD_BAFFLE_COUNT_MISMATCH
+50. SSPD_SPACING_SEQUENCE_MISMATCH
+51. SSPD_TUBE_PITCH_MISMATCH
+52. SSPD_TUBE_OUTER_DIAMETER_MISMATCH
+53. SSPD_PATTERN_FAMILY_MISMATCH
+54. SSPD_SHELL_TYPE_AUTHORITY_MISSING
+55. SSPD_SHELL_TYPE_AUTHORITY_INVALID
+56. SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH
+57. SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH
+58. SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING
+)
+BLOCKER_REACHABILITY_COUNT=58
+BLOCKER_REACHABILITY_ROWS=(
+1; SSPD_RAW_REQUEST_TYPE_INVALID; RAW_BOUNDARY; type(raw_request) is not dict; raw_request; RAW_BOUNDARY_BLOCKED; T034-B001_SSPD_RAW_REQUEST_TYPE_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+2; SSPD_RAW_BINARY_FLOAT_FORBIDDEN; RAW_BOUNDARY; any(type(value) is float for value in walk_raw_values(raw_request)); raw_request.*; RAW_BOUNDARY_BLOCKED; T034-B002_SSPD_RAW_BINARY_FLOAT_FORBIDDEN; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+3; SSPD_RAW_UNSUPPORTED_PRIMITIVE; RAW_BOUNDARY; any(type(value) not in {type(None), bool, int, str, list, dict, tuple} for value in walk_raw_values(raw_request)); raw_request.*; RAW_BOUNDARY_BLOCKED; T034-B003_SSPD_RAW_UNSUPPORTED_PRIMITIVE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+4; SSPD_RAW_CANONICALIZATION_FAILURE; RAW_BOUNDARY; canonicalize_raw_projection(raw_request) raises CanonicalizationError; raw_request; RAW_BOUNDARY_BLOCKED; T034-B004_SSPD_RAW_CANONICALIZATION_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+5; SSPD_UNKNOWN_REQUEST_FIELD; REQUEST_SCHEMA; set(request.keys()) - set(REQUEST_FIELDS) != set(); request.keys; TYPED_BLOCKED; T034-B005_SSPD_UNKNOWN_REQUEST_FIELD; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+6; SSPD_REQUEST_SCHEMA_MISMATCH; REQUEST_SCHEMA; request.schema_version != "task034.shell-side-pressure-drop-request.v2"; schema_version; TYPED_BLOCKED; T034-B006_SSPD_REQUEST_SCHEMA_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+7; SSPD_PROFILE_ID_MISMATCH; REQUEST_SCHEMA; request.profile_id != "hxforge.shell_tube.shell_side_pressure_drop.v2"; profile_id; TYPED_BLOCKED; T034-B007_SSPD_PROFILE_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+8; SSPD_SOURCE_AUTHORITY_MISMATCH; UPSTREAM_TYPED_BOUNDARY; task033_upstream_evidence.task033_validation_result.heat_transfer.engineering_source_authority_record_id != "5387111841" after the accepted public envelope exists; task033_upstream_evidence.task033_validation_result.heat_transfer.engineering_source_authority_record_id; TYPED_BLOCKED; T034-B008_SSPD_SOURCE_AUTHORITY_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+9; SSPD_TASK033_UPSTREAM_MISSING; UPSTREAM_TYPED_BOUNDARY; task033_upstream_evidence is None or task033_upstream_evidence.task033_request_evidence is None or task033_upstream_evidence.task033_validation_result is None; task033_upstream_evidence; TYPED_BLOCKED; T034-B009_SSPD_TASK033_UPSTREAM_MISSING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+10; SSPD_TASK033_UPSTREAM_INVALID; UPSTREAM_TYPED_BOUNDARY; task033_upstream_evidence.task033_validation_result.status != VALID or task033_upstream_evidence.task033_validation_result.heat_transfer is None; task033_upstream_evidence.task033_validation_result.status|task033_upstream_evidence.task033_validation_result.heat_transfer; TYPED_BLOCKED; T034-B010_SSPD_TASK033_UPSTREAM_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+11; SSPD_TASK033_REQUEST_HASH_MISMATCH; TASK033_REQUEST_IDENTITY; hash_task033_request(task033_upstream_evidence.task033_request_evidence) != task033_upstream_evidence.task033_validation_result.heat_transfer.request_hash; task033_upstream_evidence.task033_validation_result.heat_transfer.request_hash; TYPED_BLOCKED; T034-B011_SSPD_TASK033_REQUEST_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+12; SSPD_TASK033_RESULT_ID_MISMATCH; TASK033_RESULT_IDENTITY; request.task033_result_id != task033_upstream_evidence.task033_validation_result.heat_transfer.result_id; task033_upstream_evidence.task033_validation_result.heat_transfer.result_id; TYPED_BLOCKED; T034-B012_SSPD_TASK033_RESULT_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+13; SSPD_TASK033_RESULT_HASH_MISMATCH; TASK033_RESULT_IDENTITY; request.task033_result_hash != task033_upstream_evidence.task033_validation_result.heat_transfer.result_hash; task033_upstream_evidence.task033_validation_result.heat_transfer.result_hash; TYPED_BLOCKED; T034-B013_SSPD_TASK033_RESULT_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+14; SSPD_TASK031_REQUEST_EVIDENCE_MISSING; TASK031_REQUEST_REPLAY; request.task031_request_evidence is None; task031_request_evidence; TYPED_BLOCKED; T034-B014_SSPD_TASK031_REQUEST_EVIDENCE_MISSING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+15; SSPD_TASK031_REQUEST_HASH_MISMATCH; TASK031_REQUEST_REPLAY; recompute_task031_request_hash(request.task031_request_evidence) != request.task031_request_hash; task031_request_evidence.request_hash; TYPED_BLOCKED; T034-B015_SSPD_TASK031_REQUEST_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+16; SSPD_TASK031_GEOMETRY_ID_MISMATCH; TASK031_GEOMETRY_REPLAY; task033_upstream_evidence.task033_validation_result.heat_transfer.task031_geometry_id != request.task031_geometry_id; task033_upstream_evidence.task033_validation_result.heat_transfer.task031_geometry_id; TYPED_BLOCKED; T034-B016_SSPD_TASK031_GEOMETRY_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+17; SSPD_TASK031_GEOMETRY_HASH_MISMATCH; TASK031_GEOMETRY_REPLAY; task033_upstream_evidence.task033_validation_result.heat_transfer.task031_geometry_hash != request.task031_geometry_hash; task033_upstream_evidence.task033_validation_result.heat_transfer.task031_geometry_hash; TYPED_BLOCKED; T034-B017_SSPD_TASK031_GEOMETRY_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+18; SSPD_TASK032_RESULT_ID_MISMATCH; TASK033_RESULT_IDENTITY; task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_id != task033_upstream_evidence.task033_validation_result.heat_transfer.task032_result_id; task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_id; TYPED_BLOCKED; T034-B018_SSPD_TASK032_RESULT_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+19; SSPD_TASK032_RESULT_HASH_MISMATCH; TASK033_RESULT_IDENTITY; task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_hash != task033_upstream_evidence.task033_validation_result.heat_transfer.task032_result_hash; task033_upstream_evidence.task033_request_evidence.task032_flow_state.result_hash; TYPED_BLOCKED; T034-B019_SSPD_TASK032_RESULT_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+20; SSPD_CASE_ID_MISMATCH; SAME_CASE_BINDING; request.shell_side_case_id != task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_case_id; shell_side_case_id; TYPED_BLOCKED; T034-B020_SSPD_CASE_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+21; SSPD_STREAM_ID_MISMATCH; SAME_CASE_BINDING; request.shell_side_stream_id != task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_stream_id; shell_side_stream_id; TYPED_BLOCKED; T034-B021_SSPD_STREAM_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+22; SSPD_FLUID_ID_MISMATCH; SAME_CASE_BINDING; request.shell_side_fluid_id != task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_fluid_id; shell_side_fluid_id; TYPED_BLOCKED; T034-B022_SSPD_FLUID_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+23; SSPD_CONFIGURATION_ID_MISMATCH; SAME_CASE_BINDING; request.task020_configuration_id != task033_upstream_evidence.task033_request_evidence.task032_flow_state.task020_configuration_id; task020_configuration_id; TYPED_BLOCKED; T034-B023_SSPD_CONFIGURATION_ID_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+24; SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH; AUXILIARY_VALUE_BINDING; request.property_snapshot_hash != task033_upstream_evidence.task033_request_evidence.task032_flow_state.property_snapshot_hash; property_snapshot_hash; TYPED_BLOCKED; T034-B024_SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+25; SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH; AUXILIARY_VALUE_BINDING; request.mass_flow_authority_hash != task033_upstream_evidence.task033_request_evidence.task032_flow_state.mass_flow_authority_hash; mass_flow_authority_hash; TYPED_BLOCKED; T034-B025_SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+26; SSPD_WALL_PROPERTY_AUTHORITY_MISSING; WALL_PROPERTY_AUTHORITY_REPLAY; request.wall_property_authority_hash is None; wall_property_authority_hash; TYPED_BLOCKED; T034-B026_SSPD_WALL_PROPERTY_AUTHORITY_MISSING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+27; SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH; WALL_PROPERTY_AUTHORITY_REPLAY; recompute_wall_property_authority_hash(request.wall_property_fields_projection) != request.wall_property_authority_hash; wall_property_fields_projection; TYPED_BLOCKED; T034-B027_SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+28; SSPD_WALL_VISCOSITY_INVALID; WALL_PROPERTY_AUTHORITY_REPLAY; not (is_finite_decimal(request.shell_side_wall_dynamic_viscosity_pa_s) and request.shell_side_wall_dynamic_viscosity_pa_s > Decimal("0")); shell_side_wall_dynamic_viscosity_pa_s; TYPED_BLOCKED; T034-B028_SSPD_WALL_VISCOSITY_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+29; SSPD_UNSUPPORTED_PHASE; CORRELATION_AUTHORITY_AND_APPLICABILITY; task033_upstream_evidence.task033_request_evidence.task032_flow_state.phase_region != "SINGLE_PHASE_LIQUID"; task033_upstream_evidence.task033_request_evidence.task032_flow_state.phase_region; TYPED_BLOCKED; T034-B029_SSPD_UNSUPPORTED_PHASE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+30; SSPD_UNSUPPORTED_RHEOLOGY; CORRELATION_AUTHORITY_AND_APPLICABILITY; task033_upstream_evidence.task033_request_evidence.task032_flow_state.rheology_model != "NEWTONIAN"; task033_upstream_evidence.task033_request_evidence.task032_flow_state.rheology_model; TYPED_BLOCKED; T034-B030_SSPD_UNSUPPORTED_RHEOLOGY; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+31; SSPD_UNSUPPORTED_SHELL_TYPE; CORRELATION_AUTHORITY_AND_APPLICABILITY; authority_replay_and_configuration_join_pass and shell_type_authority.shell_type != "E_SHELL"; shell_type_authority.shell_type; TYPED_BLOCKED; T034-B031_SSPD_UNSUPPORTED_SHELL_TYPE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+32; SSPD_UNSUPPORTED_SHELL_PASS_COUNT; CORRELATION_AUTHORITY_AND_APPLICABILITY; task031_request_evidence.baffle_geometry_result.geometry.shell_pass_count != 1; task031_request_evidence.baffle_geometry_result.geometry.shell_pass_count; TYPED_BLOCKED; T034-B032_SSPD_UNSUPPORTED_SHELL_PASS_COUNT; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+33; SSPD_UNSUPPORTED_BAFFLE_TYPE; CORRELATION_AUTHORITY_AND_APPLICABILITY; task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_type != "SINGLE_SEGMENTAL"; task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_type; TYPED_BLOCKED; T034-B033_SSPD_UNSUPPORTED_BAFFLE_TYPE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+34; SSPD_UNSUPPORTED_TUBE_LAYOUT; CORRELATION_AUTHORITY_AND_APPLICABILITY; task031_request_evidence.tube_layout.layout_rule_authority.pattern_family != "TRIANGULAR_PITCH"; task031_request_evidence.tube_layout.layout_rule_authority.pattern_family; TYPED_BLOCKED; T034-B034_SSPD_UNSUPPORTED_TUBE_LAYOUT; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+35; SSPD_UNSUPPORTED_BAFFLE_CUT; CORRELATION_AUTHORITY_AND_APPLICABILITY; task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_cut_fraction != "0.25"; task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_cut_fraction; TYPED_BLOCKED; T034-B035_SSPD_UNSUPPORTED_BAFFLE_CUT; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+36; SSPD_UNSUPPORTED_BAFFLE_SPACING; CORRELATION_AUTHORITY_AND_APPLICABILITY; not is_uniform_central_spacing(task031_request_evidence.baffle_geometry_result.geometry.design_authority.spacing_sequence_m); task031_request_evidence.baffle_geometry_result.geometry.design_authority.spacing_sequence_m; TYPED_BLOCKED; T034-B036_SSPD_UNSUPPORTED_BAFFLE_SPACING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+37; SSPD_REYNOLDS_OUTSIDE_DOMAIN; CORRELATION_AUTHORITY_AND_APPLICABILITY; not (Decimal("400") < task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_reynolds_number < Decimal("1000000")); task033_upstream_evidence.task033_request_evidence.task032_flow_state.shell_side_reynolds_number; TYPED_BLOCKED; T034-B037_SSPD_REYNOLDS_OUTSIDE_DOMAIN; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+38; SSPD_FORMULA_INPUT_INVALID; ENGINEERING_INPUT_DOMAIN; all earlier replay, authority, applicability, and domain guards pass and validate_engineering_inputs(...) raises EngineeringInputDomainError; Re_s|G_s|rho_s|D_s|D_e|N_b|mu_b|mu_w; TYPED_BLOCKED; T034-B038_SSPD_FORMULA_INPUT_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+39; SSPD_DECIMAL_LN_FAILURE; FRICTION_FACTOR_AND_WALL_CORRECTION; S12 engineering-input guard passes and the guarded F13_DECIMAL_LN_RE operation raises FormulaCalculationError; F13_DECIMAL_LN_RE; TYPED_BLOCKED; T034-B039_SSPD_DECIMAL_LN_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+40; SSPD_DECIMAL_EXP_FAILURE; FRICTION_FACTOR_AND_WALL_CORRECTION; S12 and guarded F13_DECIMAL_LN_RE pass and the guarded F13_DECIMAL_EXP_FRICTION operation raises FormulaCalculationError; F13_DECIMAL_EXP_FRICTION; TYPED_BLOCKED; T034-B040_SSPD_DECIMAL_EXP_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+41; SSPD_DECIMAL_POWER_FAILURE; FRICTION_FACTOR_AND_WALL_CORRECTION; S12, F13_DECIMAL_LN_RE, and F13_DECIMAL_EXP_FRICTION guards pass and the guarded F13_DECIMAL_PHI_POWER operation raises FormulaCalculationError; F13_DECIMAL_PHI_POWER; TYPED_BLOCKED; T034-B041_SSPD_DECIMAL_POWER_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+42; SSPD_PRESSURE_DROP_CALCULATION_FAILURE; PRESSURE_DROP_EVALUATION; S12 and all S13 guarded operations pass and a guarded F14_PRESSURE_DROP operation raises FormulaCalculationError; F14_PRESSURE_DROP; TYPED_BLOCKED; T034-B042_SSPD_PRESSURE_DROP_CALCULATION_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+43; SSPD_PUBLIC_QUANTIZATION_FAILURE; PUBLIC_QUANTIZATION; S14 returns a finite raw pressure drop and the guarded F15_PUBLIC_QUANTIZATION operation raises PublicQuantizationError; F15_PUBLIC_QUANTIZATION; TYPED_BLOCKED; T034-B043_SSPD_PUBLIC_QUANTIZATION_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py
+44; SSPD_PROVENANCE_CANONICALIZATION_FAILURE; PROVENANCE_CANONICALIZATION; S15 and all provenance-preimage inputs pass and the guarded canonicalize_provenance/finalize_provenance operation raises CanonicalizationError; provenance; TYPED_BLOCKED; T034-B044_SSPD_PROVENANCE_CANONICALIZATION_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
+45; SSPD_RESULT_ID_FINALIZATION_FAILURE; RESULT_IDENTITY_FINALIZATION; result prehash is valid and the guarded UUID5 result-id finalization raises ResultIdentityFinalizationError other than the two explicit result-state blockers; result_hash; TYPED_BLOCKED; T034-B045_SSPD_RESULT_ID_FINALIZATION_FAILURE; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
+46; SSPD_PARTIAL_RESULT_FORBIDDEN; RESULT_IDENTITY_FINALIZATION; deferred_capability_tokens_are_valid and a result candidate has non-empty blockers or no modeled_shell_side_pressure_drop_pa; result.blockers|modeled_shell_side_pressure_drop_pa; TYPED_BLOCKED; T034-B046_SSPD_PARTIAL_RESULT_FORBIDDEN; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+47; SSPD_DEFERRED_CAPABILITY_TOKEN_INVALID; RESULT_IDENTITY_FINALIZATION; deferred_capability_tokens_are_not_valid; deferred_capabilities; TYPED_BLOCKED; T034-B047_SSPD_DEFERRED_CAPABILITY_TOKEN_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+48; SSPD_SHELL_INSIDE_DIAMETER_MISMATCH; AUXILIARY_VALUE_BINDING; request.shell_inside_diameter_m != task031_request_evidence.baffle_geometry_result.geometry.shell_inside_diameter_m; task031_request_evidence.baffle_geometry_result.geometry.shell_inside_diameter_m; TYPED_BLOCKED; T034-B048_SSPD_SHELL_INSIDE_DIAMETER_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+49; SSPD_BAFFLE_COUNT_MISMATCH; AUXILIARY_VALUE_BINDING; request.baffle_count != request.task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_count; task031_request_evidence.baffle_geometry_result.geometry.design_authority.baffle_count; TYPED_BLOCKED; T034-B049_SSPD_BAFFLE_COUNT_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+50; SSPD_SPACING_SEQUENCE_MISMATCH; AUXILIARY_VALUE_BINDING; request.uniform_spacing_sequence_m != request.task031_request_evidence.baffle_geometry_result.geometry.design_authority.spacing_sequence_m; task031_request_evidence.baffle_geometry_result.geometry.design_authority.spacing_sequence_m; TYPED_BLOCKED; T034-B050_SSPD_SPACING_SEQUENCE_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+51; SSPD_TUBE_PITCH_MISMATCH; AUXILIARY_VALUE_BINDING; request.tube_pitch_m != request.task031_request_evidence.tube_layout.layout_rule_authority.pitch_m; task031_request_evidence.tube_layout.layout_rule_authority.pitch_m; TYPED_BLOCKED; T034-B051_SSPD_TUBE_PITCH_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+52; SSPD_TUBE_OUTER_DIAMETER_MISMATCH; AUXILIARY_VALUE_BINDING; request.tube_outer_diameter_m != request.task031_request_evidence.tube_layout.tube_geometry.outer_diameter_m; task031_request_evidence.tube_layout.tube_geometry.outer_diameter_m; TYPED_BLOCKED; T034-B052_SSPD_TUBE_OUTER_DIAMETER_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+53; SSPD_PATTERN_FAMILY_MISMATCH; AUXILIARY_VALUE_BINDING; request.pattern_family != request.task031_request_evidence.tube_layout.layout_rule_authority.pattern_family; task031_request_evidence.tube_layout.layout_rule_authority.pattern_family; TYPED_BLOCKED; T034-B053_SSPD_PATTERN_FAMILY_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+54; SSPD_SHELL_TYPE_AUTHORITY_MISSING; CORRELATION_AUTHORITY_AND_APPLICABILITY; shell_type_authority key is present and request.shell_type_authority is None; shell_type_authority; TYPED_BLOCKED; T034-B054_SSPD_SHELL_TYPE_AUTHORITY_MISSING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+55; SSPD_SHELL_TYPE_AUTHORITY_INVALID; CORRELATION_AUTHORITY_AND_APPLICABILITY; shell_type_authority key is present and value is non-null and value is not an admitted exact nine-field shell-type-authority object with correct schema/types and no unknown fields; shell_type_authority; TYPED_BLOCKED; T034-B055_SSPD_SHELL_TYPE_AUTHORITY_INVALID; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+56; SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH; CORRELATION_AUTHORITY_AND_APPLICABILITY; authority object is structurally valid and recomputed authority_hash != supplied authority_hash; shell_type_authority.authority_hash; TYPED_BLOCKED; T034-B056_SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+57; SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH; CORRELATION_AUTHORITY_AND_APPLICABILITY; authority replay is valid and exact task020_configuration_id or task020_configuration_hash join fails; shell_type_authority.task020_configuration_id|task020_configuration_hash; TYPED_BLOCKED; T034-B057_SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+58; SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING; REQUEST_SCHEMA; shell_type_authority is not in request.keys(); shell_type_authority; TYPED_BLOCKED; T034-B058_SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING; tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+)
+BLOCKER_REACHABILITY_IS_BIJECTION=true
+DISTINCT_BLOCKER_ID_COUNT=58
+DISTINCT_BLOCKER_REACHABILITY_ID_COUNT=58
+DUPLICATE_BLOCKER_ID_COUNT=0
+DUPLICATE_BLOCKER_REACHABILITY_COUNT=0
+UNREACHABLE_BLOCKER_COUNT=0
+BLOCKER_WITHOUT_TEST_COUNT=0
+PLACEHOLDER_TRIGGER_PREDICATE_COUNT=0
+BLOCKER_PRIMARY_TEST_NOT_IN_TEST_INVENTORY_COUNT=0
+BLOCKER_PRIMARY_TEST_UNIQUE_COUNT=58
+ALL_58_PRIMARY_BLOCKERS_HAVE_UNIQUE_TEST=true
+BLOCKER_REACHABILITY_CLASS_BY_INDEX=(
+1|PUBLIC_INPUT_REACHABLE
+2|PUBLIC_INPUT_REACHABLE
+3|PUBLIC_INPUT_REACHABLE
+4|PUBLIC_INPUT_REACHABLE
+5|PUBLIC_INPUT_REACHABLE
+6|PUBLIC_INPUT_REACHABLE
+7|PUBLIC_INPUT_REACHABLE
+8|PUBLIC_INPUT_REACHABLE
+9|PUBLIC_INPUT_REACHABLE
+10|PUBLIC_INPUT_REACHABLE
+11|PUBLIC_INPUT_REACHABLE
+12|PUBLIC_INPUT_REACHABLE
+13|PUBLIC_INPUT_REACHABLE
+14|PUBLIC_INPUT_REACHABLE
+15|PUBLIC_INPUT_REACHABLE
+16|PUBLIC_INPUT_REACHABLE
+17|PUBLIC_INPUT_REACHABLE
+18|PUBLIC_INPUT_REACHABLE
+19|PUBLIC_INPUT_REACHABLE
+20|PUBLIC_INPUT_REACHABLE
+21|PUBLIC_INPUT_REACHABLE
+22|PUBLIC_INPUT_REACHABLE
+23|PUBLIC_INPUT_REACHABLE
+24|PUBLIC_INPUT_REACHABLE
+25|PUBLIC_INPUT_REACHABLE
+26|PUBLIC_INPUT_REACHABLE
+27|PUBLIC_INPUT_REACHABLE
+28|PUBLIC_INPUT_REACHABLE
+29|PUBLIC_INPUT_REACHABLE
+30|DEFENSIVE_FAULT_INJECTION_ONLY
+31|PUBLIC_INPUT_REACHABLE
+32|DEFENSIVE_FAULT_INJECTION_ONLY
+33|DEFENSIVE_FAULT_INJECTION_ONLY
+34|PUBLIC_INPUT_REACHABLE
+35|PUBLIC_INPUT_REACHABLE
+36|DEFENSIVE_FAULT_INJECTION_ONLY
+37|PUBLIC_INPUT_REACHABLE
+38|DEFENSIVE_FAULT_INJECTION_ONLY
+39|DEFENSIVE_FAULT_INJECTION_ONLY
+40|DEFENSIVE_FAULT_INJECTION_ONLY
+41|DEFENSIVE_FAULT_INJECTION_ONLY
+42|DEFENSIVE_FAULT_INJECTION_ONLY
+43|DEFENSIVE_FAULT_INJECTION_ONLY
+44|DEFENSIVE_FAULT_INJECTION_ONLY
+45|DEFENSIVE_FAULT_INJECTION_ONLY
+46|DEFENSIVE_FAULT_INJECTION_ONLY
+47|DEFENSIVE_FAULT_INJECTION_ONLY
+48|PUBLIC_INPUT_REACHABLE
+49|PUBLIC_INPUT_REACHABLE
+50|PUBLIC_INPUT_REACHABLE
+51|PUBLIC_INPUT_REACHABLE
+52|PUBLIC_INPUT_REACHABLE
+53|PUBLIC_INPUT_REACHABLE
+54|PUBLIC_INPUT_REACHABLE
+55|PUBLIC_INPUT_REACHABLE
+56|PUBLIC_INPUT_REACHABLE
+57|PUBLIC_INPUT_REACHABLE
+58|PUBLIC_INPUT_REACHABLE
+)
+PUBLIC_INPUT_REACHABLE_BLOCKER_COUNT=44
+DEFENSIVE_FAULT_INJECTION_ONLY_BLOCKER_COUNT=14
+RETIRED_BLOCKER_COUNT=0
+BLOCKER_REACHABILITY_UNDETERMINED_COUNT=0
+SEMANTIC_UNDETERMINED_BLOCKER_COUNT=0
+FALSE_PUBLIC_REACHABILITY_CLAIM_COUNT=0
+UNSATISFIABLE_PUBLIC_WITNESS_COUNT=0
+WRONG_PRIMARY_BLOCKER_WITNESS_COUNT=0
+SCHEMA_SHADOWED_PUBLIC_BLOCKER_COUNT=0
+EARLIER_BLOCKER_SHADOWED_PRIMARY_COUNT=0
+PUBLIC_PATH_MISMATCH_COUNT=0
+AUTHORITY_UNRESOLVED_COUNT=0
+ORIGIN_MAIN_DEFENSIVE_GUARD_EVIDENCE=(
+B030 -> Task032 success authority fixes rheology_model=NEWTONIAN; TASK034 verify_applicability guard exists
+B032 -> accepted Task031 success authority fixes shell_pass_count=1; TASK034 applicability guard exists
+B033 -> accepted Task031 success authority fixes baffle_type=SINGLE_SEGMENTAL; TASK034 applicability guard exists
+B036 -> accepted Task031 success requires uniform central spacing; TASK034 spacing guard exists
+B038 -> validate_engineering_inputs raises EngineeringInputDomainError; S12 fail-closed guard exists
+B039 -> FormulaCalculationError operation F13_DECIMAL_LN_RE is mapped at S13
+B040 -> FormulaCalculationError operation F13_DECIMAL_EXP_FRICTION is mapped at S13
+B041 -> FormulaCalculationError operation F13_DECIMAL_PHI_POWER is mapped at S13
+B042 -> FormulaCalculationError operation F14_PRESSURE_DROP is mapped at S14
+B043 -> PublicQuantizationError is mapped at S15
+B044 -> provenance construction/finalization exception is mapped at S16
+B045 -> UUID5/result identity finalization exception is mapped at S17
+B046 -> finalize_result_identity rejects partial result state
+B047 -> finalize_result_identity rejects tokens outside the deferred capability registry
+)
+DEFENSIVE_FAULT_INJECTION_PRIMARY_TESTS=(B030,B032,B033,B036,B038,B039,B040,B041,B042,B043,B044,B045,B046,B047)
+DEFENSIVE_FAULT_INJECTION_TEST_CLASS_REQUIRED=true
+PUBLIC_INPUT_WITNESS_MUST_BE_CALLER_VISIBLE=true
+PUBLIC_INPUT_WITNESS_MUST_NOT_USE_MONKEYPATCH=true
+RETIRED_BLOCKER_PRIMARY_TEST_COUNT=0
+B054_PRESENT_NULL_ONLY=true
+B054_ABSENT_KEY_REACHABLE=false
+B054_PRESENT_NON_NULL_REACHABLE=false
+B055_PRESENT_NON_NULL_INVALID_ONLY=true
+B055_PRESENT_NULL_REACHABLE=false
+B055_ABSENT_KEY_REACHABLE=false
+B056_AFTER_B055_ONLY=true
+B057_AFTER_B056_ONLY=true
+B058_ABSENT_KEY_ONLY=true
+B058_PRESENT_NULL_REACHABLE=false
+B058_PRESENT_NON_NULL_REACHABLE=false
+B058_PRECEDES_S11=true
+B058_NO_BACKFILL=true
+
+### R5 blocker result and provenance behavior
+MISSING_REQUIRED_TOP_LEVEL_FIELD_RESULT_CLASS=TYPED_BLOCKED
+PRESENT_NULL_AUTHORITY_RESULT_CLASS=TYPED_BLOCKED
+PRESENT_NON_NULL_INVALID_AUTHORITY_RESULT_CLASS=TYPED_BLOCKED
+RAW_BOUNDARY_ABSENCE_IS_EVIDENCE_ONLY=true
+RAW_PROJECTION_MISSING_MARKER_IS_NOT_TYPED_REQUEST_BACKFILL=true
+RAW_PROJECTION_DOES_NOT_REPAIR_MISSING_REQUIRED_FIELD=true
+RAW_PROJECTION_DOES_NOT_CREATE_SHELL_TYPE_AUTHORITY_FIELD=true
+RAW_PROJECTION_DOES_NOT_NORMALIZE_ABSENT_TO_PRESENT_NULL=true
+TYPED_BLOCKED_SHELL_TYPE_AUTHORITY_IDENTITY_REQUIRED_WHEN_AVAILABLE=true
+SUCCESS_SHELL_TYPE_AUTHORITY_IDENTITY_REQUIRED=true
+TYPED_BLOCKED_PROVENANCE_PREHASH_USES_SAME_AUTHORITY_FIELDS=true
+NO_TYPED_BLOCKED_PROPERTY_SNAPSHOT_HASH_DUPLICATE=true
+
+### R5 actual public production-chain acceptance
+ACTUAL_PUBLIC_PRODUCTION_CHAIN_REQUIRED=true
+MANDATORY_CHAIN=(
+TASK031.validate_request
+-> TASK032.validate_request
+-> TASK033.validate_request
+-> TASK034.validate_request
+)
+ACTUAL_PRODUCTION_BINDINGS_ONLY=true
+HAND_BUILT_UPSTREAM_SUCCESS_FOR_ACCEPTANCE=false
+FIXTURE_ONLY_RESULT_SUBSTITUTION=false
+SYNTHETIC_ORACLE_SUBSTITUTION=false
+EXPECTED_OUTPUT_USED_AS_INPUT=false
+PRIVATE_HELPER_BYPASS=false
+IDENTITY_ADAPTER_OR_REWRITE=false
+TASK034_UPSTREAM_ENGINEERING_RECOMPUTATION_OR_MUTATION_ALLOWED=false
+TASK020_MUTATION_ALLOWED=false
+TASK021_MUTATION_ALLOWED=false
+TASK022_MUTATION_ALLOWED=false
+TASK024_MUTATION_ALLOWED=false
+TASK031_MUTATION_ALLOWED=false
+TASK032_MUTATION_ALLOWED=false
+TASK033_MUTATION_ALLOWED=false
+CONSTRUCTION_FAMILY_IS_NOT_SHELL_TYPE_AUTHORITY=true
+CONSTRUCTION_FAMILY_E_SHELL_ACCEPTANCE_SUBSTITUTION_ALLOWED=false
+SHELL_TYPE_AUTHORITY_MUST_BE_CALLER_OWNED_V2_EVIDENCE=true
+SHELL_TYPE_AUTHORITY_TASK020_CONFIGURATION_ID_MUST_MATCH=true
+SHELL_TYPE_AUTHORITY_TASK020_CONFIGURATION_HASH_MUST_MATCH=true
+SHELL_TYPE_AUTHORITY_S11_SUPPORTED_VALUE=E_SHELL
+SHELL_TYPE_AUTHORITY_NO_DEFAULT=true
+SHELL_TYPE_AUTHORITY_NO_INFERENCE=true
+SHELL_TYPE_AUTHORITY_NO_FALLBACK=true
+SHELL_TYPE_AUTHORITY_NO_REWRITE=true
+SHELL_TYPE_AUTHORITY_NO_EXPECTED_OUTPUT_SUBSTITUTION=true
+HISTORICAL_SYNTHETIC_PATTERN_CONSTRUCTION_FAMILY_E_SHELL_IS_INVALID=true
+CONSTRUCTION_FAMILY_IS_INDEPENDENT_UPSTREAM_DATA=true
+S11_REGRESSION_MUST_FAIL_IF_CONSTRUCTION_FAMILY_IS_USED_AS_SHELL_TYPE=true
+T034_X016_REAL_PUBLIC_TASK031_TASK032_TASK033_TASK034_CHAIN_REQUIRED=true
+REAL_CHAIN_MUST_REACH_SUCCESS=true
+REAL_CHAIN_PUBLIC_QUANTITY_REQUIRED=modeled_shell_side_pressure_drop_pa
+REAL_CHAIN_TASK033_INPUT_TO_TASK034=(
+exact original public TASK033 request evidence
+exact public Task033 validation result with status VALID
+exact public Task033 heat_transfer success result
+)
+REAL_CHAIN_TASK033_RESULT_IDENTITY_SOURCE=actual task033_validation_result.heat_transfer.request_hash|result_hash|result_id
+REAL_CHAIN_TASK033_STATUS_LITERAL_SUCCESS_FORBIDDEN=true
+
+### R5 TASK035 downstream compatibility boundary
+TASK035_CURRENT_MERGED_CONTRACT_ACCEPTS_CORRECTED_TASK034=false
+TASK035_DOWNSTREAM_COMPATIBILITY_MIGRATION_REQUIRED=true
+TASK035_MUTATION_IN_THIS_GATE=false
+TASK035_MUTATION_AUTHORIZED=false
+TASK035_COMPATIBILITY_POLICY=MIGRATE_ENTIRELY_TO_CORRECTED_TASK034_V2
+TASK035_TASK034_MIGRATION_POLICY=MIGRATE_ENTIRELY_TO_CORRECTED_TASK034_V2
+TASK035_ACCEPTS_HISTORICAL_TASK034_V1_AFTER_MIGRATION=false
+TASK035_ACCEPTS_CORRECTED_TASK034_V2_AFTER_MIGRATION=true
+TASK035_DUAL_VERSION_ACCEPTANCE=false
+TASK035_FIELD_SUBSET_ACCEPTANCE=false
+TASK035_EXACT_TASK034_VERSION_DISCRIMINATION=true
+TASK035_WRONG_OR_MIXED_TASK034_VERSION_BEHAVIOR=FAIL_CLOSED
+TASK035_IDENTITY_REPLAY_POLICY=EXACT_CORRECTED_TASK034_V2_CANONICAL_CONTRACT
+TASK035_ENGINEERING_RECOMPUTATION_ALLOWED=false
+TASK035_TASK034_PRESSURE_DROP_RECOMPUTATION_ALLOWED=false
+TASK035_UPSTREAM_IDENTITY_REWRITE_ALLOWED=false
+TASK035_FIXTURE_SUBSTITUTION_ALLOWED=false
+TASK035_PRESSURE_DROP_FORWARDING_ONLY=true
+TASK035_COMPOSITION_SEMANTICS_PRESERVED=true
+TASK035_APPLICABILITY_MUST_NOT_BE_BROADENED=true
+TASK035_SEPARATE_DESIGN_IMPLEMENTATION_REVIEW_REQUIRED=true
+TASK034_R4_DESIGN_ACCEPTANCE_DOES_NOT_AUTHORIZE_TASK035=true
+TASK034_R4_DESIGN_ACCEPTANCE_DOES_NOT_ACCEPT_TASK035=true
+TASK034_R5_DESIGN_ACCEPTANCE_DOES_NOT_AUTHORIZE_TASK035=true
+TASK034_R5_DESIGN_ACCEPTANCE_DOES_NOT_ACCEPT_TASK035=true
+
+### R5 test inventory
+TASK034_TEST_ROOT=tests/exchangers/shell_tube/shell_side_pressure_drop/
+TASK034_TEST_MODULE_COUNT=13
+TASK034_TEST_FILES_EXPLICITLY_ENUMERATED=true
+TASK034_TEST_FILES=(
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py
+tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_public_upstream_replay_integration.py
+)
+TEST_INVENTORY_COUNT=74
+TEST_IDS=(
+1. T034-B001_SSPD_RAW_REQUEST_TYPE_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | primary reachability test
+2. T034-B002_SSPD_RAW_BINARY_FLOAT_FORBIDDEN | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | primary reachability test
+3. T034-B003_SSPD_RAW_UNSUPPORTED_PRIMITIVE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | primary reachability test
+4. T034-B004_SSPD_RAW_CANONICALIZATION_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | primary reachability test
+5. T034-B005_SSPD_UNKNOWN_REQUEST_FIELD | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py | primary reachability test
+6. T034-B006_SSPD_REQUEST_SCHEMA_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py | v2 request schema primary reachability test
+7. T034-B007_SSPD_PROFILE_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py | v2 profile primary reachability test
+8. T034-B008_SSPD_SOURCE_AUTHORITY_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+9. T034-B009_SSPD_TASK033_UPSTREAM_MISSING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+10. T034-B010_SSPD_TASK033_UPSTREAM_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+11. T034-B011_SSPD_TASK033_REQUEST_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+12. T034-B012_SSPD_TASK033_RESULT_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+13. T034-B013_SSPD_TASK033_RESULT_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+14. T034-B014_SSPD_TASK031_REQUEST_EVIDENCE_MISSING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+15. T034-B015_SSPD_TASK031_REQUEST_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+16. T034-B016_SSPD_TASK031_GEOMETRY_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+17. T034-B017_SSPD_TASK031_GEOMETRY_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py | primary reachability test
+18. T034-B018_SSPD_TASK032_RESULT_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+19. T034-B019_SSPD_TASK032_RESULT_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+20. T034-B020_SSPD_CASE_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+21. T034-B021_SSPD_STREAM_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+22. T034-B022_SSPD_FLUID_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+23. T034-B023_SSPD_CONFIGURATION_ID_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+24. T034-B024_SSPD_PROPERTY_SNAPSHOT_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+25. T034-B025_SSPD_MASS_FLOW_AUTHORITY_HASH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+26. T034-B026_SSPD_WALL_PROPERTY_AUTHORITY_MISSING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+27. T034-B027_SSPD_WALL_PROPERTY_AUTHORITY_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+28. T034-B028_SSPD_WALL_VISCOSITY_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | primary reachability test
+29. T034-B029_SSPD_UNSUPPORTED_PHASE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; actual Task032 public result may carry SINGLE_PHASE_GAS
+30. T034-B030_SSPD_UNSUPPORTED_RHEOLOGY | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | DEFENSIVE_FAULT_INJECTION_TEST; Task032 success producer fixes NEWTONIAN
+31. T034-B031_SSPD_UNSUPPORTED_SHELL_TYPE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; structurally valid shell_type=UNSUPPORTED_SHELL_TYPE after authority replay/join
+32. T034-B032_SSPD_UNSUPPORTED_SHELL_PASS_COUNT | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | DEFENSIVE_FAULT_INJECTION_TEST; accepted Task031 producer success fixes shell_pass_count=1
+33. T034-B033_SSPD_UNSUPPORTED_BAFFLE_TYPE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | DEFENSIVE_FAULT_INJECTION_TEST; accepted Task031 producer success fixes SINGLE_SEGMENTAL
+34. T034-B034_SSPD_UNSUPPORTED_TUBE_LAYOUT | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; actual Task031 public result may carry SQUARE layout
+35. T034-B035_SSPD_UNSUPPORTED_BAFFLE_CUT | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; actual Task024 public authority admits non-0.25 cut
+36. T034-B036_SSPD_UNSUPPORTED_BAFFLE_SPACING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | DEFENSIVE_FAULT_INJECTION_TEST; accepted Task031 producer success requires uniform central spacing
+37. T034-B037_SSPD_REYNOLDS_OUTSIDE_DOMAIN | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; actual Task032 public result may carry Re outside the strict Task034 domain
+38. T034-B038_SSPD_FORMULA_INPUT_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py | DEFENSIVE_FAULT_INJECTION_TEST; validate_engineering_inputs guard
+39. T034-B039_SSPD_DECIMAL_LN_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded Decimal ln exception mapping
+40. T034-B040_SSPD_DECIMAL_EXP_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded Decimal exp exception mapping
+41. T034-B041_SSPD_DECIMAL_POWER_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded Decimal power exception mapping
+42. T034-B042_SSPD_PRESSURE_DROP_CALCULATION_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded pressure-drop arithmetic exception mapping
+43. T034-B043_SSPD_PUBLIC_QUANTIZATION_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded public quantization exception mapping
+44. T034-B044_SSPD_PROVENANCE_CANONICALIZATION_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded provenance canonicalization exception mapping
+45. T034-B045_SSPD_RESULT_ID_FINALIZATION_FAILURE | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py | DEFENSIVE_FAULT_INJECTION_TEST; guarded UUID5 finalization exception mapping
+46. T034-B046_SSPD_PARTIAL_RESULT_FORBIDDEN | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | DEFENSIVE_FAULT_INJECTION_TEST; result-state guard
+47. T034-B047_SSPD_DEFERRED_CAPABILITY_TOKEN_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | DEFENSIVE_FAULT_INJECTION_TEST; deferred-capability registry guard
+48. T034-B048_SSPD_SHELL_INSIDE_DIAMETER_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; corrected Defect C authority-path
+49. T034-B049_SSPD_BAFFLE_COUNT_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; only TASK034 auxiliary copy changes
+50. T034-B050_SSPD_SPACING_SEQUENCE_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; only TASK034 auxiliary copy changes
+51. T034-B051_SSPD_TUBE_PITCH_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; only TASK034 auxiliary copy changes
+52. T034-B052_SSPD_TUBE_OUTER_DIAMETER_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; only TASK034 auxiliary copy changes
+53. T034-B053_SSPD_PATTERN_FAMILY_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | PUBLIC_INPUT_REACHABLE_TEST; only TASK034 auxiliary copy changes
+54. T034-B054_SSPD_SHELL_TYPE_AUTHORITY_MISSING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; present-null authority only at S11
+55. T034-B055_SSPD_SHELL_TYPE_AUTHORITY_INVALID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; present non-null structurally invalid authority only at S11
+56. T034-B056_SSPD_SHELL_TYPE_AUTHORITY_REPLAY_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; structurally valid authority hash mismatch
+57. T034-B057_SSPD_SHELL_TYPE_AUTHORITY_CONFIGURATION_MISMATCH | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py | PUBLIC_INPUT_REACHABLE_TEST; exact configuration join mismatch
+58. T034-B058_SSPD_SHELL_TYPE_AUTHORITY_REQUIRED_FIELD_MISSING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py | PUBLIC_INPUT_REACHABLE_TEST; absent required top-level key at REQUEST_SCHEMA
+59. T034-X001_SUCCESS_NOMINAL_LIQUID | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py | supplemental corrected-v2 success contract
+60. T034-X002_TYPED_BLOCKED_SCHEMA_IDENTITY | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | supplemental corrected-v2 blocked identity
+61. T034-X003_RAW_BLOCKED_PROJECTION_IDENTITY | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | supplemental raw-boundary identity
+62. T034-X004_EXTERNAL_ORACLE_VECTOR_SET | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py | supplemental oracle vector contract
+63. T034-X005_CROSS_PYTHON_EXPECTED_ARTIFACT_SET | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py | historical v1 evidence only; not corrected-v2 acceptance
+64. T034-X006_PHYSICAL_BOUNDARY_NO_DOUBLE_COUNT | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py | supplemental physical-boundary invariant
+65. T034-X007_SUCCESS_HASH_SELF_EXCLUSION | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py | supplemental success self-exclusion
+66. T034-X008_TYPED_BLOCKED_HASH_SELF_EXCLUSION | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py | supplemental typed-blocked self-exclusion
+67. T034-X009_RAW_BLOCKED_HASH_SELF_EXCLUSION | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | supplemental raw self-exclusion
+68. T034-X010_C5_SCHEMA_CONTRACT | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py | supplemental complete corrected-v2 schemas
+69. T034-X011_SUCCESS_ORACLE_OUTPUT_BINDING | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py | supplemental output binding
+70. T034-X012_RAW_BOUNDARY_8_FIELD_SCHEMA | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py | corrected-v2 raw-boundary final schema and nine-field raw projection
+71. T034-X013_ALL_53_EXACT_PREDICATES | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py | historical primary predicate authority extended by the four reviewed shell-type blockers and B058
+72. T034-X014_XPY_V2_ARTIFACT_REPLAY | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py | corrected-v2 artifact replay pending regeneration
+73. T034-X015_CORRECTED_V2_SHELL_TYPE_AUTHORITY_ARTIFACT_REPLAY | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py | corrected-v2 authority artifact replay pending regeneration
+74. T034-X016_REAL_PUBLIC_TASK031_TASK032_TASK033_TASK034_CHAIN | tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_public_upstream_replay_integration.py | mandatory actual public production-chain regression
+)
+DISTINCT_TEST_ID_COUNT=74
+DUPLICATE_TEST_ID_COUNT=0
+UNMAPPED_TEST_ID_COUNT=0
+UNIQUE_PRIMARY_BLOCKER_TEST_ID_COUNT=58
+ALL_58_PRIMARY_BLOCKERS_HAVE_UNIQUE_TEST=true
+SUPPLEMENTAL_TEST_IDS_UNIQUE=true
+TEST_INVENTORY_HAS_NO_DUPLICATE_PRIMARY_OR_SUPPLEMENTAL_IDS=true
+TEST_INVENTORY_COUNT_IS_DERIVED_FROM_UNIQUE_LIST=true
+
+### R5 cross-Python artifact boundary
+HISTORICAL_MERGED_V1_CROSS_PYTHON_ARTIFACT_SET_STATUS=HISTORICAL_SUPERSEDED
+HISTORICAL_MERGED_V1_CROSS_PYTHON_ARTIFACT_SET_ACCEPTANCE=false
+HISTORICAL_MERGED_V1_CROSS_PYTHON_ARTIFACTS_ARE_NOT_V2_ACCEPTANCE=true
+CROSS_PYTHON_CORRECTED_ARTIFACT_SET_STATUS=REGENERATION_REQUIRED
+CROSS_PYTHON_CORRECTED_ARTIFACT_SET_REGENERATION_REQUIRED=true
+CROSS_PYTHON_CORRECTED_ARTIFACT_SET_SHA256=NOT_YET_GENERATED
+CROSS_PYTHON_CORRECTED_ARTIFACT_SET_ACCEPTANCE_PENDING=true
+CROSS_PYTHON_CORRECTED_ARTIFACT_SET_ACCEPTANCE=false
+CROSS_PYTHON_ARTIFACT_GENERATION_IN_THIS_GATE=false
+CROSS_PYTHON_ARTIFACT_ACCEPTANCE_IN_THIS_GATE=false
+CROSS_PYTHON_REPLAY_MUST_USE_CORRECTED_V2_NAMESPACES=true
+CROSS_PYTHON_REPLAY_MUST_USE_DECLARED_FIELD_ORDER=true
+
+### R5 preserved engineering calculation contract
+ENGINEERING_CORRELATION_REOPEN_REQUIRED=false
+FORMULA_REOPEN_REQUIRED=false
+APPLICABILITY_LITERAL_REOPEN_REQUIRED=false
+WALL_VISCOSITY_EXPONENT=7/50
+REYNOLDS_APPLICABILITY=400 < Re_s < 1000000
+BAFFLE_TYPE=SINGLE_SEGMENTAL
+BAFFLE_CUT=CONSTANT_25_PERCENT_SOURCE_PROFILE
+TUBE_LAYOUT=TRIANGULAR_PITCH
+SHELL_PASS_COUNT=1
+FORMULA_OPERATION_COUNT=20
+FORMULA_OPERATIONS=(
+1. mu_ratio = context.divide(mu_b, mu_w)
+2. ratio_ln = context.ln(mu_ratio)
+3. ratio_ln_times_7 = context.multiply(ratio_ln, Decimal("7"))
+4. ratio_exp_arg = context.divide(ratio_ln_times_7, Decimal("50"))
+5. phi_s = context.exp(ratio_exp_arg)
+6. re_ln = context.ln(Re_s)
+7. friction_term = context.multiply(Decimal("0.19"), re_ln)
+8. friction_exp_arg = context.subtract(Decimal("0.576"), friction_term)
+9. f_s = context.exp(friction_exp_arg)
+10. g_s_squared = context.multiply(G_s, G_s)
+11. n_b_decimal = context.create_decimal(str(N_b))
+12. n_b_plus_one = context.add(n_b_decimal, Decimal("1"))
+13. numerator_f_g2 = context.multiply(f_s, g_s_squared)
+14. numerator_f_g2_nb = context.multiply(numerator_f_g2, n_b_plus_one)
+15. numerator = context.multiply(numerator_f_g2_nb, D_s)
+16. two_rho = context.multiply(Decimal("2"), rho_s)
+17. denominator_two_rho_de = context.multiply(two_rho, D_e)
+18. denominator = context.multiply(denominator_two_rho_de, phi_s)
+19. delta_p_raw = context.divide(numerator, denominator)
+20. delta_p_public = quantize(delta_p_raw, Decimal("0.001"), ROUND_HALF_EVEN)
+)
+DELTA_P_S_FORMULA=[f_s * G_s^2 * (N_b + 1) * D_s] / [2 * rho_s * D_e * phi_s]
+PHI_S_FORMULA=(mu_b / mu_w)^(7/50)
+FRICTION_FACTOR_FORMULA=exp(0.576 - 0.19 * ln(Re_s))
+NO_MATH_LOG=true
+NO_MATH_EXP=true
+NO_FLOAT_INTERMEDIATES=true
+DECIMAL_CONTEXT_CONSTRUCTION=EXPLICIT_CONTEXT_V1
+DECIMAL_PRECISION=50
+DECIMAL_ROUNDING_MODE=ROUND_HALF_EVEN
+DECIMAL_TRAP_INVALID_OPERATION=true
+DECIMAL_TRAP_DIVISION_BY_ZERO=true
+DECIMAL_TRAP_OVERFLOW=true
+DECIMAL_TRAP_FLOAT_OPERATION=true
+DECIMAL_SIGNAL_FALLBACK=false
+DECIMAL_SIGNAL_PARTIAL_RESULT=false
+PUBLIC_PRESSURE_DROP_QUANTUM=Decimal("0.001")
+QUANTIZATION_LAST=true
+NEGATIVE_ZERO_NORMALIZATION=true
+WALL_PROPERTY_AUTHORITY_REPLAY_REQUIRED=true
+WALL_PROPERTY_AUTHORITY_RECOMPUTATION=false
+SAME_CASE_PARTIAL_MATCH_ALLOWED=false
+SAME_CASE_TOLERANCE_ALLOWED=false
+SAME_CASE_CONFIGURATION_JOIN_REQUIRED=true
+NO_RECOMPUTATION_OF_UPSTREAM_ENGINEERING=true
+
+### R5 deterministic count and uniqueness audit contract
+ALL_EXPLICIT_FIELD_LISTS_DECLARED=true
+ALL_EXPLICIT_FIELD_LISTS_ENUMERATED=true
+ALL_EXPLICIT_FIELD_LISTS_UNIQUE=true
+ALL_EXPLICIT_FIELD_LISTS_DUPLICATE_COUNT=0
+ALL_EXPLICIT_COUNTS_RECOUNTED=true
+ALL_EXPLICIT_COUNTS_MATCH=true
+REQUEST_FIELD_COUNT=36
+REQUEST_PREHASH_FIELD_COUNT=36
+SUCCESS_FIELD_COUNT=45
+SUCCESS_PREHASH_FIELD_COUNT=43
+TYPED_BLOCKED_FIELD_COUNT=36
+TYPED_BLOCKED_PREHASH_FIELD_COUNT=35
+RAW_BOUNDARY_BLOCKED_FIELD_COUNT=8
+RAW_BOUNDARY_BLOCKED_PREHASH_FIELD_COUNT=7
+RAW_PROJECTION_FIELD_COUNT=9
+PROVENANCE_FIELD_COUNT=49
+PROVENANCE_PREHASH_FIELD_COUNT=48
+SHELL_TYPE_AUTHORITY_FIELD_COUNT=9
+SHELL_TYPE_AUTHORITY_PREHASH_FIELD_COUNT=8
+VALIDATION_STAGE_COUNT=17
+BLOCKER_REGISTRY_COUNT=58
+BLOCKER_REACHABILITY_COUNT=58
+DISTINCT_BLOCKER_ID_COUNT=58
+DISTINCT_BLOCKER_REACHABILITY_ID_COUNT=58
+DUPLICATE_BLOCKER_ID_COUNT=0
+DUPLICATE_BLOCKER_REACHABILITY_COUNT=0
+UNREACHABLE_BLOCKER_COUNT=0
+BLOCKER_WITHOUT_TEST_COUNT=0
+BLOCKER_PRIMARY_TEST_NOT_IN_TEST_INVENTORY_COUNT=0
+BLOCKER_PRIMARY_TEST_UNIQUE_COUNT=58
+TEST_INVENTORY_COUNT=74
+DISTINCT_TEST_ID_COUNT=74
+DUPLICATE_TEST_ID_COUNT=0
+UNMAPPED_TEST_ID_COUNT=0
+UNIQUE_PRIMARY_BLOCKER_TEST_ID_COUNT=58
+ALL_58_PRIMARY_BLOCKERS_HAVE_UNIQUE_TEST=true
+COUNT_MISMATCHES=NONE
+EFFECTIVE_R5_CONTRACT_COUNTS_ARE_CANDIDATE_COUNTS_NOT_REMOTE_ACCEPTANCE=true
+R5_ACTUAL_BLOCKER_COUNT_RECOMPUTED=true
+R5_ACTUAL_REACHABILITY_COUNT_RECOMPUTED=true
+R5_ACTUAL_TEST_INVENTORY_COUNT_RECOMPUTED=true
+R5_REACHABILITY_CLASS_SUM=44+14+0=58
+R5_SEMANTIC_CONVERGENCE_COUNTS=(
+BLOCKER_REGISTRY_COUNT=58
+BLOCKER_REACHABILITY_COUNT=58
+PUBLIC_INPUT_REACHABLE_BLOCKER_COUNT=44
+DEFENSIVE_FAULT_INJECTION_ONLY_BLOCKER_COUNT=14
+RETIRED_BLOCKER_COUNT=0
+TEST_INVENTORY_COUNT=74
+)
+R5_FINDING_CLOSURE_MATRIX=(
+F1|AUTHOR_CLOSED
+F2|AUTHOR_CLOSED
+F3|AUTHOR_CLOSED
+F4|AUTHOR_CLOSED
+F5|AUTHOR_CLOSED
+F6|AUTHOR_CLOSED
+F7|AUTHOR_CLOSED
+F8|AUTHOR_CLOSED
+)
+R5_AUTHOR_CLOSED_P1_COUNT=8
+R5_AUTHOR_OPEN_P1_COUNT=0
+AUTHOR_FULL_SEMANTIC_CONVERGENCE_VALIDATION_EXECUTED=true
+AUTHOR_FULL_SEMANTIC_CONVERGENCE_VALIDATION_PASS=true
+SCHEMA_FIELD_LIST_VALIDATION_PASS=true
+SCHEMA_FIELD_LIST_DECLARED_COUNT_MISMATCH_COUNT=0
+SCHEMA_FIELD_LIST_DUPLICATE_FIELD_COUNT=0
+SCHEMA_FIELD_LIST_MEMBERSHIP_MISMATCH_COUNT=0
+SCHEMA_FIELD_LIST_ORDER_MISMATCH_COUNT=0
+TASK033_IDENTITY_DECLARED_COUNT_MISMATCH_COUNT=0
+TASK033_IDENTITY_ENUMERATED_COUNT_MISMATCH_COUNT=0
+TASK033_IDENTITY_DUPLICATE_FIELD_COUNT=0
+TASK033_IDENTITY_MEMBERSHIP_MISMATCH_COUNT=0
+TASK033_IDENTITY_ORDER_MISMATCH_COUNT=0
+TASK033_PUBLIC_SUCCESS_RESULT_SCHEMA_VALID=true
+TASK033_SUCCESS_RESULT_HASH_PREIMAGE_VALID=true
+TASK033_PUBLIC_VS_PREIMAGE_DISTINCTION_VALID=true
+TASK034_CONSUMED_SUBSET_DISTINCTION_VALID=true
+STALE_TASK033_IDENTITY_CONTRADICTION_COUNT=0
+AUTHOR_SELF_VALIDATION_EXECUTED=true
+AUTHOR_SELF_VALIDATION_PASS=true
+STALE_EFFECTIVE_CONTRADICTION_COUNT=0
+
+### R5 correction and lifecycle boundary
+AUTHORIZED_R5_DESIGN_PATHS=(
+1. docs/tasks/TASK-034-shell-and-tube-shell-side-modeled-pressure-drop.md
+)
+AUTHORIZED_R5_DESIGN_FILE_COUNT=1
+ORIGIN_MAIN_TASK034_DESIGN_PATH=docs/tasks/TASK-034-shell-and-tube-shell-side-modeled-pressure-drop.md
+ORIGIN_MAIN_TASK034_DESIGN_BLOB_SHA=44d2a47af797a2f2d0c9b25d0d8acb367df332d1
+ORIGIN_MAIN_TASK034_DESIGN_SHA256=f35d8e0a73dde02bb07ca48ed63aeca2d6d61683879a26e82f37d3a7b1cf07d9
+R5_ALLOWED_REPOSITORY_MUTATION_PATH=docs/tasks/TASK-034-shell-and-tube-shell-side-modeled-pressure-drop.md
+R5_CODE_MUTATION_AUTHORIZED=false
+R5_TEST_MUTATION_AUTHORIZED=false
+R5_CI_MUTATION_AUTHORIZED=false
+R5_WORKFLOW_MUTATION_AUTHORIZED=false
+R5_TASK020_MUTATION_AUTHORIZED=false
+R5_TASK021_MUTATION_AUTHORIZED=false
+R5_TASK022_MUTATION_AUTHORIZED=false
+R5_TASK024_MUTATION_AUTHORIZED=false
+R5_TASK031_MUTATION_AUTHORIZED=false
+R5_TASK032_MUTATION_AUTHORIZED=false
+R5_TASK033_MUTATION_AUTHORIZED=false
+R5_TASK035_MUTATION_AUTHORIZED=false
+R5_TASK036_MUTATION_AUTHORIZED=false
+R5_CI_MANIFEST_MUTATION_REQUIRED=false
+TASK034_CI_MANIFEST_MUTATION_REQUIRED=false
+ISSUE_COMMENT_POSTED=false
+BRANCH_CREATED=false
+COMMIT_CREATED=false
+PUSH_PERFORMED=false
+PR_CREATED=false
+MERGE_PERFORMED=false
+TAG_CREATED=false
+RELEASE_CREATED=false
+ISSUE_199_CLOSED=false
+ISSUE_203_CLOSED=false
+
+TASK034_POST_MERGE_DEFECT_A_DEFINED=true
+TASK034_POST_MERGE_DEFECT_A_REVIEWED=true
+TASK034_POST_MERGE_DEFECT_A_FIXED=false
+TASK034_POST_MERGE_DEFECT_B_DEFINED=true
+TASK034_POST_MERGE_DEFECT_B_REVIEWED=true
+TASK034_POST_MERGE_DEFECT_B_FIXED=false
+TASK034_POST_MERGE_DEFECT_C_DEFINED=true
+TASK034_POST_MERGE_DEFECT_C_REVIEWED=true
+TASK034_POST_MERGE_DEFECT_C_FIXED=false
+
+TASK034_POST_MERGE_DESIGN_CORRECTION_AUTHORED=true
+TASK034_POST_MERGE_DESIGN_CORRECTION_REVIEWED=false
+TASK034_POST_MERGE_DESIGN_CORRECTION_ACCEPTED=false
+R4_REVIEW_RESULT=CHANGES_REQUIRED
+R4_ACCEPTED=false
+TASK034_R5_DESIGN_AUTHORED=true
+TASK034_R5_DESIGN_REVIEWED=true
+TASK034_R5_DESIGN_ACCEPTED=false
+TASK034_R5_C1_DESIGN_AUTHORED=true
+TASK034_R5_C1_DESIGN_REVIEWED=false
+TASK034_R5_C1_DESIGN_ACCEPTED=false
+R5_C1_DESIGN_SCOPE=TASK033_PUBLIC_SUCCESS_IDENTITY_INVENTORY_AND_HASH_PREIMAGE_ONLY
+R5_C1_CHANGED_FILE_COUNT=1
+R5_C1_DESIGN_CHANGED_FILE_COUNT=1
+R5_C1_CODE_CHANGED_FILE_COUNT=0
+R5_C1_TEST_CHANGED_FILE_COUNT=0
+R5_C1_CI_CHANGED_FILE_COUNT=0
+R5_C1_WORKFLOW_CHANGED_FILE_COUNT=0
+R5_C1_UNRELATED_CHANGED_FILE_COUNT=0
+TASK034_R5_DESIGN_FROZEN=false
+TASK034_R5_DESIGN_DEFINITION_COMPLETE=false
+TASK034_R5_DESIGN_REVIEW_REQUIRED=true
+TASK034_R5_DESIGN_ACCEPTANCE_REQUIRED=true
+TASK034_R5_IMPLEMENTATION_AUTHORIZED=false
+TASK034_R5_IMPLEMENTATION_STARTED=false
+TASK034_R5_IMPLEMENTATION_ACCEPTED=false
+TASK034_R5_PACKAGE_AUTHORIZED=false
+TASK034_R5_REMOTE_LIFECYCLE_ACTIONS=false
+TASK036_BLOCKED=true
+TASK036_RELEASE_DEMO_INPUT_AUTHORITY_DEFINITION_BLOCKED=true
+TASK036_SOURCE_DEFINITION_CORRECTION_R2_BLOCKED=true
+TASK036_SOURCE_DEFINITION_FROZEN=false
+TASK036_DESIGN_AUTHORIZED=false
+TASK036_IMPLEMENTATION_AUTHORIZED=false
+NEXT_GATE=AUTHORIZE_TASK034_R5_C1_FINDING_SPECIFIC_FINAL_REVIEW_ONLY
+NEXT_GATE_AUTHORIZED=false
+NO_STEP_IMPLIES_THE_NEXT=true
+R5_EFFECTIVE_CONTRACT_END=true
+
+HISTORICAL_MERGED_V1_TRAILING_TAIL_START=true
+HISTORICAL_MERGED_V1_TRAILING_TAIL_EFFECTIVE=false
+
 ## Future implementation and CI boundary
 SOURCE_DEFINITION_MUTATION_IN_THIS_GATE=false
 DESIGN_DOCUMENT_MUTATION_IN_THIS_GATE=true
@@ -5174,3 +6901,4 @@ MERGE_PERFORMED=false
 NEXT_GATE=AUTHORIZE_TASK034_DESIGN_CONTRACT_AUTHORING_REVIEW_ONLY
 NEXT_GATE_AUTHORIZED=false
 NO_STEP_IMPLIES_THE_NEXT=true
+HISTORICAL_MERGED_V1_TRAILING_TAIL_END=true

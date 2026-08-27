@@ -87,8 +87,8 @@ def test_b053_sspd_pattern_family_mismatch():
     assert "SSPD_PATTERN_FAMILY_MISMATCH" in _codes(raw)
 
 
-def test_x013_all_53_exact_predicates():
-    assert len(BLOCKER_CODES) == 53 and len(set(BLOCKER_CODES)) == 53
+def test_x013_all_58_exact_predicates():
+    assert len(BLOCKER_CODES) == 58 and len(set(BLOCKER_CODES)) == 58
     assert all(validate_blocker_token(code) == code for code in BLOCKER_CODES)
     assert len(WARNING_CODES) == 5 and len(DEFERRED_CAPABILITIES) == 16
     validate_warning_token(WARNING_CODES[0])

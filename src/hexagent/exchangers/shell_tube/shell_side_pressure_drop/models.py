@@ -8,14 +8,14 @@ from enum import StrEnum
 from typing import Any
 
 TASK_ID = "TASK034"
-REQUEST_SCHEMA_VERSION = "task034.shell-side-pressure-drop-request.v1"
-RESULT_SCHEMA_VERSION = "task034.shell-side-pressure-drop-success.v1"
-BLOCKED_RESULT_SCHEMA_VERSION = "task034.shell-side-pressure-drop-blocked.v1"
+REQUEST_SCHEMA_VERSION = "task034.shell-side-pressure-drop-request.v2"
+RESULT_SCHEMA_VERSION = "task034.shell-side-pressure-drop-success.v2"
+BLOCKED_RESULT_SCHEMA_VERSION = "task034.shell-side-pressure-drop-blocked.v2"
 RAW_BOUNDARY_BLOCKED_RESULT_SCHEMA_VERSION = (
-    "task034.shell-side-pressure-drop-raw-boundary-blocked.v1"
+    "task034.shell-side-pressure-drop-raw-boundary-blocked.v2"
 )
-IMPLEMENTATION_SOFTWARE_VERSION = "task034.shell-side-pressure-drop-impl-v1"
-PROFILE_ID = "hxforge.shell_tube.shell_side_pressure_drop.v1"
+IMPLEMENTATION_SOFTWARE_VERSION = "task034.shell-side-pressure-drop-impl-v2"
+PROFILE_ID = "hxforge.shell_tube.shell_side_pressure_drop.v2"
 FIRST_SLICE_PROFILE_ID = (
     "TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1"
 )
@@ -35,6 +35,7 @@ REQUEST_FIELDS: tuple[str, ...] = (
     "profile_id",
     "task033_upstream_evidence",
     "task031_request_evidence",
+    "shell_type_authority",
     "task031_request_hash",
     "shell_inside_diameter_m",
     "baffle_count",
@@ -78,6 +79,11 @@ SUCCESS_RESULT_FIELDS: tuple[str, ...] = (
     "shell_side_fluid_id",
     "task020_configuration_id",
     "task020_configuration_hash",
+    "shell_type",
+    "shell_type_authority_hash",
+    "shell_type_authority_record_id",
+    "shell_type_authority_source_id",
+    "shell_type_authority_source_version",
     "task031_request_hash",
     "task031_geometry_id",
     "task031_geometry_hash",
@@ -121,6 +127,11 @@ TYPED_BLOCKED_RESULT_FIELDS: tuple[str, ...] = (
     "shell_side_fluid_id",
     "task020_configuration_id",
     "task020_configuration_hash",
+    "shell_type",
+    "shell_type_authority_hash",
+    "shell_type_authority_record_id",
+    "shell_type_authority_source_id",
+    "shell_type_authority_source_version",
     "task031_request_hash",
     "task031_geometry_id",
     "task031_geometry_hash",
@@ -204,10 +215,53 @@ TASK031_REQUEST_EVIDENCE_FIELDS: tuple[str, ...] = (
     "evidence_refs",
 )
 
-REQUEST_FIELD_COUNT = 35
-SUCCESS_FIELD_COUNT = 40
-TYPED_BLOCKED_FIELD_COUNT = 31
+SHELL_TYPE_AUTHORITY_FIELDS: tuple[str, ...] = (
+    "schema_version",
+    "shell_type",
+    "task020_configuration_id",
+    "task020_configuration_hash",
+    "authority_source_id",
+    "authority_source_version",
+    "authority_record_id",
+    "evidence_refs",
+    "authority_hash",
+)
+SHELL_TYPE_AUTHORITY_PREHASH_FIELDS: tuple[str, ...] = tuple(
+    field for field in SHELL_TYPE_AUTHORITY_FIELDS if field != "authority_hash"
+)
+WALL_PROPERTY_AUTHORITY_FIELDS: tuple[str, ...] = (
+    "schema_version",
+    "shell_side_case_id",
+    "shell_side_stream_id",
+    "shell_side_fluid_id",
+    "task031_geometry_id",
+    "task031_geometry_hash",
+    "task032_result_id",
+    "task032_result_hash",
+    "property_snapshot_hash",
+    "shell_side_wall_dynamic_viscosity_pa_s",
+    "source_id",
+    "source_version",
+    "evidence_refs",
+    "wall_property_snapshot_hash",
+    "wall_property_authority_hash",
+)
+WALL_PROPERTY_AUTHORITY_PREHASH_FIELDS: tuple[str, ...] = tuple(
+    field for field in WALL_PROPERTY_AUTHORITY_FIELDS if field != "wall_property_authority_hash"
+)
+
+REQUEST_FIELD_COUNT = 36
+REQUEST_PREHASH_FIELD_COUNT = 36
+SUCCESS_FIELD_COUNT = 45
+SUCCESS_PREHASH_FIELD_COUNT = 43
+TYPED_BLOCKED_FIELD_COUNT = 36
+TYPED_BLOCKED_PREHASH_FIELD_COUNT = 35
 RAW_BOUNDARY_BLOCKED_FIELD_COUNT = 8
+RAW_BOUNDARY_BLOCKED_PREHASH_FIELD_COUNT = 7
+SHELL_TYPE_AUTHORITY_FIELD_COUNT = 9
+SHELL_TYPE_AUTHORITY_PREHASH_FIELD_COUNT = 8
+WALL_PROPERTY_AUTHORITY_FIELD_COUNT = 15
+WALL_PROPERTY_AUTHORITY_PREHASH_FIELD_COUNT = 14
 TASK032_FLOW_STATE_EVIDENCE_FIELD_COUNT = 29
 TASK032_REQUEST_EVIDENCE_FIELD_COUNT = 7
 TASK031_REQUEST_EVIDENCE_FIELD_COUNT = 5
@@ -259,6 +313,7 @@ class Task034Request:
     profile_id: Any
     task033_upstream_evidence: Any
     task031_request_evidence: Any
+    shell_type_authority: Any
     task031_request_hash: Any
     shell_inside_diameter_m: Any
     baffle_count: Any
@@ -303,6 +358,11 @@ class ShellSidePressureDropResult:
     shell_side_fluid_id: str | None
     task020_configuration_id: str | None
     task020_configuration_hash: str | None
+    shell_type: str | None
+    shell_type_authority_hash: str | None
+    shell_type_authority_record_id: str | None
+    shell_type_authority_source_id: str | None
+    shell_type_authority_source_version: str | None
     task031_request_hash: str | None
     task031_geometry_id: str | None
     task031_geometry_hash: str | None
@@ -347,6 +407,11 @@ class ShellSidePressureDropBlockedResult:
     shell_side_fluid_id: str | None
     task020_configuration_id: str | None
     task020_configuration_hash: str | None
+    shell_type: str | None
+    shell_type_authority_hash: str | None
+    shell_type_authority_record_id: str | None
+    shell_type_authority_source_id: str | None
+    shell_type_authority_source_version: str | None
     task031_request_hash: str | None
     task031_geometry_id: str | None
     task031_geometry_hash: str | None
