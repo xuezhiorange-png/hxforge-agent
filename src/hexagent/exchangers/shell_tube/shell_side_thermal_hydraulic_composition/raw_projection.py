@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
-RAW_PROJECTION_NAMESPACE = "task035.raw-projection.v1"
+RAW_PROJECTION_NAMESPACE = "task035.raw-projection.v2"
 RAW_MAX_DEPTH = 8
 RAW_MAX_MAPPING_ITEMS = 64
 RAW_MAX_SEQUENCE_ITEMS = 64

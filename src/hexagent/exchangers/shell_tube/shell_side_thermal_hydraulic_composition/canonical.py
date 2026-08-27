@@ -41,15 +41,15 @@ from .schema import (
     TYPED_BLOCKED_RESULT_FIELDS,
 )
 
-REQUEST_HASH_NAMESPACE = "task035.request.v1"
-SUCCESS_RESULT_HASH_NAMESPACE = "task035.success-result.v1"
-TYPED_BLOCKED_RESULT_HASH_NAMESPACE = "task035.typed-blocked-result.v1"
-RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE = "task035.raw-boundary-blocked-result.v1"
-PROVENANCE_NAMESPACE = "task035.provenance.v1"
-RAW_PROJECTION_NAMESPACE = "task035.raw-projection.v1"
+REQUEST_HASH_NAMESPACE = "task035.request.v2"
+SUCCESS_RESULT_HASH_NAMESPACE = "task035.success-result.v2"
+TYPED_BLOCKED_RESULT_HASH_NAMESPACE = "task035.typed-blocked-result.v2"
+RAW_BOUNDARY_BLOCKED_RESULT_HASH_NAMESPACE = "task035.raw-boundary-blocked-result.v2"
+PROVENANCE_NAMESPACE = "task035.provenance.v2"
+RAW_PROJECTION_NAMESPACE = "task035.raw-projection.v2"
 HASH_ALGORITHM = "SHA-256"
-RESULT_ID_NAMESPACE = uuid.UUID("f4a7c7b3-100e-5f54-97e4-678c14fa4044")
-RESULT_ID_NAME_PREFIX = "task035-shell-side-thermal-hydraulic-composition-id.v1:"
+RESULT_ID_NAMESPACE = uuid.UUID("661c792e-9202-57f0-bee2-201575040d7f")
+RESULT_ID_NAME_PREFIX = "task035-shell-side-thermal-hydraulic-composition-id.v2:"
 
 SUCCESS_PREHASH_FIELDS: tuple[str, ...] = tuple(
     field for field in SUCCESS_RESULT_FIELDS if field not in {"result_hash", "result_id"}
@@ -502,7 +502,7 @@ def task034_success_hash(result: Any) -> str:
         if field not in {"result_hash", "result_id"}
     )
     return hash_projection(
-        "task034.success-result.v1",
+        "task034.success-result.v2",
         [_primitive(value.get(field)) for field in fields],
     )
 
@@ -510,8 +510,8 @@ def task034_success_hash(result: Any) -> str:
 def task034_result_id(result_hash: str) -> str:
     return str(
         uuid.uuid5(
-            uuid.UUID("c8f1c1c4-a11b-596b-88ad-6e851a22b9fc"),
-            "task034-shell-side-pressure-drop-id.v1:" + result_hash,
+            uuid.UUID("c8f1c1c4-a11b-596b-88ad-6e851a22b9fd"),
+            "task034-shell-side-pressure-drop-id.v2:" + result_hash,
         )
     )
 
