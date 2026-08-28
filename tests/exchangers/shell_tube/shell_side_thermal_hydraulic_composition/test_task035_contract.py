@@ -5,11 +5,15 @@ from __future__ import annotations
 import dataclasses
 from copy import deepcopy
 from decimal import Decimal
+from enum import Enum
 from hashlib import sha256
 from typing import Any
 from unittest.mock import patch
 
 import hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition as package
+from hexagent.exchangers.shell_tube.shell_side_pressure_drop import (
+    validate_request as validate_task034_public,
+)
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
     blocker_registry,
     validate_request,
@@ -63,15 +67,28 @@ from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.sch
     TASK034_SUCCESS_RESULT_FIELDS,
     TASK034_TYPED_BLOCKED_RESULT_FIELDS,
 )
+from tests.exchangers.shell_tube.shell_side_pressure_drop.test_task034_success_contract import (
+    _task031_public_result,
+    build_actual_public_chain,
+)
 
 
 def _hex(digit: str) -> str:
     return digit * 64
 
 
-GOLDEN_REQUEST_CANONICAL_SHA256 = "9fc67fd05d26be188f1bb2d62d9067bbf14b3efc2b783bf7c3665aebaa37992c"
-GOLDEN_SUCCESS_CANONICAL_SHA256 = "c8ad2e7a4e452d1a10906620e39ecfa0003ab7c01629d3796407e9cd111499be"
+GOLDEN_REQUEST_CANONICAL_SHA256 = "323434b3ac6b22b2dc4a790d35b3aca32af040695dec36fe8e82ea551b6f1b6b"
+GOLDEN_SUCCESS_CANONICAL_SHA256 = "1e80061a5c46b7f5fbca624310931c2a362025e8001662dfd3320292838f6153"
 GOLDEN_PROVENANCE_CANONICAL_SHA256 = (
+    "abdc27c48e05de67d9382f88d87bdd34cd0514c2be0beb208b5d82187ecf3794"
+)
+HISTORICAL_V1_GOLDEN_REQUEST_CANONICAL_SHA256 = (
+    "9fc67fd05d26be188f1bb2d62d9067bbf14b3efc2b783bf7c3665aebaa37992c"
+)
+HISTORICAL_V1_GOLDEN_SUCCESS_CANONICAL_SHA256 = (
+    "c8ad2e7a4e452d1a10906620e39ecfa0003ab7c01629d3796407e9cd111499be"
+)
+HISTORICAL_V1_GOLDEN_PROVENANCE_CANONICAL_SHA256 = (
     "8459541e706b1ad2825bb2a0d8be9774d8aa0fb4f792d8313c410c09feb9a191"
 )
 
@@ -196,17 +213,22 @@ def _pressure(
     geometry: dict[str, Any], flow: dict[str, Any], heat: dict[str, Any]
 ) -> dict[str, Any]:
     pressure: dict[str, Any] = {
-        "schema_version": "task034.shell-side-pressure-drop-success.v1",
-        "profile_id": "hxforge.shell_tube.shell_side_pressure_drop.v1",
+        "schema_version": "task034.shell-side-pressure-drop-success.v2",
+        "profile_id": "hxforge.shell_tube.shell_side_pressure_drop.v2",
         "first_slice_profile_id": (
             "TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1"
         ),
-        "implementation_software_version": "task034.shell-side-pressure-drop-impl-v1",
+        "implementation_software_version": "task034.shell-side-pressure-drop-impl-v2",
         "shell_side_case_id": flow["shell_side_case_id"],
         "shell_side_stream_id": flow["shell_side_stream_id"],
         "shell_side_fluid_id": flow["shell_side_fluid_id"],
         "task020_configuration_id": geometry["task020_configuration_id"],
         "task020_configuration_hash": geometry["task020_configuration_hash"],
+        "shell_type": "E_SHELL",
+        "shell_type_authority_hash": _hex("f"),
+        "shell_type_authority_record_id": "authority-record-001",
+        "shell_type_authority_source_id": "authority-source-001",
+        "shell_type_authority_source_version": "authority-source-v1",
         "task031_request_hash": geometry["request_hash"],
         "task031_geometry_id": geometry["geometry_id"],
         "task031_geometry_hash": geometry["geometry_hash"],
@@ -293,14 +315,69 @@ def _valid_request() -> dict[str, Any]:
     }
 
 
+def _public_preserving_decimals(value: Any) -> Any:
+    """Convert producer dataclasses to public mappings without losing Decimals."""
+
+    if isinstance(value, Enum):
+        return value.value
+    if dataclasses.is_dataclass(value):
+        return {
+            field.name: _public_preserving_decimals(getattr(value, field.name))
+            for field in dataclasses.fields(value)
+        }
+    if isinstance(value, dict):
+        return {str(key): _public_preserving_decimals(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_public_preserving_decimals(item) for item in value]
+    return value
+
+
+def _actual_task035_public_request() -> dict[str, Any]:
+    """Execute the public TASK031 -> TASK032 -> TASK033 -> TASK034 chain."""
+
+    chain = build_actual_public_chain()
+    task034_validation = validate_task034_public(chain["task034_request"])
+    assert task034_validation.status.value == "VALID"
+    assert task034_validation.pressure_drop is not None
+    return {
+        "schema_version": REQUEST_SCHEMA_VERSION,
+        "profile_id": PROFILE_ID,
+        "task031_result": _task031_public_result(chain["task031_validation"]),
+        "task032_result": {
+            "status": chain["task032_validation"].status.value,
+            "flow_state": _public_preserving_decimals(chain["task032_validation"].flow_state),
+            "blocked_result": None,
+            "raw_boundary_blocked_result": None,
+        },
+        "task033_result": {
+            "status": chain["task033_validation"].status.value,
+            "heat_transfer": _public_preserving_decimals(chain["task033_validation"].heat_transfer),
+            "blocked_result": None,
+            "raw_boundary_blocked_result": None,
+        },
+        "task034_result": {
+            "status": task034_validation.status.value,
+            "pressure_drop": _public_preserving_decimals(task034_validation.pressure_drop),
+            "blocked_result": None,
+            "raw_boundary_blocked_result": None,
+        },
+        "evidence_refs": ["task035-real-public-chain"],
+    }
+
+
 def _typed_blocked_payload(
     fields: tuple[str, ...], schema_version: str, hash_field: str
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {field: None for field in fields}
+    profile_id = (
+        "hxforge.shell_tube.shell_side_pressure_drop.v2"
+        if schema_version.startswith("task034.")
+        else "upstream-profile.v1"
+    )
     payload.update(
         {
             "schema_version": schema_version,
-            "profile_id": "upstream-profile.v1",
+            "profile_id": profile_id,
             "implementation_software_version": "upstream-impl-v1",
             "failure_stage": "S01",
             "blockers": [{"code": "UPSTREAM_BLOCKED"}],
@@ -515,7 +592,7 @@ def _reachability_observations() -> tuple[list[tuple[Any, ...]], dict[str, str]]
     request = _valid_request()
     request["task034_result"] = _blocked_producer(
         TASK034_TYPED_BLOCKED_RESULT_FIELDS,
-        "task034.shell-side-pressure-drop-blocked.v1",
+        "task034.shell-side-pressure-drop-blocked.v2",
         "blocked_result_hash",
         "pressure_drop",
     )
@@ -1254,7 +1331,7 @@ def test_T035_010_TASK034_blocked_propagation() -> None:
         "pressure_drop": None,
         "blocked_result": _typed_blocked_payload(
             TASK034_TYPED_BLOCKED_RESULT_FIELDS,
-            "task034.shell-side-pressure-drop-blocked.v1",
+            "task034.shell-side-pressure-drop-blocked.v2",
             "blocked_result_hash",
         ),
         "raw_boundary_blocked_result": None,
@@ -1496,7 +1573,7 @@ def test_T035_019_completeness_blocked_not_applicable_propagation() -> None:
         "pressure_drop": None,
         "blocked_result": _typed_blocked_payload(
             TASK034_TYPED_BLOCKED_RESULT_FIELDS,
-            "task034.shell-side-pressure-drop-blocked.v1",
+            "task034.shell-side-pressure-drop-blocked.v2",
             "blocked_result_hash",
         ),
         "raw_boundary_blocked_result": None,
@@ -1619,10 +1696,10 @@ def test_T035_022_python311_python312_repeat_run_canonical_byte_identity() -> No
 
     request = _valid_request()
     first_request_bytes = canonical_bytes(
-        "task035.request.v1", request_canonical_projection(request)
+        "task035.request.v2", request_canonical_projection(request)
     )
     second_request_bytes = canonical_bytes(
-        "task035.request.v1", request_canonical_projection(deepcopy(request))
+        "task035.request.v2", request_canonical_projection(deepcopy(request))
     )
     assert first_request_bytes == second_request_bytes
     assert sha256(first_request_bytes).hexdigest() == GOLDEN_REQUEST_CANONICAL_SHA256
@@ -1630,22 +1707,118 @@ def test_T035_022_python311_python312_repeat_run_canonical_byte_identity() -> No
     second = validate_request(deepcopy(request)).success_result
     assert first is not None and second is not None
     first_success_bytes = canonical_bytes(
-        "task035.success-result.v1", success_result_canonical_projection(first)
+        "task035.success-result.v2", success_result_canonical_projection(first)
     )
     second_success_bytes = canonical_bytes(
-        "task035.success-result.v1", success_result_canonical_projection(second)
+        "task035.success-result.v2", success_result_canonical_projection(second)
     )
     assert first_success_bytes == second_success_bytes
     assert sha256(first_success_bytes).hexdigest() == GOLDEN_SUCCESS_CANONICAL_SHA256
 
     first_provenance_bytes = canonical_bytes(
-        "task035.provenance.v1", provenance_prehash_projection(first.provenance)
+        "task035.provenance.v2", provenance_prehash_projection(first.provenance)
     )
     second_provenance_bytes = canonical_bytes(
-        "task035.provenance.v1", provenance_prehash_projection(second.provenance)
+        "task035.provenance.v2", provenance_prehash_projection(second.provenance)
     )
     assert first_provenance_bytes == second_provenance_bytes
     assert sha256(first_provenance_bytes).hexdigest() == GOLDEN_PROVENANCE_CANONICAL_SHA256
     assert request_hash(request) == GOLDEN_REQUEST_CANONICAL_SHA256
     assert success_result_hash(first) == GOLDEN_SUCCESS_CANONICAL_SHA256
     assert provenance_hash(first.provenance) == GOLDEN_PROVENANCE_CANONICAL_SHA256
+    assert GOLDEN_REQUEST_CANONICAL_SHA256 != HISTORICAL_V1_GOLDEN_REQUEST_CANONICAL_SHA256
+    assert GOLDEN_SUCCESS_CANONICAL_SHA256 != HISTORICAL_V1_GOLDEN_SUCCESS_CANONICAL_SHA256
+    assert GOLDEN_PROVENANCE_CANONICAL_SHA256 != HISTORICAL_V1_GOLDEN_PROVENANCE_CANONICAL_SHA256
+
+
+def test_T035_V2_001_actual_task034_v2_success_branch() -> None:
+    """The actual public TASK034 v2 success branch composes successfully."""
+
+    request = _actual_task035_public_request()
+    result = validate_request(request)
+    assert result.status.value == "VALID"
+    assert result.success_result is not None
+    assert result.success_result.modeled_shell_side_pressure_drop_pa == Decimal("538.916")
+
+
+def test_T035_V2_002_historical_task034_v1_is_rejected_at_s09() -> None:
+    """Historical TASK034 v1 identity cannot enter the v2 producer boundary."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["schema_version"] = (
+        "task034.shell-side-pressure-drop-success.v1"
+    )
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_RESULT_INVALID",)
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S09"
+
+
+def test_T035_V2_003_wrong_task034_profile_fails_closed() -> None:
+    """A wrong TASK034 profile is rejected before identity replay."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["profile_id"] = "wrong-profile"
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_RESULT_INVALID",)
+
+
+def test_T035_V2_004_mixed_task034_version_is_rejected() -> None:
+    """A mixed v1/v2 producer payload is not admitted as a subset."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["schema_version"] = (
+        "task034.shell-side-pressure-drop-success.v1"
+    )
+    request["task034_result"]["pressure_drop"]["profile_id"] = (
+        "hxforge.shell_tube.shell_side_pressure_drop.v2"
+    )
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_RESULT_INVALID",)
+
+
+def test_T035_V2_005_task034_result_hash_tamper_is_s10_identity_mismatch() -> None:
+    """A stale TASK034 result hash is rejected without identity repair."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["result_hash"] = "0" * 64
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_IDENTITY_MISMATCH",)
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S10"
+
+
+def test_T035_V2_006_task034_result_id_tamper_is_s10_identity_mismatch() -> None:
+    """A stale TASK034 result ID is rejected without ID repair."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["result_id"] = "wrong-task034-id"
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_IDENTITY_MISMATCH",)
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S10"
+
+
+def test_T035_V2_007_pressure_tamper_with_stale_task034_identity_is_rejected() -> None:
+    """Pressure-drop tampering cannot be normalized or rebuilt by TASK035."""
+
+    request = _actual_task035_public_request()
+    request["task034_result"]["pressure_drop"]["modeled_shell_side_pressure_drop_pa"] = Decimal("0")
+    result = validate_request(request)
+    assert _codes(result) == ("SSTHC_TASK034_IDENTITY_MISMATCH",)
+    assert result.blocked_result is not None
+    assert result.blocked_result.failure_stage == "S10"
+
+
+def test_T035_V2_008_real_public_task031_to_task035_chain() -> None:
+    """The mandatory public TASK031 -> TASK032 -> TASK033 -> TASK034 -> TASK035 chain passes."""
+
+    request = _actual_task035_public_request()
+    task034_pressure = request["task034_result"]["pressure_drop"]
+    result = validate_request(request)
+    assert result.status.value == "VALID"
+    assert result.success_result is not None
+    assert (
+        result.success_result.modeled_shell_side_pressure_drop_pa
+        == task034_pressure["modeled_shell_side_pressure_drop_pa"]
+    )

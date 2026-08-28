@@ -17,23 +17,23 @@ from typing import Final
 TASK_ID: Final = "TASK035"
 PUBLIC_OPERATION: Final = "validate_request"
 
-REQUEST_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-request.v1"
-RESULT_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition.v1"
-BLOCKED_RESULT_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-blocked.v1"
+REQUEST_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-request.v2"
+RESULT_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition.v2"
+BLOCKED_RESULT_SCHEMA_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-blocked.v2"
 RAW_BOUNDARY_BLOCKED_RESULT_SCHEMA_VERSION: Final = (
-    "task035.shell-side-thermal-hydraulic-composition-raw-boundary-blocked.v1"
+    "task035.shell-side-thermal-hydraulic-composition-raw-boundary-blocked.v2"
 )
-PROFILE_ID: Final = "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.v1"
+PROFILE_ID: Final = "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.v2"
 FIRST_SLICE_PROFILE_ID: Final = (
     "SHELL_SIDE_SINGLE_PHASE_NEWTONIAN_KERN_THERMAL_HYDRAULIC_COMPOSITION_V1"
 )
-IMPLEMENTATION_SOFTWARE_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-impl-v1"
+IMPLEMENTATION_SOFTWARE_VERSION: Final = "task035.shell-side-thermal-hydraulic-composition-impl-v2"
 
 APPLICABILITY_PROFILE_ID: Final = (
-    "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.applicability.v1"
+    "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.applicability.v2"
 )
 COMPLETENESS_PROFILE_ID: Final = (
-    "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.completeness.v1"
+    "hxforge.shell_tube.shell_side_thermal_hydraulic_composition.completeness.v2"
 )
 
 REQUEST_FIELDS: Final[tuple[str, ...]] = (
@@ -317,6 +317,11 @@ TASK034_SUCCESS_RESULT_FIELDS: Final[tuple[str, ...]] = (
     "shell_side_fluid_id",
     "task020_configuration_id",
     "task020_configuration_hash",
+    "shell_type",
+    "shell_type_authority_hash",
+    "shell_type_authority_record_id",
+    "shell_type_authority_source_id",
+    "shell_type_authority_source_version",
     "task031_request_hash",
     "task031_geometry_id",
     "task031_geometry_hash",
@@ -359,6 +364,11 @@ TASK034_TYPED_BLOCKED_RESULT_FIELDS: Final[tuple[str, ...]] = (
     "shell_side_fluid_id",
     "task020_configuration_id",
     "task020_configuration_hash",
+    "shell_type",
+    "shell_type_authority_hash",
+    "shell_type_authority_record_id",
+    "shell_type_authority_source_id",
+    "shell_type_authority_source_version",
     "task031_request_hash",
     "task031_geometry_id",
     "task031_geometry_hash",

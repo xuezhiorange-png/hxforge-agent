@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -77,9 +78,9 @@ _TASK032_RAW_SCHEMA = "task032.shell-side-flow-state-raw-boundary-blocked.v1"
 _TASK033_RESULT_SCHEMA = "task033.shell-side-heat-transfer.v1"
 _TASK033_BLOCKED_SCHEMA = "task033.shell-side-heat-transfer-blocked.v1"
 _TASK033_RAW_SCHEMA = "task033.shell-side-heat-transfer-raw-boundary-blocked.v1"
-_TASK034_RESULT_SCHEMA = "task034.shell-side-pressure-drop-success.v1"
-_TASK034_BLOCKED_SCHEMA = "task034.shell-side-pressure-drop-blocked.v1"
-_TASK034_RAW_SCHEMA = "task034.shell-side-pressure-drop-raw-boundary-blocked.v1"
+_TASK034_RESULT_SCHEMA = "task034.shell-side-pressure-drop-success.v2"
+_TASK034_BLOCKED_SCHEMA = "task034.shell-side-pressure-drop-blocked.v2"
+_TASK034_RAW_SCHEMA = "task034.shell-side-pressure-drop-raw-boundary-blocked.v2"
 
 _TASK032_FLOW_PROFILE = "hxforge.shell_tube.shell_side_flow_state.v1"
 _TASK032_FIRST_SLICE_PROFILE = "SHELL_SIDE_SINGLE_PHASE_NEWTONIAN_BULK_FLOW_STATE_SCREENING_V1"
@@ -89,7 +90,7 @@ _TASK033_FIRST_SLICE_PROFILE = (
     "SHELL_SIDE_SINGLE_PHASE_NEWTONIAN_KERN_KHARAJI_2021_EQ58_OUTER_TUBE_SURFACE_HTC_SCREENING_V1"
 )
 _TASK033_CORRELATION = "TASK033_KERN_KHARAJI_2021_EQ58_NO_WALL_CORRECTION_V1"
-_TASK034_PROFILE = "hxforge.shell_tube.shell_side_pressure_drop.v1"
+_TASK034_PROFILE = "hxforge.shell_tube.shell_side_pressure_drop.v2"
 _TASK034_FIRST_SLICE_PROFILE = (
     "TASK034_KERN_BAYRAM_SEVILGEN_2017_EQ15_EQ16_EQ17_WALL_VISCOSITY_CORRECTION_V1"
 )
@@ -133,7 +134,7 @@ def _status(value: Any) -> str | None:
 
 
 def _exact_fields(value: dict[str, Any], fields: tuple[str, ...]) -> bool:
-    return set(value) == set(fields) and all(type(key) is str for key in value)
+    return tuple(value) == fields and all(type(key) is str for key in value)
 
 
 def _sequence(value: Any) -> bool:
@@ -219,7 +220,9 @@ def _valid_success(value: Any, fields: tuple[str, ...], schema: str) -> dict[str
         return None
     if payload.get("schema_version") != schema or not _nonempty_text(payload.get("profile_id")):
         return None
-    if not _nonempty_text(payload.get("implementation_software_version")):
+    if "implementation_software_version" in fields and not _nonempty_text(
+        payload.get("implementation_software_version")
+    ):
         return None
     if not _messages(payload.get("warnings"), blockers=False):
         return None
@@ -293,6 +296,7 @@ def _valid_raw_blocked(
     fields: tuple[str, ...],
     schema: str,
     projection_field: str,
+    projection_length: int | None = None,
 ) -> dict[str, Any] | None:
     payload = _as_mapping(value)
     if payload is None or not _exact_fields(payload, fields):
@@ -307,7 +311,14 @@ def _valid_raw_blocked(
         return None
     if not _valid_sequence_of_strings(payload.get("deferred_capabilities")):
         return None
-    return payload if payload.get(projection_field) is not None else None
+    projection = payload.get(projection_field)
+    if projection is None:
+        return None
+    if projection_length is not None and (
+        not isinstance(projection, list) or len(projection) != projection_length
+    ):
+        return None
+    return payload
 
 
 def _validate_task031(value: Any) -> tuple[str, dict[str, Any] | None]:
@@ -346,11 +357,13 @@ def _validate_producer(
     success_field: str,
     success_fields: tuple[str, ...],
     success_schema: str,
+    expected_profile: str | None = None,
     blocked_fields: tuple[str, ...],
     blocked_schema: str,
     raw_fields: tuple[str, ...],
     raw_schema: str,
     raw_projection_field: str,
+    raw_projection_length: int | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     if value is None:
         return "missing", None
@@ -367,6 +380,12 @@ def _validate_producer(
         if success is None or blocked is not None or raw_blocked is not None:
             return "invalid", None
         payload = _valid_success(success, success_fields, success_schema)
+        if (
+            expected_profile is not None
+            and payload is not None
+            and payload.get("profile_id") != expected_profile
+        ):
+            payload = None
         return ("success", payload) if payload is not None else ("invalid", None)
     if success is not None:
         return "invalid", None
@@ -378,8 +397,26 @@ def _validate_producer(
             "result_hash" if "result_hash" in blocked_fields else "blocked_result_hash"
         )
         payload = _valid_typed_blocked(blocked, blocked_fields, blocked_schema, blocked_hash_field)
+        if (
+            expected_profile is not None
+            and payload is not None
+            and payload.get("profile_id") != expected_profile
+        ):
+            payload = None
         return ("blocked", payload) if payload is not None else ("invalid", None)
-    payload = _valid_raw_blocked(raw_blocked, raw_fields, raw_schema, raw_projection_field)
+    payload = _valid_raw_blocked(
+        raw_blocked,
+        raw_fields,
+        raw_schema,
+        raw_projection_field,
+        raw_projection_length,
+    )
+    if (
+        expected_profile is not None
+        and payload is not None
+        and payload.get("profile_id") != expected_profile
+    ):
+        payload = None
     return ("blocked", payload) if payload is not None else ("invalid", None)
 
 
@@ -763,6 +800,33 @@ def _pair_dict(value: Any) -> dict[str, Any] | None:
     return result
 
 
+_REYNOLDS_DOMAIN = re.compile(
+    r"^\s*(?P<lower>[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\s*<\s*Re_s\s*<\s*"
+    r"(?P<upper>[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\s*$"
+)
+
+
+def _reynolds_domains_overlap(left: Any, right: Any) -> bool:
+    """Check the producer-domain intersection without rewriting either domain."""
+
+    if type(left) is not str or type(right) is not str:
+        return False
+    left_match = _REYNOLDS_DOMAIN.fullmatch(left)
+    right_match = _REYNOLDS_DOMAIN.fullmatch(right)
+    if left_match is None or right_match is None:
+        return False
+    left_bounds = (Decimal(left_match.group("lower")), Decimal(left_match.group("upper")))
+    right_bounds = (Decimal(right_match.group("lower")), Decimal(right_match.group("upper")))
+    return max(left_bounds[0], right_bounds[0]) < min(left_bounds[1], right_bounds[1])
+
+
+def _context_alias(context: Mapping[str, Any], *names: str) -> Any:
+    for name in names:
+        if name in context:
+            return context[name]
+    return None
+
+
 def _applicability_ledger(accepted: _Accepted) -> tuple[tuple[str, Any], ...] | None:
     geometry = _geometry(accepted)
     flow = _flow(accepted)
@@ -775,9 +839,32 @@ def _applicability_ledger(accepted: _Accepted) -> tuple[tuple[str, Any], ...] | 
     physical_context = _pair_dict(pressure.get("physical_boundary_context"))
     if heat_context is None or pressure_context is None or physical_context is None:
         return None
-    for key in sorted(set(heat_context) & set(pressure_context)):
-        if not _same([heat_context[key], pressure_context[key]]):
+    shared_context_pairs = (
+        ("phase", ("phase", "phase_region"), ("phase", "phase_region")),
+        ("rheology", ("rheology", "rheology_model"), ("rheology", "rheology_model")),
+        (
+            "flow_region_identity",
+            ("flow_region_identity",),
+            ("flow_region_identity",),
+        ),
+    )
+    for _name, heat_names, pressure_names in shared_context_pairs:
+        heat_value = _context_alias(heat_context, *heat_names)
+        pressure_value = _context_alias(pressure_context, *pressure_names)
+        if (
+            heat_value is not None
+            and pressure_value is not None
+            and not _same([heat_value, pressure_value])
+        ):
             return None
+    heat_reynolds = heat_context.get("reynolds_domain")
+    pressure_reynolds = pressure_context.get("reynolds_domain")
+    if (
+        heat_reynolds is not None
+        and pressure_reynolds is not None
+        and not _reynolds_domains_overlap(heat_reynolds, pressure_reynolds)
+    ):
+        return None
     case_values = [
         flow.get("shell_side_case_id"),
         heat.get("shell_side_case_id"),
@@ -1076,6 +1163,7 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
         success_field="pressure_drop",
         success_fields=TASK034_SUCCESS_RESULT_FIELDS,
         success_schema=_TASK034_RESULT_SCHEMA,
+        expected_profile=_TASK034_PROFILE,
         blocked_fields=TASK034_TYPED_BLOCKED_RESULT_FIELDS,
         blocked_schema=_TASK034_BLOCKED_SCHEMA,
         raw_fields=(
@@ -1090,6 +1178,7 @@ def validate_request(raw_request: Any) -> Task035ValidationResult:
         ),
         raw_schema=_TASK034_RAW_SCHEMA,
         raw_projection_field="raw_projection",
+        raw_projection_length=9,
     )
     if task034_state == "missing":
         return _bad(
