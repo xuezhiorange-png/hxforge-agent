@@ -188,6 +188,7 @@ shards:
       - tests/exchangers/shell_tube/tube_side_thermal/test_single_phase.py
       - tests/release_demo/test_v0_1_task020_to_task026.py
       - tests/release_demo/test_v0_2_task020_to_task029.py
+      - tests/release_demo/test_v0_3_task020_to_task035.py
     timeout: 300
 
   - name: ci-acceptance
