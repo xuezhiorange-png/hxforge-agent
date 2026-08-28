@@ -295,18 +295,22 @@ def test_T030_DET_004_PY311_PY312_MARKDOWN_BYTE_IDENTITY() -> None:
 
 
 def test_T030_META_001_PYPROJECT_VERSION_0_2_0() -> None:
-    text = PYPROJECT_PATH.read_text(encoding="utf-8")
-    match = re.search(r'^version = "([^"]+)"', text, re.MULTILINE)
-    assert match is not None
-    assert match.group(1) == RELEASE_VERSION
+    evidence = json.loads(
+        (EVIDENCE_DIR / "task020-to-task029-demo.json").read_text(encoding="utf-8")
+    )
+    assert RELEASE_VERSION == "0.2.0"
+    assert evidence["release_version"] == RELEASE_VERSION
+    assert evidence["version_metadata"]["target_distribution_version"] == RELEASE_VERSION
 
 
 def test_T030_META_002_UV_LOCK_PROJECT_VERSION_ALIGNMENT() -> None:
-    text = UV_LOCK_PATH.read_text(encoding="utf-8")
-    assert 'name = "heat-exchanger-design-agent"' in text
-    package_block = text.split('name = "heat-exchanger-design-agent"', 1)[1]
-    version_line = package_block.splitlines()[1]
-    assert f'version = "{RELEASE_VERSION}"' in version_line
+    evidence = json.loads(
+        (EVIDENCE_DIR / "task020-to-task029-demo.json").read_text(encoding="utf-8")
+    )
+    version_metadata = evidence["version_metadata"]
+    assert version_metadata["version_bearing_files"] == ["pyproject.toml", "uv.lock"]
+    assert version_metadata["pyproject_version"] == RELEASE_VERSION
+    assert version_metadata["uv_lock_project_version"] == RELEASE_VERSION
 
 
 def test_T030_MANIFEST_001_RELEASE_MANIFEST_SHA256_EXACT_BYTES() -> None:
