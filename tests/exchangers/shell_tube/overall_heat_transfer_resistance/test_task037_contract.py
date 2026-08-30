@@ -503,7 +503,8 @@ def test_task021_geometry_snapshot_tamper_blocks_before_engineering() -> None:
         )
 
 
-def test_ci_manifest_registers_task037_contract_and_static_vectors() -> None:
+def test_ci_manifest_registers_task037_contract_only() -> None:
+    """Shard the pytest contract; its imported frozen vectors are not tests."""
     manifest = Path("ci-shard-manifest.yml").read_text(encoding="utf-8")
     assert (
         manifest.count(
@@ -515,7 +516,7 @@ def test_ci_manifest_registers_task037_contract_and_static_vectors() -> None:
         manifest.count(
             "tests/exchangers/shell_tube/overall_heat_transfer_resistance/task037_frozen_vectors.py"
         )
-        == 1
+        == 0
     )
 
 
