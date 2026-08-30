@@ -5,6 +5,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+from hexagent.exchangers.shell_tube.tube_layout import (
+    AuthorityFailure as Task021AuthorityFailure,
+)
+from hexagent.exchangers.shell_tube.tube_layout import (
+    verify_geometry_snapshot,
+)
 from hexagent.exchangers.shell_tube.tube_layout.models import (
     ApprovedTubeGeometrySnapshot,
     TubeLayout,
@@ -229,6 +235,10 @@ def validate_task021_layout(layout: Any) -> tuple[bool, str]:
     for name in ("inner_diameter_m", "outer_diameter_m", "wall_thickness_m"):
         if type(getattr(geometry, name)) is not str or not getattr(geometry, name):
             return False, f"task021_geometry_{name}_invalid"
+    try:
+        verify_geometry_snapshot(geometry)
+    except (Task021AuthorityFailure, ArithmeticError, TypeError, ValueError, AttributeError):
+        return False, "task021_geometry_snapshot_identity_mismatch"
     return True, "PASS"
 
 

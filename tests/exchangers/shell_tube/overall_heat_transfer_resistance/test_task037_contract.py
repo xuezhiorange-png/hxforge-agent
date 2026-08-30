@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import hexagent.exchangers.shell_tube.tube_side as tube_side
+from hexagent.exchangers.shell_tube import validate_request as validate_task020_request
 from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance import (
     BLOCKER_COUNT,
     BLOCKER_REGISTRY,
@@ -73,7 +74,13 @@ from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.canonical i
     wall_resistance_authority_bytes,
     wall_resistance_authority_hash,
 )
+from hexagent.exchangers.shell_tube.tube_layout import ValidationStatus
+from hexagent.exchangers.shell_tube.tube_layout import validate_request as validate_task021_request
 from hexagent.exchangers.shell_tube.tube_side import heat_transfer_authority_length_hash
+from scripts.release_demo.v0_1_task020_to_task026 import (
+    _build_t020_request,
+    _build_t021_request,
+)
 from tests.exchangers.shell_tube.overall_heat_transfer_resistance import (
     task037_frozen_vectors as vectors,
 )
@@ -99,21 +106,30 @@ from tests.exchangers.shell_tube.overall_heat_transfer_resistance.task037_frozen
     result_fixture,
 )
 from tests.exchangers.shell_tube.tube_side.test_a09_scheduler import _request_input
-from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a
-from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a
+
+
+def _production_inputs():
+    task020_result = validate_task020_request(_build_t020_request())
+    assert task020_result.status.value == "VALID"
+    assert task020_result.configuration is not None
+    payload = _build_t021_request(task020_result.configuration)
+    task021_result = validate_task021_request(
+        payload,
+        software_version="0.1.0",
+        git_commit="task037-public-replay",
+    )
+    assert task021_result.status is ValidationStatus.VALID
+    assert task021_result.layout is not None
+    return task020_result.configuration, task021_result.layout
 
 
 def _production_layout():
-    layout = layout_a()
-    return replace(
-        layout,
-        tube_geometry=replace(layout.tube_geometry, inner_diameter_m="0.012"),
-    )
+    return _production_inputs()[1]
 
 
 def _production_task025():
-    layout = _production_layout()
-    result = tube_side.evaluate_task025(_request_input(config_a(), layout))
+    config, layout = _production_inputs()
+    result = tube_side.evaluate_task025(_request_input(config, layout))
     assert isinstance(result, tube_side.Task025ValidResult)
     return layout, result
 
@@ -453,6 +469,40 @@ def test_identity_verifier_replays_without_engineering_recomputation() -> None:
         assert verify_task037_success_identity(result.success_result)
 
 
+def test_task021_geometry_snapshot_tamper_blocks_before_engineering() -> None:
+    layout, task025_result = _production_task025()
+
+    for field_name, tampered_value in (
+        ("inner_diameter_m", "0.015"),
+        ("outer_diameter_m", "0.021"),
+        ("wall_thickness_m", "0.0021"),
+    ):
+        tampered_geometry = replace(
+            layout.tube_geometry,
+            **{field_name: tampered_value},
+        )
+        tampered_layout = replace(layout, tube_geometry=tampered_geometry)
+        with (
+            patch(
+                "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.validation.build_surface_projection",
+                side_effect=AssertionError("surface transform must not run"),
+            ),
+            patch(
+                "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.validation.compute_wall_resistance",
+                side_effect=AssertionError("wall resistance must not run"),
+            ),
+        ):
+            result = evaluate_task037(_task037_request(), tampered_layout, task025_result)
+
+        assert result.status == "BLOCKED"
+        assert result.typed_blocked_result is not None
+        assert result.typed_blocked_result.failure_stage == "S02_TASK021_UPSTREAM_VALIDATION"
+        assert result.typed_blocked_result.blockers[0].code == BlockerCode.TASK021_INVALID
+        assert result.typed_blocked_result.blockers[0].message_key == (
+            "task021_geometry_snapshot_identity_mismatch"
+        )
+
+
 def test_ci_manifest_registers_task037_contract_and_static_vectors() -> None:
     manifest = Path("ci-shard-manifest.yml").read_text(encoding="utf-8")
     assert (
@@ -499,13 +549,7 @@ def test_static_ledgers_remain_ordered() -> None:
 def test_actual_production_binding_reaches_valid_result() -> None:
     """Run TASK025 and TASK037 through their public production boundaries."""
 
-    layout = layout_a()
-    layout = replace(
-        layout,
-        tube_geometry=replace(layout.tube_geometry, inner_diameter_m="0.012"),
-    )
-    task025_result = tube_side.evaluate_task025(_request_input(config_a(), layout))
-    assert isinstance(task025_result, tube_side.Task025ValidResult)
+    layout, task025_result = _production_task025()
 
     material = TubeWallMaterialAuthority(
         "MAT-001",
