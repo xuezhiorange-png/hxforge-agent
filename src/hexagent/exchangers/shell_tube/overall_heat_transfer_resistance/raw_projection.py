@@ -9,6 +9,7 @@ iteration, equality, or user-defined method is invoked.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import cast
 
 from hexagent.exchangers.shell_tube.tube_side.provenance import FrozenRawProjection
 
@@ -27,25 +28,30 @@ def _safe_payload(value: object, active: set[int]) -> bytes:
     if value is None:
         return frame_value(b"NONE", b"")
     if value_type is bool:
-        return frame_value(b"BOOL_TRUE" if value else b"BOOL_FALSE", b"")
+        bool_value = cast(bool, value)
+        return frame_value(b"BOOL_TRUE" if bool_value else b"BOOL_FALSE", b"")
     if value_type is int:
-        return frame_value(b"INT", str(value).encode("ascii"))
+        int_value = cast(int, value)
+        return frame_value(b"INT", str(int_value).encode("ascii"))
     if value_type is str:
-        encoded = value.encode("utf-8")
+        string_value = cast(str, value)
+        encoded = string_value.encode("utf-8")
         return frame_value(b"STRING", encoded)
     if value_type is Decimal:
-        encoded = str(value).encode("ascii")
+        decimal_value = cast(Decimal, value)
+        encoded = str(decimal_value).encode("ascii")
         return frame_value(b"DECIMAL", encoded)
     if value_type is bytes:
-        return frame_value(b"BYTES", value)
+        return frame_value(b"BYTES", cast(bytes, value))
     if value_type in (tuple, list):
+        sequence = cast(tuple[object, ...] | list[object], value)
         object_id = id(value)
         if object_id in active:
             return frame_value(b"RAW_PROJECTION", b"CYCLIC_EXACT_SEQUENCE")
         active.add(object_id)
         try:
-            payload = bytearray(len(value).to_bytes(4, "big", signed=False))
-            for item in value:
+            payload = bytearray(len(sequence).to_bytes(4, "big", signed=False))
+            for item in sequence:
                 child = _safe_payload(item, active)
                 payload.extend(len(child).to_bytes(8, "big", signed=False))
                 payload.extend(child)
@@ -53,13 +59,14 @@ def _safe_payload(value: object, active: set[int]) -> bytes:
         finally:
             active.remove(object_id)
     if value_type is dict:
+        mapping = cast(dict[object, object], value)
         object_id = id(value)
         if object_id in active:
             return frame_value(b"RAW_PROJECTION", b"CYCLIC_EXACT_DICT")
         active.add(object_id)
         try:
-            payload = bytearray(len(value).to_bytes(4, "big", signed=False))
-            for key, item in value.items():
+            payload = bytearray(len(mapping).to_bytes(4, "big", signed=False))
+            for key, item in mapping.items():
                 if type(key) is str:
                     key_bytes = key.encode("utf-8")
                     payload.extend(len(key_bytes).to_bytes(4, "big", signed=False))

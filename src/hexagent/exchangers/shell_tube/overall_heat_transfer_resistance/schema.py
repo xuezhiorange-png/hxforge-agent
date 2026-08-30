@@ -7,6 +7,7 @@ neither module is allowed to silently add fields to these ordered contracts.
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Final
 
 TASK_ID: Final[str] = "TASK037"
@@ -285,6 +286,12 @@ TASK025_PUBLIC_AREA_ROUNDING_MODE: Final[str] = "ROUND_HALF_EVEN"
 TASK025_PUBLIC_AREA_PRECISION_POLICY_ID: Final[str] = (
     "task037.task025-public-area-authority.accept-positive-v1"
 )
+# Names used by the frozen public producer-authority wording.  The existing
+# TASK025_PUBLIC_* names remain the canonical internal spelling; these are
+# exact aliases, not additional identity fields or hash contracts.
+PRODUCER_AREA_PRECISION_POLICY_ID: Final[str] = TASK025_PUBLIC_AREA_PRECISION_POLICY_ID
+TASK025_AREA_QUANTUM_M2: Final[Decimal] = Decimal("1E-10")
+TASK025_AREA_ROUNDING_MODE: Final[str] = TASK025_PUBLIC_AREA_ROUNDING_MODE
 PRODUCER_AREA_PRECISION_POLICY_CANONICAL_ASCII: Final[str] = (
     "task037.task025-public-area-authority.accept-positive-v1|"
     "quantum_m2=0.0000000001|rounding=ROUND_HALF_EVEN|full_positive_domain=true|"

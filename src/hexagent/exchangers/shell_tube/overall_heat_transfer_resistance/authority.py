@@ -11,8 +11,11 @@ from hexagent.exchangers.shell_tube.tube_layout.models import (
 )
 from hexagent.exchangers.shell_tube.tube_side import (
     FrozenIdentity,
+    FrozenProvenance,
+    HeatTransferLengthAuthority,
     Task025BlockedResult,
     Task025ValidResult,
+    heat_transfer_authority_length_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side import (
     result_hash as task025_result_hash,
@@ -39,6 +42,7 @@ from .schema import (
     OVERALL_U_REFERENCE_SURFACE,
     PRODUCER_AREA_PRECISION_POLICY_HASH,
     SOURCE_FORMULA_IDENTITY,
+    TASK025_AREA_QUANTUM_M2,
     TUBE_SIDE_FILM_REFERENCE_SURFACE,
     WALL_BUNDLE_NUMERICAL_BASIS,
 )
@@ -71,9 +75,34 @@ def is_sha256_hex(value: object) -> bool:
     )
 
 
+def _is_non_empty_string(value: object) -> bool:
+    return type(value) is str and bool(value)
+
+
+def _is_non_empty_string_tuple(value: object) -> bool:
+    return (
+        type(value) is tuple and bool(value) and all(_is_non_empty_string(item) for item in value)
+    )
+
+
 def validate_material_authority(authority: Any) -> tuple[bool, str]:
     if type(authority) is not TubeWallMaterialAuthority:
         return False, "material_authority_type_invalid"
+    for name in (
+        "authority_id",
+        "material_id",
+        "material_grade",
+        "source_id",
+        "source_version",
+        "source_location",
+        "source_class",
+        "permission_status",
+        "approval_status",
+    ):
+        if not _is_non_empty_string(getattr(authority, name, None)):
+            return False, f"material_{name}_invalid"
+    if not _is_non_empty_string_tuple(authority.evidence_refs):
+        return False, "material_evidence_refs_invalid"
     if not is_sha256_hex(authority.authority_hash):
         return False, "material_authority_hash_invalid"
     expected_permission = _WALL_SOURCE_PERMISSION.get(authority.source_class)
@@ -92,6 +121,22 @@ def validate_conductivity_authority(
         return False, "conductivity_authority_type_invalid"
     if type(material) is not TubeWallMaterialAuthority:
         return False, "material_authority_type_invalid"
+    for name in (
+        "authority_id",
+        "material_id",
+        "evaluation_context_id",
+        "evaluation_basis",
+        "source_id",
+        "source_version",
+        "source_location",
+        "source_class",
+        "permission_status",
+        "approval_status",
+    ):
+        if not _is_non_empty_string(getattr(authority, name, None)):
+            return False, f"conductivity_{name}_invalid"
+    if not _is_non_empty_string_tuple(authority.evidence_refs):
+        return False, "conductivity_evidence_refs_invalid"
     if not is_sha256_hex(authority.authority_hash) or not is_sha256_hex(
         authority.applicability_authority_hash
     ):
@@ -122,6 +167,24 @@ def validate_fouling_authority(authority: Any, *, side: str) -> tuple[bool, str]
     expected_surface = "INNER_TUBE_SURFACE" if side == "INSIDE" else "OUTER_TUBE_SURFACE"
     if type(authority) is not expected_type:
         return False, "fouling_authority_type_invalid"
+    for name in (
+        "authority_id",
+        "side",
+        "reference_surface",
+        "fluid_service_id",
+        "source_id",
+        "source_version",
+        "source_location",
+        "source_class",
+        "permission_status",
+        "approval_status",
+        "resistance_units",
+        "applicability",
+    ):
+        if not _is_non_empty_string(getattr(authority, name, None)):
+            return False, f"fouling_{name}_invalid"
+    if not _is_non_empty_string_tuple(authority.evidence_refs):
+        return False, "fouling_evidence_refs_invalid"
     if authority.side != side or authority.reference_surface != expected_surface:
         return False, "fouling_reference_surface_invalid"
     if authority.source_class not in _FOULING_SOURCE_CLASSES:
@@ -177,24 +240,62 @@ def replay_task025_valid_result(result: Any) -> tuple[bool, str]:
     if type(result) is not Task025ValidResult:
         return False, "task025_type_invalid"
     try:
-        if task025_result_hash(result) != result.result_hash:
-            return False, "task025_result_hash_mismatch"
-        if task025_result_id(result.result_hash) != result.result_id:
-            return False, "task025_result_id_mismatch"
+        if result.schema_version != "task025.result.v1":
+            return False, "task025_schema_invalid"
+        if type(result.stage_rank) is not int or result.stage_rank != 9:
+            return False, "task025_stage_rank_invalid"
+        if result.warnings != ():
+            return False, "task025_warnings_nonempty"
+        if result.blockers != ():
+            return False, "task025_blockers_nonempty"
+        if type(result.heat_transfer_authority) is not HeatTransferLengthAuthority:
+            return False, "task025_heat_transfer_authority_invalid"
+        if type(result.provenance) is not FrozenProvenance:
+            return False, "task025_provenance_invalid"
+        if not _is_non_empty_string_tuple(result.active_position_ids):
+            return False, "task025_active_position_ids_invalid"
+        if type(result.inactive_position_ids) is not tuple or any(
+            not _is_non_empty_string(item) for item in result.inactive_position_ids
+        ):
+            return False, "task025_inactive_position_ids_invalid"
+        active_ids = result.active_position_ids
+        inactive_ids = result.inactive_position_ids
+        if len(set(active_ids)) != len(active_ids):
+            return False, "task025_active_position_ids_duplicate"
+        if len(set(inactive_ids)) != len(inactive_ids):
+            return False, "task025_inactive_position_ids_duplicate"
+        if set(active_ids).intersection(inactive_ids):
+            return False, "task025_position_partition_overlap"
+        validate_positive_finite_decimal(
+            result.heat_transfer_authority.length_m,
+            "task025.heat_transfer_authority.length_m",
+        )
+        expected_length_hash = heat_transfer_authority_length_hash(
+            result.heat_transfer_authority.length_m,
+            result.heat_transfer_authority.start_plane,
+            result.heat_transfer_authority.end_plane,
+            result.heat_transfer_authority.authority_mode,
+        )
+        if expected_length_hash != result.heat_transfer_authority.length_hash:
+            return False, "task025_heat_transfer_length_hash_mismatch"
         validate_positive_finite_decimal(
             result.internal_heat_transfer_surface_area_m2,
             "task025.internal_heat_transfer_surface_area_m2",
         )
         public_area = result.internal_heat_transfer_surface_area_m2
-        if public_area.quantize(Decimal("1E-10")) != public_area:
+        if public_area.quantize(TASK025_AREA_QUANTUM_M2) != public_area:
             return False, "task025_public_area_noncanonical"
+        if task025_result_hash(result) != result.result_hash:
+            return False, "task025_result_hash_mismatch"
+        if task025_result_id(result.result_hash) != result.result_id:
+            return False, "task025_result_id_mismatch"
         if not is_sha256_hex(result.hydraulic_authority_hash):
             return False, "task025_hydraulic_authority_hash_invalid"
         if type(result.heat_transfer_authority.length_hash) is not str or not is_sha256_hex(
             result.heat_transfer_authority.length_hash
         ):
             return False, "task025_heat_transfer_length_hash_invalid"
-    except (TypeError, ValueError, AttributeError):
+    except (ArithmeticError, TypeError, ValueError, AttributeError):
         return False, "task025_public_result_invalid"
     return True, "PASS"
 
@@ -202,26 +303,41 @@ def replay_task025_valid_result(result: Any) -> tuple[bool, str]:
 def validate_task021_task025_binding(layout: Any, result: Any) -> tuple[bool, str]:
     if type(layout) is not TubeLayout or type(result) is not Task025ValidResult:
         return False, "binding_input_type_invalid"
-    if result.layout_hash != layout.layout_hash:
-        return False, "layout_hash_mismatch"
-    identity = result.task021_identity
-    if type(identity) is not FrozenIdentity:
-        return False, "task025_task021_identity_type_invalid"
-    if (
-        identity.identity_type != "task021.tube-layout.v1"
-        or identity.identity_id != layout.layout_id
-        or identity.identity_hash != layout.layout_hash
-    ):
-        return False, "task025_task021_identity_mismatch"
     try:
+        if result.layout_hash != layout.layout_hash:
+            return False, "layout_hash_mismatch"
+        identity = result.task021_identity
+        if type(identity) is not FrozenIdentity:
+            return False, "task025_task021_identity_type_invalid"
+        if (
+            identity.identity_type != "task021.tube-layout.v1"
+            or identity.identity_id != layout.layout_id
+            or identity.identity_hash != layout.layout_hash
+        ):
+            return False, "task025_task021_identity_mismatch"
         if layout.layout_hash not in result.provenance.upstream_identity_hashes:
             return False, "task025_provenance_layout_identity_missing"
+        if type(result.active_position_ids) is not tuple or not result.active_position_ids:
+            return False, "active_position_ids_empty"
+        if type(result.inactive_position_ids) is not tuple:
+            return False, "inactive_position_ids_invalid"
+        all_ids = result.active_position_ids + result.inactive_position_ids
+        if any(not _is_non_empty_string(item) for item in all_ids):
+            return False, "position_ids_invalid"
+        if len(set(all_ids)) != len(all_ids):
+            return False, "position_partition_duplicate"
+        if not set(result.active_position_ids).isdisjoint(result.inactive_position_ids):
+            return False, "position_partition_overlap"
+        if type(result.heat_transfer_authority) is not HeatTransferLengthAuthority:
+            return False, "heat_transfer_authority_invalid"
+        validate_positive_finite_decimal(
+            result.heat_transfer_authority.length_m,
+            "task025.heat_transfer_authority.length_m",
+        )
     except AttributeError:
         return False, "task025_provenance_invalid"
-    if not result.active_position_ids:
-        return False, "active_position_ids_empty"
-    if result.heat_transfer_authority.length_m <= 0:
-        return False, "heat_transfer_length_invalid"
+    except (TypeError, ValueError):
+        return False, "task025_binding_invalid"
     return True, "PASS"
 
 

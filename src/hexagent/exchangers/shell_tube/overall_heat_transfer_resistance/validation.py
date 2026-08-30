@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from hexagent.exchangers.shell_tube.tube_layout.models import TubeLayout
 from hexagent.exchangers.shell_tube.tube_side import Task025BlockedResult, Task025ValidResult
@@ -13,6 +13,7 @@ from .authority import (
     build_surface_projection,
     build_wall_projection,
     geometry_decimals,
+    is_sha256_hex,
     replay_task025_valid_result,
     validate_conductivity_authority,
     validate_fouling_authority,
@@ -35,6 +36,8 @@ from .engineering import compute_outer_to_inner_area_ratio, compute_wall_resista
 from .models import (
     BlockerEntry,
     FrozenIdentity,
+    InsideFoulingResistanceAuthority,
+    OutsideFoulingResistanceAuthority,
     Task037RawBoundaryBlockedResult,
     Task037Request,
     Task037SuccessResult,
@@ -46,7 +49,11 @@ from .raw_projection import project_raw_request
 from .schema import (
     APPLICABILITY_ROWS,
     DEFERRED_CAPABILITIES,
+    DESIGN_ISSUE,
     DESIGN_REVISION,
+    ENGINEERING_SOURCE_ID,
+    ENGINEERING_SOURCE_LOCATION_WALL,
+    ENGINEERING_SOURCE_LOCATIONS,
     IMPLEMENTATION_SOFTWARE_VERSION,
     OVERALL_U_REFERENCE_SURFACE,
     PRODUCER_AREA_PRECISION_POLICY_HASH,
@@ -55,8 +62,15 @@ from .schema import (
     SOURCE_DEFINITION_ISSUE,
     SOURCE_DEFINITION_REVIEW_AUDIT_COMMENT,
     SOURCE_DEFINITION_REVISION,
+    SOURCE_FORMULA_IDENTITY,
+    TASK025_AREA_QUANTUM_M2,
+    TASK025_AREA_ROUNDING_MODE,
+    TASK025_PUBLIC_AREA_PRECISION_POLICY_ID,
+    TASK025_PUBLIC_AREA_QUANTUM_M2,
+    TASK025_PUBLIC_AREA_ROUNDING_MODE,
     TASK037_VERSION,
     TUBE_SIDE_FILM_REFERENCE_SURFACE,
+    WALL_BUNDLE_NUMERICAL_BASIS,
 )
 
 
@@ -202,10 +216,11 @@ def evaluate_task037(
             task021_identity=task021_identity,
             failure_stage="S03_TASK025_UPSTREAM_VALIDATION",
         )
+    task025_result = cast(Task025ValidResult, task025_result)
     ok, reason = replay_task025_valid_result(task025_result)
     if not ok:
         code = (
-            BlockerCode.TASK025_PUBLIC_AREA_NONCANONICAL
+            BlockerCode.TASK025_AREA_QUANTUM_NONCANONICAL
             if reason == "task025_public_area_noncanonical"
             else BlockerCode.TASK025_RESULT_HASH_MISMATCH
             if reason == "task025_result_hash_mismatch"
@@ -213,8 +228,13 @@ def evaluate_task037(
             if reason == "task025_result_id_mismatch"
             else BlockerCode.TASK025_INVALID
         )
+        field_path = (
+            "task025_result.internal_heat_transfer_surface_area_m2"
+            if reason == "task025_public_area_noncanonical"
+            else "task025_result"
+        )
         return _typed_blocked(
-            blockers=[_block(code, "task025_result", reason)],
+            blockers=[_block(code, field_path, reason)],
             request_hash_value=request_hash_value,
             task021_identity=task021_identity,
             failure_stage="S03_TASK025_UPSTREAM_VALIDATION",
@@ -464,7 +484,7 @@ def evaluate_task037(
             deferred_capabilities=DEFERRED_CAPABILITIES,
             provenance=provenance,
             result_hash="0" * 64,
-            result_id="0",
+            result_id="00000000-0000-5000-8000-000000000000",
         )
         result_digest = success_result_hash(provisional)
         final_result = replace(
@@ -504,23 +524,165 @@ def verify_task037_success_identity(result: Any) -> bool:
 
     if type(result) is not Task037SuccessResult:
         return False
-    if result.schema_version != RESULT_SCHEMA_VERSION or result.task037_version != TASK037_VERSION:
-        return False
-    if result.implementation_software_version != IMPLEMENTATION_SOFTWARE_VERSION:
-        return False
-    if result.provenance.design_revision != DESIGN_REVISION:
-        return False
-    if result.provenance.source_definition_revision != SOURCE_DEFINITION_REVISION:
-        return False
-    if result.provenance.source_definition_issue != SOURCE_DEFINITION_ISSUE:
-        return False
-    if (
-        result.provenance.source_definition_review_audit_comment
-        != SOURCE_DEFINITION_REVIEW_AUDIT_COMMENT
-    ):
-        return False
     try:
+        if result.schema_version != RESULT_SCHEMA_VERSION:
+            return False
+        if result.task037_version != TASK037_VERSION:
+            return False
+        if result.implementation_software_version != IMPLEMENTATION_SOFTWARE_VERSION:
+            return False
+        if type(result.task021_identity) is not FrozenIdentity:
+            return False
+        if type(result.task025_identity) is not FrozenIdentity:
+            return False
+        if (
+            result.task021_identity.identity_type != "task021.tube-layout.v1"
+            or not result.task021_identity.identity_id
+            or not is_sha256_hex(result.task021_identity.identity_hash)
+            or result.task025_identity.identity_type != "task025.tube-side.v1"
+            or not result.task025_identity.identity_id
+            or not is_sha256_hex(result.task025_identity.identity_hash)
+        ):
+            return False
+        if type(result.inside_fouling_authority) is not InsideFoulingResistanceAuthority:
+            return False
+        if type(result.outside_fouling_authority) is not OutsideFoulingResistanceAuthority:
+            return False
+        if result.inside_fouling_authority.side != "INSIDE":
+            return False
+        if result.outside_fouling_authority.side != "OUTSIDE":
+            return False
+        if result.fouling_authority_ledger != (
+            f"inside=PASS:{result.inside_fouling_authority.reference_surface}:"
+            f"{result.inside_fouling_authority.fouling_resistance_m2_k_w}",
+            f"outside=PASS:{result.outside_fouling_authority.reference_surface}:"
+            f"{result.outside_fouling_authority.fouling_resistance_m2_k_w}",
+        ):
+            return False
+        if result.applicability_ledger != tuple(f"{row}=PASS" for row in APPLICABILITY_ROWS):
+            return False
+        if result.completeness_ledger != (
+            "C01_SURFACE_BASIS_AUTHORITY_COMPLETE=PASS",
+            "C02_WALL_RESISTANCE_AUTHORITY_COMPLETE=PASS",
+            "C03_INSIDE_FOULING_AUTHORITY_COMPLETE=PASS",
+            "C04_OUTSIDE_FOULING_AUTHORITY_COMPLETE=PASS",
+            "C05_FOULING_AUTHORITY_LEDGER_COMPLETE=PASS",
+            "C06_TASK038_FORWARD_CONSUMER_CONTRACT_COMPLETE=PASS",
+        ):
+            return False
+        if result.warnings != () or result.blockers != ():
+            return False
+        if result.deferred_capabilities != DEFERRED_CAPABILITIES:
+            return False
+
+        provenance = result.provenance
+        if provenance.design_revision != DESIGN_REVISION:
+            return False
+        if provenance.source_definition_revision != SOURCE_DEFINITION_REVISION:
+            return False
+        if provenance.source_definition_issue != SOURCE_DEFINITION_ISSUE:
+            return False
+        if (
+            provenance.source_definition_review_audit_comment
+            != SOURCE_DEFINITION_REVIEW_AUDIT_COMMENT
+        ):
+            return False
+        if provenance.design_issue != DESIGN_ISSUE:
+            return False
+        if provenance.task_id != "TASK037":
+            return False
+        if provenance.implementation_software_version != IMPLEMENTATION_SOFTWARE_VERSION:
+            return False
+        if provenance.request_hash != result.request_hash:
+            return False
+        if provenance.task021_layout_hash != result.task021_identity.identity_hash:
+            return False
+        if provenance.task025_result_hash != result.task025_identity.identity_hash:
+            return False
+        if provenance.task025_hydraulic_authority_hash != result.task025_hydraulic_authority_hash:
+            return False
+        if provenance.tube_geometry_snapshot_hash != result.tube_geometry_snapshot_hash:
+            return False
+        if provenance.heat_transfer_length_hash != result.heat_transfer_length_hash:
+            return False
+        if provenance.wall_material_authority_hash != result.wall_material_authority_hash:
+            return False
+        if provenance.wall_conductivity_authority_hash != result.wall_conductivity_authority_hash:
+            return False
+        if (
+            provenance.inside_fouling_authority_hash
+            != result.inside_fouling_authority.authority_hash
+        ):
+            return False
+        if (
+            provenance.outside_fouling_authority_hash
+            != result.outside_fouling_authority.authority_hash
+        ):
+            return False
+        if provenance.surface_transform_authority_hash != result.surface_transform_authority_hash:
+            return False
+        if provenance.deferred_capabilities != DEFERRED_CAPABILITIES:
+            return False
+        if provenance.producer_edges != producer_edges():
+            return False
+        if provenance.source_identity_hashes != (
+            PRODUCER_AREA_PRECISION_POLICY_HASH,
+            result.wall_material_authority_hash,
+            result.wall_conductivity_authority_hash,
+            result.inside_fouling_authority.authority_hash,
+            result.outside_fouling_authority.authority_hash,
+        ):
+            return False
+        if (
+            provenance.task025_area_quantum_m2 != TASK025_AREA_QUANTUM_M2
+            or provenance.task025_area_rounding_mode != TASK025_AREA_ROUNDING_MODE
+            or provenance.producer_area_precision_policy_id
+            != TASK025_PUBLIC_AREA_PRECISION_POLICY_ID
+            or provenance.producer_area_precision_policy_hash != PRODUCER_AREA_PRECISION_POLICY_HASH
+            or provenance.producer_precision_limitation_disclosed is not True
+            or provenance.producer_precision_threshold_defined is not False
+        ):
+            return False
+
         surface_projection = _surface_from_result(result)
+        if set(surface_projection) != {
+            "task021_layout_hash",
+            "task025_result_hash",
+            "task025_hydraulic_authority_hash",
+            "tube_geometry_snapshot_hash",
+            "tube_inner_diameter_m",
+            "tube_outer_diameter_m",
+            "tube_side_film_reference_surface",
+            "overall_u_reference_surface",
+            "outer_to_inner_area_ratio",
+            "engineering_source_id",
+            "engineering_source_locations",
+        }:
+            return False
+        if (
+            surface_projection["task021_layout_hash"] != result.task021_identity.identity_hash
+            or surface_projection["task025_result_hash"] != result.task025_identity.identity_hash
+            or surface_projection["task025_hydraulic_authority_hash"]
+            != result.task025_hydraulic_authority_hash
+            or surface_projection["tube_geometry_snapshot_hash"]
+            != result.tube_geometry_snapshot_hash
+            or surface_projection["tube_side_film_reference_surface"]
+            != TUBE_SIDE_FILM_REFERENCE_SURFACE
+            or surface_projection["overall_u_reference_surface"] != OVERALL_U_REFERENCE_SURFACE
+            or surface_projection["outer_to_inner_area_ratio"] != result.outer_to_inner_area_ratio
+            or surface_projection["engineering_source_id"] != ENGINEERING_SOURCE_ID
+            or surface_projection["engineering_source_locations"] != ENGINEERING_SOURCE_LOCATIONS
+        ):
+            return False
+        for field in ("tube_inner_diameter_m", "tube_outer_diameter_m"):
+            value = surface_projection[field]
+            if type(value) is not Decimal or not value.is_finite() or value <= 0:
+                return False
+        if (
+            surface_projection["tube_outer_diameter_m"]
+            <= surface_projection["tube_inner_diameter_m"]
+        ):
+            return False
         if (
             surface_transform_authority_hash(surface_projection)
             != result.surface_transform_authority_hash
@@ -531,12 +693,75 @@ def verify_task037_success_identity(result: Any) -> bool:
         wall_projection = getattr(result, "_wall_projection", None)
         if not isinstance(wall_projection, dict):
             return False
+        if set(wall_projection) != {
+            "surface_transform_authority_hash",
+            "task025_result_hash",
+            "task025_hydraulic_authority_hash",
+            "task025_internal_heat_transfer_surface_area_m2",
+            "task025_area_quantum_m2",
+            "task025_area_rounding_mode",
+            "producer_area_precision_policy_id",
+            "producer_area_precision_policy_hash",
+            "producer_precision_limitation_disclosed",
+            "producer_precision_threshold_defined",
+            "wall_bundle_numerical_basis",
+            "wall_material_authority_hash",
+            "wall_conductivity_authority_hash",
+            "wall_bundle_conduction_resistance_k_w",
+            "wall_resistance_outer_surface_m2_k_w",
+            "engineering_source_id",
+            "engineering_source_location",
+            "source_formula_identity",
+            "thin_wall_approximation_used",
+        }:
+            return False
         if (
-            wall_resistance_authority_hash(wall_projection)
-            != result.provenance.wall_resistance_authority_hash
+            wall_projection["surface_transform_authority_hash"]
+            != result.surface_transform_authority_hash
+            or wall_projection["task025_result_hash"] != result.task025_identity.identity_hash
+            or wall_projection["task025_hydraulic_authority_hash"]
+            != result.task025_hydraulic_authority_hash
+            or wall_projection["task025_internal_heat_transfer_surface_area_m2"]
+            != provenance.task025_internal_heat_transfer_surface_area_m2
+            or wall_projection["task025_area_quantum_m2"] != Decimal(TASK025_PUBLIC_AREA_QUANTUM_M2)
+            or wall_projection["task025_area_rounding_mode"] != TASK025_PUBLIC_AREA_ROUNDING_MODE
+            or wall_projection["producer_area_precision_policy_id"]
+            != TASK025_PUBLIC_AREA_PRECISION_POLICY_ID
+            or wall_projection["producer_area_precision_policy_hash"]
+            != PRODUCER_AREA_PRECISION_POLICY_HASH
+            or wall_projection["producer_precision_limitation_disclosed"] is not True
+            or wall_projection["producer_precision_threshold_defined"] is not False
+            or wall_projection["wall_bundle_numerical_basis"] != WALL_BUNDLE_NUMERICAL_BASIS
+            or wall_projection["wall_material_authority_hash"]
+            != result.wall_material_authority_hash
+            or wall_projection["wall_conductivity_authority_hash"]
+            != result.wall_conductivity_authority_hash
+            or wall_projection["wall_bundle_conduction_resistance_k_w"]
+            != result.wall_bundle_conduction_resistance_k_w
+            or wall_projection["wall_resistance_outer_surface_m2_k_w"]
+            != result.wall_resistance_outer_surface_m2_k_w
+            or wall_projection["engineering_source_id"] != ENGINEERING_SOURCE_ID
+            or wall_projection["engineering_source_location"] != ENGINEERING_SOURCE_LOCATION_WALL
+            or wall_projection["source_formula_identity"] != SOURCE_FORMULA_IDENTITY
+            or wall_projection["thin_wall_approximation_used"] is not False
         ):
             return False
-        if not verify_provenance(result.provenance):
+        if (
+            type(wall_projection["task025_internal_heat_transfer_surface_area_m2"]) is not Decimal
+            or not wall_projection["task025_internal_heat_transfer_surface_area_m2"].is_finite()
+            or wall_projection["task025_internal_heat_transfer_surface_area_m2"] <= 0
+            or type(wall_projection["wall_bundle_conduction_resistance_k_w"]) is not Decimal
+            or type(wall_projection["wall_resistance_outer_surface_m2_k_w"]) is not Decimal
+            or wall_projection["wall_bundle_conduction_resistance_k_w"] <= 0
+            or wall_projection["wall_resistance_outer_surface_m2_k_w"] <= 0
+        ):
+            return False
+        if (
+            wall_resistance_authority_hash(wall_projection)
+            != provenance.wall_resistance_authority_hash
+        ):
+            return False
+        if not verify_provenance(provenance):
             return False
         if success_result_hash(result) != result.result_hash:
             return False

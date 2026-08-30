@@ -31,6 +31,70 @@ RESULT_HASH_B = "c8c6b8ac1e31e663b7128edb7755246ffdc53cbe704a06df7149d617cf282d3
 RESULT_ID_A = "537d256e-ac25-51da-b74c-698f2e36df05"
 RESULT_ID_B = "7649d8a5-8f20-5abb-9144-3f01bf2bd2c8"
 
+# GV06 is an external frozen acceptance vector from Source R3.  These values
+# are static expected-value literals; production code must not derive them at
+# import time or use them as runtime inputs.
+GV06_SOURCE_DIRECT_REFERENCE = Decimal("90679.303112398787371")
+GV06_WALL_BUNDLE = Decimal("56975.486498110820691")
+GV06_RELATIVE_DIVERGENCE = Decimal(
+    "-0.37168146928204135230747132334409942316056612012497883580501108153843671874275820027439303493157658642"
+)
+
+# The codec probes are deliberately literal expected bytes and digests.  They
+# exercise the frozen framing grammar independently of production projections.
+CANONICAL_CODEC_PROBES = (
+    (
+        "none",
+        "000000044e4f4e450000000000000000",
+        "35374d759a6cd2beccaeb7c1df8481e04bdd7c5fe4623f2dc3a5fadd21436f30",
+    ),
+    (
+        "bool_true",
+        "00000009424f4f4c5f545255450000000000000000",
+        "2564db23695c4ada3ee24ef7d87258ed0768aed19290e21ac31cd9a05b655244",
+    ),
+    (
+        "bool_false",
+        "0000000a424f4f4c5f46414c53450000000000000000",
+        "ac2b752131e8e0e7d65e7abbfb2d891b117c338e614c3a95d1687ce7a66d18d1",
+    ),
+    (
+        "int",
+        "00000003494e5400000000000000022d37",
+        "62625783247ebd2e82e4c8a97db55d9acdf5ea2a8b0e4d035bcc02c0b5dd1ab7",
+    ),
+    (
+        "string_utf8",
+        "00000006535452494e47000000000000000368c3a9",
+        "8e724023965e37d9da339f3138e0c9990ec98c33c18486c29e351a1b2e5dc6e0",
+    ),
+    (
+        "decimal",
+        "00000007444543494d414c000000000000000531452d3130",
+        "fe0d44869edf7c326df7ddbcdcd7dd4d6d1aa18e8d7404f21617acc442aca67b",
+    ),
+    (
+        "enum",
+        "00000004454e554d0000000000000012494e4e45525f545542455f53555246414345",
+        "839cc8b26d8bcaa7634cf841cd676c00b10a70e1a4788ab83b5aa3c39a9e543e",
+    ),
+    (
+        "tuple_utf8",
+        "000000055455504c45000000000000000f00000002000000016100000002c3a9",
+        "c0483d5b1aca90dab8f3661d9dd380fc8865041d4653695a78a17ed30c7312e5",
+    ),
+    (
+        "record",
+        "0000000870726f62652e7631000000010000000576616c756500000006535452494e47000000000000000176",
+        "bcdecd4e08ef1da598ce45a508ad417293d6bd3b377294e1a9ce2a45b7dc22be",
+    ),
+    (
+        "nested_record",
+        "000000065245434f5244000000000000002d000000096e65737465642e7631000000010000000576616c756500000006535452494e47000000000000000176",
+        "c6ba22b5181e95aed772c0f4d5c378bf3c3011024a7851fcd3537eecc0f8b402",
+    ),
+)
+
 SURFACE = {
     "task021_layout_hash": TASK021_LAYOUT_HASH,
     "task025_result_hash": TASK025_RESULT_HASH,

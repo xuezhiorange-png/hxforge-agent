@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, TypeAlias
+from uuid import UUID
 
 from hexagent.exchangers.shell_tube.tube_side.provenance import (
     FrozenIdentity,
@@ -12,6 +13,7 @@ from hexagent.exchangers.shell_tube.tube_side.provenance import (
 )
 
 from .schema import (
+    DEFERRED_CAPABILITIES,
     IMPLEMENTATION_SOFTWARE_VERSION,
     RAW_BOUNDARY_BLOCKED_RESULT_SCHEMA_VERSION,
     REQUEST_SCHEMA_VERSION,
@@ -373,8 +375,8 @@ class Task037SuccessResult:
     wall_conductivity_authority_hash: str
     wall_bundle_conduction_resistance_k_w: Decimal
     wall_resistance_outer_surface_m2_k_w: Decimal
-    inside_fouling_authority: InsideFoulingResistanceAuthority | Any
-    outside_fouling_authority: OutsideFoulingResistanceAuthority | Any
+    inside_fouling_authority: InsideFoulingResistanceAuthority
+    outside_fouling_authority: OutsideFoulingResistanceAuthority
     fouling_authority_ledger: tuple[str, ...]
     applicability_ledger: tuple[str, ...]
     completeness_ledger: tuple[str, ...]
@@ -407,6 +409,14 @@ class Task037SuccessResult:
             raise ValueError("result.task021_identity must be FrozenIdentity")
         if type(self.task025_identity) is not FrozenIdentity:
             raise ValueError("result.task025_identity must be FrozenIdentity")
+        if type(self.inside_fouling_authority) is not InsideFoulingResistanceAuthority:
+            raise ValueError(
+                "result.inside_fouling_authority must be InsideFoulingResistanceAuthority"
+            )
+        if type(self.outside_fouling_authority) is not OutsideFoulingResistanceAuthority:
+            raise ValueError(
+                "result.outside_fouling_authority must be OutsideFoulingResistanceAuthority"
+            )
         if type(self.provenance) is not Task037Provenance:
             raise ValueError("result.provenance must be Task037Provenance")
         for name in (
@@ -426,12 +436,24 @@ class Task037SuccessResult:
             "deferred_capabilities",
         ):
             value = getattr(self, name)
-            if not isinstance(value, tuple):
+            if type(value) is not tuple:
                 raise ValueError(f"result.{name} must be tuple")
+            if any(type(item) is not str or not item for item in value if name != "blockers"):
+                raise ValueError(f"result.{name} must contain non-empty str entries")
+        if any(type(item) is not BlockerEntry for item in self.blockers):
+            raise ValueError("result.blockers must contain BlockerEntry entries")
         if self.blockers != () or self.warnings != ():
             raise ValueError("valid TASK037 result must have empty blockers and warnings")
-        if not isinstance(self.result_id, str) or not self.result_id:
+        if self.deferred_capabilities != DEFERRED_CAPABILITIES:
+            raise ValueError("result.deferred_capabilities are not frozen")
+        if type(self.result_id) is not str or not self.result_id:
             raise ValueError("result.result_id must be non-empty str")
+        try:
+            result_uuid = UUID(self.result_id)
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise ValueError("result.result_id must be UUID text") from exc
+        if result_uuid.version != 5 or result_uuid.variant != "specified in RFC 4122":
+            raise ValueError("result.result_id must be RFC 4122 UUIDv5")
 
 
 @dataclass(frozen=True)
@@ -475,7 +497,7 @@ class Task037TypedBlockedResult:
             raise ValueError("typed_blocked.task025_identity has wrong type")
         if not isinstance(self.blockers, tuple) or not self.blockers:
             raise ValueError("typed blocked result requires blocker tuple")
-        if any(not isinstance(item, BlockerEntry) for item in self.blockers):
+        if any(type(item) is not BlockerEntry for item in self.blockers):
             raise ValueError("typed blocked blockers have wrong type")
         object.__setattr__(self, "warnings", _strings(self.warnings, "typed_blocked.warnings"))
         object.__setattr__(
@@ -483,6 +505,8 @@ class Task037TypedBlockedResult:
             "deferred_capabilities",
             _strings(self.deferred_capabilities, "typed_blocked.deferred_capabilities"),
         )
+        if self.deferred_capabilities != DEFERRED_CAPABILITIES:
+            raise ValueError("typed blocked deferred capabilities are not frozen")
         _hash(self.blocked_result_hash, "typed_blocked.blocked_result_hash")
 
 
@@ -504,11 +528,11 @@ class Task037RawBoundaryBlockedResult:
             raise ValueError("raw boundary task037_version is not frozen")
         if self.implementation_software_version != IMPLEMENTATION_SOFTWARE_VERSION:
             raise ValueError("raw boundary implementation token is not frozen")
-        if not isinstance(self.raw_request_projection, FrozenRawProjection):
+        if type(self.raw_request_projection) is not FrozenRawProjection:
             raise ValueError("raw_request_projection has wrong type")
         if not isinstance(self.blockers, tuple) or not self.blockers:
             raise ValueError("raw boundary requires blocker tuple")
-        if any(not isinstance(item, BlockerEntry) for item in self.blockers):
+        if any(type(item) is not BlockerEntry for item in self.blockers):
             raise ValueError("raw boundary blockers have wrong type")
         object.__setattr__(self, "warnings", _strings(self.warnings, "raw_boundary.warnings"))
         object.__setattr__(
@@ -516,6 +540,8 @@ class Task037RawBoundaryBlockedResult:
             "deferred_capabilities",
             _strings(self.deferred_capabilities, "raw_boundary.deferred_capabilities"),
         )
+        if self.deferred_capabilities != DEFERRED_CAPABILITIES:
+            raise ValueError("raw boundary deferred capabilities are not frozen")
         _hash(self.blocked_result_hash, "raw_boundary.blocked_result_hash")
 
 

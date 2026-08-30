@@ -14,6 +14,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Final
 
+from hexagent.exchangers.shell_tube.tube_side.provenance import FrozenRawProjection
+
 from .schema import (
     FOULING_AUTHORITY_FIELDS,
     FROZEN_IDENTITY_FIELDS,
@@ -78,8 +80,22 @@ def _u64_be(value: int) -> bytes:
 def frame_value(kind_tag_ascii: bytes | str, payload_bytes: bytes) -> bytes:
     """Encode a typed value using the frozen universal frame."""
 
-    kind = kind_tag_ascii if type(kind_tag_ascii) is bytes else str(kind_tag_ascii).encode("ascii")
-    payload = payload_bytes if type(payload_bytes) is bytes else bytes(payload_bytes)
+    if type(kind_tag_ascii) is bytes:
+        kind = kind_tag_ascii
+    elif type(kind_tag_ascii) is str:
+        try:
+            kind = kind_tag_ascii.encode("ascii")
+        except UnicodeEncodeError as exc:
+            raise CanonicalizationError("kind tag must be ASCII") from exc
+    else:
+        raise CanonicalizationError("kind tag must be exact ASCII bytes or str")
+    try:
+        kind.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise CanonicalizationError("kind tag must be ASCII") from exc
+    if type(payload_bytes) is not bytes:
+        raise CanonicalizationError("frame payload must be exact bytes")
+    payload = payload_bytes
     return _u32_be(len(kind)) + kind + _u64_be(len(payload)) + payload
 
 
@@ -174,8 +190,10 @@ def _message_record_bytes(value: Any, *, warning: bool = False) -> bytes:
     if isinstance(value, Mapping):
         get = value.get
     else:
+
         def get(name: str, default: Any = None) -> Any:
             return getattr(value, name, default)
+
     fields: list[tuple[str, bytes, bytes]] = [
         _field("code", KIND_STRING, _string(get("code"))),
     ]
@@ -585,7 +603,7 @@ def _hash_blocked_source(source: Any, namespace: str, fields: tuple[str, ...]) -
         elif field == "raw_request_projection":
             if type(value) is bytes:
                 raw = value
-            elif hasattr(value, "canonical_bytes_hex"):
+            elif type(value) is FrozenRawProjection:
                 raw = bytes.fromhex(value.canonical_bytes_hex)
             else:
                 raw = raw_projection_bytes(value)
@@ -639,10 +657,7 @@ def raw_projection_bytes(value: Any) -> bytes:
     if type(value) is bytes:
         return value
     if type(value) is str:
-        return frame_record(
-            RAW_PROJECTION_NAMESPACE,
-            (_field("value", KIND_STRING, value.encode("utf-8")),),
-        )
+        return frame_value(KIND_STRING, value.encode("utf-8"))
     return frame_record(
         RAW_PROJECTION_NAMESPACE,
         (_field("type", KIND_STRING, type(value).__name__.encode("utf-8")),),

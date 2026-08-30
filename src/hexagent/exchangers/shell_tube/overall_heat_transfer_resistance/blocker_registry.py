@@ -20,7 +20,10 @@ class BlockerCode(StrEnum):
     TASK025_RESULT_HASH_MISMATCH = "T037_TASK025_RESULT_HASH_MISMATCH"
     TASK025_RESULT_ID_MISMATCH = "T037_TASK025_RESULT_ID_MISMATCH"
     TASK025_PUBLIC_AREA_INVALID = "T037_TASK025_PUBLIC_AREA_INVALID"
-    TASK025_PUBLIC_AREA_NONCANONICAL = "T037_TASK025_PUBLIC_AREA_NONCANONICAL"
+    TASK025_AREA_QUANTUM_NONCANONICAL = "T037_TASK025_AREA_QUANTUM_NONCANONICAL"
+    # Compatibility name retained for callers from the earlier draft; the
+    # value is the frozen R10 blocker token above.
+    TASK025_PUBLIC_AREA_NONCANONICAL = TASK025_AREA_QUANTUM_NONCANONICAL
     TASK021_TASK025_MISMATCH = "T037_TASK021_TASK025_MISMATCH"
     TASK025_HYDRAULIC_AUTHORITY_INVALID = "T037_TASK025_HYDRAULIC_AUTHORITY_INVALID"
     GEOMETRY_INVALID = "T037_GEOMETRY_INVALID"
@@ -45,7 +48,7 @@ _STAGE_BY_CODE: Final[dict[BlockerCode, str]] = {
     BlockerCode.TASK025_RESULT_HASH_MISMATCH: "S03_TASK025_UPSTREAM_VALIDATION",
     BlockerCode.TASK025_RESULT_ID_MISMATCH: "S03_TASK025_UPSTREAM_VALIDATION",
     BlockerCode.TASK025_PUBLIC_AREA_INVALID: "S03_TASK025_UPSTREAM_VALIDATION",
-    BlockerCode.TASK025_PUBLIC_AREA_NONCANONICAL: "S03_TASK025_UPSTREAM_VALIDATION",
+    BlockerCode.TASK025_AREA_QUANTUM_NONCANONICAL: "S03_TASK025_UPSTREAM_VALIDATION",
     BlockerCode.TASK021_TASK025_MISMATCH: "S04_TASK021_TASK025_CROSS_BINDING",
     BlockerCode.TASK025_HYDRAULIC_AUTHORITY_INVALID: "S04_TASK021_TASK025_CROSS_BINDING",
     BlockerCode.GEOMETRY_INVALID: "S05_GEOMETRY_AND_SURFACE_SEMANTIC_VALIDATION",
@@ -91,6 +94,17 @@ def make_blocker(
 def sort_blockers(
     entries: tuple[BlockerEntry, ...] | list[BlockerEntry],
 ) -> tuple[BlockerEntry, ...]:
+    for entry in entries:
+        if type(entry) is not BlockerEntry:
+            raise TypeError("TASK037 blockers must be BlockerEntry instances")
+        expected_stage = BLOCKER_REGISTRY.get(entry.code)
+        if expected_stage is None:
+            raise ValueError(f"unregistered TASK037 blocker: {entry.code!r}")
+        if entry.stage != expected_stage:
+            raise ValueError(
+                f"TASK037 blocker {entry.code!r} has stage {entry.stage!r}; "
+                f"expected {expected_stage!r}"
+            )
     return tuple(
         sorted(
             entries,
