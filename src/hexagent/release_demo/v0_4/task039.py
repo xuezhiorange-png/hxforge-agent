@@ -59,8 +59,8 @@ from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     schema as task031_schema,
 )
-from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation import (
-    validate_typed_request as validate_task031_typed,
+from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
+    validate_request as validate_task031,
 )
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import (
     canonical as task034_canonical,
@@ -597,26 +597,7 @@ def _resync_task024_geometry_identity(raw_request: dict[str, Any]) -> None:
     raw_request["baffle_geometry_result"]["geometry"]["geometry_id"] = geometry_id
 
 
-def _task031_layout_for_typed_validation(layout: Any) -> Any:
-    """Adapt the actual public TASK021 result for TASK031's typed boundary.
-
-    TASK021's public model stores warning details as immutable Layer-B markers.
-    TASK031's public authority verifier accepts the same semantic warning
-    payload, but its canonical boundary expects the caller-owned public
-    mapping form.  Only the warning-detail representation is adapted; all
-    TASK021 identity fields and values are retained exactly.
-    """
-
-    warnings = []
-    for warning in layout.warnings:
-        details = _public(warning.details, decimal_strings=False)
-        adapted = dataclasses.replace(warning, details=details)
-        object.__setattr__(adapted, "details", details)
-        warnings.append(adapted)
-    return dataclasses.replace(layout, warnings=tuple(warnings))
-
-
-def _build_task031_request(config: Any, layout: Any) -> tuple[dict[str, Any], Any]:
+def _build_task031_request(config: Any, layout: Any) -> dict[str, Any]:
     """Build TASK031 input from the actual same-replay TASK021 output."""
 
     request = copy.deepcopy(_load_task031_fixture())
@@ -632,12 +613,7 @@ def _build_task031_request(config: Any, layout: Any) -> tuple[dict[str, Any], An
         }
     )
     _resync_task024_geometry_identity(request)
-    parsed = task031_schema.parse_request(request)
-    typed_request = dataclasses.replace(
-        parsed,
-        tube_layout=_task031_layout_for_typed_validation(layout),
-    )
-    return request, typed_request
+    return request
 
 
 def _property_snapshot_raw() -> dict[str, Any]:
@@ -916,11 +892,11 @@ def _prepare_shell_chain(
     layout: Any,
     operation_trace: list[str],
 ) -> tuple[dict[str, Any], Any, Any, Any, Any, Any, Any, Any]:
-    request031, typed_request031 = _build_task031_request(config, layout)
+    request031 = _build_task031_request(config, layout)
     operation_trace.append(
-        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation.validate_typed_request"
+        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validate_request"
     )
-    result031 = validate_task031_typed(typed_request031)
+    result031 = validate_task031(request031)
     geometry = _require_valid(result031, "TASK031")
     snapshot = _property_snapshot_raw()
     mass_flow = _mass_flow_authority_raw(

@@ -290,10 +290,15 @@ def test_t039_chain_003_task038_public_boundary_only(run: Any) -> None:
         "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.evaluate_task038",
         "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.verify_task038_success_identity",
     ]
-    assert operations[5] == (
-        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation."
-        "validate_typed_request"
+    public_task031_operation = (
+        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validate_request"
     )
+    assert operations[5] == public_task031_operation
+    assert operations.count(public_task031_operation) == 1
+    assert all(
+        "shell_side_hydraulic_geometry.validation" not in operation for operation in operations
+    )
+    assert all("validate_typed_request" not in operation for operation in operations)
     assert operations[-1] == "hexagent.release_demo.v0_4.build_release_run"
     assert run.production_graph["fixture_only_result_substitution"] is False
     assert run.production_graph["expected_output_used_as_input"] is False
