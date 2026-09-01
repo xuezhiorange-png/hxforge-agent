@@ -67,7 +67,11 @@ from hexagent.release_demo.v0_4.schema import (
     TEST_IDS,
     UNAVAILABLE_CAPABILITIES,
 )
-from hexagent.release_demo.v0_4.task039 import build_release_run
+from hexagent.release_demo.v0_4.task039 import (
+    _build_task037_request,
+    _surface_identity_summary,
+    build_release_run,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEMO_JSON_PATH = REPO_ROOT / "release_evidence/v0.4.0/task020-to-task038-demo.json"
@@ -238,6 +242,44 @@ def test_t039_chain_002_task025_task026_task035_task037_task038_same_replay_bind
     assert run.success_demo["task035_result_hash"] == run.task035_result.success_result.result_hash
     assert run.success_demo["task037_result_hash"] == run.task037_result.success_result.result_hash
     assert run.success_demo["task038_result_hash"] == run.task038_result.success_result.result_hash
+    assert run.task038_request.task025_result is run.task025_result
+    assert run.task038_request.task026_result is run.task026_result
+    assert run.task038_request.task035_result is run.task035_result.success_result
+    assert run.task038_request.task037_result is run.task037_result.success_result
+    assert (
+        run.task031_result.geometry.task020_configuration_id
+        == run.task020_result.configuration.configuration_id
+    )
+    assert (
+        run.task031_result.geometry.task020_configuration_hash
+        == run.task020_result.configuration.configuration_hash
+    )
+    assert run.task031_result.geometry.task021_layout_id == run.task021_result.layout.layout_id
+    assert run.task031_result.geometry.task021_layout_hash == run.task021_result.layout.layout_hash
+    flow = run.task032_result.flow_state
+    heat_transfer = run.task033_result.heat_transfer
+    pressure_drop = run.task034_result.pressure_drop
+    composition = run.task035_result.success_result
+    assert flow is not None
+    assert heat_transfer is not None
+    assert pressure_drop is not None
+    assert composition is not None
+    assert flow.task031_geometry_id == run.task031_result.geometry.geometry_id
+    assert flow.task031_geometry_hash == run.task031_result.geometry.geometry_hash
+    assert heat_transfer.task032_result_id == flow.result_id
+    assert heat_transfer.task032_result_hash == flow.result_hash
+    assert pressure_drop.task032_result_id == flow.result_id
+    assert pressure_drop.task032_result_hash == flow.result_hash
+    assert pressure_drop.task033_result_id == heat_transfer.result_id
+    assert pressure_drop.task033_result_hash == heat_transfer.result_hash
+    assert composition.task031_geometry_id == run.task031_result.geometry.geometry_id
+    assert composition.task031_geometry_hash == run.task031_result.geometry.geometry_hash
+    assert composition.task032_result_id == flow.result_id
+    assert composition.task032_result_hash == flow.result_hash
+    assert composition.task033_result_id == heat_transfer.result_id
+    assert composition.task033_result_hash == heat_transfer.result_hash
+    assert composition.task034_result_id == pressure_drop.result_id
+    assert composition.task034_result_hash == pressure_drop.result_hash
 
 
 def test_t039_chain_003_task038_public_boundary_only(run: Any) -> None:
@@ -248,10 +290,15 @@ def test_t039_chain_003_task038_public_boundary_only(run: Any) -> None:
         "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.evaluate_task038",
         "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.verify_task038_success_identity",
     ]
-    assert operations[-1] == "hexagent.release_demo.v0_4.validate_request"
+    assert operations[5] == (
+        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation."
+        "validate_typed_request"
+    )
+    assert operations[-1] == "hexagent.release_demo.v0_4.build_release_run"
     assert run.production_graph["fixture_only_result_substitution"] is False
     assert run.production_graph["expected_output_used_as_input"] is False
     assert run.production_graph["private_helper_stage_bypass"] is False
+    assert run.production_graph["post_producer_identity_repair"] is False
 
 
 def test_t039_chain_004_v03_release_authority_inherited(run: Any) -> None:
@@ -268,12 +315,100 @@ def test_t039_chain_004_v03_release_authority_inherited(run: Any) -> None:
 
 def test_t039_chain_005_task037_surface_wall_fouling_authority_surfaced(run: Any) -> None:
     result = run.task037_result.success_result
+    request = _build_task037_request()
     assert result is not None
     assert result.surface_transform_authority_hash
-    assert result.wall_material_authority_hash
-    assert result.wall_conductivity_authority_hash
-    assert result.inside_fouling_authority is not None
-    assert result.outside_fouling_authority is not None
+    assert request.wall_material_authority.authority_id == "T039-WALL-MAT-001"
+    assert request.wall_material_authority.material_id == "T039-MAT-001"
+    assert request.wall_material_authority.material_grade == "FIXTURE-GRADE"
+    assert request.wall_material_authority.source_id == "T039-INTERNAL-WALL-MATERIAL-SOURCE"
+    assert request.wall_material_authority.source_version == "R2"
+    assert request.wall_material_authority.source_location == (
+        "ISSUE_214/R2/SUCCESS_VECTOR/WALL_MATERIAL"
+    )
+    assert request.wall_material_authority.source_class == "INTERNAL_ENGINEERING_RULE"
+    assert request.wall_material_authority.permission_status == "INTERNAL_USE_AUTHORIZED"
+    assert request.wall_material_authority.approval_status == "APPROVED"
+    assert request.wall_material_authority.evidence_refs == ("T039-EV-WALL-MATERIAL-001",)
+    assert request.wall_material_authority.authority_hash == (
+        "2d0920034ab6f54acd3c20e339465cf26566d394aac289d6627d9dafcf2e11c4"
+    )
+    assert result.wall_material_authority_hash == request.wall_material_authority.authority_hash
+
+    assert request.wall_thermal_conductivity_authority.authority_id == "T039-WALL-COND-001"
+    assert request.wall_thermal_conductivity_authority.material_id == "T039-MAT-001"
+    assert request.wall_thermal_conductivity_authority.thermal_conductivity_w_m_k == Decimal("16")
+    assert request.wall_thermal_conductivity_authority.evaluation_temperature_k == Decimal("300")
+    assert (
+        request.wall_thermal_conductivity_authority.evaluation_context_id
+        == "T039-WALL-COND-CONTEXT-001"
+    )
+    assert request.wall_thermal_conductivity_authority.evaluation_basis == (
+        "FIXED_RELEASE_DEMO_INPUT"
+    )
+    assert request.wall_thermal_conductivity_authority.applicability_authority_hash == (
+        "b27e46a1fddcca65be32674bc07d745c1c360a2012f8b63cc53f53f47cdf7fe8"
+    )
+    assert request.wall_thermal_conductivity_authority.source_id == (
+        "T039-INTERNAL-WALL-CONDUCTIVITY-SOURCE"
+    )
+    assert request.wall_thermal_conductivity_authority.source_version == "R2"
+    assert request.wall_thermal_conductivity_authority.source_location == (
+        "ISSUE_214/R2/SUCCESS_VECTOR/WALL_CONDUCTIVITY"
+    )
+    assert request.wall_thermal_conductivity_authority.source_class == "INTERNAL_ENGINEERING_RULE"
+    assert request.wall_thermal_conductivity_authority.permission_status == (
+        "INTERNAL_USE_AUTHORIZED"
+    )
+    assert request.wall_thermal_conductivity_authority.approval_status == "APPROVED"
+    assert request.wall_thermal_conductivity_authority.evidence_refs == (
+        "T039-EV-WALL-CONDUCTIVITY-001",
+    )
+    assert request.wall_thermal_conductivity_authority.authority_hash == (
+        "3022152e4cbbbe376674c44aabf01ea10504d524f4c5f7090e03a9cb98c99134"
+    )
+    assert (
+        result.wall_conductivity_authority_hash
+        == request.wall_thermal_conductivity_authority.authority_hash
+    )
+
+    assert request.inside_fouling_authority.authority_id == "T039-FOUL-IN-001"
+    assert request.inside_fouling_authority.side == "INSIDE"
+    assert request.inside_fouling_authority.fouling_resistance_m2_k_w == Decimal("0.0001")
+    assert request.inside_fouling_authority.reference_surface == "INNER_TUBE_SURFACE"
+    assert request.inside_fouling_authority.fluid_service_id == "TUBE-WATER-001"
+    assert request.inside_fouling_authority.source_id == "T039-INTERNAL-FOULING-SOURCE"
+    assert request.inside_fouling_authority.source_version == "R2"
+    assert request.inside_fouling_authority.source_location == (
+        "ISSUE_214/R2/SUCCESS_VECTOR/INSIDE_FOULING"
+    )
+    assert request.inside_fouling_authority.source_class == "APPROVED_ENGINEERING_BASIS"
+    assert request.inside_fouling_authority.permission_status == "INTERNAL_USE_AUTHORIZED"
+    assert request.inside_fouling_authority.approval_status == "APPROVED"
+    assert request.inside_fouling_authority.evidence_refs == ("T039-EV-FOUL-IN-001",)
+    assert request.inside_fouling_authority.authority_hash == (
+        "6ed5c64239956073f73d96044224c72bb6e09f386e2a621efe9c098505068450"
+    )
+    assert result.inside_fouling_authority == request.inside_fouling_authority
+
+    assert request.outside_fouling_authority.authority_id == "T039-FOUL-OUT-001"
+    assert request.outside_fouling_authority.side == "OUTSIDE"
+    assert request.outside_fouling_authority.fouling_resistance_m2_k_w == Decimal("0.0002")
+    assert request.outside_fouling_authority.reference_surface == "OUTER_TUBE_SURFACE"
+    assert request.outside_fouling_authority.fluid_service_id == "SHELL-WATER-001"
+    assert request.outside_fouling_authority.source_id == "T039-INTERNAL-FOULING-SOURCE"
+    assert request.outside_fouling_authority.source_version == "R2"
+    assert request.outside_fouling_authority.source_location == (
+        "ISSUE_214/R2/SUCCESS_VECTOR/OUTSIDE_FOULING"
+    )
+    assert request.outside_fouling_authority.source_class == "APPROVED_ENGINEERING_BASIS"
+    assert request.outside_fouling_authority.permission_status == "INTERNAL_USE_AUTHORIZED"
+    assert request.outside_fouling_authority.approval_status == "APPROVED"
+    assert request.outside_fouling_authority.evidence_refs == ("T039-EV-FOUL-OUT-001",)
+    assert request.outside_fouling_authority.authority_hash == (
+        "b897464f286c4c228c02e1213ba9e44337f912919fd8b8951c5a08917075030d"
+    )
+    assert result.outside_fouling_authority == request.outside_fouling_authority
     assert run.success_demo["task037_result_id"] == result.result_id
 
 
@@ -522,6 +657,34 @@ def test_t039_det_003_py311_py312_json_result_byte_identity(run: Any) -> None:
         "A06",
         "FINAL_RESULT",
     ]
+    evidence = run.determinism_evidence["independent_runtime_evidence"]
+    assert evidence["schema_version"] == "task039.cross-python-evidence.v1"
+    assert evidence["status"] == "PASS"
+    assert evidence["python_versions"] == ["3.11", "3.12"]
+    assert evidence["core_comparison"]["all_surfaces_identical"] is True
+    assert evidence["final_comparison"]["all_surfaces_identical"] is True
+    for runtime in ("3.11", "3.12"):
+        assert evidence["core_runtime_captures"][runtime]["exit_code"] == 0
+        assert evidence["final_runtime_captures"][runtime]["exit_code"] == 0
+        assert evidence["core_runtime_captures"][runtime]["runtime"] == runtime
+        assert evidence["final_runtime_captures"][runtime]["runtime"] == runtime
+        assert evidence["core_runtime_captures"][runtime]["python_version"].startswith(
+            runtime + "."
+        )
+        assert evidence["final_runtime_captures"][runtime]["python_version"].startswith(
+            runtime + "."
+        )
+        assert evidence["core_runtime_captures"][runtime]["executable"]
+        assert evidence["final_runtime_captures"][runtime]["executable"]
+        assert evidence["core_runtime_captures"][runtime]["command"]
+        assert evidence["final_runtime_captures"][runtime]["command"]
+        assert set(evidence["core_runtime_captures"][runtime]["surface_digests"]) == {
+            "A03",
+            "A04",
+            "A05",
+            "A06",
+            "FINAL_RESULT",
+        }
 
 
 def test_t039_det_004_py311_py312_markdown_acceptance_manifest_byte_identity(run: Any) -> None:
@@ -530,6 +693,15 @@ def test_t039_det_004_py311_py312_markdown_acceptance_manifest_byte_identity(run
     assert digests["A04"] == exact_file_digest(run.artifact_bytes[ARTIFACT_PATHS[3]])
     assert digests["A05"] == exact_file_digest(run.artifact_bytes[ARTIFACT_PATHS[4]])
     assert digests["A06"] == exact_file_digest(run.artifact_bytes[ARTIFACT_PATHS[5]])
+    evidence = run.determinism_evidence["independent_runtime_evidence"]
+    expected = _surface_identity_summary(run)
+    for runtime in ("3.11", "3.12"):
+        assert evidence["core_runtime_captures"][runtime]["surface_digests"] == expected
+        assert evidence["final_runtime_captures"][runtime]["surface_digests"] == expected
+    assert (
+        evidence["final_runtime_captures"]["3.11"]["surface_digests"]
+        == evidence["final_runtime_captures"]["3.12"]["surface_digests"]
+    )
 
 
 def test_t039_meta_001_pyproject_version_0_4_0(run: Any) -> None:

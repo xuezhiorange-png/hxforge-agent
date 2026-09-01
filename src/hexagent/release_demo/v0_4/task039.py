@@ -6,6 +6,10 @@ import copy
 import dataclasses
 import hashlib
 import json
+import os
+import shutil
+import subprocess
+import sys
 import uuid
 from collections.abc import Mapping
 from decimal import Decimal
@@ -55,11 +59,8 @@ from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     schema as task031_schema,
 )
-from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
-    validate_request as validate_task031,
-)
-from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.authority import (
-    layout_hash_payload as task021_layout_hash_payload,
+from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation import (
+    validate_typed_request as validate_task031_typed,
 )
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop import (
     canonical as task034_canonical,
@@ -75,9 +76,6 @@ from hexagent.exchangers.shell_tube.shell_side_pressure_drop.models import (
 )
 from hexagent.exchangers.shell_tube.shell_side_pressure_drop.models import (
     REQUEST_SCHEMA_VERSION as TASK034_REQUEST_SCHEMA_VERSION,
-)
-from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
-    canonical as task035_canonical,
 )
 from hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition import (
     validate_request as validate_task035,
@@ -137,6 +135,7 @@ from .artifacts import (
     render_manifest_bytes,
 )
 from .canonical import (
+    result_canonical_bytes,
     result_hash,
     result_id,
 )
@@ -181,6 +180,12 @@ TASK035_DELIVERY_COMMIT = "e48d83208bfe4de782ee055a99c826fb9eebb334"
 TASK035_MERGE_TREE = "8399dcf766b1c8d98794430e810d186134234d89"
 TASK038_MERGE_COMMIT = "0d65380e05c0000237ef862640687c94ecc21bb1"
 TASK038_POST_MERGE_MAIN_CI_RUN = "33371394290"
+_CROSS_PYTHON_EVIDENCE_ENV = "HXFORGE_TASK039_CROSS_PYTHON_EVIDENCE"
+_CROSS_PYTHON_PROBE_MARKER = "TASK039_CROSS_PYTHON_SUMMARY="
+_CROSS_PYTHON_RUNTIMES = ("3.11", "3.12")
+_CROSS_PYTHON_SURFACES = ("A03", "A04", "A05", "A06", "FINAL_RESULT")
+_CROSS_PYTHON_SCHEMA_VERSION = "task039.cross-python-evidence.v1"
+_CROSS_PYTHON_EVIDENCE_CACHE: dict[str, dict[str, Any]] = {}
 
 
 def _public(value: Any, *, decimal_strings: bool = False) -> Any:
@@ -188,6 +193,11 @@ def _public(value: Any, *, decimal_strings: bool = False) -> Any:
         return str(value) if decimal_strings else value
     if isinstance(value, Enum):
         return _public(value.value, decimal_strings=decimal_strings)
+    if isinstance(value, (task021_canonical.FrozenJsonArray, task021_canonical.FrozenJsonObject)):
+        return _public(
+            task021_canonical.internal_frozen_to_primitive(value),
+            decimal_strings=decimal_strings,
+        )
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
             field.name: _public(getattr(value, field.name), decimal_strings=decimal_strings)
@@ -272,7 +282,7 @@ def _build_t021_geometry_payload() -> dict[str, Any]:
     return geometry
 
 
-def _build_t021_rule_payload() -> dict[str, Any]:
+def _build_t021_rule_payload(*, pattern_family: str = "SQUARE") -> dict[str, Any]:
     rule: dict[str, Any] = {
         "profile_id": "hxforge.shell_tube.tube_layout.v1",
         "authority_mode": "INTERNAL_GENERIC",
@@ -285,7 +295,7 @@ def _build_t021_rule_payload() -> dict[str, Any]:
         "provenance_edge_ids": ["edge-task039-layout"],
         "evidence_refs": ["rule-evidence"],
         "rule_pack_identity": None,
-        "pattern_family": "SQUARE",
+        "pattern_family": pattern_family,
         "pitch_m": "0.03",
         "edge_clearance_m": "0",
         "allowed_origin_modes": ["CENTER_ON_LATTICE_POINT", "CENTER_ON_PRIMITIVE_CELL"],
@@ -300,12 +310,12 @@ def _build_t021_rule_payload() -> dict[str, Any]:
     return rule
 
 
-def _build_task021_request(config: Any) -> dict[str, Any]:
+def _build_task021_request(config: Any, *, pattern_family: str = "SQUARE") -> dict[str, Any]:
     return {
         "schema_version": "task021.tube-layout-request.v1",
         "configuration": config,
         "tube_geometry": _build_t021_geometry_payload(),
-        "layout_rule_authority": _build_t021_rule_payload(),
+        "layout_rule_authority": _build_t021_rule_payload(pattern_family=pattern_family),
         "placement_envelope": {
             "schema_version": "task021.circular-envelope.v1",
             "tube_center_envelope_diameter_m": "0.12",
@@ -448,7 +458,7 @@ def _build_task037_request() -> Task037Request:
         "INTERNAL_USE_AUTHORIZED",
         "APPROVED",
         ("T039-EV-WALL-MATERIAL-001",),
-        "1" * 64,
+        "2d0920034ab6f54acd3c20e339465cf26566d394aac289d6627d9dafcf2e11c4",
     )
     conductivity = TubeWallThermalConductivityAuthority(
         "T039-WALL-COND-001",
@@ -458,14 +468,14 @@ def _build_task037_request() -> Task037Request:
         "T039-WALL-COND-CONTEXT-001",
         "FIXED_RELEASE_DEMO_INPUT",
         "b27e46a1fddcca65be32674bc07d745c1c360a2012f8b63cc53f53f47cdf7fe8",
-        "T039-INTERNAL-WALL-MATERIAL-SOURCE",
+        "T039-INTERNAL-WALL-CONDUCTIVITY-SOURCE",
         "R2",
-        "ISSUE_214/R2/SUCCESS_VECTOR/WALL_MATERIAL",
+        "ISSUE_214/R2/SUCCESS_VECTOR/WALL_CONDUCTIVITY",
         "INTERNAL_ENGINEERING_RULE",
         "INTERNAL_USE_AUTHORIZED",
         "APPROVED",
-        ("T039-EV-WALL-MATERIAL-001",),
-        "2" * 64,
+        ("T039-EV-WALL-CONDUCTIVITY-001",),
+        "3022152e4cbbbe376674c44aabf01ea10504d524f4c5f7090e03a9cb98c99134",
     )
     inside = InsideFoulingResistanceAuthority(
         "T039-FOUL-IN-001",
@@ -473,14 +483,14 @@ def _build_task037_request() -> Task037Request:
         Decimal("0.0001"),
         "INNER_TUBE_SURFACE",
         "TUBE-WATER-001",
-        "T039-FOULING",
+        "T039-INTERNAL-FOULING-SOURCE",
         "R2",
-        "ISSUE_214/R2/SUCCESS_VECTOR/FOULING",
+        "ISSUE_214/R2/SUCCESS_VECTOR/INSIDE_FOULING",
         "APPROVED_ENGINEERING_BASIS",
         "INTERNAL_USE_AUTHORIZED",
         "APPROVED",
-        ("T039-EV-FOULING-IN-001",),
-        "3" * 64,
+        ("T039-EV-FOUL-IN-001",),
+        "6ed5c64239956073f73d96044224c72bb6e09f386e2a621efe9c098505068450",
     )
     outside = OutsideFoulingResistanceAuthority(
         "T039-FOUL-OUT-001",
@@ -488,14 +498,14 @@ def _build_task037_request() -> Task037Request:
         Decimal("0.0002"),
         "OUTER_TUBE_SURFACE",
         "SHELL-WATER-001",
-        "T039-FOULING",
+        "T039-INTERNAL-FOULING-SOURCE",
         "R2",
-        "ISSUE_214/R2/SUCCESS_VECTOR/FOULING",
+        "ISSUE_214/R2/SUCCESS_VECTOR/OUTSIDE_FOULING",
         "APPROVED_ENGINEERING_BASIS",
         "INTERNAL_USE_AUTHORIZED",
         "APPROVED",
-        ("T039-EV-FOULING-OUT-001",),
-        "4" * 64,
+        ("T039-EV-FOUL-OUT-001",),
+        "b897464f286c4c228c02e1213ba9e44337f912919fd8b8951c5a08917075030d",
     )
     return Task037Request(
         schema_version="task037.request.v1",
@@ -516,32 +526,6 @@ def _load_task031_fixture() -> dict[str, Any]:
     start = text.rfind("```json", 0, index)
     end = text.index("```", start + len("```json"))
     return cast(dict[str, Any], json.loads(text[start + len("```json") : end]))
-
-
-def _layout_rule_snapshot_hash(rule: Mapping[str, Any]) -> str:
-    payload = {key: value for key, value in rule.items() if key != "snapshot_hash"}
-    return task031_canonical.sha256_hex(task021_canonical.canonical_json(payload))
-
-
-def _resync_task021_layout_identity(raw_request: dict[str, Any]) -> None:
-    rule = raw_request["tube_layout"]["layout_rule_authority"]
-    snapshot_hash = _layout_rule_snapshot_hash(rule)
-    rule["snapshot_hash"] = snapshot_hash
-    raw_request["tube_layout"]["provenance"]["layout_rule_snapshot_hash"] = snapshot_hash
-    parsed = task031_schema.parse_request(raw_request)
-    layout_hash = task031_canonical.sha256_hex(task021_layout_hash_payload(parsed.tube_layout))
-    layout_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            "urn:hxforge:task021:tube-layout:v1:" + layout_hash,
-        )
-    )
-    raw_request["tube_layout"]["layout_hash"] = layout_hash
-    raw_request["tube_layout"]["layout_id"] = layout_id
-    geometry = raw_request["baffle_geometry_result"].get("geometry")
-    if isinstance(geometry, dict):
-        geometry["task021_layout_id"] = layout_id
-        geometry["task021_layout_hash"] = layout_hash
 
 
 def _task024_geometry_hash_payload(geometry: Any) -> dict[str, Any]:
@@ -613,12 +597,47 @@ def _resync_task024_geometry_identity(raw_request: dict[str, Any]) -> None:
     raw_request["baffle_geometry_result"]["geometry"]["geometry_id"] = geometry_id
 
 
-def _build_task031_request() -> dict[str, Any]:
+def _task031_layout_for_typed_validation(layout: Any) -> Any:
+    """Adapt the actual public TASK021 result for TASK031's typed boundary.
+
+    TASK021's public model stores warning details as immutable Layer-B markers.
+    TASK031's public authority verifier accepts the same semantic warning
+    payload, but its canonical boundary expects the caller-owned public
+    mapping form.  Only the warning-detail representation is adapted; all
+    TASK021 identity fields and values are retained exactly.
+    """
+
+    warnings = []
+    for warning in layout.warnings:
+        details = _public(warning.details, decimal_strings=False)
+        adapted = dataclasses.replace(warning, details=details)
+        object.__setattr__(adapted, "details", details)
+        warnings.append(adapted)
+    return dataclasses.replace(layout, warnings=tuple(warnings))
+
+
+def _build_task031_request(config: Any, layout: Any) -> tuple[dict[str, Any], Any]:
+    """Build TASK031 input from the actual same-replay TASK021 output."""
+
     request = copy.deepcopy(_load_task031_fixture())
-    request["tube_layout"]["layout_rule_authority"]["pattern_family"] = "TRIANGULAR"
-    _resync_task021_layout_identity(request)
+    request["tube_layout"] = _public_strings(layout)
+    geometry = request["baffle_geometry_result"]["geometry"]
+    geometry.update(
+        {
+            "task020_configuration_id": config.configuration_id,
+            "task020_configuration_hash": config.configuration_hash,
+            "task021_layout_id": layout.layout_id,
+            "task021_layout_hash": layout.layout_hash,
+            "tube_outer_diameter_m": str(layout.tube_geometry.outer_diameter_m),
+        }
+    )
     _resync_task024_geometry_identity(request)
-    return request
+    parsed = task031_schema.parse_request(request)
+    typed_request = dataclasses.replace(
+        parsed,
+        tube_layout=_task031_layout_for_typed_validation(layout),
+    )
+    return request, typed_request
 
 
 def _property_snapshot_raw() -> dict[str, Any]:
@@ -892,110 +911,36 @@ def _build_task035_request(
     }
 
 
-def _replace_pairs(value: Any, changes: Mapping[str, Any]) -> Any:
-    if not isinstance(value, (tuple, list)):
-        return value
-    result: list[Any] = []
-    for item in value:
-        if isinstance(item, (tuple, list)) and len(item) == 2 and item[0] in changes:
-            result.append([item[0], changes[item[0]]])
-        else:
-            result.append(item)
-    return result
-
-
-def _patch_shell_result_identities(
-    request: dict[str, Any], config: Any, layout: Any
-) -> dict[str, Any]:
-    """Align a public TASK031--035 run with the actual TASK020/021 replay.
-
-    The shell-side producers remain the only producers that create their
-    results.  This function only prepares the caller-owned serialized handoff
-    so their public identity validators see the same upstream configuration
-    and layout identities as TASK025/TASK037.
-    """
-
-    geometry = request["task031_result"]["geometry"]
-    geometry.update(
-        {
-            "task020_configuration_id": config.configuration_id,
-            "task020_configuration_hash": config.configuration_hash,
-            "task021_layout_id": layout.layout_id,
-            "task021_layout_hash": layout.layout_hash,
-        }
+def _prepare_shell_chain(
+    config: Any,
+    layout: Any,
+    operation_trace: list[str],
+) -> tuple[dict[str, Any], Any, Any, Any, Any, Any, Any, Any]:
+    request031, typed_request031 = _build_task031_request(config, layout)
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validation.validate_typed_request"
     )
-    geometry["provenance"] = _replace_pairs(
-        geometry.get("provenance", []),
-        {
-            "task020_configuration_id": config.configuration_id,
-            "task020_configuration_hash": config.configuration_hash,
-            "task021_layout_id": layout.layout_id,
-            "task021_layout_hash": layout.layout_hash,
-        },
-    )
-    geometry["geometry_hash"] = task035_canonical.task031_geometry_hash(geometry)
-    geometry["geometry_id"] = task035_canonical.task031_geometry_id(geometry["geometry_hash"])
-
-    flow = request["task032_result"]["flow_state"]
-    flow_changes = {
-        "task020_configuration_id": config.configuration_id,
-        "task020_configuration_hash": config.configuration_hash,
-        "task031_geometry_id": geometry["geometry_id"],
-        "task031_geometry_hash": geometry["geometry_hash"],
-    }
-    flow.update(flow_changes)
-    flow["provenance"] = _replace_pairs(flow.get("provenance", []), flow_changes)
-    flow["result_hash"] = task035_canonical.task032_success_hash(flow)
-    flow["result_id"] = task035_canonical.task032_result_id(flow["result_hash"])
-
-    heat = request["task033_result"]["heat_transfer"]
-    heat_changes = {
-        "task020_configuration_id": config.configuration_id,
-        "task020_configuration_hash": config.configuration_hash,
-        "task031_geometry_id": geometry["geometry_id"],
-        "task031_geometry_hash": geometry["geometry_hash"],
-        "task032_result_id": flow["result_id"],
-        "task032_result_hash": flow["result_hash"],
-    }
-    heat.update(heat_changes)
-    heat["provenance"] = _replace_pairs(heat.get("provenance", []), heat_changes)
-    heat["result_hash"] = task035_canonical.task033_success_hash(heat)
-    heat["result_id"] = task035_canonical.task033_result_id(heat["result_hash"])
-
-    pressure = request["task034_result"]["pressure_drop"]
-    pressure_changes = {
-        "task020_configuration_id": config.configuration_id,
-        "task020_configuration_hash": config.configuration_hash,
-        "task031_geometry_id": geometry["geometry_id"],
-        "task031_geometry_hash": geometry["geometry_hash"],
-        "task032_result_id": flow["result_id"],
-        "task032_result_hash": flow["result_hash"],
-        "task033_result_id": heat["result_id"],
-        "task033_result_hash": heat["result_hash"],
-    }
-    pressure.update(pressure_changes)
-    pressure["provenance"] = _replace_pairs(pressure.get("provenance", []), pressure_changes)
-    pressure["result_hash"] = task035_canonical.task034_success_hash(pressure)
-    pressure["result_id"] = task035_canonical.task034_result_id(pressure["result_hash"])
-    return request
-
-
-def _prepare_shell_chain() -> tuple[dict[str, Any], Any, Any, Any, Any, Any, Any, Any]:
-    request031 = _build_task031_request()
-    result031 = validate_task031(request031)
+    result031 = validate_task031_typed(typed_request031)
     geometry = _require_valid(result031, "TASK031")
     snapshot = _property_snapshot_raw()
     mass_flow = _mass_flow_authority_raw(
         _public_strings(geometry), snapshot["property_snapshot_hash"]
     )
     request032 = _build_task032_request(result031, snapshot, mass_flow)
+    operation_trace.append("hexagent.exchangers.shell_tube.shell_side_flow_state.validate_request")
     result032 = validate_task032(request032)
     _require_valid(result032, "TASK032")
     request033 = _build_task033_request(request032, result032)
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.shell_side_heat_transfer.validate_request"
+    )
     result033 = validate_task033(request033)
     _require_valid(result033, "TASK033")
     request034 = _build_task034_request(
         request031, result031, request032, result032, request033, result033
+    )
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.shell_side_pressure_drop.validate_request"
     )
     result034 = validate_task034(request034)
     _require_valid(result034, "TASK034")
@@ -1004,35 +949,53 @@ def _prepare_shell_chain() -> tuple[dict[str, Any], Any, Any, Any, Any, Any, Any
 
 
 def _build_actual_chain() -> dict[str, Any]:
+    operation_trace: list[str] = []
+    operation_trace.append("hexagent.exchangers.shell_tube.validate_request")
     result020 = validate_task020(_build_task020_request())
     config = _require_valid(result020, "TASK020")
+    operation_trace.append("hexagent.exchangers.shell_tube.tube_layout.validate_request")
     result021 = validate_task021(
-        _build_task021_request(config),
+        _build_task021_request(config, pattern_family="TRIANGULAR"),
         software_version="task039-release-demo-impl-v1",
         git_commit=BASE_MAIN_SHA,
     )
     layout = _require_valid(result021, "TASK021")
+    operation_trace.append("hexagent.exchangers.shell_tube.tube_side.evaluate_task025")
     result025 = evaluate_task025(_build_task025_request(layout, config))
     if type(result025).__name__ != "Task025ValidResult":
         raise ValueError("TASK025 public operation did not produce success")
     task026_raw = _public_strings(_build_task026_request())
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.tube_side_thermal.build_raw_tube_side_request_envelope"
+    )
     task026_request = build_raw_tube_side_request_envelope(task026_raw)
     if not isinstance(task026_request, TubeSideThermalRequest):
         raise ValueError("TASK026 raw boundary unexpectedly blocked valid fixture")
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.tube_side_thermal.compute_tube_side_heat_transfer_coefficient"
+    )
     result026 = compute_tube_side_heat_transfer_coefficient(task026_request, result025)
     if type(result026).__name__ != "TubeSideThermalResult":
         raise ValueError("TASK026 public operation did not produce success")
-    result037 = evaluate_task037(_build_task037_request(), layout, result025)
-    if result037.status != "VALID" or result037.success_result is None:
-        raise ValueError("TASK037 public operation did not produce success")
     request031, result031, result032, result033, result034, request035, snapshot, mass_flow = (
-        _prepare_shell_chain()
+        _prepare_shell_chain(config, layout, operation_trace)
     )
-    request035 = _patch_shell_result_identities(request035, config, layout)
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.validate_request"
+    )
     result035 = validate_task035(request035)
     if str(getattr(result035.status, "value", result035.status)) != "VALID":
         raise ValueError(f"TASK035 public operation blocked: {result035}")
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.validate_request"
+    )
+    result037 = evaluate_task037(_build_task037_request(), layout, result025)
+    if result037.status != "VALID" or result037.success_result is None:
+        raise ValueError("TASK037 public operation did not produce success")
     task037_success = result037.success_result
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.verify_task037_success_identity"
+    )
     if not verify_task037_success_identity(task037_success):
         raise ValueError("TASK037 success identity did not replay")
     binding = TubeSideServiceBindingAuthority(
@@ -1065,15 +1028,24 @@ def _build_actual_chain() -> dict[str, Any]:
             "V03-RELEASE-378603109",
         ],
     }
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.build_raw_overall_u_ua_request"
+    )
     request038 = build_raw_overall_u_ua_request(raw038)
     if not isinstance(request038, Task038Request):
         raise ValueError("TASK038 raw boundary unexpectedly blocked")
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.evaluate_task038"
+    )
     result038 = evaluate_task038(request038)
     if (
         str(getattr(result038.status, "value", result038.status)) != "VALID"
         or result038.success_result is None
     ):
         raise ValueError(f"TASK038 public operation did not produce success: {result038}")
+    operation_trace.append(
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.verify_task038_success_identity"
+    )
     if not verify_task038_success_identity(result038.success_result):
         raise ValueError("TASK038 success identity did not replay")
     return {
@@ -1097,6 +1069,7 @@ def _build_actual_chain() -> dict[str, Any]:
         "service_binding": binding,
         "property_snapshot": snapshot,
         "mass_flow_authority": mass_flow,
+        "public_operation_trace": tuple(operation_trace),
     }
 
 
@@ -1305,6 +1278,235 @@ def _digest_record(value: Mapping[str, Any]) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
+def _surface_identity_summary(run: Task039Run) -> dict[str, dict[str, Any]]:
+    """Return the exact byte/hash identity surfaces required by R4."""
+
+    summary: dict[str, dict[str, Any]] = {}
+    for surface, path in zip(
+        ("A03", "A04", "A05", "A06"),
+        ARTIFACT_PATHS[2:],
+        strict=True,
+    ):
+        payload = run.artifact_bytes[path]
+        summary[surface] = {
+            "byte_count": len(payload),
+            "sha256": exact_file_digest(payload),
+        }
+    final_payload = result_canonical_bytes(run.final_result)
+    summary["FINAL_RESULT"] = {
+        "byte_count": len(final_payload),
+        "sha256": exact_file_digest(final_payload),
+        "result_hash": str(run.final_result["result_hash"]),
+        "result_id": str(run.final_result["result_id"]),
+    }
+    return summary
+
+
+def _determinism_identity_projection(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Exclude external-process observations from the deterministic hash input.
+
+    The child-runtime captures are evidence about the already-defined surfaces.
+    Including them in the identity projection would make the result hash depend
+    on its own external observation record and create a digest cycle.
+    """
+
+    return {key: item for key, item in value.items() if key != "independent_runtime_evidence"}
+
+
+def _cross_python_probe_seed() -> dict[str, Any]:
+    return {
+        "schema_version": _CROSS_PYTHON_SCHEMA_VERSION,
+        "phase": "CORE_PROBE",
+        "surfaces": list(_CROSS_PYTHON_SURFACES),
+        "status": "PASS",
+    }
+
+
+def _emit_cross_python_probe() -> None:
+    """Run one child-runtime assembly and emit a machine-readable summary."""
+
+    raw_evidence = os.environ.get(_CROSS_PYTHON_EVIDENCE_ENV)
+    if raw_evidence is None:
+        raise RuntimeError("cross-Python probe evidence seed is missing")
+    evidence = json.loads(raw_evidence)
+    if not isinstance(evidence, dict):
+        raise RuntimeError("cross-Python probe evidence seed must be a JSON object")
+    run = _assemble_run(
+        _build_actual_chain(),
+        cross_python_evidence=evidence,
+        capture_cross_python=False,
+    )
+    runtime = f"{sys.version_info.major}.{sys.version_info.minor}"
+    payload = {
+        "runtime": runtime,
+        "python_version": sys.version,
+        "executable": sys.executable,
+        "surface_digests": _surface_identity_summary(run),
+    }
+    print(
+        _CROSS_PYTHON_PROBE_MARKER
+        + json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    )
+
+
+def _run_cross_python_probe(runtime: str, evidence: Mapping[str, Any]) -> dict[str, Any]:
+    uv_path = shutil.which("uv")
+    if uv_path is None:
+        raise RuntimeError("uv is required for the independent Python runtime probe")
+    environment = os.environ.copy()
+    environment[_CROSS_PYTHON_EVIDENCE_ENV] = json.dumps(
+        _public(evidence), ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
+    source_path = str(REPO_ROOT / "src")
+    existing_pythonpath = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = (
+        source_path if not existing_pythonpath else source_path + os.pathsep + existing_pythonpath
+    )
+    command = [
+        uv_path,
+        "run",
+        "--quiet",
+        "--frozen",
+        "--extra",
+        "dev",
+        "--python",
+        runtime,
+        "python",
+        "-c",
+        (
+            "from hexagent.release_demo.v0_4.task039 import "
+            "_emit_cross_python_probe; _emit_cross_python_probe()"
+        ),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=180,
+    )
+    marker = next(
+        (
+            line[len(_CROSS_PYTHON_PROBE_MARKER) :]
+            for line in reversed(completed.stdout.splitlines())
+            if line.startswith(_CROSS_PYTHON_PROBE_MARKER)
+        ),
+        None,
+    )
+    if completed.returncode != 0 or marker is None:
+        raise RuntimeError(
+            f"Python {runtime} cross-runtime probe failed "
+            f"(exit={completed.returncode}); stdout={completed.stdout[-4000:]!r}; "
+            f"stderr={completed.stderr[-4000:]!r}"
+        )
+    payload = json.loads(marker)
+    if payload.get("runtime") != runtime:
+        raise RuntimeError(
+            f"Python runtime probe mismatch: requested {runtime}, "
+            f"reported {payload.get('runtime')!r}"
+        )
+    if not isinstance(payload.get("python_version"), str) or not payload["python_version"]:
+        raise RuntimeError(f"Python {runtime} probe returned no exact version")
+    if not isinstance(payload.get("executable"), str) or not payload["executable"]:
+        raise RuntimeError(f"Python {runtime} probe returned no executable path")
+    surface_digests = payload.get("surface_digests")
+    if not isinstance(surface_digests, dict):
+        raise RuntimeError(f"Python {runtime} probe returned no surface digest map")
+    return {
+        "runtime": runtime,
+        "python_version": payload.get("python_version", ""),
+        "executable": payload.get("executable", ""),
+        "command": command,
+        "exit_code": completed.returncode,
+        "surface_digests": surface_digests,
+    }
+
+
+def _surface_comparison(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
+    per_surface = {
+        surface: left.get(surface) == right.get(surface) for surface in _CROSS_PYTHON_SURFACES
+    }
+    return {
+        "per_surface": per_surface,
+        "all_surfaces_identical": all(per_surface.values()),
+    }
+
+
+def _capture_cross_python_evidence(chain: Mapping[str, Any]) -> dict[str, Any]:
+    cache_key = "task039.cross-python-evidence.v1"
+    cached = _CROSS_PYTHON_EVIDENCE_CACHE.get(cache_key)
+    if cached is not None:
+        return copy.deepcopy(cached)
+
+    seed = _cross_python_probe_seed()
+    local_core_run = _assemble_run(
+        chain,
+        cross_python_evidence=seed,
+        capture_cross_python=False,
+    )
+    local_core_surfaces = _surface_identity_summary(local_core_run)
+    core_captures: dict[str, Any] = {}
+    for runtime in _CROSS_PYTHON_RUNTIMES:
+        capture = _run_cross_python_probe(runtime, seed)
+        if capture["surface_digests"] != local_core_surfaces:
+            raise RuntimeError(f"Python {runtime} core surfaces differ from local assembly")
+        core_captures[runtime] = capture
+    core_comparison = _surface_comparison(
+        core_captures["3.11"]["surface_digests"],
+        core_captures["3.12"]["surface_digests"],
+    )
+    if not core_comparison["all_surfaces_identical"]:
+        raise RuntimeError("Python 3.11 and 3.12 core surfaces differ")
+
+    evidence: dict[str, Any] = {
+        "schema_version": _CROSS_PYTHON_SCHEMA_VERSION,
+        "evidence_id": "TASK039-CROSS-PYTHON-0.4.0",
+        "python_versions": list(_CROSS_PYTHON_RUNTIMES),
+        "repeat_run_count": 2,
+        "surfaces": list(_CROSS_PYTHON_SURFACES),
+        "core_runtime_captures": core_captures,
+        "core_comparison": core_comparison,
+        "status": "PASS",
+    }
+    local_final_run = _assemble_run(
+        chain,
+        cross_python_evidence=evidence,
+        capture_cross_python=False,
+    )
+    local_final_surfaces = _surface_identity_summary(local_final_run)
+    final_captures: dict[str, Any] = {}
+    for runtime in _CROSS_PYTHON_RUNTIMES:
+        capture = _run_cross_python_probe(runtime, evidence)
+        if capture["surface_digests"] != local_final_surfaces:
+            raise RuntimeError(f"Python {runtime} final surfaces differ from local assembly")
+        final_captures[runtime] = capture
+    final_comparison = _surface_comparison(
+        final_captures["3.11"]["surface_digests"],
+        final_captures["3.12"]["surface_digests"],
+    )
+    if not final_comparison["all_surfaces_identical"]:
+        raise RuntimeError("Python 3.11 and 3.12 final surfaces differ")
+    evidence["final_runtime_captures"] = final_captures
+    evidence["final_comparison"] = final_comparison
+    evidence["byte_identity_status"] = "PASS"
+
+    # The observations are intentionally excluded from the identity projection;
+    # verify that enriching the record does not change the final surfaces.
+    enriched_run = _assemble_run(
+        chain,
+        cross_python_evidence=evidence,
+        capture_cross_python=False,
+    )
+    enriched_surfaces = _surface_identity_summary(enriched_run)
+    if enriched_surfaces != local_final_surfaces:
+        raise RuntimeError("cross-Python evidence enrichment changed result surfaces")
+
+    _CROSS_PYTHON_EVIDENCE_CACHE[cache_key] = copy.deepcopy(evidence)
+    return evidence
+
+
 def _identity_bindings(chain: Mapping[str, Any]) -> dict[str, str]:
     values = {
         "TASK020_CONFIGURATION_ID": chain["task020_config"].configuration_id,
@@ -1326,6 +1528,8 @@ def _identity_bindings(chain: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _production_graph(chain: Mapping[str, Any]) -> dict[str, Any]:
+    operations = list(chain["public_operation_trace"])
+    operations.append("hexagent.release_demo.v0_4.build_release_run")
     return {
         "schema_version": PRODUCTION_GRAPH_SCHEMA_VERSION,
         "stages": [
@@ -1342,24 +1546,7 @@ def _production_graph(chain: Mapping[str, Any]) -> dict[str, Any]:
             "TASK038",
             "TASK039",
         ],
-        "actual_public_operations": [
-            "hexagent.exchangers.shell_tube.validate_request",
-            "hexagent.exchangers.shell_tube.tube_layout.validate_request",
-            "hexagent.exchangers.shell_tube.tube_side.evaluate_task025",
-            "hexagent.exchangers.shell_tube.tube_side_thermal.build_raw_tube_side_request_envelope",
-            "hexagent.exchangers.shell_tube.tube_side_thermal.compute_tube_side_heat_transfer_coefficient",
-            "hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.validate_request",
-            "hexagent.exchangers.shell_tube.shell_side_flow_state.validate_request",
-            "hexagent.exchangers.shell_tube.shell_side_heat_transfer.validate_request",
-            "hexagent.exchangers.shell_tube.shell_side_pressure_drop.validate_request",
-            "hexagent.exchangers.shell_tube.shell_side_thermal_hydraulic_composition.validate_request",
-            "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.validate_request",
-            "hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.verify_task037_success_identity",
-            "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.build_raw_overall_u_ua_request",
-            "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.evaluate_task038",
-            "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.verify_task038_success_identity",
-            "hexagent.release_demo.v0_4.validate_request",
-        ],
+        "actual_public_operations": operations,
         "statuses": {
             "TASK020": _status(chain["task020_result"].status),
             "TASK021": _status(chain["task021_result"].status),
@@ -1384,6 +1571,7 @@ def _production_graph(chain: Mapping[str, Any]) -> dict[str, Any]:
         "expected_output_used_as_input": False,
         "synthetic_oracle_substitution": False,
         "private_helper_stage_bypass": False,
+        "post_producer_identity_repair": False,
         "no_upstream_engineering_recomputation": True,
         "pressure_drop_forwarded_unchanged": True,
     }
@@ -1545,7 +1733,12 @@ def _build_final_result(
     return record
 
 
-def _assemble_run(chain: Mapping[str, Any]) -> Task039Run:
+def _assemble_run(
+    chain: Mapping[str, Any],
+    *,
+    cross_python_evidence: Mapping[str, Any] | None = None,
+    capture_cross_python: bool = True,
+) -> Task039Run:
     graph = _production_graph(chain)
     success_demo = _task038_success_demo(chain)
     blocked_demos = _build_blocked_demos(chain)
@@ -1603,6 +1796,12 @@ def _assemble_run(chain: Mapping[str, Any]) -> Task039Run:
     )
     artifact_bytes[ARTIFACT_PATHS[4]] = render_manifest_bytes(manifest)
     version = _version_metadata(manifest)
+    if cross_python_evidence is None:
+        cross_python_evidence = (
+            _capture_cross_python_evidence(chain)
+            if capture_cross_python
+            else _cross_python_probe_seed()
+        )
     determinism: dict[str, Any] = {
         "schema_version": DETERMINISM_SCHEMA_VERSION,
         "evidence_id": "TASK039-DETERMINISM-0.4.0",
@@ -1617,9 +1816,12 @@ def _assemble_run(chain: Mapping[str, Any]) -> Task039Run:
         },
         "result_hash": "",
         "result_id": "",
-        "byte_identity_status": "PASS",
+        "byte_identity_status": "PASS"
+        if cross_python_evidence.get("status") == "PASS"
+        else "PROBE",
+        "independent_runtime_evidence": dict(cross_python_evidence),
     }
-    determinism["evidence_hash"] = _digest_record(determinism)
+    determinism["evidence_hash"] = _digest_record(_determinism_identity_projection(determinism))
     ledger = _build_acceptance_ledger(checklist, manifest, determinism)
     provenance_values = {
         "task_id": TASK_ID,
