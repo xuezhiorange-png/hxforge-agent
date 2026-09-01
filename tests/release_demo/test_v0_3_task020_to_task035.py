@@ -257,15 +257,15 @@ def test_T036_DET_004_PY311_PY312_MARKDOWN_BYTE_IDENTITY(run: Any) -> None:
     assert first[DETERMINISM_SURFACES[3]] == second[DETERMINISM_SURFACES[3]]
 
 
-def test_T036_META_001_PYPROJECT_VERSION_0_3_0(run: Any) -> None:
+def test_T036_META_001_PYPROJECT_VERSION_0_4_0(run: Any) -> None:
     text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.3.0"' in text
+    assert 'version = "0.4.0"' in text
 
 
 def test_T036_META_002_UV_LOCK_PROJECT_VERSION_ALIGNMENT(run: Any) -> None:
     text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
     assert 'name = "heat-exchanger-design-agent"' in text
-    assert 'version = "0.3.0"' in text
+    assert 'version = "0.4.0"' in text
 
 
 def test_T036_MANIFEST_001_RELEASE_MANIFEST_SHA256_EXACT_BYTES(run: Any) -> None:
