@@ -74,7 +74,9 @@ def layout_hash_payload(layout: TubeLayout) -> dict[str, Any]:
             "field_path": item.field_path,
             "message_key": item.message_key,
             "evidence_refs": list(item.evidence_refs),
-            "details": item.details,
+            "details": (
+                None if item.details is None else internal_frozen_to_primitive(item.details)
+            ),
         }
         for item in layout.warnings
     ]
