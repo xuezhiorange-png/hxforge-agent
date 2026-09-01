@@ -681,8 +681,11 @@ def test_t039_det_003_py311_py312_json_result_byte_identity(run: Any) -> None:
         )
         assert evidence["core_runtime_captures"][runtime]["executable"]
         assert evidence["final_runtime_captures"][runtime]["executable"]
-        assert evidence["core_runtime_captures"][runtime]["command"]
-        assert evidence["final_runtime_captures"][runtime]["command"]
+        for capture_group in ("core_runtime_captures", "final_runtime_captures"):
+            command = evidence[capture_group][runtime]["command"]
+            run_index = command.index("run")
+            assert command[run_index + 1] == "--isolated"
+            assert command[command.index("--python") + 1] == runtime
         assert set(evidence["core_runtime_captures"][runtime]["surface_digests"]) == {
             "A03",
             "A04",
@@ -690,6 +693,7 @@ def test_t039_det_003_py311_py312_json_result_byte_identity(run: Any) -> None:
             "A06",
             "FINAL_RESULT",
         }
+    assert __import__("hypothesis") is not None
 
 
 def test_t039_det_004_py311_py312_markdown_acceptance_manifest_byte_identity(run: Any) -> None:

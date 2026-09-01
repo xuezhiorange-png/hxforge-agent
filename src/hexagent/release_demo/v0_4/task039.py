@@ -1341,6 +1341,7 @@ def _run_cross_python_probe(runtime: str, evidence: Mapping[str, Any]) -> dict[s
     command = [
         uv_path,
         "run",
+        "--isolated",
         "--quiet",
         "--frozen",
         "--extra",
