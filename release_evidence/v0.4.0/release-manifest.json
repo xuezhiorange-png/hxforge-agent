@@ -1,0 +1,64 @@
+{
+  "acceptance_checklist_ref": "b683f23be74206257af98839a46aceb4c86110e1bc06f5066a76a45fb6cf1b52",
+  "artifact_digest_set": [
+    {
+      "path": "scripts/release_demo/v0_4_task020_to_task038.py",
+      "sha256": "5995924b486dff9cab58e0ede9d3534240294904ece164338a4697e255314ffb"
+    },
+    {
+      "path": "tests/release_demo/test_v0_4_task020_to_task038.py",
+      "sha256": "11a4a746b28688061f0d2515566f0f4d8f8e79ad48bc5b8a41c9d892f7adc354"
+    },
+    {
+      "path": "release_evidence/v0.4.0/task020-to-task038-demo.json",
+      "sha256": "9ea397dbdd57dce43668d91f13e438d955bbeb72499319073eb62d04101c614d"
+    },
+    {
+      "path": "release_evidence/v0.4.0/task020-to-task038-demo.md",
+      "sha256": "b1cb3b6a6ff1df3ca808e6d863fc2555cce2a2335d3d2d49d10f2d1e6935c59e"
+    }
+  ],
+  "artifact_inventory": [
+    {
+      "artifact_id": "A01",
+      "path": "scripts/release_demo/v0_4_task020_to_task038.py",
+      "required": true
+    },
+    {
+      "artifact_id": "A02",
+      "path": "tests/release_demo/test_v0_4_task020_to_task038.py",
+      "required": true
+    },
+    {
+      "artifact_id": "A03",
+      "path": "release_evidence/v0.4.0/task020-to-task038-demo.json",
+      "required": true
+    },
+    {
+      "artifact_id": "A04",
+      "path": "release_evidence/v0.4.0/task020-to-task038-demo.md",
+      "required": true
+    },
+    {
+      "artifact_id": "A05",
+      "path": "release_evidence/v0.4.0/release-manifest.json",
+      "required": true
+    },
+    {
+      "artifact_id": "A06",
+      "path": "release_evidence/v0.4.0/release-acceptance.md",
+      "required": true
+    }
+  ],
+  "manifest_hash": "1d96b01d62e06592634fa80e8bcd4baf5c2d26bbe7e09578a826689cce782a35",
+  "manifest_id": "TASK039-MANIFEST-0.4.0",
+  "python_versions": [
+    "3.11",
+    "3.12"
+  ],
+  "release_acceptance_ledger_ref": "TASK039-RELEASE-ACCEPTANCE-0.4.0",
+  "release_version": "0.4.0",
+  "repeat_run_count": 2,
+  "schema_version": "task039.release-manifest.v1",
+  "upstream_evidence_ledger_ref": "67b5c98aa8d0b44ce74f1502401cb49c47a0c8d79258b223d0aa36aa3597003d"
+}
