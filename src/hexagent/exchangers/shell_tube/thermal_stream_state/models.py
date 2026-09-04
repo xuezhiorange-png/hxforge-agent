@@ -684,6 +684,8 @@ class Task160Provenance:
             or any(char not in "0123456789abcdef" for char in self.provenance_hash[7:])
         ):
             raise ValueError("provenance_hash must be sha256:<64hex>")
+        if self.provenance_hash != self.graph.compute_hash():
+            raise ValueError("provenance_hash must equal graph.compute_hash()")
 
 
 @dataclass(frozen=True)

@@ -7,16 +7,32 @@ from decimal import Decimal
 
 import pytest
 
-from hexagent.exchangers.shell_tube.thermal_stream_state.errors import BlockerCode
+import hexagent.exchangers.shell_tube.thermal_stream_state.service as service_module
+from hexagent.exchangers.shell_tube.thermal_stream_state.errors import (
+    BlockerCode,
+    InternalGuardCode,
+)
+from hexagent.exchangers.shell_tube.thermal_stream_state.ingress import (
+    build_strict_request,
+    coerce_raw_request,
+)
 from hexagent.exchangers.shell_tube.thermal_stream_state.models import (
+    ApplicabilityLedger,
+    CapacityRatedStream,
     FailureStage,
+    Task160Request,
     ValidationStatus,
 )
 from hexagent.exchangers.shell_tube.thermal_stream_state.service import (
     compute_heat_capacity_rate,
     validate_request,
 )
-from hexagent.exchangers.shell_tube.thermal_stream_state.validation import resolve_thermal_roles
+from hexagent.exchangers.shell_tube.thermal_stream_state.validation import (
+    make_applicability_ledger,
+    make_completeness_ledger,
+    resolve_thermal_roles,
+    validate_base_streams,
+)
 
 from .test_ingress_models import make_r607_raw
 
@@ -180,3 +196,103 @@ def test_cdot_service_uses_decimal_without_downstream_metrics() -> None:
 def test_role_resolver_rejects_unvalidated_or_wrong_stage_objects() -> None:
     with pytest.raises(ValueError):
         resolve_thermal_roles(object(), object())  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("function_name", "guard_code"),
+    [
+        ("success_hash_from_inputs", InternalGuardCode.I031_CANONICALIZATION_FAILURE),
+        ("result_id", InternalGuardCode.I032_IDENTITY_FINALIZATION_FAILURE),
+        ("build_provenance", InternalGuardCode.I033_PROVENANCE_FINALIZATION_FAILURE),
+        ("Task160Result", InternalGuardCode.I034_PARTIAL_RESULT_FORBIDDEN),
+    ],
+)
+def test_success_finalization_failures_raise_internal_guards_not_blockers(
+    monkeypatch: pytest.MonkeyPatch,
+    function_name: str,
+    guard_code: InternalGuardCode,
+) -> None:
+    def fail(*args: object, **kwargs: object) -> object:
+        raise RuntimeError("forced internal finalization failure")
+
+    monkeypatch.setattr(service_module, function_name, fail)
+    with pytest.raises(service_module._InternalGuardFailure) as captured:
+        validate_request(make_r607_raw())
+    assert captured.value.code is guard_code
+    assert BlockerCode.B023.value not in str(captured.value)
+
+
+def test_task161_field_leak_guard_rejects_synthetic_downstream_field() -> None:
+    from types import SimpleNamespace
+
+    with pytest.raises(service_module._InternalGuardFailure) as captured:
+        service_module._assert_no_task161_fields(SimpleNamespace(c_min=Decimal("1")))
+    assert captured.value.code is InternalGuardCode.I035_TASK161_FIELD_LEAK
+    assert BlockerCode.B023.value not in str(captured.value)
+
+
+def test_task161_field_leak_guard_is_on_success_finalization_seam(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail(_value: object) -> None:
+        raise service_module._InternalGuardFailure(
+            InternalGuardCode.I035_TASK161_FIELD_LEAK,
+            "forced TASK161 field leak seam",
+        )
+
+    monkeypatch.setattr(service_module, "_assert_no_task161_fields", fail)
+    with pytest.raises(service_module._InternalGuardFailure) as captured:
+        validate_request(make_r607_raw())
+    assert captured.value.code is InternalGuardCode.I035_TASK161_FIELD_LEAK
+    assert BlockerCode.B023.value not in str(captured.value)
+
+
+def _completeness_fixture() -> tuple[
+    Task160Request, tuple[CapacityRatedStream, ...], ApplicabilityLedger
+]:
+    strict_request, raw_blockers = build_strict_request(coerce_raw_request(make_r607_raw()))
+    assert strict_request is not None
+    assert raw_blockers == ()
+    states = validate_base_streams(strict_request)
+    applicability = make_applicability_ledger(strict_request, states)
+    rated = tuple(
+        CapacityRatedStream(
+            role,
+            compute_heat_capacity_rate(
+                role.input_state.input.mass_flow_kg_s,
+                role.input_state.input.property_snapshot.specific_heat_J_kg_K,
+            ),
+        )
+        for role in resolve_thermal_roles(*states)
+    )
+    return strict_request, rated, applicability
+
+
+def test_b029_defensive_completeness_seam_is_reachable_without_normal_path() -> None:
+    strict_request, rated, applicability = _completeness_fixture()
+    ledger = make_completeness_ledger(
+        strict_request,
+        rated,
+        c_dot_hot_W_K=Decimal("0"),
+        c_dot_cold_W_K=Decimal("4375"),
+        applicability=applicability,
+        identity_inputs_ready=True,
+    )
+    assert ledger.status.value == "INCOMPLETE"
+    assert BlockerCode.B029.value in {item.code for item in ledger.blockers}
+    assert BlockerCode.B029.value not in _codes(make_r607_raw())
+
+
+def test_b030_defensive_completeness_seam_is_reachable_without_normal_path() -> None:
+    strict_request, rated, applicability = _completeness_fixture()
+    ledger = make_completeness_ledger(
+        strict_request,
+        rated[:1],
+        c_dot_hot_W_K=Decimal("10450"),
+        c_dot_cold_W_K=Decimal("4375"),
+        applicability=applicability,
+        identity_inputs_ready=True,
+    )
+    assert ledger.status.value == "INCOMPLETE"
+    assert BlockerCode.B030.value in {item.code for item in ledger.blockers}
+    assert BlockerCode.B030.value not in _codes(make_r607_raw())

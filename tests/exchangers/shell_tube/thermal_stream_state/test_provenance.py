@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import pytest
+
 from hexagent.domain.provenance import ProvenanceNodeType
-from hexagent.exchangers.shell_tube.thermal_stream_state.models import CalculationRunScope
+from hexagent.exchangers.shell_tube.thermal_stream_state.models import (
+    CalculationRunScope,
+    Task160Provenance,
+)
 from hexagent.exchangers.shell_tube.thermal_stream_state.provenance import (
     source_authority_node,
 )
@@ -69,3 +74,19 @@ def test_provenance_scope_is_explicit_for_success_and_blocked_artifacts() -> Non
     blocked = validate_request(raw).typed_blocked
     assert blocked is not None
     assert blocked.failure_stage.value == "STRICT_VALIDATION"
+
+
+def test_provenance_hash_must_equal_graph_hash() -> None:
+    valid = validate_request(make_r607_raw()).valid
+    assert valid is not None
+    current = valid.provenance.provenance_hash
+    replacement = "sha256:" + ("0" * 64 if current != "sha256:" + "0" * 64 else "1" * 64)
+    with pytest.raises(ValueError, match="provenance_hash must equal graph.compute_hash"):
+        Task160Provenance(
+            producer_identity=valid.provenance.producer_identity,
+            upstream_identity_hashes=valid.provenance.upstream_identity_hashes,
+            source_evidence_refs=valid.provenance.source_evidence_refs,
+            adapter_evidence_refs=valid.provenance.adapter_evidence_refs,
+            graph=valid.provenance.graph,
+            provenance_hash=replacement,
+        )

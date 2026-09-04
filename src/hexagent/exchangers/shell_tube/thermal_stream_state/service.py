@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import fields, is_dataclass
 from decimal import ROUND_HALF_EVEN, Context, Decimal, InvalidOperation, localcontext
+from typing import NoReturn
+from uuid import UUID
 
 from .canonical import (
     request_hash,
@@ -12,7 +15,7 @@ from .canonical import (
     typed_blocked_hash,
     typed_blocked_result_id,
 )
-from .errors import BlockerCode, make_blocker, sort_blockers
+from .errors import BlockerCode, InternalGuardCode, make_blocker, sort_blockers
 from .ingress import (
     RawIngressStructuralError,
     build_strict_request,
@@ -27,6 +30,7 @@ from .models import (
     Task160BlockedResult,
     Task160Blocker,
     Task160PreResultIdentityInputs,
+    Task160Provenance,
     Task160RawRequest,
     Task160Request,
     Task160Result,
@@ -50,6 +54,63 @@ TASK160_DECIMAL_CONTEXT = Context(
     capitals=1,
     clamp=0,
 )
+
+
+class _InternalGuardFailure(RuntimeError):
+    """A violated implementation guard, never an engineering blocker."""
+
+    def __init__(self, code: InternalGuardCode, detail: str) -> None:
+        self.code = code
+        super().__init__(f"{code}: {detail}")
+
+
+_TASK161_FORBIDDEN_FIELDS = frozenset(
+    {
+        "c_min",
+        "c_max",
+        "capacity_ratio",
+        "flow_arrangement",
+        "effectiveness",
+        "ntu",
+        "heat_duty",
+        "outlet_temperatures",
+        "energy_balance",
+        "terminal_temperature_difference",
+        "lmtd",
+        "lmtd_correction_factor",
+        "overall_u",
+        "effective_area",
+        "ua",
+    }
+)
+
+
+def _raise_internal_guard(code: InternalGuardCode, detail: str, cause: Exception) -> NoReturn:
+    raise _InternalGuardFailure(code, detail) from cause
+
+
+def _is_bare_sha256(value: object) -> bool:
+    return (
+        type(value) is str
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _assert_no_task161_fields(value: object) -> None:
+    """Reject downstream physics fields at the successful-result seam."""
+    try:
+        names = {item.name for item in fields(value)} if is_dataclass(value) else set(vars(value))
+    except (TypeError, ValueError, RuntimeError) as exc:
+        raise _InternalGuardFailure(
+            InternalGuardCode.I035_TASK161_FIELD_LEAK, "result field inspection failed"
+        ) from exc
+    leaked = sorted(_TASK161_FORBIDDEN_FIELDS.intersection(names))
+    if leaked:
+        raise _InternalGuardFailure(
+            InternalGuardCode.I035_TASK161_FIELD_LEAK,
+            f"forbidden downstream fields: {','.join(leaked)}",
+        )
 
 
 def _valid_decimal(value: object) -> bool:
@@ -257,7 +318,33 @@ def validate_request(raw: Task160RawRequest | dict[str, object]) -> Task160Valid
             task160_version=strict_request.task160_version,
             implementation_software_version=strict_request.implementation_software_version,
         )
+    except Exception as exc:
+        _raise_internal_guard(
+            InternalGuardCode.I031_CANONICALIZATION_FAILURE,
+            "successful result hash finalization failed",
+            exc,
+        )
+    if not _is_bare_sha256(final_hash):
+        raise _InternalGuardFailure(
+            InternalGuardCode.I031_CANONICALIZATION_FAILURE,
+            "successful result hash is not bare SHA-256",
+        )
+
+    try:
         final_id = result_id(final_hash)
+    except Exception as exc:
+        _raise_internal_guard(
+            InternalGuardCode.I032_IDENTITY_FINALIZATION_FAILURE,
+            "successful result UUID finalization failed",
+            exc,
+        )
+    if type(final_id) is not UUID:
+        raise _InternalGuardFailure(
+            InternalGuardCode.I032_IDENTITY_FINALIZATION_FAILURE,
+            "successful result UUID has invalid type",
+        )
+
+    try:
         provenance = build_provenance(
             schema_version=strict_request.schema_version,
             task160_version=strict_request.task160_version,
@@ -269,6 +356,16 @@ def validate_request(raw: Task160RawRequest | dict[str, object]) -> Task160Valid
             artifact_id=final_id,
             scope=CalculationRunScope.SUCCESS,
         )
+        if not isinstance(provenance, Task160Provenance):
+            raise TypeError("successful result provenance has invalid type")
+    except Exception as exc:
+        _raise_internal_guard(
+            InternalGuardCode.I033_PROVENANCE_FINALIZATION_FAILURE,
+            "successful result provenance finalization failed",
+            exc,
+        )
+
+    try:
         result = Task160Result(
             schema_version=strict_request.schema_version,
             task160_version=strict_request.task160_version,
@@ -288,12 +385,23 @@ def validate_request(raw: Task160RawRequest | dict[str, object]) -> Task160Valid
             result_hash=final_hash,
             result_id=final_id,
         )
-    except (TypeError, ValueError, RuntimeError):
-        blocker = make_blocker(
-            BlockerCode.B023, stage=FailureStage.IDENTITY, field_path="result_identity"
+    except Exception as exc:
+        _raise_internal_guard(
+            InternalGuardCode.I034_PARTIAL_RESULT_FORBIDDEN,
+            "successful result construction failed",
+            exc,
         )
-        return _typed_blocked(strict_request, request_hash_value, (blocker,), FailureStage.IDENTITY)
-    return Task160ValidationResult(ValidationStatus.VALID, None, None, result)
+
+    _assert_no_task161_fields(result)
+    try:
+        validation_result = Task160ValidationResult(ValidationStatus.VALID, None, None, result)
+    except Exception as exc:
+        _raise_internal_guard(
+            InternalGuardCode.I034_PARTIAL_RESULT_FORBIDDEN,
+            "successful validation-result construction failed",
+            exc,
+        )
+    return validation_result
 
 
 __all__ = [
