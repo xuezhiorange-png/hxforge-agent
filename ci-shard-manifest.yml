@@ -77,6 +77,12 @@ shards:
       - tests/exchangers/shell_tube/test_task029_path.py
       - tests/exchangers/shell_tube/test_task029_raw.py
       - tests/exchangers/shell_tube/test_task029_upstream.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_ingress_models.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_adapters.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_validation_service.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_canonical.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_provenance.py
+      - tests/exchangers/shell_tube/thermal_stream_state/test_boundaries.py
       - tests/exchangers/shell_tube/tube_side/test_a01_upstream_closure.py
       - tests/exchangers/shell_tube/tube_side/test_a02_task025_enums.py
       - tests/exchangers/shell_tube/tube_side/test_a03_raw_projection.py
