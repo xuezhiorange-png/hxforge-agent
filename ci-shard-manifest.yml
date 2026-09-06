@@ -182,6 +182,7 @@ shards:
       - tests/exchangers/shell_tube/overall_heat_transfer_resistance/test_task037_contract.py
       - tests/exchangers/shell_tube/overall_heat_transfer_coefficient_ua/test_task038_contract.py
       - tests/exchangers/shell_tube/test_task161_flow_arrangement_performance_method_authority.py
+      - tests/exchangers/shell_tube/test_task162_thermal_performance_closure.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
       - tests/shell_geometry_catalogs/test_architecture.py
