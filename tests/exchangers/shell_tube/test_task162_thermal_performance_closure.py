@@ -208,6 +208,7 @@ def _rehashed_task038(
     provenance_changes: dict[str, object] | None = None,
     applicability_fail: bool = False,
     completeness_fail: bool = False,
+    **changes: object,
 ) -> Task038SuccessResult:
     adapted_provenance = replace(value.provenance, **(provenance_changes or {}))
     adapted_provenance = replace(
@@ -225,6 +226,7 @@ def _rehashed_task038(
         provenance=adapted_provenance,
         applicability_ledger=applicability,
         completeness_ledger=completeness,
+        **changes,
     )
     adapted_hash = task038_success_result_hash(provisional)
     return replace(
@@ -370,6 +372,25 @@ def test_task038_completeness_status_is_replayed() -> None:
     assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
     assert outcome.typed_blocked is not None
     assert outcome.typed_blocked.blockers[0].code == (Task162FailureCode.TASK038_NOT_COMPLETE.value)
+
+
+def test_task038_full_success_verifier_cannot_be_bypassed() -> None:
+    raw = _raw()
+    tampered = _rehashed_task038(
+        raw["task038_result"],
+        provenance_changes={"overall_u_reference_surface": "INNER_TUBE_SURFACE"},
+        overall_u_reference_surface="INNER_TUBE_SURFACE",
+    )
+    assert task038_success_result_hash(tampered) == tampered.result_hash
+    assert task038_result_id_from_hash(tampered.result_hash) == tampered.result_id
+    assert verify_task038_provenance(tampered.provenance)
+    assert not verify_task038_success_identity(tampered)
+    outcome = validate_request(_with_task038(raw, tampered))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (
+        Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED.value
+    )
 
 
 def test_task161_to_task160_and_binding_identity_mismatch_blocks() -> None:

@@ -29,6 +29,9 @@ from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.models 
 from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.provenance import (
     verify_provenance as verify_task038_provenance,
 )
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.validation import (
+    verify_task038_success_identity,
+)
 from hexagent.exchangers.shell_tube.thermal_stream_state.canonical import (
     result_id as task160_result_id,
 )
@@ -301,6 +304,7 @@ def _replay_task161(value: Task161Result) -> Task162FailureCode | None:
 
 def _replay_task038(value: Task038SuccessResult) -> Task162FailureCode | None:
     try:
+        producer_success_identity = verify_task038_success_identity(value)
         expected_hash = task038_success_result_hash(value)
         expected_id = task038_result_id_from_hash(expected_hash)
         if value.result_hash != expected_hash or value.result_id != expected_id:
@@ -313,6 +317,8 @@ def _replay_task038(value: Task038SuccessResult) -> Task162FailureCode | None:
             return Task162FailureCode.TASK038_NOT_APPLICABLE
         if any(row.status != "PASS" for row in value.completeness_ledger):
             return Task162FailureCode.TASK038_NOT_COMPLETE
+        if not producer_success_identity:
+            return Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED
     except BaseException:
         return Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED
     return None
