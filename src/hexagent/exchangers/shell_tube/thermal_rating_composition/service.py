@@ -6,7 +6,7 @@ it never replays or recalculates TASK162 engineering semantics locally.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import cast
 
 from hexagent.domain.provenance import ProvenanceGraph
@@ -113,6 +113,12 @@ TASK163_COMPLETENESS_FIELDS: tuple[Task163CompletenessField, ...] = tuple(Task16
 TASK163_DEFERRED_CAPABILITIES: tuple[Task163DeferredCapability, ...] = tuple(
     Task163DeferredCapability
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _ResultBuildOutcome:
+    result: Task163Result | None
+    failure: Task163Blocker | None
 
 
 def _metadata(value: object) -> tuple[tuple[str, str], ...]:
@@ -434,21 +440,27 @@ def _result(
     outlet: Task163OutletTemperatureProjection,
     energy: Task162EnergyBalanceEvidence,
     terminal: Task162TerminalClosureEvidence,
-) -> Task163Result | None:
+) -> _ResultBuildOutcome:
     applicability = _applicability()
     completeness = _completeness()
     deferred = _deferred()
-    semantic_inputs = build_provenance_semantic_inputs(
-        task162_evidence=task162_evidence,
-        performance=performance,
-        duty=duty,
-        outlet=outlet,
-        energy=energy,
-        terminal=terminal,
-        deferred=deferred,
-        applicability=applicability,
-        completeness=completeness,
-    )
+    try:
+        semantic_inputs = build_provenance_semantic_inputs(
+            task162_evidence=task162_evidence,
+            performance=performance,
+            duty=duty,
+            outlet=outlet,
+            energy=energy,
+            terminal=terminal,
+            deferred=deferred,
+            applicability=applicability,
+            completeness=completeness,
+        )
+    except BaseException:
+        return _ResultBuildOutcome(
+            result=None,
+            failure=blocker(Task163FailureCode.PROVENANCE_INVALID, Task163FailureStage.PROVENANCE),
+        )
     preimage = Task163PreResultIdentityInputs(
         schema_version=TASK163_SCHEMA_VERSION,
         task163_version=TASK163_VERSION,
@@ -468,8 +480,17 @@ def _result(
         blockers_normalized=(),
         provenance_semantic_inputs=semantic_inputs,
     )
-    result_hash_value = success_hash_from_inputs(preimage)
-    result_id_value = result_id(result_hash_value)
+    try:
+        result_hash_value = success_hash_from_inputs(preimage)
+        result_id_value = result_id(result_hash_value)
+    except BaseException:
+        return _ResultBuildOutcome(
+            result=None,
+            failure=blocker(
+                Task163FailureCode.IDENTITY_REPLAY_FAILED,
+                Task163FailureStage.IDENTITY,
+            ),
+        )
     provisional = Task163Result(
         schema_version=TASK163_SCHEMA_VERSION,
         task163_version=TASK163_VERSION,
@@ -492,16 +513,54 @@ def _result(
         result_hash=result_hash_value,
         result_id=result_id_value,
     )
-    provenance = build_success_provenance(semantic_inputs=semantic_inputs, result=provisional)
+    try:
+        provenance = build_success_provenance(semantic_inputs=semantic_inputs, result=provisional)
+    except BaseException:
+        return _ResultBuildOutcome(
+            result=None,
+            failure=blocker(Task163FailureCode.PROVENANCE_INVALID, Task163FailureStage.PROVENANCE),
+        )
     result_value = replace(provisional, provenance=provenance)
-    if not verify_provenance(result_value.provenance):
-        return None
-    replay_preimage = replace(preimage)
-    if success_hash_from_inputs(replay_preimage) != result_value.result_hash:
-        return None
-    if result_id(result_value.result_hash) != result_value.result_id:
-        return None
-    return result_value
+    try:
+        if not verify_provenance(result_value.provenance):
+            return _ResultBuildOutcome(
+                result=None,
+                failure=blocker(
+                    Task163FailureCode.PROVENANCE_INVALID,
+                    Task163FailureStage.PROVENANCE,
+                ),
+            )
+    except BaseException:
+        return _ResultBuildOutcome(
+            result=None,
+            failure=blocker(Task163FailureCode.PROVENANCE_INVALID, Task163FailureStage.PROVENANCE),
+        )
+    try:
+        if success_hash_from_inputs(preimage) != result_value.result_hash:
+            return _ResultBuildOutcome(
+                result=None,
+                failure=blocker(
+                    Task163FailureCode.IDENTITY_REPLAY_FAILED,
+                    Task163FailureStage.IDENTITY,
+                ),
+            )
+        if result_id(result_value.result_hash) != result_value.result_id:
+            return _ResultBuildOutcome(
+                result=None,
+                failure=blocker(
+                    Task163FailureCode.IDENTITY_REPLAY_FAILED,
+                    Task163FailureStage.IDENTITY,
+                ),
+            )
+    except BaseException:
+        return _ResultBuildOutcome(
+            result=None,
+            failure=blocker(
+                Task163FailureCode.IDENTITY_REPLAY_FAILED,
+                Task163FailureStage.IDENTITY,
+            ),
+        )
+    return _ResultBuildOutcome(result=result_value, failure=None)
 
 
 def validate_request(raw: object) -> Task163ValidationResult:
@@ -522,8 +581,13 @@ def validate_request(raw: object) -> Task163ValidationResult:
     except BaseException:
         return _typed_blocked(
             projection_hash,
-            (blocker(Task163FailureCode.IDENTITY_REPLAY_FAILED, Task163FailureStage.IDENTITY),),
-            stage=Task163FailureStage.IDENTITY,
+            (
+                blocker(
+                    Task163FailureCode.INVALID_TASK162_RESULT,
+                    Task163FailureStage.TYPED_VALIDATION,
+                ),
+            ),
+            stage=Task163FailureStage.TYPED_VALIDATION,
             task162_identity=request.task162_result,
         )
 
@@ -615,7 +679,7 @@ def validate_request(raw: object) -> Task163ValidationResult:
             task162_identity=request.task162_result,
         )
 
-    result_value = _result(
+    result_outcome = _result(
         request,
         request_hash_value,
         task162_evidence,
@@ -625,14 +689,18 @@ def validate_request(raw: object) -> Task163ValidationResult:
         energy,
         terminal,
     )
-    if result_value is None:
+    if result_outcome.failure is not None:
         return _typed_blocked(
             request_hash_value,
-            (blocker(Task163FailureCode.PROVENANCE_INVALID, Task163FailureStage.PROVENANCE),),
-            stage=Task163FailureStage.PROVENANCE,
+            (result_outcome.failure,),
+            stage=result_outcome.failure.stage,
             task162_identity=request.task162_result,
         )
-    return Task163ValidationResult(status=Task163ValidationStatus.VALID, valid=result_value)
+    assert result_outcome.result is not None
+    return Task163ValidationResult(
+        status=Task163ValidationStatus.VALID,
+        valid=result_outcome.result,
+    )
 
 
 __all__ = ["validate_request"]

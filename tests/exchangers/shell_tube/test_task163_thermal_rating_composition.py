@@ -52,14 +52,26 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
     Task163ApplicabilityStatus,
     Task163CheckStatus,
     Task163FailureCode,
+    Task163FailureStage,
     Task163RawProjectionKind,
     Task163ValidationStatus,
 )
+from hexagent.exchangers.shell_tube.thermal_rating_composition.provenance import (
+    SOURCE_AUTHORITY_DOMAIN,
+    source_authority_payload_hash,
+)
 from hexagent.exchangers.shell_tube.thermal_rating_composition.raw_projection import (
     project_raw_request,
+    project_raw_request_with_diagnostics,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
+    KIND_ENUM,
+    KIND_INT,
+    KIND_RECORD,
+    KIND_STRING,
+    KIND_TUPLE,
     frame_record,
+    frame_tuple,
     frame_value,
     sha256_hex_from_framed_bytes,
 )
@@ -187,6 +199,20 @@ def test_task163_typed_same_stage_invalid_inputs_accumulate() -> None:
     assert Task163FailureCode.INVALID_REQUEST_SCHEMA in codes
 
 
+def test_task163_top_level_non_dict_uses_invalid_request_type() -> None:
+    outcome = validate_request("not-a-mapping")
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert outcome.raw_boundary_blocked is not None
+    assert outcome.raw_boundary_blocked.failure_stage.value == "RAW_BOUNDARY"
+    assert _blocked_codes(outcome) == (Task163FailureCode.INVALID_REQUEST_TYPE,)
+
+
+def test_task163_missing_request_fields_are_raw_boundary_failures() -> None:
+    outcome = validate_request({})
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert Task163FailureCode.INVALID_REQUEST_SCHEMA in _blocked_codes(outcome)
+
+
 def test_task163_request_hash_exists_before_typed_block() -> None:
     outcome = validate_request(
         {
@@ -200,6 +226,24 @@ def test_task163_request_hash_exists_before_typed_block() -> None:
     )
     assert outcome.typed_blocked is not None
     assert len(outcome.typed_blocked.request_hash) == 64
+
+
+def test_task163_typed_request_identity_failure_uses_raw_hash_fallback(
+    success_context, monkeypatch
+) -> None:
+    raw, _, _ = success_context
+    expected_hash = raw_request_projection_hash(project_raw_request(raw))
+
+    def fail_request_hash(_request):
+        raise RuntimeError("canonical request identity failure")
+
+    monkeypatch.setattr(task163_service, "request_hash", fail_request_hash)
+    outcome = validate_request(raw)
+    assert outcome.status is Task163ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage.value == "TYPED_VALIDATION"
+    assert outcome.typed_blocked.request_hash == expected_hash
+    assert Task163FailureCode.IDENTITY_REPLAY_FAILED not in _blocked_codes(outcome)
 
 
 def test_task163_raw_task162_result_identity_projection(success_context) -> None:
@@ -308,6 +352,34 @@ def test_task163_raw_node_limit() -> None:
     )
     assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
     assert Task163FailureCode.RAW_NODE_LIMIT_EXCEEDED in _blocked_codes(outcome)
+
+
+def test_task163_raw_string_nodes_consume_node_budget() -> None:
+    outcome = project_raw_request_with_diagnostics(
+        {"items": tuple("x" for _ in range(TASK163_RAW_MAX_NODES + 32))}
+    )
+    assert Task163FailureCode.RAW_NODE_LIMIT_EXCEEDED in outcome.reasons
+
+
+def test_task163_raw_kind_inventory_is_closed() -> None:
+    assert tuple(item.value for item in Task163RawProjectionKind) == (
+        "NONE",
+        "STRING",
+        "INTEGER",
+        "DECIMAL",
+        "BOOLEAN",
+        "ENUM_LITERAL",
+        "TASK162_RESULT_IDENTITY",
+        "TASK162_REPLAY_EVIDENCE_IDENTITY",
+        "TASK160_RESULT_IDENTITY",
+        "TASK161_RESULT_IDENTITY",
+        "TASK038_RESULT_IDENTITY",
+        "CASE_AUTHORITY_IDENTITY",
+        "SEQUENCE",
+        "RECORD",
+        "UNSUPPORTED_OBJECT",
+        "LIMIT_MARKER",
+    )
 
 
 def test_task163_raw_scalar_limit() -> None:
@@ -444,7 +516,16 @@ def test_task163_uuid_identity_is_lowercase_ascii(success_context) -> None:
 
 
 def test_task163_typed_blocked_identity_namespace_and_prefix() -> None:
-    outcome = validate_request({})
+    outcome = validate_request(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": (),
+        }
+    )
     assert outcome.typed_blocked is not None
     assert TASK163_TYPED_BLOCKED_ID_PREFIX.startswith("task163-")
     assert UUID("a1630000-0000-5000-8000-000000000163") != TASK163_BLOCKED_ID_NAMESPACE
@@ -694,7 +775,16 @@ def test_task163_success_branch_populates_only_valid(success_context) -> None:
 
 
 def test_task163_blocked_branch_populates_only_typed() -> None:
-    result = validate_request({})
+    result = validate_request(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": (),
+        }
+    )
     assert (
         result.typed_blocked is not None
         and result.valid is None
@@ -736,7 +826,16 @@ def test_task163_no_test_double_enters_production_path(success_context) -> None:
 
 
 def test_task163_result_identity_uses_blocked_namespace_only_for_blocked() -> None:
-    outcome = validate_request({})
+    outcome = validate_request(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": (),
+        }
+    )
     assert outcome.typed_blocked is not None
     assert outcome.typed_blocked.blocked_result_id != UUID("00000000-0000-0000-0000-000000000000")
 
@@ -938,7 +1037,7 @@ def test_task163_raw_binding_identity_projection(success_context) -> None:
     binding = success_context[1].cross_producer_binding_evidence
     projection = project_raw_request({"binding": binding})
     node = projection.root.children[0]
-    assert node.kind is Task163RawProjectionKind.CROSS_PRODUCER_BINDING_IDENTITY
+    assert node.kind is Task163RawProjectionKind.RECORD
     assert len(node.children) == 11
 
 
@@ -960,3 +1059,78 @@ def test_task163_raw_case_authority_permutation_is_identity_invariant(success_co
     first = raw_request_projection_hash(project_raw_request({"case": case}))
     second = raw_request_projection_hash(project_raw_request({"case": reversed_case}))
     assert first == second
+
+
+def test_task163_record_tuple_items_use_actual_record_kind_framing(success_context) -> None:
+    applicability = _valid(success_context).applicability
+    expected_checks = tuple(
+        frame_value(
+            KIND_RECORD,
+            frame_record(
+                "TASK163_APPLICABILITY_CHECK_V1",
+                (
+                    ("name", KIND_ENUM, name.value.encode("utf-8")),
+                    ("status", KIND_ENUM, status.value.encode("utf-8")),
+                ),
+            ),
+        )
+        for name, status in applicability.checks
+    )
+    expected = frame_record(
+        "TASK163_APPLICABILITY_V1",
+        (
+            ("status", KIND_ENUM, applicability.status.value.encode("utf-8")),
+            ("checks", KIND_TUPLE, frame_tuple(expected_checks)),
+        ),
+    )
+    assert task163_canonical._applicability_bytes(applicability) == expected
+
+
+def test_task163_provenance_source_payload_uses_frozen_domain_and_field() -> None:
+    expected = sha256_hex_from_framed_bytes(
+        frame_record(
+            "TASK163_PROVENANCE_SOURCE_AUTHORITY_PAYLOAD_V1",
+            (
+                ("source_definition_id", KIND_STRING, TASK163_SOURCE_ID.encode("utf-8")),
+                ("source_authority_issue", KIND_INT, b"234"),
+                ("source_definition_revision", KIND_ENUM, b"R6"),
+                ("source_definition_status", KIND_ENUM, b"FROZEN"),
+                ("work_package_id", KIND_STRING, b"V05-SHT-04"),
+                (
+                    "work_package_name",
+                    KIND_STRING,
+                    b"Thermal Rating Composition, Applicability and Completeness",
+                ),
+            ),
+        )
+    )
+    assert SOURCE_AUTHORITY_DOMAIN == "TASK163_PROVENANCE_SOURCE_AUTHORITY_PAYLOAD_V1"
+    assert source_authority_payload_hash() == expected
+
+
+def test_task163_provenance_failure_routes_to_provenance_stage(
+    success_context, monkeypatch
+) -> None:
+    monkeypatch.setattr(task163_service, "verify_provenance", lambda _value: False)
+    outcome = validate_request(success_context[0])
+    assert outcome.status is Task163ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage is Task163FailureStage.PROVENANCE
+    assert _blocked_codes(outcome) == (Task163FailureCode.PROVENANCE_INVALID,)
+
+
+def test_task163_identity_failure_routes_to_identity_stage(success_context, monkeypatch) -> None:
+    original = task163_service.success_hash_from_inputs
+    calls = 0
+
+    def drift(preimage):
+        nonlocal calls
+        calls += 1
+        return original(preimage) if calls == 1 else "f" * 64
+
+    monkeypatch.setattr(task163_service, "success_hash_from_inputs", drift)
+    outcome = validate_request(success_context[0])
+    assert outcome.status is Task163ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage is Task163FailureStage.IDENTITY
+    assert _blocked_codes(outcome) == (Task163FailureCode.IDENTITY_REPLAY_FAILED,)

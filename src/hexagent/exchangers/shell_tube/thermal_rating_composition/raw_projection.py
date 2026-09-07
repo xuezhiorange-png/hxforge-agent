@@ -52,6 +52,9 @@ from .models import (
     TASK163_RAW_MAX_NODES,
     TASK163_RAW_PROJECTION_SCHEMA_VERSION,
     TASK163_RAW_TEXT_BYTE_COUNT_LIMIT_PLUS_ONE,
+    TASK163_SCHEMA_VERSION,
+    TASK163_SOURCE_DEFINITION_ID,
+    TASK163_VERSION,
     Task163FailureCode,
     Task163FailureStage,
     Task163RawProjectionKind,
@@ -163,19 +166,7 @@ class _Walker:
             return 1, tuple(ord(character) for character in value)
 
     def _text(self, field_name: str, value: str) -> Task163RawProjectionNode:
-        field_failure = self._text_failure(field_name)
-        if field_failure is not None:
-            return self._marker(field_failure)
-        failure = self._text_failure(value)
-        if failure is not None:
-            return self._marker(failure)
-        return Task163RawProjectionNode(
-            field_name=field_name,
-            kind=Task163RawProjectionKind.STRING,
-            type_identity=None,
-            scalar_payload=value,
-            children=(),
-        )
+        return self._normal(field_name, Task163RawProjectionKind.STRING, scalar=value)
 
     def _normal(
         self,
@@ -439,7 +430,7 @@ class _Walker:
         )
         return self._normal(
             field_name,
-            Task163RawProjectionKind.CROSS_PRODUCER_BINDING_IDENTITY,
+            Task163RawProjectionKind.RECORD,
             children=tuple(children),
         )
 
@@ -528,10 +519,71 @@ class _Walker:
         children: list[Task163RawProjectionNode] = []
         for key, item in value.items():
             if type(key) is not str:
-                children.append(self._marker(Task163FailureCode.UNSUPPORTED_RAW_VALUE))
+                if depth == 0:
+                    self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+                    children.append(
+                        self._normal(
+                            "__TASK163_INVALID_FIELD__",
+                            Task163RawProjectionKind.UNSUPPORTED_OBJECT,
+                        )
+                    )
+                else:
+                    children.append(self._marker(Task163FailureCode.UNSUPPORTED_RAW_VALUE))
             else:
                 children.append(self._project(key, item, depth + 1))
         return self._normal(field_name, Task163RawProjectionKind.RECORD, children=tuple(children))
+
+    def _validate_root_schema(self, value: dict[object, object]) -> None:
+        expected = (
+            "request_metadata",
+            "schema_version",
+            "source_definition_id",
+            "task162_result",
+            "task162_success_replay_evidence",
+            "task163_version",
+        )
+        keys = tuple(value.keys())
+        if any(type(key) is not str for key in keys) or tuple(sorted(keys)) != expected:
+            self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+
+        schema = value.get("schema_version")
+        if type(schema) is not str or schema != TASK163_SCHEMA_VERSION:
+            self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+
+        version = value.get("task163_version")
+        if type(version) is not str:
+            self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+        elif version != TASK163_VERSION:
+            self._reason(Task163FailureCode.UNSUPPORTED_TASK163_VERSION)
+
+        source_definition_id = value.get("source_definition_id")
+        if type(source_definition_id) is not str:
+            self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+        elif source_definition_id != TASK163_SOURCE_DEFINITION_ID:
+            self._reason(Task163FailureCode.SOURCE_DEFINITION_ID_MISMATCH)
+
+    def _invalid_top_level(self, value: object) -> Task163RawProjectionNode:
+        type_identity: str | None = None
+        try:
+            python_type = type(value)
+            module = type.__getattribute__(python_type, "__module__")
+            qualname = type.__getattribute__(python_type, "__qualname__")
+            if type(module) is str and type(qualname) is str:
+                candidate = module + "." + qualname
+                if self._text_failure(candidate) is None:
+                    type_identity = candidate
+        except BaseException:
+            type_identity = None
+        if self.nodes >= TASK163_RAW_MAX_NODES:
+            return self._marker(Task163FailureCode.RAW_NODE_LIMIT_EXCEEDED)
+        self.nodes += 1
+        return Task163RawProjectionNode(
+            field_name="root",
+            kind=Task163RawProjectionKind.UNSUPPORTED_OBJECT,
+            type_identity=type_identity,
+            scalar_payload=None,
+            children=(),
+        )
 
     def _unsupported(self, field_name: str, value: object) -> Task163RawProjectionNode:
         self._reason(Task163FailureCode.UNSUPPORTED_RAW_VALUE)
@@ -592,8 +644,10 @@ class _Walker:
 
     def project(self, raw: object) -> RawProjectionOutcome:
         if type(raw) is not dict:
-            root = self._unsupported("root", raw)
+            self._reason(Task163FailureCode.INVALID_REQUEST_TYPE)
+            root = self._invalid_top_level(raw)
         else:
+            self._validate_root_schema(raw)
             root = self._mapping("root", raw, 0)
         return RawProjectionOutcome(
             projection=Task163RawRequestProjection(

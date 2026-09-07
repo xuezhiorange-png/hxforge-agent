@@ -149,7 +149,7 @@ def _strings(values: Iterable[str]) -> bytes:
 
 
 def _records(values: Iterable[bytes]) -> bytes:
-    return frame_tuple(tuple(values))
+    return frame_tuple(tuple(frame_value(KIND_RECORD, value) for value in values))
 
 
 def _pairs(values: Iterable[tuple[str, str]]) -> bytes:
