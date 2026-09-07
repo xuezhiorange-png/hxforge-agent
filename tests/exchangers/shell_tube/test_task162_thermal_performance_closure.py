@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import fields, replace
 from decimal import Decimal, getcontext, localcontext
+from uuid import uuid4
 
 import pytest
 
@@ -30,9 +31,11 @@ from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.validat
 )
 from hexagent.exchangers.shell_tube.thermal_performance_closure import (
     TASK162_DECIMAL_CONTEXT,
+    TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION,
     Task162AmbientHeatLossAssumption,
     Task162AxialHeatTransferAssumption,
     Task162BindingStatus,
+    Task162Blocker,
     Task162BypassAssumption,
     Task162CaseAuthority,
     Task162CompatibilityDimension,
@@ -40,21 +43,31 @@ from hexagent.exchangers.shell_tube.thermal_performance_closure import (
     Task162CompatibilityStatus,
     Task162CrossProducerBindingAuthority,
     Task162FailureCode,
+    Task162FailureStage,
     Task162FlowOrientation,
     Task162HeatTransferCoefficientAssumption,
     Task162InternalSourceSinkAssumption,
     Task162LeakageAssumption,
     Task162RawProjectionKind,
+    Task162Request,
+    Task162Result,
     Task162ShellSideMixingModel,
     Task162ShellType,
+    Task162SuccessReplayEvidence,
+    Task162SuccessVerificationFailureReason,
+    Task162SuccessVerificationResult,
+    Task162SuccessVerificationStatus,
     Task162TubeSideMixing,
+    Task162ValidationResult,
     Task162ValidationStatus,
     Task162WallPropertyAssumption,
     interval_divide,
+    issue_success_replay_evidence,
     project_raw_request,
     raw_request_projection_hash,
     table7_relation,
     validate_request,
+    verify_task162_success,
 )
 from hexagent.exchangers.shell_tube.thermal_stream_state.service import (
     validate_request as validate_task160,
@@ -70,6 +83,14 @@ from .thermal_stream_state.test_ingress_models import make_r607_raw
 
 TASK161_SOURCE_ID = "TASK161-SOURCE-DEFINITION-R8-ISSUE-225"
 TASK162_SOURCE_ID = "TASK162-SOURCE-DEFINITION-R1-ISSUE-229"
+
+
+class _HostileEquality:
+    def __eq__(self, other: object) -> bool:
+        raise RuntimeError("hostile equality")
+
+    def __ne__(self, other: object) -> bool:
+        raise RuntimeError("hostile inequality")
 
 
 def _task160() -> object:
@@ -200,6 +221,47 @@ def _raw(case: object | None = None, binding: object | None = None) -> dict[str,
         "case_authority": case or _case(),
         "request_metadata": [],
     }
+
+
+def _task162_request(raw: dict[str, object]) -> Task162Request:
+    return Task162Request(
+        schema_version=raw["schema_version"],
+        task162_version=raw["task162_version"],
+        source_definition_id=raw["source_definition_id"],
+        task160_result=raw["task160_result"],
+        task161_result=raw["task161_result"],
+        task038_result=raw["task038_result"],
+        cross_producer_binding_authority=raw["cross_producer_binding_authority"],  # type: ignore[arg-type]
+        case_authority=raw["case_authority"],  # type: ignore[arg-type]
+        request_metadata=tuple(tuple(item) for item in raw["request_metadata"]),  # type: ignore[arg-type]
+    )
+
+
+def _success_context(
+    metadata: tuple[tuple[str, str], ...] = (),
+) -> tuple[Task162Request, Task162Result, Task162SuccessReplayEvidence]:
+    raw = _raw()
+    raw["request_metadata"] = list(metadata)
+    outcome = validate_request(raw)
+    assert outcome.status is Task162ValidationStatus.VALID
+    assert outcome.valid is not None
+    request = _task162_request(raw)
+    evidence = issue_success_replay_evidence(request, outcome.valid)
+    assert evidence is not None
+    return request, outcome.valid, evidence
+
+
+def _blocked_outcome_with_code(code: str) -> Task162ValidationResult:
+    seed = validate_request(_raw(case=_case(0)))
+    assert seed.typed_blocked is not None
+    blocked = replace(
+        seed.typed_blocked,
+        blockers=(Task162Blocker(code=code, stage=Task162FailureStage.TYPED_VALIDATION),),
+    )
+    return Task162ValidationResult(
+        status=Task162ValidationStatus.TYPED_BLOCKED,
+        typed_blocked=blocked,
+    )
 
 
 def _rehashed_task038(
@@ -604,3 +666,412 @@ def test_blocked_results_have_no_provenance() -> None:
     assert typed.status is Task162ValidationStatus.TYPED_BLOCKED
     assert typed.typed_blocked is not None
     assert not hasattr(typed.typed_blocked, "provenance")
+
+
+def test_success_replay_evidence_model_has_exact_twelve_fields() -> None:
+    names = tuple(field.name for field in fields(Task162SuccessReplayEvidence))
+    assert names == (
+        "evidence_schema_version",
+        "task162_schema_version",
+        "task162_version",
+        "task162_implementation_software_version",
+        "task162_source_definition_id",
+        "task162_result_hash",
+        "task162_result_id",
+        "original_task160_result",
+        "original_task161_result",
+        "original_task038_success_result",
+        "original_case_authority",
+        "request_metadata",
+    )
+
+
+def test_success_verification_result_invariants() -> None:
+    accepted = Task162SuccessVerificationResult(
+        Task162SuccessVerificationStatus.ACCEPTED,
+        None,
+    )
+    assert accepted.status is Task162SuccessVerificationStatus.ACCEPTED
+    with pytest.raises(ValueError):
+        Task162SuccessVerificationResult("ACCEPTED", None)  # type: ignore[arg-type]
+    with pytest.raises(ValueError):
+        Task162SuccessVerificationResult(
+            Task162SuccessVerificationStatus.ACCEPTED,
+            Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED,
+        )
+    with pytest.raises(ValueError):
+        Task162SuccessVerificationResult(Task162SuccessVerificationStatus.REJECTED, None)
+    with pytest.raises(ValueError):
+        Task162SuccessVerificationResult(
+            Task162SuccessVerificationStatus.REJECTED,
+            "TASK162_IDENTITY_REPLAY_FAILED",  # type: ignore[arg-type]
+        )
+
+
+def test_issue_success_replay_evidence_from_valid_context() -> None:
+    request, result, evidence = _success_context()
+    assert type(request) is Task162Request
+    assert evidence.task162_result_hash == result.result_hash
+    assert evidence.task162_result_id == result.result_id
+
+
+def test_issue_success_replay_evidence_rejects_nonreproducible_context() -> None:
+    request, result, _ = _success_context()
+    assert issue_success_replay_evidence(request, replace(result, result_hash="0" * 64)) is None
+
+
+def test_issue_success_replay_evidence_stores_canonical_metadata() -> None:
+    _, _, evidence = _success_context((("z", "2"), ("a", "1")))
+    assert evidence.request_metadata == (("a", "1"), ("z", "2"))
+    assert evidence.evidence_schema_version == TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION
+
+
+def test_verify_task162_success_accepts_exact_producer_success() -> None:
+    _, result, evidence = _success_context()
+    verification = verify_task162_success(result, evidence)
+    assert verification == Task162SuccessVerificationResult(
+        Task162SuccessVerificationStatus.ACCEPTED,
+        None,
+    )
+
+
+def test_verify_task162_success_rejects_unsupported_evidence_schema() -> None:
+    _, result, evidence = _success_context()
+    verification = verify_task162_success(
+        result,
+        replace(evidence, evidence_schema_version="task162.success-replay-evidence.v0"),
+    )
+    assert verification.failure_reason_or_none is (
+        Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+
+
+def test_verify_task162_success_requires_exact_top_level_types() -> None:
+    _, result, evidence = _success_context()
+    assert (
+        verify_task162_success(object(), evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+    assert (
+        verify_task162_success(result, object()).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_subclasses() -> None:
+    _, result, evidence = _success_context()
+
+    class ResultSubclass(Task162Result):
+        pass
+
+    class EvidenceSubclass(Task162SuccessReplayEvidence):
+        pass
+
+    subclass_result = ResultSubclass(
+        *(getattr(result, field.name) for field in fields(Task162Result))
+    )
+    subclass_evidence = EvidenceSubclass(
+        *(getattr(evidence, field.name) for field in fields(Task162SuccessReplayEvidence))
+    )
+    assert (
+        verify_task162_success(subclass_result, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+    assert (
+        verify_task162_success(result, subclass_evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_invalid_nested_evidence_types() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(evidence, original_task160_result=object())  # type: ignore[arg-type]
+    assert (
+        verify_task162_success(result, malformed).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_producer_constant_mismatch() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(result, schema_version="task162.schema.other")
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_result_header_mismatch() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(evidence, task162_result_hash="f" * 64)
+    assert (
+        verify_task162_success(result, malformed).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_nonempty_warnings_or_blockers() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(result, warnings=(object(),))  # type: ignore[arg-type]
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_step5_hostile_equality_maps_identity_replay_failed() -> None:
+    _, result, evidence = _success_context()
+    hostile = replace(result, schema_version=_HostileEquality())  # type: ignore[arg-type]
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_requires_exact_applicability() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(result, applicability=replace(result.applicability, status="BROKEN"))
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+    )
+
+
+def test_verify_task162_success_step8_hostile_equality_maps_not_applicable() -> None:
+    _, result, evidence = _success_context()
+    hostile_applicability = replace(result.applicability, status=_HostileEquality())  # type: ignore[arg-type]
+    hostile = replace(result, applicability=hostile_applicability)
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+    )
+
+
+def test_verify_task162_success_requires_exact_completeness() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(result, completeness=replace(result.completeness, required_fields=()))
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    )
+
+
+def test_verify_task162_success_step9_hostile_equality_maps_not_complete() -> None:
+    _, result, evidence = _success_context()
+    hostile_fields = (_HostileEquality(), *result.completeness.required_fields[1:])
+    hostile_completeness = replace(result.completeness, required_fields=hostile_fields)  # type: ignore[arg-type]
+    hostile = replace(result, completeness=hostile_completeness)
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none is Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    )
+
+
+def test_verify_task162_success_replays_result_hash_and_uuid() -> None:
+    _, result, evidence = _success_context()
+    assert (
+        verify_task162_success(replace(result, ntu=Decimal("0")), evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+    assert (
+        verify_task162_success(replace(result, result_id=uuid4()), evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_invalid_provenance() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(
+        result,
+        provenance=replace(result.provenance, provenance_hash="0" * 64),
+    )
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+    )
+
+
+def test_verify_task162_success_requires_exact_upstream_identity_joins() -> None:
+    _, result, evidence = _success_context()
+    tampered = (
+        replace(
+            evidence,
+            original_task160_result=replace(evidence.original_task160_result, result_hash="0" * 64),
+        ),
+        replace(
+            evidence,
+            original_task161_result=replace(evidence.original_task161_result, result_hash="0" * 64),
+        ),
+        replace(
+            evidence,
+            original_task038_success_result=replace(
+                evidence.original_task038_success_result, result_hash="0" * 64
+            ),
+        ),
+    )
+    for candidate in tampered:
+        assert (
+            verify_task162_success(result, candidate).failure_reason_or_none
+            is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+        )
+
+
+def test_verify_task162_success_rejects_cross_producer_binding_identity_mismatch() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(
+        result,
+        cross_producer_binding_evidence=replace(
+            result.cross_producer_binding_evidence,
+            task160_result_hash="0" * 64,
+        ),
+    )
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_rejects_physical_case_mismatch() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(
+        result,
+        cross_producer_binding_evidence=replace(
+            result.cross_producer_binding_evidence,
+            physical_exchanger_case_id="other-case",
+        ),
+    )
+    assert (
+        verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_replays_original_request_hash() -> None:
+    _, result, evidence = _success_context()
+    malformed = replace(evidence, request_metadata=(("changed", "value"),))
+    assert (
+        verify_task162_success(result, malformed).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
+def test_verify_task162_success_collapses_internal_replay_failures_to_five_reasons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, result, evidence = _success_context()
+    cases = (
+        (
+            Task162FailureCode.INTERNAL_INVARIANT_VIOLATION.value,
+            Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED,
+        ),
+        (
+            Task162FailureCode.TASK160_NOT_APPLICABLE.value,
+            Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE,
+        ),
+        (
+            Task162FailureCode.TASK160_NOT_COMPLETE.value,
+            Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE,
+        ),
+        (
+            Task162FailureCode.PROVENANCE_INVALID.value,
+            Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID,
+        ),
+        (
+            Task162FailureCode.IDENTITY_REPLAY_FAILED.value,
+            Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED,
+        ),
+    )
+    for code, expected in cases:
+        monkeypatch.setattr(
+            "hexagent.exchangers.shell_tube.thermal_performance_closure.service.validate_request",
+            lambda _raw, code=code: _blocked_outcome_with_code(code),
+        )
+        verification = verify_task162_success(result, evidence)
+        assert verification.failure_reason_or_none is expected
+
+
+def test_verify_task162_success_first_classifiable_failure_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, result, evidence = _success_context()
+    base = _blocked_outcome_with_code(Task162FailureCode.TASK160_NOT_COMPLETE.value)
+    assert base.typed_blocked is not None
+    mixed = replace(
+        base,
+        typed_blocked=replace(
+            base.typed_blocked,
+            blockers=(
+                Task162Blocker(
+                    code=Task162FailureCode.TASK160_NOT_COMPLETE.value,
+                    stage=Task162FailureStage.TYPED_VALIDATION,
+                ),
+                Task162Blocker(
+                    code=Task162FailureCode.PROVENANCE_INVALID.value,
+                    stage=Task162FailureStage.PROVENANCE,
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "hexagent.exchangers.shell_tube.thermal_performance_closure.service.validate_request",
+        lambda _raw: mixed,
+    )
+    assert (
+        verify_task162_success(result, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    )
+
+
+def test_verify_task162_success_final_result_mismatch_priority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, result, evidence = _success_context()
+    replacement = replace(
+        result,
+        provenance=replace(result.provenance, provenance_hash="different"),
+        applicability=replace(result.applicability, status="BROKEN"),
+        completeness=replace(result.completeness, required_fields=()),
+    )
+    replayed = Task162ValidationResult(status=Task162ValidationStatus.VALID, valid=replacement)
+    monkeypatch.setattr(
+        "hexagent.exchangers.shell_tube.thermal_performance_closure.service.validate_request",
+        lambda _raw: replayed,
+    )
+    assert (
+        verify_task162_success(result, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+    )
+
+
+def test_verify_task162_success_is_total_and_deterministic() -> None:
+    _, result, evidence = _success_context()
+    first = verify_task162_success(object(), evidence)
+    second = verify_task162_success(object(), evidence)
+    assert first == second
+    assert (
+        verify_task162_success(result, object()).status is Task162SuccessVerificationStatus.REJECTED
+    )
+    assert (
+        verify_task162_success(result, evidence).status is Task162SuccessVerificationStatus.ACCEPTED
+    )
+
+
+def test_success_replay_extension_does_not_change_existing_task162_identity() -> None:
+    _, result, evidence = _success_context()
+    before = (result.result_hash, result.result_id, result.provenance.provenance_hash)
+    assert (
+        verify_task162_success(result, evidence).status is Task162SuccessVerificationStatus.ACCEPTED
+    )
+    after = (result.result_hash, result.result_id, result.provenance.provenance_hash)
+    assert after == before

@@ -81,6 +81,7 @@ from .models import (
     TASK162_RAW_BOUNDARY_SCHEMA_VERSION,
     TASK162_SCHEMA_VERSION,
     TASK162_SOURCE_DEFINITION_ID,
+    TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION,
     TASK162_TYPED_BLOCKED_SCHEMA_VERSION,
     TASK162_VERSION,
     Task162AmbientHeatLossAssumption,
@@ -104,6 +105,7 @@ from .models import (
     Task162LeakageAssumption,
     Task162NormalizedCaseBinding,
     Task162NumericalFoundation,
+    Task162Provenance,
     Task162ProvenanceSemanticInputs,
     Task162RawBoundaryBlockedResult,
     Task162RawRequestProjection,
@@ -112,6 +114,10 @@ from .models import (
     Task162SelectedMethodIdentity,
     Task162ShellSideMixingModel,
     Task162ShellType,
+    Task162SuccessReplayEvidence,
+    Task162SuccessVerificationFailureReason,
+    Task162SuccessVerificationResult,
+    Task162SuccessVerificationStatus,
     Task162TerminalClosureEvidence,
     Task162TubeSideMixing,
     Task162TypedBlockedResult,
@@ -1237,4 +1243,489 @@ def validate_request(raw: object) -> Task162ValidationResult:
     )
 
 
-__all__ = ["validate_request"]
+def _raw_request_from_context(
+    *,
+    schema_version: str,
+    task162_version: str,
+    source_definition_id: str,
+    task160_result: Task160Result,
+    task161_result: Task161Result,
+    task038_result: Task038SuccessResult,
+    binding: Task162CrossProducerBindingAuthority,
+    case_authority: Task162CaseAuthority,
+    request_metadata: tuple[tuple[str, str], ...],
+) -> dict[str, object]:
+    return {
+        "schema_version": schema_version,
+        "task162_version": task162_version,
+        "source_definition_id": source_definition_id,
+        "task160_result": task160_result,
+        "task161_result": task161_result,
+        "task038_result": task038_result,
+        "cross_producer_binding_authority": binding,
+        "case_authority": case_authority,
+        "request_metadata": request_metadata,
+    }
+
+
+def _success_verification_rejected(
+    reason: Task162SuccessVerificationFailureReason,
+) -> Task162SuccessVerificationResult:
+    return Task162SuccessVerificationResult(
+        status=Task162SuccessVerificationStatus.REJECTED,
+        failure_reason_or_none=reason,
+    )
+
+
+def _success_verification_accepted() -> Task162SuccessVerificationResult:
+    return Task162SuccessVerificationResult(
+        status=Task162SuccessVerificationStatus.ACCEPTED,
+        failure_reason_or_none=None,
+    )
+
+
+def _replay_failure_reason(
+    outcome: Task162ValidationResult,
+) -> Task162SuccessVerificationFailureReason:
+    blockers: tuple[Task162Blocker, ...] = ()
+    if outcome.typed_blocked is not None:
+        blockers = outcome.typed_blocked.blockers
+    elif outcome.raw_boundary_blocked is not None:
+        blockers = outcome.raw_boundary_blocked.blockers
+    codes = {item.code for item in blockers}
+    if Task162FailureCode.INTERNAL_INVARIANT_VIOLATION.value in codes:
+        return Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+    if codes & {
+        Task162FailureCode.TASK160_NOT_APPLICABLE.value,
+        Task162FailureCode.TASK161_NOT_APPLICABLE.value,
+        Task162FailureCode.TASK038_NOT_APPLICABLE.value,
+    }:
+        return Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+    if codes & {
+        Task162FailureCode.TASK160_NOT_COMPLETE.value,
+        Task162FailureCode.TASK161_NOT_COMPLETE.value,
+        Task162FailureCode.TASK038_NOT_COMPLETE.value,
+    }:
+        return Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    if Task162FailureCode.PROVENANCE_INVALID.value in codes:
+        return Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+    return Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+
+
+def _result_mismatch_reason(
+    claimed: Task162Result,
+    replayed: Task162Result,
+) -> Task162SuccessVerificationFailureReason:
+    try:
+        if replayed.provenance != claimed.provenance:
+            return Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+        if replayed.applicability != claimed.applicability:
+            return Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+        if replayed.completeness != claimed.completeness:
+            return Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    except BaseException:
+        return Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    return Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+
+
+def issue_success_replay_evidence(
+    request: Task162Request,
+    result: Task162Result,
+) -> Task162SuccessReplayEvidence | None:
+    """Issue producer-owned evidence only for a reproducible full success."""
+
+    try:
+        if type(request) is not Task162Request or type(result) is not Task162Result:
+            return None
+        if (
+            type(request.task160_result) is not Task160Result
+            or type(request.task161_result) is not Task161Result
+            or type(request.task038_result) is not Task038SuccessResult
+            or type(request.case_authority) is not Task162CaseAuthority
+        ):
+            return None
+        metadata = _metadata(request.request_metadata)
+        reconstructed_raw = _raw_request_from_context(
+            schema_version=request.schema_version,
+            task162_version=request.task162_version,
+            source_definition_id=request.source_definition_id,
+            task160_result=request.task160_result,
+            task161_result=request.task161_result,
+            task038_result=request.task038_result,
+            binding=request.cross_producer_binding_authority,
+            case_authority=request.case_authority,
+            request_metadata=metadata,
+        )
+        replayed = validate_request(reconstructed_raw)
+        if replayed.status is not Task162ValidationStatus.VALID:
+            return None
+        if replayed.valid is None or replayed.valid != result:
+            return None
+        return Task162SuccessReplayEvidence(
+            evidence_schema_version=TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION,
+            task162_schema_version=result.schema_version,
+            task162_version=result.task162_version,
+            task162_implementation_software_version=result.implementation_software_version,
+            task162_source_definition_id=result.source_definition_id,
+            task162_result_hash=result.result_hash,
+            task162_result_id=result.result_id,
+            original_task160_result=request.task160_result,
+            original_task161_result=request.task161_result,
+            original_task038_success_result=request.task038_result,
+            original_case_authority=request.case_authority,
+            request_metadata=metadata,
+        )
+    except BaseException:
+        return None
+
+
+def verify_task162_success(
+    claimed_task162_result: object,
+    success_replay_evidence: object,
+) -> Task162SuccessVerificationResult:
+    """Verify one Task162 success with its original producer replay context."""
+
+    try:
+        if type(claimed_task162_result) is not Task162Result:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        if type(success_replay_evidence) is not Task162SuccessReplayEvidence:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        claimed = claimed_task162_result
+        evidence = success_replay_evidence
+
+        if evidence.evidence_schema_version != TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+
+        evidence_scalars = (
+            evidence.evidence_schema_version,
+            evidence.task162_schema_version,
+            evidence.task162_version,
+            evidence.task162_implementation_software_version,
+            evidence.task162_source_definition_id,
+            evidence.task162_result_hash,
+        )
+        if any(type(value) is not str for value in evidence_scalars):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        if (
+            type(evidence.task162_result_id) is not UUID
+            or type(evidence.original_task160_result) is not Task160Result
+            or type(evidence.original_task161_result) is not Task161Result
+            or type(evidence.original_task038_success_result) is not Task038SuccessResult
+            or type(evidence.original_case_authority) is not Task162CaseAuthority
+            or type(evidence.request_metadata) is not tuple
+        ):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        if any(type(pair) is not tuple or len(pair) != 2 for pair in evidence.request_metadata):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        if any(type(part) is not str for pair in evidence.request_metadata for part in pair):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        try:
+            if _metadata(evidence.request_metadata) != evidence.request_metadata:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+
+        frozen_header = (
+            TASK162_SCHEMA_VERSION,
+            TASK162_VERSION,
+            TASK162_IMPLEMENTATION_SOFTWARE_VERSION,
+            TASK162_SOURCE_DEFINITION_ID,
+        )
+        try:
+            claimed_header = (
+                claimed.schema_version,
+                claimed.task162_version,
+                claimed.implementation_software_version,
+                claimed.source_definition_id,
+            )
+            if claimed_header != frozen_header:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            evidence_header = (
+                evidence.task162_schema_version,
+                evidence.task162_version,
+                evidence.task162_implementation_software_version,
+                evidence.task162_source_definition_id,
+            )
+            if evidence_header != frozen_header:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+            if (
+                type(claimed.result_hash) is not str
+                or type(claimed.result_id) is not UUID
+                or evidence.task162_result_hash != claimed.result_hash
+                or evidence.task162_result_id != claimed.result_id
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if type(claimed.warnings) is not tuple or type(claimed.blockers) is not tuple:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+            if claimed.warnings != () or claimed.blockers != ():
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if (
+                type(claimed.applicability) is not Task162Applicability
+                or claimed.applicability != _make_applicability()
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+            )
+
+        try:
+            if (
+                type(claimed.completeness) is not Task162Completeness
+                or claimed.completeness != _make_completeness()
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+            )
+
+        pre_request = Task162Request(
+            schema_version=claimed.schema_version,
+            task162_version=claimed.task162_version,
+            source_definition_id=claimed.source_definition_id,
+            task160_result=evidence.original_task160_result,
+            task161_result=evidence.original_task161_result,
+            task038_result=evidence.original_task038_success_result,
+            cross_producer_binding_authority=claimed.cross_producer_binding_evidence,
+            case_authority=evidence.original_case_authority,
+            request_metadata=evidence.request_metadata,
+        )
+        try:
+            pre = _build_pre(
+                request=pre_request,
+                request_hash_value=claimed.request_hash,
+                task160=evidence.original_task160_result,
+                task161=evidence.original_task161_result,
+                task038=evidence.original_task038_success_result,
+                binding=claimed.cross_producer_binding_evidence,
+                normalized_case=claimed.case_binding_evidence,
+                foundation=claimed.numerical_foundation,
+                selected_method=claimed.selected_method_identity,
+                ntu=claimed.ntu,
+                r_source=claimed.r_source,
+                p_source=claimed.p_source,
+                epsilon=claimed.epsilon,
+                q_max=claimed.q_max,
+                q_method=claimed.q_method,
+                t_hot_out=claimed.hot_outlet_temperature,
+                t_cold_out=claimed.cold_outlet_temperature,
+                q_hot=claimed.q_hot,
+                q_cold=claimed.q_cold,
+                energy=claimed.energy_balance_evidence,
+                terminal=claimed.terminal_closure_evidence,
+                applicability=claimed.applicability,
+                completeness=claimed.completeness,
+                semantic=claimed.provenance_semantic_inputs,
+            )
+            if success_hash_from_inputs(pre) != claimed.result_hash:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if result_id(claimed.result_hash) != claimed.result_id:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if type(claimed.provenance) is not Task162Provenance:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+                )
+            if claimed.provenance.provenance_hash != claimed.provenance.graph.compute_hash():
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PROVENANCE_INVALID
+            )
+
+        try:
+            task160_projection = task160_result_identity_projection(
+                evidence.original_task160_result
+            )
+            task161_projection = task161_result_identity_projection(
+                evidence.original_task161_result
+            )
+            task038_projection = task038_result_identity_projection(
+                evidence.original_task038_success_result
+            )
+            if (
+                type(claimed.task160_evidence) is not type(task160_projection)
+                or claimed.task160_evidence != task160_projection
+                or type(claimed.task161_evidence) is not type(task161_projection)
+                or claimed.task161_evidence != task161_projection
+                or type(claimed.task038_evidence) is not type(task038_projection)
+                or claimed.task038_evidence != task038_projection
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        binding = claimed.cross_producer_binding_evidence
+        if type(binding) is not Task162CrossProducerBindingAuthority:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+        if type(binding.binding_status) is not Task162BindingStatus:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+        if binding.binding_status is not Task162BindingStatus.MATCHED:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+        binding_strings = (
+            binding.task160_result_hash,
+            binding.task160_result_id,
+            binding.task161_result_hash,
+            binding.task161_result_id,
+            binding.task038_result_hash,
+            binding.task038_result_id,
+            binding.physical_exchanger_case_id,
+            evidence.original_case_authority.case_authority_id,
+        )
+        if any(type(value) is not str for value in binding_strings):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+        if (
+            binding.task160_result_hash != task160_projection.result_hash
+            or binding.task160_result_id.lower() != task160_projection.result_id.lower()
+            or binding.task161_result_hash != task161_projection.result_hash
+            or binding.task161_result_id.lower() != task161_projection.result_id.lower()
+            or binding.task038_result_hash != task038_projection.result_hash
+            or binding.task038_result_id.lower() != task038_projection.result_id.lower()
+        ):
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        if binding.physical_exchanger_case_id != evidence.original_case_authority.case_authority_id:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        reconstructed_raw = _raw_request_from_context(
+            schema_version=claimed.schema_version,
+            task162_version=claimed.task162_version,
+            source_definition_id=claimed.source_definition_id,
+            task160_result=evidence.original_task160_result,
+            task161_result=evidence.original_task161_result,
+            task038_result=evidence.original_task038_success_result,
+            binding=binding,
+            case_authority=evidence.original_case_authority,
+            request_metadata=evidence.request_metadata,
+        )
+        reconstructed_request = Task162Request(
+            schema_version=claimed.schema_version,
+            task162_version=claimed.task162_version,
+            source_definition_id=claimed.source_definition_id,
+            task160_result=evidence.original_task160_result,
+            task161_result=evidence.original_task161_result,
+            task038_result=evidence.original_task038_success_result,
+            cross_producer_binding_authority=binding,
+            case_authority=evidence.original_case_authority,
+            request_metadata=evidence.request_metadata,
+        )
+        try:
+            if request_hash(reconstructed_request) != claimed.request_hash:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            replayed = validate_request(reconstructed_raw)
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+            )
+        if replayed.status is not Task162ValidationStatus.VALID:
+            return _success_verification_rejected(_replay_failure_reason(replayed))
+        if replayed.valid is None:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+        if replayed.valid != claimed:
+            return _success_verification_rejected(_result_mismatch_reason(claimed, replayed.valid))
+        return _success_verification_accepted()
+    except BaseException:
+        return _success_verification_rejected(
+            Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
+        )
+
+
+__all__ = [
+    "issue_success_replay_evidence",
+    "validate_request",
+    "verify_task162_success",
+]
