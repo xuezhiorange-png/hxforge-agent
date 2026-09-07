@@ -85,6 +85,14 @@ TASK161_SOURCE_ID = "TASK161-SOURCE-DEFINITION-R8-ISSUE-225"
 TASK162_SOURCE_ID = "TASK162-SOURCE-DEFINITION-R1-ISSUE-229"
 
 
+class _HostileEquality:
+    def __eq__(self, other: object) -> bool:
+        raise RuntimeError("hostile equality")
+
+    def __ne__(self, other: object) -> bool:
+        raise RuntimeError("hostile inequality")
+
+
 def _task160() -> object:
     result = validate_task160(make_r607_raw()).valid
     assert result is not None
@@ -811,11 +819,38 @@ def test_verify_task162_success_rejects_nonempty_warnings_or_blockers() -> None:
     )
 
 
+def test_verify_task162_success_step5_hostile_equality_maps_identity_replay_failed() -> None:
+    _, result, evidence = _success_context()
+    hostile = replace(result, schema_version=_HostileEquality())  # type: ignore[arg-type]
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+    )
+
+
 def test_verify_task162_success_requires_exact_applicability() -> None:
     _, result, evidence = _success_context()
     malformed = replace(result, applicability=replace(result.applicability, status="BROKEN"))
     assert (
         verify_task162_success(malformed, evidence).failure_reason_or_none
+        is Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+    )
+
+
+def test_verify_task162_success_step8_hostile_equality_maps_not_applicable() -> None:
+    _, result, evidence = _success_context()
+    hostile_applicability = replace(result.applicability, status=_HostileEquality())  # type: ignore[arg-type]
+    hostile = replace(result, applicability=hostile_applicability)
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none
         is Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
     )
 
@@ -826,6 +861,20 @@ def test_verify_task162_success_requires_exact_completeness() -> None:
     assert (
         verify_task162_success(malformed, evidence).failure_reason_or_none
         is Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+    )
+
+
+def test_verify_task162_success_step9_hostile_equality_maps_not_complete() -> None:
+    _, result, evidence = _success_context()
+    hostile_fields = (_HostileEquality(), *result.completeness.required_fields[1:])
+    hostile_completeness = replace(result.completeness, required_fields=hostile_fields)  # type: ignore[arg-type]
+    hostile = replace(result, completeness=hostile_completeness)
+    first = verify_task162_success(hostile, evidence)
+    second = verify_task162_success(hostile, evidence)
+    assert first == second
+    assert first.status is Task162SuccessVerificationStatus.REJECTED
+    assert (
+        first.failure_reason_or_none is Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
     )
 
 

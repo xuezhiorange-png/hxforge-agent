@@ -1443,58 +1443,89 @@ def verify_task162_success(
                 Task162SuccessVerificationFailureReason.TASK162_PRODUCER_VERIFICATION_FAILED
             )
 
-        claimed_header = (
-            claimed.schema_version,
-            claimed.task162_version,
-            claimed.implementation_software_version,
-            claimed.source_definition_id,
-        )
-        evidence_header = (
-            evidence.task162_schema_version,
-            evidence.task162_version,
-            evidence.task162_implementation_software_version,
-            evidence.task162_source_definition_id,
-        )
         frozen_header = (
             TASK162_SCHEMA_VERSION,
             TASK162_VERSION,
             TASK162_IMPLEMENTATION_SOFTWARE_VERSION,
             TASK162_SOURCE_DEFINITION_ID,
         )
-        if claimed_header != frozen_header or evidence_header != frozen_header:
-            return _success_verification_rejected(
-                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+        try:
+            claimed_header = (
+                claimed.schema_version,
+                claimed.task162_version,
+                claimed.implementation_software_version,
+                claimed.source_definition_id,
             )
-        if (
-            type(claimed.result_hash) is not str
-            or type(claimed.result_id) is not UUID
-            or evidence.task162_result_hash != claimed.result_hash
-            or evidence.task162_result_id != claimed.result_id
-        ):
-            return _success_verification_rejected(
-                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
-            )
-
-        if type(claimed.warnings) is not tuple or type(claimed.blockers) is not tuple:
-            return _success_verification_rejected(
-                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
-            )
-        if claimed.warnings != () or claimed.blockers != ():
+            if claimed_header != frozen_header:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
             return _success_verification_rejected(
                 Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
             )
 
-        if (
-            type(claimed.applicability) is not Task162Applicability
-            or claimed.applicability != _make_applicability()
-        ):
+        try:
+            evidence_header = (
+                evidence.task162_schema_version,
+                evidence.task162_version,
+                evidence.task162_implementation_software_version,
+                evidence.task162_source_definition_id,
+            )
+            if evidence_header != frozen_header:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+            if (
+                type(claimed.result_hash) is not str
+                or type(claimed.result_id) is not UUID
+                or evidence.task162_result_hash != claimed.result_hash
+                or evidence.task162_result_id != claimed.result_id
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if type(claimed.warnings) is not tuple or type(claimed.blockers) is not tuple:
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+            if claimed.warnings != () or claimed.blockers != ():
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+                )
+        except BaseException:
+            return _success_verification_rejected(
+                Task162SuccessVerificationFailureReason.TASK162_IDENTITY_REPLAY_FAILED
+            )
+
+        try:
+            if (
+                type(claimed.applicability) is not Task162Applicability
+                or claimed.applicability != _make_applicability()
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
+                )
+        except BaseException:
             return _success_verification_rejected(
                 Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
             )
-        if (
-            type(claimed.completeness) is not Task162Completeness
-            or claimed.completeness != _make_completeness()
-        ):
+
+        try:
+            if (
+                type(claimed.completeness) is not Task162Completeness
+                or claimed.completeness != _make_completeness()
+            ):
+                return _success_verification_rejected(
+                    Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
+                )
+        except BaseException:
             return _success_verification_rejected(
                 Task162SuccessVerificationFailureReason.TASK162_NOT_COMPLETE
             )
