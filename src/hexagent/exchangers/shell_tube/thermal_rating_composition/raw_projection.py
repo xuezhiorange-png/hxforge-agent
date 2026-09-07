@@ -499,6 +499,32 @@ class _Walker:
             )
         return self._normal(field_name, Task163RawProjectionKind.SEQUENCE, children=tuple(items))
 
+    def _validate_request_metadata(self, value: object) -> None:
+        if type(value) is not tuple:
+            self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+            return
+        seen: set[str] = set()
+        for item in value:
+            if type(item) is not tuple or len(item) != 2:
+                self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+                continue
+            key, item_value = item
+            if type(key) is not str or type(item_value) is not str:
+                self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+                for text in (key, item_value):
+                    if type(text) is str:
+                        failure = self._text_failure(text)
+                        if failure is not None:
+                            self._reason(failure)
+                continue
+            for text in (key, item_value):
+                failure = self._text_failure(text)
+                if failure is not None:
+                    self._reason(failure)
+            if key in seen:
+                self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
+            seen.add(key)
+
     def _sequence(self, field_name: str, value: object, depth: int) -> Task163RawProjectionNode:
         if depth > TASK163_RAW_MAX_DEPTH:
             return self._marker(Task163FailureCode.RAW_DEPTH_LIMIT_EXCEEDED)
@@ -564,6 +590,7 @@ class _Walker:
             self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
         elif source_definition_id != TASK163_SOURCE_DEFINITION_ID:
             self._reason(Task163FailureCode.SOURCE_DEFINITION_ID_MISMATCH)
+        self._validate_request_metadata(value.get("request_metadata"))
 
     def _invalid_top_level(self, value: object) -> Task163RawProjectionNode:
         type_identity: str | None = None

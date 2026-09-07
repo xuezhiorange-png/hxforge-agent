@@ -210,48 +210,23 @@ def _typed_blocked(
 def _parse_request(raw: object) -> tuple[Task163Request | None, tuple[Task163Blocker, ...]]:
     stage = Task163FailureStage.TYPED_VALIDATION
     if type(raw) is not dict:
-        return None, (blocker(Task163FailureCode.INVALID_REQUEST_TYPE, stage),)
-    expected = {
-        "schema_version",
-        "task163_version",
-        "source_definition_id",
-        "task162_result",
-        "task162_success_replay_evidence",
-        "request_metadata",
-    }
+        return None, (blocker(Task163FailureCode.INVALID_TASK162_RESULT, stage),)
     blockers: list[Task163Blocker] = []
-    keys = set(raw)
-    if keys != expected:
-        blockers.append(blocker(Task163FailureCode.INVALID_REQUEST_SCHEMA, stage))
-    schema = raw.get("schema_version")
-    version = raw.get("task163_version")
-    source = raw.get("source_definition_id")
-    if type(schema) is not str or type(version) is not str or type(source) is not str:
-        blockers.append(blocker(Task163FailureCode.INVALID_REQUEST_SCHEMA, stage))
-    if type(version) is str and version != TASK163_VERSION:
-        blockers.append(blocker(Task163FailureCode.UNSUPPORTED_TASK163_VERSION, stage))
-    if type(source) is str and source != TASK163_SOURCE_DEFINITION_ID:
-        blockers.append(blocker(Task163FailureCode.SOURCE_DEFINITION_ID_MISMATCH, stage))
     task162 = raw.get("task162_result")
     evidence = raw.get("task162_success_replay_evidence")
     if type(task162) is not Task162Result:
         blockers.append(blocker(Task163FailureCode.INVALID_TASK162_RESULT, stage))
     if type(evidence) is not Task162SuccessReplayEvidence:
         blockers.append(blocker(Task163FailureCode.INVALID_TASK162_REPLAY_EVIDENCE, stage))
-    metadata = raw.get("request_metadata")
-    try:
-        normalized_metadata = _metadata(metadata)
-    except BaseException:
-        blockers.append(blocker(Task163FailureCode.INVALID_REQUEST_SCHEMA, stage))
-        normalized_metadata = ()
     normalized = normalize_blockers(blockers)
     if normalized:
         return None, normalized
+    normalized_metadata = _metadata(raw["request_metadata"])
     return (
         Task163Request(
-            schema_version=cast(str, schema),
-            task163_version=cast(str, version),
-            source_definition_id=cast(str, source),
+            schema_version=cast(str, raw["schema_version"]),
+            task163_version=cast(str, raw["task163_version"]),
+            source_definition_id=cast(str, raw["source_definition_id"]),
             task162_result=cast(Task162Result, task162),
             task162_success_replay_evidence=cast(Task162SuccessReplayEvidence, evidence),
             request_metadata=normalized_metadata,

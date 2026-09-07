@@ -164,7 +164,40 @@ def test_task163_request_metadata_permutation_is_identity_invariant(success_cont
 def test_task163_duplicate_metadata_key_is_rejected(success_context) -> None:
     raw, _, _ = success_context
     outcome = validate_request({**raw, "request_metadata": (("a", "1"), ("a", "2"))})
-    assert outcome.status is Task163ValidationStatus.TYPED_BLOCKED
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert outcome.raw_boundary_blocked is not None
+    assert outcome.raw_boundary_blocked.failure_stage is Task163FailureStage.RAW_BOUNDARY
+    assert Task163FailureCode.INVALID_REQUEST_SCHEMA in _blocked_codes(outcome)
+
+
+def test_task163_invalid_metadata_tuple_shape_is_raw_boundary() -> None:
+    outcome = validate_request(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": (("a",),),
+        }
+    )
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert Task163FailureCode.INVALID_REQUEST_SCHEMA in _blocked_codes(outcome)
+
+
+@pytest.mark.parametrize("metadata", [((1, "value"),), (("key", 1),)])
+def test_task163_non_string_metadata_member_is_raw_boundary(metadata) -> None:
+    outcome = validate_request(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": metadata,
+        }
+    )
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
     assert Task163FailureCode.INVALID_REQUEST_SCHEMA in _blocked_codes(outcome)
 
 
@@ -177,6 +210,9 @@ def test_task163_raw_same_stage_version_and_source_failures_accumulate(success_c
             "source_definition_id": "wrong-source",
         }
     )
+    assert outcome.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert outcome.raw_boundary_blocked is not None
+    assert outcome.raw_boundary_blocked.failure_stage is Task163FailureStage.RAW_BOUNDARY
     codes = _blocked_codes(outcome)
     assert Task163FailureCode.UNSUPPORTED_TASK163_VERSION in codes
     assert Task163FailureCode.SOURCE_DEFINITION_ID_MISMATCH in codes
@@ -190,13 +226,23 @@ def test_task163_typed_same_stage_invalid_inputs_accumulate() -> None:
             "source_definition_id": TASK163_SOURCE_ID,
             "task162_result": None,
             "task162_success_replay_evidence": None,
-            "request_metadata": (("a", "1"), ("a", "2")),
+            "request_metadata": (),
         }
     )
+    assert outcome.status is Task163ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage is Task163FailureStage.TYPED_VALIDATION
     codes = _blocked_codes(outcome)
     assert Task163FailureCode.INVALID_TASK162_RESULT in codes
     assert Task163FailureCode.INVALID_TASK162_REPLAY_EVIDENCE in codes
-    assert Task163FailureCode.INVALID_REQUEST_SCHEMA in codes
+    assert all(
+        code
+        in {
+            Task163FailureCode.INVALID_TASK162_RESULT,
+            Task163FailureCode.INVALID_TASK162_REPLAY_EVIDENCE,
+        }
+        for code in codes
+    )
 
 
 def test_task163_top_level_non_dict_uses_invalid_request_type() -> None:
@@ -798,6 +844,9 @@ def test_task163_failure_vocabulary_exact_count() -> None:
 
 def test_task163_request_metadata_duplicate_rejected_again(success_context) -> None:
     result = validate_request({**success_context[0], "request_metadata": (("x", "1"), ("x", "1"))})
+    assert result.status is Task163ValidationStatus.RAW_BOUNDARY_BLOCKED
+    assert result.raw_boundary_blocked is not None
+    assert result.raw_boundary_blocked.failure_stage is Task163FailureStage.RAW_BOUNDARY
     assert Task163FailureCode.INVALID_REQUEST_SCHEMA in _blocked_codes(result)
 
 
