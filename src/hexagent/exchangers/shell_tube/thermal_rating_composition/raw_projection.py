@@ -543,7 +543,10 @@ class _Walker:
             "task163_version",
         )
         keys = tuple(value.keys())
-        if any(type(key) is not str for key in keys) or tuple(sorted(keys)) != expected:
+        invalid_schema = any(type(key) is not str for key in keys)
+        if not invalid_schema:
+            invalid_schema = tuple(sorted(cast(tuple[str, ...], keys))) != expected
+        if invalid_schema:
             self._reason(Task163FailureCode.INVALID_REQUEST_SCHEMA)
 
         schema = value.get("schema_version")
