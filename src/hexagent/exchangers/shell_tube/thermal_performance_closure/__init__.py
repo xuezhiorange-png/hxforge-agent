@@ -58,6 +58,7 @@ from .models import (
     TASK162_RAW_TEXT_BYTE_COUNT_LIMIT_PLUS_ONE,
     TASK162_SCHEMA_VERSION,
     TASK162_SOURCE_DEFINITION_ID,
+    TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION,
     TASK162_TYPED_BLOCKED_SCHEMA_VERSION,
     TASK162_VERSION,
     IntervalDecimal,
@@ -98,6 +99,10 @@ from .models import (
     Task162SelectedMethodIdentity,
     Task162ShellSideMixingModel,
     Task162ShellType,
+    Task162SuccessReplayEvidence,
+    Task162SuccessVerificationFailureReason,
+    Task162SuccessVerificationResult,
+    Task162SuccessVerificationStatus,
     Task162TerminalClosureEvidence,
     Task162TubeSideMixing,
     Task162TypedBlockedResult,
@@ -108,7 +113,7 @@ from .models import (
 )
 from .provenance import build_provenance_semantic_inputs, build_success_provenance
 from .raw_projection import project_raw_request
-from .service import validate_request
+from .service import issue_success_replay_evidence, validate_request, verify_task162_success
 
 __all__ = [
     "IntervalDecimal",
@@ -121,6 +126,7 @@ __all__ = [
     "TASK162_RAW_TEXT_BYTE_COUNT_LIMIT_PLUS_ONE",
     "TASK162_SCHEMA_VERSION",
     "TASK162_SOURCE_DEFINITION_ID",
+    "TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION",
     "TASK162_TYPED_BLOCKED_SCHEMA_VERSION",
     "TASK162_VERSION",
     "Task038ResultIdentityProjection",
@@ -161,6 +167,10 @@ __all__ = [
     "Task162SelectedMethodIdentity",
     "Task162ShellSideMixingModel",
     "Task162ShellType",
+    "Task162SuccessReplayEvidence",
+    "Task162SuccessVerificationFailureReason",
+    "Task162SuccessVerificationResult",
+    "Task162SuccessVerificationStatus",
     "Task162TerminalClosureEvidence",
     "Task162TubeSideMixing",
     "Task162TypedBlockedResult",
@@ -215,5 +225,7 @@ __all__ = [
     "typed_blocked_canonical_bytes",
     "typed_blocked_hash",
     "typed_blocked_id",
+    "issue_success_replay_evidence",
     "validate_request",
+    "verify_task162_success",
 ]

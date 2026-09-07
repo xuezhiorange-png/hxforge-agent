@@ -9,6 +9,13 @@ from typing import Any
 from uuid import UUID
 
 from hexagent.domain.provenance import ProvenanceGraph
+from hexagent.exchangers.shell_tube.flow_arrangement_performance_method_authority.models import (
+    Task161Result,
+)
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.models import (
+    Task038SuccessResult,
+)
+from hexagent.exchangers.shell_tube.thermal_stream_state.models import Task160Result
 
 TASK162_SCHEMA_VERSION = "task162.schema.v1"
 TASK162_VERSION = "task162.v1"
@@ -17,6 +24,7 @@ TASK162_SOURCE_DEFINITION_ID = "TASK162-SOURCE-DEFINITION-R1-ISSUE-229"
 TASK162_RAW_PROJECTION_SCHEMA_VERSION = "task162.raw-projection.v1"
 TASK162_RAW_BOUNDARY_SCHEMA_VERSION = "task162.raw-boundary-blocked.v1"
 TASK162_TYPED_BLOCKED_SCHEMA_VERSION = "task162.typed-blocked.v1"
+TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION = "task162.success-replay-evidence.v1"
 
 TASK162_RAW_MAX_DEPTH = 16
 TASK162_RAW_MAX_NODES = 512
@@ -28,6 +36,19 @@ class Task162ValidationStatus(StrEnum):
     RAW_BOUNDARY_BLOCKED = "RAW_BOUNDARY_BLOCKED"
     TYPED_BLOCKED = "TYPED_BLOCKED"
     VALID = "VALID"
+
+
+class Task162SuccessVerificationStatus(StrEnum):
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
+
+class Task162SuccessVerificationFailureReason(StrEnum):
+    TASK162_PRODUCER_VERIFICATION_FAILED = "TASK162_PRODUCER_VERIFICATION_FAILED"
+    TASK162_IDENTITY_REPLAY_FAILED = "TASK162_IDENTITY_REPLAY_FAILED"
+    TASK162_NOT_APPLICABLE = "TASK162_NOT_APPLICABLE"
+    TASK162_NOT_COMPLETE = "TASK162_NOT_COMPLETE"
+    TASK162_PROVENANCE_INVALID = "TASK162_PROVENANCE_INVALID"
 
 
 class Task162FailureStage(StrEnum):
@@ -218,6 +239,43 @@ class Task162CaseAuthority:
     leakage_model_assumption: Task162LeakageAssumption
     bypass_model_assumption: Task162BypassAssumption
     evidence_refs: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Task162SuccessReplayEvidence:
+    evidence_schema_version: str
+    task162_schema_version: str
+    task162_version: str
+    task162_implementation_software_version: str
+    task162_source_definition_id: str
+    task162_result_hash: str
+    task162_result_id: UUID
+    original_task160_result: Task160Result
+    original_task161_result: Task161Result
+    original_task038_success_result: Task038SuccessResult
+    original_case_authority: Task162CaseAuthority
+    request_metadata: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Task162SuccessVerificationResult:
+    status: Task162SuccessVerificationStatus
+    failure_reason_or_none: Task162SuccessVerificationFailureReason | None
+
+    def __post_init__(self) -> None:
+        if type(self.status) is not Task162SuccessVerificationStatus:
+            raise ValueError("status must be exact Task162SuccessVerificationStatus")
+        if self.status is Task162SuccessVerificationStatus.ACCEPTED:
+            if self.failure_reason_or_none is not None:
+                raise ValueError("ACCEPTED verification result must not contain a failure reason")
+            return
+        if self.status is Task162SuccessVerificationStatus.REJECTED:
+            if type(self.failure_reason_or_none) is not Task162SuccessVerificationFailureReason:
+                raise ValueError(
+                    "REJECTED verification result requires exact frozen failure reason"
+                )
+            return
+        raise ValueError("unsupported verification status")
 
 
 @dataclass(frozen=True, slots=True)
