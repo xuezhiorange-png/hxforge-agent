@@ -29,9 +29,6 @@ from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.models 
 from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.provenance import (
     verify_provenance as verify_task038_provenance,
 )
-from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.validation import (
-    verify_task038_success_identity,
-)
 from hexagent.exchangers.shell_tube.thermal_stream_state.canonical import (
     result_id as task160_result_id,
 )
@@ -42,6 +39,7 @@ from hexagent.exchangers.shell_tube.thermal_stream_state.canonical import (
     success_canonical_bytes as task160_success_canonical_bytes,
 )
 from hexagent.exchangers.shell_tube.thermal_stream_state.models import (
+    SideBinding,
     Task160Result,
     ThermalRole,
 )
@@ -303,8 +301,6 @@ def _replay_task161(value: Task161Result) -> Task162FailureCode | None:
 
 def _replay_task038(value: Task038SuccessResult) -> Task162FailureCode | None:
     try:
-        if not verify_task038_success_identity(value):
-            return Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED
         expected_hash = task038_success_result_hash(value)
         expected_id = task038_result_id_from_hash(expected_hash)
         if value.result_hash != expected_hash or value.result_id != expected_id:
@@ -313,6 +309,10 @@ def _replay_task038(value: Task038SuccessResult) -> Task162FailureCode | None:
             return Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED
         if value.warnings != () or value.blockers != ():
             return Task162FailureCode.INVALID_TASK038_RESULT
+        if any(row.status != "PASS" for row in value.applicability_ledger):
+            return Task162FailureCode.TASK038_NOT_APPLICABLE
+        if any(row.status != "PASS" for row in value.completeness_ledger):
+            return Task162FailureCode.TASK038_NOT_COMPLETE
     except BaseException:
         return Task162FailureCode.TASK038_IDENTITY_REPLAY_FAILED
     return None
@@ -337,6 +337,60 @@ def _prove_task161_task160(task160: Task160Result, task161: Task161Result) -> bo
             "provenance_hash",
         ),
     )
+
+
+def _task160_stream_for_side(task160: Task160Result, side: SideBinding) -> Any | None:
+    matches = [item for item in task160.stream_records if item.side_binding is side]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _task160_adapter_for_source_task(task160: Task160Result, source_task_id: str) -> Any | None:
+    matches = [item for item in task160.adapter_evidence if item.source_task_id == source_task_id]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _prove_tube_side_service_binding(task160: Task160Result, task038: Task038SuccessResult) -> bool:
+    tube_stream = _task160_stream_for_side(task160, SideBinding.TUBE_SIDE)
+    task026_adapter = _task160_adapter_for_source_task(task160, "TASK026")
+    if tube_stream is None or task026_adapter is None:
+        return False
+    if not {
+        "property_snapshot_identity",
+        "source_result_identity",
+    }.issubset(task026_adapter.admitted_fields):
+        return False
+    try:
+        task026_result_id = task026_adapter.source_result_identity
+        task026_snapshot_identity = (
+            tube_stream.input_state.input.property_snapshot.property_snapshot_identity.value
+        )
+        return (
+            type(task026_result_id) is str
+            and type(task026_snapshot_identity) is str
+            and task026_result_id == task038.provenance.task026_result_id
+            and task026_snapshot_identity == task038.provenance.task026_property_snapshot_hash
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _prove_shell_side_service_binding(
+    task160: Task160Result, task038: Task038SuccessResult
+) -> bool:
+    shell_stream = _task160_stream_for_side(task160, SideBinding.SHELL_SIDE)
+    task032_adapter = _task160_adapter_for_source_task(task160, "TASK032")
+    if shell_stream is None or task032_adapter is None:
+        return False
+    if "fluid_or_service_identity" not in task032_adapter.admitted_fields:
+        return False
+    try:
+        shell_service_identity = shell_stream.input_state.input.fluid_or_service_identity
+        return (
+            type(shell_service_identity) is str
+            and shell_service_identity == task038.provenance.task035_shell_side_fluid_id
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
 
 
 def _prove_binding(
@@ -410,6 +464,10 @@ def _prove_binding(
     seen = tuple(item.dimension for item in binding.compatibility_evidence)
     if set(seen) != set(expected_dimensions) or len(seen) != len(expected_dimensions):
         return Task162FailureCode.CROSS_PRODUCER_BINDING_INVALID
+    if not _prove_tube_side_service_binding(task160, task038):
+        return Task162FailureCode.TUBE_SIDE_SERVICE_BINDING_MISMATCH
+    if not _prove_shell_side_service_binding(task160, task038):
+        return Task162FailureCode.SHELL_SIDE_SERVICE_BINDING_MISMATCH
     return None
 
 

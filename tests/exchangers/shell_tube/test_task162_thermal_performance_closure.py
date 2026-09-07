@@ -10,8 +10,23 @@ import pytest
 from hexagent.exchangers.shell_tube.flow_arrangement_performance_method_authority.service import (
     validate_request as validate_task161,
 )
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.canonical import (
+    provenance_hash as task038_provenance_hash,
+)
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.canonical import (
+    result_id_from_hash as task038_result_id_from_hash,
+)
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.canonical import (
+    success_result_hash as task038_success_result_hash,
+)
 from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.models import (
     Task038SuccessResult,
+)
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.provenance import (
+    verify_provenance as verify_task038_provenance,
+)
+from hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.validation import (
+    verify_task038_success_identity,
 )
 from hexagent.exchangers.shell_tube.thermal_performance_closure import (
     TASK162_DECIMAL_CONTEXT,
@@ -77,11 +92,46 @@ def _task161(task160: object | None = None) -> object:
     return result
 
 
-def _task038() -> Task038SuccessResult:
-    return result_fixture(
+def _task038(task160: object | None = None) -> Task038SuccessResult:
+    task160 = task160 or _task160()
+    tube_streams = [
+        item for item in task160.stream_records if item.side_binding.value == "TUBE_SIDE"
+    ]
+    shell_streams = [
+        item for item in task160.stream_records if item.side_binding.value == "SHELL_SIDE"
+    ]
+    task026_adapters = [
+        item for item in task160.adapter_evidence if item.source_task_id == "TASK026"
+    ]
+    assert len(tube_streams) == 1
+    assert len(shell_streams) == 1
+    assert len(task026_adapters) == 1
+    base = result_fixture(
         REQUEST_HASH_A,
         provenance_fixture(REQUEST_HASH_A, PROVENANCE_HASH_A),
     )
+    adapted_provenance = replace(
+        base.provenance,
+        task026_result_id=task026_adapters[0].source_result_identity,
+        task026_property_snapshot_hash=(
+            tube_streams[0].input_state.input.property_snapshot.property_snapshot_identity.value
+        ),
+        task035_shell_side_fluid_id=(shell_streams[0].input_state.input.fluid_or_service_identity),
+    )
+    adapted_provenance = replace(
+        adapted_provenance,
+        provenance_hash=task038_provenance_hash(adapted_provenance),
+    )
+    provisional = replace(base, provenance=adapted_provenance)
+    adapted_hash = task038_success_result_hash(provisional)
+    adapted = replace(
+        provisional,
+        result_hash=adapted_hash,
+        result_id=task038_result_id_from_hash(adapted_hash),
+    )
+    assert verify_task038_provenance(adapted.provenance)
+    assert verify_task038_success_identity(adapted)
+    return adapted
 
 
 def _case(baffle_count: object = 1) -> Task162CaseAuthority:
@@ -105,11 +155,13 @@ def _case(baffle_count: object = 1) -> Task162CaseAuthority:
 
 
 def _binding(
-    task160: object | None = None, task161: object | None = None
+    task160: object | None = None,
+    task161: object | None = None,
+    task038: Task038SuccessResult | None = None,
 ) -> Task162CrossProducerBindingAuthority:
     task160 = task160 or _task160()
     task161 = task161 or _task161(task160)
-    task038 = _task038()
+    task038 = task038 or _task038(task160)
     dimensions = tuple(
         Task162CompatibilityEvidence(
             dimension=dimension,
@@ -136,16 +188,62 @@ def _binding(
 def _raw(case: object | None = None, binding: object | None = None) -> dict[str, object]:
     task160 = _task160()
     task161 = _task161(task160)
+    task038 = _task038(task160)
     return {
         "schema_version": "task162.schema.v1",
         "task162_version": "task162.v1",
         "source_definition_id": TASK162_SOURCE_ID,
         "task160_result": task160,
         "task161_result": task161,
-        "task038_result": _task038(),
-        "cross_producer_binding_authority": binding or _binding(task160, task161),
+        "task038_result": task038,
+        "cross_producer_binding_authority": binding or _binding(task160, task161, task038),
         "case_authority": case or _case(),
         "request_metadata": [],
+    }
+
+
+def _rehashed_task038(
+    value: Task038SuccessResult,
+    *,
+    provenance_changes: dict[str, object] | None = None,
+    applicability_fail: bool = False,
+    completeness_fail: bool = False,
+) -> Task038SuccessResult:
+    adapted_provenance = replace(value.provenance, **(provenance_changes or {}))
+    adapted_provenance = replace(
+        adapted_provenance,
+        provenance_hash=task038_provenance_hash(adapted_provenance),
+    )
+    applicability = value.applicability_ledger
+    if applicability_fail:
+        applicability = (replace(applicability[0], status="FAIL"), *applicability[1:])
+    completeness = value.completeness_ledger
+    if completeness_fail:
+        completeness = (replace(completeness[0], status="FAIL"), *completeness[1:])
+    provisional = replace(
+        value,
+        provenance=adapted_provenance,
+        applicability_ledger=applicability,
+        completeness_ledger=completeness,
+    )
+    adapted_hash = task038_success_result_hash(provisional)
+    return replace(
+        provisional,
+        result_hash=adapted_hash,
+        result_id=task038_result_id_from_hash(adapted_hash),
+    )
+
+
+def _with_task038(raw: dict[str, object], task038: Task038SuccessResult) -> dict[str, object]:
+    binding = raw["cross_producer_binding_authority"]
+    return {
+        **raw,
+        "task038_result": task038,
+        "cross_producer_binding_authority": replace(
+            binding,
+            task038_result_hash=task038.result_hash,
+            task038_result_id=task038.result_id,
+        ),
     }
 
 
@@ -204,6 +302,74 @@ def test_task160_task161_task038_identity_replay_and_tamper_block() -> None:
         validate_request({**original, "task038_result": tampered038}).status
         is Task162ValidationStatus.TYPED_BLOCKED
     )
+
+
+def test_cross_producer_tube_result_identity_is_actually_verified() -> None:
+    raw = _raw()
+    task038 = _rehashed_task038(
+        raw["task038_result"],
+        provenance_changes={"task026_result_id": "task026-result-other"},
+    )
+    outcome = validate_request(_with_task038(raw, task038))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (
+        Task162FailureCode.TUBE_SIDE_SERVICE_BINDING_MISMATCH.value
+    )
+
+
+def test_cross_producer_tube_property_snapshot_is_actually_verified() -> None:
+    raw = _raw()
+    task038 = _rehashed_task038(
+        raw["task038_result"],
+        provenance_changes={"task026_property_snapshot_hash": "b" * 64},
+    )
+    outcome = validate_request(_with_task038(raw, task038))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (
+        Task162FailureCode.TUBE_SIDE_SERVICE_BINDING_MISMATCH.value
+    )
+
+
+def test_cross_producer_shell_service_identity_is_actually_verified() -> None:
+    raw = _raw()
+    task038 = _rehashed_task038(
+        raw["task038_result"],
+        provenance_changes={"task035_shell_side_fluid_id": "other-shell-service"},
+    )
+    outcome = validate_request(_with_task038(raw, task038))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (
+        Task162FailureCode.SHELL_SIDE_SERVICE_BINDING_MISMATCH.value
+    )
+
+
+def test_task038_applicability_status_is_replayed() -> None:
+    raw = _raw()
+    task038 = _rehashed_task038(raw["task038_result"], applicability_fail=True)
+    assert task038_success_result_hash(task038) == task038.result_hash
+    assert task038_result_id_from_hash(task038.result_hash) == task038.result_id
+    assert verify_task038_provenance(task038.provenance)
+    outcome = validate_request(_with_task038(raw, task038))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (
+        Task162FailureCode.TASK038_NOT_APPLICABLE.value
+    )
+
+
+def test_task038_completeness_status_is_replayed() -> None:
+    raw = _raw()
+    task038 = _rehashed_task038(raw["task038_result"], completeness_fail=True)
+    assert task038_success_result_hash(task038) == task038.result_hash
+    assert task038_result_id_from_hash(task038.result_hash) == task038.result_id
+    assert verify_task038_provenance(task038.provenance)
+    outcome = validate_request(_with_task038(raw, task038))
+    assert outcome.status is Task162ValidationStatus.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.blockers[0].code == (Task162FailureCode.TASK038_NOT_COMPLETE.value)
 
 
 def test_task161_to_task160_and_binding_identity_mismatch_blocks() -> None:
