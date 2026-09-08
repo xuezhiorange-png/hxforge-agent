@@ -40,7 +40,7 @@ from .models import (
     Task164ScopeFenceEvidence,
     Task164ScopeStatus,
     Task164SurfaceHashRecord,
-    _runtime_identity_for_version,
+    runtime_identity_for_version,
 )
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
@@ -476,7 +476,7 @@ def _run_runtime(
         expected_major_minor = version.value.removeprefix("PYTHON_").replace("_", ".")
         if (
             actual_major_minor != expected_major_minor
-            or runtime_identity != _runtime_identity_for_version(version)
+            or runtime_identity != runtime_identity_for_version(version)
             or observed_head != head_sha
             or observed_tree != head_tree
             or child_runner_identity

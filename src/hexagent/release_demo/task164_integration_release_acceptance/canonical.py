@@ -88,7 +88,7 @@ from .models import (
     Task164Task163ReplayEvidence,
     Task164TerminalCapability,
     Task164TypedBlockedResult,
-    _runtime_identity_for_version,
+    runtime_identity_for_version,
 )
 from .trusted_evidence import MainDeliveryObservation
 
@@ -1217,12 +1217,12 @@ def python_parity_payload_bytes(value: Task164DeterminismEvidence) -> bytes:
             _field(
                 "python311_runtime_identity",
                 KIND_STRING,
-                _string(_runtime_identity_for_version(first.python_version)),
+                _string(runtime_identity_for_version(first.python_version)),
             ),
             _field(
                 "python312_runtime_identity",
                 KIND_STRING,
-                _string(_runtime_identity_for_version(second.python_version)),
+                _string(runtime_identity_for_version(second.python_version)),
             ),
             _field("surfaces", KIND_TUPLE, _tuple_enums(surfaces)),
             _hash_field("child311_digest", first.child_output_sha256),

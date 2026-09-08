@@ -173,7 +173,7 @@ class Task164PythonVersion(StrEnum):
     PYTHON_3_12 = "PYTHON_3_12"
 
 
-def _runtime_identity_for_version(value: Task164PythonVersion) -> str:
+def runtime_identity_for_version(value: Task164PythonVersion) -> str:
     if value is Task164PythonVersion.PYTHON_3_11:
         return "cpython:3.11"
     if value is Task164PythonVersion.PYTHON_3_12:
