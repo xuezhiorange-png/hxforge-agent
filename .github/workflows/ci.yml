@@ -201,6 +201,11 @@ jobs:
             exit 1
           fi
           git cat-file -e "${{ needs.resolve-authority.outputs.pr-head-sha }}^{commit}"
+      - name: Assert TASK164 predecessor history
+        if: matrix.name == 'ci'
+        run: |
+          git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
+          git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -225,6 +230,34 @@ jobs:
 
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
+      - name: Provision TASK164 dual-runtime observation environments
+        if: matrix.name == 'ci'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TASK164_RUNTIME_ROOT="${RUNNER_TEMP}/task164-runtimes"
+          export TASK164_REQUIREMENTS_PATH="${TASK164_RUNTIME_ROOT}/requirements.txt"
+          mkdir -p "${TASK164_RUNTIME_ROOT}"
+          uv export --locked --all-extras --format requirements.txt --no-hashes \
+            --no-emit-project --output-file "${TASK164_REQUIREMENTS_PATH}"
+          uv venv --no-project --python "${TASK029_PY311_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py311"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py311/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          uv venv --no-project --python "${TASK029_PY312_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py312"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py312/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          echo "TASK164_PY311_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py311/bin/python" >> "${GITHUB_ENV}"
+          echo "TASK164_PY312_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py312/bin/python" >> "${GITHUB_ENV}"
       - name: Run shard with real telemetry
         id: pytest
         env:
@@ -389,6 +422,11 @@ jobs:
       - name: Assert frozen merge-ref SHA
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
+      - name: Assert TASK164 predecessor history
+        if: matrix.name == 'ci'
+        run: |
+          git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
+          git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
       - run: uv sync --locked --all-extras
       - name: Assert merge-ref producer runtime matches matrix python
         shell: bash
@@ -414,6 +452,34 @@ jobs:
 
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
+      - name: Provision TASK164 dual-runtime observation environments
+        if: matrix.name == 'ci'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TASK164_RUNTIME_ROOT="${RUNNER_TEMP}/task164-runtimes"
+          export TASK164_REQUIREMENTS_PATH="${TASK164_RUNTIME_ROOT}/requirements.txt"
+          mkdir -p "${TASK164_RUNTIME_ROOT}"
+          uv export --locked --all-extras --format requirements.txt --no-hashes \
+            --no-emit-project --output-file "${TASK164_REQUIREMENTS_PATH}"
+          uv venv --no-project --python "${TASK029_PY311_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py311"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py311/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          uv venv --no-project --python "${TASK029_PY312_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py312"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py312/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          echo "TASK164_PY311_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py311/bin/python" >> "${GITHUB_ENV}"
+          echo "TASK164_PY312_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py312/bin/python" >> "${GITHUB_ENV}"
       - name: Run shard with real telemetry
         id: pytest
         env:
@@ -528,8 +594,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
       - name: Assert main-push checkout SHA
         run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+      - name: Assert TASK164 predecessor history
+        if: matrix.name == 'ci'
+        run: |
+          git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
+          git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -554,6 +626,34 @@ jobs:
 
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
+      - name: Provision TASK164 dual-runtime observation environments
+        if: matrix.name == 'ci'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TASK164_RUNTIME_ROOT="${RUNNER_TEMP}/task164-runtimes"
+          export TASK164_REQUIREMENTS_PATH="${TASK164_RUNTIME_ROOT}/requirements.txt"
+          mkdir -p "${TASK164_RUNTIME_ROOT}"
+          uv export --locked --all-extras --format requirements.txt --no-hashes \
+            --no-emit-project --output-file "${TASK164_REQUIREMENTS_PATH}"
+          uv venv --no-project --python "${TASK029_PY311_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py311"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py311/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          uv venv --no-project --python "${TASK029_PY312_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py312"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py312/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          echo "TASK164_PY311_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py311/bin/python" >> "${GITHUB_ENV}"
+          echo "TASK164_PY312_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py312/bin/python" >> "${GITHUB_ENV}"
       - name: Run shard with real telemetry
         id: pytest
         env:
