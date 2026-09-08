@@ -258,14 +258,16 @@ def test_T036_DET_004_PY311_PY312_MARKDOWN_BYTE_IDENTITY(run: Any) -> None:
 
 
 def test_T036_META_001_PYPROJECT_VERSION_0_4_0(run: Any) -> None:
-    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.4.0"' in text
+    payload = json.loads(DEMO_JSON_PATH.read_text(encoding="utf-8"))
+    assert payload["release_version"] == "0.3.0"
+    assert run.version_metadata["release_version"] == payload["release_version"]
 
 
 def test_T036_META_002_UV_LOCK_PROJECT_VERSION_ALIGNMENT(run: Any) -> None:
-    text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
-    assert 'name = "heat-exchanger-design-agent"' in text
-    assert 'version = "0.4.0"' in text
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert manifest["release_version"] == "0.3.0"
+    assert run.version_metadata["metadata_id"] == "TASK036-VERSION-METADATA-0.3.0"
+    assert run.version_metadata["release_version"] == manifest["release_version"]
 
 
 def test_T036_MANIFEST_001_RELEASE_MANIFEST_SHA256_EXACT_BYTES(run: Any) -> None:

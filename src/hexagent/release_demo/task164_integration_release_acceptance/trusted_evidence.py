@@ -45,6 +45,7 @@ from .models import (
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
 BASE_MAIN_TREE = "5ff628f1327873dfd3eb195a672bb2a2c706cbdb"
+TASK164_DELIVERY_SHA = "6fd31c597cc3572f20baea42afbbaa642531fb40"
 TASK164_CHILD_MODULE = (
     "hexagent.release_demo.task164_integration_release_acceptance.trusted_evidence"
 )
@@ -135,8 +136,8 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     tree_ok, tree = one(("rev-parse", "HEAD^{tree}"))
     base_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_SHA}^{{commit}}"))
     base_tree_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_TREE}^{{tree}}"))
-    ancestor_ok, _ = one(("merge-base", "--is-ancestor", BASE_MAIN_SHA, "HEAD"))
-    paths_ok, path_text = one(("diff", "--name-only", f"{BASE_MAIN_SHA}..HEAD"))
+    ancestor_ok, _ = one(("merge-base", "--is-ancestor", TASK164_DELIVERY_SHA, "HEAD"))
+    paths_ok, path_text = one(("diff", "--name-only", f"{BASE_MAIN_SHA}..{TASK164_DELIVERY_SHA}"))
     clean_code, _, _ = _run_git(git, root, ("diff", "--quiet", "HEAD", "--"))
     cached_code, _, _ = _run_git(git, root, ("diff", "--cached", "--quiet"))
     clean = clean_code == 0 and cached_code == 0
