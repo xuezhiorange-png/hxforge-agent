@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import struct
 from dataclasses import fields, replace
 from enum import Enum
 from pathlib import Path
@@ -29,6 +30,16 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition import (
 from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
     Task163Request,
     Task163ValidationResult,
+)
+from hexagent.exchangers.shell_tube.tube_side.canonical import (
+    KIND_BOOL_FALSE,
+    KIND_BOOL_TRUE,
+    KIND_ENUM,
+    KIND_INT,
+    KIND_NONE,
+    KIND_RECORD,
+    KIND_STRING,
+    KIND_TUPLE,
 )
 from hexagent.release_demo import task164_integration_release_acceptance as task164
 from hexagent.release_demo.task164_integration_release_acceptance import (
@@ -368,6 +379,56 @@ def _blocked_codes(outcome: m.Task164ValidationResult) -> tuple[m.Task164Failure
     if outcome.typed_blocked is not None:
         return tuple(item.code for item in outcome.typed_blocked.blockers)
     return ()
+
+
+def _read_framed_value(data: bytes, offset: int) -> tuple[bytes, bytes, int]:
+    if offset + 4 > len(data):
+        raise AssertionError("truncated kind length")
+    kind_length = struct.unpack_from(">I", data, offset)[0]
+    offset += 4
+    kind_end = offset + kind_length
+    if kind_end > len(data):
+        raise AssertionError("truncated kind")
+    kind = data[offset:kind_end]
+    offset = kind_end
+    if offset + 8 > len(data):
+        raise AssertionError("truncated payload length")
+    payload_length = struct.unpack_from(">Q", data, offset)[0]
+    offset += 8
+    payload_end = offset + payload_length
+    if payload_end > len(data):
+        raise AssertionError("truncated payload")
+    return kind, data[offset:payload_end], payload_end
+
+
+def _tuple_items(data: bytes) -> tuple[tuple[bytes, bytes], ...]:
+    if len(data) < 4:
+        raise AssertionError("truncated tuple")
+    count = struct.unpack_from(">I", data, 0)[0]
+    offset = 4
+    items: list[tuple[bytes, bytes]] = []
+    for _ in range(count):
+        outer_kind, outer_payload, offset = _read_framed_value(data, offset)
+        assert outer_kind == b"ITEM"
+        kind, payload, item_end = _read_framed_value(outer_payload, 0)
+        assert item_end == len(outer_payload)
+        items.append((kind, payload))
+    assert offset == len(data)
+    return tuple(items)
+
+
+def _negative_payload_fields(result: m.Task164Result, index: int) -> dict[str, tuple[bytes, bytes]]:
+    _, outer = trusted_evidence._parse_record(
+        result.evidence_package.negative_demo_evidence.canonical_payload_bytes
+    )
+    kind, payload = outer["scenario_records"]
+    assert kind == KIND_TUPLE
+    items = _tuple_items(payload)
+    record_kind, record_payload = items[index]
+    assert record_kind == KIND_RECORD
+    namespace, fields_by_name = trusted_evidence._parse_record(record_payload)
+    assert namespace == "TASK164_NEGATIVE_DEMONSTRATION_RECORD_V1"
+    return fields_by_name
 
 
 def _markers(node: m.Task164RawProjectionNode) -> list[m.Task164RawProjectionNode]:
@@ -758,23 +819,51 @@ def test_task164_positive_baffle_5(success_context) -> None:
 
 
 def test_task164_negative_typed_blocked(success_context) -> None:
-    record = _valid_result(success_context).scenario_evidence[5]
+    result = _valid_result(success_context)
+    record = result.scenario_evidence[5]
     assert record.observation.observed_task163_branch is m.Task164Task163Branch.TYPED_BLOCKED
+    claimed = record.claim.claimed_task163_validation_result
+    assert claimed is not None and claimed.typed_blocked is not None
+    assert claimed.typed_blocked.blockers[0].code.value == "INVALID_TASK162_RESULT"
+    fields_by_name = _negative_payload_fields(result, 0)
+    assert fields_by_name["expected_failure_stage"] == (KIND_ENUM, b"TYPED_VALIDATION")
+    assert fields_by_name["observed_failure_code"] == (KIND_ENUM, b"INVALID_TASK162_RESULT")
 
 
 def test_task164_negative_raw_boundary_blocked(success_context) -> None:
-    record = _valid_result(success_context).scenario_evidence[6]
+    result = _valid_result(success_context)
+    record = result.scenario_evidence[6]
     assert record.observation.observed_task163_branch is m.Task164Task163Branch.RAW_BOUNDARY_BLOCKED
+    claimed = record.claim.claimed_task163_validation_result
+    assert claimed is not None and claimed.raw_boundary_blocked is not None
+    assert claimed.raw_boundary_blocked.blockers[0].code.value == "INVALID_REQUEST_TYPE"
+    fields_by_name = _negative_payload_fields(result, 1)
+    assert fields_by_name["expected_failure_stage"] == (KIND_ENUM, b"RAW_BOUNDARY")
+    assert fields_by_name["observed_failure_code"] == (KIND_ENUM, b"INVALID_REQUEST_TYPE")
 
 
 def test_task164_negative_task162_replay_rejection(success_context) -> None:
-    record = _valid_result(success_context).scenario_evidence[7]
+    result = _valid_result(success_context)
+    record = result.scenario_evidence[7]
     assert record.observation.observed_outcome is m.Task164ScenarioOutcome.NEGATIVE_PASS
+    claimed = record.claim.claimed_task163_validation_result
+    assert claimed is not None and claimed.typed_blocked is not None
+    assert claimed.typed_blocked.blockers[0].code.value == "TASK162_IDENTITY_REPLAY_FAILED"
+    fields_by_name = _negative_payload_fields(result, 2)
+    assert fields_by_name["expected_failure_stage"] == (KIND_ENUM, b"TASK163_REPLAY")
+    assert fields_by_name["observed_failure_code"] == (KIND_ENUM, b"TASK163_REPLAY_BLOCKED")
 
 
 def test_task164_negative_task163_claim_tamper(success_context) -> None:
-    record = _valid_result(success_context).scenario_evidence[8]
+    result = _valid_result(success_context)
+    record = result.scenario_evidence[8]
     assert record.replay_evidence.claim_match_status is m.Task164ClaimMatchStatus.MISMATCHED
+    fields_by_name = _negative_payload_fields(result, 3)
+    assert fields_by_name["expected_failure_stage"] == (KIND_ENUM, b"TASK163_REPLAY")
+    assert fields_by_name["observed_failure_code"] == (
+        KIND_ENUM,
+        b"TASK163_RESULT_HASH_MISMATCH",
+    )
 
 
 def test_task164_scenario_matrix_exact() -> None:
@@ -786,12 +875,29 @@ def test_task164_positive_requires_real_producer(success_context) -> None:
     assert all(item.observation.real_task163_invoked for item in result.scenario_evidence[:5])
 
 
-def test_task164_negative_fail_closed(success_context) -> None:
-    result = _valid_result(success_context)
-    assert all(
-        item.observation.observed_outcome is m.Task164ScenarioOutcome.NEGATIVE_PASS
-        for item in result.scenario_evidence[5:9]
-    )
+def test_task164_negative_fail_closed(success_context, monkeypatch) -> None:
+    raw, _, _ = success_context
+    original = service.execute_scenario_with_diagnostic
+
+    def force_wrong_diagnostic(claim, fallback):
+        execution = original(claim, fallback)
+        if claim.scenario_id is m.Task164ScenarioId.D164_N01_TASK163_TYPED_BLOCKED:
+            assert execution.diagnostic is not None
+            return replace(
+                execution,
+                diagnostic=replace(
+                    execution.diagnostic,
+                    code=m.Task164FailureCode.TASK163_RESULT_ID_MISMATCH,
+                ),
+            )
+        return execution
+
+    monkeypatch.setattr(service, "execute_scenario_with_diagnostic", force_wrong_diagnostic)
+    outcome = task164.validate_request(raw)
+    assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage is m.Task164FailureStage.DEMONSTRATION
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.SCENARIO_EVIDENCE_INVALID,)
 
 
 def test_task164_terminal_capability_matrix(success_context) -> None:
@@ -838,25 +944,35 @@ def test_task164_repeat_run_all_surfaces(success_context) -> None:
     )
 
 
-def test_task164_repeat_run_failure_blocks() -> None:
-    observation = m.Task164RepeatRunObservation(
-        run_count=2,
-        surface_records=(),
-        observed_equal=False,
-        status=m.Task164ParityStatus.BLOCKED,
-        evidence_refs=(),
-    )
-    assert tuple(item.name for item in fields(observation)) == (
-        "run_count",
-        "surface_records",
-        "observed_equal",
-        "status",
-        "evidence_refs",
-    )
-    assert observation.run_count == 2
-    assert observation.surface_records == ()
-    assert not observation.observed_equal
-    assert observation.status is m.Task164ParityStatus.BLOCKED
+def test_task164_repeat_run_failure_blocks(success_context, monkeypatch) -> None:
+    raw, _, _ = success_context
+    original = service.execute_scenario_with_diagnostic
+    calls = 0
+
+    def drift_on_second_run(claim, fallback):
+        nonlocal calls
+        calls += 1
+        execution = original(claim, fallback)
+        if calls > len(m.TASK164_SCENARIO_IDS) and calls == len(m.TASK164_SCENARIO_IDS) + 1:
+            return replace(
+                execution,
+                record=replace(
+                    execution.record,
+                    replay_evidence=replace(
+                        execution.record.replay_evidence,
+                        evidence_refs=("TASK164_SECOND_RUN_DRIFT",),
+                    ),
+                ),
+            )
+        return execution
+
+    monkeypatch.setattr(service, "execute_scenario_with_diagnostic", drift_on_second_run)
+    outcome = task164.validate_request(raw)
+    assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert outcome.typed_blocked is not None
+    assert outcome.typed_blocked.failure_stage is m.Task164FailureStage.DETERMINISM
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.REPEAT_RUN_PARITY_FAILED,)
+    assert calls == 2 * len(m.TASK164_SCENARIO_IDS)
 
 
 def test_task164_claimed_scenario_not_authoritative(success_context) -> None:
@@ -1234,10 +1350,8 @@ def test_cross_python_trust_root_verification_exact(success_context) -> None:
     dual = _valid_result(success_context).determinism_evidence.dual_runtime_observation
     assert dual.status is m.Task164ParityStatus.PASS
     main = trusted_evidence.observe_main_delivery()
-    assert dual.python311_observation.actual_python_major_minor == "3.11"
-    assert dual.python312_observation.actual_python_major_minor == "3.12"
-    assert dual.python311_observation.runtime_identity
-    assert dual.python312_observation.runtime_identity
+    assert dual.python311_observation.python_version is m.Task164PythonVersion.PYTHON_3_11
+    assert dual.python312_observation.python_version is m.Task164PythonVersion.PYTHON_3_12
     assert dual.python311_observation.head_sha == main.observed_head_sha
     assert dual.python312_observation.head_sha == main.observed_head_sha
     assert dual.python311_observation.head_tree == main.observed_head_tree
@@ -1254,6 +1368,12 @@ def test_cross_python_trust_root_verification_exact(success_context) -> None:
         dual.python311_observation.child_output_sha256
         == dual.python312_observation.child_output_sha256
     )
+    parity_namespace, parity_fields = trusted_evidence._parse_record(
+        canonical.python_parity_payload_bytes(_valid_result(success_context).determinism_evidence)
+    )
+    assert parity_namespace == "TASK164_PYTHON_PARITY_PAYLOAD_V1"
+    assert parity_fields["python311_runtime_identity"] == (KIND_STRING, b"cpython:3.11")
+    assert parity_fields["python312_runtime_identity"] == (KIND_STRING, b"cpython:3.12")
 
 
 def test_evidence_package_dependency_dag_is_acyclic(success_context) -> None:
@@ -1291,6 +1411,25 @@ def test_dual_runtime_runner_environment_matches_ci_contract() -> None:
         "identity_projection_sha256",
         "evidence_projection_sha256",
     )
+    assert tuple(item.name for item in fields(m.Task164RuntimeObservation)) == (
+        "python_version",
+        "head_sha",
+        "head_tree",
+        "runner_identity",
+        "command_identity",
+        "surface_records",
+        "child_output_sha256",
+        "conclusion",
+    )
+    assert len(fields(m.Task164RuntimeObservation)) == 8
+    assert tuple(item.name for item in fields(m.Task164RepeatRunObservation)) == (
+        "run_count",
+        "surface_records",
+        "observed_equal",
+        "status",
+        "evidence_refs",
+    )
+    assert len(fields(m.Task164RepeatRunObservation)) == 5
 
 
 def test_warning_and_acceptance_status_types_are_closed() -> None:
@@ -1402,7 +1541,7 @@ def test_acceptance_category_payload_schemas_are_exact(success_context) -> None:
             ),
         ),
         (
-            "TASK164_TERMINAL_CAPABILITY_V1",
+            "TASK164_TERMINAL_CAPABILITY_PAYLOAD_V1",
             (
                 "capability_id",
                 "construction_family",
@@ -1436,7 +1575,7 @@ def test_acceptance_category_payload_schemas_are_exact(success_context) -> None:
             ),
         ),
         (
-            "TASK164_SCOPE_FENCE_V1",
+            "TASK164_SCOPE_FENCE_PAYLOAD_V1",
             (
                 "forbidden_capability_tokens",
                 "forbidden_formula_surface_absent",
@@ -1448,23 +1587,252 @@ def test_acceptance_category_payload_schemas_are_exact(success_context) -> None:
         ),
     )
     assert len(m.Task164AcceptanceCategory) == 14
-    for payload, (namespace, field_names) in zip(payloads, expected, strict=True):
+    expected_kinds = (
+        (
+            KIND_INT,
+            KIND_INT,
+            KIND_INT,
+            KIND_INT,
+            KIND_STRING,
+            KIND_ENUM,
+            KIND_INT,
+            KIND_INT,
+            KIND_STRING,
+            KIND_INT,
+            KIND_STRING,
+            KIND_BOOL_FALSE,
+        ),
+        (
+            KIND_ENUM,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_BOOL_TRUE,
+            KIND_TUPLE,
+            KIND_TUPLE,
+            KIND_BOOL_TRUE,
+            KIND_ENUM,
+        ),
+        (KIND_TUPLE,),
+        (KIND_TUPLE,),
+        (KIND_TUPLE,),
+        (KIND_TUPLE, KIND_ENUM),
+        (KIND_STRING, KIND_STRING, KIND_STRING, KIND_STRING, KIND_TUPLE),
+        (KIND_ENUM, KIND_ENUM, KIND_INT, KIND_INT, KIND_ENUM, KIND_ENUM, KIND_ENUM, KIND_ENUM),
+        (KIND_TUPLE,),
+        (KIND_TUPLE,),
+        (KIND_INT, KIND_TUPLE, KIND_BOOL_TRUE, KIND_ENUM),
+        (
+            KIND_ENUM,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_TUPLE,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_ENUM,
+            KIND_ENUM,
+        ),
+        (KIND_TUPLE, KIND_BOOL_TRUE, KIND_BOOL_TRUE, KIND_BOOL_TRUE, KIND_BOOL_TRUE, KIND_ENUM),
+    )
+    for payload, (namespace, field_names), kinds in zip(
+        payloads, expected, expected_kinds, strict=True
+    ):
         actual_namespace, actual_fields = trusted_evidence._parse_record(
             payload.canonical_payload_bytes
         )
         assert actual_namespace == namespace
         assert tuple(actual_fields) == field_names
+        assert tuple(actual_fields[name][0] for name in field_names) == kinds
+
+    replay_kind, replay_payload = trusted_evidence._parse_record(
+        package.task163_replay_evidence.canonical_payload_bytes
+    )[1]["replay_records"]
+    assert replay_kind == KIND_TUPLE
+    replay_items = _tuple_items(replay_payload)
+    assert len(replay_items) == 12
+    replay_names = (
+        "scenario_id",
+        "producer_invocation_count",
+        "original_request_projection_hash",
+        "claimed_validation_projection_hash",
+        "replayed_validation_projection_hash",
+        "replayed_branch",
+        "replayed_result_hash_or_none",
+        "replayed_result_id_or_none",
+        "replayed_provenance_hash_or_none",
+        "applicability_projection_hash_or_none",
+        "completeness_projection_hash_or_none",
+        "claim_match_status",
+        "evidence_refs",
+    )
+    replay_kinds = (
+        KIND_ENUM,
+        KIND_INT,
+        KIND_STRING,
+        (KIND_NONE, KIND_STRING),
+        KIND_STRING,
+        KIND_ENUM,
+        (KIND_NONE, KIND_STRING),
+        (KIND_NONE, KIND_STRING),
+        (KIND_NONE, KIND_STRING),
+        (KIND_NONE, KIND_STRING),
+        (KIND_NONE, KIND_STRING),
+        KIND_ENUM,
+        KIND_TUPLE,
+    )
+    for index, (item_kind, item_payload) in enumerate(replay_items):
+        assert item_kind == KIND_RECORD
+        namespace, item_fields = trusted_evidence._parse_record(item_payload)
+        assert namespace == "TASK164_TASK163_REPLAY_EVIDENCE_V1"
+        assert tuple(item_fields) == replay_names
+        for name, allowed in zip(replay_names, replay_kinds, strict=True):
+            actual = item_fields[name][0]
+            if isinstance(allowed, tuple):
+                assert actual in allowed
+            else:
+                assert actual == allowed
+        assert item_fields["scenario_id"][1] == m.TASK164_SCENARIO_IDS[index].value.encode()
+
+    identity_kind, identity_payload = trusted_evidence._parse_record(
+        package.task163_identity_evidence.canonical_payload_bytes
+    )[1]["positive_result_identities"]
+    assert identity_kind == KIND_TUPLE
+    identity_items = _tuple_items(identity_payload)
+    assert len(identity_items) == 5
+    for index, (item_kind, item_payload) in enumerate(identity_items):
+        assert item_kind == KIND_RECORD
+        namespace, item_fields = trusted_evidence._parse_record(item_payload)
+        assert namespace == "TASK164_TASK163_RESULT_IDENTITY_RECORD_V1"
+        assert tuple(item_fields) == (
+            "scenario_id",
+            "result_hash",
+            "result_id",
+            "provenance_hash",
+        )
+        assert tuple(item_fields[name][0] for name in item_fields) == (
+            KIND_ENUM,
+            KIND_STRING,
+            KIND_STRING,
+            KIND_STRING,
+        )
+        assert item_fields["scenario_id"][1] == m.TASK164_SCENARIO_IDS[index].value.encode()
+
+    checks_kind, checks_payload = trusted_evidence._parse_record(
+        package.task163_applicability_evidence.canonical_payload_bytes
+    )[1]["checks"]
+    assert checks_kind == KIND_TUPLE
+    check_items = _tuple_items(checks_payload)
+    assert len(check_items) == 6
+    for item_kind, item_payload in check_items:
+        assert item_kind == KIND_RECORD
+        namespace, item_fields = trusted_evidence._parse_record(item_payload)
+        assert namespace == "TASK164_TASK163_APPLICABILITY_CHECK_RECORD_V1"
+        assert tuple(item_fields) == (
+            "check_id",
+            "status",
+            "evidence_refs",
+            "failure_code_or_none",
+        )
+        assert tuple(item_fields[name][0] for name in item_fields) == (
+            KIND_ENUM,
+            KIND_ENUM,
+            KIND_TUPLE,
+            KIND_NONE,
+        )
+
+    positive_kind, positive_payload = trusted_evidence._parse_record(
+        package.positive_demo_evidence.canonical_payload_bytes
+    )[1]["scenario_records"]
+    assert positive_kind == KIND_TUPLE
+    positive_items = _tuple_items(positive_payload)
+    assert len(positive_items) == 5
+    for index, (item_kind, item_payload) in enumerate(positive_items):
+        assert item_kind == KIND_RECORD
+        namespace, item_fields = trusted_evidence._parse_record(item_payload)
+        assert namespace == "TASK164_POSITIVE_DEMONSTRATION_RECORD_V1"
+        assert tuple(item_fields) == (
+            "scenario_id",
+            "result_hash",
+            "result_id",
+            "provenance_hash",
+            "applicability_status",
+            "completeness_status",
+            "terminal_status",
+            "outcome",
+            "evidence_refs",
+        )
+        assert item_fields["scenario_id"][1] == m.TASK164_SCENARIO_IDS[index].value.encode()
+
+    negative_kind, negative_payload = trusted_evidence._parse_record(
+        package.negative_demo_evidence.canonical_payload_bytes
+    )[1]["scenario_records"]
+    assert negative_kind == KIND_TUPLE
+    negative_items = _tuple_items(negative_payload)
+    assert len(negative_items) == 4
+    for index, (item_kind, item_payload) in enumerate(negative_items):
+        assert item_kind == KIND_RECORD
+        namespace, item_fields = trusted_evidence._parse_record(item_payload)
+        assert namespace == "TASK164_NEGATIVE_DEMONSTRATION_RECORD_V1"
+        assert tuple(item_fields) == (
+            "scenario_id",
+            "expected_failure_stage",
+            "observed_failure_code",
+            "outcome",
+            "evidence_refs",
+        )
+        assert item_fields["scenario_id"][1] == m.TASK164_SCENARIO_IDS[index + 5].value.encode()
+
+    repeat_kind, repeat_payload = trusted_evidence._parse_record(
+        package.repeat_run_evidence.canonical_payload_bytes
+    )[1]["surface_records"]
+    assert repeat_kind == KIND_TUPLE
+    repeat_items = _tuple_items(repeat_payload)
+    assert len(repeat_items) == len(m.Task164RepeatRunSurface)
+    assert all(item_kind == KIND_RECORD for item_kind, _ in repeat_items)
+    assert tuple(
+        trusted_evidence._parse_record(item_payload)[1]["surface"][1].decode()
+        for _, item_payload in repeat_items
+    ) == tuple(item.value for item in m.Task164RepeatRunSurface)
+
+    parity_namespace, parity_fields = trusted_evidence._parse_record(
+        package.cross_python_evidence.canonical_payload_bytes
+    )
+    assert parity_namespace == "TASK164_PYTHON_PARITY_PAYLOAD_V1"
+    surface_kind, surface_payload = parity_fields["surfaces"]
+    assert surface_kind == KIND_TUPLE
+    assert tuple(payload for _, payload in _tuple_items(surface_payload)) == tuple(
+        item.value.encode() for item in m.Task164ParitySurface
+    )
 
 
-def test_main_delivery_payload_uses_verified_local_git_authority() -> None:
+def test_main_delivery_payload_uses_verified_local_git_authority(tmp_path) -> None:
     observation = trusted_evidence.observe_main_delivery()
+    original_cwd = os.getcwd()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    try:
+        os.chdir(outside)
+        from_outside = trusted_evidence.observe_main_delivery()
+    finally:
+        os.chdir(original_cwd)
     assert observation.provider_identity == "LOCAL_GIT_READONLY_V1"
+    assert from_outside.status is observation.status
+    assert from_outside.predecessor_base_sha == observation.predecessor_base_sha
+    assert from_outside.predecessor_base_tree == observation.predecessor_base_tree
+    assert from_outside.observed_head_sha == observation.observed_head_sha
+    assert from_outside.observed_head_tree == observation.observed_head_tree
+    assert from_outside.predecessor_is_ancestor == observation.predecessor_is_ancestor
+    assert from_outside.changed_paths == observation.changed_paths
+    assert from_outside.allowed_paths == observation.allowed_paths
+    assert from_outside.tracked_worktree_clean == observation.tracked_worktree_clean
     namespace, payload_fields = trusted_evidence._parse_record(
         canonical.main_delivery_payload_bytes(observation)
     )
     assert namespace == "TASK164_MAIN_DELIVERY_PAYLOAD_V1"
-    assert payload_fields["provider_identity"][0] == b"ENUM"
-    assert payload_fields["provider_identity"][1] == b"LOCAL_GIT_READONLY_V1"
+    assert payload_fields["provider_identity"] == (KIND_ENUM, b"LOCAL_GIT_READONLY_V1")
 
 
 def test_main_delivery_head_tree_mismatch_blocks() -> None:

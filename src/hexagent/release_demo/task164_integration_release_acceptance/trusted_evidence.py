@@ -40,6 +40,7 @@ from .models import (
     Task164ScopeFenceEvidence,
     Task164ScopeStatus,
     Task164SurfaceHashRecord,
+    _runtime_identity_for_version,
 )
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
@@ -420,8 +421,6 @@ def _child_surface_digest(identity_digest: str, evidence_digest: str) -> str:
 def _blocked_runtime_observation(version: Task164PythonVersion) -> Task164RuntimeObservation:
     return Task164RuntimeObservation(
         python_version=version,
-        actual_python_major_minor="",
-        runtime_identity="",
         head_sha="",
         head_tree="",
         runner_identity=Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1,
@@ -477,13 +476,13 @@ def _run_runtime(
         expected_major_minor = version.value.removeprefix("PYTHON_").replace("_", ".")
         if (
             actual_major_minor != expected_major_minor
+            or runtime_identity != _runtime_identity_for_version(version)
             or observed_head != head_sha
             or observed_tree != head_tree
             or child_runner_identity
             != Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1.value
             or child_command_identity
             != Task164CommandIdentity.TASK164_INTERNAL_DUAL_RUNTIME_PARITY_CAPTURE_V1.value
-            or not runtime_identity
         ):
             raise ValueError("parity child metadata does not match its assigned runtime")
         if any(
@@ -502,8 +501,6 @@ def _run_runtime(
         return _blocked_runtime_observation(version)
     return Task164RuntimeObservation(
         python_version=version,
-        actual_python_major_minor=actual_major_minor,
-        runtime_identity=runtime_identity,
         head_sha=observed_head,
         head_tree=observed_tree,
         runner_identity=runner_identity,
@@ -618,10 +615,8 @@ def observe_dual_runtime(
     equal = (
         first.conclusion is Task164ParityStatus.PASS
         and second.conclusion is Task164ParityStatus.PASS
-        and first.actual_python_major_minor == "3.11"
-        and second.actual_python_major_minor == "3.12"
-        and bool(first.runtime_identity)
-        and bool(second.runtime_identity)
+        and first.python_version is Task164PythonVersion.PYTHON_3_11
+        and second.python_version is Task164PythonVersion.PYTHON_3_12
         and first.head_sha == second.head_sha == head_sha
         and first.head_tree == second.head_tree == head_tree
         and first.runner_identity is Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1

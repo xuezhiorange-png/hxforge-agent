@@ -7,7 +7,7 @@ it never serializes arbitrary objects or replays an upstream calculation.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from enum import Enum
 from uuid import UUID, uuid5
@@ -78,6 +78,7 @@ from .models import (
     Task164Request,
     Task164RuntimeObservation,
     Task164ScenarioClaim,
+    Task164ScenarioId,
     Task164ScenarioObservation,
     Task164ScenarioRecord,
     Task164ScenarioSetup,
@@ -87,6 +88,7 @@ from .models import (
     Task164Task163ReplayEvidence,
     Task164TerminalCapability,
     Task164TypedBlockedResult,
+    _runtime_identity_for_version,
 )
 from .trusted_evidence import MainDeliveryObservation
 
@@ -963,12 +965,6 @@ def _runtime_observation_bytes(value: Task164RuntimeObservation) -> bytes:
         "TASK164_RUNTIME_OBSERVATION_V1",
         (
             _field("python_version", KIND_ENUM, _enum(value.python_version)),
-            _field(
-                "actual_python_major_minor",
-                KIND_STRING,
-                _string(value.actual_python_major_minor),
-            ),
-            _field("runtime_identity", KIND_STRING, _string(value.runtime_identity)),
             _hash_field("head_sha", value.head_sha),
             _hash_field("head_tree", value.head_tree),
             _field("runner_identity", KIND_ENUM, _enum(value.runner_identity)),
@@ -1003,7 +999,7 @@ def dual_runtime_observation_bytes(value: Task164DualRuntimeObservation) -> byte
 
 def terminal_capability_bytes(value: Task164TerminalCapability) -> bytes:
     return frame_record(
-        "TASK164_TERMINAL_CAPABILITY_V1",
+        "TASK164_TERMINAL_CAPABILITY_PAYLOAD_V1",
         (
             _field("capability_id", KIND_ENUM, _enum(value.capability_id)),
             _field("construction_family", KIND_ENUM, _enum(value.construction_family)),
@@ -1140,16 +1136,24 @@ def positive_demonstration_payload_bytes(
 
 def negative_demonstration_payload_bytes(
     values: Iterable[Task164ScenarioRecord],
+    *,
+    observed_diagnostics: Mapping[Task164ScenarioId, object] | None = None,
 ) -> bytes:
-    def expected_stage(item: Task164ScenarioRecord) -> Task164FailureStage:
-        if item.scenario_id is TASK164_SCENARIO_IDS[6]:
-            return Task164FailureStage.RAW_BOUNDARY
-        return Task164FailureStage.TASK163_REPLAY
+    selected = tuple(item for item in values if item.scenario_id in TASK164_SCENARIO_IDS[5:9])
+    if observed_diagnostics is None:
+        from .scenarios import diagnostic_for_record
 
-    def observed_failure_code(item: Task164ScenarioRecord) -> Task164FailureCode:
-        if item.scenario_id is TASK164_SCENARIO_IDS[8]:
-            return Task164FailureCode.TASK163_RESULT_HASH_MISMATCH
-        return Task164FailureCode.TASK163_REPLAY_BLOCKED
+        observed_diagnostics = {item.scenario_id: diagnostic_for_record(item) for item in selected}
+
+    def diagnostic(item: Task164ScenarioRecord) -> tuple[Task164FailureStage, Task164FailureCode]:
+        value = observed_diagnostics.get(item.scenario_id)
+        if value is None:
+            raise ValueError("missing observed scenario diagnostic")
+        stage = getattr(value, "stage", None)
+        code = getattr(value, "code", None)
+        if type(stage) is not Task164FailureStage or type(code) is not Task164FailureCode:
+            raise TypeError("invalid observed scenario diagnostic")
+        return stage, code
 
     records = tuple(
         frame_record(
@@ -1159,15 +1163,14 @@ def negative_demonstration_payload_bytes(
                 _field(
                     "expected_failure_stage",
                     KIND_ENUM,
-                    _enum(expected_stage(item)),
+                    _enum(diagnostic(item)[0]),
                 ),
-                _field("observed_failure_code", KIND_ENUM, _enum(observed_failure_code(item))),
+                _field("observed_failure_code", KIND_ENUM, _enum(diagnostic(item)[1])),
                 _field("outcome", KIND_ENUM, _enum(item.observation.observed_outcome)),
                 _field("evidence_refs", KIND_TUPLE, _tuple_strings(item.observation.evidence_refs)),
             ),
         )
-        for item in values
-        if item.scenario_id in TASK164_SCENARIO_IDS[5:9]
+        for item in selected
     )
     return frame_record(
         "TASK164_NEGATIVE_DEMONSTRATION_PAYLOAD_V1",
@@ -1211,8 +1214,16 @@ def python_parity_payload_bytes(value: Task164DeterminismEvidence) -> bytes:
             ),
             _hash_field("verified_head_sha", first.head_sha),
             _hash_field("verified_head_tree", first.head_tree),
-            _field("python311_runtime_identity", KIND_STRING, _string(first.runtime_identity)),
-            _field("python312_runtime_identity", KIND_STRING, _string(second.runtime_identity)),
+            _field(
+                "python311_runtime_identity",
+                KIND_STRING,
+                _string(_runtime_identity_for_version(first.python_version)),
+            ),
+            _field(
+                "python312_runtime_identity",
+                KIND_STRING,
+                _string(_runtime_identity_for_version(second.python_version)),
+            ),
             _field("surfaces", KIND_TUPLE, _tuple_enums(surfaces)),
             _hash_field("child311_digest", first.child_output_sha256),
             _hash_field("child312_digest", second.child_output_sha256),
@@ -1246,7 +1257,7 @@ def scenario_matrix_bytes(values: Iterable[Task164ScenarioRecord]) -> bytes:
 
 def scope_fence_bytes(value: Task164ScopeFenceEvidence) -> bytes:
     return frame_record(
-        "TASK164_SCOPE_FENCE_V1",
+        "TASK164_SCOPE_FENCE_PAYLOAD_V1",
         (
             _field(
                 "forbidden_capability_tokens",

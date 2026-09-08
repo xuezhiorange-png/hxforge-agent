@@ -173,6 +173,14 @@ class Task164PythonVersion(StrEnum):
     PYTHON_3_12 = "PYTHON_3_12"
 
 
+def _runtime_identity_for_version(value: Task164PythonVersion) -> str:
+    if value is Task164PythonVersion.PYTHON_3_11:
+        return "cpython:3.11"
+    if value is Task164PythonVersion.PYTHON_3_12:
+        return "cpython:3.12"
+    raise ValueError("unsupported TASK164 runtime version")
+
+
 class Task164RunnerIdentity(StrEnum):
     TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1 = "TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1"
 
@@ -500,8 +508,6 @@ class Task164CrossPythonParityInput:
 @dataclass(frozen=True, slots=True)
 class Task164RuntimeObservation:
     python_version: Task164PythonVersion
-    actual_python_major_minor: str
-    runtime_identity: str
     head_sha: str
     head_tree: str
     runner_identity: Task164RunnerIdentity

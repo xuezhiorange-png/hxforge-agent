@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -121,7 +122,11 @@ from .models import (
 )
 from .provenance import build_provenance_semantic_inputs, build_success_provenance
 from .raw_projection import project_raw_request_with_diagnostics
-from .scenarios import execute_scenario, task163_request_raw
+from .scenarios import (
+    diagnostic_for_record,
+    execute_scenario_with_diagnostic,
+    task163_request_raw,
+)
 from .trusted_evidence import observe_dual_runtime, observe_main_delivery, observe_scope_fence
 
 TASK163_APPLICABILITY_CHECKS = tuple(item.value for item in Task163ApplicabilityCheckName)
@@ -574,6 +579,7 @@ def _build_payloads(
     producer_completeness: object,
     producer_result: Task163ValidationResult,
     original_projection: bytes,
+    observed_diagnostics: Mapping[object, object] | None = None,
 ) -> tuple[Task164EvidencePackage, Task164AcceptanceLedger]:
     authority = _payload(
         Task164EvidencePayloadKind.AUTHORITY_CHAIN_PAYLOAD,
@@ -642,7 +648,10 @@ def _build_payloads(
         Task164EvidencePayloadKind.NEGATIVE_DEMONSTRATION_PAYLOAD,
         Task164AcceptanceCategory.NEGATIVE_FAIL_CLOSED_COVERAGE,
         Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION,
-        negative_demonstration_payload_bytes(scenarios),
+        negative_demonstration_payload_bytes(
+            scenarios,
+            observed_diagnostics=observed_diagnostics,
+        ),
         ("TASK164_SCENARIO_MATRIX",),
     )
     repeat = _payload(
@@ -845,6 +854,29 @@ def _make_repeat_observation(
     )
 
 
+def _scenario_diagnostic_errors(executions: tuple[object, ...]) -> tuple[Task164Blocker, ...]:
+    errors: list[Task164Blocker] = []
+    for execution in executions:
+        record = execution.record
+        expected = diagnostic_for_record(record)
+        required = record.scenario_id in TASK164_SCENARIO_IDS[5:9]
+        invalid = (
+            required
+            and (
+                execution.diagnostic is None or expected is None or execution.diagnostic != expected
+            )
+        ) or (not required and execution.diagnostic is not None)
+        if invalid:
+            errors.append(
+                blocker(
+                    Task164FailureCode.SCENARIO_EVIDENCE_INVALID,
+                    Task164FailureStage.DEMONSTRATION,
+                    record.scenario_id.value,
+                )
+            )
+    return tuple(errors)
+
+
 def _make_dual_runtime(
     *,
     request: Task164Request,
@@ -958,10 +990,11 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-    scenario_records = tuple(
-        execute_scenario(by_id[scenario_id], request.original_task163_request)
+    first_executions = tuple(
+        execute_scenario_with_diagnostic(by_id[scenario_id], request.original_task163_request)
         for scenario_id in TASK164_SCENARIO_IDS
     )
+    scenario_records = tuple(execution.record for execution in first_executions)
     failed_scenarios = tuple(
         blocker(
             Task164FailureCode.SCENARIO_EVIDENCE_INVALID,
@@ -978,10 +1011,24 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-    second_scenario_records = tuple(
-        execute_scenario(by_id[scenario_id], request.original_task163_request)
+    first_diagnostic_errors = _scenario_diagnostic_errors(first_executions)
+    if first_diagnostic_errors:
+        return _typed_blocked(
+            request_hash_value,
+            first_diagnostic_errors,
+            Task164FailureStage.DEMONSTRATION,
+            projection_hash,
+        )
+    first_diagnostics = {
+        execution.record.scenario_id: execution.diagnostic
+        for execution in first_executions
+        if execution.diagnostic is not None
+    }
+    second_executions = tuple(
+        execute_scenario_with_diagnostic(by_id[scenario_id], request.original_task163_request)
         for scenario_id in TASK164_SCENARIO_IDS
     )
+    second_scenario_records = tuple(execution.record for execution in second_executions)
     second_failed_scenarios = tuple(
         blocker(
             Task164FailureCode.SCENARIO_EVIDENCE_INVALID,
@@ -996,6 +1043,34 @@ def validate_request(raw: object) -> Task164ValidationResult:
             request_hash_value,
             second_failed_scenarios,
             Task164FailureStage.DEMONSTRATION,
+            projection_hash,
+        )
+    second_diagnostic_errors = _scenario_diagnostic_errors(second_executions)
+    if second_diagnostic_errors:
+        return _typed_blocked(
+            request_hash_value,
+            second_diagnostic_errors,
+            Task164FailureStage.DEMONSTRATION,
+            projection_hash,
+        )
+    second_diagnostics = {
+        execution.record.scenario_id: execution.diagnostic
+        for execution in second_executions
+        if execution.diagnostic is not None
+    }
+    if any(
+        first_diagnostics.get(scenario_id) != second_diagnostics.get(scenario_id)
+        for scenario_id in TASK164_SCENARIO_IDS[5:9]
+    ):
+        return _typed_blocked(
+            request_hash_value,
+            (
+                blocker(
+                    Task164FailureCode.REPEAT_RUN_PARITY_FAILED,
+                    Task164FailureStage.DETERMINISM,
+                ),
+            ),
+            Task164FailureStage.DETERMINISM,
             projection_hash,
         )
 
@@ -1111,6 +1186,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
         producer_completeness=producer_completeness,
         producer_result=replayed,
         original_projection=original_projection,
+        observed_diagnostics=first_diagnostics,
     )
     if not _compare_package_claim(request.evidence_package_claim, package):
         return _typed_blocked(
@@ -1155,6 +1231,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
         applicability=producer_applicability,
         completeness=producer_completeness,
         producer_result=replayed,
+        observed_diagnostics=first_diagnostics,
     )
     pre = Task164PreResultIdentityInputs(
         schema_version=TASK164_SCHEMA_VERSION,

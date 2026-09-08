@@ -124,9 +124,16 @@ def task163_evidence_payload_hash(
     )
 
 
-def scenario_matrix_payload_hash(value: object) -> str:
+def scenario_matrix_payload_hash(
+    value: object,
+    *,
+    observed_diagnostics: object | None = None,
+) -> str:
     positive = positive_demonstration_payload_bytes(value)  # type: ignore[arg-type]
-    negative = negative_demonstration_payload_bytes(value)  # type: ignore[arg-type]
+    negative = negative_demonstration_payload_bytes(  # type: ignore[arg-type]
+        value,
+        observed_diagnostics=observed_diagnostics,  # type: ignore[arg-type]
+    )
     return sha256_hex_from_framed_bytes(
         frame_record(
             "TASK164_SCENARIO_MATRIX_AGGREGATE_V1",
@@ -178,6 +185,7 @@ def build_provenance_semantic_inputs(
     applicability: object | None = None,
     completeness: object | None = None,
     producer_result: Task163ValidationResult | None = None,
+    observed_diagnostics: object | None = None,
 ) -> Task164ProvenanceSemanticInputs:
     return Task164ProvenanceSemanticInputs(
         source_authority_payload_hash=source_authority_payload_hash(),
@@ -187,7 +195,10 @@ def build_provenance_semantic_inputs(
             completeness=completeness,
             producer_result=producer_result,
         ),
-        scenario_matrix_payload_hash=scenario_matrix_payload_hash(scenario_matrix),
+        scenario_matrix_payload_hash=scenario_matrix_payload_hash(
+            scenario_matrix,
+            observed_diagnostics=observed_diagnostics,
+        ),
         determinism_payload_hash=determinism_payload_hash(determinism_evidence),
         acceptance_ledger_payload_hash=acceptance_ledger_payload_hash(acceptance_ledger),
         evidence_package_payload_hash=evidence_package_payload_hash(evidence_package),

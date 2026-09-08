@@ -8,6 +8,8 @@ from dataclasses import dataclass, replace
 from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
     Task163ApplicabilityStatus,
     Task163CompletenessStatus,
+    Task163FailureCode,
+    Task163FailureStage,
     Task163Request,
     Task163ValidationResult,
 )
@@ -25,6 +27,8 @@ from .models import (
     Task164AcceptanceCategory,
     Task164ClaimMatchStatus,
     Task164EvidenceStatus,
+    Task164FailureCode,
+    Task164FailureStage,
     Task164ObservedIdentity,
     Task164ScenarioClaim,
     Task164ScenarioClass,
@@ -46,6 +50,19 @@ class Task164ScenarioSpec:
     real_task163_required: bool
     expected_branch: Task164Task163Branch
     expected_outcome: Task164ScenarioOutcome
+
+
+@dataclass(frozen=True, slots=True)
+class _Task164ScenarioDiagnostic:
+    stage: Task164FailureStage
+    code: Task164FailureCode
+    source_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class _Task164ScenarioExecution:
+    record: Task164ScenarioRecord
+    diagnostic: _Task164ScenarioDiagnostic | None
 
 
 TASK164_SCENARIO_MATRIX: tuple[Task164ScenarioSpec, ...] = (
@@ -216,6 +233,89 @@ def _claim_matches(claim: Task164ScenarioClaim, observed: Task163ValidationResul
         return False
 
 
+def _task164_code(source_code: Task163FailureCode) -> Task164FailureCode:
+    try:
+        return Task164FailureCode(source_code.value)
+    except ValueError:
+        return Task164FailureCode.TASK163_REPLAY_BLOCKED
+
+
+def _task164_stage(source_stage: Task163FailureStage) -> Task164FailureStage:
+    if source_stage is Task163FailureStage.RAW_BOUNDARY:
+        return Task164FailureStage.RAW_BOUNDARY
+    if source_stage is Task163FailureStage.TYPED_VALIDATION:
+        return Task164FailureStage.TYPED_VALIDATION
+    return Task164FailureStage.TASK163_REPLAY
+
+
+def _diagnostic_from_blocked(
+    observed: Task163ValidationResult,
+) -> _Task164ScenarioDiagnostic:
+    if observed.raw_boundary_blocked is not None:
+        blockers = observed.raw_boundary_blocked.blockers
+    elif observed.typed_blocked is not None:
+        blockers = observed.typed_blocked.blockers
+    else:
+        return _Task164ScenarioDiagnostic(
+            Task164FailureStage.TASK163_REPLAY,
+            Task164FailureCode.TASK163_PRODUCER_EXCEPTION,
+            Task164FailureCode.TASK163_PRODUCER_EXCEPTION.value,
+        )
+    if not blockers:
+        return _Task164ScenarioDiagnostic(
+            Task164FailureStage.TASK163_REPLAY,
+            Task164FailureCode.TASK163_REPLAY_BLOCKED,
+            Task164FailureCode.TASK163_REPLAY_BLOCKED.value,
+        )
+    first = blockers[0]
+    return _Task164ScenarioDiagnostic(
+        _task164_stage(first.stage),
+        _task164_code(first.code),
+        first.code.value,
+    )
+
+
+def _tamper_diagnostic(
+    claim: Task164ScenarioClaim,
+    observed: Task163ValidationResult,
+) -> _Task164ScenarioDiagnostic:
+    claimed = claim.claimed_task163_validation_result
+    actual = _identity(observed)
+    if claimed is None or claimed.valid is None or actual is None:
+        return _Task164ScenarioDiagnostic(
+            Task164FailureStage.TASK163_REPLAY,
+            Task164FailureCode.TASK163_RESULT_MISMATCH,
+            Task164FailureCode.TASK163_RESULT_MISMATCH.value,
+        )
+    if claimed.valid.result_hash != actual.result_hash:
+        code = Task164FailureCode.TASK163_RESULT_HASH_MISMATCH
+    elif str(claimed.valid.result_id).lower() != actual.result_id:
+        code = Task164FailureCode.TASK163_RESULT_ID_MISMATCH
+    elif claimed.valid.provenance.provenance_hash != actual.provenance_hash:
+        code = Task164FailureCode.TASK163_PROVENANCE_MISMATCH
+    else:
+        code = Task164FailureCode.TASK163_RESULT_MISMATCH
+    return _Task164ScenarioDiagnostic(Task164FailureStage.TASK163_REPLAY, code, code.value)
+
+
+def _diagnostic_from_execution(
+    claim: Task164ScenarioClaim,
+    observed: Task163ValidationResult | None,
+    branch: Task164Task163Branch,
+) -> _Task164ScenarioDiagnostic | None:
+    if observed is None:
+        return _Task164ScenarioDiagnostic(
+            Task164FailureStage.TASK163_REPLAY,
+            Task164FailureCode.TASK163_PRODUCER_EXCEPTION,
+            Task164FailureCode.TASK163_PRODUCER_EXCEPTION.value,
+        )
+    if branch is not Task164Task163Branch.VALID:
+        return _diagnostic_from_blocked(observed)
+    if not _claim_matches(claim, observed):
+        return _tamper_diagnostic(claim, observed)
+    return None
+
+
 def _expected_category(spec: Task164ScenarioSpec) -> Task164AcceptanceCategory:
     if spec.scenario_class is Task164ScenarioClass.POSITIVE_PRODUCER:
         return Task164AcceptanceCategory.POSITIVE_DEMONSTRATION_COVERAGE
@@ -269,10 +369,10 @@ def _claim_matches_spec(claim: Task164ScenarioClaim, spec: Task164ScenarioSpec) 
     return True
 
 
-def execute_scenario(
+def execute_scenario_with_diagnostic(
     claim: Task164ScenarioClaim,
     fallback_request: Task163Request,
-) -> Task164ScenarioRecord:
+) -> _Task164ScenarioExecution:
     spec = scenario_spec(claim.scenario_id)
     refs = tuple(sorted(claim.claimed_evidence_refs, key=lambda item: item.encode("utf-8")))
     claim_spec_valid = _claim_matches_spec(claim, spec)
@@ -320,7 +420,7 @@ def execute_scenario(
         )
     elif spec.scenario_class is Task164ScenarioClass.NEGATIVE_PRODUCER:
         tamper_mismatch = (
-            spec.scenario_id.endswith("TAMPER")
+            claim.input_setup.tamper_target is not None
             and observed is not None
             and not _claim_matches(claim, observed)
         )
@@ -380,7 +480,7 @@ def execute_scenario(
         observed_outcome=outcome,
         evidence_refs=refs,
     )
-    return Task164ScenarioRecord(
+    record = Task164ScenarioRecord(
         scenario_id=claim.scenario_id,
         claim=claim,
         observation=observation,
@@ -390,6 +490,60 @@ def execute_scenario(
         if outcome in {Task164ScenarioOutcome.PASS, Task164ScenarioOutcome.NEGATIVE_PASS}
         else Task164EvidenceStatus.REJECTED,
     )
+    return _Task164ScenarioExecution(
+        record=record,
+        diagnostic=(
+            _diagnostic_from_execution(claim, observed, branch)
+            if spec.scenario_class is Task164ScenarioClass.NEGATIVE_PRODUCER
+            else None
+        ),
+    )
 
 
-__all__ = ["TASK164_SCENARIO_MATRIX", "Task164ScenarioSpec", "execute_scenario", "scenario_spec"]
+def execute_scenario(
+    claim: Task164ScenarioClaim,
+    fallback_request: Task163Request,
+) -> Task164ScenarioRecord:
+    return execute_scenario_with_diagnostic(claim, fallback_request).record
+
+
+def diagnostic_for_record(
+    record: Task164ScenarioRecord,
+) -> _Task164ScenarioDiagnostic | None:
+    branch = record.observation.observed_task163_branch
+    claimed = record.claim.claimed_task163_validation_result
+    if branch is Task164Task163Branch.VALID:
+        if record.replay_evidence.claim_match_status is not Task164ClaimMatchStatus.MISMATCHED:
+            return None
+        actual = record.observation.observed_task163_result_identity_or_none
+        if claimed is None or claimed.valid is None or actual is None:
+            return _Task164ScenarioDiagnostic(
+                Task164FailureStage.TASK163_REPLAY,
+                Task164FailureCode.TASK163_RESULT_MISMATCH,
+                Task164FailureCode.TASK163_RESULT_MISMATCH.value,
+            )
+        if claimed.valid.result_hash != actual.result_hash:
+            code = Task164FailureCode.TASK163_RESULT_HASH_MISMATCH
+        elif str(claimed.valid.result_id).lower() != actual.result_id:
+            code = Task164FailureCode.TASK163_RESULT_ID_MISMATCH
+        elif claimed.valid.provenance.provenance_hash != actual.provenance_hash:
+            code = Task164FailureCode.TASK163_PROVENANCE_MISMATCH
+        else:
+            code = Task164FailureCode.TASK163_RESULT_MISMATCH
+        return _Task164ScenarioDiagnostic(Task164FailureStage.TASK163_REPLAY, code, code.value)
+    if claimed is not None:
+        return _diagnostic_from_blocked(claimed)
+    return _Task164ScenarioDiagnostic(
+        Task164FailureStage.TASK163_REPLAY,
+        Task164FailureCode.TASK163_REPLAY_BLOCKED,
+        Task164FailureCode.TASK163_REPLAY_BLOCKED.value,
+    )
+
+
+__all__ = [
+    "TASK164_SCENARIO_MATRIX",
+    "Task164ScenarioSpec",
+    "diagnostic_for_record",
+    "execute_scenario",
+    "scenario_spec",
+]
