@@ -54,6 +54,7 @@ from hexagent.release_demo.task164_integration_release_acceptance.raw_projection
 )
 from hexagent.release_demo.task164_integration_release_acceptance.scenarios import (
     TASK164_SCENARIO_MATRIX,
+    execute_scenario,
 )
 from tests.exchangers.shell_tube.test_task162_thermal_performance_closure import (
     _raw as task162_raw,
@@ -252,7 +253,7 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         evidence_package_claim=_blank_package_claim(),
         request_metadata=(),
     )
-    scenario_records = tuple(service.execute_scenario(claim, original) for claim in claims)
+    scenario_records = tuple(execute_scenario(claim, original) for claim in claims)
     assert all(record.status is m.Task164EvidenceStatus.PASS for record in scenario_records)
     task163_evidence = m.Task164Task163Evidence(
         original_request_projection_hash=canonical.task163_request_projection_hash(original),
@@ -264,7 +265,7 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         ),
         status=m.Task164EvidenceStatus.PASS,
     )
-    second_scenario_records = tuple(service.execute_scenario(claim, original) for claim in claims)
+    second_scenario_records = tuple(execute_scenario(claim, original) for claim in claims)
     second_task163_evidence = m.Task164Task163Evidence(
         original_request_projection_hash=canonical.task163_request_projection_hash(original),
         replay_evidence=tuple(record.replay_evidence for record in second_scenario_records),
