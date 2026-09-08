@@ -109,6 +109,7 @@ from .models import (
     Task164Request,
     Task164Result,
     Task164ScenarioClaim,
+    Task164ScenarioId,
     Task164ScenarioRecord,
     Task164ScopeFenceEvidence,
     Task164ScopeStatus,
@@ -579,7 +580,7 @@ def _build_payloads(
     producer_completeness: object,
     producer_result: Task163ValidationResult,
     original_projection: bytes,
-    observed_diagnostics: Mapping[object, object] | None = None,
+    observed_diagnostics: Mapping[Task164ScenarioId, object] | None = None,
 ) -> tuple[Task164EvidencePackage, Task164AcceptanceLedger]:
     authority = _payload(
         Task164EvidencePayloadKind.AUTHORITY_CHAIN_PAYLOAD,
@@ -854,7 +855,7 @@ def _make_repeat_observation(
     )
 
 
-def _scenario_diagnostic_errors(executions: tuple[object, ...]) -> tuple[Task164Blocker, ...]:
+def _scenario_diagnostic_errors(executions: tuple[Any, ...]) -> tuple[Task164Blocker, ...]:
     errors: list[Task164Blocker] = []
     for execution in executions:
         record = execution.record
@@ -990,7 +991,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-    first_executions = tuple(
+    first_executions: tuple[Any, ...] = tuple(
         execute_scenario_with_diagnostic(by_id[scenario_id], request.original_task163_request)
         for scenario_id in TASK164_SCENARIO_IDS
     )
@@ -1019,12 +1020,12 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-    first_diagnostics = {
+    first_diagnostics: dict[Task164ScenarioId, object] = {
         execution.record.scenario_id: execution.diagnostic
         for execution in first_executions
         if execution.diagnostic is not None
     }
-    second_executions = tuple(
+    second_executions: tuple[Any, ...] = tuple(
         execute_scenario_with_diagnostic(by_id[scenario_id], request.original_task163_request)
         for scenario_id in TASK164_SCENARIO_IDS
     )
@@ -1053,7 +1054,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-    second_diagnostics = {
+    second_diagnostics: dict[Task164ScenarioId, object] = {
         execution.record.scenario_id: execution.diagnostic
         for execution in second_executions
         if execution.diagnostic is not None

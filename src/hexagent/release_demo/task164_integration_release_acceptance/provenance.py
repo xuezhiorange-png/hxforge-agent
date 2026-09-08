@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from uuid import UUID, uuid5
 
 from hexagent.domain.provenance import (
@@ -45,6 +46,8 @@ from .models import (
     Task164Provenance,
     Task164ProvenanceSemanticInputs,
     Task164Result,
+    Task164ScenarioId,
+    Task164ScenarioRecord,
     Task164Task163Evidence,
 )
 
@@ -125,14 +128,14 @@ def task163_evidence_payload_hash(
 
 
 def scenario_matrix_payload_hash(
-    value: object,
+    value: Iterable[Task164ScenarioRecord],
     *,
-    observed_diagnostics: object | None = None,
+    observed_diagnostics: Mapping[Task164ScenarioId, object] | None = None,
 ) -> str:
-    positive = positive_demonstration_payload_bytes(value)  # type: ignore[arg-type]
-    negative = negative_demonstration_payload_bytes(  # type: ignore[arg-type]
+    positive = positive_demonstration_payload_bytes(value)
+    negative = negative_demonstration_payload_bytes(
         value,
-        observed_diagnostics=observed_diagnostics,  # type: ignore[arg-type]
+        observed_diagnostics=observed_diagnostics,
     )
     return sha256_hex_from_framed_bytes(
         frame_record(
@@ -178,14 +181,14 @@ def evidence_package_payload_hash(value: Task164EvidencePackage) -> str:
 def build_provenance_semantic_inputs(
     *,
     task163_evidence: Task164Task163Evidence,
-    scenario_matrix: object,
+    scenario_matrix: Iterable[Task164ScenarioRecord],
     determinism_evidence: Task164DeterminismEvidence,
     acceptance_ledger: Task164AcceptanceLedger,
     evidence_package: Task164EvidencePackage,
     applicability: object | None = None,
     completeness: object | None = None,
     producer_result: Task163ValidationResult | None = None,
-    observed_diagnostics: object | None = None,
+    observed_diagnostics: Mapping[Task164ScenarioId, object] | None = None,
 ) -> Task164ProvenanceSemanticInputs:
     return Task164ProvenanceSemanticInputs(
         source_authority_payload_hash=source_authority_payload_hash(),
