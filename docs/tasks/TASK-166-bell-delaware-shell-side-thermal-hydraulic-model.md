@@ -146,6 +146,10 @@ ideal_crossflow_pressure_drop
 crossflow_pressure_drop
 window_pressure_drop
 end_zone_pressure_drop
+central_crossflow_contribution
+window_contribution
+entrance_zone_contribution
+exit_zone_contribution
 Rl Rb Rs
 total_shell_pressure_drop
 factor_evidence
@@ -256,16 +260,19 @@ Rb   = exp(-Cbp Fsbp)
 Rl   = exp(-1.33 (1+rs) rlm^p)
 p    = -0.15(1+rs) + 0.8
 ΔPs  = ΔPc + ΔPw + ΔPe
-ΔPe  = ΔPbi (1 + Ntcw/Ntcc) Rb Rs
+ΔPe  = ΔPe,in + ΔPe,out
+ΔPe,in  = ΔPbi (1 + Ntcw/Ntcc) Rb (Lbc/Lbi)^(2-n)
+ΔPe,out = ΔPbi (1 + Ntcw/Ntcc) Rb (Lbc/Lbo)^(2-n)
 Rs   = (Lbc/Lbo)^(2-n) + (Lbc/Lbi)^(2-n)
 ```
 
 `Cbp=4.5` for `Re<=100` and `3.7` otherwise. For the window term, the
 source uses `Gw=mc/sqrt(Sm Sw)`, the laminar equation for `Re<100`, and the
 turbulent equation for `Re>=100`. The result retains central crossflow,
-window, entrance, exit, end-zone, and total contributions. Heat-transfer
-`Jl/Jb/Js` are never reused as pressure-drop `Rl/Rb/Rs`; their source
-identities remain distinct.
+window, entrance, exit, end-zone, and total contributions for pressure-drop
+decomposition. The entrance and exit fields are the two source terms above,
+rather than an assumed equal split. Heat-transfer `Jl/Jb/Js` are never reused
+as pressure-drop `Rl/Rb/Rs`; their source identities remain distinct.
 
 ## 7. Validation, identity, and provenance
 

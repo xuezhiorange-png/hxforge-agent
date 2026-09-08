@@ -136,6 +136,11 @@ def test_valid_result_contains_full_heat_transfer_and_pressure_surfaces() -> Non
         value > Decimal("0")
         for value in (result.j_c, result.j_l, result.j_b, result.j_s, result.j_r)
     )
+    assert result.bell_geometry is not None
+    with localcontext(engineering_context()):
+        assert result.j_c == Decimal("0.55") + Decimal("0.72") * (
+            result.bell_geometry.pure_crossflow_tube_fraction
+        )
     with localcontext(engineering_context()):
         assert result.total_shell_pressure_drop == (
             result.crossflow_pressure_drop
@@ -170,6 +175,15 @@ def test_js_uses_authoritative_reynolds_branch(reynolds: str) -> None:
     result = _valid(_request(reynolds=reynolds, inlet_spacing="0.15", outlet_spacing="0.25"))
     assert result.j_s != Decimal("1")
     assert result.j_s > Decimal("0")
+
+
+def test_unequal_end_zone_terms_are_source_decomposed() -> None:
+    result = _valid(_request(inlet_spacing="0.15", outlet_spacing="0.25"))
+    with localcontext(engineering_context()):
+        assert result.entrance_zone_contribution + result.exit_zone_contribution == (
+            result.end_zone_pressure_drop
+        )
+    assert result.entrance_zone_contribution != result.exit_zone_contribution
 
 
 def test_identity_binding_is_required_across_upstream_records() -> None:

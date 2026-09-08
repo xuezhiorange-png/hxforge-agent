@@ -122,7 +122,9 @@ def calculate_heat_transfer(
         ji = a1 * power(Decimal("1.33") / pitch_ratio, exponent_a) * power(reynolds, a2)
         pr_exponent = -(Decimal("2") / Decimal("3"))
         ideal_h = ji * flow_specific_heat(flow) * mass_velocity * power(prandtl, pr_exponent)
-        j_c = Decimal("0.55") + Decimal("0.72") * geometry.window_tube_fraction
+        # Goncalves Eq. 47 uses Fc, the fraction in pure cross-flow, not Fw,
+        # the fraction of tubes in one baffle window.
+        j_c = Decimal("0.55") + Decimal("0.72") * geometry.pure_crossflow_tube_fraction
         j_l = Decimal("0.44") * (ONE - geometry.shell_leakage_fraction) + (
             ONE - Decimal("0.44") * (ONE - geometry.shell_leakage_fraction)
         ) * evaluate_exp(Decimal("-2.2") * geometry.leakage_area_ratio)

@@ -144,14 +144,37 @@ def calculate_pressure_drop(
                 * window_mass_velocity
                 / (Decimal("2") * density)
             )
-        end_zone_dp = (
+        end_zone_base = (
             ideal_dp
             * (ONE + geometry.window_tube_rows / geometry.central_crossflow_tube_rows)
             * r_b
-            * r_s
         )
+        # Eq. 72 gives the combined end-zone drop and Eq. 73 defines Rs as
+        # the sum of the inlet and outlet spacing terms.  Preserve those two
+        # source terms separately so unequal spacing is not reported as an
+        # artificial 50/50 split.
+        entrance_zone_dp = end_zone_base * power(
+            geometry.central_baffle_spacing_m / geometry.inlet_baffle_spacing_m,
+            Decimal("2") - n_spacing,
+        )
+        exit_zone_dp = end_zone_base * power(
+            geometry.central_baffle_spacing_m / geometry.outlet_baffle_spacing_m,
+            Decimal("2") - n_spacing,
+        )
+        end_zone_dp = entrance_zone_dp + exit_zone_dp
         total_dp = crossflow_dp + window_dp + end_zone_dp
-        values = (ideal_dp, crossflow_dp, window_dp, end_zone_dp, r_l, r_b, r_s, total_dp)
+        values = (
+            ideal_dp,
+            crossflow_dp,
+            window_dp,
+            end_zone_dp,
+            entrance_zone_dp,
+            exit_zone_dp,
+            r_l,
+            r_b,
+            r_s,
+            total_dp,
+        )
         if any(not value.is_finite() or value < ZERO for value in values):
             raise BellDelawareFailure(BlockerCode.NONFINITE_ENGINEERING_RESULT, "pressure_drop")
         factors = (
@@ -194,8 +217,8 @@ def calculate_pressure_drop(
             total_shell_pressure_drop=total_dp,
             central_crossflow_contribution=crossflow_dp,
             window_contribution=window_dp,
-            entrance_zone_contribution=end_zone_dp / Decimal("2"),
-            exit_zone_contribution=end_zone_dp / Decimal("2"),
+            entrance_zone_contribution=entrance_zone_dp,
+            exit_zone_contribution=exit_zone_dp,
             parameter_row_identity=f"{geometry.layout_angle}:{row}",
             b1=b1,
             b2=b2,
