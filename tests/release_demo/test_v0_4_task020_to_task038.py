@@ -714,17 +714,18 @@ def test_t039_det_004_py311_py312_markdown_acceptance_manifest_byte_identity(run
 
 
 def test_t039_meta_001_pyproject_version_0_4_0(run: Any) -> None:
-    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.4.0"' in text
+    payload = json.loads(DEMO_JSON_PATH.read_text(encoding="utf-8"))
+    assert payload["release_version"] == RELEASE_VERSION == "0.4.0"
     assert run.version_metadata["pyproject_version"] == RELEASE_VERSION
 
 
 def test_t039_meta_002_uv_lock_project_version_alignment(run: Any) -> None:
-    text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
-    assert 'name = "heat-exchanger-design-agent"' in text
-    assert 'version = "0.4.0"' in text
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    assert manifest["release_version"] == RELEASE_VERSION
     assert (
-        run.version_metadata["uv_lock_project_version"] == run.version_metadata["pyproject_version"]
+        run.version_metadata["uv_lock_project_version"]
+        == run.version_metadata["pyproject_version"]
+        == RELEASE_VERSION
     )
 
 

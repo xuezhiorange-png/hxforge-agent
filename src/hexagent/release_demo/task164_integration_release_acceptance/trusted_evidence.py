@@ -45,6 +45,8 @@ from .models import (
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
 BASE_MAIN_TREE = "5ff628f1327873dfd3eb195a672bb2a2c706cbdb"
+TASK164_DELIVERY_SHA = "6fd31c597cc3572f20baea42afbbaa642531fb40"
+TASK164_DELIVERY_TREE = "4a385542f49bc0c21a80c1bbf9eaa815f97a1d66"
 TASK164_CHILD_MODULE = (
     "hexagent.release_demo.task164_integration_release_acceptance.trusted_evidence"
 )
@@ -135,8 +137,28 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     tree_ok, tree = one(("rev-parse", "HEAD^{tree}"))
     base_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_SHA}^{{commit}}"))
     base_tree_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_TREE}^{{tree}}"))
-    ancestor_ok, _ = one(("merge-base", "--is-ancestor", BASE_MAIN_SHA, "HEAD"))
-    paths_ok, path_text = one(("diff", "--name-only", f"{BASE_MAIN_SHA}..HEAD"))
+    delivery_ok, _ = one(("cat-file", "-e", f"{TASK164_DELIVERY_SHA}^{{commit}}"))
+    delivery_tree_ok, delivery_tree = one(
+        ("rev-parse", f"{TASK164_DELIVERY_SHA}^{{tree}}")
+    )
+    base_to_delivery_ok, _ = one(
+        ("merge-base", "--is-ancestor", BASE_MAIN_SHA, TASK164_DELIVERY_SHA)
+    )
+    delivery_to_head_ok, _ = one(
+        ("merge-base", "--is-ancestor", TASK164_DELIVERY_SHA, "HEAD")
+    )
+    paths_ok, path_text = one(
+        ("diff", "--name-only", f"{BASE_MAIN_SHA}..{TASK164_DELIVERY_SHA}")
+    )
+    frozen_paths_ok, frozen_path_text = one(
+        (
+            "diff",
+            "--name-only",
+            f"{TASK164_DELIVERY_SHA}..HEAD",
+            "--",
+            *TASK164_ALLOWLIST,
+        )
+    )
     clean_code, _, _ = _run_git(git, root, ("diff", "--quiet", "HEAD", "--"))
     cached_code, _, _ = _run_git(git, root, ("diff", "--cached", "--quiet"))
     clean = clean_code == 0 and cached_code == 0
@@ -151,12 +173,21 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
         and len(tree) == 40
         and all(char in "0123456789abcdef" for char in head + tree)
     )
+    delivery_identity_ok = (
+        delivery_ok
+        and delivery_tree_ok
+        and delivery_tree == TASK164_DELIVERY_TREE
+    )
+    ancestor_ok = base_to_delivery_ok and delivery_to_head_ok
+    frozen_paths_unchanged = frozen_paths_ok and not frozen_path_text
     status = (
         Task164ParityStatus.PASS
         if base_ok
         and base_tree_ok
+        and delivery_identity_ok
         and ancestor_ok
         and paths_ok
+        and frozen_paths_unchanged
         and clean
         and identity_ok
         and set(paths).issubset(set(TASK164_ALLOWLIST))
