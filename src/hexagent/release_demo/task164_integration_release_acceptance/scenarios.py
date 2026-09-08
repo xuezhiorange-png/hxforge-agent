@@ -22,6 +22,7 @@ from .canonical import (
     task163_validation_projection_bytes,
 )
 from .models import (
+    Task164AcceptanceCategory,
     Task164ClaimMatchStatus,
     Task164EvidenceStatus,
     Task164ObservedIdentity,
@@ -34,7 +35,6 @@ from .models import (
     Task164ScenarioRecord,
     Task164Task163Branch,
     Task164Task163ReplayEvidence,
-    Task164AcceptanceCategory,
 )
 
 

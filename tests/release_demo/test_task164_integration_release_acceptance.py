@@ -122,7 +122,8 @@ def _task163_scenario_claim(
     scenario_id: m.Task164ScenarioId,
     original: Task163Request,
     base_outcome: Task163ValidationResult,
-    scenario_context: tuple[Task163Request, Task163ValidationResult, dict[str, object]] | None = None,
+    scenario_context: tuple[Task163Request, Task163ValidationResult, dict[str, object]]
+    | None = None,
 ) -> m.Task164ScenarioClaim:
     spec = next(item for item in TASK164_SCENARIO_MATRIX if item.scenario_id is scenario_id)
     authority = spec.input_authority
@@ -252,9 +253,7 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         ),
         status=m.Task164EvidenceStatus.PASS,
     )
-    second_scenario_records = tuple(
-        service.execute_scenario(claim, original) for claim in claims
-    )
+    second_scenario_records = tuple(service.execute_scenario(claim, original) for claim in claims)
     second_task163_evidence = m.Task164Task163Evidence(
         original_request_projection_hash=canonical.task163_request_projection_hash(original),
         replay_evidence=tuple(record.replay_evidence for record in second_scenario_records),
@@ -298,8 +297,6 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         dual_runtime_observation=dual,
         status=m.Task164ParityStatus.PASS,
     )
-    applicability = service._applicability()
-    completeness = service._completeness()
     original_projection = canonical.task163_request_projection_bytes(original)
     package, _ = service._build_payloads(
         main_delivery=main,

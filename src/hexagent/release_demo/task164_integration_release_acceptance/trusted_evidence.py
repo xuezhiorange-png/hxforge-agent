@@ -8,9 +8,9 @@ caller-supplied evidence as authoritative.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import os
-import ast
 import shutil
 import struct
 import subprocess
@@ -31,6 +31,7 @@ from .models import (
     Task164CrossPythonParityInput,
     Task164DualRuntimeObservation,
     Task164EvidenceAuthority,
+    Task164ForbiddenCapabilityToken,
     Task164PairingKey,
     Task164ParityStatus,
     Task164ParitySurface,
@@ -40,7 +41,6 @@ from .models import (
     Task164ScopeFenceEvidence,
     Task164ScopeStatus,
     Task164SurfaceHashRecord,
-    Task164ForbiddenCapabilityToken,
 )
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
@@ -243,7 +243,9 @@ def _projection_bytes(values: dict[str, str], names: tuple[str, ...], domain: st
 def _parent_projection_digests(input_value: Task164CrossPythonParityInput) -> tuple[str, str]:
     values = {
         "schema_version": input_value.schema_version,
-        "original_task163_request_projection_hash": input_value.original_task163_request_projection_hash,
+        "original_task163_request_projection_hash": (
+            input_value.original_task163_request_projection_hash
+        ),
         "task163_result_hash": input_value.task163_result_hash,
         "task163_result_id": input_value.task163_result_id,
         "task163_provenance_hash": input_value.task163_provenance_hash,

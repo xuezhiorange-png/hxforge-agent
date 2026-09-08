@@ -24,6 +24,7 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.canonical import 
     task162_success_replay_evidence_identity_projection,
 )
 from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
+    Task162SuccessReplayEvidenceIdentityProjection,
     Task163Applicability,
     Task163Completeness,
     Task163ValidationResult,
@@ -473,7 +474,9 @@ def _producer_pairs(values: Iterable[tuple[str, str]]) -> bytes:
     )
 
 
-def _replay_evidence_identity_bytes(value: object) -> bytes:
+def _replay_evidence_identity_bytes(
+    value: Task162SuccessReplayEvidenceIdentityProjection,
+) -> bytes:
     return frame_record(
         "TASK163_TASK162_REPLAY_EVIDENCE_IDENTITY_V1",
         (

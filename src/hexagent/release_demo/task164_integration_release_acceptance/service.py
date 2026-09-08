@@ -94,7 +94,6 @@ from .models import (
     Task164EvidenceStatus,
     Task164FailureCode,
     Task164FailureStage,
-    Task164ForbiddenCapabilityToken,
     Task164MethodAuthority,
     Task164PackageArtifactId,
     Task164PairingKey,
@@ -1040,7 +1039,10 @@ def validate_request(raw: object) -> Task164ValidationResult:
     second_terminal = _terminal_capability()
     scope = _scope_fence()
     second_scope = _scope_fence()
-    if scope.status is not Task164ScopeStatus.PASS or second_scope.status is not Task164ScopeStatus.PASS:
+    if (
+        scope.status is not Task164ScopeStatus.PASS
+        or second_scope.status is not Task164ScopeStatus.PASS
+    ):
         return _typed_blocked(
             request_hash_value,
             (blocker(Task164FailureCode.SCOPE_FENCE_FAILED, Task164FailureStage.SCOPE_FENCE),),
@@ -1061,7 +1063,12 @@ def validate_request(raw: object) -> Task164ValidationResult:
     if repeat.status is not Task164ParityStatus.PASS:
         return _typed_blocked(
             request_hash_value,
-            (blocker(Task164FailureCode.REPEAT_RUN_PARITY_FAILED, Task164FailureStage.DETERMINISM),),
+            (
+                blocker(
+                    Task164FailureCode.REPEAT_RUN_PARITY_FAILED,
+                    Task164FailureStage.DETERMINISM,
+                ),
+            ),
             Task164FailureStage.DETERMINISM,
             projection_hash,
         )
