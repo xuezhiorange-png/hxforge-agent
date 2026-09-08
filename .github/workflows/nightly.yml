@@ -70,6 +70,7 @@ jobs:
       RUN_ATTEMPT: ${{ github.run_attempt }}
       PYTHON_VERSION: "3.11"
       SHARD: full
+      PYTEST_TIMEOUT: "900"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -185,6 +186,7 @@ jobs:
       RUN_ATTEMPT: ${{ github.run_attempt }}
       PYTHON_VERSION: "3.12"
       SHARD: full
+      PYTEST_TIMEOUT: "900"
     steps:
       - uses: actions/checkout@v4
         with:
