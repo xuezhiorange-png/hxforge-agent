@@ -136,9 +136,7 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     tree_ok, tree = one(("rev-parse", "HEAD^{tree}"))
     base_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_SHA}^{{commit}}"))
     base_tree_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_TREE}^{{tree}}"))
-    ancestor_ok, _ = one(
-        ("merge-base", "--is-ancestor", TASK164_DELIVERY_SHA, "HEAD")
-    )
+    ancestor_ok, _ = one(("merge-base", "--is-ancestor", TASK164_DELIVERY_SHA, "HEAD"))
     paths_ok, path_text = one(
         ("diff", "--name-only", f"{BASE_MAIN_SHA}..{TASK164_DELIVERY_SHA}")
     )
