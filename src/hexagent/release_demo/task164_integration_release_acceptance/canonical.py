@@ -27,6 +27,7 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
     Task162SuccessReplayEvidenceIdentityProjection,
     Task163Applicability,
     Task163Completeness,
+    Task163FailureCode,
     Task163ValidationResult,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
@@ -1145,15 +1146,21 @@ def negative_demonstration_payload_bytes(
 
         observed_diagnostics = {item.scenario_id: diagnostic_for_record(item) for item in selected}
 
-    def diagnostic(item: Task164ScenarioRecord) -> tuple[Task164FailureStage, Task164FailureCode]:
+    def diagnostic(item: Task164ScenarioRecord) -> tuple[Task164FailureStage, str]:
         value = observed_diagnostics.get(item.scenario_id)
         if value is None:
             raise ValueError("missing observed scenario diagnostic")
         stage = getattr(value, "stage", None)
         code = getattr(value, "code", None)
+        source_code = getattr(value, "source_code", None)
         if type(stage) is not Task164FailureStage or type(code) is not Task164FailureCode:
             raise TypeError("invalid observed scenario diagnostic")
-        return stage, code
+        if type(source_code) is not str or (
+            source_code not in {item.value for item in Task163FailureCode}
+            and source_code not in {item.value for item in Task164FailureCode}
+        ):
+            raise TypeError("invalid observed scenario diagnostic source code")
+        return stage, source_code
 
     records = tuple(
         frame_record(

@@ -852,7 +852,10 @@ def test_task164_negative_task162_replay_rejection(success_context) -> None:
     assert claimed.typed_blocked.blockers[0].code.value == "TASK162_IDENTITY_REPLAY_FAILED"
     fields_by_name = _negative_payload_fields(result, 2)
     assert fields_by_name["expected_failure_stage"] == (KIND_ENUM, b"TASK163_REPLAY")
-    assert fields_by_name["observed_failure_code"] == (KIND_ENUM, b"TASK163_REPLAY_BLOCKED")
+    assert fields_by_name["observed_failure_code"] == (
+        KIND_ENUM,
+        b"TASK162_IDENTITY_REPLAY_FAILED",
+    )
 
 
 def test_task164_negative_task163_claim_tamper(success_context) -> None:
