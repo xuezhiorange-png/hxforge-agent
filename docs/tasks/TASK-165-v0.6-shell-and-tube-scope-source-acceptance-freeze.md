@@ -648,3 +648,294 @@ NO_STEP_IMPLIES_THE_NEXT=true
 The next gate after Draft PR + exact-head CI is an independent TASK-165
 freeze-candidate review. Ready/merge and TASK-166 each require later explicit
 authorization.
+
+## 18. Source Authority Amendment R3 — complete Bell–Delaware `Js` authority
+
+This section is the R3 amendment proposal authorized by Issue #258. It is a
+documentation-only source correction and remains a freeze candidate until its
+independent review and merge gate complete. It does not authorize TASK-166
+implementation.
+
+```text
+TASK165_R3_AUTHORITY_ISSUE=258
+TASK165_R3_STATUS=PROPOSED_PENDING_INDEPENDENT_REVIEW_AND_MERGE
+R1_HISTORY_PRESERVED=true
+R1_RESULT=BLOCKED_SOURCE_AUTHORITY_STILL_INCOMPLETE
+R2_HISTORY_PRESERVED=true
+R2_RESULT=BLOCKED_JAMIL_JS_AUTHORITY_INCOMPLETE
+TASK166_IMPLEMENTATION_RESUME_AUTHORIZED=false
+TASK167_AUTHORIZED=false
+```
+
+### 18.1 Reconciled `psi_n` task boundary
+
+The primary Gonçalves/Costa/Bagajewicz article distinguishes the tube-count
+relation from the fixed-geometry shell-side rating relations. In its tube
+count equations (7)--(9), `psi_n` represents omitted tubes caused by multiple
+tube passes and is selected as a function of tube passes and shell diameter.
+The Bell--Delaware fixed-geometry rating equations begin later with the
+ideal/corrected shell-side heat-transfer and pressure-drop relations. The
+article's rating model explicitly assumes uniformly distributed baffles for
+that presentation.
+
+Accordingly, the R3 task-boundary correction is:
+
+```text
+PSI_N_TASK_BOUNDARY_VERIFIED=true
+PSI_N_REQUIRED_BY_TASK166=false
+PSI_N_DISPOSITION=TASK168_IF_SIZING_REQUIRES_IT
+PSI_N_CAPABILITY_DELETED=false
+PSI_N_TASK166_FIXED_GEOMETRY_RATING_INPUT=false
+```
+
+`psi_n` is therefore re-homed as a possible TASK-168 tube-count / multi-pass
+sizing prerequisite within the already frozen sizing scope. This does not
+remove the capability, add a task, or change any TASK-165 product semantics.
+It is not an input to TASK-166 fixed-geometry `Jc`, `Jl`, `Jb`, `Js`, `Jr`,
+`Rl`, `Rb`, `Rs`, shell-side heat-transfer, or shell-side pressure-drop
+rating.
+
+### 18.2 Independently admitted Jamil supplemental authority
+
+The accepted author manuscript for the following peer-reviewed article was
+independently retrieved from the Northumbria University Research Portal and
+read through its Bell--Delaware section and Appendix A:
+
+```text
+SOURCE_ID=SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS
+AUTHORS=Muhammad Ahmad Jamil; Talha S. Goraya; Muhammad Wakil Shahzad; Syed M. Zubair
+TITLE=Exergoeconomic optimization of a shell-and-tube heat exchanger
+PUBLICATION=Energy Conversion and Management
+VOLUME=226
+ARTICLE=113462
+YEAR=2020
+DOI=10.1016/j.enconman.2020.113462
+SOURCE_CLASS=PEER_REVIEWED_JOURNAL_ARTICLE
+SOURCE_ARTIFACT=Northumbria University accepted author manuscript
+SOURCE_ARTIFACT_LOCATION=https://researchportal.northumbria.ac.uk/ws/files/40570913/sthx.pdf
+SOURCE_ARTIFACT_SHA256=a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970
+SOURCE_ARTIFACT_LICENSE=CC-BY-NC-ND
+EXACT_LOCATION=Appendix, Table A.1, manuscript p.57
+SOURCE_ROLE=SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY
+```
+
+Table A.1 supplies complete layout/Re-regime rows containing `a1`, `a2`,
+`a3`, `a4` for the ideal tube-bank heat-transfer parameterization and `b1`,
+`b2`, `b3`, `b4` for the ideal tube-bank friction-factor parameterization.
+The rows provide the selection dimensions needed by the Bell--Delaware ideal
+tube-bank correlations. The accepted manuscript is admitted only for these
+two parameter families:
+
+```text
+JAMIL_A1_A4_AUTHORITY_VERIFIED=true
+JAMIL_B1_B4_AUTHORITY_VERIFIED=true
+JAMIL_SCOPE=a1_a4,b1_b4
+JAMIL_AUTHORIZED_FOR_IDEAL_TUBE_BANK_HEAT_TRANSFER_PARAMETERS=true
+JAMIL_AUTHORIZED_FOR_IDEAL_TUBE_BANK_FRICTION_PARAMETERS=true
+JAMIL_AUTHORIZED_FOR_JS=false
+```
+
+The same manuscript's Table A.2 contains a `Js`-labelled expression, but R2
+correctly found that it does not close the exponent selection and complete
+applicability contract required by TASK-166. It remains non-authoritative for
+`Js`; it is not silently promoted by this amendment.
+
+### 18.3 Formal `Js` source verification
+
+The following is the formal journal source for the previously open unequal
+baffle-spacing heat-transfer correction gap:
+
+```text
+SOURCE_ID=SRC-SAIF-TARIQ-2025-JMES-UNEQUAL-BAFFLE-SPACING-JS
+AUTHORS=Mohd Saif Sonu; Mohammad Tariq
+TITLE=The impact of baffle configuration on the performance of a shell-and-tube heat exchanger using the Bell-Delaware approach
+PUBLICATION=Journal of Mechanical Engineering and Sciences
+VOLUME=19
+ISSUE=4
+PAGES=10877-10888
+YEAR=2025
+DOI=10.15282/jmes.19.4.2025.4.0852
+SOURCE_ARTICLE_LOCATION=https://journal.ump.edu.my/jmes/article/view/12360
+SOURCE_PDF_LOCATION=https://journal.ump.edu.my/jmes/article/download/12360/3856/55250
+SOURCE_PDF_SHA256=0f66f8efbb4ce071a5408bed5f938d4d659189c199231289e674b92f1d0c9571
+SOURCE_PDF_BYTES=1361143
+SOURCE_LICENSE=CC-BY-NC-4.0
+SOURCE_ROLE=SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_JS_ONLY
+EXACT_LOCATION=Section 2.1.3, printed p.10882, Eq.(21), with spacing labels/definitions in the adjoining baffle-spacing figure and text
+```
+
+The formal article presents the Bell--Delaware shell-side heat-transfer
+correction as `h_s = h_id J_c J_l J_b J_s J_r` in Eq. (17). Its Eq. (21)
+defines the unequal-inlet/outlet-spacing heat-transfer correction as:
+
+```text
+Js = ((Nb - 1) + (Lbi/Lbc)^(1-n1) + (Lbo/Lbc)^(1-n1))
+     / ((Nb - 1) + (Lbi/Lbc) + (Lbo/Lbc))
+```
+
+The R3 amendment records the source semantics as follows:
+
+```text
+JS_CORRECTION_FAMILY=UNEQUAL_BAFFLE_SPACING_HEAT_TRANSFER
+JS_RELATION_ID=SAIF_TARIQ_2025_JMES_EQ21
+JS_EQUATION_VERIFIED=true
+JS_VARIABLE_SEMANTICS_VERIFIED=true
+JS_NB_SEMANTIC=number_of_baffles
+JS_LBI_SEMANTIC=inlet_baffle_spacing
+JS_LBC_SEMANTIC=central_baffle_spacing
+JS_LBO_SEMANTIC=outlet_baffle_spacing
+JS_N1_SEMANTIC=Reynolds_selected_spacing_exponent
+JS_NUMERATOR_SEMANTICS=(Nb-1)_plus_inlet_and_outlet_spacing_ratios_to_(1-n1)
+JS_DENOMINATOR_SEMANTICS=(Nb-1)_plus_unpowered_inlet_and_outlet_spacing_ratios
+JS_REYNOLDS_BOUNDARY_VERIFIED=true
+JS_RE_GE_100_N1=0.6
+JS_RE_LT_100_N1=1/3
+JS_RE_BOUNDARY_INCLUSIVE_SIDE=RE_GE_100
+JS_UNIFORM_SPACING_LIMIT_VERIFIED=true
+JS_LIMITING_RULE_VERIFIED=true
+JS_UNIFORM_SPACING_CONDITION=Lbi=Lbc=Lbo
+JS_UNIFORM_SPACING_VALUE=1
+JS_BAFFLE_COUNT_TERMS_VERIFIED=true
+JS_PHYSICAL_DENOMINATOR_DOMAIN=Nb_is_a_positive_physical_count_and_Lbi,Lbc,Lbo_are_finite_positive_spacings
+JS_PHYSICAL_DENOMINATOR_DOMAIN_IS_INPUT_PRECONDITION=true
+JS_INVALID_DOMAIN_ACTION=SOURCE_REQUIRED_OR_BLOCKED
+```
+
+The source's exact threshold is inclusive at `Re = 100`: `n1 = 0.6` for
+`Re >= 100`, and `n1 = 1/3` for `Re < 100`. The source explicitly assigns
+`Js = 1` when all baffle spacings are uniform. The implementation must retain
+that explicit limiting branch and must reject a non-finite or non-positive
+physical spacing, an invalid baffle count, or a non-positive/non-finite
+formula denominator rather than extrapolating.
+
+The article's evaluated Bell--Delaware model is a single-phase, segmental-
+baffle shell-and-tube model with a TEMA E-type, one shell pass and a single-
+pass fixed-tube-sheet case. The `Js` authority is therefore admitted only for
+current cases whose geometry authority supplies the source variables and
+whose model is within the verified segmental-baffle/source envelope. This
+source does not authorize silent extension to another baffle family,
+multi-shell-pass arrangement, two-phase service, or an unverified geometry
+representation.
+
+The article also confirms that `Rs` is a pressure-drop end-zone correction;
+that pressure-drop quantity is not the heat-transfer `Js` relation. No
+pressure-drop authority is transferred by this amendment.
+
+The resulting closure assertions are:
+
+```text
+JS_SOURCE_IDENTITY_VERIFIED=true
+JS_EQUATION_VERIFIED=true
+JS_VARIABLE_SEMANTICS_VERIFIED=true
+JS_EXPONENT_SELECTION_VERIFIED=true
+JS_REYNOLDS_BOUNDARY_VERIFIED=true
+JS_UNIFORM_SPACING_LIMIT_VERIFIED=true
+JS_APPLICABILITY_VERIFIED=true
+JS_COMPLETE_IMPLEMENTATION_AUTHORITY_VERIFIED=true
+```
+
+### 18.4 Effective source hierarchy after R3
+
+R3 does not blend authorities. The effective hierarchy for TASK-166 is:
+
+```text
+Bell 1963
+  = METHOD_ORIGIN_AND_PROVENANCE
+
+Gonçalves / Costa / Bagajewicz 2019
+  = PRIMARY_IMPLEMENTATION_EQUATION_AUTHORITY
+
+Jamil / Goraya / Shahzad / Zubair 2020
+  = SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_a1_a4_AND_b1_b4
+
+Saif / Tariq 2025
+  = SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_JS_UNEQUAL_BAFFLE_SPACING_ONLY
+```
+
+```text
+GONCALVES_PRIMARY_IMPLEMENTATION_AUTHORITY=true
+GONCALVES_PRIMARY=true
+JAMIL_SCOPE_CLOSED=true
+JAMIL_AUTHORIZED_FOR_JS=false
+SAIF_TARIQ_SCOPE=Js_ONLY
+SAIF_TARIQ_SCOPE_CLOSED=true
+SUPPLEMENTAL_AUTHORITY_SCOPE_CLOSED=true
+SUPPLEMENTAL_MAY_SILENTLY_OVERRIDE_PRIMARY=false
+SERTH_REMAINS_CROSSCHECK_ONLY=true
+SOURCE_CONFLICT_POLICY=FAIL_CLOSED
+IMPLEMENTATION_SOURCE_CONFLICT=false
+```
+
+Saif/Tariq is not authorized for `Jc`, `Jl`, `Jb`, `Jr`, `Rl`, `Rb`, `Rs`,
+the ideal heat-transfer relation generally, or the ideal pressure-drop
+relation generally. Jamil is not authorized for `Js`. If a supplemental
+source conflicts materially with the selected primary relation or with
+another authorized source on an overlapping surface, the affected output is
+blocked; the sources are never averaged, arbitrarily selected, or silently
+overridden.
+
+### 18.5 Wiley Supporting Information and TASK-032 disposition
+
+The official Wiley article record confirms the attachment identity
+`aic16602-sup-0001-Supinfo.docx` under DOI `10.1002/aic.16602`, but the
+attachment bytes were not obtained in this amendment. Its content is not
+represented as verified:
+
+```text
+WILEY_SI_ATTACHMENT_IDENTITY_VERIFIED=true
+WILEY_SI_BYTES_OBTAINED=false
+WILEY_SI_TABLE_CONTENT_VERIFIED=false
+WILEY_SI_TABLE_S2_S3_REQUIRED_AS_EXCLUSIVE_TASK166_PREREQUISITE=false
+```
+
+The Jamil Table A.1 evidence closes the `a1`--`a4` and `b1`--`b4`
+supplemental parameter requirement without claiming Wiley Table S2/S3
+content. Table S1 / `psi_n` is now a possible TASK-168 sizing prerequisite,
+not a TASK-166 fixed-geometry rating prerequisite.
+
+The current TASK-032 authority explicitly records that its flow-regime
+classification is not computable. TASK-166 must not cite TASK-032 as a
+general laminar/turbulent classifier for `Js`. For the `Js` branch only, the
+implementation may use an authoritative shell-side Reynolds value and the
+closed threshold above; this does not create a general TASK-032 regime
+authority.
+
+```text
+TASK032_FLOW_REGIME_CLASSIFICATION_AUTHORITY_PRESENT=false
+TASK032_FLOW_REGIME_CLASSIFICATION_NOT_COMPUTABLE=true
+TASK166_JS_REYNOLDS_SELECTION_REUSES_TASK032_REGIME_AUTHORITY=false
+TASK166_JS_REYNOLDS_SELECTION_USES_AUTHORIZED_RE_VALUE=true
+```
+
+### 18.6 R3 scope and completion audit
+
+This amendment changes only the source-authority completeness path. It does
+not change the product boundary or any coarse work package:
+
+```text
+VERSION=HXFORGE_V0_6
+TASK_COUNT=5
+TASK165_SCOPE_CHANGED=false
+TASK_COUNT_CHANGED=false
+TASK166_SCOPE_CHANGED=false
+TASK166_WORK_PACKAGE_CHANGED=false
+TASK167_SCOPE_CHANGED=false
+TASK168_CORE_SCOPE_CHANGED=false
+TASK169_SCOPE_CHANGED=false
+GOLDEN_CLASSES_CHANGED=false
+NUMERIC_TOLERANCE_POLICY_CHANGED=false
+NON_SCOPE_CHANGED=false
+PRODUCTION_FILES_CHANGED=false
+TEST_FILES_CHANGED=false
+WORKFLOW_FILES_CHANGED=false
+DEPENDENCIES_CHANGED=false
+TASK166_SOURCE_AUTHORITY_COMPLETE=true
+TASK165_R3_AMENDMENT_AUTHORED=true
+TASK166_IMPLEMENTATION_RESUME_AUTHORIZED=false
+TASK167_STARTED=false
+```
+
+No Bell--Delaware formula, coefficient table, implementation package, test,
+workflow, or dependency is added by R3. The next gate remains independent
+review of this TASK-165 amendment, followed by separately authorized
+Ready/merge and TASK-166 implementation gates.
