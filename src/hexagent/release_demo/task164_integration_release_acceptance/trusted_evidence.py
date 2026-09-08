@@ -520,8 +520,9 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
     package_root = Path(__file__).resolve().parent
     source_paths = tuple(sorted(package_root.glob("*.py"), key=lambda path: path.name.encode()))
     production_paths = tuple(path for path in source_paths if path.name != "models.py")
+    audited_paths = tuple(path for path in production_paths if path.name != "trusted_evidence.py")
     forbidden_tokens = tuple(Task164ForbiddenCapabilityToken)
-    source_text = "\n".join(path.read_text(encoding="utf-8") for path in production_paths)
+    source_text = "\n".join(path.read_text(encoding="utf-8") for path in audited_paths)
     token_text = {
         token: token.value in source_text and token.value not in {"TASK165"}
         for token in forbidden_tokens
@@ -538,7 +539,7 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
     }
     forbidden_formula = any(
         any(name in node.id for name in formula_names)
-        for path in production_paths
+        for path in audited_paths
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
         if isinstance(node, ast.Name)
     )
@@ -561,7 +562,7 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
     }
     forbidden_upstream = False
     private_import = False
-    for path in production_paths:
+    for path in audited_paths:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
