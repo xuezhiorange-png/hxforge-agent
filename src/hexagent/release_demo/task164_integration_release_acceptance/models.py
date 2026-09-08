@@ -468,7 +468,6 @@ class Task164RepeatRunObservation:
     observed_equal: bool
     status: Task164ParityStatus
     evidence_refs: tuple[str, ...]
-    second_run_surface_records: tuple[Task164SurfaceHashRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -501,6 +500,8 @@ class Task164CrossPythonParityInput:
 @dataclass(frozen=True, slots=True)
 class Task164RuntimeObservation:
     python_version: Task164PythonVersion
+    actual_python_major_minor: str
+    runtime_identity: str
     head_sha: str
     head_tree: str
     runner_identity: Task164RunnerIdentity

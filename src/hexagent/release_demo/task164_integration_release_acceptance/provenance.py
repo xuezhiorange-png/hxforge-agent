@@ -10,6 +10,9 @@ from hexagent.domain.provenance import (
     ProvenanceNode,
     ProvenanceNodeType,
 )
+from hexagent.exchangers.shell_tube.thermal_rating_composition.models import (
+    Task163ValidationResult,
+)
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
     KIND_BOOL_FALSE,
     KIND_ENUM,
@@ -94,11 +97,16 @@ def task163_evidence_payload_hash(
     *,
     applicability: object | None = None,
     completeness: object | None = None,
+    producer_result: Task163ValidationResult | None = None,
 ) -> str:
     fields = [
         ("replay", KIND_RECORD, task163_replay_payload_bytes(value)),
         ("identity", KIND_RECORD, task163_identity_payload_bytes(value)),
-        ("provenance", KIND_RECORD, task163_provenance_payload_bytes(value)),
+        (
+            "provenance",
+            KIND_RECORD,
+            task163_provenance_payload_bytes(value, producer_result=producer_result),
+        ),
     ]
     if applicability is not None:
         fields.append(
@@ -169,6 +177,7 @@ def build_provenance_semantic_inputs(
     evidence_package: Task164EvidencePackage,
     applicability: object | None = None,
     completeness: object | None = None,
+    producer_result: Task163ValidationResult | None = None,
 ) -> Task164ProvenanceSemanticInputs:
     return Task164ProvenanceSemanticInputs(
         source_authority_payload_hash=source_authority_payload_hash(),
@@ -176,6 +185,7 @@ def build_provenance_semantic_inputs(
             task163_evidence,
             applicability=applicability,
             completeness=completeness,
+            producer_result=producer_result,
         ),
         scenario_matrix_payload_hash=scenario_matrix_payload_hash(scenario_matrix),
         determinism_payload_hash=determinism_payload_hash(determinism_evidence),

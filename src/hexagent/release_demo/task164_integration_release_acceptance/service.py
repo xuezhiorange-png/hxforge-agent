@@ -20,9 +20,11 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.service import (
     validate_request as validate_task163_request,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
+    KIND_BOOL_FALSE,
     KIND_BYTES,
     KIND_ENUM,
     KIND_INT,
+    KIND_STRING,
     frame_record,
 )
 
@@ -78,7 +80,6 @@ from .models import (
     Task164ArtifactRecord,
     Task164Blocker,
     Task164CaseBinding,
-    Task164CommandIdentity,
     Task164Completeness,
     Task164CompletenessStatus,
     Task164ConstructionFamily,
@@ -96,20 +97,16 @@ from .models import (
     Task164FailureStage,
     Task164MethodAuthority,
     Task164PackageArtifactId,
-    Task164PairingKey,
     Task164ParityStatus,
     Task164PreResultIdentityInputs,
     Task164Provenance,
     Task164PythonParityClaim,
-    Task164PythonVersion,
     Task164RawBoundaryBlockedResult,
     Task164RepeatRunClaim,
     Task164RepeatRunObservation,
     Task164RepeatRunSurface,
     Task164Request,
     Task164Result,
-    Task164RunnerIdentity,
-    Task164RuntimeObservation,
     Task164ScenarioClaim,
     Task164ScenarioRecord,
     Task164ScopeFenceEvidence,
@@ -575,6 +572,7 @@ def _build_payloads(
     scope: Task164ScopeFenceEvidence,
     producer_applicability: object,
     producer_completeness: object,
+    producer_result: Task163ValidationResult,
     original_projection: bytes,
 ) -> tuple[Task164EvidencePackage, Task164AcceptanceLedger]:
     authority = _payload(
@@ -623,7 +621,7 @@ def _build_payloads(
         Task164EvidencePayloadKind.TASK163_PROVENANCE_PAYLOAD,
         Task164AcceptanceCategory.TASK163_PROVENANCE_ACCEPTANCE,
         Task164EvidenceAuthority.TASK163_PRODUCER,
-        task163_provenance_payload_bytes(task163_evidence),
+        task163_provenance_payload_bytes(task163_evidence, producer_result=producer_result),
         ("TASK163_PRODUCER",),
     )
     terminal_payload = _payload(
@@ -758,11 +756,20 @@ def _authority_bytes() -> bytes:
         (
             ("namespace_issue", KIND_INT, b"219"),
             ("allocation_issue", KIND_INT, b"220"),
-            ("source_issue", KIND_INT, b"243"),
-            ("design_issue", KIND_INT, b"245"),
             ("lifecycle_issue", KIND_INT, b"242"),
+            ("source_issue", KIND_INT, b"243"),
+            ("source_revision", KIND_STRING, b"R1"),
             ("source_status", KIND_ENUM, b"FROZEN"),
-            ("design_status", KIND_ENUM, b"R6_FROZEN"),
+            ("design_authority_issue", KIND_INT, b"244"),
+            ("design_issue", KIND_INT, b"245"),
+            ("design_revision", KIND_STRING, b"R6"),
+            ("predecessor_task163_pr", KIND_INT, b"241"),
+            (
+                "predecessor_task163_merge_commit",
+                KIND_STRING,
+                b"66dabc275bcf1a35d97e4d57fc70c2ccf05697e9",
+            ),
+            ("task165_authority_present", KIND_BOOL_FALSE, b""),
         ),
     )
 
@@ -835,7 +842,6 @@ def _make_repeat_observation(
         observed_equal=equal,
         status=Task164ParityStatus.PASS if equal else Task164ParityStatus.BLOCKED,
         evidence_refs=("TASK164_REPEAT_RUN_INTERNAL",),
-        second_run_surface_records=second_surfaces,
     )
 
 
@@ -852,16 +858,6 @@ def _make_dual_runtime(
 ) -> Task164DualRuntimeObservation:
     if task163.valid is None:
         raise ValueError("dual runtime requires a valid producer result")
-    placeholder = Task164RuntimeObservation(
-        python_version=Task164PythonVersion.PYTHON_3_11,
-        head_sha=head_sha,
-        head_tree=head_tree,
-        runner_identity=Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1,
-        command_identity=Task164CommandIdentity.TASK164_INTERNAL_DUAL_RUNTIME_PARITY_CAPTURE_V1,
-        surface_records=(),
-        child_output_sha256="0" * 64,
-        conclusion=Task164ParityStatus.PASS,
-    )
     input_value = Task164CrossPythonParityInput(
         schema_version="task164.cross-python-input.v1",
         original_task163_request_projection_hash=task163_request_projection_hash(
@@ -877,23 +873,7 @@ def _make_dual_runtime(
             task163_completeness_payload_bytes(task163.valid.completeness)
         ),
         scenario_matrix_projection_hash=_sha(scenario_matrix_bytes(scenarios)),
-        repeat_run_evidence_projection_hash=_sha(
-            repeat_run_payload_bytes(
-                Task164DeterminismEvidence(
-                    repeat_run_observation=repeat,
-                    dual_runtime_observation=Task164DualRuntimeObservation(
-                        pairing_key=Task164PairingKey.TASK164_PYTHON_3_11__TASK164_PYTHON_3_12,
-                        python311_observation=placeholder,
-                        python312_observation=replace(
-                            placeholder, python_version=Task164PythonVersion.PYTHON_3_12
-                        ),
-                        status=Task164ParityStatus.PASS,
-                        evidence_refs=(),
-                    ),
-                    status=Task164ParityStatus.PASS,
-                )
-            )
-        ),
+        repeat_run_evidence_projection_hash=_sha(repeat_run_payload_bytes(repeat)),
         terminal_capability_projection_hash=_sha(terminal_capability_bytes(terminal)),
         scope_fence_projection_hash=_sha(scope_fence_bytes(scope)),
         head_sha=head_sha,
@@ -1129,6 +1109,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
         scope=scope,
         producer_applicability=producer_applicability,
         producer_completeness=producer_completeness,
+        producer_result=replayed,
         original_projection=original_projection,
     )
     if not _compare_package_claim(request.evidence_package_claim, package):
@@ -1173,6 +1154,7 @@ def validate_request(raw: object) -> Task164ValidationResult:
         evidence_package=package,
         applicability=producer_applicability,
         completeness=producer_completeness,
+        producer_result=replayed,
     )
     pre = Task164PreResultIdentityInputs(
         schema_version=TASK164_SCHEMA_VERSION,

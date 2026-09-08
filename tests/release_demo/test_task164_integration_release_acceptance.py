@@ -307,6 +307,7 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         scope=scope,
         producer_applicability=task163_outcome.valid.applicability,
         producer_completeness=task163_outcome.valid.completeness,
+        producer_result=task163_outcome,
         original_projection=original_projection,
     )
     payloads = (
@@ -382,6 +383,24 @@ def _valid_result(success_context):
     assert outcome.status is m.Task164ValidationBranch.VALID
     assert outcome.valid is not None
     return outcome.valid
+
+
+def _dual_runtime_from_valid_context(success_context, result):
+    raw, _, claimed = success_context
+    request, errors = service._parse_request(raw)
+    assert not errors and request is not None
+    main = trusted_evidence.observe_main_delivery()
+    assert main.status is m.Task164ParityStatus.PASS
+    return service._make_dual_runtime(
+        request=request,
+        task163=claimed,
+        scenarios=result.scenario_evidence,
+        repeat=result.determinism_evidence.repeat_run_observation,
+        terminal=result.terminal_capability,
+        scope=result.scope_fence_evidence,
+        head_sha=main.observed_head_sha,
+        head_tree=main.observed_head_tree,
+    )
 
 
 def test_task164_request_has_exact_ten_fields() -> None:
@@ -499,6 +518,7 @@ def test_task164_raw_limit_marker_canonical() -> None:
     assert marker.field_name == "__TASK164_LIMIT_MARKER__"
     assert marker.kind is m.Task164RawProjectionKind.LIMIT_MARKER
     assert marker.type_identity is None
+    assert marker.scalar_payload == m.Task164FailureCode.RAW_SCALAR_BYTE_LIMIT_EXCEEDED.value
     assert marker.children == ()
 
 
@@ -589,9 +609,18 @@ def test_task164_nested_projection_no_full_serialization(success_context) -> Non
     assert node.kind is m.Task164RawProjectionKind.RECORD
     assert len(node.children) == len(TASK164_REQUEST_FIELDS)
     assert all(child.field_name in TASK164_REQUEST_FIELDS for child in node.children)
-    assert next(
+    assert (
+        next(
+            child for child in node.children if child.field_name == "original_task163_request"
+        ).type_identity
+        == "Task163Request"
+    )
+    projected_identity = next(
         child for child in node.children if child.field_name == "original_task163_request"
-    ).scalar_payload
+    )
+    assert projected_identity.scalar_payload is not None
+    assert len(projected_identity.scalar_payload) == 64
+    assert projected_identity.children == ()
 
 
 def test_task164_task163_replay_valid(success_context) -> None:
@@ -605,13 +634,24 @@ def test_task164_task163_replay_valid(success_context) -> None:
 
 
 def test_task164_task163_replay_typed_blocked() -> None:
-    outcome = validate_task163({})
-    assert outcome.typed_blocked is not None or outcome.raw_boundary_blocked is not None
+    outcome = validate_task163(
+        {
+            "schema_version": "task163.schema.v1",
+            "task163_version": "task163.v1",
+            "source_definition_id": TASK163_SOURCE_ID,
+            "task162_result": None,
+            "task162_success_replay_evidence": None,
+            "request_metadata": (),
+        }
+    )
+    assert outcome.status is not None
+    assert outcome.typed_blocked is not None
 
 
 def test_task164_task163_replay_raw_blocked() -> None:
     outcome = validate_task163(object())
     assert outcome.raw_boundary_blocked is not None
+    assert outcome.valid is None
 
 
 def test_task164_task163_result_hash_mismatch(success_context) -> None:
@@ -650,14 +690,37 @@ def test_task164_task163_provenance_mismatch(success_context) -> None:
 def test_task164_task163_applicability_exact(success_context) -> None:
     _, _, claimed = success_context
     assert claimed.valid is not None
-    assert len(claimed.valid.applicability.checks) == 6
+    assert tuple(name for name, _ in claimed.valid.applicability.checks) == (
+        "TASK162_SUCCESS_ACCEPTED",
+        "TASK162_APPLICABILITY_ACCEPTED",
+        "TASK162_COMPLETENESS_ACCEPTED",
+        "TASK162_IDENTITY_ACCEPTED",
+        "TASK162_PROVENANCE_ACCEPTED",
+        "RATING_COMPOSITION_BINDING_COMPLETE",
+    )
+    assert all(status == "PASS" for _, status in claimed.valid.applicability.checks)
     assert claimed.valid.applicability.status.value == "APPLICABLE"
 
 
 def test_task164_task163_completeness_exact(success_context) -> None:
     _, _, claimed = success_context
     assert claimed.valid is not None
-    assert len(claimed.valid.completeness.required_fields) == 14
+    assert claimed.valid.completeness.required_fields == (
+        "ACCEPTED_TASK162_EVIDENCE",
+        "TASK162_IDENTITY_REPLAY_COMPLETE",
+        "TASK162_PROVENANCE_REPLAY_COMPLETE",
+        "RATING_PERFORMANCE_PROJECTION",
+        "HEAT_DUTY_PROJECTION",
+        "HOT_OUTLET_PROJECTION",
+        "COLD_OUTLET_PROJECTION",
+        "ENERGY_BALANCE_EVIDENCE",
+        "TERMINAL_TEMPERATURE_EVIDENCE",
+        "RATING_APPLICABILITY_LEDGER",
+        "RATING_COMPLETENESS_EVIDENCE",
+        "DEFERRED_CAPABILITY_DECLARATION",
+        "TASK163_PROVENANCE",
+        "TASK163_RESULT_IDENTITY",
+    )
     assert claimed.valid.completeness.status.value == "COMPLETE"
 
 
@@ -738,12 +801,24 @@ def test_task164_terminal_capability_matrix(success_context) -> None:
     assert capability.status is m.Task164EvidenceStatus.PASS
 
 
-def test_task164_scope_fence_lmtd_absent(success_context) -> None:
+def test_task164_scope_fence_lmtd_absent(success_context, tmp_path) -> None:
+    hostile = tmp_path / "hostile_lmtd.py"
+    hostile.write_text("def calculate_lmtd():\n    return 1\n", encoding="utf-8")
+    assert (
+        trusted_evidence.observe_scope_fence(source_root=hostile.parent).status
+        is m.Task164ScopeStatus.BLOCKED
+    )
     scope = _valid_result(success_context).scope_fence_evidence
     assert m.Task164ForbiddenCapabilityToken.LMTD in scope.forbidden_capability_tokens_absent
 
 
-def test_task164_scope_fence_f_factor_absent(success_context) -> None:
+def test_task164_scope_fence_f_factor_absent(success_context, tmp_path) -> None:
+    hostile = tmp_path / "hostile_f_factor.py"
+    hostile.write_text("def f_factor():\n    return 1\n", encoding="utf-8")
+    assert (
+        trusted_evidence.observe_scope_fence(source_root=hostile.parent).status
+        is m.Task164ScopeStatus.BLOCKED
+    )
     scope = _valid_result(success_context).scope_fence_evidence
     assert m.Task164ForbiddenCapabilityToken.F_FACTOR in scope.forbidden_capability_tokens_absent
 
@@ -753,8 +828,14 @@ def test_task164_repeat_run_all_surfaces(success_context) -> None:
     assert repeat.run_count == 2
     assert repeat.observed_equal
     assert len(repeat.surface_records) == len(m.Task164RepeatRunSurface)
-    assert len(repeat.second_run_surface_records) == len(m.Task164RepeatRunSurface)
-    assert repeat.surface_records == repeat.second_run_surface_records
+    assert tuple(item.surface for item in repeat.surface_records) == tuple(
+        m.Task164RepeatRunSurface
+    )
+    assert all(
+        record.replay_evidence.producer_invocation_count == 1
+        for record in _valid_result(success_context).scenario_evidence
+        if record.observation.real_task163_invoked
+    )
 
 
 def test_task164_repeat_run_failure_blocks() -> None:
@@ -765,6 +846,16 @@ def test_task164_repeat_run_failure_blocks() -> None:
         status=m.Task164ParityStatus.BLOCKED,
         evidence_refs=(),
     )
+    assert tuple(item.name for item in fields(observation)) == (
+        "run_count",
+        "surface_records",
+        "observed_equal",
+        "status",
+        "evidence_refs",
+    )
+    assert observation.run_count == 2
+    assert observation.surface_records == ()
+    assert not observation.observed_equal
     assert observation.status is m.Task164ParityStatus.BLOCKED
 
 
@@ -786,12 +877,49 @@ def test_task164_claimed_package_not_authoritative(success_context) -> None:
 
 
 def test_task164_evidence_category_mapping() -> None:
-    assert len(m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD) == len(m.Task164AcceptanceCategory)
+    expected = (
+        (m.Task164AcceptanceCategory.AUTHORITY_CHAIN_INTEGRITY, "AUTHORITY_CHAIN_PAYLOAD"),
+        (
+            m.Task164AcceptanceCategory.DELIVERED_MAIN_AND_PREDECESSOR_INTEGRITY,
+            "MAIN_DELIVERY_PAYLOAD",
+        ),
+        (m.Task164AcceptanceCategory.TASK163_PUBLIC_BOUNDARY_ACCEPTANCE, "TASK163_REPLAY_PAYLOAD"),
+        (
+            m.Task164AcceptanceCategory.TASK163_RESULT_IDENTITY_ACCEPTANCE,
+            "TASK163_IDENTITY_PAYLOAD",
+        ),
+        (
+            m.Task164AcceptanceCategory.TASK163_APPLICABILITY_ACCEPTANCE,
+            "TASK163_APPLICABILITY_PAYLOAD",
+        ),
+        (
+            m.Task164AcceptanceCategory.TASK163_COMPLETENESS_ACCEPTANCE,
+            "TASK163_COMPLETENESS_PAYLOAD",
+        ),
+        (m.Task164AcceptanceCategory.TASK163_PROVENANCE_ACCEPTANCE, "TASK163_PROVENANCE_PAYLOAD"),
+        (
+            m.Task164AcceptanceCategory.SUPPORTED_TERMINAL_CAPABILITY_COVERAGE,
+            "TERMINAL_CAPABILITY_PAYLOAD",
+        ),
+        (
+            m.Task164AcceptanceCategory.POSITIVE_DEMONSTRATION_COVERAGE,
+            "POSITIVE_DEMONSTRATION_PAYLOAD",
+        ),
+        (
+            m.Task164AcceptanceCategory.NEGATIVE_FAIL_CLOSED_COVERAGE,
+            "NEGATIVE_DEMONSTRATION_PAYLOAD",
+        ),
+        (m.Task164AcceptanceCategory.REPEAT_RUN_DETERMINISM, "REPEAT_RUN_PAYLOAD"),
+        (m.Task164AcceptanceCategory.CROSS_PYTHON_DETERMINISM, "PYTHON_PARITY_PAYLOAD"),
+        (m.Task164AcceptanceCategory.SCOPE_FENCE_ACCEPTANCE, "SCOPE_FENCE_PAYLOAD"),
+        (m.Task164AcceptanceCategory.EVIDENCE_PACKAGE_INTEGRITY, None),
+    )
     assert (
-        m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD[
-            m.Task164AcceptanceCategory.EVIDENCE_PACKAGE_INTEGRITY
-        ]
-        is None
+        tuple(
+            (category, payload.value if payload is not None else None)
+            for category, payload in m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD.items()
+        )
+        == expected
     )
 
 
@@ -813,7 +941,13 @@ def test_task164_acceptance_ledger_all_categories(success_context) -> None:
     assert all(item.status is m.Task164AcceptanceCategoryStatus.PASS for item in ledger.records)
 
 
-def test_task164_no_task165_or_release_side_effects(success_context) -> None:
+def test_task164_no_task165_or_release_side_effects(success_context, tmp_path) -> None:
+    hostile = tmp_path / "hostile_task165.py"
+    hostile.write_text("def TASK165():\n    return True\n", encoding="utf-8")
+    assert (
+        trusted_evidence.observe_scope_fence(source_root=hostile.parent).status
+        is m.Task164ScopeStatus.BLOCKED
+    )
     result = _valid_result(success_context)
     assert result.scope_fence_evidence.task165_absent
     assert not any(item.name == "TASK165" for item in fields(result))
@@ -858,65 +992,111 @@ def test_evidence_category_domain_substitution_rejected(success_context) -> None
     raw, _, _ = success_context
     claim = raw["evidence_package_claim"]
     assert isinstance(claim, m.Task164EvidencePackageClaim)
-    swapped = replace(
-        claim,
-        claimed_category_payload_hashes=tuple(reversed(claim.claimed_category_payload_hashes)),
-    )
-    assert (
-        task164.validate_request({**raw, "evidence_package_claim": swapped}).status
-        is m.Task164ValidationBranch.VALID
-    )
+    entries = list(claim.claimed_category_payload_hashes)
+    first_category, first_hash = entries[0]
+    second_category, second_hash = entries[1]
+    entries[0] = (first_category, second_hash)
+    entries[1] = (second_category, first_hash)
+    swapped = replace(claim, claimed_category_payload_hashes=tuple(entries))
+    outcome = task164.validate_request({**raw, "evidence_package_claim": swapped})
+    assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.EVIDENCE_PACKAGE_INTEGRITY_FAILED,)
 
 
 def test_self_consistent_scenario_claim_cannot_create_pass(success_context) -> None:
-    result = _valid_result(success_context)
-    assert result.scenario_evidence[0].observation.real_task163_invoked
+    raw, _, _ = success_context
+    claims = list(raw["scenario_claims"])
+    claims[0] = replace(claims[0], claimed_outcome=m.Task164ScenarioOutcome.BLOCKED)
+    outcome = task164.validate_request({**raw, "scenario_claims": tuple(claims)})
+    assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.SCENARIO_EVIDENCE_INVALID,)
 
 
 def test_self_consistent_repeat_claim_cannot_create_pass(success_context) -> None:
-    assert _valid_result(success_context).determinism_evidence.status is m.Task164ParityStatus.PASS
-
-
-def test_stale_head_internal_dual_runtime_observation_rejected(success_context) -> None:
-    dual = _valid_result(success_context).determinism_evidence.dual_runtime_observation
-    assert (
-        dual.python311_observation.head_sha
-        == trusted_evidence.observe_main_delivery().observed_head_sha
+    raw, _, _ = success_context
+    claim = raw["repeat_run_claim"]
+    assert isinstance(claim, m.Task164RepeatRunClaim)
+    result = _valid_result(
+        ({**raw, "repeat_run_claim": replace(claim, requested_run_count=1)}, None, None)
     )
+    assert result.determinism_evidence.status is m.Task164ParityStatus.PASS
+    assert result.determinism_evidence.repeat_run_observation.run_count == 2
 
 
-def test_wrong_runtime_internal_dual_runtime_observation_rejected(success_context) -> None:
-    dual = _valid_result(success_context).determinism_evidence.dual_runtime_observation
-    assert dual.python311_observation.python_version is m.Task164PythonVersion.PYTHON_3_11
-    assert dual.python312_observation.python_version is m.Task164PythonVersion.PYTHON_3_12
+def test_stale_head_internal_dual_runtime_observation_rejected(
+    success_context, monkeypatch
+) -> None:
+    result = _valid_result(success_context)
+    original_run_runtime = trusted_evidence._run_runtime
+
+    def stale_run_runtime(executable, version, input_bytes, head_sha, head_tree):
+        observation = original_run_runtime(executable, version, input_bytes, head_sha, head_tree)
+        if version is m.Task164PythonVersion.PYTHON_3_11:
+            return replace(observation, head_sha="0" * 40)
+        return observation
+
+    monkeypatch.setattr(trusted_evidence, "_run_runtime", stale_run_runtime)
+    dual = _dual_runtime_from_valid_context(success_context, result)
+    assert dual.status is m.Task164ParityStatus.BLOCKED
 
 
-def test_duplicate_python_pair_rejected() -> None:
-    claim = m.Task164PythonParityClaim(
-        schema_version="task164.python-parity-claim.v1",
-        requested_pair=(m.Task164PythonVersion.PYTHON_3_11, m.Task164PythonVersion.PYTHON_3_11),
-        claimed_surface_records=(),
-        claimed_evidence_refs=(),
-    )
-    assert claim.requested_pair[0] is claim.requested_pair[1]
+def test_wrong_runtime_internal_dual_runtime_observation_rejected(
+    success_context, monkeypatch
+) -> None:
+    result = _valid_result(success_context)
+    py311 = os.environ["TASK164_PY311_EXECUTABLE"]
+    py312 = os.environ["TASK164_PY312_EXECUTABLE"]
+    monkeypatch.setenv("TASK164_PY311_EXECUTABLE", py312)
+    monkeypatch.setenv("TASK164_PY312_EXECUTABLE", py311)
+    dual = _dual_runtime_from_valid_context(success_context, result)
+    assert dual.status is m.Task164ParityStatus.BLOCKED
 
 
-def test_missing_python_pair_rejected() -> None:
-    assert len((m.Task164PythonVersion.PYTHON_3_11, m.Task164PythonVersion.PYTHON_3_12)) == 2
+def test_duplicate_python_pair_rejected(success_context, monkeypatch) -> None:
+    result = _valid_result(success_context)
+    executable = os.environ["TASK164_PY311_EXECUTABLE"]
+    monkeypatch.setenv("TASK164_PY312_EXECUTABLE", executable)
+    dual = _dual_runtime_from_valid_context(success_context, result)
+    assert dual.status is m.Task164ParityStatus.BLOCKED
+    assert dual.python311_observation.conclusion is m.Task164ParityStatus.BLOCKED
+    assert dual.python312_observation.conclusion is m.Task164ParityStatus.BLOCKED
 
 
-def test_contradictory_python_pair_rejected() -> None:
-    assert m.Task164PairingKey.TASK164_PYTHON_3_11__TASK164_PYTHON_3_12.value.endswith("3_12")
+def test_missing_python_pair_rejected(success_context, monkeypatch) -> None:
+    result = _valid_result(success_context)
+    monkeypatch.setenv("TASK164_PY311_EXECUTABLE", "/definitely/missing/task164-python311")
+    monkeypatch.setenv("TASK164_PY312_EXECUTABLE", "/definitely/missing/task164-python312")
+    dual = _dual_runtime_from_valid_context(success_context, result)
+    assert dual.status is m.Task164ParityStatus.BLOCKED
+
+
+def test_contradictory_python_pair_rejected(success_context, monkeypatch) -> None:
+    result = _valid_result(success_context)
+    py311 = os.environ["TASK164_PY311_EXECUTABLE"]
+    py312 = os.environ["TASK164_PY312_EXECUTABLE"]
+    monkeypatch.setenv("TASK164_PY311_EXECUTABLE", py312)
+    monkeypatch.setenv("TASK164_PY312_EXECUTABLE", py311)
+    dual = _dual_runtime_from_valid_context(success_context, result)
+    assert dual.status is m.Task164ParityStatus.BLOCKED
 
 
 def test_claimed_package_must_match_derived_package(success_context) -> None:
-    result = _valid_result(success_context)
-    assert result.evidence_package.package_version == "task164.evidence-package.v1"
+    raw, _, _ = success_context
+    claim = raw["evidence_package_claim"]
+    assert isinstance(claim, m.Task164EvidencePackageClaim)
+    changed = replace(claim, package_version="task164.evidence-package.tampered")
+    outcome = task164.validate_request({**raw, "evidence_package_claim": changed})
+    assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.EVIDENCE_PACKAGE_INTEGRITY_FAILED,)
 
 
 def test_caller_package_cannot_self_authorize_acceptance(success_context) -> None:
     result = _valid_result(success_context)
     assert result.acceptance_ledger.status is m.Task164AcceptanceLedgerStatus.ACCEPTED
+    assert all(
+        item.status is m.Task164AcceptanceCategoryStatus.PASS
+        for item in result.acceptance_ledger.records
+    )
 
 
 def test_namespace_collision_inventory_pass() -> None:
@@ -1020,6 +1200,16 @@ def test_all_named_contract_types_have_closed_schema() -> None:
 def test_evidence_package_nonself_category_mapping_exact() -> None:
     assert (
         m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD[
+            m.Task164AcceptanceCategory.AUTHORITY_CHAIN_INTEGRITY
+        ]
+        is m.Task164EvidencePayloadKind.AUTHORITY_CHAIN_PAYLOAD
+    )
+    assert (
+        m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD[m.Task164AcceptanceCategory.SCOPE_FENCE_ACCEPTANCE]
+        is m.Task164EvidencePayloadKind.SCOPE_FENCE_PAYLOAD
+    )
+    assert (
+        m.TASK164_ACCEPTANCE_CATEGORY_TO_PAYLOAD[
             m.Task164AcceptanceCategory.EVIDENCE_PACKAGE_INTEGRITY
         ]
         is None
@@ -1043,7 +1233,27 @@ def test_untrusted_parity_evidence_cannot_become_trusted(success_context) -> Non
 def test_cross_python_trust_root_verification_exact(success_context) -> None:
     dual = _valid_result(success_context).determinism_evidence.dual_runtime_observation
     assert dual.status is m.Task164ParityStatus.PASS
-    assert dual.python311_observation.head_tree == dual.python312_observation.head_tree
+    main = trusted_evidence.observe_main_delivery()
+    assert dual.python311_observation.actual_python_major_minor == "3.11"
+    assert dual.python312_observation.actual_python_major_minor == "3.12"
+    assert dual.python311_observation.runtime_identity
+    assert dual.python312_observation.runtime_identity
+    assert dual.python311_observation.head_sha == main.observed_head_sha
+    assert dual.python312_observation.head_sha == main.observed_head_sha
+    assert dual.python311_observation.head_tree == main.observed_head_tree
+    assert dual.python312_observation.head_tree == main.observed_head_tree
+    assert (
+        dual.python311_observation.runner_identity
+        is m.Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1
+    )
+    assert (
+        dual.python312_observation.command_identity
+        is m.Task164CommandIdentity.TASK164_INTERNAL_DUAL_RUNTIME_PARITY_CAPTURE_V1
+    )
+    assert (
+        dual.python311_observation.child_output_sha256
+        == dual.python312_observation.child_output_sha256
+    )
 
 
 def test_evidence_package_dependency_dag_is_acyclic(success_context) -> None:
@@ -1063,8 +1273,24 @@ def test_cross_python_parity_input_is_complete_primitive_projection() -> None:
 
 
 def test_dual_runtime_runner_environment_matches_ci_contract() -> None:
-    assert trusted_evidence.TASK164_CHILD_MODULE.endswith("trusted_evidence")
-    assert os.environ.get("TASK164_NETWORK_DISABLED", "1") == "1"
+    assert trusted_evidence.TASK164_CHILD_ARGV == ("--child", "TASK164_PARITY_CHILD_V1")
+    assert trusted_evidence.TASK164_CHILD_ENVIRONMENT == {
+        "PYTHONHASHSEED": "0",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "PYTHONNOUSERSITE": "1",
+        "TASK164_NETWORK_DISABLED": "1",
+    }
+    assert trusted_evidence.TASK164_CHILD_OUTPUT_FIELDS == (
+        "actual_python_major_minor",
+        "runtime_identity",
+        "verified_head_sha",
+        "verified_head_tree",
+        "runner_identity",
+        "command_identity",
+        "identity_projection_sha256",
+        "evidence_projection_sha256",
+    )
 
 
 def test_warning_and_acceptance_status_types_are_closed() -> None:
@@ -1087,27 +1313,173 @@ def test_terminal_capability_matches_frozen_source_exactly(success_context) -> N
 
 
 def test_success_semantic_records_have_exact_canonical_inventory() -> None:
-    assert len(canonical.TASK164_SUCCESS_PREIMAGE_FIELD_ORDER) == 19
+    assert canonical.TASK164_SUCCESS_PREIMAGE_FIELD_ORDER == (
+        "schema_version",
+        "task164_version",
+        "implementation_software_version",
+        "source_definition_id",
+        "request_hash",
+        "original_task163_request_projection",
+        "task163_evidence",
+        "scenario_evidence",
+        "determinism_evidence",
+        "terminal_capability",
+        "demonstration_coverage",
+        "scope_fence_evidence",
+        "applicability",
+        "completeness",
+        "evidence_package",
+        "acceptance_ledger",
+        "warnings_normalized",
+        "blockers_normalized",
+        "provenance_semantic_inputs",
+    )
     assert len(fields(m.Task164Result)) == 22
 
 
-def test_acceptance_category_payload_schemas_are_exact() -> None:
+def test_acceptance_category_payload_schemas_are_exact(success_context) -> None:
+    package = _valid_result(success_context).evidence_package
+    payloads = (
+        package.authority_evidence,
+        package.main_delivery_evidence,
+        package.task163_replay_evidence,
+        package.task163_identity_evidence,
+        package.task163_applicability_evidence,
+        package.task163_completeness_evidence,
+        package.task163_provenance_evidence,
+        package.terminal_capability_evidence,
+        package.positive_demo_evidence,
+        package.negative_demo_evidence,
+        package.repeat_run_evidence,
+        package.cross_python_evidence,
+        package.scope_fence_evidence,
+    )
+    expected = (
+        (
+            "TASK164_AUTHORITY_CHAIN_PAYLOAD_V1",
+            (
+                "namespace_issue",
+                "allocation_issue",
+                "lifecycle_issue",
+                "source_issue",
+                "source_revision",
+                "source_status",
+                "design_authority_issue",
+                "design_issue",
+                "design_revision",
+                "predecessor_task163_pr",
+                "predecessor_task163_merge_commit",
+                "task165_authority_present",
+            ),
+        ),
+        (
+            "TASK164_MAIN_DELIVERY_PAYLOAD_V1",
+            (
+                "provider_identity",
+                "predecessor_base_sha",
+                "predecessor_base_tree",
+                "observed_head_sha",
+                "observed_head_tree",
+                "predecessor_is_ancestor",
+                "changed_paths",
+                "allowed_paths",
+                "tracked_worktree_clean",
+                "status",
+            ),
+        ),
+        ("TASK164_TASK163_REPLAY_PAYLOAD_V1", ("replay_records",)),
+        ("TASK164_TASK163_IDENTITY_PAYLOAD_V1", ("positive_result_identities",)),
+        ("TASK164_TASK163_APPLICABILITY_PAYLOAD_V1", ("checks",)),
+        ("TASK164_TASK163_COMPLETENESS_PAYLOAD_V1", ("required_fields", "status")),
+        (
+            "TASK164_TASK163_PROVENANCE_PAYLOAD_V1",
+            (
+                "result_provenance_hash",
+                "graph_hash",
+                "result_node_id",
+                "result_node_payload_hash",
+                "producer_evidence_refs",
+            ),
+        ),
+        (
+            "TASK164_TERMINAL_CAPABILITY_V1",
+            (
+                "capability_id",
+                "construction_family",
+                "shell_pass_count",
+                "tube_pass_count",
+                "case_binding",
+                "method_authority",
+                "rating_output_authority",
+                "status",
+            ),
+        ),
+        ("TASK164_POSITIVE_DEMONSTRATION_PAYLOAD_V1", ("scenario_records",)),
+        ("TASK164_NEGATIVE_DEMONSTRATION_PAYLOAD_V1", ("scenario_records",)),
+        (
+            "TASK164_REPEAT_RUN_PAYLOAD_V1",
+            ("run_count", "surface_records", "observed_equal", "status"),
+        ),
+        (
+            "TASK164_PYTHON_PARITY_PAYLOAD_V1",
+            (
+                "pairing_key",
+                "verified_head_sha",
+                "verified_head_tree",
+                "python311_runtime_identity",
+                "python312_runtime_identity",
+                "surfaces",
+                "child311_digest",
+                "child312_digest",
+                "equality_rule",
+                "status",
+            ),
+        ),
+        (
+            "TASK164_SCOPE_FENCE_V1",
+            (
+                "forbidden_capability_tokens",
+                "forbidden_formula_surface_absent",
+                "upstream_replay_absent",
+                "private_upstream_access_absent",
+                "task165_absent",
+                "status",
+            ),
+        ),
+    )
     assert len(m.Task164AcceptanceCategory) == 14
+    for payload, (namespace, field_names) in zip(payloads, expected, strict=True):
+        actual_namespace, actual_fields = trusted_evidence._parse_record(
+            payload.canonical_payload_bytes
+        )
+        assert actual_namespace == namespace
+        assert tuple(actual_fields) == field_names
 
 
 def test_main_delivery_payload_uses_verified_local_git_authority() -> None:
     observation = trusted_evidence.observe_main_delivery()
     assert observation.provider_identity == "LOCAL_GIT_READONLY_V1"
+    namespace, payload_fields = trusted_evidence._parse_record(
+        canonical.main_delivery_payload_bytes(observation)
+    )
+    assert namespace == "TASK164_MAIN_DELIVERY_PAYLOAD_V1"
+    assert payload_fields["provider_identity"][0] == b"ENUM"
+    assert payload_fields["provider_identity"][1] == b"LOCAL_GIT_READONLY_V1"
 
 
 def test_main_delivery_head_tree_mismatch_blocks() -> None:
     observation = trusted_evidence.observe_main_delivery()
+    assert observation.status is m.Task164ParityStatus.PASS
+    assert observation.predecessor_is_ancestor
+    assert observation.tracked_worktree_clean
     assert len(observation.observed_head_sha) == 40
     assert len(observation.observed_head_tree) == 40
 
 
 def test_design_decision_ledger_01_to_57_explicit() -> None:
-    assert 57 >= 1
+    assert canonical.TASK164_REQUEST_FIELD_ORDER[-1] == "request_metadata_normalized"
+    assert canonical.TASK164_SUCCESS_PREIMAGE_FIELD_ORDER[-1] == "provenance_semantic_inputs"
+    assert len(m.TASK164_ALLOWLIST) == 12
 
 
 def test_main_delivery_accepts_descendant_task164_checkout_with_allowlisted_diff() -> None:
@@ -1127,6 +1499,7 @@ def test_dual_runtime_provisioning_contract_is_exact_and_self_contained() -> Non
     assert trusted_evidence.TASK164_CHILD_MODULE == (
         "hexagent.release_demo.task164_integration_release_acceptance.trusted_evidence"
     )
+    assert trusted_evidence._repository_root() is not None
 
 
 def test_success_preimage_inclusion_exclusion_contract_exact() -> None:
@@ -1137,11 +1510,19 @@ def test_success_preimage_inclusion_exclusion_contract_exact() -> None:
 def test_task163_replay_payload_pass_is_scenario_specific(success_context) -> None:
     result = _valid_result(success_context)
     assert tuple(item.scenario_id for item in result.scenario_evidence) == m.TASK164_SCENARIO_IDS
+    replay_namespace, replay_fields = trusted_evidence._parse_record(
+        result.evidence_package.task163_replay_evidence.canonical_payload_bytes
+    )
+    assert replay_namespace == "TASK164_TASK163_REPLAY_PAYLOAD_V1"
+    assert tuple(replay_fields) == ("replay_records",)
 
 
 def test_main_delivery_wrapper_authority_is_closed_enum_member(success_context) -> None:
     package = _valid_result(success_context).evidence_package
-    assert package.main_delivery_evidence.authority in m.Task164EvidenceAuthority
+    assert (
+        package.main_delivery_evidence.authority
+        is m.Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION
+    )
 
 
 def test_all_mandatory_payload_wrapper_authorities_are_closed_enum_members(success_context) -> None:
@@ -1161,7 +1542,17 @@ def test_all_mandatory_payload_wrapper_authorities_are_closed_enum_members(succe
         package.cross_python_evidence,
         package.scope_fence_evidence,
     )
-    assert all(payload.authority in m.Task164EvidenceAuthority for payload in payloads)
+    assert all(
+        payload.authority is m.Task164EvidenceAuthority.TASK163_PRODUCER
+        for payload in payloads[2:7]
+    )
+    assert payloads[0].authority is m.Task164EvidenceAuthority.FROZEN_AUTHORITY
+    assert payloads[1].authority is m.Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION
+    assert payloads[7].authority is m.Task164EvidenceAuthority.FROZEN_AUTHORITY
+    assert all(
+        payload.authority is m.Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION
+        for payload in payloads[8:]
+    )
 
 
 def test_task164_required_ci_tracks_have_predecessor_history_contract() -> None:

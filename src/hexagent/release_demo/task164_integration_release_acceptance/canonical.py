@@ -62,6 +62,7 @@ from .models import (
     Task164EvidencePackage,
     Task164EvidencePackageClaim,
     Task164EvidencePayload,
+    Task164FailureCode,
     Task164FailureStage,
     Task164ObservedIdentity,
     Task164PreResultIdentityInputs,
@@ -73,6 +74,7 @@ from .models import (
     Task164RawRequestProjection,
     Task164RepeatRunClaim,
     Task164RepeatRunObservation,
+    Task164RepeatRunSurface,
     Task164Request,
     Task164RuntimeObservation,
     Task164ScenarioClaim,
@@ -214,6 +216,23 @@ def _hash(domain: str, fields: Sequence[tuple[str, bytes, bytes]]) -> str:
 
 def _hash_field(name: str, value: str) -> tuple[str, bytes, bytes]:
     return _field(name, KIND_STRING, _string(value))
+
+
+def _required_sha256(value: str | None) -> str:
+    """Accept the repository's two hash spellings without changing them."""
+
+    if type(value) is not str:
+        raise ValueError("expected SHA-256 text")
+    digest = value[7:] if value.startswith("sha256:") else value
+    if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+        raise ValueError("expected lowercase SHA-256 text")
+    return value
+
+
+def _required_nonempty_string(value: str | None) -> str:
+    if type(value) is not str or not value:
+        raise ValueError("expected non-empty string")
+    return value
 
 
 def _observed_identity_bytes(value: Task164ObservedIdentity) -> bytes:
@@ -772,7 +791,9 @@ def task163_identity_payload_bytes(value: Task164Task163Evidence) -> bytes:
             "TASK164_TASK163_RESULT_IDENTITY_RECORD_V1",
             (
                 _field("scenario_id", KIND_ENUM, _enum(TASK164_SCENARIO_IDS[index])),
-                _nested("identity", _observed_identity_bytes(identity)),
+                _hash_field("result_hash", identity.result_hash),
+                _field("result_id", KIND_STRING, _string(identity.result_id.lower())),
+                _hash_field("provenance_hash", identity.provenance_hash),
             ),
         )
         for index, identity in enumerate(value.accepted_result_identities)
@@ -787,18 +808,19 @@ def _task163_applicability_bytes(value: Task163Applicability) -> bytes:
     if type(value) is not Task163Applicability:
         raise TypeError("expected exact producer Task163Applicability")
     return frame_record(
-        "TASK163_APPLICABILITY_V1",
+        "TASK164_TASK163_APPLICABILITY_PAYLOAD_V1",
         (
-            _field("status", KIND_ENUM, _enum(value.status)),
             _field(
                 "checks",
                 KIND_TUPLE,
                 _tuple_records(
                     frame_record(
-                        "TASK163_APPLICABILITY_CHECK_V1",
+                        "TASK164_TASK163_APPLICABILITY_CHECK_RECORD_V1",
                         (
-                            _field("name", KIND_ENUM, _enum(name)),
+                            _field("check_id", KIND_ENUM, _enum(name)),
                             _field("status", KIND_ENUM, _enum(status)),
+                            _field("evidence_refs", KIND_TUPLE, _tuple_strings(())),
+                            _field("failure_code_or_none", KIND_NONE, b""),
                         ),
                     )
                     for name, status in value.checks
@@ -812,42 +834,59 @@ def _task163_completeness_bytes(value: Task163Completeness) -> bytes:
     if type(value) is not Task163Completeness:
         raise TypeError("expected exact producer Task163Completeness")
     return frame_record(
-        "TASK163_COMPLETENESS_V1",
+        "TASK164_TASK163_COMPLETENESS_PAYLOAD_V1",
         (
-            _field("status", KIND_ENUM, _enum(value.status)),
             _field("required_fields", KIND_TUPLE, _tuple_enums(value.required_fields)),
+            _field("status", KIND_ENUM, _enum(value.status)),
         ),
     )
 
 
 def task163_applicability_payload_bytes(value: Task163Applicability) -> bytes:
-    return frame_record(
-        "TASK164_TASK163_APPLICABILITY_PAYLOAD_V1",
-        (("producer_applicability", KIND_RECORD, _task163_applicability_bytes(value)),),
-    )
+    return _task163_applicability_bytes(value)
 
 
 def task163_completeness_payload_bytes(value: Task163Completeness) -> bytes:
-    return frame_record(
-        "TASK164_TASK163_COMPLETENESS_PAYLOAD_V1",
-        (("producer_completeness", KIND_RECORD, _task163_completeness_bytes(value)),),
+    return _task163_completeness_bytes(value)
+
+
+def task163_provenance_payload_bytes(
+    value: Task164Task163Evidence,
+    *,
+    producer_result: Task163ValidationResult | None = None,
+) -> bytes:
+    """Project the producer's accepted provenance, never a local substitute."""
+
+    if type(producer_result) is not Task163ValidationResult or producer_result.valid is None:
+        raise ValueError("accepted Task163 result is required for provenance projection")
+    producer = producer_result.valid
+    graph = producer.provenance.graph
+    result_nodes = tuple(
+        node
+        for node in graph.nodes
+        if node.label == "TASK163_RESULT" and node.node_id == producer.result_id
     )
-
-
-def task163_provenance_payload_bytes(value: Task164Task163Evidence) -> bytes:
-    records = tuple(
-        frame_record(
-            "TASK164_TASK163_PROVENANCE_RECORD_V1",
-            (
-                _field("scenario_id", KIND_ENUM, _enum(TASK164_SCENARIO_IDS[index])),
-                _nested("identity", _observed_identity_bytes(identity)),
-            ),
+    if len(result_nodes) != 1 or producer.provenance.provenance_hash != graph.compute_hash():
+        raise ValueError("producer provenance graph is not self-consistent")
+    evidence_refs = tuple(
+        sorted(
+            {evidence_ref for item in value.replay_evidence for evidence_ref in item.evidence_refs},
+            key=_string,
         )
-        for index, identity in enumerate(value.accepted_result_identities)
     )
     return frame_record(
         "TASK164_TASK163_PROVENANCE_PAYLOAD_V1",
-        (("positive_provenance_records", KIND_TUPLE, _tuple_records(records)),),
+        (
+            _hash_field("result_provenance_hash", producer.provenance.provenance_hash),
+            _hash_field("graph_hash", graph.compute_hash()),
+            _field("result_node_id", KIND_STRING, _uuid_text(result_nodes[0].node_id)),
+            _field(
+                "result_node_payload_hash",
+                KIND_STRING,
+                _string(result_nodes[0].payload_hash),
+            ),
+            _field("producer_evidence_refs", KIND_TUPLE, _tuple_strings(evidence_refs)),
+        ),
     )
 
 
@@ -859,10 +898,13 @@ def main_delivery_payload_bytes(value: MainDeliveryObservation) -> bytes:
     authority is a registered ``Task164EvidenceAuthority`` value.
     """
 
+    if value.provider_identity != "LOCAL_GIT_READONLY_V1":
+        raise ValueError("main delivery provider identity is not registered")
+
     return frame_record(
         "TASK164_MAIN_DELIVERY_PAYLOAD_V1",
         (
-            _field("provider_identity", KIND_STRING, _string(value.provider_identity)),
+            _field("provider_identity", KIND_ENUM, _enum(value.provider_identity)),
             _hash_field("predecessor_base_sha", value.predecessor_base_sha),
             _hash_field("predecessor_base_tree", value.predecessor_base_tree),
             _hash_field("observed_head_sha", value.observed_head_sha),
@@ -892,11 +934,14 @@ def determinism_evidence_bytes(value: Task164DeterminismEvidence) -> bytes:
     )
 
 
+def _repeat_surface_order(value: Task164SurfaceHashRecord) -> int:
+    if type(value.surface) is not Task164RepeatRunSurface:
+        raise ValueError("repeat-run observation contains a non-repeat surface")
+    return tuple(Task164RepeatRunSurface).index(value.surface)
+
+
 def repeat_run_observation_bytes(value: Task164RepeatRunObservation) -> bytes:
-    ordered = tuple(sorted(value.surface_records, key=lambda item: item.surface.value))
-    second_ordered = tuple(
-        sorted(value.second_run_surface_records, key=lambda item: item.surface.value)
-    )
+    ordered = tuple(sorted(value.surface_records, key=_repeat_surface_order))
     return frame_record(
         "TASK164_REPEAT_RUN_OBSERVATION_V1",
         (
@@ -905,11 +950,6 @@ def repeat_run_observation_bytes(value: Task164RepeatRunObservation) -> bytes:
                 "surface_records",
                 KIND_TUPLE,
                 _tuple_records(_surface_hash_bytes(item) for item in ordered),
-            ),
-            _field(
-                "second_run_surface_records",
-                KIND_TUPLE,
-                _tuple_records(_surface_hash_bytes(item) for item in second_ordered),
             ),
             _field("observed_equal", *_boolean(value.observed_equal)),
             _field("status", KIND_ENUM, _enum(value.status)),
@@ -923,6 +963,12 @@ def _runtime_observation_bytes(value: Task164RuntimeObservation) -> bytes:
         "TASK164_RUNTIME_OBSERVATION_V1",
         (
             _field("python_version", KIND_ENUM, _enum(value.python_version)),
+            _field(
+                "actual_python_major_minor",
+                KIND_STRING,
+                _string(value.actual_python_major_minor),
+            ),
+            _field("runtime_identity", KIND_STRING, _string(value.runtime_identity)),
             _hash_field("head_sha", value.head_sha),
             _hash_field("head_tree", value.head_tree),
             _field("runner_identity", KIND_ENUM, _enum(value.runner_identity)),
@@ -1044,18 +1090,22 @@ def positive_demonstration_payload_bytes(
             "TASK164_POSITIVE_DEMONSTRATION_RECORD_V1",
             (
                 _field("scenario_id", KIND_ENUM, _enum(item.scenario_id)),
-                _nested("input_setup", _scenario_setup_bytes(item.claim.input_setup)),
-                _field(
+                _hash_field(
                     "result_hash",
-                    *_none_or_string(item.replay_evidence.replayed_result_hash_or_none),
+                    _required_sha256(item.replay_evidence.replayed_result_hash_or_none),
                 ),
                 _field(
                     "result_id",
-                    *_none_or_string(item.replay_evidence.replayed_result_id_or_none),
+                    KIND_STRING,
+                    _string(
+                        _required_nonempty_string(
+                            item.replay_evidence.replayed_result_id_or_none
+                        ).lower()
+                    ),
                 ),
-                _field(
+                _hash_field(
                     "provenance_hash",
-                    *_none_or_string(item.replay_evidence.replayed_provenance_hash_or_none),
+                    _required_sha256(item.replay_evidence.replayed_provenance_hash_or_none),
                 ),
                 _field(
                     "applicability_status",
@@ -1096,6 +1146,11 @@ def negative_demonstration_payload_bytes(
             return Task164FailureStage.RAW_BOUNDARY
         return Task164FailureStage.TASK163_REPLAY
 
+    def observed_failure_code(item: Task164ScenarioRecord) -> Task164FailureCode:
+        if item.scenario_id is TASK164_SCENARIO_IDS[8]:
+            return Task164FailureCode.TASK163_RESULT_HASH_MISMATCH
+        return Task164FailureCode.TASK163_REPLAY_BLOCKED
+
     records = tuple(
         frame_record(
             "TASK164_NEGATIVE_DEMONSTRATION_RECORD_V1",
@@ -1106,7 +1161,7 @@ def negative_demonstration_payload_bytes(
                     KIND_ENUM,
                     _enum(expected_stage(item)),
                 ),
-                _field("observed_branch", KIND_ENUM, _enum(item.replay_evidence.replayed_branch)),
+                _field("observed_failure_code", KIND_ENUM, _enum(observed_failure_code(item))),
                 _field("outcome", KIND_ENUM, _enum(item.observation.observed_outcome)),
                 _field("evidence_refs", KIND_TUPLE, _tuple_strings(item.observation.evidence_refs)),
             ),
@@ -1120,22 +1175,53 @@ def negative_demonstration_payload_bytes(
     )
 
 
-def repeat_run_payload_bytes(value: Task164DeterminismEvidence) -> bytes:
+def repeat_run_payload_bytes(
+    value: Task164DeterminismEvidence | Task164RepeatRunObservation,
+) -> bytes:
+    observation = (
+        value.repeat_run_observation if isinstance(value, Task164DeterminismEvidence) else value
+    )
+    ordered = tuple(sorted(observation.surface_records, key=_repeat_surface_order))
     return frame_record(
         "TASK164_REPEAT_RUN_PAYLOAD_V1",
-        (("repeat_run", KIND_RECORD, repeat_run_observation_bytes(value.repeat_run_observation)),),
+        (
+            _field("run_count", KIND_INT, _integer(observation.run_count)),
+            _field(
+                "surface_records",
+                KIND_TUPLE,
+                _tuple_records(_surface_hash_bytes(item) for item in ordered),
+            ),
+            _field("observed_equal", *_boolean(observation.observed_equal)),
+            _field("status", KIND_ENUM, _enum(observation.status)),
+        ),
     )
 
 
 def python_parity_payload_bytes(value: Task164DeterminismEvidence) -> bytes:
+    first = value.dual_runtime_observation.python311_observation
+    second = value.dual_runtime_observation.python312_observation
+    surfaces = tuple(item.surface for item in first.surface_records)
     return frame_record(
         "TASK164_PYTHON_PARITY_PAYLOAD_V1",
         (
-            (
-                "dual_runtime",
-                KIND_RECORD,
-                dual_runtime_observation_bytes(value.dual_runtime_observation),
+            _field(
+                "pairing_key",
+                KIND_ENUM,
+                _enum(value.dual_runtime_observation.pairing_key),
             ),
+            _hash_field("verified_head_sha", first.head_sha),
+            _hash_field("verified_head_tree", first.head_tree),
+            _field("python311_runtime_identity", KIND_STRING, _string(first.runtime_identity)),
+            _field("python312_runtime_identity", KIND_STRING, _string(second.runtime_identity)),
+            _field("surfaces", KIND_TUPLE, _tuple_enums(surfaces)),
+            _hash_field("child311_digest", first.child_output_sha256),
+            _hash_field("child312_digest", second.child_output_sha256),
+            _field(
+                "equality_rule",
+                KIND_ENUM,
+                _string("ALL_DECLARED_SURFACES_AND_DIGESTS_EQUAL"),
+            ),
+            _field("status", KIND_ENUM, _enum(value.dual_runtime_observation.status)),
         ),
     )
 
@@ -1163,7 +1249,7 @@ def scope_fence_bytes(value: Task164ScopeFenceEvidence) -> bytes:
         "TASK164_SCOPE_FENCE_V1",
         (
             _field(
-                "forbidden_capability_tokens_absent",
+                "forbidden_capability_tokens",
                 KIND_TUPLE,
                 _tuple_enums(value.forbidden_capability_tokens_absent),
             ),
