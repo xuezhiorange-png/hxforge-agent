@@ -15,6 +15,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tokenize
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -523,10 +524,15 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
     audited_paths = tuple(path for path in production_paths if path.name != "trusted_evidence.py")
     forbidden_tokens = tuple(Task164ForbiddenCapabilityToken)
     source_text = "\n".join(path.read_text(encoding="utf-8") for path in audited_paths)
-    token_text = {
-        token: token.value in source_text and token.value not in {"TASK165"}
-        for token in forbidden_tokens
+    executable_names = {
+        token.string
+        for path in audited_paths
+        for token in tokenize.generate_tokens(
+            iter(path.read_text(encoding="utf-8").splitlines(keepends=True)).__next__
+        )
+        if token.type == tokenize.NAME
     }
+    token_text = {token: token.value in executable_names for token in forbidden_tokens}
     formula_names = {
         "LMTD",
         "F_FACTOR",
