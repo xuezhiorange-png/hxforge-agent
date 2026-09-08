@@ -137,9 +137,7 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     base_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_SHA}^{{commit}}"))
     base_tree_ok, _ = one(("cat-file", "-e", f"{BASE_MAIN_TREE}^{{tree}}"))
     ancestor_ok, _ = one(("merge-base", "--is-ancestor", TASK164_DELIVERY_SHA, "HEAD"))
-    paths_ok, path_text = one(
-        ("diff", "--name-only", f"{BASE_MAIN_SHA}..{TASK164_DELIVERY_SHA}")
-    )
+    paths_ok, path_text = one(("diff", "--name-only", f"{BASE_MAIN_SHA}..{TASK164_DELIVERY_SHA}"))
     clean_code, _, _ = _run_git(git, root, ("diff", "--quiet", "HEAD", "--"))
     cached_code, _, _ = _run_git(git, root, ("diff", "--cached", "--quiet"))
     clean = clean_code == 0 and cached_code == 0
