@@ -184,6 +184,7 @@ shards:
       - tests/exchangers/shell_tube/test_task161_flow_arrangement_performance_method_authority.py
       - tests/exchangers/shell_tube/test_task162_thermal_performance_closure.py
       - tests/exchangers/shell_tube/test_task163_thermal_rating_composition.py
+      - tests/exchangers/shell_tube/test_task166_bell_delaware.py
       - tests/release_demo/test_task164_integration_release_acceptance.py
       - tests/shell_geometry_catalogs/test_models.py
       - tests/shell_geometry_catalogs/test_catalog.py
