@@ -15,7 +15,12 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.service import (
     validate_request as validate_task163_request,
 )
 
-from .canonical import task163_request_projection_hash, task163_validation_projection_bytes
+from .canonical import (
+    task163_applicability_payload_bytes,
+    task163_completeness_payload_bytes,
+    task163_request_projection_hash,
+    task163_validation_projection_bytes,
+)
 from .models import (
     Task164ClaimMatchStatus,
     Task164EvidenceStatus,
@@ -29,6 +34,7 @@ from .models import (
     Task164ScenarioRecord,
     Task164Task163Branch,
     Task164Task163ReplayEvidence,
+    Task164AcceptanceCategory,
 )
 
 
@@ -210,16 +216,70 @@ def _claim_matches(claim: Task164ScenarioClaim, observed: Task163ValidationResul
         return False
 
 
+def _expected_category(spec: Task164ScenarioSpec) -> Task164AcceptanceCategory:
+    if spec.scenario_class is Task164ScenarioClass.POSITIVE_PRODUCER:
+        return Task164AcceptanceCategory.POSITIVE_DEMONSTRATION_COVERAGE
+    if spec.scenario_class is Task164ScenarioClass.NEGATIVE_PRODUCER:
+        return Task164AcceptanceCategory.NEGATIVE_FAIL_CLOSED_COVERAGE
+    if spec.scenario_id is Task164ScenarioId.D164_D01_REPEAT_RUN_IDENTITY_AND_EVIDENCE_PARITY:
+        return Task164AcceptanceCategory.REPEAT_RUN_DETERMINISM
+    if spec.scenario_id is Task164ScenarioId.D164_D02_PYTHON_CROSS_VERSION_IDENTITY_PARITY:
+        return Task164AcceptanceCategory.CROSS_PYTHON_DETERMINISM
+    return Task164AcceptanceCategory.SCOPE_FENCE_ACCEPTANCE
+
+
+def _claim_matches_spec(claim: Task164ScenarioClaim, spec: Task164ScenarioSpec) -> bool:
+    if claim.scenario_class is not spec.scenario_class:
+        return False
+    if claim.input_setup.input_authority is not spec.input_authority:
+        return False
+    if claim.required_for_acceptance is not spec.real_task163_required:
+        return False
+    if claim.expected_task163_branch is not spec.expected_branch:
+        return False
+    if claim.claimed_outcome is not spec.expected_outcome:
+        return False
+    if tuple(claim.claimed_acceptance_categories) != (_expected_category(spec),):
+        return False
+    if spec.scenario_class is Task164ScenarioClass.POSITIVE_PRODUCER:
+        expected_baffle = int(spec.input_authority.value.rsplit("_", 1)[1])
+        if claim.input_setup.baffle_count != expected_baffle:
+            return False
+        original = claim.original_task163_request
+        if original is None:
+            return False
+        try:
+            actual_baffle = (
+                original.task162_success_replay_evidence.original_case_authority.baffle_count
+            )
+        except BaseException:
+            return False
+        if actual_baffle != expected_baffle:
+            return False
+    if spec.scenario_id is Task164ScenarioId.D164_N04_TASK163_RESULT_IDENTITY_OR_PROVENANCE_TAMPER:
+        if claim.input_setup.tamper_target is None:
+            return False
+    elif claim.input_setup.tamper_target is not None:
+        return False
+    if spec.scenario_id is Task164ScenarioId.D164_D02_PYTHON_CROSS_VERSION_IDENTITY_PARITY:
+        if claim.input_setup.python_pair_key != "PYTHON_3_11__PYTHON_3_12":
+            return False
+    elif claim.input_setup.python_pair_key is not None:
+        return False
+    return True
+
+
 def execute_scenario(
     claim: Task164ScenarioClaim,
     fallback_request: Task163Request,
 ) -> Task164ScenarioRecord:
     spec = scenario_spec(claim.scenario_id)
     refs = tuple(sorted(claim.claimed_evidence_refs, key=lambda item: item.encode("utf-8")))
+    claim_spec_valid = _claim_matches_spec(claim, spec)
     invoked = False
     invocation_count = 0
     observed: Task163ValidationResult | None = None
-    if spec.real_task163_required:
+    if spec.real_task163_required and claim_spec_valid:
         invoked = True
         invocation_count = 1
         try:
@@ -240,11 +300,17 @@ def execute_scenario(
             result_hash = observed.valid.result_hash
             result_id = str(observed.valid.result_id).lower()
             provenance_hash = observed.valid.provenance.provenance_hash
-            projection = task163_validation_projection_bytes(observed)
-            app_hash = hashlib.sha256(projection).hexdigest()
-            comp_hash = hashlib.sha256(projection).hexdigest()
+            app_hash = hashlib.sha256(
+                task163_applicability_payload_bytes(observed.valid.applicability)
+            ).hexdigest()
+            comp_hash = hashlib.sha256(
+                task163_completeness_payload_bytes(observed.valid.completeness)
+            ).hexdigest()
     claim_match = (
-        observed is not None and branch is spec.expected_branch and _claim_matches(claim, observed)
+        claim_spec_valid
+        and observed is not None
+        and branch is spec.expected_branch
+        and _claim_matches(claim, observed)
     )
     if spec.scenario_class is Task164ScenarioClass.POSITIVE_PRODUCER:
         outcome = (

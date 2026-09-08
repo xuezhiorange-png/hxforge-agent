@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import os
+import ast
 import shutil
+import struct
 import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
     KIND_STRING,
@@ -33,7 +36,10 @@ from .models import (
     Task164PythonVersion,
     Task164RunnerIdentity,
     Task164RuntimeObservation,
+    Task164ScopeFenceEvidence,
+    Task164ScopeStatus,
     Task164SurfaceHashRecord,
+    Task164ForbiddenCapabilityToken,
 )
 
 BASE_MAIN_SHA = "66dabc275bcf1a35d97e4d57fc70c2ccf05697e9"
@@ -71,7 +77,22 @@ def _run_git(git: str, cwd: str, args: Sequence[str]) -> tuple[int, bytes, bytes
 def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     """Run the exact local-Git predecessor and allowlist observations."""
 
-    root = cwd or os.getcwd()
+    del cwd
+    root_path = _repository_root()
+    if root_path is None:
+        return MainDeliveryObservation(
+            "LOCAL_GIT_READONLY_V1",
+            BASE_MAIN_SHA,
+            BASE_MAIN_TREE,
+            "",
+            "",
+            False,
+            (),
+            TASK164_ALLOWLIST,
+            False,
+            Task164ParityStatus.BLOCKED,
+        )
+    root = str(root_path)
     git = shutil.which("git")
     if git is None:
         return MainDeliveryObservation(
@@ -136,10 +157,161 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
     )
 
 
-def _child_payload(data: bytes) -> bytes:
+def _repository_root() -> Path | None:
+    module_path = Path(__file__).resolve()
+    for candidate in (module_path.parent, *module_path.parents):
+        if (candidate / ".git").exists() and (candidate / "pyproject.toml").is_file():
+            return candidate
+    return None
+
+
+def _u32(data: bytes, offset: int) -> tuple[int, int]:
+    if offset + 4 > len(data):
+        raise ValueError("truncated u32")
+    return struct.unpack_from(">I", data, offset)[0], offset + 4
+
+
+def _u64(data: bytes, offset: int) -> tuple[int, int]:
+    if offset + 8 > len(data):
+        raise ValueError("truncated u64")
+    return struct.unpack_from(">Q", data, offset)[0], offset + 8
+
+
+def _read_bytes(data: bytes, offset: int, length: int) -> tuple[bytes, int]:
+    end = offset + length
+    if end > len(data):
+        raise ValueError("truncated payload")
+    return data[offset:end], end
+
+
+def _parse_record(data: bytes) -> tuple[str, dict[str, tuple[bytes, bytes]]]:
+    ns_len, offset = _u32(data, 0)
+    namespace_bytes, offset = _read_bytes(data, offset, ns_len)
+    namespace = namespace_bytes.decode("utf-8", "strict")
+    field_count, offset = _u32(data, offset)
+    fields: dict[str, tuple[bytes, bytes]] = {}
+    for _ in range(field_count):
+        name_len, offset = _u32(data, offset)
+        name_bytes, offset = _read_bytes(data, offset, name_len)
+        name = name_bytes.decode("utf-8", "strict")
+        kind_len, offset = _u32(data, offset)
+        kind, offset = _read_bytes(data, offset, kind_len)
+        payload_len, offset = _u64(data, offset)
+        payload, offset = _read_bytes(data, offset, payload_len)
+        if name in fields:
+            raise ValueError("duplicate parity input field")
+        fields[name] = (kind, payload)
+    if offset != len(data):
+        raise ValueError("trailing parity input bytes")
+    return namespace, fields
+
+
+def _string_field(fields: dict[str, tuple[bytes, bytes]], name: str) -> str:
+    kind, payload = fields[name]
+    if kind != KIND_STRING:
+        raise ValueError(f"parity field {name} is not a string")
+    return payload.decode("utf-8", "strict")
+
+
+_PARITY_FIELDS = (
+    "schema_version",
+    "original_task163_request_projection_hash",
+    "task163_result_hash",
+    "task163_result_id",
+    "task163_provenance_hash",
+    "applicability_projection_hash",
+    "completeness_projection_hash",
+    "scenario_matrix_projection_hash",
+    "repeat_run_evidence_projection_hash",
+    "terminal_capability_projection_hash",
+    "scope_fence_projection_hash",
+    "head_sha",
+    "head_tree",
+    "task164_design_version",
+    "runtime_contract_version",
+)
+
+
+def _projection_bytes(values: dict[str, str], names: tuple[str, ...], domain: str) -> bytes:
     return frame_record(
-        "TASK164_PARITY_CHILD_OUTPUT_V1",
-        (("input_sha256", KIND_STRING, hashlib.sha256(data).hexdigest().encode("ascii")),),
+        domain,
+        tuple((name, KIND_STRING, values[name].encode("utf-8", "strict")) for name in names),
+    )
+
+
+def _parent_projection_digests(input_value: Task164CrossPythonParityInput) -> tuple[str, str]:
+    values = {
+        "schema_version": input_value.schema_version,
+        "original_task163_request_projection_hash": input_value.original_task163_request_projection_hash,
+        "task163_result_hash": input_value.task163_result_hash,
+        "task163_result_id": input_value.task163_result_id,
+        "task163_provenance_hash": input_value.task163_provenance_hash,
+        "applicability_projection_hash": input_value.applicability_projection_hash,
+        "completeness_projection_hash": input_value.completeness_projection_hash,
+        "scenario_matrix_projection_hash": input_value.scenario_matrix_projection_hash,
+        "repeat_run_evidence_projection_hash": input_value.repeat_run_evidence_projection_hash,
+        "terminal_capability_projection_hash": input_value.terminal_capability_projection_hash,
+        "scope_fence_projection_hash": input_value.scope_fence_projection_hash,
+        "head_sha": input_value.head_sha,
+        "head_tree": input_value.head_tree,
+        "task164_design_version": input_value.task164_design_version,
+        "runtime_contract_version": input_value.runtime_contract_version,
+    }
+    return (
+        hashlib.sha256(
+            _projection_bytes(values, _IDENTITY_FIELDS, "TASK164_XPY_IDENTITY_PROJECTION_V1")
+        ).hexdigest(),
+        hashlib.sha256(
+            _projection_bytes(values, _EVIDENCE_FIELDS, "TASK164_XPY_EVIDENCE_PROJECTION_V1")
+        ).hexdigest(),
+    )
+
+
+_IDENTITY_FIELDS = (
+    "schema_version",
+    "original_task163_request_projection_hash",
+    "task163_result_hash",
+    "task163_result_id",
+    "task163_provenance_hash",
+    "head_sha",
+    "head_tree",
+    "task164_design_version",
+    "runtime_contract_version",
+)
+_EVIDENCE_FIELDS = (
+    "schema_version",
+    "applicability_projection_hash",
+    "completeness_projection_hash",
+    "scenario_matrix_projection_hash",
+    "repeat_run_evidence_projection_hash",
+    "terminal_capability_projection_hash",
+    "scope_fence_projection_hash",
+    "head_sha",
+    "head_tree",
+    "task164_design_version",
+    "runtime_contract_version",
+)
+
+
+def _child_payload(data: bytes) -> bytes:
+    namespace, fields = _parse_record(data)
+    if namespace != "TASK164_CROSS_PYTHON_PARITY_INPUT_V1":
+        raise ValueError("unexpected parity input namespace")
+    if tuple(fields) != _PARITY_FIELDS or set(fields) != set(_PARITY_FIELDS):
+        raise ValueError("unexpected parity input fields")
+    values = {name: _string_field(fields, name) for name in _PARITY_FIELDS}
+    identity = hashlib.sha256(
+        _projection_bytes(values, _IDENTITY_FIELDS, "TASK164_XPY_IDENTITY_PROJECTION_V1")
+    ).hexdigest()
+    evidence = hashlib.sha256(
+        _projection_bytes(values, _EVIDENCE_FIELDS, "TASK164_XPY_EVIDENCE_PROJECTION_V1")
+    ).hexdigest()
+    return frame_record(
+        "TASK164_PARITY_CHILD_OUTPUT_V2",
+        (
+            ("identity_projection_sha256", KIND_STRING, identity.encode("ascii")),
+            ("evidence_projection_sha256", KIND_STRING, evidence.encode("ascii")),
+        ),
     )
 
 
@@ -149,17 +321,19 @@ def _child_main() -> int:
     return 0
 
 
-def _runtime_surface(digest: str, ref: str) -> tuple[Task164SurfaceHashRecord, ...]:
+def _runtime_surface(
+    identity_digest: str, evidence_digest: str
+) -> tuple[Task164SurfaceHashRecord, ...]:
     return (
         Task164SurfaceHashRecord(
             surface=Task164ParitySurface.TASK164_XPY_IDENTITY_PROJECTION_V1,
-            sha256=digest,
+            sha256=identity_digest,
             authority=Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION,
             evidence_ref="TASK164_DUAL_RUNTIME:identity",
         ),
         Task164SurfaceHashRecord(
             surface=Task164ParitySurface.TASK164_XPY_EVIDENCE_PROJECTION_V1,
-            sha256=digest,
+            sha256=evidence_digest,
             authority=Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION,
             evidence_ref="TASK164_DUAL_RUNTIME:evidence",
         ),
@@ -190,18 +364,38 @@ def _run_runtime(
             check=False,
         )
         valid = completed.returncode == 0 and not completed.stderr and bool(completed.stdout)
-        digest = hashlib.sha256(completed.stdout).hexdigest() if valid else "0" * 64
+        output_sha = hashlib.sha256(completed.stdout).hexdigest() if valid else "0" * 64
+        namespace, fields = _parse_record(completed.stdout) if valid else ("", {})
+        if namespace != "TASK164_PARITY_CHILD_OUTPUT_V2":
+            raise ValueError("unexpected parity child namespace")
+        if tuple(fields) != (
+            "identity_projection_sha256",
+            "evidence_projection_sha256",
+        ):
+            raise ValueError("unexpected parity child fields")
+        identity_digest = _string_field(fields, "identity_projection_sha256")
+        evidence_digest = _string_field(fields, "evidence_projection_sha256")
+        if any(
+            len(value) != 64 or any(char not in "0123456789abcdef" for char in value)
+            for value in (identity_digest, evidence_digest)
+        ):
+            raise ValueError("invalid parity child digest")
     except (OSError, subprocess.SubprocessError):
         valid = False
-        digest = "0" * 64
+        output_sha = "0" * 64
+        identity_digest = evidence_digest = "0" * 64
+    except (UnicodeError, ValueError, struct.error):
+        valid = False
+        output_sha = "0" * 64
+        identity_digest = evidence_digest = "0" * 64
     return Task164RuntimeObservation(
         python_version=version,
         head_sha=head_sha,
         head_tree=head_tree,
         runner_identity=Task164RunnerIdentity.TASK164_INTERNAL_DUAL_RUNTIME_RUNNER_V1,
         command_identity=Task164CommandIdentity.TASK164_INTERNAL_DUAL_RUNTIME_PARITY_CAPTURE_V1,
-        surface_records=_runtime_surface(digest, version.value),
-        child_output_sha256=digest,
+        surface_records=_runtime_surface(identity_digest, evidence_digest),
+        child_output_sha256=output_sha,
         conclusion=Task164ParityStatus.PASS if valid else Task164ParityStatus.BLOCKED,
     )
 
@@ -276,6 +470,9 @@ def observe_dual_runtime(
             ),
         ),
     )
+    expected_identity, expected_evidence = _parent_projection_digests(input_value)
+    if py311 and py312 and os.path.abspath(py311) == os.path.abspath(py312):
+        raise ValueError("dual runtime requires distinct executables")
     first = _run_runtime(
         py311
         or os.environ.get("TASK164_PY311_EXECUTABLE")
@@ -303,6 +500,10 @@ def observe_dual_runtime(
         and first.head_tree == second.head_tree == head_tree
         and first.surface_records == second.surface_records
         and first.child_output_sha256 == second.child_output_sha256
+        and first.surface_records[0].sha256 == expected_identity
+        and first.surface_records[1].sha256 == expected_evidence
+        and second.surface_records[0].sha256 == expected_identity
+        and second.surface_records[1].sha256 == expected_evidence
     )
     return Task164DualRuntimeObservation(
         pairing_key=Task164PairingKey.TASK164_PYTHON_3_11__TASK164_PYTHON_3_12,
@@ -313,8 +514,102 @@ def observe_dual_runtime(
     )
 
 
+def observe_scope_fence() -> Task164ScopeFenceEvidence:
+    """Observe the implementation scope from the module-owned source tree."""
+
+    package_root = Path(__file__).resolve().parent
+    source_paths = tuple(sorted(package_root.glob("*.py"), key=lambda path: path.name.encode()))
+    production_paths = tuple(path for path in source_paths if path.name != "models.py")
+    forbidden_tokens = tuple(Task164ForbiddenCapabilityToken)
+    source_text = "\n".join(path.read_text(encoding="utf-8") for path in production_paths)
+    token_text = {
+        token: token.value in source_text and token.value not in {"TASK165"}
+        for token in forbidden_tokens
+    }
+    formula_names = {
+        "LMTD",
+        "F_FACTOR",
+        "NTU",
+        "EFFECTIVENESS",
+        "HEAT_DUTY",
+        "OUTLET_TEMPERATURE",
+        "ENERGY_BALANCE",
+        "TERMINAL_TEMPERATURE",
+    }
+    forbidden_formula = any(
+        any(name in node.id for name in formula_names)
+        for path in production_paths
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path)))
+        if isinstance(node, ast.Name)
+    )
+    upstream_modules = (
+        "thermal_stream_state",
+        "flow_arrangement_performance_method_authority",
+        "overall_heat_transfer_coefficient_ua",
+    )
+    forbidden_upstream = False
+    private_import = False
+    for path in production_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                if any(item in module for item in upstream_modules):
+                    forbidden_upstream = True
+                if any(alias.name.startswith("_") for alias in node.names):
+                    private_import = True
+            elif isinstance(node, ast.Import):
+                if any(alias.name.startswith("_") for alias in node.names):
+                    private_import = True
+    try:
+        from . import scenarios as scenario_module
+        from . import service as service_module
+
+        public_task163 = (
+            getattr(service_module, "validate_task163_request", None),
+            getattr(scenario_module, "validate_task163_request", None),
+        )
+        public_replay = all(
+            getattr(value, "__module__", "")
+            == "hexagent.exchangers.shell_tube.thermal_rating_composition.service"
+            and getattr(value, "__name__", "") == "validate_request"
+            for value in public_task163
+        )
+    except BaseException:
+        public_replay = False
+    task165_present = "TASK165" in source_text
+    absent = tuple(token for token in forbidden_tokens if not token_text[token])
+    formula_ok = not forbidden_formula
+    upstream_ok = not forbidden_upstream
+    private_ok = not private_import
+    task165_ok = not task165_present
+    status = (
+        Task164ScopeStatus.PASS
+        if len(absent) == len(forbidden_tokens)
+        and formula_ok
+        and upstream_ok
+        and private_ok
+        and task165_ok
+        and public_replay
+        else Task164ScopeStatus.BLOCKED
+    )
+    return Task164ScopeFenceEvidence(
+        forbidden_capability_tokens_absent=absent,
+        forbidden_formula_surface_absent=formula_ok,
+        upstream_replay_absent=upstream_ok,
+        private_upstream_access_absent=private_ok and public_replay,
+        task165_absent=task165_ok,
+        status=status,
+    )
+
+
 if __name__ == "__main__":  # pragma: no cover - exercised by CI child command
     raise SystemExit(_child_main() if len(sys.argv) >= 3 and sys.argv[1] == "--child" else 2)
 
 
-__all__ = ["MainDeliveryObservation", "observe_dual_runtime", "observe_main_delivery"]
+__all__ = [
+    "MainDeliveryObservation",
+    "observe_dual_runtime",
+    "observe_main_delivery",
+    "observe_scope_fence",
+]

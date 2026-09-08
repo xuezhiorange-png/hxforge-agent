@@ -20,6 +20,7 @@ from hexagent.exchangers.shell_tube.thermal_rating_composition.service import (
     validate_request as validate_task163_request,
 )
 from hexagent.exchangers.shell_tube.tube_side.canonical import (
+    KIND_BYTES,
     KIND_ENUM,
     KIND_INT,
     frame_record,
@@ -125,7 +126,7 @@ from .models import (
 from .provenance import build_provenance_semantic_inputs, build_success_provenance
 from .raw_projection import project_raw_request_with_diagnostics
 from .scenarios import execute_scenario, task163_request_raw
-from .trusted_evidence import observe_dual_runtime, observe_main_delivery
+from .trusted_evidence import observe_dual_runtime, observe_main_delivery, observe_scope_fence
 
 TASK163_APPLICABILITY_CHECKS = tuple(item.value for item in Task163ApplicabilityCheckName)
 TASK163_COMPLETENESS_FIELDS = tuple(item.value for item in Task163CompletenessField)
@@ -368,6 +369,18 @@ def _compare_replay(
 ) -> tuple[Task164Blocker, ...]:
     stage = Task164FailureStage.TASK163_REPLAY
     try:
+        if _task163_branch(claimed) is not _task163_branch(replayed):
+            return (blocker(Task164FailureCode.TASK163_REPLAY_STATUS_MISMATCH, stage),)
+        if claimed.valid is not None and replayed.valid is not None:
+            if claimed.valid.result_hash != replayed.valid.result_hash:
+                return (blocker(Task164FailureCode.TASK163_RESULT_HASH_MISMATCH, stage),)
+            if claimed.valid.result_id != replayed.valid.result_id:
+                return (blocker(Task164FailureCode.TASK163_RESULT_ID_MISMATCH, stage),)
+            if (
+                claimed.valid.provenance.provenance_hash
+                != replayed.valid.provenance.provenance_hash
+            ):
+                return (blocker(Task164FailureCode.TASK163_PROVENANCE_MISMATCH, stage),)
         if task163_validation_projection_bytes(claimed) != task163_validation_projection_bytes(
             replayed
         ):
@@ -444,30 +457,56 @@ def _terminal_capability() -> Task164TerminalCapability:
 
 
 def _scope_fence() -> Task164ScopeFenceEvidence:
-    return Task164ScopeFenceEvidence(
-        forbidden_capability_tokens_absent=tuple(Task164ForbiddenCapabilityToken),
-        forbidden_formula_surface_absent=True,
-        upstream_replay_absent=True,
-        private_upstream_access_absent=True,
-        task165_absent=True,
-        status=Task164ScopeStatus.PASS,
-    )
+    return observe_scope_fence()
 
 
 def _sha(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _surface_records(evidence: Task164Task163Evidence) -> tuple[Task164SurfaceHashRecord, ...]:
-    content = task163_replay_payload_bytes(evidence)
+def _surface_records(
+    *,
+    request_projection: bytes,
+    evidence: Task164Task163Evidence,
+    scenarios: tuple[Task164ScenarioRecord, ...],
+    terminal: Task164TerminalCapability,
+    scope: Task164ScopeFenceEvidence,
+) -> tuple[Task164SurfaceHashRecord, ...]:
+    pre_determinism = frame_record(
+        "TASK164_PRE_DETERMINISM_PAYLOADS_V1",
+        (
+            ("request_projection", KIND_BYTES, request_projection),
+            ("replay_evidence", KIND_BYTES, task163_replay_payload_bytes(evidence)),
+            ("scenario_evidence", KIND_BYTES, scenario_matrix_bytes(scenarios)),
+            ("terminal_capability", KIND_BYTES, terminal_capability_bytes(terminal)),
+            ("scope_fence", KIND_BYTES, scope_fence_bytes(scope)),
+        ),
+    )
+    payloads = (
+        (Task164RepeatRunSurface.TASK164_TASK163_REQUEST_PROJECTION, request_projection),
+        (
+            Task164RepeatRunSurface.TASK164_TASK163_REPLAY_EVIDENCE,
+            task163_replay_payload_bytes(evidence),
+        ),
+        (
+            Task164RepeatRunSurface.TASK164_SCENARIO_EVIDENCE,
+            scenario_matrix_bytes(scenarios),
+        ),
+        (
+            Task164RepeatRunSurface.TASK164_TERMINAL_CAPABILITY,
+            terminal_capability_bytes(terminal),
+        ),
+        (Task164RepeatRunSurface.TASK164_SCOPE_FENCE, scope_fence_bytes(scope)),
+        (Task164RepeatRunSurface.TASK164_PRE_DETERMINISM_PAYLOADS, pre_determinism),
+    )
     return tuple(
         Task164SurfaceHashRecord(
             surface=surface,
-            sha256=_sha(content + surface.value.encode("ascii")),
+            sha256=_sha(payload),
             authority=Task164EvidenceAuthority.TASK164_INTERNAL_OBSERVATION,
             evidence_ref=surface.value,
         )
-        for surface in Task164RepeatRunSurface
+        for surface, payload in payloads
     )
 
 
@@ -535,8 +574,8 @@ def _build_payloads(
     determinism: Task164DeterminismEvidence,
     terminal: Task164TerminalCapability,
     scope: Task164ScopeFenceEvidence,
-    applicability: Task164Applicability,
-    completeness: Task164Completeness,
+    producer_applicability: object,
+    producer_completeness: object,
     original_projection: bytes,
 ) -> tuple[Task164EvidencePackage, Task164AcceptanceLedger]:
     authority = _payload(
@@ -571,14 +610,14 @@ def _build_payloads(
         Task164EvidencePayloadKind.TASK163_APPLICABILITY_PAYLOAD,
         Task164AcceptanceCategory.TASK163_APPLICABILITY_ACCEPTANCE,
         Task164EvidenceAuthority.TASK163_PRODUCER,
-        task163_applicability_payload_bytes(applicability),
+        task163_applicability_payload_bytes(producer_applicability),  # type: ignore[arg-type]
         ("TASK163_PRODUCER",),
     )
     comp = _payload(
         Task164EvidencePayloadKind.TASK163_COMPLETENESS_PAYLOAD,
         Task164AcceptanceCategory.TASK163_COMPLETENESS_ACCEPTANCE,
         Task164EvidenceAuthority.TASK163_PRODUCER,
-        task163_completeness_payload_bytes(completeness),
+        task163_completeness_payload_bytes(producer_completeness),  # type: ignore[arg-type]
         ("TASK163_PRODUCER",),
     )
     prov = _payload(
@@ -764,13 +803,40 @@ def _compare_package_claim(
     return claim.claimed_package_hash == _sha(evidence_package_bytes(package))
 
 
-def _make_repeat_observation(evidence: Task164Task163Evidence) -> Task164RepeatRunObservation:
+def _make_repeat_observation(
+    *,
+    request_projection: bytes,
+    first_evidence: Task164Task163Evidence,
+    second_evidence: Task164Task163Evidence,
+    first_scenarios: tuple[Task164ScenarioRecord, ...],
+    second_scenarios: tuple[Task164ScenarioRecord, ...],
+    first_terminal: Task164TerminalCapability,
+    second_terminal: Task164TerminalCapability,
+    first_scope: Task164ScopeFenceEvidence,
+    second_scope: Task164ScopeFenceEvidence,
+) -> Task164RepeatRunObservation:
+    first_surfaces = _surface_records(
+        request_projection=request_projection,
+        evidence=first_evidence,
+        scenarios=first_scenarios,
+        terminal=first_terminal,
+        scope=first_scope,
+    )
+    second_surfaces = _surface_records(
+        request_projection=request_projection,
+        evidence=second_evidence,
+        scenarios=second_scenarios,
+        terminal=second_terminal,
+        scope=second_scope,
+    )
+    equal = first_surfaces == second_surfaces
     return Task164RepeatRunObservation(
         run_count=2,
-        surface_records=_surface_records(evidence),
-        observed_equal=True,
-        status=Task164ParityStatus.PASS,
+        surface_records=first_surfaces,
+        observed_equal=equal,
+        status=Task164ParityStatus.PASS if equal else Task164ParityStatus.BLOCKED,
         evidence_refs=("TASK164_REPEAT_RUN_INTERNAL",),
+        second_run_surface_records=second_surfaces,
     )
 
 
@@ -805,8 +871,12 @@ def _make_dual_runtime(
         task163_result_hash=task163.valid.result_hash,
         task163_result_id=str(task163.valid.result_id).lower(),
         task163_provenance_hash=task163.valid.provenance.provenance_hash,
-        applicability_projection_hash=_sha(task163_validation_projection_bytes(task163)),
-        completeness_projection_hash=_sha(task163_validation_projection_bytes(task163)),
+        applicability_projection_hash=_sha(
+            task163_applicability_payload_bytes(task163.valid.applicability)
+        ),
+        completeness_projection_hash=_sha(
+            task163_completeness_payload_bytes(task163.valid.completeness)
+        ),
         scenario_matrix_projection_hash=_sha(scenario_matrix_bytes(scenarios)),
         repeat_run_evidence_projection_hash=_sha(
             repeat_run_payload_bytes(
@@ -929,22 +999,72 @@ def validate_request(raw: object) -> Task164ValidationResult:
             Task164FailureStage.DEMONSTRATION,
             projection_hash,
         )
-
-    task163_evidence = Task164Task163Evidence(
-        original_request_projection_hash=task163_request_projection_hash(
-            request.original_task163_request
-        ),
-        replay_evidence=tuple(record.replay_evidence for record in scenario_records),
-        accepted_result_identities=tuple(
-            record.observation.observed_task163_result_identity_or_none
-            for record in scenario_records[:5]
-            if record.observation.observed_task163_result_identity_or_none is not None
-        ),
-        status=Task164EvidenceStatus.PASS,
+    second_scenario_records = tuple(
+        execute_scenario(by_id[scenario_id], request.original_task163_request)
+        for scenario_id in TASK164_SCENARIO_IDS
     )
-    repeat = _make_repeat_observation(task163_evidence)
+    second_failed_scenarios = tuple(
+        blocker(
+            Task164FailureCode.SCENARIO_EVIDENCE_INVALID,
+            Task164FailureStage.DEMONSTRATION,
+            record.scenario_id.value,
+        )
+        for record in second_scenario_records
+        if record.status is not Task164EvidenceStatus.PASS
+    )
+    if second_failed_scenarios:
+        return _typed_blocked(
+            request_hash_value,
+            second_failed_scenarios,
+            Task164FailureStage.DEMONSTRATION,
+            projection_hash,
+        )
+
+    def evidence_for(records: tuple[Task164ScenarioRecord, ...]) -> Task164Task163Evidence:
+        return Task164Task163Evidence(
+            original_request_projection_hash=task163_request_projection_hash(
+                request.original_task163_request
+            ),
+            replay_evidence=tuple(record.replay_evidence for record in records),
+            accepted_result_identities=tuple(
+                record.observation.observed_task163_result_identity_or_none
+                for record in records[:5]
+                if record.observation.observed_task163_result_identity_or_none is not None
+            ),
+            status=Task164EvidenceStatus.PASS,
+        )
+
+    task163_evidence = evidence_for(scenario_records)
+    second_task163_evidence = evidence_for(second_scenario_records)
     terminal = _terminal_capability()
+    second_terminal = _terminal_capability()
     scope = _scope_fence()
+    second_scope = _scope_fence()
+    if scope.status is not Task164ScopeStatus.PASS or second_scope.status is not Task164ScopeStatus.PASS:
+        return _typed_blocked(
+            request_hash_value,
+            (blocker(Task164FailureCode.SCOPE_FENCE_FAILED, Task164FailureStage.SCOPE_FENCE),),
+            Task164FailureStage.SCOPE_FENCE,
+            projection_hash,
+        )
+    repeat = _make_repeat_observation(
+        request_projection=original_projection,
+        first_evidence=task163_evidence,
+        second_evidence=second_task163_evidence,
+        first_scenarios=scenario_records,
+        second_scenarios=second_scenario_records,
+        first_terminal=terminal,
+        second_terminal=second_terminal,
+        first_scope=scope,
+        second_scope=second_scope,
+    )
+    if repeat.status is not Task164ParityStatus.PASS:
+        return _typed_blocked(
+            request_hash_value,
+            (blocker(Task164FailureCode.REPEAT_RUN_PARITY_FAILED, Task164FailureStage.DETERMINISM),),
+            Task164FailureStage.DETERMINISM,
+            projection_hash,
+        )
     main_delivery = observe_main_delivery()
     if main_delivery.status is not Task164ParityStatus.PASS:
         return _typed_blocked(
@@ -988,6 +1108,9 @@ def validate_request(raw: object) -> Task164ValidationResult:
         dual_runtime_observation=dual,
         status=Task164ParityStatus.PASS,
     )
+    assert replayed.valid is not None
+    producer_applicability = replayed.valid.applicability
+    producer_completeness = replayed.valid.completeness
     applicability = _applicability()
     completeness = _completeness()
     package, ledger = _build_payloads(
@@ -997,8 +1120,8 @@ def validate_request(raw: object) -> Task164ValidationResult:
         determinism=determinism,
         terminal=terminal,
         scope=scope,
-        applicability=applicability,
-        completeness=completeness,
+        producer_applicability=producer_applicability,
+        producer_completeness=producer_completeness,
         original_projection=original_projection,
     )
     if not _compare_package_claim(request.evidence_package_claim, package):
@@ -1041,8 +1164,8 @@ def validate_request(raw: object) -> Task164ValidationResult:
         determinism_evidence=determinism,
         acceptance_ledger=ledger,
         evidence_package=package,
-        applicability=applicability,
-        completeness=completeness,
+        applicability=producer_applicability,
+        completeness=producer_completeness,
     )
     pre = Task164PreResultIdentityInputs(
         schema_version=TASK164_SCHEMA_VERSION,

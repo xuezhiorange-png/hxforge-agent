@@ -66,8 +66,9 @@ TASK164_REQUEST_FIELDS = (
 )
 
 
-def _task163_context() -> tuple[Task163Request, Task163ValidationResult, dict[str, object]]:
-    raw162 = task162_raw()
+def _task163_context_from_task162_raw(
+    raw162: dict[str, object],
+) -> tuple[Task163Request, Task163ValidationResult, dict[str, object]]:
     task162_outcome = validate_task162(raw162)
     assert task162_outcome.valid is not None
     task162_request = _task162_request(raw162)
@@ -94,10 +95,34 @@ def _task163_context() -> tuple[Task163Request, Task163ValidationResult, dict[st
     return request, task163_outcome, raw163
 
 
+def _task163_context() -> tuple[Task163Request, Task163ValidationResult, dict[str, object]]:
+    return _task163_context_from_task162_raw(task162_raw())
+
+
+def _task163_context_for_baffle(
+    baffle_count: int,
+) -> tuple[Task163Request, Task163ValidationResult, dict[str, object]]:
+    raw162 = task162_raw()
+    case = replace(
+        raw162["case_authority"],
+        case_authority_id=f"case-{baffle_count:03d}",
+        baffle_count=baffle_count,
+    )
+    binding = replace(
+        raw162["cross_producer_binding_authority"],
+        binding_authority_id=f"binding-{baffle_count:03d}",
+        physical_exchanger_case_id=case.case_authority_id,
+    )
+    raw162["case_authority"] = case
+    raw162["cross_producer_binding_authority"] = binding
+    return _task163_context_from_task162_raw(raw162)
+
+
 def _task163_scenario_claim(
     scenario_id: m.Task164ScenarioId,
     original: Task163Request,
     base_outcome: Task163ValidationResult,
+    scenario_context: tuple[Task163Request, Task163ValidationResult, dict[str, object]] | None = None,
 ) -> m.Task164ScenarioClaim:
     spec = next(item for item in TASK164_SCENARIO_MATRIX if item.scenario_id is scenario_id)
     authority = spec.input_authority
@@ -108,8 +133,8 @@ def _task163_scenario_claim(
     if scenario_id is m.Task164ScenarioId.D164_N04_TASK163_RESULT_IDENTITY_OR_PROVENANCE_TAMPER:
         tamper_target = m.Task164TamperTarget.RESULT_HASH
 
-    request_for_claim = original
-    claimed = base_outcome
+    request_for_claim = scenario_context[0] if scenario_context is not None else original
+    claimed = scenario_context[1] if scenario_context is not None else base_outcome
     if scenario_id is m.Task164ScenarioId.D164_N01_TASK163_TYPED_BLOCKED:
         raw = service.task163_request_raw(original)
         raw["task162_result"] = None
@@ -137,18 +162,22 @@ def _task163_scenario_claim(
         else m.Task164AcceptanceCategory.NEGATIVE_FAIL_CLOSED_COVERAGE
         if spec.scenario_class is m.Task164ScenarioClass.NEGATIVE_PRODUCER
         else m.Task164AcceptanceCategory.REPEAT_RUN_DETERMINISM
+        if scenario_id is m.Task164ScenarioId.D164_D01_REPEAT_RUN_IDENTITY_AND_EVIDENCE_PARITY
+        else m.Task164AcceptanceCategory.CROSS_PYTHON_DETERMINISM
+        if scenario_id is m.Task164ScenarioId.D164_D02_PYTHON_CROSS_VERSION_IDENTITY_PARITY
+        else m.Task164AcceptanceCategory.SCOPE_FENCE_ACCEPTANCE
     )
     return m.Task164ScenarioClaim(
         scenario_id=scenario_id,
         scenario_class=spec.scenario_class,
-        required_for_acceptance=True,
+        required_for_acceptance=spec.real_task163_required,
         input_setup=m.Task164ScenarioSetup(
             input_authority=authority,
             baffle_count=baffle_count,
             tamper_target=tamper_target,
             python_pair_key=(
                 m.Task164PairingKey.TASK164_PYTHON_3_11__TASK164_PYTHON_3_12.value
-                if spec.scenario_class is m.Task164ScenarioClass.DETERMINISM
+                if scenario_id is m.Task164ScenarioId.D164_D02_PYTHON_CROSS_VERSION_IDENTITY_PARITY
                 else None
             ),
         ),
@@ -174,8 +203,17 @@ def _blank_package_claim() -> m.Task164EvidencePackageClaim:
 
 def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163ValidationResult]:
     original, task163_outcome, _ = _task163_context()
+    positive_contexts = {
+        scenario_id: _task163_context_for_baffle(index)
+        for index, scenario_id in enumerate(m.TASK164_SCENARIO_IDS[:5], start=1)
+    }
     claims = tuple(
-        _task163_scenario_claim(scenario_id, original, task163_outcome)
+        _task163_scenario_claim(
+            scenario_id,
+            original,
+            task163_outcome,
+            positive_contexts.get(scenario_id),
+        )
         for scenario_id in m.TASK164_SCENARIO_IDS
     )
     repeat_claim = m.Task164RepeatRunClaim(
@@ -214,9 +252,34 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         ),
         status=m.Task164EvidenceStatus.PASS,
     )
-    repeat = service._make_repeat_observation(task163_evidence)
+    second_scenario_records = tuple(
+        service.execute_scenario(claim, original) for claim in claims
+    )
+    second_task163_evidence = m.Task164Task163Evidence(
+        original_request_projection_hash=canonical.task163_request_projection_hash(original),
+        replay_evidence=tuple(record.replay_evidence for record in second_scenario_records),
+        accepted_result_identities=tuple(
+            record.observation.observed_task163_result_identity_or_none
+            for record in second_scenario_records[:5]
+            if record.observation.observed_task163_result_identity_or_none is not None
+        ),
+        status=m.Task164EvidenceStatus.PASS,
+    )
     terminal = service._terminal_capability()
+    second_terminal = service._terminal_capability()
     scope = service._scope_fence()
+    second_scope = service._scope_fence()
+    repeat = service._make_repeat_observation(
+        request_projection=canonical.task163_request_projection_bytes(original),
+        first_evidence=task163_evidence,
+        second_evidence=second_task163_evidence,
+        first_scenarios=scenario_records,
+        second_scenarios=second_scenario_records,
+        first_terminal=terminal,
+        second_terminal=second_terminal,
+        first_scope=scope,
+        second_scope=second_scope,
+    )
     main = trusted_evidence.observe_main_delivery()
     assert main.status is m.Task164ParityStatus.PASS
     dual = service._make_dual_runtime(
@@ -245,8 +308,8 @@ def _build_task164_request() -> tuple[dict[str, object], Task163Request, Task163
         determinism=determinism,
         terminal=terminal,
         scope=scope,
-        applicability=applicability,
-        completeness=completeness,
+        producer_applicability=task163_outcome.valid.applicability,
+        producer_completeness=task163_outcome.valid.completeness,
         original_projection=original_projection,
     )
     payloads = (
@@ -357,6 +420,14 @@ def test_task164_duplicate_metadata_raw_schema_failure(success_context) -> None:
     raw, _, _ = success_context
     outcome = task164.validate_request({**raw, "request_metadata": (("x", "1"), ("x", "2"))})
     assert outcome.status is m.Task164ValidationBranch.RAW_BOUNDARY_BLOCKED
+
+
+def test_task164_request_metadata_duplicate_rejected(success_context) -> None:
+    raw, _, _ = success_context
+    duplicated = {**raw, "request_metadata": (("release", "demo"), ("release", "demo"))}
+    outcome = task164.validate_request(duplicated)
+    assert outcome.status is m.Task164ValidationBranch.RAW_BOUNDARY_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.INVALID_REQUEST_SCHEMA,)
 
 
 def test_task164_source_definition_mismatch_raw_failure(success_context) -> None:
@@ -552,6 +623,7 @@ def test_task164_task163_result_hash_mismatch(success_context) -> None:
     changed = replace(claimed, valid=replace(claimed.valid, result_hash="0" * 64))
     outcome = task164.validate_request({**raw, "claimed_task163_validation_result": changed})
     assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.TASK163_RESULT_HASH_MISMATCH,)
 
 
 def test_task164_task163_result_id_mismatch(success_context) -> None:
@@ -560,6 +632,7 @@ def test_task164_task163_result_id_mismatch(success_context) -> None:
     changed = replace(claimed, valid=replace(claimed.valid, result_id=UUID(int=0)))
     outcome = task164.validate_request({**raw, "claimed_task163_validation_result": changed})
     assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.TASK163_RESULT_ID_MISMATCH,)
 
 
 def test_task164_task163_provenance_mismatch(success_context) -> None:
@@ -574,6 +647,7 @@ def test_task164_task163_provenance_mismatch(success_context) -> None:
     )
     outcome = task164.validate_request({**raw, "claimed_task163_validation_result": changed})
     assert outcome.status is m.Task164ValidationBranch.TYPED_BLOCKED
+    assert _blocked_codes(outcome) == (m.Task164FailureCode.TASK163_PROVENANCE_MISMATCH,)
 
 
 def test_task164_task163_applicability_exact(success_context) -> None:
@@ -593,8 +667,14 @@ def test_task164_task163_completeness_exact(success_context) -> None:
 def _assert_positive_baffle(success_context, index: int) -> None:
     result = _valid_result(success_context)
     record = result.scenario_evidence[index]
+    expected_baffle = index + 1
     assert record.observation.observed_outcome is m.Task164ScenarioOutcome.PASS
     assert record.observation.real_task163_invoked
+    assert record.claim.input_setup.baffle_count == expected_baffle
+    assert (
+        record.claim.original_task163_request.task162_success_replay_evidence.original_case_authority.baffle_count
+        == expected_baffle
+    )
 
 
 def test_task164_positive_baffle_1(success_context) -> None:
@@ -676,6 +756,8 @@ def test_task164_repeat_run_all_surfaces(success_context) -> None:
     assert repeat.run_count == 2
     assert repeat.observed_equal
     assert len(repeat.surface_records) == len(m.Task164RepeatRunSurface)
+    assert len(repeat.second_run_surface_records) == len(m.Task164RepeatRunSurface)
+    assert repeat.surface_records == repeat.second_run_surface_records
 
 
 def test_task164_repeat_run_failure_blocks() -> None:
@@ -1209,19 +1291,4 @@ _PLANNED_TEST_NAMES = (
 
 
 assert len(_PLANNED_TEST_NAMES) == 109
-
-
-def _static_contract_smoke(name: str) -> None:
-    assert name.startswith("test_task164_") or name.startswith("test_valid_")
-    assert len(m.TASK164_ALLOWLIST) == 12
-
-
-for _test_name in _PLANNED_TEST_NAMES:
-    if _test_name not in globals():
-
-        def _generated_test(name: str = _test_name) -> None:
-            _static_contract_smoke(name)
-
-        _generated_test.__name__ = _test_name
-        _generated_test.__qualname__ = _test_name
-        globals()[_test_name] = _generated_test
+assert len({name for name in _PLANNED_TEST_NAMES if name in globals()}) == 109

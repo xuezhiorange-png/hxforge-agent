@@ -468,6 +468,7 @@ class Task164RepeatRunObservation:
     observed_equal: bool
     status: Task164ParityStatus
     evidence_refs: tuple[str, ...]
+    second_run_surface_records: tuple[Task164SurfaceHashRecord, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
