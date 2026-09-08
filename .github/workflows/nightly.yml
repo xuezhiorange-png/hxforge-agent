@@ -101,6 +101,33 @@ jobs:
 
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
+      - name: Provision TASK164 dual-runtime observation environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TASK164_RUNTIME_ROOT="${RUNNER_TEMP}/task164-runtimes"
+          export TASK164_REQUIREMENTS_PATH="${TASK164_RUNTIME_ROOT}/requirements.txt"
+          mkdir -p "${TASK164_RUNTIME_ROOT}"
+          uv export --locked --all-extras --format requirements.txt --no-hashes \
+            --no-emit-project --output-file "${TASK164_REQUIREMENTS_PATH}"
+          uv venv --no-project --python "${TASK029_PY311_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py311"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py311/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          uv venv --no-project --python "${TASK029_PY312_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py312"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py312/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          echo "TASK164_PY311_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py311/bin/python" >> "${GITHUB_ENV}"
+          echo "TASK164_PY312_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py312/bin/python" >> "${GITHUB_ENV}"
       - name: Run all tests (py3.11) with real telemetry
         run: >
           uv run --locked python -m tests.ci.run_test_shard
@@ -189,6 +216,33 @@ jobs:
 
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
+      - name: Provision TASK164 dual-runtime observation environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          export TASK164_RUNTIME_ROOT="${RUNNER_TEMP}/task164-runtimes"
+          export TASK164_REQUIREMENTS_PATH="${TASK164_RUNTIME_ROOT}/requirements.txt"
+          mkdir -p "${TASK164_RUNTIME_ROOT}"
+          uv export --locked --all-extras --format requirements.txt --no-hashes \
+            --no-emit-project --output-file "${TASK164_REQUIREMENTS_PATH}"
+          uv venv --no-project --python "${TASK029_PY311_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py311"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py311/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py311/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.11"
+          uv venv --no-project --python "${TASK029_PY312_EXECUTABLE}" \
+            "${TASK164_RUNTIME_ROOT}/py312"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --requirement "${TASK164_REQUIREMENTS_PATH}"
+          uv pip install --python "${TASK164_RUNTIME_ROOT}/py312/bin/python" --strict \
+            --no-deps --editable .
+          test "$("${TASK164_RUNTIME_ROOT}/py312/bin/python" -I -c \
+            'import hexagent,sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')" = "3.12"
+          echo "TASK164_PY311_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py311/bin/python" >> "${GITHUB_ENV}"
+          echo "TASK164_PY312_EXECUTABLE=${TASK164_RUNTIME_ROOT}/py312/bin/python" >> "${GITHUB_ENV}"
       - name: Run all tests (py3.12) with real telemetry
         run: >
           uv run --locked python -m tests.ci.run_test_shard
