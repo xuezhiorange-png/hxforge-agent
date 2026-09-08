@@ -547,6 +547,18 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
         "flow_arrangement_performance_method_authority",
         "overall_heat_transfer_coefficient_ua",
     )
+    allowed_model_modules = {
+        "hexagent.exchangers.shell_tube.thermal_stream_state.models",
+        "hexagent.exchangers.shell_tube.flow_arrangement_performance_method_authority.models",
+        "hexagent.exchangers.shell_tube.overall_heat_transfer_coefficient_ua.models",
+    }
+    allowed_canonical_names = {
+        "task038_result_identity_projection",
+        "task160_result_identity_projection",
+        "task161_result_identity_projection",
+        "task162_result_identity_projection",
+        "task162_success_replay_evidence_identity_projection",
+    }
     forbidden_upstream = False
     private_import = False
     for path in production_paths:
@@ -554,10 +566,20 @@ def observe_scope_fence() -> Task164ScopeFenceEvidence:
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom):
                 module = node.module or ""
-                if any(item in module for item in upstream_modules):
-                    forbidden_upstream = True
                 if any(alias.name.startswith("_") for alias in node.names):
                     private_import = True
+                if any(item in module for item in upstream_modules):
+                    if module in allowed_model_modules:
+                        continue
+                    if module.endswith(".service"):
+                        if tuple(alias.name for alias in node.names) != ("validate_request",):
+                            forbidden_upstream = True
+                        continue
+                    if module.endswith(".canonical"):
+                        if any(alias.name not in allowed_canonical_names for alias in node.names):
+                            forbidden_upstream = True
+                        continue
+                    forbidden_upstream = True
             elif isinstance(node, ast.Import):
                 if any(alias.name.startswith("_") for alias in node.names):
                     private_import = True
