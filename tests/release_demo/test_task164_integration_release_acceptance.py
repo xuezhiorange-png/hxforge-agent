@@ -1858,11 +1858,13 @@ def test_main_delivery_accepts_descendant_task164_checkout_with_allowlisted_diff
     observation = trusted_evidence.observe_main_delivery()
     assert observation.status is m.Task164ParityStatus.PASS
     assert observation.predecessor_is_ancestor
-    assert trusted_evidence.TASK164_DELIVERY_SHA == (
-        "6fd31c597cc3572f20baea42afbbaa642531fb40"
+    assert (
+        trusted_evidence.TASK164_DELIVERY_SHA
+        == "6fd31c597cc3572f20baea42afbbaa642531fb40"
     )
-    assert trusted_evidence.TASK164_DELIVERY_TREE == (
-        "4a385542f49bc0c21a80c1bbf9eaa815f97a1d66"
+    assert (
+        trusted_evidence.TASK164_DELIVERY_TREE
+        == "4a385542f49bc0c21a80c1bbf9eaa815f97a1d66"
     )
     assert set(observation.changed_paths).issubset(set(m.TASK164_ALLOWLIST))
     assert len(m.TASK164_ALLOWLIST) == 12

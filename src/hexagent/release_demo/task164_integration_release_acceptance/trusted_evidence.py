@@ -174,9 +174,7 @@ def observe_main_delivery(*, cwd: str | None = None) -> MainDeliveryObservation:
         and all(char in "0123456789abcdef" for char in head + tree)
     )
     delivery_identity_ok = (
-        delivery_ok
-        and delivery_tree_ok
-        and delivery_tree == TASK164_DELIVERY_TREE
+        delivery_ok and delivery_tree_ok and delivery_tree == TASK164_DELIVERY_TREE
     )
     ancestor_ok = base_to_delivery_ok and delivery_to_head_ok
     frozen_paths_unchanged = frozen_paths_ok and not frozen_path_text
