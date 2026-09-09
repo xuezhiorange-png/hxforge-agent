@@ -44,16 +44,21 @@ The typed request has exactly these nine fields, in this order:
 5. `requirement_authority`
 6. `shell_geometry_catalog`
 7. `discrete_candidate_set_authorities`
-8. `candidate_evaluations`
+8. `evaluation_input_authority`
 9. `request_metadata`
 
 `task020_configuration` is the exact TASK-020 normalized configuration.
-`shell_geometry_catalog` is the exact approved TASK-023 catalog.  Each
-`candidate_evaluations` entry is a producer-owned hand-off for one generated
-candidate and contains exact TASK-021/022/024, tube-side, TASK-037/038,
-TASK-162, TASK-166, and TASK-167 results where evaluation is available.
-TASK-168 accepts no replacement UA, duty, outlet temperature, pressure drop,
-or arbitrary geometry scalar.
+`shell_geometry_catalog` is the exact approved TASK-023 catalog.  The
+`evaluation_input_authority` is an identity-bearing bundle of producer request
+templates and base property/service authorities.  TASK-168 fills the selected
+candidate dimensions into those templates, invokes TASK-021/022/024,
+tube-side, TASK-166, TASK-037/038, TASK-162, tube-side pressure-drop
+composition, and TASK-167, and records the producer-owned identities returned
+by that live chain.  It may carry explicit TASK-160 and TASK-161 request
+templates; TASK-168 binds the live TASK-026 result into TASK-160 and then
+binds the newly issued TASK-160 result into TASK-161.  The caller does not
+provide candidate-specific results, callbacks, or replacement UA, duty,
+outlet-temperature, pressure-drop, or arbitrary geometry scalars.
 
 `Task168RequirementAuthority` identities every hard constraint.  Required
 duty, maximum tube-side DP, and maximum shell-side DP are optional only when
@@ -162,18 +167,24 @@ Candidate
  -> PASS / WARN / BLOCKED
 ```
 
-TASK-168 replays producer identities and same-case joins; it does not rerun a
-producer's engineering equations.  A missing or blocked producer result is a
-candidate blocker, never a Kern fallback or a synthetic success.
+For each generated candidate, TASK-168 materializes the actual producer
+request from candidate dimensions plus the evaluation-input authority and
+invokes the existing producer boundary before constructing the next request.
+TASK-029 receives a composition authority rebuilt from the live TASK-027 and
+TASK-028 results.  TASK-168 replays producer identities and same-case joins;
+it does not rerun a producer's engineering equations.  A missing or blocked
+producer result is a candidate blocker, never a Kern fallback or a synthetic
+success.
 
 ## Tube count and psi_n
 
 TASK-168 prefers exact TASK-021 layout enumeration.  When the accepted layout
 contains `physical_tube_count`, `tube_hole_count`, and its exclusion audit,
-`PSI_N_USED=false` and the inaccessible Wiley `psi_n` table is not a TASK-168
-prerequisite.  `psi_n` remains deferred to TASK-168 only if a future sizing
-path genuinely needs the published tube-count estimate and its source is
-complete.  TASK-168 does not guess `psi_n`.
+`TUBE_COUNT_SOURCE=TASK021_EXACT_LAYOUT_ENUMERATION` and `PSI_N_USED=false`;
+the inaccessible Wiley `psi_n` table is not a TASK-168 prerequisite.
+`psi_n` remains deferred to TASK-168 only if a future sizing path genuinely
+needs the published tube-count estimate and its source is complete.  TASK-168
+does not guess `psi_n`.
 
 ## Status semantics
 
@@ -220,10 +231,13 @@ and never create a provenance graph.
 The implementation tests cover authority hash replay, approved catalog
 membership, duplicate semantics, deterministic Cartesian order, resource
 limits, structural geometry blockers, no silent repair, exact TASK-021 tube
-count, producer replay/case joins, blocked-candidate retention, PASS/WARN/
-BLOCKED aggregation, hard-constraint equality and over-limit behavior,
-canonical replay under ambient Decimal-context changes, raw totality, and
-provenance cycle count zero.  Regression tests prove TASK-033/TASK-034,
+count, live TASK-021/022/024 and producer orchestration, TASK-029
+candidate-specific path binding, producer replay/case joins,
+blocked-candidate retention, PASS/WARN/BLOCKED aggregation, hard-constraint
+equality and over-limit behavior, canonical replay under ambient Decimal-
+context changes, raw totality, and provenance cycle count zero.  The real
+full-chain fixture reaches an evaluated WARN candidate; a separate structural
+candidate is retained as BLOCKED.  Regression tests prove TASK-033/TASK-034,
 TASK-162, TASK-166, and TASK-167 semantics are consumed rather than modified.
 
 Python 3.11 and 3.12 are the supported identity-parity runtimes.  TASK-169

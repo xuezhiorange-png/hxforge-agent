@@ -15,8 +15,11 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any
 
+from pydantic import BaseModel
+
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.tube_layout.canonical import canonical_json
+from hexagent.exchangers.shell_tube.tube_side.owned_enums import ReferencePlanePair
 
 from .models import (
     CandidateRecord,
@@ -24,7 +27,7 @@ from .models import (
     DiscreteCandidateSetAuthority,
     ProvenanceGraph,
     Task168BatchResult,
-    Task168CandidateEvaluationContext,
+    Task168EvaluationInputAuthority,
     Task168Request,
     Task168RequirementAuthority,
 )
@@ -62,6 +65,14 @@ def _primitive(value: Any) -> Any:
         return _primitive(value.value)
     if isinstance(value, uuid.UUID):
         return str(value).lower()
+    if type(value) is ReferencePlanePair:
+        return {
+            "kind": value.kind,
+            "start": _primitive(value.start),
+            "end": _primitive(value.end),
+        }
+    if isinstance(value, BaseModel):
+        return _primitive(value.model_dump(mode="python"))
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return {
             item.name: _primitive(getattr(value, item.name)) for item in dataclasses.fields(value)
@@ -73,7 +84,7 @@ def _primitive(value: Any) -> Any:
                 raise ValueError("canonical mapping keys must be exact str")
             pairs.append((key.encode("utf-8", "strict"), key, _primitive(item)))
         return {key: item for _, key, item in sorted(pairs, key=lambda pair: pair[0])}
-    if type(value) in (tuple, list):
+    if isinstance(value, (tuple, list)):
         return [_primitive(item) for item in value]
     raise ValueError(f"unsupported canonical value {type(value).__name__}")
 
@@ -101,6 +112,18 @@ def _sorted_pairs(value: tuple[tuple[str, str], ...]) -> tuple[tuple[str, str], 
 
 
 def discrete_authority_projection(value: DiscreteCandidateSetAuthority) -> dict[str, Any]:
+    def value_key(item: Any) -> tuple[int, Any]:
+        if type(item) is Decimal:
+            return (0, item)
+        if type(item) is int and type(item) is not bool:
+            return (1, item)
+        if isinstance(item, enum.Enum):
+            raw = item.value
+            return (2, raw.encode("utf-8") if type(raw) is str else str(raw).encode("utf-8"))
+        if type(item) is str:
+            return (3, item.encode("utf-8", "strict"))
+        return (4, type(item).__qualname__.encode("utf-8"))
+
     return {
         "authority_id": value.authority_id,
         "authority_version": value.authority_version,
@@ -109,7 +132,7 @@ def discrete_authority_projection(value: DiscreteCandidateSetAuthority) -> dict[
         "source_id": value.source_id,
         "source_revision": value.source_revision,
         "approval_status": value.approval_status,
-        "values": value.values,
+        "values": tuple(sorted(value.values, key=value_key)),
         "evidence_refs": value.evidence_refs,
         "provenance_refs": value.provenance_refs,
     }
@@ -137,6 +160,25 @@ def requirement_authority_projection(value: Task168RequirementAuthority) -> dict
 
 def requirement_authority_hash(value: Task168RequirementAuthority) -> str:
     return canonical_sha256(_primitive(requirement_authority_projection(value)))
+
+
+def evaluation_input_authority_projection(
+    value: Task168EvaluationInputAuthority,
+) -> dict[str, Any]:
+    """Project explicit base inputs, excluding the supplied replay hash."""
+
+    return {
+        field.name: getattr(value, field.name)
+        for field in dataclasses.fields(value)
+        if field.name != "canonical_hash"
+    }
+
+
+def evaluation_input_authority_hash(value: Task168EvaluationInputAuthority) -> str:
+    return sha256_domain_hex(
+        "task168.manufacturable-candidates.evaluation-input-authority.v1",
+        evaluation_input_authority_projection(value),
+    )
 
 
 def _source_binding_projection(binding: Any) -> dict[str, Any]:
@@ -209,38 +251,6 @@ def configuration_projection(configuration: Any) -> dict[str, Any]:
     }
 
 
-def context_identity_projection(value: Task168CandidateEvaluationContext) -> dict[str, Any]:
-    result_names = (
-        "task021_layout",
-        "task022_geometry",
-        "task024_geometry",
-        "task026_result",
-        "task029_result",
-        "task037_result",
-        "task038_result",
-        "task162_result",
-        "task162_replay_evidence",
-        "task166_result",
-        "task167_result",
-    )
-    result_identity: dict[str, Any] = {}
-    for name in result_names:
-        item = getattr(value, name)
-        if item is None:
-            result_identity[name] = None
-            continue
-        result_identity[name] = {
-            "type": f"{type(item).__module__}.{type(item).__qualname__}",
-            "result_hash": getattr(item, "result_hash", None),
-            "result_id": getattr(item, "result_id", None),
-            "layout_hash": getattr(item, "layout_hash", None),
-            "layout_id": getattr(item, "layout_id", None),
-            "geometry_hash": getattr(item, "geometry_hash", None),
-            "geometry_id": getattr(item, "geometry_id", None),
-        }
-    return {"candidate_id": value.candidate_id, "results": result_identity}
-
-
 def request_projection(request: Task168Request) -> dict[str, Any]:
     return {
         "schema_version": request.schema_version,
@@ -263,9 +273,8 @@ def request_projection(request: Task168Request) -> dict[str, Any]:
                 key=lambda item: item.dimension_role.value,
             )
         ),
-        "candidate_evaluations": tuple(
-            context_identity_projection(item)
-            for item in sorted(request.candidate_evaluations, key=lambda item: item.candidate_id)
+        "evaluation_input_authority": evaluation_input_authority_projection(
+            request.evaluation_input_authority
         ),
         "request_metadata": _sorted_pairs(request.request_metadata),
     }
@@ -483,10 +492,11 @@ __all__ = [
     "candidate_space_hash",
     "candidate_space_id",
     "canonical_bytes",
-    "context_identity_projection",
     "configuration_projection",
     "discrete_authority_hash",
     "discrete_authority_projection",
+    "evaluation_input_authority_hash",
+    "evaluation_input_authority_projection",
     "provenance_graph_hash",
     "raw_blocked_hash",
     "raw_blocked_id",

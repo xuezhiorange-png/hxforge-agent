@@ -41,9 +41,17 @@ REQUEST_FIELDS = (
     "requirement_authority",
     "shell_geometry_catalog",
     "discrete_candidate_set_authorities",
-    "candidate_evaluations",
+    "evaluation_input_authority",
     "request_metadata",
 )
+
+# TASK-168 owns candidate generation, geometry materialisation, and producer
+# orchestration.  These are contract markers, not additional public business
+# entry points.
+TASK168_GENERATES_CANDIDATES = True
+TASK168_MATERIALIZES_CANDIDATE_GEOMETRY = True
+TASK168_ORCHESTRATES_EVALUATION_CHAIN = True
+CALLER_PRECOMPUTED_CANDIDATE_RESULTS_REQUIRED = False
 
 DIMENSION_ORDER = (
     "CONSTRUCTION_FAMILY",
@@ -237,27 +245,69 @@ class Task168RequirementAuthority:
 
 
 @dataclass(frozen=True, slots=True)
-class Task168CandidateEvaluationContext:
-    """Producer-owned outputs for one candidate.
+class Task168EvaluationInputAuthority:
+    """Base authority from which TASK-168 builds producer requests.
 
-    TASK-168 never accepts replacement scalar physics.  A context is the
-    typed hand-off produced by the existing TASK-021/022/024, tube-side,
-    TASK-037/038, TASK-162, TASK-166, and TASK-167 boundaries.  Missing
-    context therefore blocks that candidate instead of causing a fallback.
+    The record carries request templates and upstream base authorities only.
+    It deliberately contains no candidate-specific producer result and no
+    callback or executable factory.  TASK-168 fills candidate dimensions into
+    these templates, invokes the existing producer boundaries, and records
+    their identities in the candidate audit.
     """
 
-    candidate_id: str
-    task021_layout: object | None = None
-    task022_geometry: object | None = None
-    task024_geometry: object | None = None
-    task026_result: object | None = None
-    task029_result: object | None = None
-    task037_result: object | None = None
-    task038_result: object | None = None
-    task162_result: object | None = None
-    task162_replay_evidence: object | None = None
-    task166_result: object | None = None
-    task167_result: object | None = None
+    authority_id: str
+    authority_version: str
+    source_class: str
+    source_id: str
+    source_revision: str
+    approval_status: str
+    evidence_refs: tuple[str, ...]
+    provenance_refs: tuple[str, ...]
+    task021_request_template: object | None = None
+    task022_request_template: object | None = None
+    task024_request_template: object | None = None
+    task025_request_template: object | None = None
+    task026_request: object | None = None
+    task027_property_snapshot: object | None = None
+    task027_roughness_authority: object | None = None
+    task027_constant_density_assertion: object | None = None
+    task027_zero_net_elevation_assertion: object | None = None
+    task027_flow_direction_assertion: object | None = None
+    task028_request_template: object | None = None
+    task029_request_template: object | None = None
+    task031_request_template: object | None = None
+    task032_request_template: object | None = None
+    task032_property_snapshot: object | None = None
+    task032_mass_flow_authority: object | None = None
+    task033_request_template: object | None = None
+    task034_request_template: object | None = None
+    task035_request_template: object | None = None
+    task037_request: object | None = None
+    task038_service_binding_authority: object | None = None
+    task166_request_template: object | None = None
+    task160_request_template: object | None = None
+    task161_request_template: object | None = None
+    task162_case_authority: object | None = None
+    task162_binding_authority: object | None = None
+    task162_request_metadata: tuple[tuple[str, str], ...] = ()
+    task167_screening_requirements: object | None = None
+    task167_screening_property_snapshot: object | None = None
+    task167_nozzle_geometry: object | None = None
+    task167_approved_rule_pack_authority: object | None = None
+    task167_request_metadata: tuple[tuple[str, str], ...] = ()
+    canonical_hash: str = ""
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "evidence_refs",
+            tuple(sorted(self.evidence_refs, key=lambda item: item.encode("utf-8"))),
+        )
+        object.__setattr__(
+            self,
+            "provenance_refs",
+            tuple(sorted(self.provenance_refs, key=lambda item: item.encode("utf-8"))),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,7 +319,7 @@ class Task168Request:
     requirement_authority: Task168RequirementAuthority
     shell_geometry_catalog: ShellGeometryCatalog
     discrete_candidate_set_authorities: tuple[DiscreteCandidateSetAuthority, ...]
-    candidate_evaluations: tuple[Task168CandidateEvaluationContext, ...] = ()
+    evaluation_input_authority: Task168EvaluationInputAuthority
     request_metadata: tuple[tuple[str, str], ...] = ()
 
 
@@ -454,6 +504,7 @@ def dataclass_field_names(value: object) -> tuple[str, ...]:
 
 __all__ = [
     "ApplicabilityStatus",
+    "CALLER_PRECOMPUTED_CANDIDATE_RESULTS_REQUIRED",
     "CandidateDisposition",
     "CandidateRecord",
     "CandidateSpec",
@@ -484,10 +535,13 @@ __all__ = [
     "TASK168_SOURCE_DEFINITION_ID",
     "TASK168_VERSION",
     "TASK168_COMPLETENESS_FIELDS",
+    "TASK168_GENERATES_CANDIDATES",
+    "TASK168_MATERIALIZES_CANDIDATE_GEOMETRY",
+    "TASK168_ORCHESTRATES_EVALUATION_CHAIN",
     "Task168Applicability",
     "Task168BatchResult",
     "Task168Blocker",
-    "Task168CandidateEvaluationContext",
+    "Task168EvaluationInputAuthority",
     "Task168Completeness",
     "Task168RawBoundaryBlockedResult",
     "Task168Request",
