@@ -92,6 +92,23 @@ def build_batch_provenance(
         candidate_node_id = "TASK168_CANDIDATE::" + record.candidate_id
         nodes.append(_node(candidate_node_id, "sha256:" + record.candidate_hash))
         edges.append(ProvenanceEdge(candidate_node_id, "SUPPLIES", run_id))
+        configuration_evidence = dict(record.configuration_evidence)
+        task020_node_id = ""
+        if configuration_evidence.get("result_id"):
+            task020_node_id = "TASK020::" + configuration_evidence["result_id"]
+            nodes.append(
+                _node(
+                    task020_node_id,
+                    _stable_hash(
+                        (
+                            "TASK020",
+                            configuration_evidence.get("result_id"),
+                            configuration_evidence.get("result_hash"),
+                        )
+                    ),
+                )
+            )
+            edges.append(ProvenanceEdge(task020_node_id, "SUPPLIES", candidate_node_id))
         for binding in record.candidate.dimension_authority_bindings:
             role = binding.dimension_role.value
             authority_node_id = (
@@ -125,7 +142,10 @@ def build_batch_provenance(
                     ProvenanceEdge(materialized_node_id, "SUPPLIES", candidate_node_id),
                 )
             )
+            if task020_node_id:
+                edges.append(ProvenanceEdge(authority_node_id, "AUTHORIZES", task020_node_id))
         for label, evidence in (
+            ("TASK020", record.configuration_evidence),
             ("TASK021", record.tube_layout_evidence),
             ("TUBE_SIDE", record.tube_side_evidence),
             ("TASK166", record.bell_evidence),

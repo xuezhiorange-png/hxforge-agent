@@ -47,7 +47,17 @@ The typed request has exactly these nine fields, in this order:
 8. `evaluation_input_authority`
 9. `request_metadata`
 
-`task020_configuration` is the exact TASK-020 normalized configuration.
+`task020_configuration` is the exact TASK-020 normalized base/template
+authority.  It is not the final configuration for every generated candidate.
+For each candidate, TASK-168 constructs a TASK-020 request by combining the
+base/template's invariant structure with the selected
+`CONSTRUCTION_FAMILY` and `TUBE_PASS_COUNT` discrete authority members, then
+calls the public TASK-020 validator.  The returned candidate-specific
+`ShellAndTubeConfiguration`, including its TASK-020-generated ID and hash, is
+the only configuration consumed by that candidate's downstream producer
+chain.  A TASK-020 rejection is an auditable `CONFIGURATION`-stage blocker;
+TASK-168 does not compare the candidate family to the base family and stop
+before TASK-020 validation.
 `shell_geometry_catalog` is the exact approved TASK-023 catalog.  The
 `evaluation_input_authority` is an identity-bearing bundle of producer request
 templates and base property/service authorities.  TASK-168 fills the selected
@@ -154,6 +164,7 @@ The producer-owned chain is consumed in this order:
 
 ```text
 Candidate
+ -> candidate-specific TASK-020 configuration
  -> TASK-021 tube layout / exact physical tube count
  -> TASK-022 shell-bundle geometry
  -> TASK-024 baffle geometry

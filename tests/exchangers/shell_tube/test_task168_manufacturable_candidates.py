@@ -367,6 +367,146 @@ def _codes(outcome: object) -> set[str]:
     return set() if branch is None else {item.code for item in branch.blockers}
 
 
+def _with_authority_values(
+    request: Task168Request,
+    role: DiscreteDimensionRole,
+    values: tuple[object, ...],
+) -> Task168Request:
+    authorities = list(request.discrete_candidate_set_authorities)
+    for index, authority in enumerate(authorities):
+        if authority.dimension_role is role:
+            changed = replace(authority, values=values, canonical_hash="")
+            authorities[index] = replace(
+                changed,
+                canonical_hash=discrete_authority_hash(changed),
+            )
+    return replace(request, discrete_candidate_set_authorities=tuple(authorities))
+
+
+def test_candidate_specific_task020_configuration_materializes_each_family() -> None:
+    request = _request()
+    families = (
+        ConstructionFamily.FIXED_TUBESHEET,
+        ConstructionFamily.U_TUBE,
+        ConstructionFamily.FLOATING_HEAD,
+    )
+    requirement = replace(
+        request.requirement_authority,
+        allowed_construction_families=families,
+        canonical_hash="",
+    )
+    requirement = replace(requirement, canonical_hash=requirement_authority_hash(requirement))
+    request = replace(
+        _with_authority_values(
+            replace(request, requirement_authority=requirement),
+            DiscreteDimensionRole.CONSTRUCTION_FAMILY,
+            families,
+        ),
+        task020_configuration=_configuration(),
+    )
+
+    outcome = validate_request(request)
+
+    assert outcome.status is ValidationStatus.VALID
+    assert outcome.valid is not None
+    records = outcome.valid.candidate_records
+    assert tuple(record.candidate.construction_family for record in records) == (
+        ConstructionFamily.FIXED_TUBESHEET,
+        ConstructionFamily.FLOATING_HEAD,
+        ConstructionFamily.U_TUBE,
+    )
+    configuration_ids = []
+    for record in records:
+        evidence = dict(record.configuration_evidence)
+        configuration_ids.append(evidence["configuration_id"])
+        assert evidence["construction_family"] == record.candidate.construction_family.value
+        assert record.last_successful_stage is CandidateStage.CONFIGURATION
+        assert record.stage is CandidateStage.TUBE_LAYOUT
+        assert all(
+            blocker.code != BlockerCode.UPSTREAM_CASE_BINDING_MISMATCH.value
+            for blocker in record.blockers
+        )
+    assert len(set(configuration_ids)) == len(families)
+
+
+def test_candidate_specific_task020_configuration_materializes_each_tube_pass_count() -> None:
+    request = _with_authority_values(
+        _request(),
+        DiscreteDimensionRole.TUBE_PASS_COUNT,
+        (1, 2),
+    )
+
+    outcome = validate_request(request)
+
+    assert outcome.status is ValidationStatus.VALID
+    assert outcome.valid is not None
+    records = outcome.valid.candidate_records
+    assert [record.candidate.tube_pass_count for record in records] == [1, 2]
+    configuration_ids = []
+    for record in records:
+        evidence = dict(record.configuration_evidence)
+        configuration_ids.append(evidence["configuration_id"])
+        assert int(evidence["tube_pass_count"]) == record.candidate.tube_pass_count
+        assert record.last_successful_stage is CandidateStage.CONFIGURATION
+    assert len(set(configuration_ids)) == 2
+
+
+def test_candidate_task020_configuration_identity_replays_and_tracks_selected_authority() -> None:
+    base = _request()
+    requirement = replace(
+        base.requirement_authority,
+        allowed_construction_families=(
+            ConstructionFamily.FIXED_TUBESHEET,
+            ConstructionFamily.U_TUBE,
+        ),
+        canonical_hash="",
+    )
+    request = _with_authority_values(
+        replace(
+            base,
+            requirement_authority=replace(
+                requirement,
+                canonical_hash=requirement_authority_hash(requirement),
+            ),
+        ),
+        DiscreteDimensionRole.CONSTRUCTION_FAMILY,
+        (ConstructionFamily.FIXED_TUBESHEET, ConstructionFamily.U_TUBE),
+    )
+    first = validate_request(request)
+    second = validate_request(request)
+
+    assert first.valid is not None
+    assert second.valid is not None
+    assert first.valid.result_hash == second.valid.result_hash
+    first_evidence = [
+        dict(record.configuration_evidence) for record in first.valid.candidate_records
+    ]
+    second_evidence = [
+        dict(record.configuration_evidence) for record in second.valid.candidate_records
+    ]
+    assert first_evidence == second_evidence
+    assert first_evidence[0]["configuration_id"] != first_evidence[1]["configuration_id"]
+    assert first_evidence[0]["case_authority_id"] == "rev-task168"
+
+
+def test_real_candidate_exposes_candidate_task020_identity_for_downstream_chain() -> None:
+    outcome = validate_request(_real_request())
+
+    assert outcome.valid is not None
+    record = outcome.valid.candidate_records[0]
+    configuration = dict(record.configuration_evidence)
+    assert configuration["configuration_id"]
+    assert configuration["configuration_hash"]
+    assert configuration["construction_family"] == "FIXED_TUBESHEET"
+    assert configuration["tube_pass_count"] == "1"
+    assert configuration["case_authority_id"] == record.candidate.case_authority_id
+    request_configuration_id = configuration["configuration_id"]
+    assert request_configuration_id
+    assert dict(record.tube_layout_evidence)["layout_id"]
+    assert dict(record.geometry_evidence)["geometry_id"]
+    assert outcome.valid.provenance.cycle_count == 0
+
+
 def test_exact_discrete_enumeration_retains_missing_evaluation_as_audited_block() -> None:
     outcome = validate_request(_request())
     assert outcome.status is ValidationStatus.VALID
@@ -840,6 +980,7 @@ def test_provenance_contains_discrete_authority_and_materialization_edges() -> N
     assert outcome.valid is not None
     record = outcome.valid.candidate_records[0]
     candidate_node = f"TASK168_CANDIDATE::{record.candidate_id}"
+    configuration_node = f"TASK020::{dict(record.configuration_evidence)['result_id']}"
     edge_set = {
         (edge.source_node_id, edge.relation, edge.target_node_id)
         for edge in outcome.valid.provenance.edges
@@ -851,5 +992,7 @@ def test_provenance_contains_discrete_authority_and_materialization_edges() -> N
         assert (authority_node, "AUTHORIZES", candidate_node) in edge_set
         assert (authority_node, "SUPPLIES", materialized_node) in edge_set
         assert (materialized_node, "SUPPLIES", candidate_node) in edge_set
+        assert (authority_node, "AUTHORIZES", configuration_node) in edge_set
+    assert (configuration_node, "SUPPLIES", candidate_node) in edge_set
     assert outcome.valid.provenance.self_edge_count == 0
     assert outcome.valid.provenance.cycle_count == 0

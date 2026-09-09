@@ -377,6 +377,7 @@ def candidate_record_projection(value: CandidateRecord) -> dict[str, Any]:
         "status": value.status,
         "stage": value.stage,
         "last_successful_stage": value.last_successful_stage,
+        "configuration_evidence": value.configuration_evidence,
         "geometry_evidence": value.geometry_evidence,
         "tube_layout_evidence": value.tube_layout_evidence,
         "tube_side_evidence": value.tube_side_evidence,

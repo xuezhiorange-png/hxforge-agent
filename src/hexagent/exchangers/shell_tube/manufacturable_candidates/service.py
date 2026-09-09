@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from itertools import product
 from typing import Any, cast
 
+from hexagent.exchangers.shell_tube import validate_request as validate_task020
 from hexagent.exchangers.shell_tube.baffle_geometry import canonical as task024_canonical
 from hexagent.exchangers.shell_tube.baffle_geometry import validate_request as validate_task024
 from hexagent.exchangers.shell_tube.baffle_geometry.models import (
@@ -1149,6 +1150,20 @@ def _legacy_context_blockers(
 ) -> tuple[Task168Blocker, ...]:
     """Replay each producer boundary in frozen stage order."""
 
+    try:
+        configuration = _materialize_candidate_configuration(
+            request.task020_configuration,
+            candidate,
+        )
+    except _StageFailure as failure:
+        return (
+            _blocker(
+                failure.code,
+                failure.stage,
+                failure.field_path,
+                message=failure.message,
+            ),
+        )
     layout = context.task021_layout
     if type(layout) is not TubeLayout or not layout.layout_id or not layout.layout_hash:
         return (
@@ -1172,8 +1187,8 @@ def _legacy_context_blockers(
             ),
         )
     if (
-        layout.task020_configuration_id != request.task020_configuration.configuration_id
-        or layout.task020_configuration_hash != request.task020_configuration.configuration_hash
+        layout.task020_configuration_id != configuration.configuration_id
+        or layout.task020_configuration_hash != configuration.configuration_hash
     ):
         return (
             _blocker(
@@ -1596,6 +1611,7 @@ class _ExecutionBundle:
     producer boundaries.
     """
 
+    task020_configuration: ShellAndTubeConfiguration | None = None
     task021_layout: object | None = None
     task022_geometry: object | None = None
     task024_geometry: object | None = None
@@ -1705,6 +1721,127 @@ def _template_mapping(
             "request template must project to a mapping",
         )
     return cast(dict[str, object], projected)
+
+
+def _task020_candidate_payload(
+    base: ShellAndTubeConfiguration,
+    candidate: CandidateSpec,
+) -> dict[str, object]:
+    """Build the exact TASK-020 request for one generated candidate.
+
+    ``base`` is a trusted normalized TASK-020 authority and contributes only
+    invariant configuration structure.  Candidate-selectable fields are
+    replaced in the request mapping and are then re-admitted by TASK-020;
+    TASK-168 never constructs or rewrites a configuration identity itself.
+    """
+
+    case = base.case_authority
+    binding = base.authority_binding
+    evaluated_rule_pack = binding.evaluated_rule_pack_authority
+    requested_rule_pack: dict[str, str] | None = None
+    if _status_text(base.authority_mode) == "APPROVED_RULE_PACK":
+        if evaluated_rule_pack is None:
+            raise _StageFailure(
+                CandidateStage.CONFIGURATION,
+                BlockerCode.CONFIGURATION_AUTHORITY_INVALID,
+                "task020_configuration.authority_binding.evaluated_rule_pack_authority",
+                "TASK-020 rule-pack identity is unavailable for candidate materialization",
+            )
+        requested_rule_pack = {
+            "rule_pack_id": evaluated_rule_pack.rule_pack_id,
+            "rule_pack_version": evaluated_rule_pack.rule_pack_version,
+            "rule_pack_canonical_hash": evaluated_rule_pack.rule_pack_canonical_hash,
+        }
+    return {
+        "schema_version": "task020.configuration-request.v1",
+        "case_authority": {
+            "revision_id": case.revision_id,
+            "payload_hash": case.payload_hash,
+            "domain_snapshot_hash": case.domain_snapshot_hash,
+            "status": case.revision_status.value,
+        },
+        "equipment_family": _status_text(base.equipment_family),
+        "authority_mode": _status_text(base.authority_mode),
+        "construction_family": candidate.construction_family.value,
+        "orientation": _status_text(base.orientation),
+        "shell_pass_count": base.shell_pass_count,
+        "tube_pass_count": candidate.tube_pass_count,
+        "front_head_token": base.component_tokens.front_head,
+        "shell_token": base.component_tokens.shell,
+        "rear_head_token": base.component_tokens.rear_head,
+        "standard_system_id": binding.standard_system_id,
+        "requested_rule_pack_identity": requested_rule_pack,
+        "evidence_refs": list(binding.case_authority_evidence_refs),
+    }
+
+
+def _materialize_candidate_configuration(
+    base: ShellAndTubeConfiguration,
+    candidate: CandidateSpec,
+) -> ShellAndTubeConfiguration:
+    """Use TASK-020's public validator to materialize one candidate config."""
+
+    payload = _task020_candidate_payload(base, candidate)
+    try:
+        outcome = validate_task020(payload)
+    except _StageFailure:
+        raise
+    except Exception as exc:
+        raise _StageFailure(
+            CandidateStage.CONFIGURATION,
+            BlockerCode.CONFIGURATION_AUTHORITY_INVALID,
+            "task020_candidate_request",
+            type(exc).__name__,
+        ) from exc
+    if _status_text(getattr(outcome, "status", None)) != "VALID":
+        blocker_codes = tuple(
+            _text(getattr(item, "code", "")) for item in getattr(outcome, "blockers", ())
+        )
+        message = "TASK-020 rejected candidate configuration"
+        if blocker_codes:
+            message += ":" + ",".join(blocker_codes)
+        raise _StageFailure(
+            CandidateStage.CONFIGURATION,
+            BlockerCode.CONFIGURATION_AUTHORITY_INVALID,
+            "task020_candidate_request",
+            message,
+        )
+    configuration = getattr(outcome, "configuration", None)
+    if type(configuration) is not ShellAndTubeConfiguration:
+        raise _StageFailure(
+            CandidateStage.CONFIGURATION,
+            BlockerCode.CONFIGURATION_AUTHORITY_INVALID,
+            "task020_candidate_request.configuration",
+            "TASK-020 did not return ShellAndTubeConfiguration",
+        )
+    if (
+        configuration.construction_family is not candidate.construction_family
+        or configuration.tube_pass_count != candidate.tube_pass_count
+        or configuration.case_authority != base.case_authority
+    ):
+        raise _StageFailure(
+            CandidateStage.CONFIGURATION,
+            BlockerCode.CONFIGURATION_AUTHORITY_INVALID,
+            "task020_candidate_request.configuration",
+            "TASK-020 returned a mismatched candidate configuration",
+        )
+    return configuration
+
+
+def _configuration_evidence(
+    configuration: object | None,
+) -> tuple[tuple[str, str], ...]:
+    if type(configuration) is not ShellAndTubeConfiguration:
+        return ()
+    return (
+        ("result_hash", configuration.configuration_hash),
+        ("result_id", configuration.configuration_id),
+        ("configuration_hash", configuration.configuration_hash),
+        ("configuration_id", configuration.configuration_id),
+        ("construction_family", configuration.construction_family.value),
+        ("tube_pass_count", str(configuration.tube_pass_count)),
+        ("case_authority_id", configuration.case_authority.revision_id),
+    )
 
 
 def _status_text(value: object) -> str:
@@ -2714,16 +2851,6 @@ def _execute_candidate_chain(
     authority = request.evaluation_input_authority
     bundle = _ExecutionBundle()
     last_successful: CandidateStage | None = None
-    if candidate.construction_family is not request.task020_configuration.construction_family:
-        return (
-            bundle,
-            _StageFailure(
-                CandidateStage.CONFIGURATION,
-                BlockerCode.UPSTREAM_CASE_BINDING_MISMATCH,
-                "construction_family",
-            ),
-            last_successful,
-        )
 
     def step(stage: CandidateStage, field_path: str, operation: Any) -> object:
         nonlocal last_successful
@@ -2732,11 +2859,23 @@ def _execute_candidate_chain(
         return value
 
     try:
+        configuration = cast(
+            ShellAndTubeConfiguration,
+            step(
+                CandidateStage.CONFIGURATION,
+                "task020",
+                lambda: _materialize_candidate_configuration(
+                    request.task020_configuration,
+                    candidate,
+                ),
+            ),
+        )
+        bundle.task020_configuration = configuration
         layout_outcome = step(
             CandidateStage.TUBE_LAYOUT,
             "task021",
             lambda: validate_task021(
-                _task021_payload(authority, candidate, request.task020_configuration),
+                _task021_payload(authority, candidate, configuration),
                 software_version=TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
                 git_commit="task168-orchestration",
             ),
@@ -2762,7 +2901,7 @@ def _execute_candidate_chain(
                 _task022_payload(
                     authority,
                     candidate,
-                    request.task020_configuration,
+                    configuration,
                     layout,
                     record,
                 ),
@@ -2785,7 +2924,7 @@ def _execute_candidate_chain(
                 _task024_payload(
                     authority,
                     candidate,
-                    request.task020_configuration,
+                    configuration,
                     layout,
                     native_geometry,
                 )
@@ -2805,7 +2944,7 @@ def _execute_candidate_chain(
                 _task025_payload(
                     authority.task025_request_template,
                     candidate,
-                    request.task020_configuration,
+                    configuration,
                     layout,
                     CandidateStage.TUBE_SIDE,
                     "evaluation_input_authority.task025_request_template",
@@ -2863,7 +3002,7 @@ def _execute_candidate_chain(
         ]:
             request031 = _task031_payload(
                 authority,
-                request.task020_configuration,
+                configuration,
                 layout,
                 bundle.task024_geometry,
             )
@@ -2875,7 +3014,7 @@ def _execute_candidate_chain(
             request032 = _task032_payload(
                 authority,
                 result031,
-                request.task020_configuration,
+                configuration,
                 layout,
             )
             result032 = validate_task032(request032)
@@ -2886,7 +3025,7 @@ def _execute_candidate_chain(
                 authority,
                 result032,
                 request032,
-                request.task020_configuration,
+                configuration,
                 layout,
             )
             result033 = validate_task033(request033)
@@ -2900,7 +3039,7 @@ def _execute_candidate_chain(
                 result032,
                 result033,
                 request033,
-                request.task020_configuration,
+                configuration,
                 layout,
                 bundle.task024_geometry,
             )
@@ -2914,7 +3053,7 @@ def _execute_candidate_chain(
                 result032,
                 result033,
                 result034,
-                request.task020_configuration,
+                configuration,
                 layout,
             )
             result035 = validate_task035(request035)
@@ -2955,7 +3094,7 @@ def _execute_candidate_chain(
             lambda: validate_task166(
                 _task166_payload(
                     authority,
-                    request.task020_configuration,
+                    configuration,
                     layout,
                     bundle.task022_geometry,
                     bundle.task024_geometry,
@@ -3392,7 +3531,7 @@ def _execute_candidate_chain(
             lambda: validate_task167(
                 _task167_payload(
                     authority,
-                    request.task020_configuration,
+                    configuration,
                     bundle.task166_result,
                     cast(TubeSideThermalResult, bundle.task026_result),
                 )
@@ -3562,6 +3701,7 @@ def _task025_payload(
 
 def _bundle_evidence(bundle: _ExecutionBundle) -> dict[str, tuple[tuple[str, str], ...]]:
     return {
+        "configuration": _configuration_evidence(bundle.task020_configuration),
         "geometry": _evidence(bundle.task022_geometry),
         "tube_layout": _evidence(bundle.task021_layout),
         "tube_side": _evidence(bundle.task026_result, result_name="tube_side"),
@@ -3598,6 +3738,7 @@ def _orchestrated_evaluate_candidate(
                 ),
             ),
             last_successful_stage=last_successful,
+            configuration_evidence=evidence["configuration"],
             geometry_evidence=evidence["geometry"],
             tube_layout_evidence=evidence["tube_layout"],
             tube_side_evidence=evidence["tube_side"],
@@ -3637,6 +3778,7 @@ def _orchestrated_evaluate_candidate(
                 ),
             ),
             last_successful_stage=CandidateStage.ENGINEERING_SCREENING,
+            configuration_evidence=evidence["configuration"],
             geometry_evidence=evidence["geometry"],
             tube_layout_evidence=evidence["tube_layout"],
             tube_side_evidence=evidence["tube_side"],
@@ -3680,6 +3822,7 @@ def _orchestrated_evaluate_candidate(
         )
     )
     common: dict[str, Any] = {
+        "configuration_evidence": evidence["configuration"],
         "geometry_evidence": evidence["geometry"],
         "tube_layout_evidence": evidence["tube_layout"],
         "tube_side_evidence": evidence["tube_side"],

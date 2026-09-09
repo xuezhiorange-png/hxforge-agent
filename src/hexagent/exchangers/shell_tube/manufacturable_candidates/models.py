@@ -52,6 +52,8 @@ TASK168_GENERATES_CANDIDATES = True
 TASK168_MATERIALIZES_CANDIDATE_GEOMETRY = True
 TASK168_ORCHESTRATES_EVALUATION_CHAIN = True
 CALLER_PRECOMPUTED_CANDIDATE_RESULTS_REQUIRED = False
+CANDIDATE_SPECIFIC_TASK020_CONFIGURATION = True
+BASE_TASK020_CONFIGURATION_USED_AS_FIXED_FINAL_CONFIG = False
 
 DIMENSION_ORDER = (
     "CONSTRUCTION_FAMILY",
@@ -402,6 +404,7 @@ class CandidateRecord:
     status: CandidateStatus
     stage: CandidateStage
     last_successful_stage: CandidateStage | None
+    configuration_evidence: tuple[tuple[str, str], ...] = ()
     geometry_evidence: tuple[tuple[str, str], ...] = ()
     tube_layout_evidence: tuple[tuple[str, str], ...] = ()
     tube_side_evidence: tuple[tuple[str, str], ...] = ()
@@ -540,6 +543,8 @@ def dataclass_field_names(value: object) -> tuple[str, ...]:
 __all__ = [
     "ApplicabilityStatus",
     "CALLER_PRECOMPUTED_CANDIDATE_RESULTS_REQUIRED",
+    "CANDIDATE_SPECIFIC_TASK020_CONFIGURATION",
+    "BASE_TASK020_CONFIGURATION_USED_AS_FIXED_FINAL_CONFIG",
     "CandidateDisposition",
     "CandidateDimensionAuthorityBinding",
     "CandidateRecord",
