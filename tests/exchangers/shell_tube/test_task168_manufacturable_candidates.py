@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from hexagent.exchangers.shell_tube import validate_request as validate_task020
+from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168_service
 from hexagent.exchangers.shell_tube.manufacturable_candidates import validate_request
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     discrete_authority_hash,
@@ -19,6 +20,7 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.errors import BlockerCode
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    REQUIRED_DISCRETE_ROLES,
     TASK168_SCHEMA_VERSION,
     TASK168_SOURCE_DEFINITION_ID,
     TASK168_VERSION,
@@ -698,3 +700,156 @@ def test_raw_depth_limit_is_bounded_and_total() -> None:
     outcome = validate_request(raw)
     assert outcome.status is ValidationStatus.RAW_BOUNDARY_BLOCKED
     assert BlockerCode.RAW_DEPTH_LIMIT_EXCEEDED.value in _codes(outcome)
+
+
+def test_candidate_retains_complete_selected_discrete_authority_bindings() -> None:
+    request = _request()
+    outcome = validate_request(request)
+    assert outcome.valid is not None
+    candidate = outcome.valid.candidate_records[0].candidate
+    bindings = {
+        binding.dimension_role.value: binding for binding in candidate.dimension_authority_bindings
+    }
+    authorities = {
+        authority.dimension_role.value: authority
+        for authority in request.discrete_candidate_set_authorities
+    }
+    assert tuple(bindings) == REQUIRED_DISCRETE_ROLES
+    for role in REQUIRED_DISCRETE_ROLES:
+        binding = bindings[role]
+        authority = authorities[role]
+        assert binding.authority_id == authority.authority_id
+        assert binding.authority_version == authority.authority_version
+        assert binding.canonical_hash == authority.canonical_hash
+        assert binding.source_class is authority.source_class
+        assert binding.source_id == authority.source_id
+        assert binding.source_revision == authority.source_revision
+        assert binding.evidence_refs == authority.evidence_refs
+        assert binding.provenance_refs == authority.provenance_refs
+        assert binding.selected_member == authority.values[0]
+        assert (
+            f"TASK168_DISCRETE_AUTHORITY::{role}::{authority.canonical_hash}"
+            in task168_service._candidate_dimension_authority_refs(candidate)
+        )
+
+
+def test_discrete_authority_source_swap_changes_candidate_identity() -> None:
+    request = _request()
+    baseline = validate_request(request)
+    assert baseline.valid is not None
+    baseline_candidate = baseline.valid.candidate_records[0].candidate
+    original = request.discrete_candidate_set_authorities[1]
+    changed = replace(
+        original,
+        source_id="task168-different-project-snapshot",
+        canonical_hash="",
+    )
+    changed = replace(changed, canonical_hash=discrete_authority_hash(changed))
+    authorities = list(request.discrete_candidate_set_authorities)
+    authorities[1] = changed
+    swapped = validate_request(
+        replace(request, discrete_candidate_set_authorities=tuple(authorities))
+    )
+    assert swapped.valid is not None
+    swapped_candidate = swapped.valid.candidate_records[0].candidate
+    assert swapped_candidate.candidate_id != baseline_candidate.candidate_id
+    assert swapped_candidate.candidate_hash != baseline_candidate.candidate_hash
+    assert (
+        swapped_candidate.dimension_authority_bindings[1].canonical_hash
+        != baseline_candidate.dimension_authority_bindings[1].canonical_hash
+    )
+
+
+def test_native_task021_and_task022_identity_and_warnings_survive_task024_admission() -> None:
+    request = _real_request()
+    initial = validate_request(request)
+    assert initial.valid is not None
+    candidate = initial.valid.candidate_records[0].candidate
+    authority = request.evaluation_input_authority
+    configuration = request.task020_configuration
+    record = request.shell_geometry_catalog.records[0]
+
+    task021_payload = task168_service._task021_payload(authority, candidate, configuration)
+    layout_outcome = task168_service.validate_task021(
+        task021_payload,
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert layout_outcome.layout is not None
+    native_layout = layout_outcome.layout
+    tube_geometry_source = task021_payload["tube_geometry"]["source_binding"]
+    assert tube_geometry_source["source_type"] == "TASK168_DERIVED_DISCRETE_AUTHORITY"
+    assert tube_geometry_source["source_id"].startswith("TASK168-DERIVED-TUBE-GEOMETRY::")
+    assert tube_geometry_source["evidence_ref"].startswith("TASK168_TUBE_GEOMETRY_AUTHORITY::")
+    assert set(
+        task168_service._candidate_dimension_authority_refs(
+            candidate, ("TUBE_OUTER_DIAMETER", "TUBE_WALL_THICKNESS")
+        )
+    ).issubset(set(task021_payload["layout_rule_authority"]["provenance_edge_ids"]))
+    geometry_outcome = task168_service.validate_task022(
+        task168_service._task022_payload(
+            authority, candidate, configuration, native_layout, record
+        ),
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert geometry_outcome.geometry is not None
+    native_geometry = geometry_outcome.geometry
+    native_layout_identity = (native_layout.layout_id, native_layout.layout_hash)
+    native_geometry_identity = (native_geometry.geometry_id, native_geometry.geometry_hash)
+    native_layout_warnings = native_layout.warnings
+    native_geometry_warnings = native_geometry.warnings
+
+    task024_payload = task168_service._task024_payload(
+        authority,
+        candidate,
+        configuration,
+        native_layout,
+        native_geometry,
+    )
+    bridge_refs = task168_service._candidate_dimension_authority_refs(candidate)
+    assert set(bridge_refs).issubset(set(task021_payload["evidence_refs"]))
+    assert set(bridge_refs).issubset(set(task024_payload["evidence_refs"]))
+    assert set(
+        task168_service._candidate_dimension_authority_refs(
+            candidate, ("TUBE_LENGTH", "BAFFLE_SPACING", "BAFFLE_COUNT")
+        )
+    ).issubset(set(task024_payload["axial_span"]["evidence_refs"]))
+    assert set(
+        task168_service._candidate_dimension_authority_refs(
+            candidate, ("BAFFLE_TYPE", "BAFFLE_CUT", "BAFFLE_SPACING", "BAFFLE_COUNT")
+        )
+    ).issubset(set(task024_payload["design_authority"]["evidence_refs"]))
+    assert task024_payload["tube_layout"] is native_layout
+    assert task024_payload["shell_bundle_geometry"] is native_geometry
+    assert (native_layout.layout_id, native_layout.layout_hash) == native_layout_identity
+    assert (native_geometry.geometry_id, native_geometry.geometry_hash) == native_geometry_identity
+    assert native_layout.warnings == native_layout_warnings
+    assert native_geometry.warnings == native_geometry_warnings
+
+    task024_outcome = task168_service.validate_task024(task024_payload)
+    assert task024_outcome.geometry is not None
+    assert task024_outcome.geometry.task021_layout_id == native_layout.layout_id
+    assert task024_outcome.geometry.task022_geometry_id == native_geometry.geometry_id
+    assert task024_outcome.geometry.task021_layout_hash == native_layout.layout_hash
+    assert task024_outcome.geometry.task022_geometry_hash == native_geometry.geometry_hash
+
+
+def test_provenance_contains_discrete_authority_and_materialization_edges() -> None:
+    outcome = validate_request(_request())
+    assert outcome.valid is not None
+    record = outcome.valid.candidate_records[0]
+    candidate_node = f"TASK168_CANDIDATE::{record.candidate_id}"
+    edge_set = {
+        (edge.source_node_id, edge.relation, edge.target_node_id)
+        for edge in outcome.valid.provenance.edges
+    }
+    for binding in record.candidate.dimension_authority_bindings:
+        role = binding.dimension_role.value
+        authority_node = f"TASK168_DISCRETE_AUTHORITY::{role}::{binding.canonical_hash}"
+        materialized_node = f"TASK168_MATERIALIZED_AUTHORITY::{record.candidate_id}::{role}"
+        assert (authority_node, "AUTHORIZES", candidate_node) in edge_set
+        assert (authority_node, "SUPPLIES", materialized_node) in edge_set
+        assert (materialized_node, "SUPPLIES", candidate_node) in edge_set
+    assert outcome.valid.provenance.self_edge_count == 0
+    assert outcome.valid.provenance.cycle_count == 0

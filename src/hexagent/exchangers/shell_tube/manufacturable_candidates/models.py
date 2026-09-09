@@ -209,6 +209,40 @@ class DiscreteCandidateSetAuthority:
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateDimensionAuthorityBinding:
+    """The exact authority member selected for one candidate dimension.
+
+    A candidate dimension is not authorized by the value alone.  This
+    binding carries the complete identity of the discrete set that supplied
+    the value so materialized producer requests can be audited without
+    attributing the value to a structural request template.
+    """
+
+    dimension_role: DiscreteDimensionRole
+    authority_id: str
+    authority_version: str
+    canonical_hash: str
+    source_class: DiscreteAuthoritySource
+    source_id: str
+    source_revision: str
+    evidence_refs: tuple[str, ...]
+    provenance_refs: tuple[str, ...]
+    selected_member: Any
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "evidence_refs",
+            tuple(sorted(self.evidence_refs, key=lambda item: item.encode("utf-8"))),
+        )
+        object.__setattr__(
+            self,
+            "provenance_refs",
+            tuple(sorted(self.provenance_refs, key=lambda item: item.encode("utf-8"))),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class Task168RequirementAuthority:
     """Identity-bearing constraints; numbers without this object are invalid."""
 
@@ -343,6 +377,7 @@ class CandidateSpec:
     baffle_spacing_m: Decimal
     baffle_count: int
     authority_bindings: tuple[tuple[str, str], ...]
+    dimension_authority_bindings: tuple[CandidateDimensionAuthorityBinding, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -506,6 +541,7 @@ __all__ = [
     "ApplicabilityStatus",
     "CALLER_PRECOMPUTED_CANDIDATE_RESULTS_REQUIRED",
     "CandidateDisposition",
+    "CandidateDimensionAuthorityBinding",
     "CandidateRecord",
     "CandidateSpec",
     "CandidateStage",

@@ -243,3 +243,42 @@ TASK-162, TASK-166, and TASK-167 semantics are consumed rather than modified.
 Python 3.11 and 3.12 are the supported identity-parity runtimes.  TASK-169
 owns ranking, recommendation, Golden integration, and release acceptance;
 TASK-168 stops before those capabilities.
+
+## R3 authority-preserving materialization correction
+
+TASK-168 retains the exact native TASK-021 `TubeLayout` and TASK-022
+`ShellBundleGeometry` success objects throughout the live chain.  It does
+not discard warnings, reconstruct a replacement `layout_id`/`layout_hash` or
+`geometry_id`/`geometry_hash`, or store a TASK-024-specific substitute as the
+authoritative upstream result.  TASK-024 admission may use a private
+representation adapter only to project the native frozen warning/provenance
+fragments into the already-authorized TASK-024 replay shape; the native IDs,
+hashes, warning semantics, and provenance semantics remain unchanged.
+
+Every selected member of `CONSTRUCTION_FAMILY`, `TUBE_OUTER_DIAMETER`,
+`TUBE_WALL_THICKNESS`, `TUBE_LENGTH`, `TUBE_PITCH`, `TUBE_LAYOUT`,
+`TUBE_PASS_COUNT`, `BAFFLE_TYPE`, `BAFFLE_CUT`, `BAFFLE_SPACING`, and
+`BAFFLE_COUNT` is carried by a complete `CandidateDimensionAuthorityBinding`:
+authority ID/version, canonical hash, source class/ID/revision, evidence
+references, provenance references, and the selected canonical member.  The
+binding is part of candidate identity and is exposed through deterministic
+`TASK168_DISCRETE_AUTHORITY::<role>::<canonical_hash>` evidence bridges in
+candidate-specific TASK-021/TASK-022/TASK-024 request materialization.
+
+The TASK-021 tube geometry snapshot is itself rebuilt as a candidate-specific
+derived authority from the structural template, selected OD/wall bindings,
+and their exact values.  Its geometry ID, source binding, record hash, and
+snapshot hash are recomputed together; the structural template's source
+record identity is never retained for a different tube dimension.  TASK-021
+layout-rule provenance and TASK-024 axial/design authority evidence carry the
+corresponding pitch/layout/pass, length/spacing/count, and baffle-type/cut
+selection bridges.  These changes are identity/provenance materialization
+only; upstream geometry equations, authority rules, and result replay
+contracts are unchanged.
+
+Request templates authorize structure only.  Candidate values are rebound
+from the selected discrete authorities before each producer request is
+validated; stale template evidence cannot claim ownership of a changed
+candidate dimension.  The final provenance graph contains explicit
+discrete-authority, candidate-specific materialization, native-producer, and
+candidate-record edges, with no source discontinuity or provenance cycle.

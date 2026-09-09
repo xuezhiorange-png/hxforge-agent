@@ -595,7 +595,12 @@ def _task021_layout_hash_payload(layout: Any) -> dict[str, Any]:
                 "field_path": w.field_path,
                 "message_key": w.message_key,
                 "evidence_refs": list(w.evidence_refs),
-                "details": w.details,
+                # TASK-021 stores detached warning details as Layer-B frozen
+                # values.  The producer's canonical hash reduces those
+                # values before framing; TASK-024 must do the same during
+                # replay admission.  This is a representation adaptation
+                # only: the warning entry and its semantics remain intact.
+                "details": internal_frozen_to_primitive(w.details),
             }
         )
     return {
@@ -819,9 +824,64 @@ def _task022_geometry_hash_payload(geometry: Any) -> dict[str, Any]:
                 "field_path": w.field_path,
                 "message_key": w.message_key,
                 "evidence_refs": list(w.evidence_refs),
-                "details": w.details,
+                # See the TASK-021 replay note above.  Do not discard warning
+                # details merely to make the older TASK-024 projection
+                # consumable; reduce the detached frozen representation
+                # exactly as the native producer does.
+                "details": internal_frozen_to_primitive(w.details),
             }
         )
+    provenance = internal_frozen_to_primitive(geometry.provenance)
+    if "shell_authority_identity" in provenance:
+        # Native TASK-022 uses this complete payload.  Keep the field list
+        # and enum/value conversions aligned with
+        # shell_bundle_geometry.validation.validate_request so TASK-024
+        # validates the producer object without creating a second identity.
+        return {
+            "schema_version": geometry.schema_version,
+            "request_hash": geometry.request_hash,
+            "task020_configuration_id": geometry.task020_configuration_id,
+            "task020_configuration_hash": geometry.task020_configuration_hash,
+            "task021_layout_id": geometry.task021_layout_id,
+            "task021_layout_hash": geometry.task021_layout_hash,
+            "construction_family": geometry.construction_family,
+            "equipment_orientation": geometry.equipment_orientation.value,
+            "shell_pass_count": geometry.shell_pass_count,
+            "tube_pass_count": geometry.tube_pass_count,
+            "tube_geometry_snapshot_hash": geometry.tube_geometry_snapshot_hash,
+            "geometry_rule_authority": _task022_canonical.dataclass_to_mapping(
+                geometry.geometry_rule_authority
+            ),
+            "shell_authority_mode": geometry.shell_authority_mode.value,
+            "caller_supplied_shell": (
+                None
+                if geometry.caller_supplied_shell is None
+                else _task022_canonical.dataclass_to_mapping(geometry.caller_supplied_shell)
+            ),
+            "approved_shell_geometry": (
+                None
+                if geometry.approved_shell_geometry is None
+                else _task022_canonical.dataclass_to_mapping(geometry.approved_shell_geometry)
+            ),
+            "shell_inside_diameter_m": geometry.shell_inside_diameter_m,
+            "shell_radius_m": geometry.shell_radius_m,
+            "bare_tube_bundle_radius_m": geometry.bare_tube_bundle_radius_m,
+            "bare_tube_bundle_diameter_m": geometry.bare_tube_bundle_diameter_m,
+            "bundle_peripheral_allowance_m": geometry.bundle_peripheral_allowance_m,
+            "bundle_outer_envelope_radius_m": geometry.bundle_outer_envelope_radius_m,
+            "bundle_outer_envelope_diameter_m": geometry.bundle_outer_envelope_diameter_m,
+            "shell_to_bundle_radial_clearance_m": geometry.shell_to_bundle_radial_clearance_m,
+            "shell_to_bundle_diametral_clearance_m": (
+                geometry.shell_to_bundle_diametral_clearance_m
+            ),
+            "required_minimum_radial_clearance_m": geometry.required_minimum_radial_clearance_m,
+            "radial_clearance_margin_m": geometry.radial_clearance_margin_m,
+            "limiting_position_ids": list(geometry.limiting_position_ids),
+            "position_count": geometry.position_count,
+            "warnings": warnings,
+            "deferred_capabilities": list(geometry.deferred_capabilities),
+            "provenance_pre_hash": _task022_provenance_pre_hash(geometry),
+        }
     return {
         "schema_version": geometry.schema_version,
         "request_hash": geometry.request_hash,
@@ -846,6 +906,66 @@ def _task022_provenance_pre_hash(geometry: Any) -> dict[str, Any]:
     field-by-field (no runtime discovery).
     """
     prov = internal_frozen_to_primitive(geometry.provenance)
+
+    # TASK-022 is the native producer for this input.  Its R1 provenance
+    # vocabulary uses ``shell_authority_identity`` and ``rule_profile_id``;
+    # older TASK-024 fixtures use the separate ``geometry_source_binding`` /
+    # ``geometry_rule_authority`` vocabulary below.  Reconstruct the native
+    # producer payload literally when the native markers are present.  This
+    # keeps the exact TASK-022 hash/id and all warning metadata intact while
+    # making the replay admission boundary representation-compatible.
+    if "shell_authority_identity" in prov:
+        shell_identity_raw = prov["shell_authority_identity"]
+        if not isinstance(shell_identity_raw, dict):
+            raise KeyError("shell_authority_identity")
+        if "authority_hash" in shell_identity_raw:
+            shell_identity: dict[str, Any] = {
+                "authority_hash": shell_identity_raw["authority_hash"],
+                "evidence_refs": list(shell_identity_raw["evidence_refs"]),
+            }
+        else:
+            source_binding = shell_identity_raw["source_binding"]
+            shell_identity = {
+                "geometry_id": shell_identity_raw["geometry_id"],
+                "record_hash": shell_identity_raw["record_hash"],
+                "snapshot_hash": shell_identity_raw["snapshot_hash"],
+                "source_binding": _task021_source_binding_primitive(source_binding),
+            }
+        return {
+            "task_id": prov["task_id"],
+            "design_contract_path": prov["design_contract_path"],
+            "task020_configuration_id": prov["task020_configuration_id"],
+            "task020_configuration_hash": prov["task020_configuration_hash"],
+            "task020_case_authority": _task020_case_authority_primitive(
+                prov["task020_case_authority"]
+            ),
+            "task021_layout_id": prov["task021_layout_id"],
+            "task021_layout_hash": prov["task021_layout_hash"],
+            "tube_geometry_snapshot_hash": prov["tube_geometry_snapshot_hash"],
+            "rule_profile_id": prov["rule_profile_id"],
+            "rule_id": prov["rule_id"],
+            "rule_version": prov["rule_version"],
+            "rule_artifact_canonical_hash": prov["rule_artifact_canonical_hash"],
+            "rule_snapshot_hash": prov["rule_snapshot_hash"],
+            "shell_authority_mode": prov["shell_authority_mode"],
+            "shell_authority_identity": shell_identity,
+            "evidence_refs": list(prov["evidence_refs"]),
+            "request_hash": prov["request_hash"],
+            "software_version": prov["software_version"],
+            "git_commit": prov["git_commit"],
+            "warnings": [
+                {
+                    "code": warning["code"],
+                    "field_path": warning["field_path"],
+                    "message_key": warning["message_key"],
+                    "evidence_refs": list(warning["evidence_refs"]),
+                    "details": warning["details"],
+                }
+                for warning in prov["warnings"]
+            ],
+            "deferred_capabilities": list(prov["deferred_capabilities"]),
+        }
+
     return {
         "task_id": prov["task_id"],
         "design_contract_path": prov["design_contract_path"],

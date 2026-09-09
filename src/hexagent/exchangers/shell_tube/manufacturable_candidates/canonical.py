@@ -334,6 +334,11 @@ def candidate_projection(
         "baffle_spacing_m": candidate.baffle_spacing_m,
         "baffle_count": candidate.baffle_count,
         "authority_bindings": candidate.authority_bindings,
+        # Keep the complete selected-member authority trace in candidate
+        # identity.  The compact legacy bindings above remain for the
+        # existing catalog-facing surface; they are not sufficient to prove
+        # which source-bound member authorized a candidate dimension.
+        "dimension_authority_bindings": candidate.dimension_authority_bindings,
     }
     if include_identity:
         payload["candidate_hash"] = candidate.candidate_hash

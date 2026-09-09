@@ -14,9 +14,6 @@ from typing import Any, cast
 
 from hexagent.exchangers.shell_tube.baffle_geometry import canonical as task024_canonical
 from hexagent.exchangers.shell_tube.baffle_geometry import validate_request as validate_task024
-from hexagent.exchangers.shell_tube.baffle_geometry.authority import (
-    _task022_geometry_hash_payload,
-)
 from hexagent.exchangers.shell_tube.baffle_geometry.models import (
     BaffleGeometry,
     BaffleOrientation,
@@ -106,10 +103,7 @@ from hexagent.exchangers.shell_tube.thermal_stream_state import (
 from hexagent.exchangers.shell_tube.thermal_stream_state.models import Task160Result
 from hexagent.exchangers.shell_tube.tube_layout import canonical as task021_canonical
 from hexagent.exchangers.shell_tube.tube_layout import validate_request as validate_task021
-from hexagent.exchangers.shell_tube.tube_layout.canonical import (
-    force_frozen_canonical,
-    internal_frozen_to_primitive,
-)
+from hexagent.exchangers.shell_tube.tube_layout.canonical import internal_frozen_to_primitive
 from hexagent.exchangers.shell_tube.tube_layout.canonical import layout_id as task021_layout_id
 from hexagent.exchangers.shell_tube.tube_layout.models import TubeLayout
 from hexagent.exchangers.shell_tube.tube_side import (
@@ -180,6 +174,7 @@ from .models import (
     TASK168_SOURCE_DEFINITION_ID,
     TASK168_VERSION,
     ApplicabilityStatus,
+    CandidateDimensionAuthorityBinding,
     CandidateDisposition,
     CandidateRecord,
     CandidateSpec,
@@ -876,6 +871,21 @@ def _candidate(
         if role == "SHELL_GEOMETRY_ID":
             continue
         bindings.append((role, authorities[role].authority_id))
+    dimension_authority_bindings = tuple(
+        CandidateDimensionAuthorityBinding(
+            dimension_role=authorities[role].dimension_role,
+            authority_id=authorities[role].authority_id,
+            authority_version=authorities[role].authority_version,
+            canonical_hash=authorities[role].canonical_hash,
+            source_class=authorities[role].source_class,
+            source_id=authorities[role].source_id,
+            source_revision=authorities[role].source_revision,
+            evidence_refs=authorities[role].evidence_refs,
+            provenance_refs=authorities[role].provenance_refs,
+            selected_member=by_role[role],
+        )
+        for role in REQUIRED_DISCRETE_ROLES
+    )
     candidate = CandidateSpec(
         candidate_id="",
         candidate_hash="",
@@ -895,9 +905,102 @@ def _candidate(
         baffle_spacing_m=cast(Decimal, by_role["BAFFLE_SPACING"]),
         baffle_count=cast(int, by_role["BAFFLE_COUNT"]),
         authority_bindings=tuple(bindings),
+        dimension_authority_bindings=dimension_authority_bindings,
     )
     digest = candidate_hash(candidate)
     return replace(candidate, candidate_hash=digest, candidate_id=candidate_id(digest))
+
+
+def _dimension_authority_bridge_ref(binding: CandidateDimensionAuthorityBinding) -> str:
+    """Return a stable evidence edge for one selected discrete authority."""
+
+    return (
+        "TASK168_DISCRETE_AUTHORITY::"
+        + binding.dimension_role.value
+        + "::"
+        + binding.canonical_hash
+    )
+
+
+def _candidate_dimension_authority_refs(
+    candidate: CandidateSpec,
+    roles: Iterable[str] | None = None,
+) -> tuple[str, ...]:
+    allowed = None if roles is None else frozenset(roles)
+    refs = [
+        _dimension_authority_bridge_ref(binding)
+        for binding in candidate.dimension_authority_bindings
+        if allowed is None or binding.dimension_role.value in allowed
+    ]
+    return tuple(sorted(set(refs), key=lambda item: item.encode("utf-8")))
+
+
+def _merge_evidence_refs(value: object, additions: Iterable[str]) -> list[str]:
+    """Add authority bridge refs while preserving canonical evidence semantics."""
+
+    if type(value) not in {list, tuple}:
+        raise TypeError("evidence_refs must be a list or tuple")
+    raw_refs = list(cast(Iterable[object], value)) + list(additions)
+    if any(type(item) is not str or not item for item in raw_refs):
+        raise TypeError("evidence_refs must contain non-empty strings")
+    refs = cast(list[str], raw_refs)
+    return sorted(set(refs), key=lambda item: item.encode("utf-8", "strict"))
+
+
+def _task021_candidate_geometry_authority(
+    candidate: CandidateSpec,
+    tube_geometry: Mapping[str, object],
+) -> tuple[str, dict[str, object], str]:
+    """Materialize a candidate-specific TASK-021 tube authority.
+
+    The request template contributes the structural/base geometry authority;
+    it does not authorize changed OD or wall values.  A deterministic bridge
+    identity retains the base source binding and the exact selected discrete
+    authority bindings, then becomes the source binding of the materialized
+    snapshot consumed by TASK-021.
+    """
+
+    base_source = tube_geometry.get("source_binding")
+    if type(base_source) is not dict:
+        raise TypeError("tube_geometry.source_binding must be a mapping")
+    source_fields = (
+        "source_id",
+        "source_type",
+        "source_revision",
+        "source_location",
+        "evidence_ref",
+        "approved_by",
+        "approved_at",
+    )
+    if any(type(base_source.get(field)) is not str for field in source_fields):
+        raise TypeError("tube_geometry.source_binding is incomplete")
+    selected_refs = _candidate_dimension_authority_refs(
+        candidate, ("TUBE_OUTER_DIAMETER", "TUBE_WALL_THICKNESS")
+    )
+    bridge_payload = {
+        "base_geometry_id": tube_geometry.get("geometry_id"),
+        "base_geometry_type": tube_geometry.get("geometry_type"),
+        "base_revision": tube_geometry.get("revision"),
+        "base_approval_state": tube_geometry.get("approval_state"),
+        "base_source_binding": base_source,
+        "candidate_hash": candidate.candidate_hash,
+        "selected_authority_refs": list(selected_refs),
+        "selected_outer_diameter_m": str(candidate.tube_outer_diameter_m),
+        "selected_wall_thickness_m": str(candidate.tube_wall_thickness_m),
+    }
+    bridge_hash = task021_canonical.sha256_hex(bridge_payload)
+    bridge_evidence_ref = "TASK168_TUBE_GEOMETRY_AUTHORITY::" + bridge_hash
+    materialized_source = {
+        "source_id": "TASK168-DERIVED-TUBE-GEOMETRY::" + bridge_hash,
+        "source_type": "TASK168_DERIVED_DISCRETE_AUTHORITY",
+        "source_revision": "TASK168::" + bridge_hash,
+        "source_location": "task168://candidate-tube-geometry/" + bridge_hash,
+        "evidence_ref": bridge_evidence_ref,
+        "approved_by": "TASK168_DISCRETE_AUTHORITY_BRIDGE",
+        "approved_at": base_source["approved_at"],
+    }
+    materialized_geometry_id = "TASK168-TUBE-GEOMETRY::" + bridge_hash
+    return materialized_geometry_id, materialized_source, bridge_evidence_ref
 
 
 def _base_record(
@@ -1734,28 +1837,28 @@ def _task021_payload(
     outer = candidate.tube_outer_diameter_m
     wall = candidate.tube_wall_thickness_m
     inner = outer - (Decimal("2") * wall)
-    original_geometry = {
-        "outer_diameter_m": tube_geometry.get("outer_diameter_m"),
-        "inner_diameter_m": tube_geometry.get("inner_diameter_m"),
-        "wall_thickness_m": tube_geometry.get("wall_thickness_m"),
-    }
-    candidate_geometry = {
-        "outer_diameter_m": str(outer),
-        "inner_diameter_m": str(inner),
-        "wall_thickness_m": str(wall),
-    }
-    geometry_changed = original_geometry != candidate_geometry
-    tube_geometry.update(candidate_geometry)
-    if geometry_changed:
-        record_payload = {
+    materialized_geometry_id, materialized_source, geometry_bridge_ref = (
+        _task021_candidate_geometry_authority(candidate, tube_geometry)
+    )
+    tube_geometry.update(
+        {
+            "geometry_id": materialized_geometry_id,
+            "outer_diameter_m": str(outer),
+            "inner_diameter_m": str(inner),
+            "wall_thickness_m": str(wall),
+            "source_binding": materialized_source,
+        }
+    )
+    tube_geometry["record_hash"] = task021_canonical.sha256_hex(
+        {
             key: item
             for key, item in tube_geometry.items()
             if key not in {"record_hash", "snapshot_hash"}
         }
-        tube_geometry["record_hash"] = task021_canonical.sha256_hex(record_payload)
-        tube_geometry["snapshot_hash"] = task021_canonical.sha256_hex(
-            {key: item for key, item in tube_geometry.items() if key != "snapshot_hash"}
-        )
+    )
+    tube_geometry["snapshot_hash"] = task021_canonical.sha256_hex(
+        {key: item for key, item in tube_geometry.items() if key != "snapshot_hash"}
+    )
     rule = payload.get("layout_rule_authority")
     if type(rule) is not dict:
         raise _StageFailure(
@@ -1764,8 +1867,30 @@ def _task021_payload(
             "task021_request_template.layout_rule_authority",
         )
     layout_rule = cast(dict[str, object], rule)
+    all_authority_refs = _candidate_dimension_authority_refs(candidate)
+    layout_authority_refs = _candidate_dimension_authority_refs(
+        candidate,
+        (
+            "CONSTRUCTION_FAMILY",
+            "TUBE_OUTER_DIAMETER",
+            "TUBE_WALL_THICKNESS",
+            "TUBE_PITCH",
+            "TUBE_LAYOUT",
+            "TUBE_PASS_COUNT",
+        ),
+    )
+    payload["evidence_refs"] = _merge_evidence_refs(
+        payload.get("evidence_refs"),
+        (*all_authority_refs, geometry_bridge_ref),
+    )
     layout_rule["pattern_family"] = _task021_pattern_family(candidate.tube_layout)
     layout_rule["pitch_m"] = str(candidate.tube_pitch_m)
+    layout_rule["evidence_refs"] = _merge_evidence_refs(
+        layout_rule.get("evidence_refs"), layout_authority_refs
+    )
+    layout_rule["provenance_edge_ids"] = _merge_evidence_refs(
+        layout_rule.get("provenance_edge_ids"), layout_authority_refs
+    )
     if "snapshot_hash" not in layout_rule:
         raise _StageFailure(
             CandidateStage.TUBE_LAYOUT,
@@ -1776,154 +1901,6 @@ def _task021_payload(
         {key: item for key, item in layout_rule.items() if key != "snapshot_hash"}
     )
     return payload
-
-
-def _task021_layout_for_task024(layout: TubeLayout) -> TubeLayout:
-    """Make the valid TASK-021 layout projection consumable by TASK-024.
-
-    TASK-024's frozen identity replay consumes the literal TASK-021 layout
-    payload.  Its current replay helper accepts primitive warning details,
-    whereas a valid TASK-021 result stores those details as internal frozen
-    markers.  Warning entries do not participate in candidate geometry; this
-    compatibility projection therefore removes only those non-geometric
-    entries and recomputes the identity with TASK-021's canonical helpers.
-    It does not alter positions, counts, dimensions, or any geometry result.
-    """
-
-    if not layout.warnings:
-        return layout
-    provenance = internal_frozen_to_primitive(layout.provenance)
-    provenance.pop("layout_hash", None)
-    provenance["warnings"] = []
-    layout_hash_payload = {
-        "schema_version": layout.schema_version,
-        "request_hash": layout.request_hash,
-        "positions": [
-            {
-                "position_id": position.position_id,
-                "u": position.u,
-                "v": position.v,
-                "x_m": position.x_m,
-                "y_m": position.y_m,
-            }
-            for position in layout.positions
-        ],
-        "tube_hole_count": layout.tube_hole_count,
-        "physical_tube_count": layout.physical_tube_count,
-        "boundary_rejection_count": layout.boundary_rejection_count,
-        "exclusion_rejection_count": layout.exclusion_rejection_count,
-        "exclusion_audit": [
-            {
-                "zone_id": audit.zone_id,
-                "rejected_position_count": audit.rejected_position_count,
-                "reason_code": audit.reason_code,
-                "evidence_refs": list(audit.evidence_refs),
-            }
-            for audit in layout.exclusion_audit
-        ],
-        "warnings": [],
-        "blockers": [],
-        "deferred_capabilities": list(layout.deferred_capabilities),
-        "provenance_pre_hash": provenance,
-    }
-    layout_hash = task021_canonical.sha256_hex(layout_hash_payload)
-    provenance["layout_hash"] = layout_hash
-    return replace(
-        layout,
-        layout_id=task021_canonical.layout_id(layout_hash),
-        layout_hash=layout_hash,
-        warnings=(),
-        provenance=force_frozen_canonical(provenance),
-    )
-
-
-def _task022_geometry_for_task024(
-    geometry: Any,
-    layout: TubeLayout,
-) -> object:
-    """Project the live TASK-022 geometry into TASK-024's frozen input view.
-
-    TASK-022 currently records the tube-geometry source as
-    ``shell_authority_identity``.  TASK-024's identity verifier consumes the
-    same source under its older ``geometry_source_binding`` field.  The
-    projection below carries the exact TASK-022 physical geometry and source
-    values, adds only that named compatibility binding, and recomputes the
-    TASK-024 input-view identity with TASK-024's own replay helper.  The
-    native TASK-022 object remains the authoritative stage result; this view
-    is never emitted as a replacement TASK-022 result.
-    """
-
-    provenance_raw = getattr(geometry, "provenance", None)
-    if provenance_raw is None:
-        return geometry
-    provenance = internal_frozen_to_primitive(provenance_raw)
-    if not isinstance(provenance, dict):
-        raise _StageFailure(
-            CandidateStage.BAFFLE_GEOMETRY,
-            BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
-            "task022_geometry.provenance",
-        )
-    if "geometry_source_binding" in provenance:
-        return geometry
-    source_binding = getattr(getattr(layout, "tube_geometry", None), "source_binding", None)
-    if source_binding is None:
-        raise _StageFailure(
-            CandidateStage.BAFFLE_GEOMETRY,
-            BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
-            "task021_layout.tube_geometry.source_binding",
-        )
-    provenance["geometry_source_binding"] = task021_canonical.dataclass_to_mapping(source_binding)
-    provenance["caller_supplied_shell"] = (
-        None
-        if getattr(geometry, "caller_supplied_shell", None) is None
-        else task022_canonical.dataclass_to_mapping(geometry.caller_supplied_shell)
-    )
-    provenance["approved_shell_geometry"] = (
-        None
-        if getattr(geometry, "approved_shell_geometry", None) is None
-        else task022_canonical.dataclass_to_mapping(geometry.approved_shell_geometry)
-    )
-    provenance["geometry_rule_authority"] = task022_canonical.dataclass_to_mapping(
-        geometry.geometry_rule_authority
-    )
-    for name in (
-        "shell_inside_diameter_m",
-        "shell_radius_m",
-        "bare_tube_bundle_radius_m",
-        "bare_tube_bundle_diameter_m",
-        "bundle_peripheral_allowance_m",
-        "bundle_outer_envelope_radius_m",
-        "bundle_outer_envelope_diameter_m",
-        "shell_to_bundle_radial_clearance_m",
-        "shell_to_bundle_diametral_clearance_m",
-        "required_minimum_radial_clearance_m",
-        "radial_clearance_margin_m",
-        "limiting_position_ids",
-        "position_count",
-    ):
-        value = getattr(geometry, name)
-        provenance[name] = list(value) if type(value) is tuple else value
-    # TASK-024's replay helper expects primitive warning details, while the
-    # live TASK-022 object intentionally stores those details as Layer-B
-    # markers.  The warning markers are non-geometric deferred-capability
-    # metadata, so the TASK-024 input view carries an empty warning projection
-    # and the native TASK-022 object remains available in the execution bundle.
-    provenance["warnings"] = []
-    provenance["deferred_capabilities"] = list(geometry.deferred_capabilities)
-    compatibility_geometry = replace(
-        cast(Any, geometry),
-        warnings=(),
-        provenance=force_frozen_canonical(provenance),
-    )
-    geometry_payload = _task022_geometry_hash_payload(compatibility_geometry)
-    geometry_hash = task021_canonical.sha256_hex(geometry_payload)
-    provenance["geometry_hash"] = geometry_hash
-    return replace(
-        compatibility_geometry,
-        geometry_hash=geometry_hash,
-        geometry_id=task022_canonical.geometry_id(geometry_hash),
-        provenance=force_frozen_canonical(provenance),
-    )
 
 
 def _task021_pattern_family(layout: str) -> str:
@@ -1987,6 +1964,9 @@ def _task022_payload(
     payload["approved_shell_geometry"] = _task022_shell_snapshot(record)
     payload["caller_supplied_shell"] = None
     payload["shell_authority_mode"] = "APPROVED_CATALOG_SNAPSHOT"
+    payload["evidence_refs"] = _merge_evidence_refs(
+        payload.get("evidence_refs"), _candidate_dimension_authority_refs(candidate)
+    )
     if "geometry_rule_authority" not in payload:
         raise _StageFailure(
             CandidateStage.SHELL_BUNDLE_GEOMETRY,
@@ -2051,6 +2031,22 @@ def _task024_payload(
         )
     axial_map = cast(dict[str, object], axial)
     design_map = cast(dict[str, object], design)
+    axial_authority_refs = _candidate_dimension_authority_refs(
+        candidate, ("TUBE_LENGTH", "BAFFLE_SPACING", "BAFFLE_COUNT")
+    )
+    design_authority_refs = _candidate_dimension_authority_refs(
+        candidate,
+        ("BAFFLE_TYPE", "BAFFLE_CUT", "BAFFLE_SPACING", "BAFFLE_COUNT"),
+    )
+    payload["evidence_refs"] = _merge_evidence_refs(
+        payload.get("evidence_refs"), _candidate_dimension_authority_refs(candidate)
+    )
+    axial_map["evidence_refs"] = _merge_evidence_refs(
+        axial_map.get("evidence_refs"), axial_authority_refs
+    )
+    design_map["evidence_refs"] = _merge_evidence_refs(
+        design_map.get("evidence_refs"), design_authority_refs
+    )
     try:
         start = Decimal(cast(str, axial_map["axial_start_coordinate_m"]))
     except (KeyError, TypeError, ValueError, InvalidOperation) as exc:
@@ -2758,8 +2754,6 @@ def _execute_candidate_chain(
                 BlockerCode.TASK021_REPLAY_FAILED,
                 "task021.layout",
             )
-        bundle.task021_layout = _task021_layout_for_task024(layout)
-        layout = bundle.task021_layout
 
         geometry_outcome = step(
             CandidateStage.SHELL_BUNDLE_GEOMETRY,
@@ -2782,10 +2776,7 @@ def _execute_candidate_chain(
             CandidateStage.SHELL_BUNDLE_GEOMETRY,
             "task022",
         )
-        task022_geometry_for_task024 = _task022_geometry_for_task024(
-            bundle.task022_geometry,
-            layout,
-        )
+        native_geometry = bundle.task022_geometry
 
         baffle_outcome = step(
             CandidateStage.BAFFLE_GEOMETRY,
@@ -2796,7 +2787,7 @@ def _execute_candidate_chain(
                     candidate,
                     request.task020_configuration,
                     layout,
-                    task022_geometry_for_task024,
+                    native_geometry,
                 )
             ),
         )
