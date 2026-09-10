@@ -22,7 +22,7 @@ The remote heads observed after `git fetch --prune` were:
 | Ref | Head | State |
 | --- | --- | --- |
 | `main` | `2e0f8642cbbacff67cdf97f0541d21360ce379f7` | base |
-| TASK-169 PR #266 | `ce499e6fcdaccf5467cf16510b1af5e48331f70c` | open Draft; TASK-169 primary; final sweep head |
+| TASK-169 PR #266 | `c160eeece8654522a697e2e7e800d352f454ea91` | open Draft; TASK-169 primary; final sweep head |
 | TASK-024 PR #267 | `f61658b5d7d75c78fe2a38afc8c41f0a940cbea4` | open Draft; frozen |
 | TASK-025 PR #268 | `9c8d258ba9243a822ba616e9fe3aee8b4517a2cc` | open Draft; frozen |
 | TASK-031 PR #269 | `f3c6995b334f656ecca5d1f2e3cd2052dba08350` | open Draft; frozen |
