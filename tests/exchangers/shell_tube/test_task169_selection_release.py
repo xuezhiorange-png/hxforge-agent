@@ -790,6 +790,16 @@ def test_golden_authority_payload_is_proposal_only() -> None:
         "V06-G05",
     ]
     assert all(
+        item["ranking_policy"]
+        == {
+            "policy_id": "V06-RANKING-POLICY-TEST",
+            "policy_version": "v1",
+            "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
+            "approval_status": "APPROVED",
+        }
+        for item in payload["goldens"]
+    )
+    assert all(
         item["review_status"] == "PROPOSED"
         and item["expected_identity_status"] == "PROPOSED_FOR_REVIEW"
         and item["approved_by"] == ""
