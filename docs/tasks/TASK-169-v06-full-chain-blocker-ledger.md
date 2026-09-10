@@ -22,7 +22,7 @@ The remote heads observed after `git fetch --prune` were:
 | Ref | Head | State |
 | --- | --- | --- |
 | `main` | `2e0f8642cbbacff67cdf97f0541d21360ce379f7` | base |
-| TASK-169 PR #266 | `97d9b28d9958a2c8838882bfbeeea08974718d2a` | open Draft; TASK-169 primary |
+| TASK-169 PR #266 | `ce499e6fcdaccf5467cf16510b1af5e48331f70c` | open Draft; TASK-169 primary; final sweep head |
 | TASK-024 PR #267 | `f61658b5d7d75c78fe2a38afc8c41f0a940cbea4` | open Draft; frozen |
 | TASK-025 PR #268 | `9c8d258ba9243a822ba616e9fe3aee8b4517a2cc` | open Draft; frozen |
 | TASK-031 PR #269 | `f3c6995b334f656ecca5d1f2e3cd2052dba08350` | open Draft; frozen |
@@ -34,6 +34,11 @@ no Bell equation, pressure-drop equation, tolerance, or identity contract.
 The TASK-169 adapter correction is `d300e28` (`fix(task168): preserve native
 task024 result envelope`) and preserves the native TASK-024 result envelope
 when constructing the TASK-031 request.
+
+The PR #266 ref at the start of the sweep was `97d9b28d...`; the final sweep
+documentation and adapter commits advanced the primary branch to the head
+shown above.  The correction-branch heads remain the independently recorded
+values in this table.
 
 The temporary validation stack was `main + #267 + #268 + #269 + #270 +
 #266 + d300e28` at temporary composition `e9cdf8d`.  No temporary merge SHA is
