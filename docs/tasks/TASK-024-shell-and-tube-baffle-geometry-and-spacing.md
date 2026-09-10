@@ -105,6 +105,33 @@ adequacy, or code-compliance results; those remain deferred diagnostics.
 requires an explicit, complete `UTubePairingPlan` and the baffle contract does
 not design that plan.
 
+### 3.2.1 Reviewed V0.6 applicability amendment
+
+The TASK-169 V06-G03 reviewed gate authorizes one narrow applicability
+amendment on this branch.  The amendment changes which construction-family
+inputs are admitted by the existing TASK-024 validation boundary; it does not
+change the geometric equations, numeric tolerances, identity contract, or
+engineering meaning of an accepted baffle result.
+
+```text
+TASK024_ENGINEERING_FORMULAS_CHANGED=false
+TASK024_GEOMETRY_EQUATIONS_CHANGED=false
+TASK024_APPLICABILITY_CONTRACT_CHANGED=true
+TASK024_SUPPORTED_FAMILY_SET_CHANGED=true
+TASK024_AUTHORITY_APPLICABILITY_RULE_CHANGED=true
+CHANGE_SCOPE=FLOATING_HEAD_APPLICABILITY_ONLY
+DETAILED_FLOATING_HEAD_MECHANICAL_DESIGN_ADDED=false
+PULL_CLEARANCE_MODEL_ADDED=false
+FORMULA_CHANGE=false
+TOLERANCE_CHANGE=false
+```
+
+`FLOATING_HEAD` is therefore admitted to this existing deterministic geometry
+path.  This amendment is not a general construction-family expansion, does
+not admit `U_TUBE`, and does not provide floating-head mechanical or pull-
+clearance design.  `U_TUBE` remains subject to the explicit TASK-021 pairing
+plan contract above.
+
 ```text
 U_TUBE
 SHELL_PASS_COUNT_OTHER_THAN_1
