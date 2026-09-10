@@ -9,6 +9,10 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     result_id as task168_result_id,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+    TASK168_RESULT_SCHEMA_VERSION,
+    TASK168_SOURCE_DEFINITION_ID,
+    TASK168_VERSION,
     ApplicabilityStatus,
     CandidateDisposition,
     CandidateRecord,
@@ -17,10 +21,6 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     CandidateStatus,
     CompletenessStatus,
     ProvenanceGraph,
-    TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
-    TASK168_RESULT_SCHEMA_VERSION,
-    TASK168_SOURCE_DEFINITION_ID,
-    TASK168_VERSION,
     Task168Applicability,
     Task168BatchResult,
     Task168Blocker,
@@ -34,12 +34,12 @@ from hexagent.exchangers.shell_tube.selection_release.canonical import (
     result_id as task169_result_id,
 )
 from hexagent.exchangers.shell_tube.selection_release.models import (
-    RankingDirection,
-    RankingObjective,
-    SelectionStatus,
     TASK169_SCHEMA_VERSION,
     TASK169_SOURCE_DEFINITION_ID,
     TASK169_VERSION,
+    RankingDirection,
+    RankingObjective,
+    SelectionStatus,
     Task169RankingPolicy,
     Task169Request,
     ValidationStatus,
