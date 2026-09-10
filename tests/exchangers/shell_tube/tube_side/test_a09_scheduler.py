@@ -8,7 +8,7 @@ from decimal import Decimal
 import pytest
 
 import hexagent.exchangers.shell_tube.tube_side as ts
-from hexagent.exchangers.shell_tube.models import Orientation
+from hexagent.exchangers.shell_tube.models import ConstructionFamily, Orientation
 from tests.fixtures.shell_and_tube.tube_side.task020_configurations import config_a
 from tests.fixtures.shell_and_tube.tube_side.task021_layouts import layout_a, layout_b
 
@@ -116,6 +116,36 @@ def test_mixed_task020_task021_fixture_is_blocked() -> None:
     assert isinstance(result, ts.Task025BlockedResult)
     assert result.stage_rank == 2
     assert ts.BlockerCode.BL_024_TASK020_IDENTITY_MISMATCH in {b.code for b in result.blockers}
+
+
+@pytest.mark.parametrize(
+    "construction_family",
+    [ConstructionFamily.U_TUBE, ConstructionFamily.FLOATING_HEAD],
+)
+def test_v06_supported_construction_family_is_not_fixed_only_blocked(
+    construction_family: ConstructionFamily,
+) -> None:
+    """TASK-025 accepts v0.6 families after upstream validation.
+
+    TASK-025 consumes the already validated configuration/layout path.  It
+    does not infer U-tube pairing or model construction-specific mechanics;
+    those remain owned by TASK-020/TASK-021 and their callers.
+    """
+    configuration = replace(config_a(), construction_family=construction_family)
+    layout = replace(
+        layout_a(),
+        construction_family=construction_family.value,
+        task020_configuration_id=configuration.configuration_id,
+        task020_configuration_hash=configuration.configuration_hash,
+    )
+
+    result = ts.evaluate_task025(_request_input(configuration, layout))
+
+    assert isinstance(result, ts.Task025ValidResult)
+    assert result.task020_identity.identity_id == configuration.configuration_id
+    assert result.task021_identity.identity_id == layout.layout_id
+    assert result.task020_identity.identity_hash == configuration.configuration_hash
+    assert result.task021_identity.identity_hash == layout.layout_hash
 
 
 def test_task020_configuration_id_mismatch_is_blocked() -> None:
