@@ -340,16 +340,21 @@ def _golden_case(
     golden_id: GoldenCaseId,
     records: tuple[CandidateRecord, ...],
 ) -> Task169GoldenCase:
+    selection_request = _request(_batch(records))
+    expected = validate_request(selection_request)
+    assert expected.valid is not None
     return Task169GoldenCase(
         golden_id=golden_id,
         source_id=f"TASK169-TEST-{golden_id.value}",
         source_location=f"tests::{golden_id.value}",
         redistribution_status="PROJECT_TEST_FIXTURE",
         normalized_input_identity=f"normalized::{golden_id.value}",
+        expected_result_identity=expected.valid.result_hash,
+        approved_numeric_expectations=(),
         tolerance_class="TASK165_FROZEN_V06",
         reviewer_evidence_refs=(f"review::{golden_id.value}",),
         provenance_source_hash=f"source-hash::{golden_id.value}",
-        selection_request=_request(_batch(records)),
+        selection_request=selection_request,
     )
 
 
