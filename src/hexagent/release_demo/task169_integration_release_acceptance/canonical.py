@@ -37,6 +37,8 @@ def request_projection(value: Task169ReleaseRequest) -> dict[str, Any]:
                 "source_location": case.source_location,
                 "redistribution_status": case.redistribution_status,
                 "normalized_input_identity": case.normalized_input_identity,
+                "expected_result_identity": case.expected_result_identity,
+                "approved_numeric_expectations": case.approved_numeric_expectations,
                 "tolerance_class": case.tolerance_class,
                 "reviewer_evidence_refs": case.reviewer_evidence_refs,
                 "provenance_source_hash": case.provenance_source_hash,
