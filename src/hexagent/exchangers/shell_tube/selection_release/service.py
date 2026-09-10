@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from decimal import Context, Decimal, InvalidOperation, ROUND_HALF_EVEN, localcontext
+from decimal import Context, Decimal, InvalidOperation, localcontext, ROUND_HALF_EVEN
 
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     batch_result_hash as task168_batch_result_hash,
@@ -32,6 +32,10 @@ from .canonical import (
     result_id,
 )
 from .models import (
+    CandidateExclusionRecord,
+    CandidateRankingRecord,
+    RankingDirection,
+    SelectionStatus,
     SUPPORTED_RANKING_METRICS,
     TASK169_BLOCKED_SCHEMA_VERSION,
     TASK169_IMPLEMENTATION_SOFTWARE_VERSION,
@@ -39,10 +43,6 @@ from .models import (
     TASK169_SCHEMA_VERSION,
     TASK169_SOURCE_DEFINITION_ID,
     TASK169_VERSION,
-    CandidateExclusionRecord,
-    CandidateRankingRecord,
-    RankingDirection,
-    SelectionStatus,
     Task169RankingPolicy,
     Task169Request,
     Task169Result,
