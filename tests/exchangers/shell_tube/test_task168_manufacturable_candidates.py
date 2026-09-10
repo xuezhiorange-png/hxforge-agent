@@ -1024,6 +1024,17 @@ def test_native_task021_and_task022_identity_and_warnings_survive_task024_admiss
     assert task024_outcome.geometry.task021_layout_hash == native_layout.layout_hash
     assert task024_outcome.geometry.task022_geometry_hash == native_geometry.geometry_hash
 
+    task031_payload = task168_service._task031_payload(
+        authority,
+        configuration,
+        native_layout,
+        task024_outcome,
+        task024_outcome.geometry,
+    )
+    assert task031_payload["baffle_geometry_result"] == task168_service._public_value(
+        task024_outcome
+    )
+
 
 def test_provenance_contains_discrete_authority_and_materialization_edges() -> None:
     outcome = validate_request(_request())

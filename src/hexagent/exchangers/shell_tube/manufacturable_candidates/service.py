@@ -1614,6 +1614,7 @@ class _ExecutionBundle:
     task020_configuration: ShellAndTubeConfiguration | None = None
     task021_layout: object | None = None
     task022_geometry: object | None = None
+    task024_result: object | None = None
     task024_geometry: object | None = None
     task025_result: object | None = None
     task026_result: object | None = None
@@ -2245,6 +2246,7 @@ def _task031_payload(
     authority: Task168EvaluationInputAuthority,
     configuration: ShellAndTubeConfiguration,
     layout: object,
+    task024_result: object,
     baffle_geometry: object,
 ) -> dict[str, object]:
     payload = _template_mapping(
@@ -2259,6 +2261,10 @@ def _task031_payload(
         layout=layout,
         baffle_geometry=baffle_geometry,
     )
+    # TASK-024's validation result is the authoritative upstream envelope.
+    # Keep its exact warning/blocker/deferred/provenance projection; the
+    # structural TASK-031 template is not allowed to replace those fields.
+    payload["baffle_geometry_result"] = _public_value(task024_result)
     if type(payload.get("baffle_geometry_result")) is dict:
         baffle_result = cast(dict[str, object], payload["baffle_geometry_result"])
         if type(baffle_result.get("geometry")) is dict:
@@ -2995,6 +3001,7 @@ def _execute_candidate_chain(
             CandidateStage.BAFFLE_GEOMETRY,
             "task024",
         )
+        bundle.task024_result = baffle_outcome
 
         task025_outcome = step(
             CandidateStage.TUBE_SIDE,
@@ -3063,6 +3070,7 @@ def _execute_candidate_chain(
                 authority,
                 configuration,
                 layout,
+                bundle.task024_result,
                 bundle.task024_geometry,
             )
             result031 = validate_task031(request031)
