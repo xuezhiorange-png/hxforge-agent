@@ -61,15 +61,46 @@
  | Golden | Real replay evidence | Current disposition | Review requirement |
  | --- | --- | --- | --- |
  | V06-G01 | Fixed-tubesheet/E-shell request reaches a complete candidate and runs the real TASK-168 chain through TASK-169 selection. | Ready for independent review; current candidate status is WARN. | Approve the source/evidence binding and numeric/identity expectation. |
- | V06-G02 | U-tube is materialized by TASK-020, then TASK-021 returns `STL_UTUBE_PAIRING_REQUIRED` at `u_tube_pairing_plan`. | Blocked by missing explicit pairing authority; this is not a TASK-169 bypass candidate. | Confirm the required pairing authority or provide a separately authorized upstream materialization path. |
- | V06-G03 | Floating-head is materialized by TASK-020 and TASK-021/TASK-022 pass, then TASK-024 returns `BFG_CONSTRUCTION_FAMILY_UNSUPPORTED` at `configuration.construction_family`. | Blocked by the TASK-024 v1 fixed-tubesheet-only contract. | Requires a narrow reviewed TASK-024 applicability correction before this Golden can be a success proposal. |
+| V06-G02 | TASK-020 materializes `U_TUBE`; TASK-021 consumes a literal, hash-verified `UTubePairingPlan` proposal and returns ten accepted legs/five pairs; TASK-022 passes; TASK-024 then blocks `U_TUBE` at `configuration.construction_family`. | Blocked by the current TASK-024 U-tube applicability boundary. Pairing validation is complete; no runtime pair inference is used. | Requires a separately reviewed TASK-024 U-tube applicability correction. |
+| V06-G03 | Floating-head is materialized by TASK-020 and TASK-021/TASK-022 pass, then TASK-024 returns `BFG_CONSTRUCTION_FAMILY_UNSUPPORTED` at `configuration.construction_family` on the TASK-169 base. | Blocked pending the narrow reviewed TASK-024 applicability correction in PR #267. | PR #267 must merge and the G03 chain must be replayed on the resulting ancestry. |
  | V06-G04 | One real two-member TASK-168 request has a complete WARN candidate and a candidate rejected by an authoritative shell-DP hard constraint; TASK-169 selects the feasible candidate. | Ready for independent review. | Approve the DP-constrained input/constraint authority and expected identity. |
  | V06-G05 | A real Bell-side blocked candidate is replayed and selection produces no recommendation. | Ready for independent review as a negative Golden. | Approve the negative fail-closed source and expected no-recommendation semantics. |
 
- G02 and G03 are not represented as successes.  They remain useful negative
- capability evidence until their upstream configuration/geometry contracts
- can support the frozen Golden purpose.  G05 similarly proves only the
- negative path.
+G02 and G03 are not represented as successes.  G02 now has a literal pairing
+proposal, but the current TASK-024 contract still rejects `U_TUBE`; this is a
+producer applicability boundary, not a TASK-169 bypass opportunity.  G03 is
+blocked on the TASK-024 correction PR #267 and is not accepted into the
+TASK-169 base ancestry until that PR is merged and replayed.  G05 similarly
+proves only the negative path.
+
+## G02 literal pairing proposal
+
+The G02 pairing proposal is committed in
+`src/hexagent/release_demo/task169_integration_release_acceptance/golden_fixtures.py`
+as `G02_UTUBE_PAIRING_PLAN_RAW`.  It is project-defined proposal authority,
+not an approved Golden:
+
+```ini
+PAIRING_AUTHORITY_ID=HXFORGE-V06-G02-UTUBE-PAIRING
+PAIRING_AUTHORITY_VERSION=v1
+SOURCE_CLASS=AUTHORIZED_PROJECT_DEFINED_PAIRING_PROPOSAL
+SOURCE_ID=TASK169-G02-PAIRING-PROPOSAL
+SOURCE_REVISION=v1
+APPROVAL_STATUS=PROPOSED
+EVIDENCE_REF=TASK169-V06-G02-PAIRING-REVIEW
+SCHEMA_VERSION=task021.u-tube-pairing.v1
+TASK021_ORIGIN_MODE=CENTER_ON_PRIMITIVE_CELL
+PAIRING_PLAN_HASH=e7fe05b5ebd5e55107545f9a8f9b32908301d3bd12d4602b0ca0b3b8598eb4b0
+PAIR_COUNT=5
+ACCEPTED_LEG_COUNT=10
+RUNTIME_PAIR_INFERENCE=false
+PAIRING_HASH_REPLAY=PASS
+PAIRING_COVERAGE=PASS
+```
+
+The pair list is literal and covers every accepted TASK-021 lattice leg once.
+TASK-021 remains responsible for validating the plan; neither production
+runtime nor Golden runtime derives pairs from accepted coordinates.
 
  ## Expected identity policy
 

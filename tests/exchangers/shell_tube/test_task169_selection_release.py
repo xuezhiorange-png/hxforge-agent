@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from copy import deepcopy
 from dataclasses import replace
 from decimal import Decimal
 from functools import lru_cache
@@ -17,6 +18,7 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates import (
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     batch_result_hash,
+    evaluation_input_authority_hash,
     provenance_graph_hash,
     requirement_authority_hash,
 )
@@ -84,6 +86,13 @@ from hexagent.release_demo.task169_integration_release_acceptance import (
 )
 from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
     request_hash as release_request_hash,
+)
+from hexagent.release_demo.task169_integration_release_acceptance.golden_fixtures import (
+    G02_PAIRING_EVIDENCE_REF,
+    G02_PAIRING_PROVENANCE_SOURCE_HASH,
+    G02_RUNTIME_PAIR_INFERENCE,
+    G02_TASK021_ORIGIN_MODE,
+    G02_UTUBE_PAIRING_PLAN_RAW,
 )
 from hexagent.release_demo.task169_integration_release_acceptance.models import (
     TASK169_GOLDEN_TOLERANCE_CLASS,
@@ -448,6 +457,21 @@ def _family_request(family: ConstructionFamily) -> Task168Request:
     )
 
     request = _real_task168_request()
+    if family is ConstructionFamily.U_TUBE:
+        task021_template = deepcopy(request.evaluation_input_authority.task021_request_template)
+        assert isinstance(task021_template, dict)
+        task021_template["origin_mode"] = G02_TASK021_ORIGIN_MODE
+        task021_template["u_tube_pairing_plan"] = deepcopy(G02_UTUBE_PAIRING_PLAN_RAW)
+        evaluation_authority = dataclass_replace(
+            request.evaluation_input_authority,
+            task021_request_template=task021_template,
+            canonical_hash="",
+        )
+        evaluation_authority = dataclass_replace(
+            evaluation_authority,
+            canonical_hash=evaluation_input_authority_hash(evaluation_authority),
+        )
+        request = dataclass_replace(request, evaluation_input_authority=evaluation_authority)
     requirement = dataclass_replace(
         request.requirement_authority,
         allowed_construction_families=(family,),
@@ -504,7 +528,13 @@ def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169G
     return Task169GoldenCase(
         golden_id=golden_id,
         source_id=f"TASK169-PROPOSAL-{golden_id.value}",
-        source_location="tests/exchangers/shell_tube/test_task169_selection_release.py",
+        source_location=(
+            "src/hexagent/release_demo/task169_integration_release_acceptance/"
+            "golden_fixtures.py::G02_UTUBE_PAIRING_PLAN_RAW; "
+            "tests/exchangers/shell_tube/test_task169_selection_release.py"
+            if golden_id is GoldenCaseId.V06_G02
+            else "tests/exchangers/shell_tube/test_task169_selection_release.py"
+        ),
         source_class="PROPOSAL_ONLY_INTEGRATION_EVIDENCE",
         redistribution_status="METADATA_ONLY_NO_PROTECTED_PAYLOAD",
         normalized_input_identity=request_digest,
@@ -518,7 +548,9 @@ def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169G
         expected_task169_result_id=None,
         approved_numeric_expectations=(("EXPECTED_IDENTITY_STATUS", "PROPOSED_FOR_REVIEW"),),
         tolerance_class=TASK169_GOLDEN_TOLERANCE_CLASS,
-        provenance_source_hash="f" * 64,
+        provenance_source_hash=(
+            G02_PAIRING_PROVENANCE_SOURCE_HASH if golden_id is GoldenCaseId.V06_G02 else "f" * 64
+        ),
         reviewer_evidence_refs=("INDEPENDENT_REVIEW_PENDING",),
     )
 
@@ -796,11 +828,22 @@ def test_real_family_materialization_attempts_u_tube_and_floating_head() -> None
         )
 
 
-def test_g02_exact_task021_blocker_is_explicit_pairing_authority() -> None:
+def test_g02_literal_pairing_passes_task021_and_reaches_task024_boundary() -> None:
+    from hexagent.exchangers.shell_tube.baffle_geometry import (
+        validate_request as validate_task024,
+    )
     from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168_service
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
+        validate_request as validate_task022,
+    )
     from hexagent.exchangers.shell_tube.tube_layout import validate_request as validate_task021
 
     request = _family_request(ConstructionFamily.U_TUBE)
+    template = request.evaluation_input_authority.task021_request_template
+    assert isinstance(template, dict)
+    pairing_plan = template["u_tube_pairing_plan"]
+    assert pairing_plan == G02_UTUBE_PAIRING_PLAN_RAW
+    assert G02_RUNTIME_PAIR_INFERENCE is False
     outcome = validate_task168_request(request)
     assert outcome.valid is not None
     record = outcome.valid.candidate_records[0]
@@ -815,11 +858,43 @@ def test_g02_exact_task021_blocker_is_explicit_pairing_authority() -> None:
         git_commit="task168-orchestration",
     )
     assert configuration.construction_family is ConstructionFamily.U_TUBE
-    assert producer.status.value == "BLOCKED"
+    assert producer.status.value == "VALID"
+    assert producer.layout is not None
+    assert producer.layout.tube_hole_count == 10
+    assert producer.layout.physical_tube_count == 5
     assert any(
-        blocker.code == "STL_UTUBE_PAIRING_REQUIRED" and blocker.field_path == "u_tube_pairing_plan"
-        for blocker in producer.blockers
+        warning.code == "STL_UTUBE_BEND_GEOMETRY_DEFERRED"
+        and G02_PAIRING_EVIDENCE_REF in warning.evidence_refs
+        for warning in producer.layout.warnings
     )
+    geometry_outcome = validate_task022(
+        task168_service._task022_payload(
+            request.evaluation_input_authority,
+            record.candidate,
+            configuration,
+            producer.layout,
+            request.shell_geometry_catalog.records[0],
+        ),
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert geometry_outcome.geometry is not None
+    baffle_outcome = validate_task024(
+        task168_service._task024_payload(
+            request.evaluation_input_authority,
+            record.candidate,
+            configuration,
+            producer.layout,
+            geometry_outcome.geometry,
+        )
+    )
+    assert baffle_outcome.status.value == "BLOCKED"
+    assert any(
+        blocker.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
+        and blocker.field_path == "configuration.construction_family"
+        for blocker in baffle_outcome.blockers
+    )
+    assert record.stage is CandidateStage.BAFFLE_GEOMETRY
 
 
 def test_g03_exact_task024_blocker_is_fixed_tubesheet_only_contract() -> None:
@@ -942,3 +1017,15 @@ def test_golden_authority_payload_is_proposal_only() -> None:
         and item["expected_task169_result_id"] is None
         for item in payload["goldens"]
     )
+    g02 = payload["goldens"][1]
+    assert g02["pairing_authority"]["authority_id"] == "HXFORGE-V06-G02-UTUBE-PAIRING"
+    assert g02["pairing_authority"]["approval_status"] == "PROPOSED"
+    assert g02["pairing_authority"]["pairing_plan_hash"] == (
+        "e7fe05b5ebd5e55107545f9a8f9b32908301d3bd12d4602b0ca0b3b8598eb4b0"
+    )
+    assert g02["pairing_authority"]["pair_count"] == 5
+    assert g02["pairing_authority"]["accepted_leg_count"] == 10
+    assert g02["runtime_pair_inference"] is False
+    assert g02["task021_status"] == "PASS"
+    assert g02["task024_status"] == "BLOCKED"
+    assert g02["task024_blocker"] == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"

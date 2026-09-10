@@ -165,10 +165,12 @@ All five cases are represented and replayed through real TASK-168 requests:
 - `V06-G01` uses the real fixed-tubesheet/E-shell chain and reaches a real
   complete WARN candidate in the current producer chain.  Its expected
   TASK-168 identity is recorded as a proposal binding.
-- `V06-G02` and `V06-G03` use real candidate-specific U-tube and floating-head
-  materialization attempts.  Current TASK-021/TASK-024 authority rejects
-  those configurations before complete screening, so the cases remain
-  blocked proposals; no success is claimed.
+- `V06-G02` uses a real candidate-specific U-tube request with the literal,
+  hash-verified pairing proposal in the release fixture.  TASK-021 pairing
+  validation and TASK-022 pass; the current TASK-024 applicability boundary
+  then blocks U-tube before complete screening.  `V06-G03` uses the real
+  floating-head materialization attempt and remains blocked on the unmerged
+  TASK-024 applicability correction.  Neither case is claimed as a success.
 - `V06-G04` uses a real two-member TASK-168 space.  One candidate is complete
   and recommendable and one is rejected by the authoritative shell-DP
   constraint; the selection output records the alternative and exclusion
