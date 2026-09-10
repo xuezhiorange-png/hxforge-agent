@@ -32,10 +32,6 @@ from .canonical import (
     result_id,
 )
 from .models import (
-    CandidateExclusionRecord,
-    CandidateRankingRecord,
-    RankingDirection,
-    SelectionStatus,
     SUPPORTED_RANKING_METRICS,
     TASK169_BLOCKED_SCHEMA_VERSION,
     TASK169_IMPLEMENTATION_SOFTWARE_VERSION,
@@ -43,6 +39,10 @@ from .models import (
     TASK169_SCHEMA_VERSION,
     TASK169_SOURCE_DEFINITION_ID,
     TASK169_VERSION,
+    CandidateExclusionRecord,
+    CandidateRankingRecord,
+    RankingDirection,
+    SelectionStatus,
     Task169RankingPolicy,
     Task169Request,
     Task169Result,
@@ -264,7 +264,9 @@ def validate_request(raw: object) -> Task169ValidationResult:
     recommended = top[0] if top else None
     alternatives = top[1:] if len(top) > 1 else ()
     selection_status = (
-        SelectionStatus.SELECTED if recommended is not None else SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
+        SelectionStatus.SELECTED
+        if recommended is not None
+        else SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
     )
     semantic_inputs = (
         ("TASK168_RESULT_HASH", request.task168_result.result_hash),
@@ -295,7 +297,10 @@ def validate_request(raw: object) -> Task169ValidationResult:
     )
     digest = result_hash(provisional)
     result = replace(provisional, result_hash=digest, result_id=result_id(digest))
-    if result_hash(result) != result.result_hash or result_id(result.result_hash) != result.result_id:
+    if (
+        result_hash(result) != result.result_hash
+        or result_id(result.result_hash) != result.result_id
+    ):
         return _blocked(request_hash_value, ("TASK169_IDENTITY_REPLAY_FAILED",))
     return Task169ValidationResult(status=ValidationStatus.VALID, valid=result)
 
