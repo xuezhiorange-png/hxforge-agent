@@ -546,7 +546,10 @@ def test_task160_envelope_is_candidate_bound_and_does_not_retain_fixed_template(
     assert isinstance(envelope, dict)
     assert envelope["construction_family"] == "U_TUBE"
     assert envelope["tube_pass_count"] == candidate.tube_pass_count
-    assert envelope["authority_source_identity"] == "TASK168-CANDIDATE-CONFIGURATION-BRIDGE"
+    assert envelope["authority_source_identity"] == "TASK169-V06-THERMAL-CLOSURE-AUTHORITY"
+    assert envelope["authority_source_version"] == "v0.6"
+    assert envelope["authority_identity"].startswith("A06_V06_SHELL_TUBE_THERMAL_ENVELOPE::")
+    assert "TASK169-THERMAL-CLOSURE-AUTHORITY-V06" in envelope["evidence_refs"]
     assert any(
         ref.startswith("TASK168_TASK020_CONFIGURATION::") for ref in envelope["evidence_refs"]
     )

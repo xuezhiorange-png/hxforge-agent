@@ -206,6 +206,11 @@ from .raw_projection import (
     raw_projection_hash_from_projection,
 )
 
+TASK168_TASK160_V06_ENVELOPE_AUTHORITY_ID = "A06_V06_SHELL_TUBE_THERMAL_ENVELOPE"
+TASK168_TASK160_V06_ENVELOPE_SOURCE_ID = "TASK169-V06-THERMAL-CLOSURE-AUTHORITY"
+TASK168_TASK160_V06_ENVELOPE_SOURCE_VERSION = "v0.6"
+TASK168_TASK160_V06_ENVELOPE_EVIDENCE_REF = "TASK169-THERMAL-CLOSURE-AUTHORITY-V06"
+
 _DECIMAL_ROLES = frozenset(
     {
         DiscreteDimensionRole.TUBE_OUTER_DIAMETER,
@@ -2719,13 +2724,25 @@ def _task160_payload(
         }
         bridge_hash = task021_canonical.sha256_hex(bridge_payload)
         envelope_map.update(selected_envelope)
-        envelope_map.update(
-            {
-                "authority_source_identity": "TASK168-CANDIDATE-CONFIGURATION-BRIDGE",
-                "authority_source_version": "v1",
-                "authority_identity": "TASK168-TASK160-ENVELOPE::" + bridge_hash,
-            }
-        )
+        if configuration.construction_family is ConstructionFamily.FIXED_TUBESHEET:
+            envelope_map.update(
+                {
+                    "authority_source_identity": "TASK168-CANDIDATE-CONFIGURATION-BRIDGE",
+                    "authority_source_version": "v1",
+                    "authority_identity": "TASK168-TASK160-ENVELOPE::" + bridge_hash,
+                }
+            )
+        else:
+            envelope_map.update(
+                {
+                    "authority_source_identity": TASK168_TASK160_V06_ENVELOPE_SOURCE_ID,
+                    "authority_source_version": TASK168_TASK160_V06_ENVELOPE_SOURCE_VERSION,
+                    "authority_identity": TASK168_TASK160_V06_ENVELOPE_AUTHORITY_ID
+                    + "::"
+                    + bridge_hash,
+                }
+            )
+            candidate_refs = (*candidate_refs, TASK168_TASK160_V06_ENVELOPE_EVIDENCE_REF)
     envelope_map["evidence_refs"] = _merge_evidence_refs(
         envelope_map.get("evidence_refs"), (*candidate_refs, configuration_ref)
     )
