@@ -1,9 +1,5 @@
 """TASK-169 deterministic candidate selection boundary."""
 
-# fmt: off
-
-# ruff: noqa: I001
-
 from __future__ import annotations
 
 from dataclasses import replace
@@ -17,6 +13,8 @@ from decimal import (
 
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     batch_result_hash as task168_batch_result_hash,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     result_id as task168_result_id,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
@@ -179,7 +177,7 @@ def _candidate_static_exclusion(record: CandidateRecord) -> str | None:
 def _score_candidate(
     record: CandidateRecord,
     policy: Task169RankingPolicy,
-) -> tuple[Decimal, tuple[tuple[str, str], ...]] | None:
+) -> tuple[Decimal, tuple[tuple[str, str], ...], Decimal] | None:
     metrics = _metric_map(record)
     objective_values: list[tuple[str, str]] = []
     with localcontext(_RANKING_CONTEXT):
@@ -195,23 +193,29 @@ def _score_candidate(
             if not value.is_finite():
                 return None
             normalized = value / objective.scale
-            signed = (
-                normalized
-                if objective.direction is RankingDirection.MINIMIZE
-                else -normalized
-            )
+            signed = normalized if objective.direction is RankingDirection.MINIMIZE else -normalized
             score += objective.weight * signed
             objective_values.append((objective.metric, str(value)))
-        if record.status is CandidateStatus.WARN:
-            score += policy.warning_penalty
-        return (+score, tuple(objective_values))
+        warning_penalty = (
+            policy.warning_penalty if record.status is CandidateStatus.WARN else Decimal("0")
+        )
+        score += warning_penalty
+        return (+score, tuple(objective_values), warning_penalty)
 
 
 def _rank(
     records: tuple[CandidateRecord, ...],
     policy: Task169RankingPolicy,
 ) -> tuple[tuple[CandidateRankingRecord, ...], tuple[CandidateExclusionRecord, ...]]:
-    scored: list[tuple[Decimal, bytes, CandidateRecord, tuple[tuple[str, str], ...]]] = []
+    scored: list[
+        tuple[
+            Decimal,
+            bytes,
+            CandidateRecord,
+            tuple[tuple[str, str], ...],
+            Decimal,
+        ]
+    ] = []
     excluded: list[CandidateExclusionRecord] = []
     for record in records:
         reason = _candidate_static_exclusion(record)
@@ -237,12 +241,31 @@ def _rank(
                 )
             )
             continue
-        score, objective_values = scored_value
-        scored.append((score, record.candidate_hash.encode("utf-8"), record, objective_values))
+        score, objective_values, warning_penalty = scored_value
+        scored.append(
+            (
+                score,
+                record.candidate_hash.encode("utf-8"),
+                record,
+                objective_values,
+                warning_penalty,
+            )
+        )
 
     scored.sort(key=lambda item: (item[0], item[1]))
     ranked: list[CandidateRankingRecord] = []
-    for index, (score, _, record, objective_values) in enumerate(scored, start=1):
+    for index, (score, _, record, objective_values, warning_penalty) in enumerate(scored, start=1):
+        reason_codes = [
+            "RANKED_BY_VERSIONED_OBJECTIVE_POLICY",
+        ]
+        if warning_penalty:
+            reason_codes.append("WARN_PENALTY_APPLIED")
+        if index > 1:
+            previous_score = scored[index - 2][0]
+            if score == previous_score:
+                reason_codes.append("CANONICAL_CANDIDATE_HASH_TIE_BREAK")
+            else:
+                reason_codes.append("HIGHER_COMPOSITE_SCORE_THAN_RECOMMENDATION")
         provisional = CandidateRankingRecord(
             rank=index,
             candidate_id=record.candidate_id,
@@ -252,6 +275,8 @@ def _rank(
             objective_values=objective_values,
             warning_count=len(record.warnings),
             record_hash="",
+            warning_penalty_contribution=warning_penalty,
+            reason_codes=tuple(reason_codes),
         )
         ranked.append(replace(provisional, record_hash=rank_record_hash(provisional)))
     excluded.sort(key=lambda item: item.candidate_hash.encode("utf-8"))
@@ -296,6 +321,39 @@ def validate_request(raw: object) -> Task169ValidationResult:
         ("TASK168_PROVENANCE_HASH", request.task168_result.provenance.graph_hash),
         ("TASK169_RANKING_POLICY_HASH", request.ranking_policy.canonical_hash),
     )
+    recommendation_reason_codes: tuple[str, ...] = (
+        ("RECOMMENDATION_LOWEST_COMPOSITE_SCORE",)
+        if recommended is not None
+        else ("NO_RECOMMENDABLE_CANDIDATE",)
+    )
+    if (
+        recommended is not None
+        and len(ranked) > 1
+        and (ranked[0].composite_score == ranked[1].composite_score)
+    ):
+        recommendation_reason_codes += ("CANONICAL_CANDIDATE_HASH_TIE_BREAK",)
+    if recommended is not None and recommended.warning_penalty_contribution:
+        recommendation_reason_codes += ("WARN_PENALTY_APPLIED",)
+    recommended_score = recommended.composite_score if recommended is not None else None
+    alternative_reason_codes = tuple(
+        (
+            item.candidate_id,
+            tuple(
+                (
+                    "ALTERNATIVE_RANKED_BEHIND_RECOMMENDATION",
+                    "WARN_PENALTY_APPLIED"
+                    if item.warning_penalty_contribution
+                    else "HIGHER_COMPOSITE_SCORE_THAN_RECOMMENDATION",
+                )
+                + (
+                    ("CANONICAL_CANDIDATE_HASH_TIE_BREAK",)
+                    if recommended_score is not None and item.composite_score == recommended_score
+                    else ()
+                )
+            ),
+        )
+        for item in alternatives
+    )
     provisional = Task169Result(
         schema_version=TASK169_RESULT_SCHEMA_VERSION,
         task169_version=TASK169_VERSION,
@@ -316,6 +374,8 @@ def validate_request(raw: object) -> Task169ValidationResult:
         provenance_semantic_inputs=semantic_inputs,
         result_hash="",
         result_id="",
+        recommendation_reason_codes=recommendation_reason_codes,
+        alternative_reason_codes=alternative_reason_codes,
     )
     digest = result_hash(provisional)
     result = replace(provisional, result_hash=digest, result_id=result_id(digest))
@@ -328,5 +388,3 @@ def validate_request(raw: object) -> Task169ValidationResult:
 
 
 __all__ = ["validate_request"]
-
-# fmt: on

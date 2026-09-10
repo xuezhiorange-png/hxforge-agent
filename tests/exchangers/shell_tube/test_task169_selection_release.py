@@ -1,13 +1,28 @@
-# fmt: off
-# ruff: noqa: I001
+"""TASK-169 selection, replay, and release-boundary contract tests."""
+
 from __future__ import annotations
 
+import json
+import shutil
 from dataclasses import replace
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 
+import pytest
+
+from hexagent.exchangers.shell_tube.manufacturable_candidates import (
+    validate_request as validate_task168_request,
+)
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     batch_result_hash,
     provenance_graph_hash,
+    requirement_authority_hash,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
+    request_hash as task168_request_hash,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     result_id as task168_result_id,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
@@ -22,17 +37,26 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     CandidateStage,
     CandidateStatus,
     CompletenessStatus,
+    DiscreteDimensionRole,
     ProvenanceGraph,
     Task168Applicability,
     Task168BatchResult,
     Task168Blocker,
     Task168Completeness,
+    Task168Request,
     Task168Warning,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    ValidationStatus as Task168ValidationStatus,
 )
 from hexagent.exchangers.shell_tube.models import ConstructionFamily
 from hexagent.exchangers.shell_tube.selection_release.canonical import (
     ranking_policy_hash,
+)
+from hexagent.exchangers.shell_tube.selection_release.canonical import (
     result_hash as task169_result_hash,
+)
+from hexagent.exchangers.shell_tube.selection_release.canonical import (
     result_id as task169_result_id,
 )
 from hexagent.exchangers.shell_tube.selection_release.models import (
@@ -46,8 +70,18 @@ from hexagent.exchangers.shell_tube.selection_release.models import (
     Task169Request,
     ValidationStatus,
 )
-from hexagent.exchangers.shell_tube.selection_release.service import validate_request
+from hexagent.exchangers.shell_tube.selection_release.service import (
+    validate_request as validate_selection_request,
+)
+from hexagent.release_demo.task169_integration_release_acceptance import service as release_service
+from hexagent.release_demo.task169_integration_release_acceptance import (
+    validate_request as validate_release_request,
+)
+from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
+    request_hash as release_request_hash,
+)
 from hexagent.release_demo.task169_integration_release_acceptance.models import (
+    TASK169_GOLDEN_TOLERANCE_CLASS,
     TASK169_RELEASE_SCHEMA_VERSION,
     TASK169_RELEASE_SOURCE_DEFINITION_ID,
     TASK169_RELEASE_VERSION,
@@ -55,11 +89,11 @@ from hexagent.release_demo.task169_integration_release_acceptance.models import 
     GoldenCaseId,
     Task169GoldenCase,
     Task169ReleaseRequest,
-    Task169RuntimeParityEvidence,
 )
-from hexagent.release_demo.task169_integration_release_acceptance.service import (
-    FROZEN_TOLERANCE_LEDGER,
-    validate_request as validate_release_request,
+from hexagent.release_demo.task169_integration_release_acceptance.trusted_evidence import (
+    Task169ParityInput,
+    observe_dual_runtime,
+    repository_identity,
 )
 
 
@@ -99,17 +133,27 @@ def _candidate(
         dimension_authority_bindings=(),
     )
     blockers = (
-        Task168Blocker(
-            code="HARD_CONSTRAINT_UNSATISFIED",
-            stage=CandidateStage.CONSTRAINT_EVALUATION,
-            field_path=blocked_field,
-        ),
-    ) if blocked else ()
+        (
+            Task168Blocker(
+                code="HARD_CONSTRAINT_UNSATISFIED",
+                stage=CandidateStage.CONSTRAINT_EVALUATION,
+                field_path=blocked_field,
+            ),
+        )
+        if blocked
+        else ()
+    )
     evidence = (("result_hash", candidate_hash),) if full_chain_evidence else ()
     constraints = (
         ("required_duty_w", "PASS"),
-        ("max_tube_dp_pa", "PASS"),
-        ("max_shell_dp_pa", "PASS"),
+        (
+            "max_tube_dp_pa",
+            "PASS" if not blocked or blocked_field != "max_tube_dp_pa" else "BLOCKED",
+        ),
+        (
+            "max_shell_dp_pa",
+            "PASS" if not blocked or blocked_field != "max_shell_dp_pa" else "BLOCKED",
+        ),
     )
     return CandidateRecord(
         candidate_id=candidate_id,
@@ -121,6 +165,7 @@ def _candidate(
         last_successful_stage=(
             CandidateStage.ENGINEERING_SCREENING if blocked else CandidateStage.COMPLETE
         ),
+        configuration_evidence=evidence,
         geometry_evidence=evidence,
         tube_layout_evidence=evidence,
         tube_side_evidence=evidence,
@@ -145,6 +190,7 @@ def _candidate(
 
 
 def _batch(records: tuple[CandidateRecord, ...]) -> Task168BatchResult:
+    records = tuple(sorted(records, key=lambda record: record.candidate_hash.encode("utf-8")))
     graph0 = ProvenanceGraph(nodes=(), edges=(), graph_hash="", self_edge_count=0, cycle_count=0)
     graph = replace(graph0, graph_hash=provenance_graph_hash(graph0))
     provisional = Task168BatchResult(
@@ -223,11 +269,11 @@ def _request(
     )
 
 
-def test_task169_excludes_hard_blockers_and_selects_lowest_score() -> None:
+def test_selection_excludes_hard_blockers_and_selects_lowest_score() -> None:
     blocked = _candidate("blocked", "0" * 64, shell_dp="1", blocked=True)
     high = _candidate("high", "b" * 64, shell_dp="200")
     low = _candidate("low", "a" * 64, shell_dp="100")
-    result = validate_request(_request(_batch((blocked, high, low))))
+    result = validate_selection_request(_request(_batch((blocked, high, low))))
     assert result.status is ValidationStatus.VALID
     assert result.valid is not None
     assert result.valid.selection_status is SelectionStatus.SELECTED
@@ -237,7 +283,7 @@ def test_task169_excludes_hard_blockers_and_selects_lowest_score() -> None:
     assert result.valid.excluded_candidates[0].candidate_id == "blocked"
 
 
-def test_task169_maximize_objective_is_supported() -> None:
+def test_selection_maximize_objective_is_supported() -> None:
     policy = _policy(
         objectives=(
             RankingObjective(
@@ -248,15 +294,23 @@ def test_task169_maximize_objective_is_supported() -> None:
             ),
         )
     )
-    low_ua = _candidate("low-ua", "a" * 64, ua="900")
-    high_ua = _candidate("high-ua", "b" * 64, ua="1200")
-    result = validate_request(_request(_batch((low_ua, high_ua)), policy))
+    result = validate_selection_request(
+        _request(
+            _batch(
+                (
+                    _candidate("low-ua", "a" * 64, ua="900"),
+                    _candidate("high-ua", "b" * 64, ua="1200"),
+                )
+            ),
+            policy,
+        )
+    )
     assert result.valid is not None
     assert result.valid.recommended_candidate is not None
     assert result.valid.recommended_candidate.candidate_id == "high-ua"
 
 
-def test_task169_warn_penalty_is_explicit_and_deterministic() -> None:
+def test_selection_warn_penalty_and_reason_trace_are_explicit() -> None:
     warn = _candidate(
         "warn",
         "a" * 64,
@@ -265,38 +319,42 @@ def test_task169_warn_penalty_is_explicit_and_deterministic() -> None:
         warnings=(Task168Warning(code="SCREENING_WARN"),),
     )
     passed = _candidate("pass", "b" * 64, shell_dp="100")
-    result = validate_request(
+    result = validate_selection_request(
         _request(_batch((warn, passed)), _policy(warning_penalty=Decimal("2")))
     )
     assert result.valid is not None
     assert result.valid.recommended_candidate is not None
     assert result.valid.recommended_candidate.candidate_id == "pass"
+    assert "WARN_PENALTY_APPLIED" in result.valid.ranked_candidates[1].reason_codes
+    assert result.valid.alternative_reason_codes
 
 
-def test_task169_tie_breaks_by_candidate_hash() -> None:
-    b = _candidate("b", "b" * 64, shell_dp="100")
+def test_selection_tie_breaks_by_candidate_hash_and_is_order_invariant() -> None:
     a = _candidate("a", "a" * 64, shell_dp="100")
-    result = validate_request(_request(_batch((b, a))))
-    assert result.valid is not None
-    assert [item.candidate_id for item in result.valid.ranked_candidates] == ["a", "b"]
+    b = _candidate("b", "b" * 64, shell_dp="100")
+    first = validate_selection_request(_request(_batch((b, a))))
+    second = validate_selection_request(_request(_batch((a, b))))
+    assert first.valid is not None and second.valid is not None
+    assert [item.candidate_id for item in first.valid.ranked_candidates] == ["a", "b"]
+    assert first.valid.result_hash == second.valid.result_hash
+    assert first.valid.result_id == second.valid.result_id
+    assert "CANONICAL_CANDIDATE_HASH_TIE_BREAK" in first.valid.recommendation_reason_codes
 
 
-def test_task169_missing_metric_excludes_candidate() -> None:
-    record = _candidate("missing", "a" * 64)
-    record = replace(record, metrics=(("tube_dp_pa", "50"),))
-    result = validate_request(_request(_batch((record,))))
+def test_selection_missing_metric_excludes_candidate() -> None:
+    record = replace(_candidate("missing", "a" * 64), metrics=(("tube_dp_pa", "50"),))
+    result = validate_selection_request(_request(_batch((record,))))
     assert result.valid is not None
     assert result.valid.selection_status is SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
     assert result.valid.recommended_candidate is None
     assert result.valid.excluded_candidates[0].reason_code == "RANKING_METRIC_MISSING_OR_INVALID"
 
 
-def test_task169_top_n_is_exact_prefix() -> None:
+def test_selection_top_n_is_exact_prefix() -> None:
     records = tuple(
-        _candidate(str(index), f"{index:064x}", shell_dp=str(100 + index))
-        for index in range(5)
+        _candidate(str(index), f"{index:064x}", shell_dp=str(100 + index)) for index in range(5)
     )
-    result = validate_request(_request(_batch(records), _policy(top_n=2)))
+    result = validate_selection_request(_request(_batch(records), _policy(top_n=2)))
     assert result.valid is not None
     assert result.valid.recommended_candidate is not None
     assert len(result.valid.alternatives) == 1
@@ -304,215 +362,415 @@ def test_task169_top_n_is_exact_prefix() -> None:
     assert result.valid.alternatives[0].rank == 2
 
 
-def test_task169_rejects_tampered_task168_result() -> None:
+def test_selection_rejects_tampered_task168_result() -> None:
     batch = _batch((_candidate("a", "a" * 64),))
-    tampered = replace(batch, result_hash="0" * 64)
-    result = validate_request(_request(tampered))
+    result = validate_selection_request(_request(replace(batch, result_hash="0" * 64)))
     assert result.status is ValidationStatus.TYPED_BLOCKED
     assert result.typed_blocked is not None
     assert "TASK168_RESULT_HASH_MISMATCH" in result.typed_blocked.blocker_codes
 
 
-def test_task169_rejects_unbound_ranking_policy_hash() -> None:
+def test_selection_rejects_tampered_ranking_policy_identity() -> None:
     policy = replace(_policy(), canonical_hash="0" * 64)
-    result = validate_request(_request(_batch((_candidate("a", "a" * 64),)), policy))
+    result = validate_selection_request(_request(_batch((_candidate("a", "a" * 64),)), policy))
     assert result.status is ValidationStatus.TYPED_BLOCKED
     assert result.typed_blocked is not None
     assert "RANKING_POLICY_HASH_MISMATCH" in result.typed_blocked.blocker_codes
 
 
-def test_task169_result_identity_replays() -> None:
-    result = validate_request(_request(_batch((_candidate("a", "a" * 64),))))
+def test_selection_result_identity_replays_with_reason_trace() -> None:
+    result = validate_selection_request(
+        _request(_batch((_candidate("a", "a" * 64), _candidate("b", "b" * 64))))
+    )
     assert result.valid is not None
     assert task169_result_hash(result.valid) == result.valid.result_hash
     assert task169_result_id(result.valid.result_hash) == result.valid.result_id
+    assert result.valid.recommendation_reason_codes
+    assert result.valid.alternative_reason_codes
 
 
-def test_task169_invalid_type_fails_closed() -> None:
-    result = validate_request(object())
+def test_selection_invalid_type_fails_closed() -> None:
+    result = validate_selection_request(object())
     assert result.status is ValidationStatus.TYPED_BLOCKED
     assert result.typed_blocked is not None
     assert result.typed_blocked.blocker_codes == ("INVALID_REQUEST_TYPE",)
 
 
+@lru_cache(maxsize=1)
+def _real_request() -> Task168Request:
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _real_request as build_real_request,
+    )
 
-def _golden_case(
-    golden_id: GoldenCaseId,
-    records: tuple[CandidateRecord, ...],
-) -> Task169GoldenCase:
-    selection_request = _request(_batch(records))
-    expected = validate_request(selection_request)
-    assert expected.valid is not None
+    return build_real_request()
+
+
+def _real_task168_request() -> Task168Request:
+    return _real_request()
+
+
+def _family_request(family: ConstructionFamily) -> Task168Request:
+    from dataclasses import replace as dataclass_replace
+
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _with_authority_values,
+    )
+
+    request = _real_task168_request()
+    requirement = dataclass_replace(
+        request.requirement_authority,
+        allowed_construction_families=(family,),
+        canonical_hash="",
+    )
+    requirement = dataclass_replace(
+        requirement,
+        canonical_hash=requirement_authority_hash(requirement),
+    )
+    return _with_authority_values(
+        dataclass_replace(request, requirement_authority=requirement),
+        DiscreteDimensionRole.CONSTRUCTION_FAMILY,
+        (family,),
+    )
+
+
+def _g04_request() -> Task168Request:
+    from dataclasses import replace as dataclass_replace
+
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _with_authority_values,
+    )
+
+    request = _real_task168_request()
+    requirement = dataclass_replace(
+        request.requirement_authority,
+        max_shell_dp_pa=Decimal("20000"),
+        canonical_hash="",
+    )
+    requirement = dataclass_replace(
+        requirement,
+        canonical_hash=requirement_authority_hash(requirement),
+    )
+    return _with_authority_values(
+        dataclass_replace(request, requirement_authority=requirement),
+        DiscreteDimensionRole.TUBE_OUTER_DIAMETER,
+        (Decimal("0.018"), Decimal("0.02")),
+    )
+
+
+def _g05_request() -> Task168Request:
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _real_request as build_real_request,
+    )
+
+    return build_real_request(shell_diameter="0.20")
+
+
+def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169GoldenCase:
+    outcome = validate_task168_request(request)
+    assert outcome.status is Task168ValidationStatus.VALID
+    assert outcome.valid is not None
+    request_digest = task168_request_hash(request)
     return Task169GoldenCase(
         golden_id=golden_id,
-        source_id=f"TASK169-TEST-{golden_id.value}",
-        source_location=f"tests::{golden_id.value}",
-        redistribution_status="PROJECT_TEST_FIXTURE",
-        normalized_input_identity=f"normalized::{golden_id.value}",
-        expected_result_identity=expected.valid.result_hash,
-        approved_numeric_expectations=(),
-        tolerance_class="TASK165_FROZEN_V06",
-        reviewer_evidence_refs=(f"review::{golden_id.value}",),
-        provenance_source_hash=f"source-hash::{golden_id.value}",
-        selection_request=selection_request,
+        source_id=f"TASK169-PROPOSAL-{golden_id.value}",
+        source_location="tests/exchangers/shell_tube/test_task169_selection_release.py",
+        source_class="PROPOSAL_ONLY_INTEGRATION_EVIDENCE",
+        redistribution_status="METADATA_ONLY_NO_PROTECTED_PAYLOAD",
+        normalized_input_identity=request_digest,
+        task168_request=request,
+        task168_request_hash=request_digest,
+        expected_task168_result_hash=outcome.valid.result_hash,
+        expected_task168_result_id=outcome.valid.result_id,
+        expected_task168_result_status=Task168ValidationStatus.VALID.value,
+        ranking_policy=_policy(),
+        expected_task169_result_hash=None,
+        expected_task169_result_id=None,
+        approved_numeric_expectations=(("EXPECTED_IDENTITY_STATUS", "PROPOSED_FOR_REVIEW"),),
+        tolerance_class=TASK169_GOLDEN_TOLERANCE_CLASS,
+        provenance_source_hash="f" * 64,
+        reviewer_evidence_refs=("INDEPENDENT_REVIEW_PENDING",),
     )
 
 
+@lru_cache(maxsize=1)
 def _release_request() -> Task169ReleaseRequest:
-    g01 = _golden_case(
-        GoldenCaseId.V06_G01,
-        (
-            _candidate(
-                "g01-fixed",
-                "1" * 64,
-                family=ConstructionFamily.FIXED_TUBESHEET,
-                full_chain_evidence=True,
-            ),
-        ),
+    cases = (
+        _proposal_case(GoldenCaseId.V06_G01, _real_task168_request()),
+        _proposal_case(GoldenCaseId.V06_G02, _family_request(ConstructionFamily.U_TUBE)),
+        _proposal_case(GoldenCaseId.V06_G03, _family_request(ConstructionFamily.FLOATING_HEAD)),
+        _proposal_case(GoldenCaseId.V06_G04, _g04_request()),
+        _proposal_case(GoldenCaseId.V06_G05, _g05_request()),
     )
-    g02 = _golden_case(
-        GoldenCaseId.V06_G02,
-        (
-            _candidate(
-                "g02-utube",
-                "2" * 64,
-                family=ConstructionFamily.U_TUBE,
-                full_chain_evidence=True,
-            ),
-        ),
-    )
-    g03 = _golden_case(
-        GoldenCaseId.V06_G03,
-        (
-            _candidate(
-                "g03-floating",
-                "3" * 64,
-                family=ConstructionFamily.FLOATING_HEAD,
-                full_chain_evidence=True,
-            ),
-        ),
-    )
-    g04 = _golden_case(
-        GoldenCaseId.V06_G04,
-        (
-            _candidate(
-                "g04-rejected",
-                "4" * 64,
-                shell_dp="1000",
-                blocked=True,
-                blocked_field="max_shell_dp_pa",
-                full_chain_evidence=True,
-            ),
-            _candidate(
-                "g04-selected",
-                "5" * 64,
-                shell_dp="100",
-                full_chain_evidence=True,
-            ),
-        ),
-    )
-    g05 = _golden_case(
-        GoldenCaseId.V06_G05,
-        (
-            _candidate(
-                "g05-blocked",
-                "6" * 64,
-                blocked=True,
-                blocked_field="required_source_authority",
-            ),
-        ),
-    )
-    cases = (g01, g02, g03, g04, g05)
-    hashes: list[tuple[str, str]] = []
-    for case in cases:
-        selected = validate_request(case.selection_request)
-        assert selected.valid is not None
-        hashes.append((case.golden_id.value, selected.valid.result_hash))
-    parity = tuple(hashes)
     return Task169ReleaseRequest(
         schema_version=TASK169_RELEASE_SCHEMA_VERSION,
         release_version=TASK169_RELEASE_VERSION,
         source_definition_id=TASK169_RELEASE_SOURCE_DEFINITION_ID,
         golden_cases=cases,
-        runtime_parity_evidence=(
-            Task169RuntimeParityEvidence(
-                runtime_id="PYTHON_3_11",
-                golden_result_hashes=parity,
-                evidence_refs=("ci::python3.11",),
-            ),
-            Task169RuntimeParityEvidence(
-                runtime_id="PYTHON_3_12",
-                golden_result_hashes=parity,
-                evidence_refs=("ci::python3.12",),
-            ),
-        ),
     )
 
 
-def test_task169_release_acceptance_passes_all_frozen_gates() -> None:
+def test_task168_real_request_replays_before_release_validation() -> None:
+    outcome = validate_task168_request(_real_task168_request())
+    assert outcome.valid is not None
+    assert outcome.valid.candidate_records[0].stage is CandidateStage.COMPLETE
+    assert outcome.valid.result_hash
+
+
+def test_release_replays_task168_public_validator_for_each_golden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    original = release_service.validate_task168_request
+
+    def counted(request: object) -> object:
+        nonlocal calls
+        calls += 1
+        return original(request)
+
+    monkeypatch.setattr(release_service, "validate_task168_request", counted)
     outcome = validate_release_request(_release_request())
-    assert outcome.blocked is None
+    assert calls == 5
     assert outcome.valid is not None
-    assert outcome.valid.overall_status is AcceptanceStatus.PASS
-    assert all(
-        gate.status is AcceptanceStatus.PASS
-        for gate in outcome.valid.acceptance_gates
+    g01 = outcome.valid.golden_records[0]
+    assert (
+        g01.task168_result_hash == _release_request().golden_cases[0].expected_task168_result_hash
     )
-    assert tuple(record.golden_id for record in outcome.valid.golden_records) == (
-        GoldenCaseId.V06_G01,
-        GoldenCaseId.V06_G02,
-        GoldenCaseId.V06_G03,
-        GoldenCaseId.V06_G04,
-        GoldenCaseId.V06_G05,
-    )
-    assert outcome.valid.frozen_tolerance_ledger == FROZEN_TOLERANCE_LEDGER
+    assert g01.selection_result_hash
 
 
-def test_task169_release_g04_rejects_dp_candidate_and_selects_alternative() -> None:
+def test_release_does_not_have_caller_supplied_task168_result_surface() -> None:
+    case = _release_request().golden_cases[0]
+    assert not hasattr(case, "task168_result")
+    assert hasattr(case, "task168_request")
+
+
+def test_release_golden_proposals_cannot_self_approve() -> None:
     outcome = validate_release_request(_release_request())
-    assert outcome.valid is not None
-    record = next(
-        item
-        for item in outcome.valid.golden_records
-        if item.golden_id is GoldenCaseId.V06_G04
-    )
-    assert record.status is AcceptanceStatus.PASS
-    assert record.recommended_candidate_id == "g04-selected"
-
-
-def test_task169_release_g05_has_no_recommendation() -> None:
-    request = _release_request()
-    selection = validate_request(request.golden_cases[4].selection_request)
-    assert selection.valid is not None
-    assert selection.valid.selection_status is SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
-    outcome = validate_release_request(request)
-    assert outcome.valid is not None
-    g05 = outcome.valid.golden_records[4]
-    assert g05.status is AcceptanceStatus.PASS
-    assert g05.recommended_candidate_id is None
-
-
-def test_task169_release_blocks_when_python_parity_evidence_diverges() -> None:
-    request = _release_request()
-    bad_py312 = replace(
-        request.runtime_parity_evidence[1],
-        golden_result_hashes=(("V06-G01", "0" * 64),),
-    )
-    modified = replace(
-        request,
-        runtime_parity_evidence=(
-            request.runtime_parity_evidence[0],
-            bad_py312,
-        ),
-    )
-    outcome = validate_release_request(modified)
     assert outcome.valid is not None
     assert outcome.valid.overall_status is AcceptanceStatus.BLOCKED
-    parity_gate = next(
-        gate
-        for gate in outcome.valid.acceptance_gates
-        if gate.gate_id == "PY311_PY312_PARITY"
-    )
-    assert parity_gate.status is AcceptanceStatus.BLOCKED
+    assert all(record.status is AcceptanceStatus.BLOCKED for record in outcome.valid.golden_records)
+    assert "V06_GOLDEN_FIXTURE_REVIEW_APPROVAL_PENDING" in outcome.valid.blocker_codes
 
-# fmt: on
+
+def test_release_g04_replays_real_multi_candidate_dp_constraint() -> None:
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    g04 = outcome.valid.golden_records[3]
+    assert g04.task168_result_hash
+    assert g04.recommended_candidate_id
+    assert not any(code == "G04_MULTI_CANDIDATE_REQUIRED" for code in g04.reason_codes)
+    assert not any(code == "G04_DP_CONSTRAINED_REJECTION_REQUIRED" for code in g04.reason_codes)
+
+
+def test_release_g05_is_real_no_recommendation_path() -> None:
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    g05 = outcome.valid.golden_records[4]
+    assert g05.recommended_candidate_id is None
+    assert "G05_NO_RECOMMENDATION_REQUIRED" not in g05.reason_codes
+
+
+def test_release_negative_batch_keeps_provenance_gate_replayable() -> None:
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    gates = {gate.gate_id: gate.status for gate in outcome.valid.acceptance_gates}
+    assert gates["PROVENANCE_COMPLETE"] is AcceptanceStatus.PASS
+
+
+def test_release_task168_request_binding_tampering_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = _release_request().golden_cases[0]
+    original = release_service.validate_task168_request
+
+    def tampered(request: object) -> object:
+        outcome = original(request)
+        if request is not case.task168_request or outcome.valid is None:
+            return outcome
+        changed = replace(outcome.valid, request_hash="0" * 64, result_hash="", result_id="")
+        digest = batch_result_hash(changed)
+        changed = replace(changed, result_hash=digest, result_id=task168_result_id(digest))
+        return replace(outcome, valid=changed)
+
+    monkeypatch.setattr(release_service, "validate_task168_request", tampered)
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    assert "TASK168_REQUEST_BINDING_MISMATCH" in outcome.valid.golden_records[0].reason_codes
+
+
+def test_release_task168_expected_identity_tampering_is_fail_closed() -> None:
+    case = _release_request().golden_cases[0]
+    tampered = replace(case, expected_task168_result_hash="0" * 64)
+    request = replace(
+        _release_request(), golden_cases=(tampered, *_release_request().golden_cases[1:])
+    )
+    outcome = validate_release_request(request)
+    assert outcome.valid is not None
+    assert "TASK168_EXPECTED_RESULT_HASH_MISMATCH" in outcome.valid.golden_records[0].reason_codes
+
+
+def test_release_task168_request_hash_tampering_is_fail_closed() -> None:
+    case = _release_request().golden_cases[0]
+    tampered = replace(case, task168_request_hash="0" * 64)
+    request = replace(
+        _release_request(), golden_cases=(tampered, *_release_request().golden_cases[1:])
+    )
+    outcome = validate_release_request(request)
+    assert outcome.valid is not None
+    assert "TASK168_REQUEST_HASH_MISMATCH" in outcome.valid.golden_records[0].reason_codes
+
+
+def test_release_frozen_tolerance_cannot_be_overridden() -> None:
+    request = replace(
+        _release_request(),
+        frozen_tolerance_ledger=(("ENERGY_BALANCE_RELATIVE_ERROR_MAX", "9"),),
+    )
+    outcome = validate_release_request(request)
+    assert outcome.blocked is not None
+    assert "FROZEN_TOLERANCE_AUTHORITY_MISMATCH" in outcome.blocked.blocker_codes
+
+
+def test_release_request_identity_includes_all_golden_request_bindings() -> None:
+    request = _release_request()
+    first = release_request_hash(request)
+    altered = replace(
+        request.golden_cases[0],
+        source_location="different-authority-location",
+    )
+    second = release_request_hash(
+        replace(request, golden_cases=(altered, *request.golden_cases[1:]))
+    )
+    assert first != second
+
+
+def _parity_input_for_test() -> Task169ParityInput:
+    identity = repository_identity()
+    assert identity is not None
+    head, tree = identity
+    return Task169ParityInput(
+        release_request_hash="a" * 64,
+        task168_request_hashes=(("V06-G01", "b" * 64),),
+        task168_result_hashes=(("V06-G01", "c" * 64),),
+        task169_result_hashes=(("V06-G01", "d" * 64),),
+        task169_result_ids=(("V06-G01", "task169-result"),),
+        head_sha=head,
+        head_tree=tree,
+        software_version="task169.release-acceptance-impl-v2",
+    )
+
+
+def test_trusted_runtime_rejects_duplicate_executable_assignment() -> None:
+    executable = shutil.which("python3")
+    if executable is None:
+        pytest.skip("python executable unavailable")
+    observed = observe_dual_runtime(
+        input_value=_parity_input_for_test(),
+        py311=executable,
+        py312=executable,
+    )
+    assert observed.status == "BLOCKED"
+    assert observed.python311.status == "BLOCKED"
+    assert observed.python312.status == "BLOCKED"
+
+
+def test_trusted_runtime_missing_observation_is_fail_closed() -> None:
+    observed = observe_dual_runtime(
+        input_value=_parity_input_for_test(),
+        py311="/definitely/missing/python311",
+        py312="/definitely/missing/python312",
+    )
+    assert observed.status == "BLOCKED"
+
+
+def test_trusted_runtime_input_pair_order_is_canonical() -> None:
+    first = _parity_input_for_test()
+    second = replace(
+        first,
+        task168_request_hashes=tuple(reversed(first.task168_request_hashes)),
+        task168_result_hashes=tuple(reversed(first.task168_result_hashes)),
+    )
+    from hexagent.release_demo.task169_integration_release_acceptance.trusted_evidence import (
+        expected_digests,
+    )
+
+    assert expected_digests(first) == expected_digests(second)
+
+
+def test_release_result_identity_replays_even_when_acceptance_is_blocked() -> None:
+    from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
+        result_hash as release_result_hash,
+    )
+    from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
+        result_id as release_result_id,
+    )
+
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    assert release_result_hash(outcome.valid) == outcome.valid.result_hash
+    assert release_result_id(outcome.valid.result_hash) == outcome.valid.result_id
+
+
+def test_real_g04_request_has_one_feasible_and_one_dp_blocked_candidate() -> None:
+    outcome = validate_task168_request(_g04_request())
+    assert outcome.valid is not None
+    assert len(outcome.valid.candidate_records) == 2
+    assert (
+        sum(record.stage is CandidateStage.COMPLETE for record in outcome.valid.candidate_records)
+        == 1
+    )
+    blocked = [
+        record
+        for record in outcome.valid.candidate_records
+        if record.status is CandidateStatus.BLOCKED
+    ]
+    assert blocked
+    assert any(
+        blocker.code == "HARD_CONSTRAINT_UNSATISFIED" and blocker.field_path == "max_shell_dp_pa"
+        for record in blocked
+        for blocker in record.blockers
+    )
+
+
+def test_real_family_materialization_attempts_u_tube_and_floating_head() -> None:
+    for family in (ConstructionFamily.U_TUBE, ConstructionFamily.FLOATING_HEAD):
+        outcome = validate_task168_request(_family_request(family))
+        assert outcome.valid is not None
+        assert outcome.valid.candidate_records[0].candidate.construction_family is family
+        assert (
+            dict(outcome.valid.candidate_records[0].configuration_evidence)["construction_family"]
+            == family.value
+        )
+
+
+def test_task169_release_schema_is_v2_and_proposal_status_is_frozen() -> None:
+    request = _release_request()
+    assert request.schema_version == TASK169_RELEASE_SCHEMA_VERSION
+    assert all(case.review_status == "PROPOSED" for case in request.golden_cases)
+    assert all(
+        case.expected_identity_status == "PROPOSED_FOR_REVIEW" for case in request.golden_cases
+    )
+
+
+def test_golden_authority_payload_is_proposal_only() -> None:
+    payload_path = (
+        Path(__file__).parents[3] / "docs" / "tasks" / "TASK-169-v06-golden-authority-proposal.json"
+    )
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    assert payload["authority_status"] == "PROPOSED"
+    assert payload["golden_self_approval"] is False
+    assert [item["golden_id"] for item in payload["goldens"]] == [
+        "V06-G01",
+        "V06-G02",
+        "V06-G03",
+        "V06-G04",
+        "V06-G05",
+    ]
+    assert all(
+        item["review_status"] == "PROPOSED"
+        and item["expected_identity_status"] == "PROPOSED_FOR_REVIEW"
+        and item["approved_by"] == ""
+        and item["approval_evidence"] == []
+        and item["expected_task169_result_hash"] is None
+        and item["expected_task169_result_id"] is None
+        for item in payload["goldens"]
+    )

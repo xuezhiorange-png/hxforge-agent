@@ -81,6 +81,8 @@ def rank_record_projection(value: CandidateRankingRecord) -> dict[str, Any]:
         "composite_score": value.composite_score,
         "objective_values": value.objective_values,
         "warning_count": value.warning_count,
+        "warning_penalty_contribution": value.warning_penalty_contribution,
+        "reason_codes": value.reason_codes,
     }
 
 
@@ -107,6 +109,8 @@ def result_preimage(value: Task169Result) -> dict[str, Any]:
         "alternatives": value.alternatives,
         "excluded_candidates": value.excluded_candidates,
         "provenance_semantic_inputs": value.provenance_semantic_inputs,
+        "recommendation_reason_codes": value.recommendation_reason_codes,
+        "alternative_reason_codes": value.alternative_reason_codes,
     }
 
 

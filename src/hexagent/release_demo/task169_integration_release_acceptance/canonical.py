@@ -1,4 +1,4 @@
-"""Canonical identity helpers for TASK-169 release acceptance."""
+"""Canonical identities for TASK-169 release acceptance."""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ from .models import (
     Task169ReleaseResult,
 )
 
-REQUEST_HASH_DOMAIN = "task169.release-acceptance.request.v1"
-RESULT_HASH_DOMAIN = "task169.release-acceptance.result.v1"
-BLOCKED_HASH_DOMAIN = "task169.release-acceptance.blocked.v1"
+REQUEST_HASH_DOMAIN = "task169.release-acceptance.request.v2"
+RESULT_HASH_DOMAIN = "task169.release-acceptance.result.v2"
+BLOCKED_HASH_DOMAIN = "task169.release-acceptance.blocked.v2"
 
 RESULT_ID_NAMESPACE = uuid.UUID("a1690000-0000-5000-8000-000000000179")
-RESULT_ID_PREFIX = "task169-release-result-v1::"
+RESULT_ID_PREFIX = "task169-release-result-v2::"
 BLOCKED_ID_NAMESPACE = uuid.UUID("a1690000-0000-5000-8000-00000000017a")
-BLOCKED_ID_PREFIX = "task169-release-blocked-v1::"
+BLOCKED_ID_PREFIX = "task169-release-blocked-v2::"
 
 
 def request_projection(value: Task169ReleaseRequest) -> dict[str, Any]:
@@ -35,19 +35,28 @@ def request_projection(value: Task169ReleaseRequest) -> dict[str, Any]:
                 "golden_id": case.golden_id,
                 "source_id": case.source_id,
                 "source_location": case.source_location,
+                "source_class": case.source_class,
                 "redistribution_status": case.redistribution_status,
                 "normalized_input_identity": case.normalized_input_identity,
-                "expected_result_identity": case.expected_result_identity,
+                "task168_request_hash": case.task168_request_hash,
+                "expected_task168_result_hash": case.expected_task168_result_hash,
+                "expected_task168_result_id": case.expected_task168_result_id,
+                "expected_task168_result_status": case.expected_task168_result_status,
+                "ranking_policy_hash": case.ranking_policy.canonical_hash,
+                "expected_task169_result_hash": case.expected_task169_result_hash,
+                "expected_task169_result_id": case.expected_task169_result_id,
                 "approved_numeric_expectations": case.approved_numeric_expectations,
                 "tolerance_class": case.tolerance_class,
-                "reviewer_evidence_refs": case.reviewer_evidence_refs,
                 "provenance_source_hash": case.provenance_source_hash,
-                "selection_request_source_hash": case.selection_request.task168_result.result_hash,
-                "ranking_policy_hash": case.selection_request.ranking_policy.canonical_hash,
+                "reviewer_evidence_refs": case.reviewer_evidence_refs,
+                "review_status": case.review_status,
+                "approved_by": case.approved_by,
+                "approval_evidence": case.approval_evidence,
+                "expected_identity_status": case.expected_identity_status,
             }
             for case in value.golden_cases
         ),
-        "runtime_parity_evidence": value.runtime_parity_evidence,
+        "frozen_tolerance_ledger": value.frozen_tolerance_ledger,
         "request_metadata": tuple(
             sorted(
                 value.request_metadata,
@@ -74,7 +83,10 @@ def result_preimage(value: Task169ReleaseResult) -> dict[str, Any]:
         "frozen_tolerance_ledger": value.frozen_tolerance_ledger,
         "golden_records": value.golden_records,
         "acceptance_gates": value.acceptance_gates,
+        "trusted_runtime_observation_hash": value.trusted_runtime_observation_hash,
+        "trusted_runtime_status": value.trusted_runtime_status,
         "overall_status": value.overall_status,
+        "blocker_codes": value.blocker_codes,
     }
 
 

@@ -1,9 +1,9 @@
 """Typed TASK-169 selection and v0.6 release-boundary models.
 
-TASK-169 consumes the authoritative TASK-168 batch.  It does not recompute
-candidate physics; it verifies the upstream result identity, filters hard
-blockers, applies one explicit deterministic ranking policy, and emits a
-traceable recommendation surface.
+TASK-169 consumes a verified TASK-168 batch.  It does not recompute candidate
+physics; it verifies the upstream result identity, filters hard blockers,
+applies one explicit deterministic ranking policy, and emits a traceable
+recommendation surface.
 """
 
 from __future__ import annotations
@@ -22,6 +22,20 @@ TASK169_SOURCE_DEFINITION_ID = "TASK169-SOURCE-DEFINITION-ISSUE-265"
 TASK169_IMPLEMENTATION_SOFTWARE_VERSION = "task169.selection-release-impl-v1"
 TASK169_DESIGN_CONTRACT_PATH = (
     "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+)
+
+TASK165_V06_TOLERANCE_CLASS = "TASK165_V06_FROZEN"
+TASK169_FROZEN_TOLERANCE_LEDGER = (
+    ("ENERGY_BALANCE_RELATIVE_ERROR_MAX", "0.001"),
+    ("THERMAL_DUTY_CLOSURE_RELATIVE_ERROR_MAX", "0.001"),
+    ("DIRECT_PUBLISHED_EQUATION_REPRODUCTION_RELATIVE_ERROR_MAX", "0.005"),
+    ("PUBLISHED_REFERENCE_SHELL_H_RELATIVE_ERROR_MAX", "0.02"),
+    ("PUBLISHED_REFERENCE_SHELL_DP_RELATIVE_ERROR_MAX", "0.02"),
+    ("MANUFACTURABLE_CATALOG_MEMBERSHIP", "EXACT"),
+    ("HARD_CONSTRAINT_STATUS", "EXACT"),
+    ("RANKING_ORDER", "EXACT"),
+    ("CANONICAL_IDENTITY_REPLAY", "EXACT"),
+    ("PY311_PY312_CANONICAL_PARITY", "EXACT"),
 )
 
 SUPPORTED_RANKING_METRICS = (
@@ -113,6 +127,8 @@ class CandidateRankingRecord:
     objective_values: tuple[tuple[str, str], ...]
     warning_count: int
     record_hash: str
+    warning_penalty_contribution: Decimal = Decimal("0")
+    reason_codes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +152,8 @@ class Task169Result:
     provenance_semantic_inputs: tuple[tuple[str, str], ...]
     result_hash: str
     result_id: str
+    recommendation_reason_codes: tuple[str, ...] = ()
+    alternative_reason_codes: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
