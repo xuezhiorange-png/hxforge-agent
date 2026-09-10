@@ -52,36 +52,59 @@
  CANONICAL_HASH=142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8
  ```
 
- `V06-RANKING-POLICY-TEST` / `TASK169-TEST-AUTHORITY` remains unit-test
- authority only and is rejected by the release boundary.  This policy
- establishment does not approve any Golden fixture.
+`V06-RANKING-POLICY-TEST` / `TASK169-TEST-AUTHORITY` remains unit-test
+authority only and is rejected by the release boundary.  This policy
+establishment does not approve any Golden fixture.
+
+## v0.6 thermal-closure authority
+
+The selected U-tube and floating-head observations use the independent Draft
+PR #271 authority path:
+
+```ini
+TASK160_V06_AUTHORITY=A06_V06_SHELL_TUBE_THERMAL_ENVELOPE
+TASK161_V06_PROFILE=V1_V06_SHELL_TUBE
+TASK162_V06_PROFILE=V1_V06_SHELL_TUBE
+SUPPORTED_CONSTRUCTION_FAMILIES=FIXED_TUBESHEET|U_TUBE|FLOATING_HEAD
+SHELL_PASS_COUNT=1
+TUBE_PASS_COUNT=1
+FORMULA_CHANGE=false
+PHYSICS_CHANGE=false
+TOLERANCE_CHANGE=false
+LEGACY_V05_CONTRACT_CHANGED=false
+```
+
+The v0.6 profiles only requalify the existing stream-state, flow-arrangement,
+and thermal-closure relations for the three construction families.  Geometry,
+Bell applicability, and construction-specific mechanical semantics remain
+owned by their upstream authorities.  PR #271 is not merged into the TASK-169
+base ancestry, so these are temporary-composition observations pending
+independent review of that correction.
 
  ## Proposed cases
 
  | Golden | Real replay evidence | Current disposition | Review requirement |
  | --- | --- | --- | --- |
  | V06-G01 | Fixed-tubesheet/E-shell request reaches a complete candidate and runs the real TASK-168 chain through TASK-169 selection. | Ready for independent review; current candidate status is WARN. | Approve the source/evidence binding and numeric/identity expectation. |
-| V06-G02 | The selected deterministic proposal uses `U_TUBE`, the literal hash-verified `UTubePairingPlan`, shell catalog member `0.16 m`, and `baffle_cut_fraction=0.25`; TASK-021, TASK-022, TASK-024, TASK-031, TASK-034, and TASK-166 pass in the temporary correction composition. | The smaller shell members are rejected by the TASK-024 Stage-14 cut-boundary intersection rule; the selected candidate then reaches the source-bound TASK-160 fixed-tubesheet 1x1 envelope and is blocked with `B022`. | Review the literal geometry proposal and the independent TASK-160 applicability boundary; no runtime geometry search or pair inference is used. |
-| V06-G03 | Floating-head is materialized by TASK-020; TASK-021, TASK-022, TASK-024, TASK-025, TASK-031, TASK-034, and TASK-166 pass in the temporary correction composition. | The candidate reaches the source-bound TASK-160 fixed-tubesheet 1x1 envelope and is blocked with `B022`; the TASK-166 construction-family correction is PR #270 and is not in the TASK-169 base ancestry. | Review the temporary composition and the independent TASK-160 applicability boundary before any Golden approval. |
+| V06-G02 | The selected deterministic proposal uses `U_TUBE`, the literal hash-verified `UTubePairingPlan`, shell catalog member `0.16 m`, and `baffle_cut_fraction=0.25`; the complete temporary stack passes TASK-020 through TASK-169 and produces a real WARN/EVALUATED candidate. | Ready for independent review; TASK-160/161/162 use the versioned v0.6 1x1 thermal-closure profiles from Draft PR #271. | Review the literal geometry proposal and the v0.6 thermal-closure authority; no runtime geometry search or pair inference is used. |
+| V06-G03 | Floating-head is materialized by TASK-020; the complete temporary stack passes TASK-020 through TASK-169 and produces a real WARN/EVALUATED candidate, including TASK-167 fouling, cleanability, and configuration screens. | Ready for independent review; TASK-160/161/162 use the versioned v0.6 1x1 thermal-closure profiles from Draft PR #271. | Review the temporary composition and the v0.6 thermal-closure authority before any Golden approval. |
  | V06-G04 | One real two-member TASK-168 request has a complete WARN candidate and a candidate rejected by an authoritative shell-DP hard constraint; TASK-169 selects the feasible candidate. | Ready for independent review. | Approve the DP-constrained input/constraint authority and expected identity. |
  | V06-G05 | A real Bell-side blocked candidate is replayed and selection produces no recommendation. | Ready for independent review as a negative Golden. | Approve the negative fail-closed source and expected no-recommendation semantics. |
 
-G02 and G03 are not represented as successes.  G02 has a literal pairing
-proposal and a deterministic `0.16 m` shell geometry proposal that passes the
-reviewed TASK-024/TASK-031/TASK-034/Bell gates in temporary composition, but
-the candidate is still blocked by the source-bound TASK-160 fixed-tubesheet
-1x1 envelope.  The smaller shell candidates remain auditable Stage-14
-intersection failures.  G03 passes the construction-family corrections in
-temporary composition but reaches the same TASK-160 envelope blocker.  PR
-#270 contains the independent TASK-166 applicability correction and is not
-part of TASK-169 base ancestry until separately reviewed and merged.  G05
-similarly proves only the negative path.
+G02 and G03 are complete engineering replays in the temporary composition,
+not approved Goldens.  G02 uses the literal pairing proposal and the selected
+`0.16 m` shell geometry; the smaller shell candidates remain auditable
+Stage-14 intersection failures.  G03 uses an independently materialized
+`FLOATING_HEAD` candidate and does not reuse the G02 pairing plan.  Both
+replays reach TASK-167 and TASK-169; their WARN status is caused by the
+existing unbound generic FIV/erosion screening limits, not by a thermal
+closure or family-applicability blocker.  Draft PR #271 supplies the
+versioned TASK-160/161/162 v0.6 authority but remains an independent,
+unmerged correction PR.
 
-The companion JSON retains the earlier `.12 m` G02/G03 proposal observations
-as historical, proposal-only evidence; the `.16 m` G02 search result is a
-separately recorded candidate-space sweep in
-`TASK-169-v06-full-chain-blocker-ledger.md`.  It is not silently substituted
-into the frozen JSON Golden payload and is not approved by this change.
+The companion JSON now records the `.16 m` G02 and current G03 replay
+identities as observed proposal evidence.  `EXPECTED_IDENTITY_STATUS` remains
+`PROPOSED_FOR_REVIEW`; no observed identity is promoted or self-approved.
 
 ## G02 literal pairing proposal
 

@@ -453,10 +453,20 @@ def _family_request(family: ConstructionFamily) -> Task168Request:
     from dataclasses import replace as dataclass_replace
 
     from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _real_request as build_real_request,
+    )
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
         _with_authority_values,
     )
 
-    request = _real_task168_request()
+    # G02 is the frozen source-compatible U-tube proposal: its literal
+    # pairing plan was authored for the 0.16 m shell / 0.018 m tube candidate
+    # and must not be silently replaced by the smaller default shell.
+    request = (
+        build_real_request(shell_diameter="0.16", tube_outer_diameter="0.018")
+        if family is ConstructionFamily.U_TUBE
+        else _real_task168_request()
+    )
     if family is ConstructionFamily.U_TUBE:
         task021_template = deepcopy(request.evaluation_input_authority.task021_request_template)
         assert isinstance(task021_template, dict)
@@ -1027,5 +1037,34 @@ def test_golden_authority_payload_is_proposal_only() -> None:
     assert g02["pairing_authority"]["accepted_leg_count"] == 10
     assert g02["runtime_pair_inference"] is False
     assert g02["task021_status"] == "PASS"
-    assert g02["task024_status"] == "BLOCKED"
-    assert g02["task024_blocker"] == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
+    assert g02["task024_status"] == "PASS"
+    assert g02["task160_status"] == "PASS"
+    assert g02["task161_status"] == "PASS"
+    assert g02["task162_status"] == "PASS"
+    assert g02["task167_status"] == "WARN"
+    assert g02["task168_status"] == "COMPLETE"
+    assert g02["task169_status"] == "SELECTED"
+    assert g02["disposition"] == "READY_FOR_INDEPENDENT_REVIEW"
+    assert g02["replay_evidence"] == [
+        "G02_PAIRING_VALIDATION_PASS",
+        "TASK160_V06_PASS",
+        "TASK161_V06_PASS",
+        "TASK162_V06_PASS",
+        "TASK167_WARN_EVALUATED",
+        "TASK168_COMPLETE",
+        "TASK169_RECOMMENDABLE",
+    ]
+    g03 = payload["goldens"][2]
+    assert g03["task020_status"] == "PASS"
+    assert g03["task021_status"] == "PASS"
+    assert g03["task022_status"] == "PASS"
+    assert g03["task024_status"] == "PASS"
+    assert g03["task025_status"] == "PASS"
+    assert g03["task031_status"] == "PASS"
+    assert g03["task160_status"] == "PASS"
+    assert g03["task161_status"] == "PASS"
+    assert g03["task162_status"] == "PASS"
+    assert g03["task167_status"] == "WARN"
+    assert g03["task168_status"] == "COMPLETE"
+    assert g03["task169_status"] == "SELECTED"
+    assert g03["disposition"] == "READY_FOR_INDEPENDENT_REVIEW"

@@ -8,7 +8,7 @@ BASE_MAIN_SHA=2e0f8642cbbacff67cdf97f0541d21360ce379f7
 TEMP_INTEGRATION_COMPOSITION=true
 MAIN_ANCESTRY_ACCEPTANCE=false
 GOLDEN_SELF_APPROVAL=false
-STATUS=BLOCKED
+STATUS=THERMAL_CLOSURE_V06_REPLAY_COMPLETE_REVIEW_PENDING
 ```
 
 This ledger records the complete static scan and the dynamic replay that was
@@ -22,15 +22,20 @@ The remote heads observed after `git fetch --prune` were:
 | Ref | Head | State |
 | --- | --- | --- |
 | `main` | `2e0f8642cbbacff67cdf97f0541d21360ce379f7` | base |
-| TASK-169 PR #266 | `c160eeece8654522a697e2e7e800d352f454ea91` | open Draft; TASK-169 primary; head observed before this ledger-only commit |
+| TASK-169 PR #266 | `ae3fbb1f04f228bad6384bd77bf5d3a607594755` | open Draft; TASK-169 primary; v0.6 thermal-closure bridge pushed |
 | TASK-024 PR #267 | `f61658b5d7d75c78fe2a38afc8c41f0a940cbea4` | open Draft; frozen |
 | TASK-025 PR #268 | `9c8d258ba9243a822ba616e9fe3aee8b4517a2cc` | open Draft; frozen |
 | TASK-031 PR #269 | `f3c6995b334f656ecca5d1f2e3cd2052dba08350` | open Draft; frozen |
 | TASK-166 PR #270 | `c066ac2ab1733c8df3f2abd2d4b31420eefa7495` | open Draft; independent narrow correction |
+| TASK-160/161/162 PR #271 | `3ad198e11ca01e891e1bf411b63390528d1f22d7` | open Draft; independent v0.6 thermal-closure authority; CI green |
 
 PR #267, #268, and #269 were not extended.  PR #270 is the separately
 identified TASK-166 construction-family applicability correction; it changes
 no Bell equation, pressure-drop equation, tolerance, or identity contract.
+PR #271 is the separately identified, versioned TASK-160/161/162 thermal
+closure authority expansion; it retains the legacy v0.5 fixed-tubesheet
+profiles and adds only the reviewed v0.6 1x1 shell-and-tube profile for
+`FIXED_TUBESHEET`, `U_TUBE`, and `FLOATING_HEAD`.
 The TASK-169 adapter correction is `d300e28` (`fix(task168): preserve native
 task024 result envelope`) and preserves the native TASK-024 result envelope
 when constructing the TASK-031 request.
@@ -42,9 +47,11 @@ current PR head and its exact-head CI are reported by the final receipt.  The
 correction-branch heads remain the independently recorded values in this
 table.
 
-The temporary validation stack was `main + #267 + #268 + #269 + #270 +
-#266 + d300e28` at temporary composition `e9cdf8d`.  No temporary merge SHA is
-treated as a release authority.
+The temporary validation stack was `main + #267 + #268 + #269 + #270 + #271
++ #266` at temporary composition `5f9eabfdfc2142149b37afd66fb4793e6c1b3de3`.
+No temporary merge SHA is treated as a release authority.  PR #271's exact
+head CI was run as `34541257120` (`pull_request`, completed/success) before
+this integration replay.
 
 ## Static scan method
 
@@ -924,5 +931,197 @@ G03_FINAL_BLOCKER=B022
 TASK169_READY_AUTHORIZED=false
 TASK169_MERGE_AUTHORIZED=false
 TASK167_STARTED=false
+STOP=true
+```
+
+## Current v0.6 thermal-closure closure addendum
+
+The preceding sections preserve the historical pre-v0.6 sweep snapshot.  The
+following addendum is the current result after the independent TASK-160/161/162
+v0.6 authority correction in PR #271.  It supersedes the earlier `B022`
+snapshot for the selected G02 and G03 replay paths; it does not alter the
+history of that blocked run.
+
+```ini
+CURRENT_TEMP_COMPOSITION=5f9eabfdfc2142149b37afd66fb4793e6c1b3de3
+CURRENT_STACK=main+#267+#268+#269+#270+#271+#266
+TASK160_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
+TASK161_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
+TASK162_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
+TASK160_V06_AUTHORITY=A06_V06_SHELL_TUBE_THERMAL_ENVELOPE
+TASK161_V06_PROFILE=V1_V06_SHELL_TUBE
+TASK162_V06_PROFILE=V1_V06_SHELL_TUBE
+TASK160_V06_SCOPE=FIXED_TUBESHEET|U_TUBE|FLOATING_HEAD;1x1
+TASK161_V06_SCOPE=FIXED_TUBESHEET|U_TUBE|FLOATING_HEAD;1x1
+TASK162_V06_SCOPE=FIXED_TUBESHEET|U_TUBE|FLOATING_HEAD;1x1
+FORMULA_CHANGE=false
+PHYSICS_CHANGE=false
+TOLERANCE_CHANGE=false
+NEW_MECHANICAL_MODEL=false
+LEGACY_V05_REPLAY_UNCHANGED=true
+TASK167_STARTED=true
+TASK167_STATUS=WARN
+UNKNOWN_DOWNSTREAM_GATE_REMAINS=false
+GOLDEN_SELF_APPROVAL=false
+```
+
+The v0.6 decision is based on the source/implementation audit recorded in
+PR #271: TASK-160 computes stream and capacity-rate state, TASK-161 selects
+the frozen 1x1 sectional performance method, and TASK-162 closes the energy
+and terminal-performance relation.  None of those relations has an
+independent construction-family, rear-head, tubesheet, or mechanical branch;
+the construction-specific geometry and Bell applicability are already bound
+upstream.  The new profiles retain the pass-count restriction at one shell
+pass and one tube pass.  No 2-pass or 4-pass authority is implied.
+
+### Current G02 complete replay
+
+G02 is the frozen source-compatible `U_TUBE` candidate
+`08b77a40-a3e4-5f77-9e4a-d9fce17030e0`, shell catalog member `0.16 m`, tube OD
+`0.018 m`, source-bound baffle cut `0.25`, and literal five-pair/ten-leg
+pairing plan (`e7fe05b5...`).  The same native producer results are carried
+through the chain; no runtime pair or geometry search occurs.
+
+| Task | Status | Result ID | Result hash | Evidence / note |
+| --- | --- | --- | --- | --- |
+| TASK-020 | PASS | `8d61a3a4-7490-5e58-a019-02f49df5a1e0` | `e8d47696046317fd2cd0940452053d38ced2c55f63fdb4449f91c2bdfdf99300` | candidate-specific U-tube configuration |
+| TASK-021 | PASS | `7b61487f-de53-573a-9a23-2e9739bdda49` | `291e1257482a4e581b219d5fd4cc078506019297fda56f6e0353c946ca3bbfb0` | exact layout and explicit pairing validation |
+| TASK-022 | PASS | `e8b2f091-93e2-5c12-9240-57c205a69f09` | `b805d791cd725e770870f3cc51228583669928aa0fbb7e713de8fdde2d654325` | bundle geometry |
+| TASK-023 | PASS | `shell-1` | `9d08aa69e7a7128c6893cb7bc7d28a33aacc6493ca139594b0012e94b39e2df2` | exact approved shell record; catalog hash `e1f6667c...` |
+| TASK-024 | PASS | `ab168f99-9100-514e-ac03-586c10f9a262` | `762d77835c4090cf96c3ca7e7fb009abf0e51fc29e2e292468670423a09ebbfa` | native baffle geometry |
+| TASK-025 | PASS | `bc09f714-1ddd-5f64-9ac3-06b94d75d1f8` | `fee69cc301cf5517387355679db3e32e8ac965ab980406da31efc49c02b773cd` | tube-side geometry/participation |
+| TASK-026 | PASS | `64f0bde4-a76e-5f7b-b58f-4b3a7e34f8bf` | `9752281d3bf911a7fffdf78f493ed76fb14431afb80b70a3bf154a6ad19be1c7` | tube-side thermal result |
+| TASK-027 | PASS | `e1a0d3e7-df1d-54fa-9884-e1cf06b540c4` | `92ea19e58b554996f4d82844bc33a6c67922002a6be7c8708cf28a661ecc0406` | tube-side pressure-drop input/composition |
+| TASK-028 | PASS | `b8a5a33d-9090-5f0b-8686-a05f32b67f1c` | `658a9ae07eb3abf60e86769c4341e83304c1960cff6792711bcba656e81e706b` | tube-side pressure-drop result |
+| TASK-029 | PASS | `2c25d9a8-19bf-586a-a41c-ae7604a1fb02` | `f575b91289db1ebcbf656599bbf43e47012209ee151e0d1c40aedcd3efc8d573` | tube-side DP composition |
+| TASK-031 | PASS | `61cdf194-f52b-5a5d-a637-6ab27961f940` | `fa2bad35763e27e87ceacb1dac70847b59e780e8daa1a749624e7dcd04d1422` | shell hydraulic geometry |
+| TASK-032 | PASS | `7464169b-1f0e-5690-9b8a-a6204098c169` | `d7f11916f2736aed2fa65b59a30193764fe5245bc12a6d2f92e91693647a5823` | shell flow state |
+| TASK-033 | PASS | `1415276a-3f65-5d09-ba75-8f3d5a1593a1` | `255fea4351e6ccb475662c216a39c6077cf498e2418272c47a5739dd7acfeccc` | ideal shell heat transfer |
+| TASK-034 | PASS | `a68a9c88-28f9-59da-93a4-9405d621ae67` | `8a4d306ece66f37f604c521d25b73a5952ffe5b329e6fdc684166e3e5f9e4ee7` | shell pressure drop |
+| TASK-035 | PASS | `787a13dd-4743-5e40-8058-141a6797494c` | `531a9f9446485bda47e460bfa027f15b143560d74da67ac47615194a40357455` | shell composition |
+| TASK-036 | NOT_ON_ACTIVE_PATH | — | — | release helper only |
+| TASK-037 | PASS | `d4e5c787-225d-52d8-9857-95078ba75433` | `54b9b92bc31d9094bb7dc3b395e5b59f36aced2cdf07c0380f62ae663a580cef` | overall resistance |
+| TASK-038 | PASS | `3626ebd1-e467-5fb8-b51f-96b8591ad8ae` | `b730790ea9a680a81e6128d1f00e680b90f4971ea9d6fcb16e03edf8d575e6ef0` | U/UA |
+| TASK-039 | NOT_ON_ACTIVE_PATH | — | — | fixture helper only |
+| TASK-160 | PASS | `1b9bdd54-0f56-5327-932c-fc44518f5ffe` | `dba79832b5156b5979919bc21d226f3c54ebc6e67f1501ff33171251f4470674` | v0.6 thermal-stream envelope |
+| TASK-161 | PASS | `dc10938c-6f44-5d8a-a411-fe02fef8c15d` | `d03282d3248ffb9a19824980a0f92e2182a386811899c777f030f92fba6141b6` | v0.6 flow/method profile |
+| TASK-162 | PASS | `ffed4a1b-80e9-5be2-b979-f074bc17b033` | `2b1984d1ca8c90b59967cbbc09656b796132c94c1d9e1454d3c6b9c939815ae3` | v0.6 thermal closure |
+| TASK-163 | NOT_ON_ACTIVE_PATH | — | — | no active candidate boundary |
+| TASK-164 | NOT_ON_ACTIVE_PATH | — | — | runtime evidence is release-only |
+| TASK-166 | PASS | `b07a7f7b-9d2a-5d6c-8e70-718e217b1665` | `687f8e65800c6d52d0108c44faca46243e0dace7c68e9e1084b86602d9bc5223` | Bell applicability composition |
+| TASK-167 | WARN | `9c723ae5-c3ae-5fd3-b513-b97f142f3e3b` | `8b949dcaf48854affffc6b2a015900dc5407bae67b8ec938b8171f81ed741a1a` | real screening; expansion/configuration PASS, FIV/erosion authority warnings |
+| TASK-168 | COMPLETE | `05f20f03-a486-51cc-b47d-c61e6e3b02a9` | `5abf3df51b532d8ceb14cecfb5f30b1234dc79b2e4efed077255806ea3896cf0` | evaluated WARN candidate |
+| TASK-169 | PASS | `13565146-3cf6-5618-8e50-5f817d891ed1` | `8991fccdd8b06b8a8910b8d2fd5f690d804a06d3dac282754b338ddbb4e2a762` | selected/recommendable; production ranking policy |
+
+```ini
+G02_TASK167_AGGREGATE=WARN
+G02_TASK167_THERMAL_EXPANSION=PASS
+G02_TASK167_CONFIGURATION_SUITABILITY=PASS
+G02_TASK167_FOULING_CLEANABILITY=PASS
+G02_TASK167_FIV=WARN_FIV_LIMIT_AUTHORITY_MISSING
+G02_TASK168_STATUS=WARN
+G02_TASK168_DISPOSITION=EVALUATED
+G02_TASK169_RECOMMENDABLE=true
+G02_FINAL_BLOCKER=NONE
+```
+
+### Current G03 complete replay
+
+G03 is the independently materialized `FLOATING_HEAD` candidate.  It does
+not reuse the G02 U-tube pairing plan.
+
+| Task | Status | Result ID | Result hash | Evidence / note |
+| --- | --- | --- | --- | --- |
+| TASK-020 | PASS | `a61fcfff-5b31-513a-8045-6172ab3844e1` | `57958a20aea5a28c51523a32a8a4a9d335f2f04941c3ea85b2896762d7c34a7b` | candidate-specific floating-head configuration |
+| TASK-021 | PASS | `dd5288fe-412a-5687-a044-d2bab6580e98` | `669708af6bbb0dec01e94560c505a1b573de28af6cb8d56f32d1e85ac8f02a34` | exact layout |
+| TASK-022 | PASS | `3b70be44-0f7d-5d2c-87e1-ab2c9739dddf` | `5021b3102e0b8e10f55e45fbe3640e7c70079260bfd87f56c769e9aed826711a` | bundle geometry |
+| TASK-023 | PASS | `shell-1` | `edf9cda737d12bc8c4ddadb4ec011d1df26eacf1817c260f25fd144e34bf5db1` | exact catalog record; catalog hash `ee06d67b...` |
+| TASK-024 | PASS | `deb1da80-7289-553b-9058-bbc298f6988b` | `1c66b5662d952657ba8568fe7e27d0e46a1813028a994a886e6d39e52990db72` | native baffle geometry |
+| TASK-025 | PASS | `5cb14356-ee17-5fa0-878f-00a933cdfa32` | `d5145fbe34d44861687e2313ad28f6a8acc9ada3455bbbdded1467876b2c483d` | tube-side geometry/participation |
+| TASK-026 | PASS | `e62636ac-3c5b-509d-ad11-da6f82b98ee0` | `9a48419b02e24f2ccb5e0c17601fa5e30bcf74f363328e8868da8b68d93483c3` | tube-side thermal result |
+| TASK-027 | PASS | `72f4a182-eef9-579b-93e4-aad00cb83bd5` | `2bbb72f9b16bd4893997945c3c38283ea86245788c81f60ee36765c826c0cbaf` | tube-side pressure-drop input/composition |
+| TASK-028 | PASS | `7d8194f2-1511-536f-9a34-60ce8aa161ae` | `62367a23945e3f7ae28eaf31bbf60179555c4ef2f547218cc73d3299e215db5c` | tube-side pressure-drop result |
+| TASK-029 | PASS | `5fc17057-5cd7-5a2d-9b6d-9b478378d16a` | `fd49c668996fd8cacf07011902a9a1f73fe0ed6b6873d8ae75f0649d81834286` | tube-side DP composition |
+| TASK-031 | PASS | `49674a27-765a-5c41-b9f4-0603628da03c` | `ae980e88c5130d7a1db281b061a9ec463d92a8d6b1d568810b7c8b811e6f4132` | shell hydraulic geometry |
+| TASK-032 | PASS | `4c34ca60-a1ef-5bcc-b8cc-75b690126c89` | `d561951c71ec1727617aeced5d43777bade9d4e6cc1ff97fd73167efb7025f0a` | shell flow state |
+| TASK-033 | PASS | `bb7ea0af-2a15-54d5-8ab1-36acb9a0db00` | `0fc0dfc8d21619f9eeda030d10d07064a7215292db65f758d7aa9a4132cca923` | ideal shell heat transfer |
+| TASK-034 | PASS | `710d1a89-35db-500d-a6eb-08f812279cd8` | `f63083020e6ae316dc6322811c1bfceec747f97bf9191f9c00e111cce3ec5fff` | shell pressure drop |
+| TASK-035 | PASS | `51f17746-8a6c-58ba-89ae-30966e380723` | `e1951470e0a51ee2f5191dd5854ea6a807d529aab92362658a8e2791d97a0dee` | shell composition |
+| TASK-036 | NOT_ON_ACTIVE_PATH | — | — | release helper only |
+| TASK-037 | PASS | `86ba409c-c89f-5659-93b7-09b8f25fd6ae` | `57a6393092a86e764ba17e8e63d4b250f326fc5282e1c4b43a77b8b898374c0c` | overall resistance |
+| TASK-038 | PASS | `02915940-af09-53d8-85e0-8ff4213dba5b` | `3348f94ce3165e479d2be2e326cf26bc8642d8784ac0cc10d4dfb8173713fe83` | U/UA |
+| TASK-039 | NOT_ON_ACTIVE_PATH | — | — | fixture helper only |
+| TASK-160 | PASS | `48ef1fd7-0980-5fef-847f-8961c9ee07f9` | `ff2cd18ea57541d8d488606165caa6a1298060614b0fcc5d165b48be9b5432b8` | v0.6 thermal-stream envelope |
+| TASK-161 | PASS | `2b00da06-cb7f-5296-af0f-a686e0a97bdd` | `a0dd3effb6ba0476ce846d92edbb97525601fb12b1dbc4f990a902fa3af08dd1` | v0.6 flow/method profile |
+| TASK-162 | PASS | `a46cab04-9c28-5c13-82ab-8240326cedf1` | `61094951e16a5e13c8c64d84d9d87fe57c8c556d7589c43c566fbc38b32f6819` | v0.6 thermal closure |
+| TASK-163 | NOT_ON_ACTIVE_PATH | — | — | no active candidate boundary |
+| TASK-164 | NOT_ON_ACTIVE_PATH | — | — | runtime evidence is release-only |
+| TASK-166 | PASS | `9a3ae967-b0ee-519e-999c-e762541cd209` | `a556f23e02276d2f63ae66aea14469610ff80b19e6309adfff856d77ee0fdd5a` | Bell applicability composition |
+| TASK-167 | WARN | `ddd66427-b2b0-5898-86cd-defdffa25228` | `b92cdce03d1ba2567e947d63e00014012ed6483a6ff3be20082b0843766028b4` | real screening; fouling/cleanability/configuration PASS, FIV/erosion authority warnings |
+| TASK-168 | COMPLETE | `ee016f4d-542d-5e0b-a95c-e90fcad7497f` | `3b763508f555bb5053a2050fc7477edd43ddf9553a6b3fd9381bb3390c229777` | evaluated WARN candidate |
+| TASK-169 | PASS | `fb325ffa-9a7d-5c45-9402-34555d3de22a` | `fc5b0399f0b372ead182071bad5b7049e3a99ddb7a3b032d8c618ea155c7f65e` | selected/recommendable; production ranking policy |
+
+```ini
+G03_TASK167_AGGREGATE=WARN
+G03_TASK167_FOULING_CLEANABILITY=PASS
+G03_TASK167_THERMAL_EXPANSION=PASS
+G03_TASK167_CONFIGURATION_SUITABILITY=PASS
+G03_TASK167_FIV=WARN_FIV_LIMIT_AUTHORITY_MISSING
+G03_TASK168_STATUS=WARN
+G03_TASK168_DISPOSITION=EVALUATED
+G03_TASK169_RECOMMENDABLE=true
+G03_FINAL_BLOCKER=NONE
+```
+
+### Current counts and governance state
+
+```ini
+TOTAL_ACTIVE_CHAIN_GATES=30
+TOTAL_STATIC_PREDICTED_BLOCKERS=0
+TOTAL_DYNAMIC_CONFIRMED_BLOCKERS=2
+TRUE_ENGINEERING_LIMIT_COUNT=2
+SOURCE_BOUND_APPLICABILITY_COUNT=4
+STALE_REPOSITORY_APPLICABILITY_COUNT=4
+INVALID_GOLDEN_INPUT_COUNT=0
+ADAPTER_BUG_COUNT=1
+MISSING_AUTHORITY_COUNT=0
+MISSING_UPSTREAM_CAPABILITY_COUNT=0
+ALL_KNOWN_STALE_APPLICABILITY_GATES_MAPPED=true
+ALL_PROVEN_STALE_GATES_CORRECTED=true
+UNKNOWN_DOWNSTREAM_GATE_REMAINS=false
+TEMP_G02_END_TO_END=PASS
+TEMP_G03_END_TO_END=PASS
+G02_FINAL_BLOCKER=NONE
+G03_FINAL_BLOCKER=NONE
+TASK167_STARTED=true
+```
+
+The two dynamic confirmed engineering-limit observations are retained from
+the authoring-only G02 shell sweep: the smaller shell members have real
+TASK-024 Stage-14 cut-boundary intersections, while the non-selected `0.20 m`
+member fails the Bell geometry numerical domain.  They are not blockers for
+the selected `0.16 m` G02 candidate or for G03.  No static-predicted blocker
+remains on either selected path.
+
+Both current candidate results are `WARN` rather than `PASS` because TASK-167
+correctly exposes unbound generic FIV/erosion limit authority; this is not a
+thermal-closure or source-applicability failure.  The production ranking
+policy is the formal v1 policy, not the test policy.  The G02/G03 identities
+in this addendum are observed identities in a temporary composition and stay
+`PROPOSED_FOR_REVIEW`; no observed result is self-approved.
+
+```ini
+V06_G01_PROPOSAL=READY_FOR_REVIEW
+V06_G02_PROPOSAL=READY_FOR_REVIEW
+V06_G03_PROPOSAL=READY_FOR_REVIEW
+V06_G04_PROPOSAL=READY_FOR_REVIEW
+V06_G05_PROPOSAL=READY_FOR_REVIEW
+REVIEW_STATUS=PROPOSED
+EXPECTED_IDENTITY_STATUS=PROPOSED_FOR_REVIEW
+APPROVED_BY=
+APPROVAL_EVIDENCE=[]
+GOLDEN_SELF_APPROVAL=false
+TASK169_READY_AUTHORIZED=false
+TASK169_MERGE_AUTHORIZED=false
 STOP=true
 ```

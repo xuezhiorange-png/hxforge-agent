@@ -167,13 +167,17 @@ All five cases are represented and replayed through real TASK-168 requests:
   TASK-168 identity is recorded as a proposal binding.
 - `V06-G02` uses a real candidate-specific U-tube request with the literal,
   hash-verified pairing proposal in the release fixture.  The deterministic
-  `0.16 m` shell proposal passes TASK-021, TASK-022, TASK-024, TASK-031,
-  TASK-034, and TASK-166 in temporary composition; the candidate then blocks
-  at the source-bound TASK-160 fixed-tubesheet 1x1 envelope.  Smaller shell
-  members remain auditable TASK-024 Stage-14 intersection failures.
-  `V06-G03` uses the real floating-head materialization attempt and passes the
-  TASK-024/TASK-025/TASK-031 family corrections in temporary composition, but
-  also blocks at TASK-160.  Neither case is claimed as a success.
+  `0.16 m` shell proposal passes the complete TASK-020 through TASK-169
+  temporary composition after the independent versioned TASK-160/161/162
+  v0.6 authority correction.  It reaches TASK-167 as WARN/EVALUATED and is
+  recommendable under the production ranking policy.  Smaller shell members
+  remain auditable TASK-024 Stage-14 intersection failures.
+- `V06-G03` uses the real floating-head materialization attempt and passes the
+  complete TASK-020 through TASK-169 temporary composition, including real
+  TASK-167 fouling, cleanability, and configuration screens.  It reaches
+  TASK-167 as WARN/EVALUATED and is recommendable.  The v0.6 thermal-closure
+  authority is supplied by independent Draft PR #271; no Golden is approved
+  by this document.
 - `V06-G04` uses a real two-member TASK-168 space.  One candidate is complete
   and recommendable and one is rejected by the authoritative shell-DP
   constraint; the selection output records the alternative and exclusion

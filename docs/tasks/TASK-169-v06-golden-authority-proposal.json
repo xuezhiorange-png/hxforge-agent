@@ -10,7 +10,7 @@
   "expected_identity_status": "PROPOSED_FOR_REVIEW",
   "golden_self_approval": false,
   "tolerance_class": "TASK165_V06_FROZEN",
-  "release_request_hash": "e2a3ea142505bd97da6a4087e59b3d8497bb177b1e967cb059293f7b434fccd3",
+  "release_request_hash": "33d59bbd17abdcee6034b67fd56042f8aa6062e90eb57b1764b2bd671c74c306",
   "goldens": [
     {
       "golden_id": "V06-G01",
@@ -69,10 +69,10 @@
       "source_location": "src/hexagent/release_demo/task169_integration_release_acceptance/golden_fixtures.py::G02_UTUBE_PAIRING_PLAN_RAW; tests/exchangers/shell_tube/test_task169_selection_release.py::_family_request; TASK-020/TASK-021/TASK-024 producer boundary",
       "source_class": "REAL_TASK168_CONFIGURATION_CAPABILITY_PROPOSAL",
       "redistribution_or_license_status": "METADATA_ONLY_NO_PROTECTED_PAYLOAD",
-      "normalized_input_hash": "5338d8aa883e69a6599c4720e7bd2c33fc174102bf91a330dc3a6815efe3521a",
-      "task168_request_hash": "5338d8aa883e69a6599c4720e7bd2c33fc174102bf91a330dc3a6815efe3521a",
-      "expected_task168_result_hash": "62e23b1d3a9cce600243a861e5b4444df95e58e0dc81efc13235601d717f2179",
-      "expected_task168_result_id": "99a2f560-bcb7-5766-a559-2a457850b7cc",
+      "normalized_input_hash": "f99f9d37b535201c2952b6652e6c84c912ac2d3ad9428362ffcb397d6fea80fb",
+      "task168_request_hash": "f99f9d37b535201c2952b6652e6c84c912ac2d3ad9428362ffcb397d6fea80fb",
+      "expected_task168_result_hash": "5abf3df51b532d8ceb14cecfb5f30b1234dc79b2e4efed077255806ea3896cf0",
+      "expected_task168_result_id": "05f20f03-a486-51cc-b47d-c61e6e3b02a9",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
         "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
@@ -98,10 +98,10 @@
           "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
         ]
       },
-      "observed_task168_result_hash": "62e23b1d3a9cce600243a861e5b4444df95e58e0dc81efc13235601d717f2179",
-      "observed_task168_result_id": "99a2f560-bcb7-5766-a559-2a457850b7cc",
-      "observed_task169_result_hash": "182f7a9068ddbf8d137d3bf34b3d6827d63d3db9738e7fc964135539229aa022",
-      "observed_task169_result_id": "44fb6e02-c6af-5a19-8827-346a48f5b309",
+      "observed_task168_result_hash": "5abf3df51b532d8ceb14cecfb5f30b1234dc79b2e4efed077255806ea3896cf0",
+      "observed_task168_result_id": "05f20f03-a486-51cc-b47d-c61e6e3b02a9",
+      "observed_task169_result_hash": "8991fccdd8b06b8a8910b8d2fd5f690d804a06d3dac282754b338ddbb4e2a762",
+      "observed_task169_result_id": "13565146-3cf6-5618-8e50-5f817d891ed1",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -140,17 +140,22 @@
       "task020_status": "PASS",
       "task021_status": "PASS",
       "task022_status": "PASS",
-      "task024_status": "BLOCKED",
-      "task024_blocker": "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED",
-      "task024_blocker_field": "configuration.construction_family",
-      "task024_blocker_owner": "TASK-024",
-      "disposition": "BLOCKED_BY_TASK024_UTUBE_APPLICABILITY_BOUNDARY",
-      "blocker_evidence": [
+      "task024_status": "PASS",
+      "task160_status": "PASS",
+      "task161_status": "PASS",
+      "task162_status": "PASS",
+      "task167_status": "WARN",
+      "task168_status": "COMPLETE",
+      "task169_status": "SELECTED",
+      "disposition": "READY_FOR_INDEPENDENT_REVIEW",
+      "replay_evidence": [
         "G02_PAIRING_VALIDATION_PASS",
-        "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED",
-        "configuration.construction_family",
-        "TASK024_V06_SUPPORTED_FAMILY_SET_FIXED_TUBESHEET_FLOATING_HEAD",
-        "TASK024_UTUBE_APPLICABILITY_NOT_AUTHORIZED"
+        "TASK160_V06_PASS",
+        "TASK161_V06_PASS",
+        "TASK162_V06_PASS",
+        "TASK167_WARN_EVALUATED",
+        "TASK168_COMPLETE",
+        "TASK169_RECOMMENDABLE"
       ]
     },
     {
@@ -161,8 +166,8 @@
       "redistribution_or_license_status": "METADATA_ONLY_NO_PROTECTED_PAYLOAD",
       "normalized_input_hash": "81dcec220d87ec412789fa83d5d1d6d56a5ff23cffaf7a0f7bb55d06ce31f210",
       "task168_request_hash": "81dcec220d87ec412789fa83d5d1d6d56a5ff23cffaf7a0f7bb55d06ce31f210",
-      "expected_task168_result_hash": "fcf135333096253ff480a5cce0033d9d48599c62ef3bef79547066c2274c88c0",
-      "expected_task168_result_id": "3c4c87b5-cb8a-5450-9407-00c03c0c6f28",
+      "expected_task168_result_hash": "3b763508f555bb5053a2050fc7477edd43ddf9553a6b3fd9381bb3390c229777",
+      "expected_task168_result_id": "ee016f4d-542d-5e0b-a95c-e90fcad7497f",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
         "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
@@ -188,10 +193,10 @@
           "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
         ]
       },
-      "observed_task168_result_hash": "fcf135333096253ff480a5cce0033d9d48599c62ef3bef79547066c2274c88c0",
-      "observed_task168_result_id": "3c4c87b5-cb8a-5450-9407-00c03c0c6f28",
-      "observed_task169_result_hash": "ca3c5d560740e1a0995e59abbaf815a9113ead24b6aba9794da52611b105f7e0",
-      "observed_task169_result_id": "d987c5ef-89ee-58fa-8719-f88332bc26b1",
+      "observed_task168_result_hash": "3b763508f555bb5053a2050fc7477edd43ddf9553a6b3fd9381bb3390c229777",
+      "observed_task168_result_id": "ee016f4d-542d-5e0b-a95c-e90fcad7497f",
+      "observed_task169_result_hash": "fc5b0399f0b372ead182071bad5b7049e3a99ddb7a3b032d8c618ea155c7f65e",
+      "observed_task169_result_id": "fb325ffa-9a7d-5c45-9402-34555d3de22a",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -202,11 +207,27 @@
       "approved_by": "",
       "approval_evidence": [],
       "expected_identity_status": "PROPOSED_FOR_REVIEW",
-      "disposition": "BLOCKED_BY_CURRENT_PRODUCER_CAPABILITY",
-      "blocker_evidence": [
-        "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED",
-        "configuration.construction_family",
-        "TASK024_V1_SUPPORTED_CONSTRUCTION_FAMILY_FIXED_TUBESHEET"
+      "task020_status": "PASS",
+      "task021_status": "PASS",
+      "task022_status": "PASS",
+      "task024_status": "PASS",
+      "task025_status": "PASS",
+      "task031_status": "PASS",
+      "task160_status": "PASS",
+      "task161_status": "PASS",
+      "task162_status": "PASS",
+      "task167_status": "WARN",
+      "task168_status": "COMPLETE",
+      "task169_status": "SELECTED",
+      "disposition": "READY_FOR_INDEPENDENT_REVIEW",
+      "replay_evidence": [
+        "TASK160_V06_PASS",
+        "TASK161_V06_PASS",
+        "TASK162_V06_PASS",
+        "TASK167_FOULING_CLEANABILITY_CONFIGURATION_PASS",
+        "TASK167_WARN_EVALUATED",
+        "TASK168_COMPLETE",
+        "TASK169_RECOMMENDABLE"
       ]
     },
     {
