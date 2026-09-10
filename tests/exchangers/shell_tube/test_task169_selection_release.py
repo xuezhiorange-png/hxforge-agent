@@ -1,3 +1,4 @@
+# fmt: off
 # ruff: noqa: I001
 from __future__ import annotations
 
@@ -508,3 +509,5 @@ def test_task169_release_blocks_when_python_parity_evidence_diverges() -> None:
         if gate.gate_id == "PY311_PY312_PARITY"
     )
     assert parity_gate.status is AcceptanceStatus.BLOCKED
+
+# fmt: on
