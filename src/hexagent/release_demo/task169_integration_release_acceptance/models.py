@@ -1,5 +1,7 @@
 """TASK-169 v0.6 Golden and release-acceptance models."""
 
+# fmt: off
+
 from __future__ import annotations
 
 import enum
@@ -182,3 +184,5 @@ __all__ = [
     "Task169ReleaseValidationResult",
     "Task169RuntimeParityEvidence",
 ]
+
+# fmt: on
