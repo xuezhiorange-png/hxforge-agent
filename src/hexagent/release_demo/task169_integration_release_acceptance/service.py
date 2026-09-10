@@ -44,6 +44,9 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
 from hexagent.exchangers.shell_tube.manufacturable_candidates.provenance import (
     verify_provenance_graph,
 )
+from hexagent.exchangers.shell_tube.selection_release.authority import (
+    TASK169_PRODUCTION_RANKING_POLICY,
+)
 from hexagent.exchangers.shell_tube.selection_release.models import (
     TASK169_FROZEN_TOLERANCE_LEDGER,
     SelectionStatus,
@@ -164,6 +167,14 @@ def _metadata_failures(
     case: Task169GoldenCase, computed_task168_request_hash: str
 ) -> tuple[str, ...]:
     failures: list[str] = []
+    if case.ranking_policy != TASK169_PRODUCTION_RANKING_POLICY:
+        if (
+            case.ranking_policy.policy_id == "V06-RANKING-POLICY-TEST"
+            or case.ranking_policy.source_id == "TASK169-TEST-AUTHORITY"
+        ):
+            failures.append("TEST_RANKING_AUTHORITY_FORBIDDEN")
+        else:
+            failures.append("PRODUCTION_RANKING_AUTHORITY_MISMATCH")
     if not case.source_id or not case.source_location or not case.source_class:
         failures.append("GOLDEN_SOURCE_IDENTITY_REQUIRED")
     if not case.redistribution_status:

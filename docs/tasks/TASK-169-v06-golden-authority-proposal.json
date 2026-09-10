@@ -10,7 +10,7 @@
   "expected_identity_status": "PROPOSED_FOR_REVIEW",
   "golden_self_approval": false,
   "tolerance_class": "TASK165_V06_FROZEN",
-  "release_request_hash": "bbc5531357f027943f108f3434153eef315a8aa4adc39600612b31a5aa0f9cd5",
+  "release_request_hash": "49231a1cf0e12c95192089ca46e5c9b89aeb61626bcbafa41ea7fe345f8c945d",
   "goldens": [
     {
       "golden_id": "V06-G01",
@@ -24,15 +24,33 @@
       "expected_task168_result_id": "67193ca0-edbd-513b-81c3-f4f31a6df39f",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
-        "policy_id": "V06-RANKING-POLICY-TEST",
+        "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
         "policy_version": "v1",
-        "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-        "approval_status": "APPROVED"
+        "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+        "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+        "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+        "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+        "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+        "top_n": 3,
+        "warning_penalty": "10",
+        "objectives": [
+          {"metric": "shell_dp_pa", "direction": "MINIMIZE", "weight": "1", "scale": "100"}
+        ],
+        "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+        "evidence_refs": [
+          "TASK165_AUTHORITY_ISSUE_253",
+          "TASK169_AUTHORITY_ISSUE_265",
+          "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+        ],
+        "provenance_refs": [
+          "TASK165_RANKING_ORDER_EXACT",
+          "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
+        ]
       },
       "observed_task168_result_hash": "872422c33dcaabf3898713116892dc3ba7a19db33820b381180ec544f3f6bb0e",
       "observed_task168_result_id": "67193ca0-edbd-513b-81c3-f4f31a6df39f",
-      "observed_task169_result_hash": "37faf7e2dcab425190033e550bec7398ed7142009c267d57829c23841514ec38",
-      "observed_task169_result_id": "46eff388-ae2c-54cb-94bd-462c8ca6558f",
+      "observed_task169_result_hash": "63d961054fd2b314898398f46fb36797721a04d8f8b172ca2a159792986c8be7",
+      "observed_task169_result_id": "241ef24d-a651-556d-b485-019b4d140d16",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -57,15 +75,33 @@
       "expected_task168_result_id": "ddd5a35f-330d-5ebc-9351-3e6b26a1f0e0",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
-        "policy_id": "V06-RANKING-POLICY-TEST",
+        "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
         "policy_version": "v1",
-        "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-        "approval_status": "APPROVED"
+        "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+        "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+        "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+        "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+        "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+        "top_n": 3,
+        "warning_penalty": "10",
+        "objectives": [
+          {"metric": "shell_dp_pa", "direction": "MINIMIZE", "weight": "1", "scale": "100"}
+        ],
+        "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+        "evidence_refs": [
+          "TASK165_AUTHORITY_ISSUE_253",
+          "TASK169_AUTHORITY_ISSUE_265",
+          "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+        ],
+        "provenance_refs": [
+          "TASK165_RANKING_ORDER_EXACT",
+          "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
+        ]
       },
       "observed_task168_result_hash": "6f67a46c6be5cd09a22829cf817134ebea621a1d2991635b00067223ddd4ae42",
       "observed_task168_result_id": "ddd5a35f-330d-5ebc-9351-3e6b26a1f0e0",
-      "observed_task169_result_hash": "6f0e2def1dd7276ba0295cbfe5bd6d3c02085771939d6654b96f41aa7b826dca",
-      "observed_task169_result_id": "c3f20427-4721-5eb0-a0c7-564ba24fc906",
+      "observed_task169_result_hash": "414880a7a3d0299abdc44301096b47f3637a4babcfe407dab1ccae6d491ee177",
+      "observed_task169_result_id": "284735b6-2373-58e5-aded-c3fc5a36df7f",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -77,7 +113,11 @@
       "approval_evidence": [],
       "expected_identity_status": "PROPOSED_FOR_REVIEW",
       "disposition": "BLOCKED_BY_CURRENT_PRODUCER_CAPABILITY",
-      "blocker_evidence": ["TASK021_LAYOUT_AUTHORITY_REJECTED_U_TUBE_CONFIGURATION"]
+      "blocker_evidence": [
+        "STL_UTUBE_PAIRING_REQUIRED",
+        "u_tube_pairing_plan",
+        "TASK021_CONTRACT_REQUIRES_EXPLICIT_UTUBE_PAIRING_PLAN"
+      ]
     },
     {
       "golden_id": "V06-G03",
@@ -91,15 +131,33 @@
       "expected_task168_result_id": "3c4c87b5-cb8a-5450-9407-00c03c0c6f28",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
-        "policy_id": "V06-RANKING-POLICY-TEST",
+        "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
         "policy_version": "v1",
-        "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-        "approval_status": "APPROVED"
+        "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+        "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+        "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+        "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+        "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+        "top_n": 3,
+        "warning_penalty": "10",
+        "objectives": [
+          {"metric": "shell_dp_pa", "direction": "MINIMIZE", "weight": "1", "scale": "100"}
+        ],
+        "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+        "evidence_refs": [
+          "TASK165_AUTHORITY_ISSUE_253",
+          "TASK169_AUTHORITY_ISSUE_265",
+          "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+        ],
+        "provenance_refs": [
+          "TASK165_RANKING_ORDER_EXACT",
+          "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
+        ]
       },
       "observed_task168_result_hash": "fcf135333096253ff480a5cce0033d9d48599c62ef3bef79547066c2274c88c0",
       "observed_task168_result_id": "3c4c87b5-cb8a-5450-9407-00c03c0c6f28",
-      "observed_task169_result_hash": "62888f13dc08b7dd377e16fc298c0edba99d7d23930d8c5c81347f8e2f65c563",
-      "observed_task169_result_id": "2065cab2-a6b9-5234-a84d-d648d8b22963",
+      "observed_task169_result_hash": "ca3c5d560740e1a0995e59abbaf815a9113ead24b6aba9794da52611b105f7e0",
+      "observed_task169_result_id": "d987c5ef-89ee-58fa-8719-f88332bc26b1",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -111,7 +169,11 @@
       "approval_evidence": [],
       "expected_identity_status": "PROPOSED_FOR_REVIEW",
       "disposition": "BLOCKED_BY_CURRENT_PRODUCER_CAPABILITY",
-      "blocker_evidence": ["TASK024_BAFFLE_GEOMETRY_REJECTED_FLOATING_HEAD_CONFIGURATION"]
+      "blocker_evidence": [
+        "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED",
+        "configuration.construction_family",
+        "TASK024_V1_SUPPORTED_CONSTRUCTION_FAMILY_FIXED_TUBESHEET"
+      ]
     },
     {
       "golden_id": "V06-G04",
@@ -125,15 +187,33 @@
       "expected_task168_result_id": "81792b6f-390e-591e-a53b-1bf90eeec740",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
-        "policy_id": "V06-RANKING-POLICY-TEST",
+        "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
         "policy_version": "v1",
-        "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-        "approval_status": "APPROVED"
+        "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+        "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+        "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+        "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+        "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+        "top_n": 3,
+        "warning_penalty": "10",
+        "objectives": [
+          {"metric": "shell_dp_pa", "direction": "MINIMIZE", "weight": "1", "scale": "100"}
+        ],
+        "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+        "evidence_refs": [
+          "TASK165_AUTHORITY_ISSUE_253",
+          "TASK169_AUTHORITY_ISSUE_265",
+          "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+        ],
+        "provenance_refs": [
+          "TASK165_RANKING_ORDER_EXACT",
+          "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
+        ]
       },
       "observed_task168_result_hash": "37ced0d8693aa3659617c1f345b5fca9fbe3f81b53cb84e45f1795f40e2c9fcd",
       "observed_task168_result_id": "81792b6f-390e-591e-a53b-1bf90eeec740",
-      "observed_task169_result_hash": "6325bf328428365ede3d112112a73f77aa132fdfecaea7d3e969c3c3941cce13",
-      "observed_task169_result_id": "6e641ed4-5174-5f41-9d60-a5b206088eb4",
+      "observed_task169_result_hash": "4b6607246d1bf590c5c8b063a636b3870c8da1e6d9735610bb091f90fe11c9cd",
+      "observed_task169_result_id": "e1f87fbf-eb60-5519-b65d-511eaec5ecd5",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],
@@ -159,15 +239,33 @@
       "expected_task168_result_id": "290787cf-0051-59f7-95a1-3ebde75351e4",
       "expected_task168_result_status": "VALID",
       "ranking_policy": {
-        "policy_id": "V06-RANKING-POLICY-TEST",
+        "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
         "policy_version": "v1",
-        "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-        "approval_status": "APPROVED"
+        "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+        "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+        "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+        "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+        "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+        "top_n": 3,
+        "warning_penalty": "10",
+        "objectives": [
+          {"metric": "shell_dp_pa", "direction": "MINIMIZE", "weight": "1", "scale": "100"}
+        ],
+        "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+        "evidence_refs": [
+          "TASK165_AUTHORITY_ISSUE_253",
+          "TASK169_AUTHORITY_ISSUE_265",
+          "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md"
+        ],
+        "provenance_refs": [
+          "TASK165_RANKING_ORDER_EXACT",
+          "TASK169_PRODUCTION_RANKING_AUTHORITY_V1"
+        ]
       },
       "observed_task168_result_hash": "212fb93cdd05204c469259f79ba3862f37050b34bcd45bd90899e3bdd0bf3e16",
       "observed_task168_result_id": "290787cf-0051-59f7-95a1-3ebde75351e4",
-      "observed_task169_result_hash": "d634a12ecacb74764e6180cb964ffcee3f943d0db371ded3c595bb201d1bb95e",
-      "observed_task169_result_id": "0d2c5308-d7b5-5d08-93fd-628b182426eb",
+      "observed_task169_result_hash": "78a604d1dcdafbbf30094fee7d9dcb804c4d2b7bc1c4efe3178d096af28d4d57",
+      "observed_task169_result_id": "d4280c22-5453-52b3-9abd-c0380ee8118f",
       "expected_task169_result_hash": null,
       "expected_task169_result_id": null,
       "approved_numeric_expectations": [],

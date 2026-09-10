@@ -37,13 +37,32 @@
  needed for independent review, and `provenance_source_hash` identifies the
  proposal evidence descriptor rather than claiming a protected source copy.
 
+ ## Production ranking authority
+
+ The proposal now binds the formal production ranking authority rather than a
+ test policy:
+
+ ```ini
+ POLICY_ID=HXFORGE-V06-TASK169-RANKING-POLICY
+ POLICY_VERSION=v1
+ SOURCE_DEFINITION_ID=TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1
+ SOURCE_ID=TASK169-PRODUCTION-RANKING-AUTHORITY-V1
+ AUTHORITY_ORIGIN=TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265
+ APPROVAL_STATUS=APPROVED_FOR_IMPLEMENTATION
+ CANONICAL_HASH=142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8
+ ```
+
+ `V06-RANKING-POLICY-TEST` / `TASK169-TEST-AUTHORITY` remains unit-test
+ authority only and is rejected by the release boundary.  This policy
+ establishment does not approve any Golden fixture.
+
  ## Proposed cases
 
  | Golden | Real replay evidence | Current disposition | Review requirement |
  | --- | --- | --- | --- |
  | V06-G01 | Fixed-tubesheet/E-shell request reaches a complete candidate and runs the real TASK-168 chain through TASK-169 selection. | Ready for independent review; current candidate status is WARN. | Approve the source/evidence binding and numeric/identity expectation. |
- | V06-G02 | U-tube is materialized by TASK-020, then the real chain records a TASK-021 layout blocker. | Blocked by current producer capability. | Confirm that this is the correct fail-closed outcome or provide approved upstream capability evidence. |
- | V06-G03 | Floating-head is materialized by TASK-020, then the real chain records a TASK-024 baffle-geometry blocker. | Blocked by current producer capability. | Confirm that this is the correct fail-closed outcome or provide approved upstream capability evidence. |
+ | V06-G02 | U-tube is materialized by TASK-020, then TASK-021 returns `STL_UTUBE_PAIRING_REQUIRED` at `u_tube_pairing_plan`. | Blocked by missing explicit pairing authority; this is not a TASK-169 bypass candidate. | Confirm the required pairing authority or provide a separately authorized upstream materialization path. |
+ | V06-G03 | Floating-head is materialized by TASK-020 and TASK-021/TASK-022 pass, then TASK-024 returns `BFG_CONSTRUCTION_FAMILY_UNSUPPORTED` at `configuration.construction_family`. | Blocked by the TASK-024 v1 fixed-tubesheet-only contract. | Requires a narrow reviewed TASK-024 applicability correction before this Golden can be a success proposal. |
  | V06-G04 | One real two-member TASK-168 request has a complete WARN candidate and a candidate rejected by an authoritative shell-DP hard constraint; TASK-169 selects the feasible candidate. | Ready for independent review. | Approve the DP-constrained input/constraint authority and expected identity. |
  | V06-G05 | A real Bell-side blocked candidate is replayed and selection produces no recommendation. | Ready for independent review as a negative Golden. | Approve the negative fail-closed source and expected no-recommendation semantics. |
 

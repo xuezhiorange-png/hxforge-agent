@@ -84,10 +84,18 @@ def _blocked(request_hash_value: str, codes: tuple[str, ...]) -> Task169Validati
 
 def _validate_policy(value: Task169RankingPolicy) -> tuple[str, ...]:
     failures: list[str] = []
-    if not value.policy_id or not value.policy_version or not value.source_id:
+    if (
+        not value.policy_id
+        or not value.policy_version
+        or not value.source_definition_id
+        or not value.source_id
+        or not value.authority_origin
+    ):
         failures.append("RANKING_POLICY_IDENTITY_REQUIRED")
-    if value.approval_status != "APPROVED":
+    if value.approval_status not in {"APPROVED", "APPROVED_FOR_IMPLEMENTATION"}:
         failures.append("RANKING_POLICY_NOT_APPROVED")
+    if value.tie_break_rule != "CANDIDATE_HASH_ASC_UTF8":
+        failures.append("RANKING_TIE_BREAK_RULE_UNSUPPORTED")
     if value.top_n < 1 or value.top_n > _MAX_TOP_N:
         failures.append("RANKING_TOP_N_OUT_OF_RANGE")
     if not value.objectives:

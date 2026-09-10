@@ -34,11 +34,14 @@ def ranking_policy_projection(value: Task169RankingPolicy) -> dict[str, Any]:
     return {
         "policy_id": value.policy_id,
         "policy_version": value.policy_version,
+        "source_definition_id": value.source_definition_id,
         "source_id": value.source_id,
+        "authority_origin": value.authority_origin,
         "approval_status": value.approval_status,
         "top_n": value.top_n,
         "warning_penalty": value.warning_penalty,
         "objectives": value.objectives,
+        "tie_break_rule": value.tie_break_rule,
         "evidence_refs": value.evidence_refs,
         "provenance_refs": value.provenance_refs,
     }

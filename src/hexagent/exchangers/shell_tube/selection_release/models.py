@@ -76,11 +76,14 @@ class RankingObjective:
 class Task169RankingPolicy:
     policy_id: str
     policy_version: str
+    source_definition_id: str
     source_id: str
+    authority_origin: str
     approval_status: str
     top_n: int
     warning_penalty: Decimal
     objectives: tuple[RankingObjective, ...]
+    tie_break_rule: str
     evidence_refs: tuple[str, ...] = ()
     provenance_refs: tuple[str, ...] = ()
     canonical_hash: str = ""

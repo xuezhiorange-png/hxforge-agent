@@ -72,12 +72,33 @@ no-recommendation behavior.
 
 ## Ranking authority
 
-Ranking authority is explicit and versioned.  A policy contains policy
-ID/version/source, APPROVED status, deterministic Top-N, metric objectives,
-MINIMIZE/MAXIMIZE direction, Decimal weight/scale, explicit WARN penalty,
-evidence/provenance references, and a canonical policy hash.  The policy
-identity is verified before ranking; a caller cannot replace it with a policy
-whose hash does not replay.
+Ranking authority is explicit, versioned, and source-bound.  The release path
+accepts only this formal production identity:
+
+```ini
+POLICY_ID=HXFORGE-V06-TASK169-RANKING-POLICY
+POLICY_VERSION=v1
+SOURCE_DEFINITION_ID=TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1
+SOURCE_ID=TASK169-PRODUCTION-RANKING-AUTHORITY-V1
+AUTHORITY_ORIGIN=TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265
+APPROVAL_STATUS=APPROVED_FOR_IMPLEMENTATION
+TOP_N=3
+WARN_PENALTY=10
+OBJECTIVE_01_METRIC=shell_dp_pa
+OBJECTIVE_01_DIRECTION=MINIMIZE
+OBJECTIVE_01_WEIGHT=1
+OBJECTIVE_01_SCALE=100
+TIE_BREAK_RULE=CANDIDATE_HASH_ASC_UTF8
+CANONICAL_HASH=142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8
+```
+
+The policy is an engineering implementation authority, not Golden fixture
+approval.  Its evidence and provenance references bind TASK-165 ranking
+semantics to the TASK-169 implementation authority.  The unit-test identity
+`V06-RANKING-POLICY-TEST` / `TASK169-TEST-AUTHORITY` is deliberately separate
+and is rejected by the release validator.  A caller cannot replace the
+production policy with a test policy or a policy whose canonical hash does not
+replay.
 
 Supported TASK-168 metrics are:
 

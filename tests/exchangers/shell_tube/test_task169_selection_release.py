@@ -51,6 +51,10 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     ValidationStatus as Task168ValidationStatus,
 )
 from hexagent.exchangers.shell_tube.models import ConstructionFamily
+from hexagent.exchangers.shell_tube.selection_release.authority import (
+    TASK169_PRODUCTION_RANKING_POLICY,
+    production_ranking_policy,
+)
 from hexagent.exchangers.shell_tube.selection_release.canonical import (
     ranking_policy_hash,
 )
@@ -237,7 +241,9 @@ def _policy(
     provisional = Task169RankingPolicy(
         policy_id="V06-RANKING-POLICY-TEST",
         policy_version="v1",
+        source_definition_id="TASK169-TEST-SOURCE-DEFINITION",
         source_id="TASK169-TEST-AUTHORITY",
+        authority_origin="UNIT_CONTRACT_TEST",
         approval_status="APPROVED",
         top_n=top_n,
         warning_penalty=warning_penalty,
@@ -250,6 +256,7 @@ def _policy(
                 scale=Decimal("100"),
             ),
         ),
+        tie_break_rule="CANDIDATE_HASH_ASC_UTF8",
         evidence_refs=("TASK169_TEST",),
         provenance_refs=("TASK169_TEST",),
         canonical_hash="",
@@ -328,6 +335,29 @@ def test_selection_warn_penalty_and_reason_trace_are_explicit() -> None:
     assert result.valid.recommended_candidate.candidate_id == "pass"
     assert "WARN_PENALTY_APPLIED" in result.valid.ranked_candidates[1].reason_codes
     assert result.valid.alternative_reason_codes
+
+
+def test_production_ranking_authority_identity_replays() -> None:
+    policy = production_ranking_policy()
+    assert policy == TASK169_PRODUCTION_RANKING_POLICY
+    assert policy.policy_id == "HXFORGE-V06-TASK169-RANKING-POLICY"
+    assert policy.source_definition_id == "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1"
+    assert policy.authority_origin == "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265"
+    assert policy.tie_break_rule == "CANDIDATE_HASH_ASC_UTF8"
+    assert ranking_policy_hash(policy) == policy.canonical_hash
+    outcome = validate_selection_request(_request(_batch((_candidate("p", "a" * 64),)), policy))
+    assert outcome.status is ValidationStatus.VALID
+
+
+def test_release_rejects_test_ranking_authority() -> None:
+    case = _release_request().golden_cases[0]
+    tampered = replace(case, ranking_policy=_policy())
+    request = replace(
+        _release_request(), golden_cases=(tampered, *_release_request().golden_cases[1:])
+    )
+    outcome = validate_release_request(request)
+    assert outcome.valid is not None
+    assert "TEST_RANKING_AUTHORITY_FORBIDDEN" in outcome.valid.golden_records[0].reason_codes
 
 
 def test_selection_tie_breaks_by_candidate_hash_and_is_order_invariant() -> None:
@@ -483,7 +513,7 @@ def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169G
         expected_task168_result_hash=outcome.valid.result_hash,
         expected_task168_result_id=outcome.valid.result_id,
         expected_task168_result_status=Task168ValidationStatus.VALID.value,
-        ranking_policy=_policy(),
+        ranking_policy=production_ranking_policy(),
         expected_task169_result_hash=None,
         expected_task169_result_id=None,
         approved_numeric_expectations=(("EXPECTED_IDENTITY_STATUS", "PROPOSED_FOR_REVIEW"),),
@@ -766,6 +796,87 @@ def test_real_family_materialization_attempts_u_tube_and_floating_head() -> None
         )
 
 
+def test_g02_exact_task021_blocker_is_explicit_pairing_authority() -> None:
+    from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168_service
+    from hexagent.exchangers.shell_tube.tube_layout import validate_request as validate_task021
+
+    request = _family_request(ConstructionFamily.U_TUBE)
+    outcome = validate_task168_request(request)
+    assert outcome.valid is not None
+    record = outcome.valid.candidate_records[0]
+    configuration = task168_service._materialize_candidate_configuration(
+        request.task020_configuration, record.candidate
+    )
+    producer = validate_task021(
+        task168_service._task021_payload(
+            request.evaluation_input_authority, record.candidate, configuration
+        ),
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert configuration.construction_family is ConstructionFamily.U_TUBE
+    assert producer.status.value == "BLOCKED"
+    assert any(
+        blocker.code == "STL_UTUBE_PAIRING_REQUIRED" and blocker.field_path == "u_tube_pairing_plan"
+        for blocker in producer.blockers
+    )
+
+
+def test_g03_exact_task024_blocker_is_fixed_tubesheet_only_contract() -> None:
+    from hexagent.exchangers.shell_tube.baffle_geometry import (
+        validate_request as validate_task024,
+    )
+    from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168_service
+    from hexagent.exchangers.shell_tube.shell_bundle_geometry import (
+        validate_request as validate_task022,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout import validate_request as validate_task021
+
+    request = _family_request(ConstructionFamily.FLOATING_HEAD)
+    outcome = validate_task168_request(request)
+    assert outcome.valid is not None
+    record = outcome.valid.candidate_records[0]
+    configuration = task168_service._materialize_candidate_configuration(
+        request.task020_configuration, record.candidate
+    )
+    layout_outcome = validate_task021(
+        task168_service._task021_payload(
+            request.evaluation_input_authority, record.candidate, configuration
+        ),
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert layout_outcome.layout is not None
+    geometry_outcome = validate_task022(
+        task168_service._task022_payload(
+            request.evaluation_input_authority,
+            record.candidate,
+            configuration,
+            layout_outcome.layout,
+            request.shell_geometry_catalog.records[0],
+        ),
+        software_version=task168_service.TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+        git_commit="task168-orchestration",
+    )
+    assert geometry_outcome.geometry is not None
+    baffle_outcome = validate_task024(
+        task168_service._task024_payload(
+            request.evaluation_input_authority,
+            record.candidate,
+            configuration,
+            layout_outcome.layout,
+            geometry_outcome.geometry,
+        )
+    )
+    assert configuration.construction_family is ConstructionFamily.FLOATING_HEAD
+    assert baffle_outcome.status.value == "BLOCKED"
+    assert any(
+        blocker.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
+        and blocker.field_path == "configuration.construction_family"
+        for blocker in baffle_outcome.blockers
+    )
+
+
 def test_task169_release_schema_is_v2_and_proposal_status_is_frozen() -> None:
     request = _release_request()
     assert request.schema_version == TASK169_RELEASE_SCHEMA_VERSION
@@ -792,10 +903,33 @@ def test_golden_authority_payload_is_proposal_only() -> None:
     assert all(
         item["ranking_policy"]
         == {
-            "policy_id": "V06-RANKING-POLICY-TEST",
+            "policy_id": "HXFORGE-V06-TASK169-RANKING-POLICY",
             "policy_version": "v1",
-            "canonical_hash": "4d75d26403b61abd41434222819c04ff05f2328f389f34eb072574bd2cb5e7cf",
-            "approval_status": "APPROVED",
+            "source_definition_id": "TASK169-PRODUCTION-RANKING-SOURCE-DEFINITION-V1",
+            "source_id": "TASK169-PRODUCTION-RANKING-AUTHORITY-V1",
+            "authority_origin": "TASK169_IMPLEMENTATION_AUTHORITY_ISSUE_265",
+            "canonical_hash": "142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8",
+            "approval_status": "APPROVED_FOR_IMPLEMENTATION",
+            "top_n": 3,
+            "warning_penalty": "10",
+            "objectives": [
+                {
+                    "metric": "shell_dp_pa",
+                    "direction": "MINIMIZE",
+                    "weight": "1",
+                    "scale": "100",
+                }
+            ],
+            "tie_break_rule": "CANDIDATE_HASH_ASC_UTF8",
+            "evidence_refs": [
+                "TASK165_AUTHORITY_ISSUE_253",
+                "TASK169_AUTHORITY_ISSUE_265",
+                "docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md",
+            ],
+            "provenance_refs": [
+                "TASK165_RANKING_ORDER_EXACT",
+                "TASK169_PRODUCTION_RANKING_AUTHORITY_V1",
+            ],
         }
         for item in payload["goldens"]
     )
