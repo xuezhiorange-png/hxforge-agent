@@ -34,6 +34,8 @@ class Task169GoldenCase:
     source_location: str
     redistribution_status: str
     normalized_input_identity: str
+    expected_result_identity: str | None
+    approved_numeric_expectations: tuple[tuple[str, str], ...]
     tolerance_class: str
     reviewer_evidence_refs: tuple[str, ...]
     provenance_source_hash: str
@@ -42,9 +44,28 @@ class Task169GoldenCase:
     def __post_init__(self) -> None:
         object.__setattr__(
             self,
+            "approved_numeric_expectations",
+            tuple(
+                sorted(
+                    self.approved_numeric_expectations,
+                    key=lambda item: (
+                        item[0].encode("utf-8"),
+                        item[1].encode("utf-8"),
+                    ),
+                )
+            ),
+        )
+        object.__setattr__(
+            self,
             "reviewer_evidence_refs",
             tuple(sorted(self.reviewer_evidence_refs, key=lambda item: item.encode("utf-8"))),
         )
+        has_identity = self.expected_result_identity is not None
+        has_numeric = bool(self.approved_numeric_expectations)
+        if has_identity == has_numeric:
+            raise ValueError(
+                "TASK-169 Golden must bind exactly one expectation authority branch"
+            )
 
 
 @dataclass(frozen=True, slots=True)
