@@ -106,6 +106,13 @@ def _metadata_failures(case: Task169GoldenCase) -> tuple[str, ...]:
         failures.append("GOLDEN_REDISTRIBUTION_STATUS_REQUIRED")
     if not case.normalized_input_identity:
         failures.append("GOLDEN_NORMALIZED_INPUT_IDENTITY_REQUIRED")
+    if case.expected_result_identity is None and not case.approved_numeric_expectations:
+        failures.append("GOLDEN_EXPECTATION_AUTHORITY_REQUIRED")
+    if (
+        case.expected_result_identity is not None
+        and case.approved_numeric_expectations
+    ):
+        failures.append("GOLDEN_EXPECTATION_AUTHORITY_AMBIGUOUS")
     if not case.tolerance_class:
         failures.append("GOLDEN_TOLERANCE_CLASS_REQUIRED")
     if not case.reviewer_evidence_refs:
@@ -160,6 +167,14 @@ def _golden_record(
     reasons = list(_metadata_failures(case))
     selected = result is not None and result.selection_status is SelectionStatus.SELECTED
     candidate = _candidate_for_result(case, result) if result is not None else None
+    if (
+        case.expected_result_identity is not None
+        and (
+            result is None
+            or result.result_hash != case.expected_result_identity
+        )
+    ):
+        reasons.append("GOLDEN_EXPECTED_RESULT_IDENTITY_MISMATCH")
 
     if case.golden_id is GoldenCaseId.V06_G01:
         if not selected or candidate is None:
