@@ -20,6 +20,10 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     result_id as task168_result_id,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+    TASK168_RESULT_SCHEMA_VERSION,
+    TASK168_SOURCE_DEFINITION_ID,
+    TASK168_VERSION,
     ApplicabilityStatus,
     CandidateDisposition,
     CandidateRecord,
@@ -120,6 +124,14 @@ def _validate_policy(value: Task169RankingPolicy) -> tuple[str, ...]:
 
 def _validate_task168_result(value: Task168BatchResult) -> tuple[str, ...]:
     failures: list[str] = []
+    if value.schema_version != TASK168_RESULT_SCHEMA_VERSION:
+        failures.append("TASK168_RESULT_SCHEMA_VERSION_MISMATCH")
+    if value.task168_version != TASK168_VERSION:
+        failures.append("TASK168_VERSION_MISMATCH")
+    if value.source_definition_id != TASK168_SOURCE_DEFINITION_ID:
+        failures.append("TASK168_SOURCE_DEFINITION_ID_MISMATCH")
+    if value.implementation_software_version != TASK168_IMPLEMENTATION_SOFTWARE_VERSION:
+        failures.append("TASK168_IMPLEMENTATION_SOFTWARE_VERSION_MISMATCH")
     try:
         if task168_batch_result_hash(value) != value.result_hash:
             failures.append("TASK168_RESULT_HASH_MISMATCH")
