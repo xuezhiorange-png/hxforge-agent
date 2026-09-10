@@ -80,7 +80,7 @@ or legal-compliance adequacy.
 ### 3.1 Frozen v1 scope
 
 ```text
-SUPPORTED_CONSTRUCTION_FAMILY=FIXED_TUBESHEET
+SUPPORTED_CONSTRUCTION_FAMILIES=FIXED_TUBESHEET,FLOATING_HEAD
 SUPPORTED_SHELL_PASS_COUNT=1
 SUPPORTED_BAFFLE_TYPE=SINGLE_SEGMENTAL
 AXIAL_AUTHORITY_MODE=CALLER_SUPPLIED_EXPLICIT
@@ -95,8 +95,17 @@ TUBE_HOLE_REGION_CLASSIFICATION=IN_SCOPE
 
 ### 3.2 Explicitly unsupported in v1
 
+The TASK-169 reviewed Golden G03 gate authorizes a narrow applicability
+correction for `FLOATING_HEAD`.  The existing deterministic baffle geometry
+equations, upstream identity bindings, and fail-closed checks are unchanged.
+This does not establish floating-head hardware, pull-clearance, mechanical
+adequacy, or code-compliance results; those remain deferred diagnostics.
+
+`U_TUBE` remains blocked at TASK-024 in this revision because TASK-021 first
+requires an explicit, complete `UTubePairingPlan` and the baffle contract does
+not design that plan.
+
 ```text
-FLOATING_HEAD
 U_TUBE
 SHELL_PASS_COUNT_OTHER_THAN_1
 BAFFLE_TYPE_OTHER_THAN_SINGLE_SEGMENTAL

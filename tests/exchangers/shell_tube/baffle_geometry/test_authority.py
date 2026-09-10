@@ -318,6 +318,16 @@ def test_stage6_unsupported_construction_family_blocks_and_suppresses_warnings()
     assert stage6_warning_codes == []
 
 
+def test_stage6_floating_head_is_supported_geometric_applicability_path() -> None:
+    request = builders.make_request(
+        construction_family=task020_models.ConstructionFamily.FLOATING_HEAD
+    )
+    result = t024_authority.validate_authority_foundation(request)
+    assert not any(b.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED" for b in result.blockers)
+    assert "BFG_FIXED_TUBESHEET_ONLY_V1" not in {warning.code for warning in result.warnings}
+    assert any(warning.code == "BFG_GEOMETRY_NOT_FLOW_AREA" for warning in result.warnings)
+
+
 def test_stage6_unsupported_shell_pass_count_blocks() -> None:
     request = builders.make_request(shell_pass_count=2)
     result = t024_authority.validate_authority_foundation(request)
