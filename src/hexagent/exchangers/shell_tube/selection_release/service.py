@@ -1,5 +1,7 @@
 """TASK-169 deterministic candidate selection boundary."""
 
+# ruff: noqa: I001
+
 from __future__ import annotations
 
 from dataclasses import replace
