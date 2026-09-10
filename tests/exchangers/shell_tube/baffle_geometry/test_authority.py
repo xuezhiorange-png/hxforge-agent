@@ -307,6 +307,10 @@ def test_stage6_u_tube_is_supported_after_upstream_pairing_validation() -> None:
     assert any(warning.code == "BFG_GEOMETRY_NOT_FLOW_AREA" for warning in result.warnings)
 
 
+def test_v06_supported_family_slice_has_no_unsupported_family_residue() -> None:
+    assert t024_models.UNSUPPORTED_FAMILIES == ()
+
+
 def test_utube_real_task021_pairing_result_is_admitted_by_task024() -> None:
     from dataclasses import replace as _dc_replace
 

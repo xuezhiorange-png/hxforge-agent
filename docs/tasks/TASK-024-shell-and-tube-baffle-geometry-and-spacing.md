@@ -139,6 +139,10 @@ floating-head mechanical design, or pull-clearance design.  U-tube requests
 remain subject to the explicit TASK-021 pairing-plan contract above; missing or
 invalid pairing continues to fail closed in TASK-021 before TASK-024.
 
+No member of the closed TASK-020 `ConstructionFamily` enum is excluded by
+this v0.6 TASK-024 applicability slice.  The unsupported set below is for
+non-family topology and capability limits only.
+
 ```text
 SHELL_PASS_COUNT_OTHER_THAN_1
 BAFFLE_TYPE_OTHER_THAN_SINGLE_SEGMENTAL
@@ -273,7 +277,8 @@ The core verifies:
 - `blockers` is empty;
 - the existing TASK-020 canonical payload reproduces `configuration_hash`;
 - the existing TASK-020 identity helper reproduces `configuration_id`;
-- `construction_family == FIXED_TUBESHEET`;
+- `construction_family` is one of `FIXED_TUBESHEET`, `U_TUBE`, or
+  `FLOATING_HEAD`;
 - `shell_pass_count == 1`;
 - orientation is one exact existing `Orientation` token;
 - case authority is accepted under the frozen TASK-020/TASK-014 contract.
@@ -316,7 +321,8 @@ The core verifies:
 - `task020_configuration_id` and `task020_configuration_hash` match the
   separately supplied configuration;
 - construction family, orientation, shell-pass count, and tube-pass count match;
-- `tube_hole_count == len(positions)` for the supported fixed-tubesheet slice;
+- `tube_hole_count == len(positions)` for every admitted construction-family
+  path in this TASK-024 slice;
 - every `TubePosition.position_id` is unique;
 - every accepted position has exact canonical `x_m` and `y_m`;
 - no position is re-enumerated, rotated, mirrored, axis-swapped, renamed, or
