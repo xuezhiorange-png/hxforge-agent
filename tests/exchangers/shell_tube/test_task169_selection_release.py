@@ -9,6 +9,10 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     result_id as task168_result_id,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
+    TASK168_RESULT_SCHEMA_VERSION,
+    TASK168_SOURCE_DEFINITION_ID,
+    TASK168_VERSION,
     ApplicabilityStatus,
     CandidateDisposition,
     CandidateRecord,
@@ -22,10 +26,6 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     Task168Blocker,
     Task168Completeness,
     Task168Warning,
-    TASK168_IMPLEMENTATION_SOFTWARE_VERSION,
-    TASK168_RESULT_SCHEMA_VERSION,
-    TASK168_SOURCE_DEFINITION_ID,
-    TASK168_VERSION,
 )
 from hexagent.exchangers.shell_tube.models import ConstructionFamily
 from hexagent.exchangers.shell_tube.selection_release.canonical import (
@@ -34,12 +34,12 @@ from hexagent.exchangers.shell_tube.selection_release.canonical import (
     result_id as task169_result_id,
 )
 from hexagent.exchangers.shell_tube.selection_release.models import (
-    RankingDirection,
-    RankingObjective,
-    SelectionStatus,
     TASK169_SCHEMA_VERSION,
     TASK169_SOURCE_DEFINITION_ID,
     TASK169_VERSION,
+    RankingDirection,
+    RankingObjective,
+    SelectionStatus,
     Task169RankingPolicy,
     Task169Request,
     ValidationStatus,
@@ -92,7 +92,9 @@ def _candidate(
         disposition=CandidateDisposition.BLOCKED if blocked else CandidateDisposition.EVALUATED,
         status=CandidateStatus.BLOCKED if blocked else status,
         stage=CandidateStage.CONSTRAINT_EVALUATION if blocked else CandidateStage.COMPLETE,
-        last_successful_stage=CandidateStage.ENGINEERING_SCREENING if blocked else CandidateStage.COMPLETE,
+        last_successful_stage=(
+            CandidateStage.ENGINEERING_SCREENING if blocked else CandidateStage.COMPLETE
+        ),
         metrics=(
             ("modeled_ua_w_k", ua),
             ("q_method_w", "100000"),
@@ -172,7 +174,10 @@ def _policy(
     return replace(provisional, canonical_hash=ranking_policy_hash(provisional))
 
 
-def _request(batch: Task168BatchResult, policy: Task169RankingPolicy | None = None) -> Task169Request:
+def _request(
+    batch: Task168BatchResult,
+    policy: Task169RankingPolicy | None = None,
+) -> Task169Request:
     return Task169Request(
         schema_version=TASK169_SCHEMA_VERSION,
         task169_version=TASK169_VERSION,
