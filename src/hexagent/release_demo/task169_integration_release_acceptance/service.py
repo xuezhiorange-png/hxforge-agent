@@ -18,15 +18,15 @@ from hexagent.exchangers.shell_tube.selection_release.service import (
 
 from .canonical import blocked_hash, blocked_id, request_hash, result_hash, result_id
 from .models import (
-    AcceptanceGateRecord,
-    AcceptanceStatus,
-    GoldenAcceptanceRecord,
-    GoldenCaseId,
     TASK169_RELEASE_RESULT_SCHEMA_VERSION,
     TASK169_RELEASE_SCHEMA_VERSION,
     TASK169_RELEASE_SOFTWARE_VERSION,
     TASK169_RELEASE_SOURCE_DEFINITION_ID,
     TASK169_RELEASE_VERSION,
+    AcceptanceGateRecord,
+    AcceptanceStatus,
+    GoldenAcceptanceRecord,
+    GoldenCaseId,
     Task169GoldenCase,
     Task169ReleaseBlockedResult,
     Task169ReleaseRequest,
@@ -294,12 +294,17 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
         case.selection_request.task168_result.total_enumerated_candidates > 0
         for case in request.golden_cases[:4]
     )
-    replay_ok = all(
-        result is not None
-        and _selection(case) is not None
-        and _selection(case).result_hash == result.result_hash
-        for case, result in zip(request.golden_cases, selections, strict=True)
-    )
+    replay_ok = True
+    for case, expected in zip(request.golden_cases, selections, strict=True):
+        replayed = _selection(case)
+        if (
+            expected is None
+            or replayed is None
+            or replayed.result_hash != expected.result_hash
+            or replayed.result_id != expected.result_id
+        ):
+            replay_ok = False
+            break
     parity_ok = _runtime_parity_ok(request, golden_records)
     g04_source = request.golden_cases[3].selection_request.task168_result.candidate_records
     g04_dp_rejection = any(
@@ -313,7 +318,10 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
     )
     tube_dp_ok = _constraint(g04, "max_tube_dp_pa") == "PASS" and g04_dp_rejection
     shell_dp_ok = _constraint(g04, "max_shell_dp_pa") == "PASS" and g04_dp_rejection
-    duty_ok = all(_constraint(item, "required_duty_w") == "PASS" for item in (g01, g02, g03, g04))
+    duty_ok = all(
+        _constraint(item, "required_duty_w") == "PASS"
+        for item in (g01, g02, g03, g04)
+    )
     full_chain_ok = all(_full_chain_evidence(item) for item in (g01, g02, g03, g04))
 
     gates = [
@@ -321,17 +329,43 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
         _gate(full_chain_ok, _GATE_ORDER[1]),
         _gate(full_chain_ok, _GATE_ORDER[2]),
         _gate(full_chain_ok, _GATE_ORDER[3]),
-        _gate(all(item is not None and item.screening_evidence for item in (g01, g02, g03, g04)), _GATE_ORDER[4]),
-        _gate(golden_ok[GoldenCaseId.V06_G02] and g02 is not None and bool(g02.screening_evidence), _GATE_ORDER[5]),
-        _gate(golden_ok[GoldenCaseId.V06_G02] and g02 is not None and bool(g02.screening_evidence), _GATE_ORDER[6]),
+        _gate(
+            all(
+                item is not None and item.screening_evidence
+                for item in (g01, g02, g03, g04)
+            ),
+            _GATE_ORDER[4],
+        ),
+        _gate(
+            golden_ok[GoldenCaseId.V06_G02]
+            and g02 is not None
+            and bool(g02.screening_evidence),
+            _GATE_ORDER[5],
+        ),
+        _gate(
+            golden_ok[GoldenCaseId.V06_G02]
+            and g02 is not None
+            and bool(g02.screening_evidence),
+            _GATE_ORDER[6],
+        ),
         _gate(candidate_generation_ok, _GATE_ORDER[7]),
-        _gate(candidate_generation_ok and all(result is not None for result in selections[:4]), _GATE_ORDER[8]),
+        _gate(
+            candidate_generation_ok
+            and all(result is not None for result in selections[:4]),
+            _GATE_ORDER[8],
+        ),
         _gate(golden_ok[GoldenCaseId.V06_G04], _GATE_ORDER[9]),
         _gate(tube_dp_ok, _GATE_ORDER[10]),
         _gate(shell_dp_ok, _GATE_ORDER[11]),
         _gate(duty_ok, _GATE_ORDER[12]),
         _gate(replay_ok, _GATE_ORDER[13]),
-        _gate(all(result is not None and bool(result.provenance_semantic_inputs) for result in selections), _GATE_ORDER[14]),
+        _gate(
+            all(
+                result is not None and bool(result.provenance_semantic_inputs)
+                for result in selections
+            ),
+            _GATE_ORDER[14],
+        ),
         _gate(parity_ok, _GATE_ORDER[15]),
     ]
     gates.extend(
@@ -364,7 +398,10 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
     )
     digest = result_hash(provisional)
     result = replace(provisional, result_hash=digest, result_id=result_id(digest))
-    if result_hash(result) != result.result_hash or result_id(result.result_hash) != result.result_id:
+    if (
+        result_hash(result) != result.result_hash
+        or result_id(result.result_hash) != result.result_id
+    ):
         return _blocked(request_hash_value, ("RELEASE_IDENTITY_REPLAY_FAILED",))
     return Task169ReleaseValidationResult(valid=result)
 
