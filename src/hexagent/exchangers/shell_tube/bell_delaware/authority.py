@@ -41,7 +41,18 @@ BELL_ORIGIN_LOCATION: Final[str] = (
 
 SUPPORTED_LAYOUTS: Final[tuple[str, ...]] = ("LAYOUT_30_DEG", "LAYOUT_45_DEG", "LAYOUT_90_DEG")
 SUPPORTED_SHELL_TYPE: Final[str] = "TEMA_E"
-SUPPORTED_CONSTRUCTION_FAMILY: Final[str] = "FIXED_TUBESHEET"
+# Bell--Delaware's admitted shell-side projection consumes shell, baffle,
+# bundle, and tube-layout geometry.  The equations in this package do not
+# branch on construction family or model a front/rear head, tubesheet, or
+# U-bend.  Keep the former singular name as a compatibility alias for
+# consumers that only need the historical fixed-family label, while making
+# the actual applicability set explicit for v0.6 candidate replay.
+SUPPORTED_CONSTRUCTION_FAMILIES: Final[tuple[str, ...]] = (
+    "FIXED_TUBESHEET",
+    "U_TUBE",
+    "FLOATING_HEAD",
+)
+SUPPORTED_CONSTRUCTION_FAMILY: Final[str] = SUPPORTED_CONSTRUCTION_FAMILIES[0]
 SUPPORTED_BAFFLE_TYPE: Final[str] = "SINGLE_SEGMENTAL"
 SUPPORTED_PHASE: Final[str] = "SINGLE_PHASE"
 SUPPORTED_RHEOLOGY: Final[str] = "NEWTONIAN"
