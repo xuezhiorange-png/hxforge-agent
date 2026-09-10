@@ -113,7 +113,14 @@ from .models import (
 )
 from .provenance import build_provenance_semantic_inputs, build_success_provenance
 from .raw_projection import project_raw_request
-from .service import issue_success_replay_evidence, validate_request, verify_task162_success
+from .service import (
+    TASK162_V06_CONSTRUCTION_FAMILY_SCOPE,
+    TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID,
+    TASK162_V06_METHOD_REVISION,
+    issue_success_replay_evidence,
+    validate_request,
+    verify_task162_success,
+)
 
 __all__ = [
     "IntervalDecimal",
@@ -129,6 +136,9 @@ __all__ = [
     "TASK162_SUCCESS_REPLAY_EVIDENCE_SCHEMA_VERSION",
     "TASK162_TYPED_BLOCKED_SCHEMA_VERSION",
     "TASK162_VERSION",
+    "TASK162_V06_CONSTRUCTION_FAMILY_SCOPE",
+    "TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID",
+    "TASK162_V06_METHOD_REVISION",
     "Task038ResultIdentityProjection",
     "Task160ResultIdentityProjection",
     "Task161ResultIdentityProjection",
