@@ -1,5 +1,7 @@
 """TASK-169 Golden validation and HXForge v0.6 release acceptance."""
 
+# fmt: off
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -407,3 +409,5 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
 
 
 __all__ = ["FROZEN_TOLERANCE_LEDGER", "validate_request"]
+
+# fmt: on
