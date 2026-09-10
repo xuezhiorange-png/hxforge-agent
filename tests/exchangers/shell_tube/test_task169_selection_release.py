@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import replace
 from decimal import Decimal
@@ -536,6 +537,12 @@ def test_release_replays_task168_public_validator_for_each_golden(
         g01.task168_result_hash == _release_request().golden_cases[0].expected_task168_result_hash
     )
     assert g01.selection_result_hash
+    if (
+        os.environ.get("TASK169_PY311_EXECUTABLE") and os.environ.get("TASK169_PY312_EXECUTABLE")
+    ) or (
+        os.environ.get("TASK164_PY311_EXECUTABLE") and os.environ.get("TASK164_PY312_EXECUTABLE")
+    ):
+        assert outcome.valid.trusted_runtime_status is AcceptanceStatus.PASS
 
 
 def test_release_does_not_have_caller_supplied_task168_result_surface() -> None:
@@ -680,6 +687,23 @@ def test_trusted_runtime_missing_observation_is_fail_closed() -> None:
         py312="/definitely/missing/python312",
     )
     assert observed.status == "BLOCKED"
+
+
+def test_trusted_runtime_executes_provisioned_py311_and_py312() -> None:
+    py311 = os.environ.get("TASK169_PY311_EXECUTABLE") or os.environ.get("TASK164_PY311_EXECUTABLE")
+    py312 = os.environ.get("TASK169_PY312_EXECUTABLE") or os.environ.get("TASK164_PY312_EXECUTABLE")
+    if not py311 or not py312:
+        pytest.skip("trusted dual-runtime executables are not provisioned")
+    observed = observe_dual_runtime(
+        input_value=_parity_input_for_test(),
+        py311=py311,
+        py312=py312,
+    )
+    assert observed.status == "PASS"
+    assert observed.python311.status == "PASS"
+    assert observed.python312.status == "PASS"
+    assert observed.python311.actual_python_major_minor == "3.11"
+    assert observed.python312.actual_python_major_minor == "3.12"
 
 
 def test_trusted_runtime_input_pair_order_is_canonical() -> None:
