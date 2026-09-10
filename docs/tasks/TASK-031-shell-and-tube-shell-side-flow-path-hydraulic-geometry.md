@@ -124,7 +124,15 @@ IN_SCOPE_IDENTITY:
   engineering authority identity
 
 SUPPORTED_PATTERN_FAMILIES=(SQUARE, TRIANGULAR)
+SUPPORTED_CONSTRUCTION_FAMILIES=(FIXED_TUBESHEET, U_TUBE, FLOATING_HEAD)
 ```
+
+The construction-family set is a v0.6 repository applicability overlay. The
+frozen Formula A and Formula B records remain the same records: neither
+formula accepts construction family as an input, and neither formula has a
+construction-family branch. This overlay therefore does not add a mechanical
+model or broaden a formula beyond the geometry and pattern inputs documented
+in §4.
 
 ### 3.2 Explicitly deferred geometry quantities
 
@@ -403,7 +411,7 @@ INTERSECTION(
 
 ```text
 TASK031_ADMITTED_ENGINEERING_FORMULA_DOMAIN:
-  construction_family=FIXED_TUBESHEET
+  construction_family in {FIXED_TUBESHEET, U_TUBE, FLOATING_HEAD}
   shell_pass_count=1
   baffle_type=SINGLE_SEGMENTAL
   baffle_count>=2
@@ -412,9 +420,10 @@ TASK031_ADMITTED_ENGINEERING_FORMULA_DOMAIN:
   flow_region_identity=CENTRAL_CROSSFLOW_SCREENING
 ```
 
-Repository applicability may narrow source applicability. Repository
-applicability must never broaden frozen source authority from comment
-`5311936966`.
+The v0.6 construction-family overlay is admitted only because the frozen
+Formula A and Formula B source records are construction-family independent;
+the overlay does not change either equation, its numerical domain, or its
+pattern-family branch. All other predicates in this table remain enforced.
 
 ### 7.1 Applicability enforcement table
 
@@ -425,7 +434,7 @@ specific blocker.
 
 | Field | Production binding | Accepted value / domain | Blocker code | Stage rank |
 |---|---|---|---|---|
-| `construction_family` | `task024_result.geometry.construction_family` | `FIXED_TUBESHEET` | `SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED` | 6 |
+| `construction_family` | `task024_result.geometry.construction_family` | `FIXED_TUBESHEET`, `U_TUBE`, or `FLOATING_HEAD` | `SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED` | 6 |
 | `shell_pass_count` | `task024_result.geometry.shell_pass_count` | `1` | `SSHG_SHELL_PASS_COUNT_UNSUPPORTED` | 6 |
 | `baffle_type` | `task024_result.geometry.design_authority.baffle_type` | `SINGLE_SEGMENTAL` | `SSHG_BAFFLE_TYPE_UNSUPPORTED` | 6 |
 | `baffle_count` | `task024_result.geometry.design_authority.baffle_count` | `>= 2` | `SSHG_BAFFLE_COUNT_INSUFFICIENT` | 6 |
@@ -488,9 +497,17 @@ build time from comment `5311936966`. It contains:
 - formula record A: `TASK031_CF_AREA_KERN_SCREENING_INTCHOPN_EQ55_56_V1`
 - formula record B: `TASK031_DE_KERN_SCREENING_INTCHOPN_EQ51_BRANCH_V1`
 - supported pattern families `(SQUARE, TRIANGULAR)`
-- admitted applicability envelope
+- admitted formula applicability envelope
 - permission state `LAWFUL_PUBLIC_ACCESS_REUSE_WITH_ATTRIBUTION`
 - IntechOpen license `CC BY 3.0`
+
+The v0.6 repository applicability overlay additionally admits
+`FIXED_TUBESHEET`, `U_TUBE`, and `FLOATING_HEAD` for the same central
+crossflow formulas. It is a reviewed applicability gate, not a new formula
+authority. `SUPPORTED_CONSTRUCTION_FAMILIES` is intentionally not included in
+the v1 formula-authority canonical projection: the frozen
+`ENGINEERING_AUTHORITY_HASH` and all existing fixed-tubesheet result
+identities remain replayable and unchanged.
 
 ### 9.3 Authority hash and ID
 
@@ -2975,3 +2992,33 @@ TASK034_AUTHORIZED=false
 Authoring this `PROPOSED` design contract does not authorize implementation,
 tests, fixtures, CI changes, pull request creation, push, merge, or Issue
 mutation.
+
+## 29. v0.6 construction-family applicability correction
+
+```text
+CORRECTION_SCOPE=TASK031_SHELL_SIDE_HYDRAULIC_GEOMETRY_APPLICABILITY_ONLY
+TASK031_SUPPORTED_FAMILIES=FIXED_TUBESHEET,U_TUBE,FLOATING_HEAD
+TASK031_FORMULA_A_CONSTRUCTION_FAMILY_DEPENDENT=false
+TASK031_FORMULA_B_CONSTRUCTION_FAMILY_DEPENDENT=false
+TASK031_FLOW_AREA_SEMANTIC_DIFFERENCE=false
+TASK031_HYDRAULIC_DIAMETER_SEMANTIC_DIFFERENCE=false
+TASK031_REQUIRED_NEW_MECHANICAL_MODEL=false
+TASK031_FORMULA_CHANGE=false
+TASK031_FLOW_AREA_EQUATION_CHANGE=false
+TASK031_HYDRAULIC_DIAMETER_EQUATION_CHANGE=false
+TASK031_QUANTIZATION_CHANGE=false
+TASK031_TOLERANCE_CHANGE=false
+TASK031_IDENTITY_CONTRACT_CHANGE=false
+TASK031_APPLICABILITY_CONTRACT_CHANGED=true
+TASK031_SUPPORTED_FAMILY_SET_CHANGED=true
+```
+
+The correction removes only the stale single-family runtime allowlist. It does
+not add a U-tube bend model, floating-head mechanical model, pull-clearance
+model, tubesheet design, or construction-specific shell-side empirical
+correction. The existing shell-pass, baffle-type, baffle-count, pattern,
+spacing, upstream-identity, cross-binding, canonical-replay, and formula
+domain gates remain mandatory. The legacy formula-authority hash and identity
+are deliberately unchanged; construction family remains part of each
+request/result preimage where already defined, so family-specific result
+identity is still deterministic.
