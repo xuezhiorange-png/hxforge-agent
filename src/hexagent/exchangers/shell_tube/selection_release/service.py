@@ -1,5 +1,7 @@
 """TASK-169 deterministic candidate selection boundary."""
 
+# fmt: off
+
 # ruff: noqa: I001
 
 from __future__ import annotations
@@ -314,3 +316,5 @@ def validate_request(raw: object) -> Task169ValidationResult:
 
 
 __all__ = ["validate_request"]
+
+# fmt: on
