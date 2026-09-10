@@ -17,7 +17,8 @@ Stages implemented (Section 7 + 8 of the TASK-024 design contract):
 - Stage 3 — TASK-021 layout validation (typed layout only).
 - Stage 4 — TASK-022 geometry validation (typed geometry only).
 - Stage 5 — three-way upstream cross-binding (configuration ↔ layout ↔ geometry).
-- Stage 6 — supported v1 slice (FIXED_TUBESHEET / shell-pass 1 / SINGLE_SEGMENTAL).
+- Stage 6 — supported v1 slice (FIXED_TUBESHEET / U_TUBE / FLOATING_HEAD,
+  shell-pass 1, SINGLE_SEGMENTAL).
 - Stage 7 — axial authority identity (exact hash recompute).
 - Stage 8 — design authority identity (exact hash recompute).
 
@@ -102,10 +103,12 @@ _AXIAL_SPAN_SCHEMA: Final[str] = _t024.AXIAL_SPAN_SCHEMA_VERSION
 _DESIGN_AUTHORITY_SCHEMA: Final[str] = _t024.DESIGN_AUTHORITY_SCHEMA_VERSION
 
 # Supported v1 slice (Section 6.2 / 3.2), amended by the reviewed TASK-169
-# Golden G03 gate. This is an applicability expansion only; geometry
-# equations and authority bindings remain unchanged.
+# Golden G02/G03 gate. This is an applicability expansion only; geometry
+# equations and authority bindings remain unchanged. TASK-021 remains the
+# sole owner of U-tube pairing validation and this module consumes only its
+# already-validated TubeLayout.
 _SUPPORTED_CONSTRUCTION_FAMILIES: Final[frozenset[str]] = frozenset(
-    {"FIXED_TUBESHEET", "FLOATING_HEAD"}
+    {"FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"}
 )
 _SUPPORTED_SHELL_PASS_COUNT: Final[int] = 1
 _SUPPORTED_BAFFLE_TYPE_TOKEN: Final[str] = "SINGLE_SEGMENTAL"
