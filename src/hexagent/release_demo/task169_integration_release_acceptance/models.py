@@ -58,7 +58,12 @@ class Task169GoldenCase:
         object.__setattr__(
             self,
             "reviewer_evidence_refs",
-            tuple(sorted(self.reviewer_evidence_refs, key=lambda item: item.encode("utf-8"))),
+            tuple(
+                sorted(
+                    self.reviewer_evidence_refs,
+                    key=lambda item: item.encode("utf-8"),
+                )
+            ),
         )
         has_identity = self.expected_result_identity is not None
         has_numeric = bool(self.approved_numeric_expectations)
@@ -78,12 +83,22 @@ class Task169RuntimeParityEvidence:
         object.__setattr__(
             self,
             "golden_result_hashes",
-            tuple(sorted(self.golden_result_hashes, key=lambda item: item[0].encode("utf-8"))),
+            tuple(
+                sorted(
+                    self.golden_result_hashes,
+                    key=lambda item: item[0].encode("utf-8"),
+                )
+            ),
         )
         object.__setattr__(
             self,
             "evidence_refs",
-            tuple(sorted(self.evidence_refs, key=lambda item: item.encode("utf-8"))),
+            tuple(
+                sorted(
+                    self.evidence_refs,
+                    key=lambda item: item.encode("utf-8"),
+                )
+            ),
         )
 
 
