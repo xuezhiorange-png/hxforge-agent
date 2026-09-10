@@ -2650,15 +2650,24 @@ def _task166_payload(
 
 def _task160_payload(
     authority: Task168EvaluationInputAuthority,
+    configuration: ShellAndTubeConfiguration,
+    candidate: CandidateSpec,
     task026: TubeSideThermalResult,
 ) -> dict[str, object]:
-    """Bind the live TASK-026 result into the caller's TASK-160 template.
+    """Bind live candidate results into the candidate's TASK-160 request.
 
-    TASK-160 remains the owner of thermal-stream identity.  TASK-168 only
-    materializes the two candidate-dependent links that TASK-160's existing
-    adapter contract requires: the TASK-026 result identity and its property
-    snapshot identity.  All other stream and envelope values remain explicit
-    inputs from the evaluation authority.
+    TASK-160 remains the owner of thermal-stream identity and applicability.
+    The evaluation template supplies only structural stream data.  The
+    candidate-specific configuration is always projected into the envelope;
+    this is important because retaining the template's fixed-tubesheet
+    envelope would let an unsupported U-tube or floating-head candidate
+    produce a misleading TASK-160 success.
+
+    When the selected family/pass-count differs from the template, the fixed
+    template source identity is not retained.  A deterministic TASK-168
+    configuration bridge records the selected producer configuration and its
+    discrete-authority evidence.  TASK-160 then decides whether that
+    candidate-specific envelope is within its own frozen applicability.
     """
 
     payload = _template_mapping(
@@ -2666,6 +2675,56 @@ def _task160_payload(
         CandidateStage.THERMAL_CLOSURE,
         "evaluation_input_authority.task160_request_template",
     )
+
+    envelope = payload.get("envelope_authority")
+    if type(envelope) is not dict:
+        raise _StageFailure(
+            CandidateStage.THERMAL_CLOSURE,
+            BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
+            "evaluation_input_authority.task160_request_template.envelope_authority",
+            "TASK-160 envelope authority must project to a mapping",
+        )
+    envelope_map = cast(dict[str, object], envelope)
+    selected_envelope = {
+        "construction_family": configuration.construction_family.value,
+        "shell_pass_count": configuration.shell_pass_count,
+        "tube_pass_count": configuration.tube_pass_count,
+    }
+    template_envelope = {
+        key: envelope_map.get(key)
+        for key in ("construction_family", "shell_pass_count", "tube_pass_count")
+    }
+    candidate_refs = _candidate_dimension_authority_refs(
+        candidate, ("CONSTRUCTION_FAMILY", "TUBE_PASS_COUNT")
+    )
+    configuration_ref = (
+        "TASK168_TASK020_CONFIGURATION::"
+        + configuration.configuration_id
+        + "::"
+        + configuration.configuration_hash
+    )
+    if template_envelope != selected_envelope:
+        bridge_payload = {
+            "base_envelope": template_envelope,
+            "candidate_configuration_id": configuration.configuration_id,
+            "candidate_configuration_hash": configuration.configuration_hash,
+            "selected_envelope": selected_envelope,
+            "selected_authority_refs": list(candidate_refs),
+        }
+        bridge_hash = task021_canonical.sha256_hex(bridge_payload)
+        envelope_map.update(selected_envelope)
+        envelope_map.update(
+            {
+                "authority_source_identity": "TASK168-CANDIDATE-CONFIGURATION-BRIDGE",
+                "authority_source_version": "v1",
+                "authority_identity": "TASK168-TASK160-ENVELOPE::" + bridge_hash,
+            }
+        )
+    envelope_map["evidence_refs"] = _merge_evidence_refs(
+        envelope_map.get("evidence_refs"), (*candidate_refs, configuration_ref)
+    )
+    payload["envelope_authority"] = envelope_map
+
     task026_result_id = getattr(task026, "result_id", None)
     task026_property_snapshot_hash = getattr(task026, "property_snapshot_hash", None)
     if (
@@ -3227,7 +3286,12 @@ def _execute_candidate_chain(
                 )
 
             task160_outcome = validate_task160(
-                _task160_payload(authority, cast(TubeSideThermalResult, bundle.task026_result))
+                _task160_payload(
+                    authority,
+                    configuration,
+                    candidate,
+                    cast(TubeSideThermalResult, bundle.task026_result),
+                )
             )
             task160_value = _result_payload(
                 task160_outcome,

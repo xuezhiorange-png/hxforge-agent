@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import fields, replace
 from decimal import Decimal, getcontext, localcontext
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -505,6 +506,55 @@ def test_real_candidate_exposes_candidate_task020_identity_for_downstream_chain(
     assert dict(record.tube_layout_evidence)["layout_id"]
     assert dict(record.geometry_evidence)["geometry_id"]
     assert outcome.valid.provenance.cycle_count == 0
+
+
+def test_task160_envelope_is_candidate_bound_and_does_not_retain_fixed_template() -> None:
+    """A non-fixed candidate must reach TASK-160 with its own envelope values."""
+
+    from hexagent.exchangers.shell_tube.thermal_stream_state import (
+        validate_request as validate_task160,
+    )
+
+    base = _real_request()
+    requirement = replace(
+        base.requirement_authority,
+        allowed_construction_families=(ConstructionFamily.U_TUBE,),
+        canonical_hash="",
+    )
+    requirement = replace(requirement, canonical_hash=requirement_authority_hash(requirement))
+    request = _with_authority_values(
+        replace(base, requirement_authority=requirement),
+        DiscreteDimensionRole.CONSTRUCTION_FAMILY,
+        (ConstructionFamily.U_TUBE,),
+    )
+
+    outcome = validate_request(request)
+    assert outcome.valid is not None
+    candidate = outcome.valid.candidate_records[0].candidate
+    configuration = task168_service._materialize_candidate_configuration(
+        request.task020_configuration,
+        candidate,
+    )
+    payload = task168_service._task160_payload(
+        request.evaluation_input_authority,
+        configuration,
+        candidate,
+        SimpleNamespace(result_id="task026-result", property_snapshot_hash="a" * 64),
+    )
+
+    envelope = payload["envelope_authority"]
+    assert isinstance(envelope, dict)
+    assert envelope["construction_family"] == "U_TUBE"
+    assert envelope["tube_pass_count"] == candidate.tube_pass_count
+    assert envelope["authority_source_identity"] == "TASK168-CANDIDATE-CONFIGURATION-BRIDGE"
+    assert any(
+        ref.startswith("TASK168_TASK020_CONFIGURATION::") for ref in envelope["evidence_refs"]
+    )
+
+    task160_outcome = validate_task160(payload)
+    assert task160_outcome.status.value == "RAW_BOUNDARY_BLOCKED"
+    assert task160_outcome.raw_boundary_blocked is not None
+    assert any(blocker.code == "B022" for blocker in task160_outcome.raw_boundary_blocked.blockers)
 
 
 def test_exact_discrete_enumeration_retains_missing_evaluation_as_audited_block() -> None:
