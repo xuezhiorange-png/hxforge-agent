@@ -82,6 +82,22 @@ from hexagent.exchangers.shell_tube.tube_side.valid_result import (
 STAGE_RANKS: Final[int] = 9
 
 
+# TASK-169 / v0.6 applicability correction.  TASK-025 owns the tube-side
+# hydraulic validation path, but it does not model construction-specific
+# mechanical details.  The configuration, layout, and pairing authorities
+# remain responsible for validating those inputs before this scheduler is
+# called.  Keep this as an explicit closed set rather than retaining the
+# historical fixed-tubesheet-only admission guard.
+SUPPORTED_CONSTRUCTION_FAMILIES: Final[tuple[ConstructionFamily, ...]] = (
+    ConstructionFamily.FIXED_TUBESHEET,
+    ConstructionFamily.U_TUBE,
+    ConstructionFamily.FLOATING_HEAD,
+)
+SUPPORTED_CONSTRUCTION_FAMILY_VALUES: Final[tuple[str, ...]] = tuple(
+    family.value for family in SUPPORTED_CONSTRUCTION_FAMILIES
+)
+
+
 # §4.2 — top-level token constants.
 TOP_LEVEL_NOT_EXACT_DICT_TOKEN: Final[bytes] = b"task025.top-level-not-exact-dict.v1"
 RAW_PROFILE_ID_MISSING_TOKEN: Final[bytes] = b"task025.profile-id-missing.v1"
@@ -1148,12 +1164,12 @@ def _validate_task020(raw: Any) -> tuple[Any, list[Task025BlockerEntry]]:
                 (),
             )
         )
-    if raw.construction_family is not ConstructionFamily.FIXED_TUBESHEET:
+    if raw.construction_family not in SUPPORTED_CONSTRUCTION_FAMILIES:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_013_INVALID_TASK020_CONFIGURATION,
                 "raw_input.task020_configuration.construction_family",
-                "task020_construction_family_not_fixed_tubesheet",
+                "task020_construction_family_unsupported",
                 (),
             )
         )
@@ -1260,12 +1276,12 @@ def _validate_task021(raw: Any) -> tuple[TubeLayout | None, list[Task025BlockerE
                 (),
             )
         )
-    if raw.construction_family != ConstructionFamily.FIXED_TUBESHEET.value:
+    if raw.construction_family not in SUPPORTED_CONSTRUCTION_FAMILY_VALUES:
         blockers.append(
             emit_blocker(
                 BlockerCode.BL_014_INVALID_TASK021_LAYOUT,
                 "raw_input.task021_layout.construction_family",
-                "task021_construction_family_not_fixed_tubesheet",
+                "task021_construction_family_unsupported",
                 (),
             )
         )
