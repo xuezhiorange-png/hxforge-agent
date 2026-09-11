@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import fields, replace
 from decimal import Decimal, getcontext, localcontext
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -507,6 +508,58 @@ def test_real_candidate_exposes_candidate_task020_identity_for_downstream_chain(
     assert outcome.valid.provenance.cycle_count == 0
 
 
+def test_task160_envelope_is_candidate_bound_and_does_not_retain_fixed_template() -> None:
+    """A non-fixed candidate must reach TASK-160 with its own envelope values."""
+
+    from hexagent.exchangers.shell_tube.thermal_stream_state import (
+        validate_request as validate_task160,
+    )
+
+    base = _real_request()
+    requirement = replace(
+        base.requirement_authority,
+        allowed_construction_families=(ConstructionFamily.U_TUBE,),
+        canonical_hash="",
+    )
+    requirement = replace(requirement, canonical_hash=requirement_authority_hash(requirement))
+    request = _with_authority_values(
+        replace(base, requirement_authority=requirement),
+        DiscreteDimensionRole.CONSTRUCTION_FAMILY,
+        (ConstructionFamily.U_TUBE,),
+    )
+
+    outcome = validate_request(request)
+    assert outcome.valid is not None
+    candidate = outcome.valid.candidate_records[0].candidate
+    configuration = task168_service._materialize_candidate_configuration(
+        request.task020_configuration,
+        candidate,
+    )
+    payload = task168_service._task160_payload(
+        request.evaluation_input_authority,
+        configuration,
+        candidate,
+        SimpleNamespace(result_id="task026-result", property_snapshot_hash="a" * 64),
+    )
+
+    envelope = payload["envelope_authority"]
+    assert isinstance(envelope, dict)
+    assert envelope["construction_family"] == "U_TUBE"
+    assert envelope["tube_pass_count"] == candidate.tube_pass_count
+    assert envelope["authority_source_identity"] == "TASK169-V06-THERMAL-CLOSURE-AUTHORITY"
+    assert envelope["authority_source_version"] == "v0.6"
+    assert envelope["authority_identity"].startswith("A06_V06_SHELL_TUBE_THERMAL_ENVELOPE::")
+    assert "TASK169-THERMAL-CLOSURE-AUTHORITY-V06" in envelope["evidence_refs"]
+    assert any(
+        ref.startswith("TASK168_TASK020_CONFIGURATION::") for ref in envelope["evidence_refs"]
+    )
+
+    task160_outcome = validate_task160(payload)
+    assert task160_outcome.status.value == "VALID"
+    assert task160_outcome.valid is not None
+    assert task160_outcome.raw_boundary_blocked is None
+
+
 def test_exact_discrete_enumeration_retains_missing_evaluation_as_audited_block() -> None:
     outcome = validate_request(_request())
     assert outcome.status is ValidationStatus.VALID
@@ -626,6 +679,9 @@ def test_real_candidate_replays_batch_identity_exactly() -> None:
     assert second.valid is not None
     assert first.valid.result_hash == second.valid.result_hash
     assert first.valid.result_id == second.valid.result_id
+    assert first.valid.provenance.graph_hash == second.valid.provenance.graph_hash
+    first_node_ids = tuple(item.node_id for item in first.valid.provenance.nodes)
+    assert len(first_node_ids) == len(set(first_node_ids))
     assert [item.candidate_id for item in first.valid.candidate_records] == [
         item.candidate_id for item in second.valid.candidate_records
     ]
@@ -973,6 +1029,17 @@ def test_native_task021_and_task022_identity_and_warnings_survive_task024_admiss
     assert task024_outcome.geometry.task022_geometry_id == native_geometry.geometry_id
     assert task024_outcome.geometry.task021_layout_hash == native_layout.layout_hash
     assert task024_outcome.geometry.task022_geometry_hash == native_geometry.geometry_hash
+
+    task031_payload = task168_service._task031_payload(
+        authority,
+        configuration,
+        native_layout,
+        task024_outcome,
+        task024_outcome.geometry,
+    )
+    assert task031_payload["baffle_geometry_result"] == task168_service._public_value(
+        task024_outcome
+    )
 
 
 def test_provenance_contains_discrete_authority_and_materialization_edges() -> None:

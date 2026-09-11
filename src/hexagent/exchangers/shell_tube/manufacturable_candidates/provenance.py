@@ -155,6 +155,13 @@ def build_batch_provenance(
         ):
             for key, value in evidence:
                 if key in {"result_id", "layout_id", "geometry_id"}:
+                    # TASK-020 is emitted above with the paired configuration
+                    # hash.  Do not emit the same node id again with the
+                    # weaker generic ``(label, key, value)`` payload: two
+                    # equal-id nodes make set iteration observable in the
+                    # graph hash and break cross-process replay.
+                    if label == "TASK020" and key == "result_id":
+                        continue
                     producer_node_id = f"{label}::{value}"
                     nodes.append(_node(producer_node_id, _stable_hash((label, key, value))))
                     edges.append(ProvenanceEdge(producer_node_id, "SUPPLIES", candidate_node_id))
