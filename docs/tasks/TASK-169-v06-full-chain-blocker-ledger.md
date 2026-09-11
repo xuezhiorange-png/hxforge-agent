@@ -4,16 +4,21 @@
 TASK=TASK169_FULL_CHAIN_BLOCKER_SWEEP_AND_BATCH_CLOSURE
 AUTHORITY_ISSUE=265
 TASK169_PR=266
-BASE_MAIN_SHA=2e0f8642cbbacff67cdf97f0541d21360ce379f7
-TEMP_INTEGRATION_COMPOSITION=true
-MAIN_ANCESTRY_ACCEPTANCE=false
+ORIGINAL_TEMPORARY_BASE_MAIN_SHA=2e0f8642cbbacff67cdf97f0541d21360ce379f7
+HISTORICAL_TEMP_INTEGRATION_COMPOSITION=true
+HISTORICAL_MAIN_ANCESTRY_ACCEPTANCE=false
+CURRENT_MAIN_ANCESTRY=c911e14f9fee1513667a559094732b9ab12ad117
+CORRECTION_CHAIN_MERGED=true
+TEMP_INTEGRATION_COMPOSITION=false
+MAIN_ANCESTRY_ACCEPTANCE=true
 GOLDEN_SELF_APPROVAL=false
-STATUS=THERMAL_CLOSURE_V06_REPLAY_COMPLETE_REVIEW_PENDING
+STATUS=MAIN_ANCESTRY_TECHNICAL_REPLAY_COMPLETE_REVIEW_PENDING
 ```
 
-This ledger records the complete static scan and the dynamic replay that was
-possible without weakening a frozen producer authority.  It is not a Golden
-approval and the temporary composition is not a release ancestry.
+This ledger preserves the earlier temporary-composition scan as historical
+evidence and adds the current main-ancestry acceptance below.  It is not a
+Golden approval.  The current correction chain is in main; the earlier
+temporary composition is not treated as release ancestry.
 
 ## Remote state and correction mapping
 
@@ -934,17 +939,88 @@ TASK167_STARTED=false
 STOP=true
 ```
 
-## Current v0.6 thermal-closure closure addendum
+## Final main-ancestry acceptance
 
-The preceding sections preserve the historical pre-v0.6 sweep snapshot.  The
-following addendum is the current result after the independent TASK-160/161/162
-v0.6 authority correction in PR #271.  It supersedes the earlier `B022`
-snapshot for the selected G02 and G03 replay paths; it does not alter the
-history of that blocked run.
+The preceding thermal-closure addendum records the temporary composition and
+is retained as historical evidence.  The correction chain has since been
+merged into main at `c911e14f9fee1513667a559094732b9ab12ad117`.  The replay
+identities below were independently regenerated from that main ancestry; no
+temporary merge SHA is used as release authority.
 
 ```ini
-CURRENT_TEMP_COMPOSITION=5f9eabfdfc2142149b37afd66fb4793e6c1b3de3
-CURRENT_STACK=main+#267+#268+#269+#270+#271+#266
+CURRENT_MAIN_ANCESTRY=c911e14f9fee1513667a559094732b9ab12ad117
+CORRECTION_CHAIN_IN_ANCESTRY=true
+TEMP_INTEGRATION_COMPOSITION=false
+MAIN_ANCESTRY_ACCEPTANCE=true
+TASK267_MERGED=true
+TASK268_MERGED=true
+TASK269_MERGED=true
+TASK270_MERGED=true
+TASK271_MERGED=true
+TASK168_PROVENANCE_NODE_IDS_UNIQUE=true
+TASK168_PROVENANCE_HASH_STABLE_ACROSS_RANDOM_HASH_SEEDS=true
+PRODUCTION_RANKING_AUTHORITY=HXFORGE-V06-TASK169-RANKING-POLICY:v1
+PRODUCTION_RANKING_POLICY_HASH=142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8
+RELEASE_REQUEST_HASH=6e9ae801f059bbe6beb739abe0390ff80825476a784697e2d32d3b7737bb3f2f
+TRUSTED_PY311_RUNTIME=PASS
+TRUSTED_PY312_RUNTIME=PASS
+PY311_PY312_PARITY=PASS
+CALLER_TOLERANCE_OVERRIDE_REJECTED=true
+```
+
+### Main-ancestry observed identities
+
+| Golden | TASK-168 request hash | TASK-168 result hash | TASK-168 result ID | TASK-168 provenance graph hash | TASK-169 result hash | TASK-169 result ID | status |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| V06-G01 | `b4e959204e09f784b9c698b97170357d68310218077c41dd6363390083a36ea2` | `48f74fa55a69033f7af13777f0098293f325138e2bc61d46cb50ce2557c16562` | `3455efc1-e4ad-5571-aab7-4612780b82b8` | `45c453585b4a666e5562778495574c8596dc27f0c6712c66de5e735b5906c7f7` | `625b4fd3694504c3757e11758c7aaa6f4e4b6bdf6eb7143f9a4c19862b5f3717` | `7e736888-2736-5da8-8887-582daadb288e` | WARN / recommendable |
+| V06-G02 | `f99f9d37b535201c2952b6652e6c84c912ac2d3ad9428362ffcb397d6fea80fb` | `5abf3df51b532d8ceb14cecfb5f30b1234dc79b2e4efed077255806ea3896cf0` | `05f20f03-a486-51cc-b47d-c61e6e3b02a9` | `94e4c35a8f0b450bbc472f21ee86465ed3490d6da71c89ddc2fd5067c9d0d7a8` | `1e1f3e9155e2cdf8fb7ebbc28a11afd199c54d43d4575f12ff19023b0fd68637` | `a2fd6ad6-08c2-5d8d-b9d7-6768483ed464` | WARN / recommendable |
+| V06-G03 | `81dcec220d87ec412789fa83d5d1d6d56a5ff23cffaf7a0f7bb55d06ce31f210` | `3b763508f555bb5053a2050fc7477edd43ddf9553a6b3fd9381bb3390c229777` | `ee016f4d-542d-5e0b-a95c-e90fcad7497f` | `0053bdeb8a11bdcec6924499aeb35a5013e214fe39a0b5fa67ad0e5663899cb7` | `e79b4f254f03f53c51c06f557cb3e7558ae379c4e7b729fa31fa759a99db5a24` | `d6361e86-e089-5e75-8789-f5679d8b344f` | WARN / recommendable |
+| V06-G04 | `ffb7dc72a82395a8493e636897a2a9430b9a4c9c78e79c84d0f5f6273a9fd6a9` | `c7cb67c9c6a7fc7af3f5ba1f30639d18e3b3c010f566756c97e306d3fcb93a87` | `0333664d-a67b-5aeb-b520-f77bb8fa7ebc` | `39beceb245ec0ee57905a9a023481784b944d5ee351e0aa6e1dba1ca714a8338` | `901dcb049c8a833d987ea1de03e2ad177ba7f9966d4fbe38b9ce0f60ad536d6a` | `55abcd89-fab4-5b29-88ea-60d0ef077b83` | WARN / recommendable; hard-blocked alternative excluded |
+| V06-G05 | `57e2b9e8a268b66c33027b9efdf16d4888a83beb89acbc15b5c20415ec3ca533` | `212fb93cdd05204c469259f79ba3862f37050b34bcd45bd90899e3bdd0bf3e16` | `290787cf-0051-59f7-95a1-3ebde75351e4` | `1f2ca89c35fcd7839177528189089599b3302c4c04b786d00d68f759030fa8c0` | `36fdc728a69770b17fbf9cfe680f407bf4b56426b551f595a21bd951e2898b05` | `e25e4be1-1b22-5596-a555-9f4ce8fcae6e` | BLOCKED / no recommendation |
+
+### Current release gate assessment
+
+The real main-ancestry replay satisfies all seventeen non-Golden technical
+gates: fixed-geometry rating, Bell heat transfer and pressure drop, Bell
+provenance, engineering screening, thermal-expansion and vibration screening
+semantics, candidate generation and sizing, multi-candidate ranking, tube and
+shell pressure-drop closure, thermal-duty closure, deterministic replay,
+provenance completeness, Python parity, and the end-to-end technical replay.
+The five Golden gates remain review-pending, not technically failed.
+
+```ini
+RELEASE_GATE_TECHNICAL_PASS_COUNT=17
+RELEASE_GATE_GOLDEN_REVIEW_PENDING_COUNT=5
+RELEASE_GATE_TECHNICAL_FAILURE_COUNT=0
+ALL_NON_GOLDEN_RELEASE_GATES=PASS
+GOLDEN_REVIEW_PENDING=true
+V06_G01_REVIEW_STATUS=PROPOSED
+V06_G02_REVIEW_STATUS=PROPOSED
+V06_G03_REVIEW_STATUS=PROPOSED
+V06_G04_REVIEW_STATUS=PROPOSED
+V06_G05_REVIEW_STATUS=PROPOSED
+EXPECTED_IDENTITY_STATUS=PROPOSED_FOR_REVIEW
+APPROVED_BY=
+APPROVAL_EVIDENCE=[]
+GOLDEN_SELF_APPROVAL=false
+RELEASE_ACCEPTANCE=BLOCKED
+BLOCK_REASON=V06_GOLDEN_FIXTURE_REVIEW_APPROVAL_PENDING
+READY_AUTHORIZED=false
+MERGE_AUTHORIZED=false
+NO_STEP_IMPLIES_THE_NEXT=true
+```
+
+## Historical temporary thermal-closure closure addendum
+
+This section preserves the earlier temporary-composition snapshot after the
+independent TASK-160/161/162 v0.6 authority correction in PR #271.  It
+supersedes the earlier `B022` snapshot for the selected G02 and G03 replay
+paths, but it is not the current release ancestry.  The current
+main-ancestry evidence is recorded in the preceding section.
+
+```ini
+HISTORICAL_TEMP_COMPOSITION=5f9eabfdfc2142149b37afd66fb4793e6c1b3de3
+HISTORICAL_STACK=main+#267+#268+#269+#270+#271+#266
 TASK160_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
 TASK161_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
 TASK162_ROOT_CLASS=GEOMETRY_UPSTREAM_ALREADY_CAPTURES_FAMILY_DIFFERENCE
@@ -1103,12 +1179,13 @@ member fails the Bell geometry numerical domain.  They are not blockers for
 the selected `0.16 m` G02 candidate or for G03.  No static-predicted blocker
 remains on either selected path.
 
-Both current candidate results are `WARN` rather than `PASS` because TASK-167
-correctly exposes unbound generic FIV/erosion limit authority; this is not a
-thermal-closure or source-applicability failure.  The production ranking
-policy is the formal v1 policy, not the test policy.  The G02/G03 identities
-in this addendum are observed identities in a temporary composition and stay
-`PROPOSED_FOR_REVIEW`; no observed result is self-approved.
+Both temporary-composition candidate results are `WARN` rather than `PASS`
+because TASK-167 correctly exposes unbound generic FIV/erosion limit
+authority; this is not a thermal-closure or source-applicability failure.  The
+production ranking policy is the formal v1 policy, not the test policy.  The
+G02/G03 identities in this historical addendum are observations from the
+temporary composition and stay `PROPOSED_FOR_REVIEW`; no observed result is
+self-approved.
 
 ```ini
 V06_G01_PROPOSAL=READY_FOR_REVIEW

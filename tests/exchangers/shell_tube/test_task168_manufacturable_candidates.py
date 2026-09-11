@@ -555,9 +555,9 @@ def test_task160_envelope_is_candidate_bound_and_does_not_retain_fixed_template(
     )
 
     task160_outcome = validate_task160(payload)
-    assert task160_outcome.status.value == "RAW_BOUNDARY_BLOCKED"
-    assert task160_outcome.raw_boundary_blocked is not None
-    assert any(blocker.code == "B022" for blocker in task160_outcome.raw_boundary_blocked.blockers)
+    assert task160_outcome.status.value == "VALID"
+    assert task160_outcome.valid is not None
+    assert task160_outcome.raw_boundary_blocked is None
 
 
 def test_exact_discrete_enumeration_retains_missing_evaluation_as_audited_block() -> None:
@@ -679,6 +679,9 @@ def test_real_candidate_replays_batch_identity_exactly() -> None:
     assert second.valid is not None
     assert first.valid.result_hash == second.valid.result_hash
     assert first.valid.result_id == second.valid.result_id
+    assert first.valid.provenance.graph_hash == second.valid.provenance.graph_hash
+    first_node_ids = tuple(item.node_id for item in first.valid.provenance.nodes)
+    assert len(first_node_ids) == len(set(first_node_ids))
     assert [item.candidate_id for item in first.valid.candidate_records] == [
         item.candidate_id for item in second.valid.candidate_records
     ]

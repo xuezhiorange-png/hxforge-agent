@@ -6,6 +6,9 @@
 TASK_ID=HXFORGE_V0_6_TASK169_SELECTION_INTEGRATION_GOLDEN_RELEASE_ACCEPTANCE
 AUTHORITY_ISSUE=265
 BASE_MAIN_SHA=2e0f8642cbbacff67cdf97f0541d21360ce379f7
+CURRENT_MAIN_ANCESTRY=c911e14f9fee1513667a559094732b9ab12ad117
+CORRECTION_CHAIN_MERGED=true
+MAIN_ANCESTRY_ACCEPTANCE=true
 TASK165_AUTHORITY_ISSUE=253
 TASK166_AUTHORITY_ISSUE=255
 TASK167_AUTHORITY_ISSUE=261
@@ -168,16 +171,16 @@ All five cases are represented and replayed through real TASK-168 requests:
 - `V06-G02` uses a real candidate-specific U-tube request with the literal,
   hash-verified pairing proposal in the release fixture.  The deterministic
   `0.16 m` shell proposal passes the complete TASK-020 through TASK-169
-  temporary composition after the independent versioned TASK-160/161/162
+  current main-ancestry replay after the merged versioned TASK-160/161/162
   v0.6 authority correction.  It reaches TASK-167 as WARN/EVALUATED and is
   recommendable under the production ranking policy.  Smaller shell members
   remain auditable TASK-024 Stage-14 intersection failures.
 - `V06-G03` uses the real floating-head materialization attempt and passes the
-  complete TASK-020 through TASK-169 temporary composition, including real
+  complete TASK-020 through TASK-169 main-ancestry replay, including real
   TASK-167 fouling, cleanability, and configuration screens.  It reaches
   TASK-167 as WARN/EVALUATED and is recommendable.  The v0.6 thermal-closure
-  authority is supplied by independent Draft PR #271; no Golden is approved
-  by this document.
+  authority is supplied by merged PR #271; no Golden is approved by this
+  document.
 - `V06-G04` uses a real two-member TASK-168 space.  One candidate is complete
   and recommendable and one is rejected by the authoritative shell-DP
   constraint; the selection output records the alternative and exclusion
@@ -243,4 +246,41 @@ READY_AUTHORIZED=false
 MERGE_AUTHORIZED=false
 V0_7_AUTHORIZED=false
 NO_STEP_IMPLIES_THE_NEXT=true
+```
+
+## Final main-ancestry acceptance addendum
+
+The merged correction chain is now part of main at
+`c911e14f9fee1513667a559094732b9ab12ad117`.  The following identities are
+from the main-ancestry replay, not from the earlier temporary composition.
+
+| Golden | TASK-168 result | TASK-169 result | technical disposition |
+| --- | --- | --- | --- |
+| V06-G01 | `48f74fa55a69033f7af13777f0098293f325138e2bc61d46cb50ce2557c16562` / `3455efc1-e4ad-5571-aab7-4612780b82b8` | `625b4fd3694504c3757e11758c7aaa6f4e4b6bdf6eb7143f9a4c19862b5f3717` / `7e736888-2736-5da8-8887-582daadb288e` | WARN, recommendable |
+| V06-G02 | `5abf3df51b532d8ceb14cecfb5f30b1234dc79b2e4efed077255806ea3896cf0` / `05f20f03-a486-51cc-b47d-c61e6e3b02a9` | `1e1f3e9155e2cdf8fb7ebbc28a11afd199c54d43d4575f12ff19023b0fd68637` / `a2fd6ad6-08c2-5d8d-b9d7-6768483ed464` | WARN, recommendable |
+| V06-G03 | `3b763508f555bb5053a2050fc7477edd43ddf9553a6b3fd9381bb3390c229777` / `ee016f4d-542d-5e0b-a95c-e90fcad7497f` | `e79b4f254f03f53c51c06f557cb3e7558ae379c4e7b729fa31fa759a99db5a24` / `d6361e86-e089-5e75-8789-f5679d8b344f` | WARN, recommendable |
+| V06-G04 | `c7cb67c9c6a7fc7af3f5ba1f30639d18e3b3c010f566756c97e306d3fcb93a87` / `0333664d-a67b-5aeb-b520-f77bb8fa7ebc` | `901dcb049c8a833d987ea1de03e2ad177ba7f9966d4fbe38b9ce0f60ad536d6a` / `55abcd89-fab4-5b29-88ea-60d0ef077b83` | WARN, recommendable; hard-blocked alternative excluded |
+| V06-G05 | `212fb93cdd05204c469259f79ba3862f37050b34bcd45bd90899e3bdd0bf3e16` / `290787cf-0051-59f7-95a1-3ebde75351e4` | `36fdc728a69770b17fbf9cfe680f407bf4b56426b551f595a21bd951e2898b05` / `e25e4be1-1b22-5596-a555-9f4ce8fcae6e` | BLOCKED, no recommendation |
+
+The non-Golden release gates are technically satisfied by the real replay,
+including trusted Python 3.11/3.12 parity and deterministic identity
+reconciliation.  The five Golden gates remain blocked only because their
+fixture authority is still `PROPOSED` / `PROPOSED_FOR_REVIEW` and the approved
+registry is intentionally empty.  This is a review gate, not a self-approval.
+
+```ini
+CURRENT_MAIN_ANCESTRY=c911e14f9fee1513667a559094732b9ab12ad117
+CORRECTION_CHAIN_MERGED=true
+TEMPORARY_INTEGRATION_COMPOSITION=false
+RELEASE_GATE_TECHNICAL_PASS_COUNT=17
+RELEASE_GATE_GOLDEN_REVIEW_PENDING_COUNT=5
+RELEASE_GATE_TECHNICAL_FAILURE_COUNT=0
+TRUSTED_PY311_RUNTIME=PASS
+TRUSTED_PY312_RUNTIME=PASS
+PY311_PY312_PARITY=PASS
+GOLDEN_SELF_APPROVAL=false
+RELEASE_ACCEPTANCE=BLOCKED
+BLOCK_REASON=V06_GOLDEN_FIXTURE_REVIEW_APPROVAL_PENDING
+READY_AUTHORIZED=false
+MERGE_AUTHORIZED=false
 ```

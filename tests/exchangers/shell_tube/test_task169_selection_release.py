@@ -838,7 +838,7 @@ def test_real_family_materialization_attempts_u_tube_and_floating_head() -> None
         )
 
 
-def test_g02_literal_pairing_passes_task021_and_reaches_task024_boundary() -> None:
+def test_g02_literal_pairing_passes_task021_and_task024() -> None:
     from hexagent.exchangers.shell_tube.baffle_geometry import (
         validate_request as validate_task024,
     )
@@ -898,16 +898,12 @@ def test_g02_literal_pairing_passes_task021_and_reaches_task024_boundary() -> No
             geometry_outcome.geometry,
         )
     )
-    assert baffle_outcome.status.value == "BLOCKED"
-    assert any(
-        blocker.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
-        and blocker.field_path == "configuration.construction_family"
-        for blocker in baffle_outcome.blockers
-    )
-    assert record.stage is CandidateStage.BAFFLE_GEOMETRY
+    assert baffle_outcome.status.value == "VALID"
+    assert baffle_outcome.geometry is not None
+    assert record.stage is CandidateStage.COMPLETE
 
 
-def test_g03_exact_task024_blocker_is_fixed_tubesheet_only_contract() -> None:
+def test_g03_floating_head_passes_task024_applicability() -> None:
     from hexagent.exchangers.shell_tube.baffle_geometry import (
         validate_request as validate_task024,
     )
@@ -954,12 +950,8 @@ def test_g03_exact_task024_blocker_is_fixed_tubesheet_only_contract() -> None:
         )
     )
     assert configuration.construction_family is ConstructionFamily.FLOATING_HEAD
-    assert baffle_outcome.status.value == "BLOCKED"
-    assert any(
-        blocker.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED"
-        and blocker.field_path == "configuration.construction_family"
-        for blocker in baffle_outcome.blockers
-    )
+    assert baffle_outcome.status.value == "VALID"
+    assert baffle_outcome.geometry is not None
 
 
 def test_task169_release_schema_is_v2_and_proposal_status_is_frozen() -> None:
