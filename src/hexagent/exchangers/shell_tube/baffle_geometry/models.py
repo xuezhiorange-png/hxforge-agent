@@ -421,10 +421,10 @@ PUBLIC_OUTPUT_QUANTIZATION_MUST_NOT_CHANGE_CLASSIFICATION = True
 ###############################################################################
 
 
-UNSUPPORTED_FAMILIES: tuple[str, ...] = (
-    "FLOATING_HEAD",
-    "U_TUBE",
-)
+# Every member of TASK-020's closed ``ConstructionFamily`` enum is admitted
+# by the TASK-024 v0.6 applicability slice.  Keep this exported diagnostic
+# set empty so it cannot contradict the Stage-6 supported-family authority.
+UNSUPPORTED_FAMILIES: tuple[str, ...] = ()
 
 
 DEFERRED_CAPABILITIES: tuple[str, ...] = (

@@ -80,7 +80,7 @@ or legal-compliance adequacy.
 ### 3.1 Frozen v1 scope
 
 ```text
-SUPPORTED_CONSTRUCTION_FAMILY=FIXED_TUBESHEET
+SUPPORTED_CONSTRUCTION_FAMILIES=FIXED_TUBESHEET,U_TUBE,FLOATING_HEAD
 SUPPORTED_SHELL_PASS_COUNT=1
 SUPPORTED_BAFFLE_TYPE=SINGLE_SEGMENTAL
 AXIAL_AUTHORITY_MODE=CALLER_SUPPLIED_EXPLICIT
@@ -95,9 +95,55 @@ TUBE_HOLE_REGION_CLASSIFICATION=IN_SCOPE
 
 ### 3.2 Explicitly unsupported in v1
 
+The TASK-169 reviewed Golden G02/G03 gate authorizes a narrow applicability
+correction for `U_TUBE` and `FLOATING_HEAD`.  The existing deterministic
+baffle geometry equations, upstream identity bindings, and fail-closed checks
+are unchanged.  This does not establish U-tube bend fabrication, floating-head
+hardware, pull-clearance, mechanical adequacy, or code-compliance results;
+those remain deferred diagnostics.
+
+`TASK-021` remains the sole authority for U-tube pairing.  TASK-024 consumes
+only a layout that has already passed TASK-021's explicit, complete
+`UTubePairingPlan` validation.  TASK-024 does not generate pairing, infer
+pairs, calculate a U-bend radius, or claim U-tube mechanical/fabrication
+feasibility.
+
+### 3.2.1 Reviewed V0.6 applicability amendment
+
+The TASK-169 V06-G02/G03 reviewed gate authorizes one narrow applicability
+amendment on this branch.  The amendment changes which construction-family
+inputs are admitted by the existing TASK-024 validation boundary; it does not
+change the geometric equations, numeric tolerances, identity contract, or
+engineering meaning of an accepted baffle result.
+
 ```text
-FLOATING_HEAD
-U_TUBE
+TASK024_ENGINEERING_FORMULAS_CHANGED=false
+TASK024_GEOMETRY_EQUATIONS_CHANGED=false
+TASK024_APPLICABILITY_CONTRACT_CHANGED=true
+TASK024_SUPPORTED_FAMILY_SET_CHANGED=true
+TASK024_AUTHORITY_APPLICABILITY_RULE_CHANGED=true
+CHANGE_SCOPE=U_TUBE_AND_FLOATING_HEAD_APPLICABILITY_ONLY
+UTUBE_PAIRING_CONTRACT_CHANGED=false
+UTUBE_PAIRING_INFERENCE_ADDED=false
+UTUBE_BEND_GEOMETRY_MODEL_ADDED=false
+FLOATING_HEAD_MECHANICAL_MODEL_ADDED=false
+PULL_CLEARANCE_MODEL_ADDED=false
+FORMULA_CHANGE=false
+TOLERANCE_CHANGE=false
+```
+
+`U_TUBE` and `FLOATING_HEAD` are therefore admitted to this existing
+deterministic geometry path.  This is not a general construction-family
+expansion and does not provide U-tube mechanical design, U-bend geometry,
+floating-head mechanical design, or pull-clearance design.  U-tube requests
+remain subject to the explicit TASK-021 pairing-plan contract above; missing or
+invalid pairing continues to fail closed in TASK-021 before TASK-024.
+
+No member of the closed TASK-020 `ConstructionFamily` enum is excluded by
+this v0.6 TASK-024 applicability slice.  The unsupported set below is for
+non-family topology and capability limits only.
+
+```text
 SHELL_PASS_COUNT_OTHER_THAN_1
 BAFFLE_TYPE_OTHER_THAN_SINGLE_SEGMENTAL
 AUTOMATIC_BAFFLE_SELECTION
@@ -231,7 +277,8 @@ The core verifies:
 - `blockers` is empty;
 - the existing TASK-020 canonical payload reproduces `configuration_hash`;
 - the existing TASK-020 identity helper reproduces `configuration_id`;
-- `construction_family == FIXED_TUBESHEET`;
+- `construction_family` is one of `FIXED_TUBESHEET`, `U_TUBE`, or
+  `FLOATING_HEAD`;
 - `shell_pass_count == 1`;
 - orientation is one exact existing `Orientation` token;
 - case authority is accepted under the frozen TASK-020/TASK-014 contract.
@@ -274,7 +321,8 @@ The core verifies:
 - `task020_configuration_id` and `task020_configuration_hash` match the
   separately supplied configuration;
 - construction family, orientation, shell-pass count, and tube-pass count match;
-- `tube_hole_count == len(positions)` for the supported fixed-tubesheet slice;
+- `tube_hole_count == len(positions)` for every admitted construction-family
+  path in this TASK-024 slice;
 - every `TubePosition.position_id` is unique;
 - every accepted position has exact canonical `x_m` and `y_m`;
 - no position is re-enumerated, rotated, mirrored, axis-swapped, renamed, or
@@ -1788,7 +1836,7 @@ crossflow_reference_region_semantics=CLASSIFICATION_REFERENCE_ONLY_NOT_FLOW_AREA
 | `task021_layout_hash` | SHA-256 hex |
 | `task022_geometry_id` | string |
 | `task022_geometry_hash` | SHA-256 hex |
-| `construction_family` | exact `FIXED_TUBESHEET` |
+| `construction_family` | exact one of `FIXED_TUBESHEET`, `U_TUBE`, or `FLOATING_HEAD` |
 | `equipment_orientation` | copied from `ShellBundleGeometry.equipment_orientation` and cross-checked against `ShellAndTubeConfiguration.orientation` and `TubeLayout.equipment_orientation` |
 | `shell_pass_count` | exact `1` |
 | `tube_pass_count` | positive integer copied upstream |
@@ -2469,11 +2517,22 @@ BFG_BAFFLE_HOLE_OUTER_TANGENCY_NOT_MANUFACTURING_ADEQUACY
 BFG_BAFFLE_HOLE_PAIR_TANGENCY_NOT_MANUFACTURING_ADEQUACY
 ```
 
-Required baseline warnings on every valid v1 result, in the sole §13 global
-message-sort order (validation stage rank ascending, then code ascending):
+Required baseline warnings on every valid `FIXED_TUBESHEET` v1 result, in the
+sole §13 global message-sort order (validation stage rank ascending, then code
+ascending):
 
 ```text
 BFG_FIXED_TUBESHEET_ONLY_V1
+BFG_GEOMETRY_NOT_FLOW_AREA
+BFG_NOZZLE_POSITION_DEFERRED
+BFG_THERMAL_HYDRAULIC_DEFERRED
+BFG_CALLER_SUPPLIED_NO_STANDARD_CLAIM
+```
+
+For valid `U_TUBE` and `FLOATING_HEAD` results, the fixed-tubesheet-specific
+warning is omitted.  Their baseline set is therefore:
+
+```text
 BFG_GEOMETRY_NOT_FLOW_AREA
 BFG_NOZZLE_POSITION_DEFERRED
 BFG_THERMAL_HYDRAULIC_DEFERRED
@@ -2544,9 +2603,11 @@ LOCAL_TABLE_ORDER_MUST_MATCH_GLOBAL_MESSAGE_SORT=REQUIRED
 
 ### 12.2 Baseline warnings on every `VALID` result
 
-Every `VALID` v1 result emits each of these five codes exactly once, in the
-§13 global message-sort order. Their stage, field path, message key, evidence
-references, and details remain the frozen Round 4 values.
+Every `VALID` `FIXED_TUBESHEET` result emits each of these five codes exactly
+once, in the §13 global message-sort order. The
+`BFG_FIXED_TUBESHEET_ONLY_V1` entry is construction-family-specific: it is not
+emitted for the now-admitted `U_TUBE` or `FLOATING_HEAD` applicability paths.
+The other stage-6 and stage-8 warning semantics remain unchanged.
 
 | Code | `eligibility_stage` | `field_path` | `message_key` | `evidence_refs` | `details` |
 |---|---|---|---|---|---|
@@ -2646,9 +2707,8 @@ Rules:
   - do NOT produce any warning whose eligibility stage is `s` or any
     stage `t > s`.
 
-A `VALID` result therefore carries:
-
-- the five baseline warnings (each exactly once), plus
+A `VALID` result therefore carries the applicable construction-family baseline
+warnings (each exactly once), plus
 - at most one of each tangency warning that actually occurred.
 
 The closed warning set remains exactly **8** codes.
@@ -3305,7 +3365,7 @@ at minimum:
     `BFG_PUBLIC_GEOMETRY_QUANTIZATION_COLLISION`;
 21. positive unquantized gap becoming public zero does NOT emit a
     solid-tangency warning;
-22. five baseline warnings exactly match the §13 sorted order;
+22. construction-family baseline warnings exactly match the §13 sorted order;
 23. eligible stage-12, stage-15, and stage-16 optional warnings appear after
     baseline stages in the same §13 order;
 24. local table order and serialized warning order are identical;

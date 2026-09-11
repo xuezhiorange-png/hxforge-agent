@@ -297,9 +297,115 @@ def test_stage6_supported_slice_passes_and_emits_four_warnings() -> None:
     ]
 
 
-def test_stage6_unsupported_construction_family_blocks_and_suppresses_warnings() -> None:
+def test_stage6_u_tube_is_supported_after_upstream_pairing_validation() -> None:
     from hexagent.exchangers.shell_tube import models as task020_models
 
+    request = builders.make_request(construction_family=task020_models.ConstructionFamily.U_TUBE)
+    result = t024_authority.validate_authority_foundation(request)
+    assert not any(b.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED" for b in result.blockers)
+    assert "BFG_FIXED_TUBESHEET_ONLY_V1" not in {warning.code for warning in result.warnings}
+    assert any(warning.code == "BFG_GEOMETRY_NOT_FLOW_AREA" for warning in result.warnings)
+
+
+def test_v06_supported_family_slice_has_no_unsupported_family_residue() -> None:
+    assert t024_models.UNSUPPORTED_FAMILIES == ()
+
+
+def test_utube_real_task021_pairing_result_is_admitted_by_task024() -> None:
+    from dataclasses import replace as _dc_replace
+
+    from hexagent.exchangers.shell_tube import models as task020_models
+    from hexagent.exchangers.shell_tube.tube_layout import (
+        ValidationStatus as task021_status,
+    )
+    from hexagent.exchangers.shell_tube.tube_layout import (
+        validate_request as validate_task021_request,
+    )
+    from tests.exchangers.shell_tube.tube_layout import (
+        _builders as task021_builders,
+    )
+
+    configuration = builders.make_shell_and_tube_configuration(
+        construction_family=task020_models.ConstructionFamily.U_TUBE
+    )
+    task021_request = task021_builders.make_request()
+    task021_request["configuration"] = configuration
+    task021_request["origin_mode"] = "CENTER_ON_PRIMITIVE_CELL"
+    task021_request["u_tube_pairing_plan"] = {
+        "schema_version": "task021.u-tube-pairing.v1",
+        "pairs": [
+            {
+                "pair_id": "t024-utube-001",
+                "leg_a": {"u": -1, "v": -2},
+                "leg_b": {"u": 0, "v": -2},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+            {
+                "pair_id": "t024-utube-002",
+                "leg_a": {"u": -2, "v": -1},
+                "leg_b": {"u": -1, "v": -1},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+            {
+                "pair_id": "t024-utube-003",
+                "leg_a": {"u": 0, "v": -1},
+                "leg_b": {"u": 1, "v": -1},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+            {
+                "pair_id": "t024-utube-004",
+                "leg_a": {"u": -2, "v": 0},
+                "leg_b": {"u": -1, "v": 0},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+            {
+                "pair_id": "t024-utube-005",
+                "leg_a": {"u": 0, "v": 0},
+                "leg_b": {"u": 1, "v": 0},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+            {
+                "pair_id": "t024-utube-006",
+                "leg_a": {"u": -1, "v": 1},
+                "leg_b": {"u": 0, "v": 1},
+                "evidence_refs": ["task024-utube-pairing"],
+            },
+        ],
+        "evidence_refs": ["task024-utube-pairing"],
+        "pairing_plan_hash": "1b9c573e81f7591467f3afd0b68a5209c109b484436ab1db84944b157899a774",
+    }
+    layout_result = validate_task021_request(
+        task021_request,
+        software_version="task024-test",
+        git_commit="task024-test",
+    )
+    assert layout_result.status is task021_status.VALID
+    assert layout_result.layout is not None
+    assert layout_result.layout.physical_tube_count == 6
+
+    base_request = builders.make_request(
+        construction_family=task020_models.ConstructionFamily.U_TUBE
+    )
+    geometry = builders.make_shell_bundle_geometry(configuration, layout_result.layout)
+    request = _dc_replace(
+        base_request,
+        configuration=configuration,
+        tube_layout=layout_result.layout,
+        shell_bundle_geometry=geometry,
+    )
+    result = t024_authority.validate_authority_foundation(request)
+    assert not any(b.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED" for b in result.blockers)
+    assert result.completed_stage_rank >= 6
+
+
+def test_stage6_allowlist_still_blocks_an_unadmitted_family(monkeypatch) -> None:
+    from hexagent.exchangers.shell_tube import models as task020_models
+
+    monkeypatch.setattr(
+        t024_authority,
+        "_SUPPORTED_CONSTRUCTION_FAMILIES",
+        frozenset({"FIXED_TUBESHEET", "FLOATING_HEAD"}),
+    )
     request = builders.make_request(construction_family=task020_models.ConstructionFamily.U_TUBE)
     result = t024_authority.validate_authority_foundation(request)
     assert any(b.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED" for b in result.blockers)
@@ -316,6 +422,16 @@ def test_stage6_unsupported_construction_family_blocks_and_suppresses_warnings()
         }
     ]
     assert stage6_warning_codes == []
+
+
+def test_stage6_floating_head_is_supported_geometric_applicability_path() -> None:
+    request = builders.make_request(
+        construction_family=task020_models.ConstructionFamily.FLOATING_HEAD
+    )
+    result = t024_authority.validate_authority_foundation(request)
+    assert not any(b.code == "BFG_CONSTRUCTION_FAMILY_UNSUPPORTED" for b in result.blockers)
+    assert "BFG_FIXED_TUBESHEET_ONLY_V1" not in {warning.code for warning in result.warnings}
+    assert any(warning.code == "BFG_GEOMETRY_NOT_FLOW_AREA" for warning in result.warnings)
 
 
 def test_stage6_unsupported_shell_pass_count_blocks() -> None:
