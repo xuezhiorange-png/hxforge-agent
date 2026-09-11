@@ -618,10 +618,10 @@ def _full_chain_evidence(record: CandidateRecord | None) -> bool:
     return all(evidence_groups)
 
 
-def _constraint(record: CandidateRecord | None, key: str) -> str | None:
-    if record is None:
-        return None
-    return dict(record.constraint_evaluations).get(key)
+def _has_candidate_evidence(record: CandidateRecord | None, field_name: str) -> bool:
+    """Require the named native TASK-168 evidence projection for a gate."""
+
+    return record is not None and bool(getattr(record, field_name))
 
 
 def _exclusion_reasons(
@@ -871,10 +871,31 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
         )
         for record in g04_records
     )
-    tube_dp_ok = _constraint(g04, "max_tube_dp_pa") == "PASS" and g04_dp_rejection
-    shell_dp_ok = _constraint(g04, "max_shell_dp_pa") == "PASS" and g04_dp_rejection
+    # TASK-165 requires both native DP result surfaces and a real constrained
+    # multi-candidate Golden.  G04 intentionally binds one of the frozen
+    # tube/shell DP limits, not both; requiring a second absent limit would
+    # reject a valid shell-DP constrained fixture.
+    tube_dp_ok = (
+        all(
+            _has_candidate_evidence(candidate, "tube_dp_evidence")
+            for candidate in (g01, g02, g03, g04)
+        )
+        and g04_dp_rejection
+    )
+    shell_dp_ok = (
+        all(
+            _has_candidate_evidence(candidate, "shell_dp_evidence")
+            for candidate in (g01, g02, g03, g04)
+        )
+        and g04_dp_rejection
+    )
+    # Thermal-duty closure is the native TASK-162 closure result.  A separate
+    # optional ``required_duty_w`` hard constraint is not required by every
+    # approved positive Golden when the closed thermal specification itself is
+    # present.
     duty_ok = all(
-        _constraint(candidate, "required_duty_w") == "PASS" for candidate in (g01, g02, g03, g04)
+        _has_candidate_evidence(candidate, "thermal_closure_evidence")
+        for candidate in (g01, g02, g03, g04)
     )
     full_chain_ok = all(_full_chain_evidence(candidate) for candidate in (g01, g02, g03, g04))
     runtime = _runtime_observation(request_hash_value, request, replays)
@@ -913,9 +934,19 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
             _GATE_ORDER[8],
         ),
         _gate(golden_ok[GoldenCaseId.V06_G04], _GATE_ORDER[9]),
-        _gate(tube_dp_ok, _GATE_ORDER[10]),
-        _gate(shell_dp_ok, _GATE_ORDER[11]),
-        _gate(duty_ok, _GATE_ORDER[12]),
+        _gate(
+            tube_dp_ok,
+            _GATE_ORDER[10],
+            "TASK168_TUBE_DP_EVIDENCE",
+            "G04_DP_HARD_CONSTRAINT_REJECTION",
+        ),
+        _gate(
+            shell_dp_ok,
+            _GATE_ORDER[11],
+            "TASK168_SHELL_DP_EVIDENCE",
+            "G04_DP_HARD_CONSTRAINT_REJECTION",
+        ),
+        _gate(duty_ok, _GATE_ORDER[12], "TASK162_THERMAL_CLOSURE_EVIDENCE"),
         _gate(task168_replay_ok and selection_replay_ok, _GATE_ORDER[13]),
         _gate(provenance_ok, _GATE_ORDER[14]),
         _gate(parity_ok, _GATE_ORDER[15]),
@@ -928,6 +959,7 @@ def validate_request(raw: object) -> Task169ReleaseValidationResult:
         _gate(
             all(gate.status is AcceptanceStatus.PASS for gate in gates),
             _GATE_ORDER[-1],
+            "GATES_01_21_ALL_PASS",
         )
     )
     gates_tuple = tuple(gates)

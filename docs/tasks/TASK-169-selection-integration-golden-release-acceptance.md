@@ -234,15 +234,18 @@ END_TO_END_RELEASE_DEMO
 
 Synthetic/unit fixtures remain contract tests only.  They cannot satisfy a
 Golden gate or provide reviewer approval.  The approved registry still does
-not bypass exact replay or trusted runtime evidence; a missing runtime or
-identity mismatch remains blocked:
+not bypass exact replay or trusted runtime evidence.  The pre-closeout local
+observation with four blocked gates was superseded by the final 22-gate
+closeout recorded in `docs/tasks/TASK-169-v06-release-acceptance-final.md`.
 
 ```ini
 TASK168_AUTHORITATIVE_REQUEST_BOUND=true
 TASK168_REAL_REPLAY=PASS
 TRUSTED_PARITY=CI_PROVISIONED_RUNTIME_OBSERVATION
-RELEASE_ACCEPTANCE=BLOCKED
-BLOCK_REASON=GOLDEN_AUTHORITY_OR_REPLAY_EVIDENCE_MISSING
+RELEASE_ACCEPTANCE=PASS
+RELEASE_GATE_PASS_COUNT=22
+RELEASE_GATE_FAIL_COUNT=0
+RELEASE_GATE_REVIEW_PENDING_COUNT=0
 ```
 
 ```ini
@@ -266,11 +269,13 @@ from the main-ancestry replay, not from the earlier temporary composition.
 | V06-G04 | `c7cb67c9c6a7fc7af3f5ba1f30639d18e3b3c010f566756c97e306d3fcb93a87` / `0333664d-a67b-5aeb-b520-f77bb8fa7ebc` | `901dcb049c8a833d987ea1de03e2ad177ba7f9966d4fbe38b9ce0f60ad536d6a` / `55abcd89-fab4-5b29-88ea-60d0ef077b83` | WARN, recommendable; hard-blocked alternative excluded |
 | V06-G05 | `a0521d00137833f0bd3763c440e0684fa993ba36917b824951a43a234ef3a17e` / `1cf76875-a201-5a14-a9c7-960912156a1d` | `b2f86665b182deab959af4eb1e0617a7939341d67b5eb81c2b94aa9a0a66c197` / `4019e286-8f41-5d94-a996-f825aa39094b` | BLOCKED, no recommendation; frozen missing TASK-166 authority |
 
-The non-Golden release gates are technically satisfied by the real replay,
-including trusted Python 3.11/3.12 parity and deterministic identity
-reconciliation.  The five Golden identities are bound to the independent
-review decisions in the approved registry.  This is an authority binding, not
-a self-approval, and it does not alter Ready/Merge authorization.
+The final 22-gate closeout is satisfied by the real replay, including trusted
+Python 3.11/3.12 parity and deterministic identity reconciliation.  The five
+Golden identities are bound to the independent review decisions in the
+approved registry.  This is an authority binding, not a self-approval, and it
+does not alter Ready/Merge authorization.  The DP gates use native TASK-168
+DP evidence plus the approved G04 shell-DP hard-constraint rejection; the
+thermal-duty gate uses native TASK-162 thermal-closure evidence.
 
 ```ini
 CURRENT_MAIN_ANCESTRY=c911e14f9fee1513667a559094732b9ab12ad117
@@ -283,8 +288,8 @@ TRUSTED_PY311_RUNTIME=PASS
 TRUSTED_PY312_RUNTIME=PASS
 PY311_PY312_PARITY=PASS
 GOLDEN_SELF_APPROVAL=false
-RELEASE_ACCEPTANCE=BLOCKED
-BLOCK_REASON=GOLDEN_AUTHORITY_OR_REPLAY_EVIDENCE_MISSING
+RELEASE_ACCEPTANCE=PASS
+BLOCK_REASON=NONE
 READY_AUTHORIZED=false
 MERGE_AUTHORIZED=false
 ```

@@ -17,7 +17,7 @@
     "main_ancestry_acceptance": true
   },
   "tolerance_class": "TASK165_V06_FROZEN",
-  "release_request_hash": "2be7bb6283145c79a35594032ec68f86f443bac1be9a3a30ec0077c77eb510c8",
+  "release_request_hash": "674e01f347146ae19056c15e934fb7d87c8279e8a1274be11ac85063f0d9c334",
   "goldens": [
     {
       "golden_id": "V06-G01",
@@ -338,10 +338,10 @@
       "approved_numeric_expectations": [],
       "tolerance_class": "TASK165_V06_FROZEN",
       "provenance_source_hash": "5396c03e3219577edc840db46395c30fb02a270b0b942dcd92df3e221c1416ba",
-      "reviewer_evidence_refs": ["TASK169_INDEPENDENT_GOLDEN_REVIEW", "TASK169_REVIEW_HEAD_40C8188"],
+      "reviewer_evidence_refs": ["TASK169_INDEPENDENT_GOLDEN_REVIEW", "TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION", "TASK169_REVIEW_HEAD_E467F05"],
       "review_status": "APPROVED",
       "approved_by": "TASK169_INDEPENDENT_GOLDEN_REVIEW",
-      "approval_evidence": ["40c8188eca8f0430c54277a3b86873012942ed10", "TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION"],
+      "approval_evidence": ["TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION", "e467f05f4d73a5df569f94d01a72cadbd0dc16b1"],
       "expected_identity_status": "APPROVED",
       "negative_class": "MISSING_REQUIRED_SOURCE_OR_LICENSE_AUTHORITY",
       "expected_blocker_code": "EVALUATION_AUTHORITY_REQUIRED",

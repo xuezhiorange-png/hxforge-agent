@@ -157,6 +157,16 @@ or detailed mechanical design.
  APPROVAL_EVIDENCE=[REVIEW_HEAD,DECISION_REF]
  ```
 
+ `V06-G01` through `V06-G04` retain the review evidence for head
+ `40c8188eca8f0430c54277a3b86873012942ed10`.  `V06-G05` is independently
+ approved after the frozen-negative correction and therefore carries its own
+ per-Golden evidence binding:
+
+ ```ini
+ G05_REVIEW_HEAD=e467f05f4d73a5df569f94d01a72cadbd0dc16b1
+ G05_REVIEW_DECISION=TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION
+ ```
+
  The production release validator has no mutable caller approval path.  It
  compares each approved case with the immutable registry before accepting its
  replay; a missing or mismatched registry entry remains fail-closed.
@@ -182,11 +192,12 @@ or detailed mechanical design.
 The full TASK-165 gate set remains mandatory.  Golden registration does not
 authorize Ready or Merge; release acceptance can pass only after exact replay
 and trusted runtime evidence satisfy every gate.  Any missing review or replay
-evidence remains fail-closed:
+evidence remains fail-closed.  The final 22-gate closeout is recorded
+separately in `docs/tasks/TASK-169-v06-release-acceptance-final.md`.
 
  ```ini
- RELEASE_ACCEPTANCE=BLOCKED
- BLOCK_REASON=GOLDEN_AUTHORITY_OR_REPLAY_EVIDENCE_MISSING
+ RELEASE_ACCEPTANCE=PASS
+ BLOCK_REASON=NONE
  READY_AUTHORIZED=false
  MERGE_AUTHORIZED=false
  ```

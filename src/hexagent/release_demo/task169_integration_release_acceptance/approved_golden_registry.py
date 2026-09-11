@@ -17,6 +17,7 @@ from .models import GoldenCaseId
 
 APPROVED_GOLDEN_REVIEW_AUTHORITY: Final[str] = "TASK169_INDEPENDENT_GOLDEN_REVIEW"
 APPROVED_GOLDEN_REVIEW_HEAD: Final[str] = "40c8188eca8f0430c54277a3b86873012942ed10"
+APPROVED_GOLDEN_G05_REVIEW_HEAD: Final[str] = "e467f05f4d73a5df569f94d01a72cadbd0dc16b1"
 APPROVED_GOLDEN_REVIEW_STATUS: Final[str] = "APPROVED"
 APPROVED_GOLDEN_IDENTITY_STATUS: Final[str] = "APPROVED"
 APPROVED_GOLDEN_TOLERANCE_CLASS: Final[str] = "TASK165_V06_FROZEN"
@@ -58,6 +59,11 @@ _REVIEW_REFS = (
     APPROVED_GOLDEN_REVIEW_AUTHORITY,
     "TASK169_REVIEW_HEAD_40C8188",
 )
+_G05_REVIEW_REFS = (
+    APPROVED_GOLDEN_REVIEW_AUTHORITY,
+    "TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION",
+    "TASK169_REVIEW_HEAD_E467F05",
+)
 
 
 def _entry(
@@ -75,6 +81,8 @@ def _entry(
     expected_blocker_code: str | None = None,
     expected_blocker_owner: str | None = None,
     no_recommendation_required: bool = False,
+    review_head: str = APPROVED_GOLDEN_REVIEW_HEAD,
+    reviewer_evidence_refs: tuple[str, ...] = _REVIEW_REFS,
 ) -> ApprovedGoldenAuthority:
     return ApprovedGoldenAuthority(
         golden_id=golden_id,
@@ -95,12 +103,12 @@ def _entry(
         task169_result_id=task169_result_id,
         tolerance_class=APPROVED_GOLDEN_TOLERANCE_CLASS,
         provenance_source_hash=provenance_source_hash,
-        reviewer_evidence_refs=_REVIEW_REFS,
+        reviewer_evidence_refs=reviewer_evidence_refs,
         review_status=APPROVED_GOLDEN_REVIEW_STATUS,
         approved_by=APPROVED_GOLDEN_REVIEW_AUTHORITY,
         approval_evidence=tuple(
             sorted(
-                (decision_ref, APPROVED_GOLDEN_REVIEW_HEAD),
+                (decision_ref, review_head),
                 key=lambda item: item.encode("utf-8"),
             )
         ),
@@ -172,6 +180,8 @@ APPROVED_GOLDEN_REGISTRY: Final[Mapping[GoldenCaseId, ApprovedGoldenAuthority]] 
             expected_blocker_code="EVALUATION_AUTHORITY_REQUIRED",
             expected_blocker_owner="TASK166",
             no_recommendation_required=True,
+            review_head=APPROVED_GOLDEN_G05_REVIEW_HEAD,
+            reviewer_evidence_refs=_G05_REVIEW_REFS,
         ),
     }
 )
@@ -191,6 +201,7 @@ __all__ = [
     "APPROVED_GOLDEN_RANKING_POLICY_HASH",
     "APPROVED_GOLDEN_REGISTRY",
     "APPROVED_GOLDEN_REVIEW_AUTHORITY",
+    "APPROVED_GOLDEN_G05_REVIEW_HEAD",
     "APPROVED_GOLDEN_REVIEW_HEAD",
     "APPROVED_GOLDEN_REVIEW_STATUS",
     "APPROVED_GOLDEN_TOLERANCE_CLASS",

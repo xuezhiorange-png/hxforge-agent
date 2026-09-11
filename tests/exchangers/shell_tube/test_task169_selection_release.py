@@ -85,6 +85,8 @@ from hexagent.release_demo.task169_integration_release_acceptance import (
     validate_request as validate_release_request,
 )
 from hexagent.release_demo.task169_integration_release_acceptance.approved_golden_registry import (
+    APPROVED_GOLDEN_G05_REVIEW_HEAD,
+    APPROVED_GOLDEN_REVIEW_HEAD,
     approved_golden_authority,
 )
 from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
@@ -115,6 +117,31 @@ from hexagent.release_demo.task169_integration_release_acceptance.trusted_eviden
     Task169ParityInput,
     observe_dual_runtime,
     repository_identity,
+)
+
+EXPECTED_RELEASE_GATE_ORDER = (
+    "SHELL_TUBE_FIXED_GEOMETRY_RATING",
+    "BELL_DELAWARE_HEAT_TRANSFER",
+    "BELL_DELAWARE_PRESSURE_DROP",
+    "BELL_DELAWARE_PROVENANCE_COMPLETE",
+    "SHELL_TUBE_ENGINEERING_SCREENING",
+    "THERMAL_EXPANSION_SCREENING",
+    "VIBRATION_SCREENING",
+    "SHELL_TUBE_CANDIDATE_GENERATION",
+    "SHELL_TUBE_SIZING",
+    "SHELL_TUBE_MULTI_CANDIDATE_RANKING",
+    "TUBE_DP_CONSTRAINT_CLOSURE",
+    "SHELL_DP_CONSTRAINT_CLOSURE",
+    "THERMAL_DUTY_CLOSURE",
+    "DETERMINISTIC_REPLAY",
+    "PROVENANCE_COMPLETE",
+    "PY311_PY312_PARITY",
+    "GOLDEN_V06_G01",
+    "GOLDEN_V06_G02",
+    "GOLDEN_V06_G03",
+    "GOLDEN_V06_G04",
+    "GOLDEN_V06_G05",
+    "END_TO_END_RELEASE_DEMO",
 )
 
 
@@ -669,6 +696,64 @@ def test_release_replays_task168_public_validator_for_each_golden(
         assert outcome.valid.trusted_runtime_status is AcceptanceStatus.PASS
 
 
+def test_release_approved_goldens_pass_all_22_gates() -> None:
+    py311 = os.environ.get("TASK169_PY311_EXECUTABLE") or os.environ.get("TASK164_PY311_EXECUTABLE")
+    py312 = os.environ.get("TASK169_PY312_EXECUTABLE") or os.environ.get("TASK164_PY312_EXECUTABLE")
+    if not (py311 and py312 and Path(py311).is_file() and Path(py312).is_file()):
+        pytest.skip("trusted dual-runtime executables are not provisioned")
+
+    outcome = validate_release_request(_release_request())
+    assert outcome.valid is not None
+    assert outcome.valid.overall_status is AcceptanceStatus.PASS
+    assert outcome.valid.blocker_codes == ()
+    assert len(outcome.valid.acceptance_gates) == 22
+    assert (
+        tuple(gate.gate_id for gate in outcome.valid.acceptance_gates)
+        == EXPECTED_RELEASE_GATE_ORDER
+    )
+    assert all(gate.status is AcceptanceStatus.PASS for gate in outcome.valid.acceptance_gates)
+    golden_statuses = {
+        record.golden_id.value: record.status for record in outcome.valid.golden_records
+    }
+    assert golden_statuses == {
+        "V06-G01": AcceptanceStatus.PASS,
+        "V06-G02": AcceptanceStatus.PASS,
+        "V06-G03": AcceptanceStatus.PASS,
+        "V06-G04": AcceptanceStatus.PASS,
+        "V06-G05": AcceptanceStatus.PASS,
+    }
+    assert outcome.valid.golden_records[-1].recommended_candidate_id is None
+
+
+def test_g05_review_evidence_is_bound_per_golden() -> None:
+    prior_review_decisions = {
+        GoldenCaseId.V06_G01: "TASK169_REVIEW_G01_APPROVE",
+        GoldenCaseId.V06_G02: "TASK169_REVIEW_G02_APPROVE_FOR_FIXTURE_SCOPE",
+        GoldenCaseId.V06_G03: "TASK169_REVIEW_G03_APPROVE",
+        GoldenCaseId.V06_G04: "TASK169_REVIEW_G04_APPROVE",
+    }
+    for golden_id, decision_ref in prior_review_decisions.items():
+        approved = approved_golden_authority(golden_id)
+        assert approved is not None
+        assert approved.reviewer_evidence_refs == (
+            "TASK169_INDEPENDENT_GOLDEN_REVIEW",
+            "TASK169_REVIEW_HEAD_40C8188",
+        )
+        assert approved.approval_evidence == (APPROVED_GOLDEN_REVIEW_HEAD, decision_ref)
+
+    g05 = approved_golden_authority(GoldenCaseId.V06_G05)
+    assert g05 is not None
+    assert g05.reviewer_evidence_refs == (
+        "TASK169_INDEPENDENT_GOLDEN_REVIEW",
+        "TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION",
+        "TASK169_REVIEW_HEAD_E467F05",
+    )
+    assert g05.approval_evidence == (
+        "TASK169_REVIEW_G05_APPROVE_AFTER_FROZEN_NEGATIVE_CORRECTION",
+        APPROVED_GOLDEN_G05_REVIEW_HEAD,
+    )
+
+
 def test_release_does_not_have_caller_supplied_task168_result_surface() -> None:
     case = _release_request().golden_cases[0]
     assert not hasattr(case, "task168_result")
@@ -691,6 +776,26 @@ def test_release_g04_replays_real_multi_candidate_dp_constraint() -> None:
     assert g04.recommended_candidate_id
     assert not any(code == "G04_MULTI_CANDIDATE_REQUIRED" for code in g04.reason_codes)
     assert not any(code == "G04_DP_CONSTRAINED_REJECTION_REQUIRED" for code in g04.reason_codes)
+
+
+def test_release_constraint_gates_use_native_evidence_for_bound_requirements() -> None:
+    request = _release_request()
+    outcome = validate_release_request(request)
+    assert outcome.valid is not None
+    gates = {gate.gate_id: gate for gate in outcome.valid.acceptance_gates}
+    assert gates["TUBE_DP_CONSTRAINT_CLOSURE"].status is AcceptanceStatus.PASS
+    assert gates["SHELL_DP_CONSTRAINT_CLOSURE"].status is AcceptanceStatus.PASS
+    assert gates["THERMAL_DUTY_CLOSURE"].status is AcceptanceStatus.PASS
+    assert gates["TUBE_DP_CONSTRAINT_CLOSURE"].evidence_refs == (
+        "TASK168_TUBE_DP_EVIDENCE",
+        "G04_DP_HARD_CONSTRAINT_REJECTION",
+    )
+    assert gates["THERMAL_DUTY_CLOSURE"].evidence_refs == ("TASK162_THERMAL_CLOSURE_EVIDENCE",)
+    g04_replay = release_service._replay_task168(request.golden_cases[3])
+    assert g04_replay.selection is not None
+    g04_candidate = release_service._candidate_for_result(g04_replay, g04_replay.selection)
+    assert g04_candidate is not None
+    assert dict(g04_candidate.constraint_evaluations) == {"max_shell_dp_pa": "PASS"}
 
 
 def test_release_g05_is_real_no_recommendation_path() -> None:
