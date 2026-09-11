@@ -131,6 +131,11 @@ from .raw_projection import project_raw_request_with_diagnostics
 TASK162_METHOD_AUTHORITY_ID = "MAGAZONI_1X1_COUNTERFLOW_SECTIONAL_P_MODEL_V1"
 TASK162_METHOD_FAMILY = "BOUNDED_TEMA_E_SECTIONAL_COUNTERFLOW"
 TASK162_FLOW_ARRANGEMENT_CATALOG_ID = "TEMA_E_1X1_OVERALL_COUNTERFLOW_SECTIONAL_MIXING"
+TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID = (
+    "TEMA_E_1X1_OVERALL_COUNTERFLOW_SECTIONAL_MIXING_V06_SHELL_TUBE"
+)
+TASK162_V06_METHOD_REVISION = "V1_V06_SHELL_TUBE"
+TASK162_V06_CONSTRUCTION_FAMILY_SCOPE = frozenset({"FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"})
 TASK162_ENGINEERING_SOURCE_ID = "MAGAZONI_2019"
 TASK162_RELATION_ID = "MAGAZONI_1X1_MIXING_MODEL_2_P_RELATION_TABLE_7"
 
@@ -542,7 +547,8 @@ def _case_binding(
         return None, Task162FailureCode.CASE_AUTHORITY_INVALID
     try:
         envelope = task160.envelope_authority
-        if envelope.construction_family.value != "FIXED_TUBESHEET":
+        construction_family = envelope.construction_family.value
+        if construction_family not in TASK162_V06_CONSTRUCTION_FAMILY_SCOPE:
             return None, Task162FailureCode.CASE_BINDING_VALUE_MISMATCH
         if envelope.shell_pass_count != 1 or envelope.tube_pass_count != 1:
             return None, Task162FailureCode.CASE_BINDING_VALUE_MISMATCH
@@ -550,7 +556,7 @@ def _case_binding(
         return None, Task162FailureCode.INVALID_TASK160_RESULT
     return (
         Task162NormalizedCaseBinding(
-            physical_configuration_authority="FIXED_TUBESHEET",
+            physical_configuration_authority=construction_family,
             shell_pass_count_authority=1,
             tube_pass_count_authority=1,
             shell_type_authority=case.shell_type,
@@ -571,18 +577,39 @@ def _case_binding(
     )
 
 
-def _method_applicable(task161: Task161Result, case: Task162CaseAuthority) -> bool:
+def _method_applicable(
+    task161: Task161Result,
+    case: Task162CaseAuthority,
+    construction_family: str,
+) -> bool:
     flow = task161.flow_arrangement_catalog
     method = task161.performance_method_catalog
+    legacy_profile = (
+        construction_family == "FIXED_TUBESHEET"
+        and flow.catalog_id == TASK162_FLOW_ARRANGEMENT_CATALOG_ID
+        and method.method_revision == "V1"
+    )
+    v06_profile = (
+        construction_family in TASK162_V06_CONSTRUCTION_FAMILY_SCOPE
+        and construction_family != "FIXED_TUBESHEET"
+        and flow.catalog_id == TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID
+        and method.method_revision == TASK162_V06_METHOD_REVISION
+    )
+    expected_catalog_id = (
+        TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID
+        if v06_profile
+        else TASK162_FLOW_ARRANGEMENT_CATALOG_ID
+    )
     return (
-        flow.catalog_id == TASK162_FLOW_ARRANGEMENT_CATALOG_ID
+        (legacy_profile or v06_profile)
+        and flow.catalog_id == expected_catalog_id
         and flow.source_shell_type == "TEMA_E"
         and flow.source_shell_pass_count == 1
         and flow.source_tube_pass_count == 1
         and flow.overall_flow_orientation == "COUNTER_FLOW"
         and method.method_authority_id == TASK162_METHOD_AUTHORITY_ID
         and method.method_family == TASK162_METHOD_FAMILY
-        and method.flow_arrangement_catalog_id == TASK162_FLOW_ARRANGEMENT_CATALOG_ID
+        and method.flow_arrangement_catalog_id == expected_catalog_id
         and method.engineering_source_id == TASK162_ENGINEERING_SOURCE_ID
         and method.relation_id == TASK162_RELATION_ID
         and case.shell_type is Task162ShellType.TEMA_E
@@ -677,10 +704,15 @@ def _energy_closure(
         return None, None, None
 
 
-def _make_applicability() -> Task162Applicability:
+def _make_applicability(*, v06: bool = False) -> Task162Applicability:
     names = (
-        "TASK160_ACCEPTED",
-        "TASK161_ACCEPTED",
+        (
+            "TASK160_V06_ENVELOPE_ACCEPTED",
+            "TASK161_V06_METHOD_PROFILE_ACCEPTED",
+        )
+        if v06
+        else ("TASK160_ACCEPTED", "TASK161_ACCEPTED")
+    ) + (
         "TASK038_ACCEPTED",
         "SAME_CASE_BINDING_MATCHED",
         "CASE_BINDING_COMPLETE",
@@ -873,7 +905,9 @@ def _success(
         delta_t_in_k=decimal_subtract(t_hot_in, t_cold_in),
         q_max_w=q_max,
     )
-    applicability = _make_applicability()
+    applicability = _make_applicability(
+        v06=normalized_case.physical_configuration_authority != "FIXED_TUBESHEET"
+    )
     completeness = _make_completeness()
     _, semantic = build_success_provenance(
         request_hash=request_hash_value,
@@ -1220,7 +1254,11 @@ def validate_request(raw: object) -> Task162ValidationResult:
             stage=Task162FailureStage.CASE_BINDING,
             task160_id=_task160_id_or_none(task160),
         )
-    if not _method_applicable(task161, request.case_authority):
+    if not _method_applicable(
+        task161,
+        request.case_authority,
+        task160.envelope_authority.construction_family.value,
+    ):
         return _typed_blocked(
             request_hash_value,
             (
@@ -1505,9 +1543,11 @@ def verify_task162_success(
             )
 
         try:
-            if (
-                type(claimed.applicability) is not Task162Applicability
-                or claimed.applicability != _make_applicability()
+            if type(
+                claimed.applicability
+            ) is not Task162Applicability or claimed.applicability != _make_applicability(
+                v06=claimed.case_binding_evidence.physical_configuration_authority
+                != "FIXED_TUBESHEET"
             ):
                 return _success_verification_rejected(
                     Task162SuccessVerificationFailureReason.TASK162_NOT_APPLICABLE
@@ -1725,6 +1765,9 @@ def verify_task162_success(
 
 
 __all__ = [
+    "TASK162_V06_CONSTRUCTION_FAMILY_SCOPE",
+    "TASK162_V06_FLOW_ARRANGEMENT_CATALOG_ID",
+    "TASK162_V06_METHOD_REVISION",
     "issue_success_replay_evidence",
     "validate_request",
     "verify_task162_success",

@@ -23,6 +23,15 @@ TASK160_VERSION = "task160.v1"
 TASK160_IMPLEMENTATION_SOFTWARE_VERSION = "task160.local-implementation.v1"
 RAW_PROJECTION_SCHEMA_VERSION = "task160.raw-projection.v1"
 
+# The v0.5 envelope remains the historical TASK160 authority.  This separate
+# profile is the reviewed v0.6 bridge for the construction families whose
+# family-specific geometry and mechanical semantics have already been closed
+# by the upstream TASK020-TASK166 chain.  It deliberately remains 1x1.
+TASK160_V06_ENVELOPE_AUTHORITY_ID = "A06_V06_SHELL_TUBE_THERMAL_ENVELOPE"
+TASK160_V06_ENVELOPE_SOURCE_ID = "TASK169-V06-THERMAL-CLOSURE-AUTHORITY"
+TASK160_V06_ENVELOPE_SOURCE_VERSION = "v0.6"
+TASK160_V06_ENVELOPE_EVIDENCE_REF = "TASK169-THERMAL-CLOSURE-AUTHORITY-V06"
+
 TASK160_DECIMAL_PRECISION = 160
 TASK160_DECIMAL_MAX_INPUT_SIGNIFICANT_DIGITS = 79
 TASK160_DECIMAL_MIN_ADJUSTED_EXPONENT = -499000
@@ -61,6 +70,15 @@ class PropertyEvaluationQueryType(StrEnum):
 
 class ConstructionFamily(StrEnum):
     FIXED_TUBESHEET = "FIXED_TUBESHEET"
+    U_TUBE = "U_TUBE"
+    FLOATING_HEAD = "FLOATING_HEAD"
+
+
+TASK160_V06_CONSTRUCTION_FAMILIES: tuple[ConstructionFamily, ...] = (
+    ConstructionFamily.FIXED_TUBESHEET,
+    ConstructionFamily.U_TUBE,
+    ConstructionFamily.FLOATING_HEAD,
+)
 
 
 class PropertySnapshotIdentityScheme(StrEnum):
@@ -120,6 +138,7 @@ class ApplicabilityCheckId(StrEnum):
     A04_SINGLE_PHASE_AUTHORITY = "A04"
     A05_CONSTANT_PROPERTY_SNAPSHOT = "A05"
     A06_FIXED_GEOMETRY_V05_ENVELOPE = "A06"
+    A06_V06_SHELL_TUBE_THERMAL_ENVELOPE = "A06_V06"
     A07_FINITE_VALID_INLET_STATE = "A07"
     A08_POSITIVE_MASS_FLOW = "A08"
     A09_POSITIVE_CP = "A09"
@@ -392,16 +411,57 @@ class Task160EnvelopeAuthority:
     evidence_refs: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if self.construction_family is not ConstructionFamily.FIXED_TUBESHEET:
+        if self.construction_family not in TASK160_V06_CONSTRUCTION_FAMILIES:
             raise ValueError("unsupported construction family")
         if type(self.shell_pass_count) is not int or type(self.tube_pass_count) is not int:
             raise ValueError("pass counts must be int")
         if self.shell_pass_count != 1 or self.tube_pass_count != 1:
-            raise ValueError("TASK160 v0.5 supports only a fixed tubesheet 1x1 envelope")
+            raise ValueError("TASK160 v0.6 supports only a 1x1 shell-and-tube envelope")
         _require_nonempty(self.authority_source_identity, "authority_source_identity")
         _require_nonempty(self.authority_source_version, "authority_source_version")
         _require_nonempty(self.authority_identity, "authority_identity")
         _require_tuple_strings(self.evidence_refs, "evidence_refs", nonempty=True)
+        if (
+            self.construction_family is not ConstructionFamily.FIXED_TUBESHEET
+            and not is_v06_envelope_authority(self)
+        ):
+            raise ValueError("non-fixed construction families require the v0.6 envelope authority")
+
+
+def is_v06_envelope_authority(value: object) -> bool:
+    """Return whether an envelope carries the exact v0.6 authority bridge."""
+    if not isinstance(value, Task160EnvelopeAuthority):
+        return False
+    return is_v06_envelope_metadata(
+        value.authority_source_identity,
+        value.authority_source_version,
+        value.authority_identity,
+        value.evidence_refs,
+    )
+
+
+def is_v06_envelope_metadata(
+    source_identity: object,
+    source_version: object,
+    authority_identity: object,
+    evidence_refs: object,
+) -> bool:
+    """Validate the raw metadata portion of the v0.6 envelope authority."""
+    if (
+        source_identity != TASK160_V06_ENVELOPE_SOURCE_ID
+        or source_version != TASK160_V06_ENVELOPE_SOURCE_VERSION
+        or type(authority_identity) is not str
+        or type(evidence_refs) is not tuple
+        or TASK160_V06_ENVELOPE_EVIDENCE_REF not in evidence_refs
+    ):
+        return False
+    if authority_identity == TASK160_V06_ENVELOPE_AUTHORITY_ID:
+        return True
+    prefix = TASK160_V06_ENVELOPE_AUTHORITY_ID + "::"
+    if not authority_identity.startswith(prefix):
+        return False
+    suffix = authority_identity.removeprefix(prefix)
+    return fullmatch(r"[0-9a-f]{64}", suffix) is not None
 
 
 @dataclass(frozen=True)
