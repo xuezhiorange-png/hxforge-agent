@@ -238,6 +238,34 @@ def test_unsupported_configuration_and_layout_do_not_fallback_to_kern() -> None:
     assert BlockerCode.TUBE_LAYOUT_UNSUPPORTED in _codes(layout_case)
 
 
+@pytest.mark.parametrize("construction_family", ["FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"])
+def test_v06_construction_family_applicability_does_not_add_formula_branches(
+    construction_family: str,
+) -> None:
+    raw = _request()
+    config = dict(cast(dict[str, object], raw["task020_configuration"]))
+    config["construction_family"] = construction_family
+    raw["task020_configuration"] = config
+
+    result = _valid(raw)
+    assert result.corrected_shell_side_heat_transfer_coefficient > Decimal("0")
+    assert result.total_shell_pressure_drop > Decimal("0")
+    assert result.bell_geometry is not None
+    assert result.applicability is not None
+    assert result.applicability.status.value == "APPLICABLE"
+
+
+def test_unsupported_construction_family_remains_fail_closed() -> None:
+    raw = _request()
+    config = dict(cast(dict[str, object], raw["task020_configuration"]))
+    config["construction_family"] = "SPLIT_RING"
+    raw["task020_configuration"] = config
+
+    outcome = validate_request(raw)
+    assert outcome.status is ValidationStatus.TYPED_BLOCKED
+    assert BlockerCode.CONFIGURATION_UNSUPPORTED in _codes(outcome)
+
+
 @pytest.mark.parametrize("baffle_count", [0, 1, True, 2.5, "2"])
 def test_invalid_baffle_counts_are_not_coerced(baffle_count: object) -> None:
     outcome = validate_request(_request(baffle_count=baffle_count))

@@ -184,7 +184,7 @@ def _validate_upstream(request: Task166Request) -> None:
 def _validate_configuration(request: Task166Request) -> None:
     config = request.task020_configuration
     construction = _field(config, "construction_family", "construction_family_id")
-    if construction != authority.SUPPORTED_CONSTRUCTION_FAMILY:
+    if construction not in authority.SUPPORTED_CONSTRUCTION_FAMILIES:
         raise BellDelawareFailure(BlockerCode.CONFIGURATION_UNSUPPORTED, "construction_family")
     shell_type = _field(config, "shell_type", "shell_type_authority")
     if shell_type != authority.SUPPORTED_SHELL_TYPE:

@@ -8,7 +8,11 @@ TASK-034.
 ## 1. Boundary and authority
 
 TASK-166 owns fixed-geometry Bell–Delaware shell-side rating for a deliberately
-narrow envelope. It owns the Bell-specific geometry projection, ideal
+narrow envelope.  In v0.6, “fixed geometry” describes the shell-side geometry
+projection, not a restriction to one exchanger construction family.  The
+admitted construction-family set is `FIXED_TUBESHEET`, `U_TUBE`, and
+`FLOATING_HEAD`; the package does not add a family-specific mechanical model.
+It owns the Bell-specific geometry projection, ideal
 tube-bank heat transfer and friction state, the correction-factor chains, the
 crossflow/window/end-zone pressure-drop decomposition, applicability,
 provenance, and deterministic identity.
@@ -70,7 +74,7 @@ PSI_N_DISPOSITION=TASK168_IF_SIZING_REQUIRES_IT
 Only the following cases can return `VALID`:
 
 ```text
-construction_family=FIXED_TUBESHEET
+construction_family=FIXED_TUBESHEET | U_TUBE | FLOATING_HEAD
 shell_type=TEMA_E
 shell_pass_count=1
 baffle_type=SINGLE_SEGMENTAL
@@ -106,6 +110,13 @@ Unsupported phase, rheology, shell arrangement, baffle family, layout,
 Reynolds domain, or missing geometry/property authority is `BLOCKED`. There
 is no implicit Kern fallback. If a separate future consumer wants a Kern
 screening result, it must remain a separate TASK-033/TASK-034 authority.
+
+The construction-family expansion is an applicability correction only.  The
+Bell equations and geometry formulas are unchanged and operate on the same
+accepted shell/bundle/baffle/layout inputs for all three admitted families.
+TASK-166 does not generate U-tube pairing, calculate a U-bend radius, perform
+floating-head mechanical design, or infer tubesheet/pull-clearance adequacy;
+those responsibilities remain with their upstream authority contracts.
 
 ## 3. Request and output surface
 
@@ -324,7 +335,33 @@ The following are outside TASK-166:
 - detailed TEMA/API/ASME compliance, mechanical design, FEA, CFD, CAD, and
   proprietary vendor geometry inversion.
 
-## 9. Test contract
+## 9. Construction-family applicability correction
+
+The v0.6 Golden replay gates exposed that the former fixed-tubesheet check was
+a repository applicability restriction rather than a dependency of any
+Bell–Delaware equation in this package.  The correction is deliberately
+narrow:
+
+```text
+TASK166_FORMULA_CHANGE=false
+TASK166_PHYSICS_CHANGE=false
+TASK166_TOLERANCE_CHANGE=false
+TASK166_IDENTITY_CONTRACT_CHANGE=false
+TASK166_APPLICABILITY_CONTRACT_CHANGED=true
+TASK166_SUPPORTED_FAMILY_SET_CHANGED=true
+TASK166_SUPPORTED_CONSTRUCTION_FAMILIES=FIXED_TUBESHEET,U_TUBE,FLOATING_HEAD
+UTUBE_PAIRING_INFERENCE_ADDED=false
+UTUBE_BEND_GEOMETRY_MODEL_ADDED=false
+FLOATING_HEAD_MECHANICAL_MODEL_ADDED=false
+PULL_CLEARANCE_MODEL_ADDED=false
+```
+
+TASK-021 still owns and validates an explicit `UTubePairingPlan` before a
+layout is consumed by TASK-166.  TASK-166 only consumes the resulting accepted
+layout and shell-side geometry.  A construction-family applicability PASS is
+not a mechanical-design or fabrication-feasibility PASS.
+
+## 10. Test contract
 
 The implementation test module covers source identity and conflict behavior,
 all geometry zones and invalid domains, all five J and three R factors, all
