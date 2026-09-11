@@ -14,6 +14,7 @@ from hexagent.exchangers.shell_tube.tube_layout.canonical import internal_frozen
 from hexagent.exchangers.shell_tube.tube_layout.models import PatternFamily, TubeLayout
 
 from .canonical import ENGINEERING_AUTHORITY_HASH, parse_decimal, sha256_hex
+from .engineering_authority_snapshot import SUPPORTED_CONSTRUCTION_FAMILIES
 from .models import (
     AGGREGATE_AUTHORITY_PROFILE_ID,
     BlockerCode,
@@ -392,7 +393,7 @@ def verify_applicability(request: ShellSideHydraulicGeometryRequest) -> Decimal:
     assert geometry is not None
     design = geometry.design_authority
     blockers: list[MessageEntry] = []
-    if geometry.construction_family != "FIXED_TUBESHEET":
+    if geometry.construction_family not in SUPPORTED_CONSTRUCTION_FAMILIES:
         blockers.append(
             _message(
                 BlockerCode.SSHG_CONSTRUCTION_FAMILY_UNSUPPORTED,
