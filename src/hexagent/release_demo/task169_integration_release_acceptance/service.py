@@ -31,6 +31,7 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     TASK168_VERSION,
     ApplicabilityStatus,
     CandidateRecord,
+    CandidateStage,
     CandidateStatus,
     CompletenessStatus,
     Task168BatchResult,
@@ -60,6 +61,10 @@ from hexagent.exchangers.shell_tube.selection_release.service import (
     validate_request as validate_selection_request,
 )
 
+from .approved_golden_registry import (
+    APPROVED_GOLDEN_AUTHORITY_IDS,
+    approved_golden_authority,
+)
 from .canonical import (
     blocked_hash,
     blocked_id,
@@ -68,6 +73,13 @@ from .canonical import (
 )
 from .canonical import (
     request_hash as release_request_hash,
+)
+from .golden_fixtures import (
+    G05_EXPECTED_BLOCKER_CODE,
+    G05_EXPECTED_BLOCKER_FIELD,
+    G05_EXPECTED_BLOCKER_OWNER,
+    G05_NEGATIVE_CLASS,
+    G05_NO_RECOMMENDATION_REQUIRED,
 )
 from .models import (
     TASK169_GOLDEN_TOLERANCE_CLASS,
@@ -96,7 +108,7 @@ from .trusted_evidence import (
 
 FROZEN_TOLERANCE_LEDGER = TASK169_FROZEN_TOLERANCE_LEDGER
 
-_APPROVED_GOLDEN_AUTHORITY_IDS: frozenset[GoldenCaseId] = frozenset()
+_APPROVED_GOLDEN_AUTHORITY_IDS = APPROVED_GOLDEN_AUTHORITY_IDS
 _GOLDEN_ORDER = (
     GoldenCaseId.V06_G01,
     GoldenCaseId.V06_G02,
@@ -207,6 +219,7 @@ def _metadata_failures(
         failures.append("GOLDEN_REVIEW_EVIDENCE_REQUIRED")
     if not case.provenance_source_hash or not _hex_digest(case.provenance_source_hash):
         failures.append("GOLDEN_PROVENANCE_SOURCE_HASH_REQUIRED")
+    approved_authority = approved_golden_authority(case.golden_id)
     if case.review_status == "PROPOSED":
         failures.append("V06_GOLDEN_FIXTURE_REVIEW_APPROVAL_PENDING")
     elif case.review_status == "APPROVED":
@@ -214,9 +227,105 @@ def _metadata_failures(
             failures.append("GOLDEN_APPROVAL_NOT_REGISTERED")
         if not case.approved_by or not case.approval_evidence:
             failures.append("GOLDEN_APPROVAL_EVIDENCE_REQUIRED")
+        if approved_authority is None:
+            failures.append("GOLDEN_APPROVAL_NOT_REGISTERED")
+        else:
+            approved_fields = (
+                ("source_id", case.source_id, approved_authority.source_id),
+                ("source_location", case.source_location, approved_authority.source_location),
+                ("source_class", case.source_class, approved_authority.source_class),
+                (
+                    "redistribution_status",
+                    case.redistribution_status,
+                    approved_authority.redistribution_status,
+                ),
+                (
+                    "task168_request_hash",
+                    case.task168_request_hash,
+                    approved_authority.task168_request_hash,
+                ),
+                (
+                    "expected_task168_result_hash",
+                    case.expected_task168_result_hash,
+                    approved_authority.task168_result_hash,
+                ),
+                (
+                    "expected_task168_result_id",
+                    case.expected_task168_result_id,
+                    approved_authority.task168_result_id,
+                ),
+                (
+                    "expected_task168_result_status",
+                    case.expected_task168_result_status,
+                    approved_authority.task168_result_status,
+                ),
+                (
+                    "ranking_policy_hash",
+                    case.ranking_policy.canonical_hash,
+                    approved_authority.ranking_policy_hash,
+                ),
+                (
+                    "expected_task169_result_hash",
+                    case.expected_task169_result_hash,
+                    approved_authority.task169_result_hash,
+                ),
+                (
+                    "expected_task169_result_id",
+                    case.expected_task169_result_id,
+                    approved_authority.task169_result_id,
+                ),
+                ("tolerance_class", case.tolerance_class, approved_authority.tolerance_class),
+                (
+                    "provenance_source_hash",
+                    case.provenance_source_hash,
+                    approved_authority.provenance_source_hash,
+                ),
+                (
+                    "reviewer_evidence_refs",
+                    case.reviewer_evidence_refs,
+                    approved_authority.reviewer_evidence_refs,
+                ),
+                ("approved_by", case.approved_by, approved_authority.approved_by),
+                (
+                    "approval_evidence",
+                    case.approval_evidence,
+                    approved_authority.approval_evidence,
+                ),
+                (
+                    "expected_identity_status",
+                    case.expected_identity_status,
+                    approved_authority.expected_identity_status,
+                ),
+                ("negative_class", case.negative_class, approved_authority.negative_class),
+                (
+                    "expected_blocker_code",
+                    case.expected_blocker_code,
+                    approved_authority.expected_blocker_code,
+                ),
+                (
+                    "expected_blocker_owner",
+                    case.expected_blocker_owner,
+                    approved_authority.expected_blocker_owner,
+                ),
+                (
+                    "no_recommendation_required",
+                    case.no_recommendation_required,
+                    approved_authority.no_recommendation_required,
+                ),
+            )
+            failures.extend(
+                "GOLDEN_APPROVED_AUTHORITY_" + name.upper() + "_MISMATCH"
+                for name, observed, expected in approved_fields
+                if observed != expected
+            )
     else:
         failures.append("GOLDEN_REVIEW_STATUS_INVALID")
-    if case.expected_identity_status != TASK169_PROPOSED_IDENTITY_STATUS:
+    expected_identity_status = (
+        approved_authority.expected_identity_status
+        if case.review_status == "APPROVED" and approved_authority is not None
+        else TASK169_PROPOSED_IDENTITY_STATUS
+    )
+    if case.expected_identity_status != expected_identity_status:
         failures.append("GOLDEN_EXPECTED_IDENTITY_STATUS_INVALID")
     return tuple(dict.fromkeys(failures))
 
@@ -583,19 +692,35 @@ def _golden_record(case: Task169GoldenCase, replay: _Task168Replay) -> GoldenAcc
         if not hard_dp_rejection:
             reasons.append("G04_DP_CONSTRAINED_REJECTION_REQUIRED")
     else:
+        if (
+            case.negative_class != G05_NEGATIVE_CLASS
+            or case.expected_blocker_code != G05_EXPECTED_BLOCKER_CODE
+            or case.expected_blocker_owner != G05_EXPECTED_BLOCKER_OWNER
+            or not case.no_recommendation_required
+        ):
+            reasons.append("G05_FROZEN_NEGATIVE_CLASS_REQUIRED")
         if replay.batch is not None:
-            if not any(
+            matching_blocker = any(
                 record.status is CandidateStatus.BLOCKED
+                and any(
+                    blocker.code == G05_EXPECTED_BLOCKER_CODE
+                    and blocker.stage is CandidateStage.SHELL_SIDE_BELL
+                    and blocker.field_path == G05_EXPECTED_BLOCKER_FIELD
+                    for blocker in record.blockers
+                )
                 for record in replay.batch.candidate_records
-            ):
-                reasons.append("G05_FAIL_CLOSED_BLOCKER_REQUIRED")
-            if result is not None and (
+            )
+            if not matching_blocker:
+                reasons.append("G05_FROZEN_NEGATIVE_CLASS_REQUIRED")
+            if result is None or (
                 result.selection_status is not SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
                 or result.recommended_candidate is not None
             ):
                 reasons.append("G05_NO_RECOMMENDATION_REQUIRED")
         elif not (replay.raw_blocked or replay.typed_blocked):
             reasons.append("G05_FAIL_CLOSED_RESULT_REQUIRED")
+        elif result is not None and G05_NO_RECOMMENDATION_REQUIRED:
+            reasons.append("G05_NO_RECOMMENDATION_REQUIRED")
 
     recommendation_hash = (
         result.recommended_candidate.candidate_hash

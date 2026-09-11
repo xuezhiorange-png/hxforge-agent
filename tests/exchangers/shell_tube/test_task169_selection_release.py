@@ -84,15 +84,22 @@ from hexagent.release_demo.task169_integration_release_acceptance import service
 from hexagent.release_demo.task169_integration_release_acceptance import (
     validate_request as validate_release_request,
 )
+from hexagent.release_demo.task169_integration_release_acceptance.approved_golden_registry import (
+    approved_golden_authority,
+)
 from hexagent.release_demo.task169_integration_release_acceptance.canonical import (
     request_hash as release_request_hash,
 )
 from hexagent.release_demo.task169_integration_release_acceptance.golden_fixtures import (
     G02_PAIRING_EVIDENCE_REF,
-    G02_PAIRING_PROVENANCE_SOURCE_HASH,
     G02_RUNTIME_PAIR_INFERENCE,
     G02_TASK021_ORIGIN_MODE,
     G02_UTUBE_PAIRING_PLAN_RAW,
+    G05_EXPECTED_BLOCKER_CODE,
+    G05_EXPECTED_BLOCKER_FIELD,
+    G05_EXPECTED_BLOCKER_OWNER,
+    G05_NEGATIVE_CLASS,
+    G05_NO_RECOMMENDATION_REQUIRED,
 )
 from hexagent.release_demo.task169_integration_release_acceptance.models import (
     TASK169_GOLDEN_TOLERANCE_CLASS,
@@ -527,7 +534,17 @@ def _g05_request() -> Task168Request:
         _real_request as build_real_request,
     )
 
-    return build_real_request(shell_diameter="0.20")
+    base = build_real_request(shell_diameter="0.20")
+    # This is the frozen missing-authority negative, not an arbitrary
+    # geometry failure.  TASK-168 must fail the real candidate chain because
+    # the mandatory TASK-166 request authority is absent.
+    authority = replace(
+        base.evaluation_input_authority,
+        task166_request_template=None,
+        canonical_hash="",
+    )
+    authority = replace(authority, canonical_hash=evaluation_input_authority_hash(authority))
+    return replace(base, evaluation_input_authority=authority)
 
 
 def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169GoldenCase:
@@ -535,18 +552,30 @@ def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169G
     assert outcome.status is Task168ValidationStatus.VALID
     assert outcome.valid is not None
     request_digest = task168_request_hash(request)
+    approved = approved_golden_authority(golden_id)
+    assert approved is not None
+    assert request_digest == approved.task168_request_hash
+    assert outcome.valid.result_hash == approved.task168_result_hash
+    assert outcome.valid.result_id == approved.task168_result_id
+    selection_outcome = validate_selection_request(
+        Task169Request(
+            schema_version=TASK169_SCHEMA_VERSION,
+            task169_version=TASK169_VERSION,
+            source_definition_id=TASK169_SOURCE_DEFINITION_ID,
+            task168_result=outcome.valid,
+            ranking_policy=production_ranking_policy(),
+            request_metadata=(("golden_id", golden_id.value),),
+        )
+    )
+    assert selection_outcome.valid is not None
+    assert selection_outcome.valid.result_hash == approved.task169_result_hash
+    assert selection_outcome.valid.result_id == approved.task169_result_id
     return Task169GoldenCase(
         golden_id=golden_id,
-        source_id=f"TASK169-PROPOSAL-{golden_id.value}",
-        source_location=(
-            "src/hexagent/release_demo/task169_integration_release_acceptance/"
-            "golden_fixtures.py::G02_UTUBE_PAIRING_PLAN_RAW; "
-            "tests/exchangers/shell_tube/test_task169_selection_release.py"
-            if golden_id is GoldenCaseId.V06_G02
-            else "tests/exchangers/shell_tube/test_task169_selection_release.py"
-        ),
-        source_class="PROPOSAL_ONLY_INTEGRATION_EVIDENCE",
-        redistribution_status="METADATA_ONLY_NO_PROTECTED_PAYLOAD",
+        source_id=approved.source_id,
+        source_location=approved.source_location,
+        source_class=approved.source_class,
+        redistribution_status=approved.redistribution_status,
         normalized_input_identity=request_digest,
         task168_request=request,
         task168_request_hash=request_digest,
@@ -554,15 +583,38 @@ def _proposal_case(golden_id: GoldenCaseId, request: Task168Request) -> Task169G
         expected_task168_result_id=outcome.valid.result_id,
         expected_task168_result_status=Task168ValidationStatus.VALID.value,
         ranking_policy=production_ranking_policy(),
-        expected_task169_result_hash=None,
-        expected_task169_result_id=None,
-        approved_numeric_expectations=(("EXPECTED_IDENTITY_STATUS", "PROPOSED_FOR_REVIEW"),),
+        expected_task169_result_hash=selection_outcome.valid.result_hash,
+        expected_task169_result_id=selection_outcome.valid.result_id,
+        approved_numeric_expectations=(),
         tolerance_class=TASK169_GOLDEN_TOLERANCE_CLASS,
-        provenance_source_hash=(
-            G02_PAIRING_PROVENANCE_SOURCE_HASH if golden_id is GoldenCaseId.V06_G02 else "f" * 64
-        ),
-        reviewer_evidence_refs=("INDEPENDENT_REVIEW_PENDING",),
+        provenance_source_hash=approved.provenance_source_hash,
+        reviewer_evidence_refs=approved.reviewer_evidence_refs,
+        review_status=approved.review_status,
+        approved_by=approved.approved_by,
+        approval_evidence=approved.approval_evidence,
+        expected_identity_status=approved.expected_identity_status,
+        negative_class=approved.negative_class,
+        expected_blocker_code=approved.expected_blocker_code,
+        expected_blocker_owner=approved.expected_blocker_owner,
+        no_recommendation_required=approved.no_recommendation_required,
     )
+
+
+def _proposal_release_request() -> Task169ReleaseRequest:
+    cases = tuple(
+        replace(
+            case,
+            expected_task169_result_hash=None,
+            expected_task169_result_id=None,
+            approved_numeric_expectations=(("EXPECTED_IDENTITY_STATUS", "PROPOSED_FOR_REVIEW"),),
+            review_status="PROPOSED",
+            approved_by="",
+            approval_evidence=(),
+            expected_identity_status="PROPOSED_FOR_REVIEW",
+        )
+        for case in _release_request().golden_cases
+    )
+    return replace(_release_request(), golden_cases=cases)
 
 
 @lru_cache(maxsize=1)
@@ -624,7 +676,7 @@ def test_release_does_not_have_caller_supplied_task168_result_surface() -> None:
 
 
 def test_release_golden_proposals_cannot_self_approve() -> None:
-    outcome = validate_release_request(_release_request())
+    outcome = validate_release_request(_proposal_release_request())
     assert outcome.valid is not None
     assert outcome.valid.overall_status is AcceptanceStatus.BLOCKED
     assert all(record.status is AcceptanceStatus.BLOCKED for record in outcome.valid.golden_records)
@@ -645,8 +697,70 @@ def test_release_g05_is_real_no_recommendation_path() -> None:
     outcome = validate_release_request(_release_request())
     assert outcome.valid is not None
     g05 = outcome.valid.golden_records[4]
+    assert g05.status is AcceptanceStatus.PASS
     assert g05.recommended_candidate_id is None
     assert "G05_NO_RECOMMENDATION_REQUIRED" not in g05.reason_codes
+
+
+def test_g05_frozen_negative_class_is_real() -> None:
+    case = _release_request().golden_cases[4]
+    assert case.negative_class == G05_NEGATIVE_CLASS
+    assert case.expected_blocker_code == G05_EXPECTED_BLOCKER_CODE
+    assert case.expected_blocker_owner == G05_EXPECTED_BLOCKER_OWNER
+    assert case.no_recommendation_required is G05_NO_RECOMMENDATION_REQUIRED
+    replay = release_service._replay_task168(case)
+    assert replay.batch is not None
+    blockers = tuple(
+        blocker for record in replay.batch.candidate_records for blocker in record.blockers
+    )
+    assert any(
+        blocker.code == G05_EXPECTED_BLOCKER_CODE
+        and blocker.field_path == G05_EXPECTED_BLOCKER_FIELD
+        for blocker in blockers
+    )
+
+
+def test_g05_unrelated_blocked_candidate_does_not_satisfy_golden() -> None:
+    from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
+        _real_request as build_real_request,
+    )
+
+    unrelated_request = build_real_request(shell_diameter="0.20")
+    unrelated_outcome = validate_task168_request(unrelated_request)
+    assert unrelated_outcome.valid is not None
+    unrelated_selection = validate_selection_request(
+        Task169Request(
+            schema_version=TASK169_SCHEMA_VERSION,
+            task169_version=TASK169_VERSION,
+            source_definition_id=TASK169_SOURCE_DEFINITION_ID,
+            task168_result=unrelated_outcome.valid,
+            ranking_policy=production_ranking_policy(),
+            request_metadata=(("golden_id", GoldenCaseId.V06_G05.value),),
+        )
+    )
+    assert unrelated_selection.valid is not None
+    approved_case = _release_request().golden_cases[4]
+    unrelated_case = replace(
+        approved_case,
+        task168_request=unrelated_request,
+        normalized_input_identity=task168_request_hash(unrelated_request),
+        task168_request_hash=task168_request_hash(unrelated_request),
+        expected_task168_result_hash=unrelated_outcome.valid.result_hash,
+        expected_task168_result_id=unrelated_outcome.valid.result_id,
+        expected_task169_result_hash=unrelated_selection.valid.result_hash,
+        expected_task169_result_id=unrelated_selection.valid.result_id,
+    )
+    replay = release_service._replay_task168(unrelated_case)
+    record = release_service._golden_record(unrelated_case, replay)
+    assert record.status is AcceptanceStatus.BLOCKED
+    assert "G05_FROZEN_NEGATIVE_CLASS_REQUIRED" in record.reason_codes
+
+
+def test_g05_has_no_recommendation() -> None:
+    replay = release_service._replay_task168(_release_request().golden_cases[4])
+    assert replay.selection is not None
+    assert replay.selection.selection_status is SelectionStatus.NO_RECOMMENDABLE_CANDIDATE
+    assert replay.selection.recommended_candidate is None
 
 
 def test_release_negative_batch_keeps_provenance_gate_replayable() -> None:
@@ -954,22 +1068,28 @@ def test_g03_floating_head_passes_task024_applicability() -> None:
     assert baffle_outcome.geometry is not None
 
 
-def test_task169_release_schema_is_v2_and_proposal_status_is_frozen() -> None:
+def test_task169_release_schema_is_v2_and_approved_status_is_registry_bound() -> None:
     request = _release_request()
     assert request.schema_version == TASK169_RELEASE_SCHEMA_VERSION
-    assert all(case.review_status == "PROPOSED" for case in request.golden_cases)
+    assert all(case.review_status == "APPROVED" for case in request.golden_cases)
+    assert all(case.expected_identity_status == "APPROVED" for case in request.golden_cases)
+    proposal = _proposal_release_request()
+    assert all(case.review_status == "PROPOSED" for case in proposal.golden_cases)
     assert all(
-        case.expected_identity_status == "PROPOSED_FOR_REVIEW" for case in request.golden_cases
+        case.expected_identity_status == "PROPOSED_FOR_REVIEW" for case in proposal.golden_cases
     )
 
 
-def test_golden_authority_payload_is_proposal_only() -> None:
+def test_golden_authority_payload_is_registered_and_not_self_approved() -> None:
     payload_path = (
         Path(__file__).parents[3] / "docs" / "tasks" / "TASK-169-v06-golden-authority-proposal.json"
     )
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
-    assert payload["authority_status"] == "PROPOSED"
+    assert payload["authority_status"] == "APPROVED"
+    assert payload["review_status"] == "APPROVED"
+    assert payload["expected_identity_status"] == "APPROVED"
     assert payload["golden_self_approval"] is False
+    assert payload["approved_registry_count"] == 5
     assert [item["golden_id"] for item in payload["goldens"]] == [
         "V06-G01",
         "V06-G02",
@@ -1011,12 +1131,12 @@ def test_golden_authority_payload_is_proposal_only() -> None:
         for item in payload["goldens"]
     )
     assert all(
-        item["review_status"] == "PROPOSED"
-        and item["expected_identity_status"] == "PROPOSED_FOR_REVIEW"
-        and item["approved_by"] == ""
-        and item["approval_evidence"] == []
-        and item["expected_task169_result_hash"] is None
-        and item["expected_task169_result_id"] is None
+        item["review_status"] == "APPROVED"
+        and item["expected_identity_status"] == "APPROVED"
+        and item["approved_by"] == "TASK169_INDEPENDENT_GOLDEN_REVIEW"
+        and item["approval_evidence"]
+        and item["expected_task169_result_hash"]
+        and item["expected_task169_result_id"]
         for item in payload["goldens"]
     )
     g02 = payload["goldens"][1]
@@ -1036,7 +1156,7 @@ def test_golden_authority_payload_is_proposal_only() -> None:
     assert g02["task167_status"] == "WARN"
     assert g02["task168_status"] == "COMPLETE"
     assert g02["task169_status"] == "SELECTED"
-    assert g02["disposition"] == "READY_FOR_INDEPENDENT_REVIEW"
+    assert g02["disposition"] == "APPROVED_BY_INDEPENDENT_REVIEW"
     assert g02["replay_evidence"] == [
         "G02_PAIRING_VALIDATION_PASS",
         "TASK160_V06_PASS",
@@ -1046,6 +1166,13 @@ def test_golden_authority_payload_is_proposal_only() -> None:
         "TASK168_COMPLETE",
         "TASK169_RECOMMENDABLE",
     ]
+    g05 = payload["goldens"][4]
+    assert g05["negative_class"] == G05_NEGATIVE_CLASS
+    assert g05["expected_blocker_code"] == G05_EXPECTED_BLOCKER_CODE
+    assert g05["expected_blocker_owner"] == G05_EXPECTED_BLOCKER_OWNER
+    assert g05["no_recommendation_required"] is True
+    assert g05["task168_status"] == "VALID"
+    assert g05["task169_status"] == "NO_RECOMMENDABLE_CANDIDATE"
     g03 = payload["goldens"][2]
     assert g03["task020_status"] == "PASS"
     assert g03["task021_status"] == "PASS"
@@ -1059,4 +1186,4 @@ def test_golden_authority_payload_is_proposal_only() -> None:
     assert g03["task167_status"] == "WARN"
     assert g03["task168_status"] == "COMPLETE"
     assert g03["task169_status"] == "SELECTED"
-    assert g03["disposition"] == "READY_FOR_INDEPENDENT_REVIEW"
+    assert g03["disposition"] == "APPROVED_BY_INDEPENDENT_REVIEW"

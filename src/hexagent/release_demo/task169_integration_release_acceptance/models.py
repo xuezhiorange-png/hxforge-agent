@@ -26,6 +26,7 @@ TASK169_RELEASE_SOURCE_DEFINITION_ID = "TASK169-RELEASE-SOURCE-DEFINITION-ISSUE-
 TASK169_RELEASE_SOFTWARE_VERSION = "task169.release-acceptance-impl-v2"
 TASK169_GOLDEN_TOLERANCE_CLASS = "TASK165_V06_FROZEN"
 TASK169_PROPOSED_IDENTITY_STATUS = "PROPOSED_FOR_REVIEW"
+TASK169_APPROVED_IDENTITY_STATUS = "APPROVED"
 
 
 class GoldenCaseId(enum.StrEnum):
@@ -72,6 +73,10 @@ class Task169GoldenCase:
     approved_by: str = ""
     approval_evidence: tuple[str, ...] = ()
     expected_identity_status: str = TASK169_PROPOSED_IDENTITY_STATUS
+    negative_class: str | None = None
+    expected_blocker_code: str | None = None
+    expected_blocker_owner: str | None = None
+    no_recommendation_required: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -97,6 +102,8 @@ class Task169GoldenCase:
             "approval_evidence",
             tuple(sorted(self.approval_evidence, key=lambda item: item.encode("utf-8"))),
         )
+        if type(self.no_recommendation_required) is not bool:
+            raise ValueError("no_recommendation_required must be bool")
         has_identity = self.expected_task169_result_hash is not None
         has_numeric = bool(self.approved_numeric_expectations)
         if has_identity == has_numeric:
@@ -184,6 +191,7 @@ __all__ = [
     "GoldenAcceptanceRecord",
     "GoldenCaseId",
     "TASK169_GOLDEN_TOLERANCE_CLASS",
+    "TASK169_APPROVED_IDENTITY_STATUS",
     "TASK169_PROPOSED_IDENTITY_STATUS",
     "TASK169_RELEASE_RESULT_SCHEMA_VERSION",
     "TASK169_RELEASE_SCHEMA_VERSION",

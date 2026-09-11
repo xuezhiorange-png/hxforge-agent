@@ -53,6 +53,10 @@ def request_projection(value: Task169ReleaseRequest) -> dict[str, Any]:
                 "approved_by": case.approved_by,
                 "approval_evidence": case.approval_evidence,
                 "expected_identity_status": case.expected_identity_status,
+                "negative_class": case.negative_class,
+                "expected_blocker_code": case.expected_blocker_code,
+                "expected_blocker_owner": case.expected_blocker_owner,
+                "no_recommendation_required": case.no_recommendation_required,
             }
             for case in value.golden_cases
         ),

@@ -1,4 +1,4 @@
-"""Literal TASK-169 Golden proposal fixtures.
+"""Literal TASK-169 Golden fixture authority data.
 
 These values are proposal authority data, not runtime geometry inference.  In
 particular, the G02 U-tube pairing plan is intentionally a literal payload
@@ -6,6 +6,12 @@ whose hash is verified by TASK-021 at the public boundary.
 """
 
 from typing import Final
+
+G05_NEGATIVE_CLASS: Final[str] = "MISSING_REQUIRED_SOURCE_OR_LICENSE_AUTHORITY"
+G05_EXPECTED_BLOCKER_CODE: Final[str] = "EVALUATION_AUTHORITY_REQUIRED"
+G05_EXPECTED_BLOCKER_OWNER: Final[str] = "TASK166"
+G05_EXPECTED_BLOCKER_FIELD: Final[str] = "evaluation_input_authority.task166_request_template"
+G05_NO_RECOMMENDATION_REQUIRED: Final[bool] = True
 
 G02_PAIRING_AUTHORITY_ID: Final[str] = "HXFORGE-V06-G02-UTUBE-PAIRING"
 G02_PAIRING_AUTHORITY_VERSION: Final[str] = "v1"
@@ -64,6 +70,11 @@ G02_UTUBE_PAIRING_PLAN_RAW: Final[dict[str, object]] = {
 
 
 __all__ = (
+    "G05_EXPECTED_BLOCKER_CODE",
+    "G05_EXPECTED_BLOCKER_FIELD",
+    "G05_EXPECTED_BLOCKER_OWNER",
+    "G05_NEGATIVE_CLASS",
+    "G05_NO_RECOMMENDATION_REQUIRED",
     "G02_PAIRING_APPROVAL_STATUS",
     "G02_PAIRING_AUTHORITY_ID",
     "G02_PAIRING_AUTHORITY_VERSION",
