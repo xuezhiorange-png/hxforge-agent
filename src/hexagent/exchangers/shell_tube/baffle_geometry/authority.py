@@ -17,7 +17,8 @@ Stages implemented (Section 7 + 8 of the TASK-024 design contract):
 - Stage 3 — TASK-021 layout validation (typed layout only).
 - Stage 4 — TASK-022 geometry validation (typed geometry only).
 - Stage 5 — three-way upstream cross-binding (configuration ↔ layout ↔ geometry).
-- Stage 6 — supported v1 slice (FIXED_TUBESHEET / shell-pass 1 / SINGLE_SEGMENTAL).
+- Stage 6 — supported v1 slice (FIXED_TUBESHEET / U_TUBE / FLOATING_HEAD,
+  shell-pass 1, SINGLE_SEGMENTAL).
 - Stage 7 — axial authority identity (exact hash recompute).
 - Stage 8 — design authority identity (exact hash recompute).
 
@@ -101,8 +102,14 @@ _TASK022_SHELL_BUNDLE_GEOMETRY_SCHEMA: Final[str] = "task022.shell-bundle-geomet
 _AXIAL_SPAN_SCHEMA: Final[str] = _t024.AXIAL_SPAN_SCHEMA_VERSION
 _DESIGN_AUTHORITY_SCHEMA: Final[str] = _t024.DESIGN_AUTHORITY_SCHEMA_VERSION
 
-# Supported v1 slice (Section 6.2 / 3.2).
-_SUPPORTED_CONSTRUCTION_FAMILY: Final[str] = "FIXED_TUBESHEET"
+# Supported v1 slice (Section 6.2 / 3.2), amended by the reviewed TASK-169
+# Golden G02/G03 gate. This is an applicability expansion only; geometry
+# equations and authority bindings remain unchanged. TASK-021 remains the
+# sole owner of U-tube pairing validation and this module consumes only its
+# already-validated TubeLayout.
+_SUPPORTED_CONSTRUCTION_FAMILIES: Final[frozenset[str]] = frozenset(
+    {"FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"}
+)
 _SUPPORTED_SHELL_PASS_COUNT: Final[int] = 1
 _SUPPORTED_BAFFLE_TYPE_TOKEN: Final[str] = "SINGLE_SEGMENTAL"
 
@@ -1255,7 +1262,7 @@ def _stage6_validate(
     design_authority = request.design_authority
     blockers: list[_RankedMessage] = []
 
-    if configuration.construction_family.value != _SUPPORTED_CONSTRUCTION_FAMILY:
+    if configuration.construction_family.value not in _SUPPORTED_CONSTRUCTION_FAMILIES:
         blockers.append(
             _rank_blocker(
                 _STAGE_6_RANK,
@@ -1297,48 +1304,54 @@ def _stage6_validate(
     if blockers:
         return tuple(blockers), ()
 
-    warnings: list[_RankedMessage] = [
-        _rank_warning(
-            _STAGE_6_RANK,
-            _make_message(
-                _t024.WarningCode.BFG_FIXED_TUBESHEET_ONLY_V1.value,
-                field_path="configuration.construction_family",
-                message_key="fixed_tubesheet_only_v1",
-                evidence_refs=request.evidence_refs,
-                details=(("construction_family", _SUPPORTED_CONSTRUCTION_FAMILY),),
+    warnings: list[_RankedMessage] = []
+    if configuration.construction_family.value == "FIXED_TUBESHEET":
+        warnings.append(
+            _rank_warning(
+                _STAGE_6_RANK,
+                _make_message(
+                    _t024.WarningCode.BFG_FIXED_TUBESHEET_ONLY_V1.value,
+                    field_path="configuration.construction_family",
+                    message_key="fixed_tubesheet_only_v1",
+                    evidence_refs=request.evidence_refs,
+                    details=(("construction_family", "FIXED_TUBESHEET"),),
+                ),
+            )
+        )
+    warnings.extend(
+        [
+            _rank_warning(
+                _STAGE_6_RANK,
+                _make_message(
+                    _t024.WarningCode.BFG_GEOMETRY_NOT_FLOW_AREA.value,
+                    field_path=None,
+                    message_key="geometry_not_flow_area",
+                    evidence_refs=request.evidence_refs,
+                    details=(("flow_area_calculation_performed", "false"),),
+                ),
             ),
-        ),
-        _rank_warning(
-            _STAGE_6_RANK,
-            _make_message(
-                _t024.WarningCode.BFG_GEOMETRY_NOT_FLOW_AREA.value,
-                field_path=None,
-                message_key="geometry_not_flow_area",
-                evidence_refs=request.evidence_refs,
-                details=(("flow_area_calculation_performed", "false"),),
+            _rank_warning(
+                _STAGE_6_RANK,
+                _make_message(
+                    _t024.WarningCode.BFG_NOZZLE_POSITION_DEFERRED.value,
+                    field_path=None,
+                    message_key="nozzle_position_deferred",
+                    evidence_refs=request.evidence_refs,
+                    details=(("nozzle_position_inference_performed", "false"),),
+                ),
             ),
-        ),
-        _rank_warning(
-            _STAGE_6_RANK,
-            _make_message(
-                _t024.WarningCode.BFG_NOZZLE_POSITION_DEFERRED.value,
-                field_path=None,
-                message_key="nozzle_position_deferred",
-                evidence_refs=request.evidence_refs,
-                details=(("nozzle_position_inference_performed", "false"),),
+            _rank_warning(
+                _STAGE_6_RANK,
+                _make_message(
+                    _t024.WarningCode.BFG_THERMAL_HYDRAULIC_DEFERRED.value,
+                    field_path=None,
+                    message_key="thermal_hydraulic_deferred",
+                    evidence_refs=request.evidence_refs,
+                    details=(("thermal_hydraulic_calculation_performed", "false"),),
+                ),
             ),
-        ),
-        _rank_warning(
-            _STAGE_6_RANK,
-            _make_message(
-                _t024.WarningCode.BFG_THERMAL_HYDRAULIC_DEFERRED.value,
-                field_path=None,
-                message_key="thermal_hydraulic_deferred",
-                evidence_refs=request.evidence_refs,
-                details=(("thermal_hydraulic_calculation_performed", "false"),),
-            ),
-        ),
-    ]
+        ]
+    )
     return (), tuple(warnings)
 
 

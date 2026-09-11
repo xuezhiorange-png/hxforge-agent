@@ -41,6 +41,7 @@ from .models import (
     Task160RawRequestProjection,
     Task160RawStreamInput,
     Task160Request,
+    is_v06_envelope_metadata,
 )
 
 RAW_RECORD_FIELDS: dict[str, tuple[str, ...]] = {
@@ -1082,10 +1083,21 @@ def _build_envelope(value: object, blockers: list[Any]) -> Task160EnvelopeAuthor
         blockers,
         nonempty=True,
     )
-    if family is not ConstructionFamily.FIXED_TUBESHEET or shell != 1 or tube != 1:
+    if shell != 1 or tube != 1:
         blockers.append(
             make_blocker(
                 BlockerCode.B022, stage=FailureStage.RAW_BOUNDARY, field_path="envelope_authority"
+            )
+        )
+        return None
+    if family is not ConstructionFamily.FIXED_TUBESHEET and not is_v06_envelope_metadata(
+        source, version, identity, refs
+    ):
+        blockers.append(
+            make_blocker(
+                BlockerCode.B022,
+                stage=FailureStage.RAW_BOUNDARY,
+                field_path="envelope_authority",
             )
         )
         return None

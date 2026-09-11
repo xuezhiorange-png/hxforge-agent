@@ -16,6 +16,7 @@ from .models import (
     CompletenessCheckId,
     CompletenessLedger,
     CompletenessStatus,
+    ConstructionFamily,
     FailureStage,
     RoleResolvedRatingStream,
     SideBinding,
@@ -23,6 +24,7 @@ from .models import (
     Task160Request,
     ThermalRole,
     ValidatedRatingStreamState,
+    is_v06_envelope_authority,
 )
 
 
@@ -148,18 +150,29 @@ def make_applicability_ledger(
         (("property_model", "RATING_LEVEL_FIXED_SNAPSHOT"),),
     )
     envelope = request.envelope_authority
-    envelope_ok = (
-        envelope.construction_family.value == "FIXED_TUBESHEET"
-        and envelope.shell_pass_count == 1
-        and envelope.tube_pass_count == 1
-        and bool(envelope.authority_identity)
-        and bool(envelope.evidence_refs)
-    )
+    if envelope.construction_family is ConstructionFamily.FIXED_TUBESHEET:
+        # Keep the historical v0.5 check and its canonical payload unchanged.
+        envelope_ok = (
+            envelope.shell_pass_count == 1
+            and envelope.tube_pass_count == 1
+            and bool(envelope.authority_identity)
+            and bool(envelope.evidence_refs)
+        )
+        envelope_check = ApplicabilityCheckId.A06_FIXED_GEOMETRY_V05_ENVELOPE
+        envelope_details = (("envelope", "fixed-tubesheet-1x1"),)
+    else:
+        envelope_ok = (
+            envelope.shell_pass_count == 1
+            and envelope.tube_pass_count == 1
+            and is_v06_envelope_authority(envelope)
+        )
+        envelope_check = ApplicabilityCheckId.A06_V06_SHELL_TUBE_THERMAL_ENVELOPE
+        envelope_details = (("envelope", "v0.6-shell-tube-1x1"),)
     add(
-        ApplicabilityCheckId.A06_FIXED_GEOMETRY_V05_ENVELOPE,
+        envelope_check,
         envelope_ok,
         tuple(envelope.evidence_refs),
-        (("envelope", "fixed-tubesheet-1x1"),),
+        envelope_details,
         ()
         if envelope_ok
         else (

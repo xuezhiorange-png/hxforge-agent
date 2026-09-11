@@ -24,6 +24,7 @@ from hexagent.exchangers.shell_tube.thermal_stream_state.models import Task160Re
 
 from .canonical import (
     RawProjectionOutcome,
+    method_catalog_payload_hash,
     project_raw_request_with_diagnostics,
     raw_blocked_hash,
     raw_blocked_result_id,
@@ -96,6 +97,13 @@ TASK161_RAW_FIELD_SET = frozenset(TASK161_RAW_FIELDS)
 TASK161_CASE_BINDING_REQUIRED_FOR_SUCCESS = False
 TASK161_PERFORMANCE_METHOD_ROLE = "AUTHORITY_ONLY"
 TASK161_METHOD_AUTHORITY_MODE = "CATALOG_ONLY"
+
+TASK161_V06_FLOW_ARRANGEMENT_CATALOG_ID = (
+    "TEMA_E_1X1_OVERALL_COUNTERFLOW_SECTIONAL_MIXING_V06_SHELL_TUBE"
+)
+TASK161_V06_METHOD_REVISION = "V1_V06_SHELL_TUBE"
+TASK161_V06_CONSTRUCTION_FAMILY_SCOPE = "FIXED_TUBESHEET|U_TUBE|FLOATING_HEAD"
+TASK161_V06_AUTHORITY_EVIDENCE_REF = "TASK169-THERMAL-CLOSURE-AUTHORITY-V06"
 
 
 def _metadata_pair(value: object) -> tuple[str, str] | None:
@@ -718,6 +726,124 @@ def _catalogs() -> tuple[
     )
 
 
+def _catalogs_v06() -> tuple[
+    FlowArrangementCatalogAuthority,
+    PerformanceMethodCatalogAuthority,
+    PhysicalStheMixingAuthority,
+    CfheSurrogateMixingAuthority,
+    StheCfheIdentityMapping,
+    tuple[SourceAssumption, ...],
+    MethodOutputSemantics,
+    CaseBindingState,
+    CatalogApplicability,
+    CatalogCompleteness,
+]:
+    """Return the explicit v0.6 applicability profile without new physics.
+
+    The legacy catalog builder is intentionally left byte-for-byte on its
+    fixed-tubesheet path.  This profile changes only the catalog authority
+    envelope and its provenance so a non-fixed family cannot masquerade as a
+    v0.5 result.
+    """
+    (
+        legacy_flow,
+        legacy_method,
+        physical,
+        surrogate,
+        mapping,
+        assumptions,
+        output,
+        binding,
+        _legacy_applicability,
+        completeness,
+    ) = _catalogs()
+    flow = replace(
+        legacy_flow,
+        catalog_id=TASK161_V06_FLOW_ARRANGEMENT_CATALOG_ID,
+        hxforge_construction_intersection=TASK161_V06_CONSTRUCTION_FAMILY_SCOPE,
+        limitations=legacy_flow.limitations
+        + (
+            "v0.6-family-applicability-bridge",
+            "family-specific-mechanics-closed-upstream",
+        ),
+        evidence_refs=legacy_flow.evidence_refs + (TASK161_V06_AUTHORITY_EVIDENCE_REF,),
+    )
+    method = replace(
+        legacy_method,
+        method_revision=TASK161_V06_METHOD_REVISION,
+        flow_arrangement_catalog_id=flow.catalog_id,
+        physical_configuration_scope=tuple(
+            (
+                key,
+                TASK161_V06_CONSTRUCTION_FAMILY_SCOPE
+                if key == "hxforge_construction_intersection"
+                else value,
+            )
+            for key, value in legacy_method.physical_configuration_scope
+        ),
+        applicability=tuple(
+            TASK161_V06_CONSTRUCTION_FAMILY_SCOPE if value == "FIXED_TUBESHEET" else value
+            for value in legacy_method.applicability
+        ),
+        limitations=legacy_method.limitations
+        + (
+            "v0.6-family-applicability-bridge",
+            "no-construction-specific-thermal-performance-equation",
+        ),
+        evidence_refs=legacy_method.evidence_refs + (TASK161_V06_AUTHORITY_EVIDENCE_REF,),
+        provenance=legacy_method.provenance + (TASK161_V06_AUTHORITY_EVIDENCE_REF,),
+        authority_hash="0" * 64,
+    )
+    method = replace(method, authority_hash=method_catalog_payload_hash(method))
+    applicability = replace(
+        _legacy_applicability,
+        required_scope=(
+            "TASK160_V06_SHELL_TUBE_THERMAL_ENVELOPE",
+            "TEMA_E",
+            "1_SHELL_PASS",
+            "1_TUBE_PASS",
+            "COUNTER_FLOW",
+            "SECTIONAL_CROSSFLOW",
+            "MODEL_2",
+            "BAFFLE_COUNT_1_THROUGH_5",
+            "SOURCE_ASSUMPTION_SET",
+        ),
+    )
+    return (
+        flow,
+        method,
+        physical,
+        surrogate,
+        mapping,
+        assumptions,
+        output,
+        binding,
+        applicability,
+        completeness,
+    )
+
+
+def _catalogs_for_family(
+    construction_family: str,
+) -> tuple[
+    FlowArrangementCatalogAuthority,
+    PerformanceMethodCatalogAuthority,
+    PhysicalStheMixingAuthority,
+    CfheSurrogateMixingAuthority,
+    StheCfheIdentityMapping,
+    tuple[SourceAssumption, ...],
+    MethodOutputSemantics,
+    CaseBindingState,
+    CatalogApplicability,
+    CatalogCompleteness,
+]:
+    if construction_family == "FIXED_TUBESHEET":
+        return _catalogs()
+    if construction_family in {"U_TUBE", "FLOATING_HEAD"}:
+        return _catalogs_v06()
+    raise ValueError("unsupported construction family")
+
+
 def _capacity_foundation(task160_result: Task160Result) -> CapacityFoundation:
     c_hot = task160_result.c_dot_hot_W_K
     c_cold = task160_result.c_dot_cold_W_K
@@ -872,7 +998,7 @@ def _valid_task161(
             binding,
             applicability,
             completeness,
-        ) = _catalogs()
+        ) = _catalogs_for_family(task160_result.envelope_authority.construction_family.value)
         task160_evidence = task160_result_identity_projection(task160_result)
         from .provenance import build_provenance_semantic_inputs
 
@@ -1022,5 +1148,9 @@ __all__ = [
     "TASK161_DECIMAL_CONTEXT",
     "TASK161_METHOD_AUTHORITY_MODE",
     "TASK161_PERFORMANCE_METHOD_ROLE",
+    "TASK161_V06_AUTHORITY_EVIDENCE_REF",
+    "TASK161_V06_CONSTRUCTION_FAMILY_SCOPE",
+    "TASK161_V06_FLOW_ARRANGEMENT_CATALOG_ID",
+    "TASK161_V06_METHOD_REVISION",
     "validate_request",
 ]

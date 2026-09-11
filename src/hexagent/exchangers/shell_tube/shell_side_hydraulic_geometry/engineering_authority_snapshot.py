@@ -40,6 +40,16 @@ SOURCE_IDS: tuple[str, ...] = tuple(sorted((PRIMARY_SOURCE_ID, *CORROBORATING_SO
 
 SUPPORTED_PATTERN_FAMILIES: tuple[str, ...] = ("SQUARE", "TRIANGULAR")
 
+# TASK-031 v0.6 repository applicability overlay.  The two frozen formula
+# records are independent of construction family; keeping this overlay out of
+# the legacy formula-authority canonical projection preserves the v1 authority
+# hash and the replay identity of existing FIXED_TUBESHEET results.
+SUPPORTED_CONSTRUCTION_FAMILIES: tuple[str, ...] = (
+    "FIXED_TUBESHEET",
+    "U_TUBE",
+    "FLOATING_HEAD",
+)
+
 APPLICABILITY_ENVELOPE: dict[str, Any] = {
     "construction_family": "FIXED_TUBESHEET",
     "shell_pass_count": 1,
@@ -90,6 +100,7 @@ __all__ = [
     "SOURCE_IDS",
     "SOURCE_LEDGER_COUNT",
     "SOURCE_LEDGER_VERSION",
+    "SUPPORTED_CONSTRUCTION_FAMILIES",
     "SUPPORTED_PATTERN_FAMILIES",
     "authority_canonical_projection",
     "recompute_engineering_authority_hash",
