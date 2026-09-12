@@ -162,6 +162,22 @@ def _validate(
         Code.INVALID_PHYSICAL_MAPPING,
         "intervals",
     )
+    required_boundaries = {start, end} | {number(p.center_coordinate_m) for p in g.baffle_planes}
+    supplied_boundaries = {number(i.start_m) for i in intervals.values()} | {
+        number(i.end_m) for i in intervals.values()
+    }
+    require(
+        required_boundaries <= supplied_boundaries,
+        Code.INVALID_PHYSICAL_MAPPING,
+        "missing_native_event_boundary",
+    )
+    # This profile has no separate authority for additional physical cuts.
+    # Refinement belongs in cells, not invented physical geometry intervals.
+    require(
+        supplied_boundaries <= required_boundaries,
+        Code.INVALID_PHYSICAL_MAPPING,
+        "unbound_physical_boundary",
+    )
     require(
         sum((number(i.inside_area_m2) for i in intervals.values()), Fraction()) == inside
         and sum((number(i.outside_area_m2) for i in intervals.values()), Fraction()) == outside,

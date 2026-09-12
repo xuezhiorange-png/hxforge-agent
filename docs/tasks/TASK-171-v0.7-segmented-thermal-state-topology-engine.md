@@ -62,7 +62,13 @@ Reciprocal shared-face connectivity has one inlet/outlet, complete reachability
 and no disconnected cycles, orphan cells, cross-stream mass edges or branches.
 
 Each cell belongs to one physical interval; cells completely partition each
-interval on each path. Different stream meshes require an explicit common wall
+interval on each path. R2 requires interval boundaries at the native TASK024
+axial start, every baffle-plane center and axial end. Missing any native boundary
+fails with `INVALID_PHYSICAL_MAPPING / missing_native_event_boundary`, before
+cell/event incidence can excuse it. The initial profile has no authority for
+extra physical cuts; these fail with `unbound_physical_boundary`. Refinement is
+explicit subdivision into cells **inside** the same native-bounded interval,
+not promotion of a mesh cut into hardware geometry. Different stream meshes require an explicit common wall
 intersection map. Wall subareas sum exactly on their own inner/outer bases to
 interval and native totals. No averaging, interpolation or constitutive mixing
 is inferred. Refinement changes mesh/cell identity, not physical hardware IDs.
@@ -127,7 +133,7 @@ regressions, lock, lint, format, mypy and manifest checks precede final commit/
 push. Exact final PR-head CI and counts are recorded on the Draft PR after
 execution; CI status is not embedded as a self-referential source identity.
 
-Local evidence (2026-09-12): 53 TASK171 tests passed independently on Python
+Historical R1 evidence (2026-09-12; superseded by R2 boundary review): 53 TASK171 tests passed independently on Python
 3.11.15 and 3.12.13. The final full-suite validation snapshot passed 6854 tests,
 with 3 skips and 19 warnings (including 3 passing generated CI self-test probes
 left by the preceding run). The registered manifest remains exactly 256 files;
@@ -155,3 +161,35 @@ started. U-tube, floating head, extra passes, cocurrent and alternate topology
 remain unsupported. N=1 equivalence is not required for TASK171 and remains
 required for TASK175 release. TASK170 receipts and legacy Golden expectations
 are unchanged. Ready/Merge and subsequent tasks require separate authorization.
+
+## R2 — native physical-event boundary correction
+
+Review baseline: `33c8f42153714bff4880dbe0945b1ce3793334ac`, PR #275.
+The independent review found that span coverage alone admitted intervals/cells
+crossing native baffle planes. R1's whole-span and arbitrary midpoint positive
+fixtures were therefore invalid physical mappings, notwithstanding green CI.
+
+`TASK171_V0_7_PHYSICAL_EVENT_BOUNDARY_R2` adds only native-boundary admission
+checks. Required coordinates are axial start, every native baffle-plane center,
+and axial end. Extra cuts have no separately admitted physical authority in
+this profile and are rejected; they cannot be justified by numerical refinement.
+No cell/event incidence repairs a missing physical boundary.
+
+Positive test intervals now derive from native geometry. Refinement subdivides
+those same intervals; event/baffle/window identities, native identities and
+physical ownership remain unchanged while mesh identity changes. Four negative
+cases reproduced erroneous `VALIDATED` on R1 before the patch: missing one cut,
+whole-span interval, old midpoint intervals and anonymous extra physical cut.
+All now fail closed. A separate cell-merge test rejects crossing a baffle/window
+boundary even with the valid physical interval map retained.
+
+Local R2 evidence: 58 TASK171 tests pass on Python 3.11 and 3.12; targeted
+TASK024/TASK166/canonical/provenance regressions pass. Clean local validation
+snapshot full suite: **6856 passed, 3 skipped, 19 warnings**. Ruff, format,
+strict mypy and manifest verification pass (256 registered files). No production
+changes outside TASK171 `_validate`; conservation equations, canonical system,
+legacy geometry/area/Bell behavior and dependencies are unchanged. The local
+snapshot is validation-only, not a published commit or release authority.
+Final R2 exact-head CI is recorded on the existing Draft PR after completion.
+The R1 hashes above are historical test evidence, not R2 expectations or Golden
+authority. Ready/Merge and TASK172/174/173/175 remain unauthorized.

@@ -59,7 +59,7 @@ def authority(source_hash="a" * 64):
     )
 
 
-def fixture(*, split=False, multiple=False, hot_tube=True):
+def fixture(*, split=False, hot_tube=True, invalid_physical_cuts=None):
     c = config_validate(task039._build_task020_request()).configuration
     layout = layout_validate(
         task039._build_task021_request(c, pattern_family="TRIANGULAR"),
@@ -99,18 +99,24 @@ def fixture(*, split=False, multiple=False, hot_tube=True):
             )
         )
     )
-    cuts = (
-        [Fraction(0), Fraction("2.425"), Fraction("4.85")]
-        if multiple
-        else [Fraction(0), Fraction("4.85")]
+    cuts = sorted(
+        {
+            number(g.axial_span.axial_start_coordinate_m),
+            *(number(p.center_coordinate_m) for p in g.baffle_planes),
+            number(g.axial_span.axial_end_coordinate_m),
+        }
     )
+    if invalid_physical_cuts is not None:
+        # Negative fixtures only: never an admitted physical/numerical policy.
+        cuts = invalid_physical_cuts
+    span = cuts[-1] - cuts[0]
     intervals = tuple(
         Interval(
             physical_segment_id=f"i{k}",
             start_m=decimal_text(a),
             end_m=decimal_text(z),
-            inside_area_m2=decimal_text(inside / (len(cuts) - 1)),
-            outside_area_m2=decimal_text(outside / (len(cuts) - 1)),
+            inside_area_m2=decimal_text(inside * (z - a) / span),
+            outside_area_m2=decimal_text(outside * (z - a) / span),
         )
         for k, (a, z) in enumerate(zip(cuts, cuts[1:], strict=False))
     )
@@ -262,17 +268,16 @@ def fixture(*, split=False, multiple=False, hot_tube=True):
 
 
 @pytest.mark.parametrize(
-    "split,multiple,hot_tube",
+    "split,hot_tube",
     [
-        (False, False, True),
-        (True, False, True),
-        (True, True, True),
-        (True, True, False),
-        (False, False, False),
+        (False, True),
+        (True, True),
+        (True, False),
+        (False, False),
     ],
 )
-def test_valid_explicit_topology(split, multiple, hot_tube):
-    r = validate_request(fixture(split=split, multiple=multiple, hot_tube=hot_tube))
+def test_valid_explicit_topology(split, hot_tube):
+    r = validate_request(fixture(split=split, hot_tube=hot_tube))
     assert r.status == "VALIDATED", r
     assert r.bookkeeping_status == "NOT_REQUESTED"
 
@@ -284,10 +289,69 @@ def test_mesh_split_preserves_hardware():
     assert a.native_identity == z.native_identity
     assert a.physical_ownership_hash == z.physical_ownership_hash
     assert a.mesh_identity != z.mesh_identity
+    assert a.topology_definition.events == z.topology_definition.events
+    assert a.topology_definition.intervals == z.topology_definition.intervals
+
+
+def native_cuts(request):
+    g = baffle_validate(request["baffle_request"]).geometry
+    return sorted(
+        {
+            number(g.axial_span.axial_start_coordinate_m),
+            *(number(p.center_coordinate_m) for p in g.baffle_planes),
+            number(g.axial_span.axial_end_coordinate_m),
+        }
+    )
+
+
+def test_positive_intervals_exactly_follow_native_boundaries():
+    request = fixture()
+    d = request["definition"]
+    actual = {number(i.start_m) for i in d.intervals} | {number(i.end_m) for i in d.intervals}
+    assert actual == set(native_cuts(request))
+    assert validate_request(request).status == "VALIDATED"
+
+
+@pytest.mark.parametrize("kind", ["missing_one", "whole_span", "old_midpoint", "extra_mesh_cut"])
+def test_physical_boundaries_must_be_native(kind):
+    cuts = native_cuts(fixture())
+    if kind == "missing_one":
+        cuts = cuts[:1] + cuts[2:]
+    elif kind == "whole_span":
+        cuts = [cuts[0], cuts[-1]]
+    elif kind == "old_midpoint":
+        cuts = [cuts[0], (cuts[0] + cuts[-1]) / 2, cuts[-1]]
+    else:
+        cuts = sorted(cuts + [(cuts[0] + cuts[1]) / 2])
+    # Internally consistent cells/events/areas cannot excuse missing native cuts.
+    request = fixture(invalid_physical_cuts=cuts)
+    result = validate_request(request)
+    assert result.status == "BLOCKED"
+    assert result.blocker_code == "INVALID_PHYSICAL_MAPPING"
+    assert result.blocker_field in {"missing_native_event_boundary", "unbound_physical_boundary"}
+    assert result.topology_definition is None
+
+
+def test_mesh_merge_cannot_cross_baffle_window_boundary():
+    request = fixture()
+    d = request["definition"]
+    a, b = d.cells[:2]
+    merged = a.model_copy(
+        update={
+            "downstream_face_id": b.downstream_face_id,
+            "physical_downstream_m": b.physical_downstream_m,
+            "travel_end_m": b.travel_end_m,
+        }
+    )
+    request["definition"] = d.model_copy(update={"cells": (merged,) + d.cells[2:]})
+    result = validate_request(request)
+    assert result.status == "BLOCKED"
+    assert result.blocker_code == "INVALID_MESH_MAPPING"
+    assert result.blocker_field == "cell_partition"
 
 
 def test_canonical_order_and_decimal_context():
-    f = fixture(split=True, multiple=True)
+    f = fixture(split=True)
     a = validate_request(f)
     d = f["definition"]
     f["definition"] = d.model_copy(
@@ -404,18 +468,28 @@ def test_unlocated_state():
 def test_enthalpy_residual_not_numerical_acceptance():
     f = fixture()
     d = f["definition"]
-    values = {"TUBEf0": "20", "TUBEout": "10", "SHELLf0": "0", "SHELLout": "10"}
+    values = {}
+    for path in d.paths:
+        cells = sorted(
+            (c for c in d.cells if c.flow_path_id == path.flow_path_id),
+            key=lambda c: number(c.travel_start_m),
+        )
+        faces = [c.upstream_face_id for c in cells] + [cells[-1].downstream_face_id]
+        for i, face in enumerate(faces):
+            delta = Fraction(10 * i, len(cells))
+            values[face] = decimal_text(20 - delta if path.role == Role.HOT else delta)
     f["bookkeeping"] = Bookkeeping(
         faces=tuple(
             FaceObservation(face_id=k, enthalpy_j_kg=v, mass_flow_kg_s="2", authority=authority())
             for k, v in values.items()
         ),
-        heat_events=(
+        heat_events=tuple(
             HeatObservation(
-                wall_interface_id=d.walls[0].wall_interface_id,
-                heat_rate_w="20",
+                wall_interface_id=w.wall_interface_id,
+                heat_rate_w=decimal_text(Fraction(20, len(d.walls))),
                 authority=authority(),
-            ),
+            )
+            for w in d.walls
         ),
     )
     r = validate_request(f)
@@ -424,17 +498,20 @@ def test_enthalpy_residual_not_numerical_acceptance():
     assert r.bookkeeping_status == "COMPUTED_NOT_ASSESSED"
     f["bookkeeping"] = f["bookkeeping"].model_copy(
         update={
-            "heat_events": (
+            "heat_events": tuple(
                 HeatObservation(
-                    wall_interface_id=d.walls[0].wall_interface_id,
+                    wall_interface_id=w.wall_interface_id,
                     heat_rate_w="-1",
                     authority=authority(),
-                ),
+                )
+                for w in d.walls
             )
         }
     )
     r = validate_request(f)
-    assert {x.energy_residual_w for x in r.residuals} == {"21"}
+    assert {x.energy_residual_w for x in r.residuals} == {
+        decimal_text(Fraction(20, len(d.walls)) + 1)
+    }
     assert r.status == "VALIDATED"  # Structural status only, not energy acceptance.
 
 
@@ -567,7 +644,10 @@ def test_canonical_decimal_lexical_equivalence():
     a = validate_request(f)
     d = f["definition"]
     f["definition"] = d.model_copy(
-        update={"intervals": (d.intervals[0].model_copy(update={"start_m": "0.0000"}),)}
+        update={
+            "intervals": (d.intervals[0].model_copy(update={"start_m": "0.0000"}),)
+            + d.intervals[1:]
+        }
     )
     assert validate_request(f) == a
 
@@ -599,7 +679,7 @@ def test_required_provenance_and_no_cycle():
 
 
 def test_canonical_snapshot_can_be_replayed():
-    request = fixture(split=True, multiple=True)
+    request = fixture(split=True)
     first = validate_request(request)
     assert first.status == "VALIDATED"
     request["definition"] = first.topology_definition
