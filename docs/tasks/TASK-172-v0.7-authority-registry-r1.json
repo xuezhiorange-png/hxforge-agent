@@ -1067,5 +1067,262 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "80debe2dba9a003a4377be86eb7f47b2396f317c20f25957ca6f480ba4f07b38"
+  "canonical_hash": "4e21c4962527c084bb361d88fbb9206e8eb228eb3de490762845fc43c92e4aaa",
+  "r2_extension": {
+    "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
+    "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
+    "historical_r1_root_hash": "80debe2dba9a003a4377be86eb7f47b2396f317c20f25957ca6f480ba4f07b38",
+    "historical_r1_records_unchanged": true,
+    "sources": [
+      {
+        "authority_id": "SRC-T172-IAPWS-MELT-R2",
+        "source_id": "IAPWS-MELT-R2",
+        "capability": "WATER_DOMAIN",
+        "source_role": "PRIMARY_FORMULATION",
+        "title": "R14-08(2011) Melting and Sublimation Curves",
+        "author": "IAPWS",
+        "year": 2011,
+        "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+        "access_path": "https://iapws.org/documents/release/MeltSub.download",
+        "license_rights": "Cover permits publication with IAPWS attribution; PDF not vendored",
+        "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "sections3.1-3.2 Eq1; Tables1/2; section5",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WATER-DOMAIN-AND-PHASE-QUALIFICATION"
+      },
+      {
+        "authority_id": "SRC-T172-IAPWS-SAT-R2",
+        "source_id": "IAPWS-SAT-R2",
+        "capability": "WATER_DOMAIN",
+        "source_role": "PRIMARY_FORMULATION",
+        "title": "SR1-86(1992) Saturation Properties",
+        "author": "IAPWS",
+        "year": 1992,
+        "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+        "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download",
+        "license_rights": "Public IAPWS release; no redistribution permission inferred; PDF not vendored",
+        "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WATER-DOMAIN-AND-PHASE-QUALIFICATION"
+      },
+      {
+        "authority_id": "SRC-T172-DOE-WALL-R2",
+        "source_id": "DOE-WALL-R2",
+        "capability": "CLEAN_WALL_NETWORK",
+        "source_role": "INHERITED_GOVERNMENT_HANDBOOK",
+        "title": "DOE-HDBK-1012/2-92, Thermodynamics Heat Transfer and Fluid Flow Vol2",
+        "author": "US DOE",
+        "year": 1992,
+        "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+        "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf",
+        "license_rights": "Official DOE public-distribution handbook; metadata/derivation only, no PDF vendored",
+        "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WALL-SURFACE-NETWORK-REVIEW-PACKAGE"
+      }
+    ],
+    "proposals": [
+      {
+        "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "authority_version": "v2",
+        "capability": "PURE_ORDINARY_WATER_HEOS8_DEF_STABLE_LIQUID",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "IAPWS95",
+            "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+            "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4",
+            "access_path": "https://iapws.org/technical-guidance/release/IAPWS-95.download"
+          },
+          {
+            "source_id": "IAPWS-MU",
+            "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+            "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4",
+            "access_path": "https://iapws.org/technical-guidance/release/viscosity.download"
+          },
+          {
+            "source_id": "IAPWS-K",
+            "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+            "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4",
+            "access_path": "https://iapws.org/technical-guidance/release/ThCond.download"
+          },
+          {
+            "source_id": "IAPWS-LIQUID",
+            "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+            "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11",
+            "access_path": "https://iapws.org/technical-guidance/release/LiquidWater.download"
+          },
+          {
+            "source_id": "IAPWS-H",
+            "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+            "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3",
+            "access_path": "https://iapws.org/public/documents/x2LDq/Advise1.pdf"
+          },
+          {
+            "source_id": "CP-WATER",
+            "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+            "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/dev/fluids/Water.json"
+          },
+          {
+            "source_id": "CP-TRANSPORT",
+            "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+            "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/src/Backends/Helmholtz/TransportRoutines.cpp"
+          },
+          {
+            "source_id": "CP-LICENSE",
+            "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+            "exact_location": "LICENSE at pinned commit",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/LICENSE"
+          },
+          {
+            "source_id": "IAPWS-MELT-R2",
+            "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+            "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+            "access_path": "https://iapws.org/documents/release/MeltSub.download"
+          },
+          {
+            "source_id": "IAPWS-SAT-R2",
+            "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+            "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+            "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download"
+          },
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "domain_authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+        "domain_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+        "bounds": {
+          "T_min_K": "298.15",
+          "T_max_K": "300",
+          "P_min_Pa": "100000",
+          "P_max_Pa": "101325"
+        },
+        "backend_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "reference_fingerprint": "8d37dea32044ee8d",
+        "evidence_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+        "evidence_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+        "production_enabled": false,
+        "canonical_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de"
+      },
+      {
+        "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+        "authority_version": "v2",
+        "capability": "CLEAN_SURFACE_ONLY_SUPPLIED_QUALIFIED_FILMS_AND_CONSTANT_K",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          },
+          {
+            "source_id": "REPO-WALL",
+            "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+            "exact_location": "R3_FROZEN, TASK037 schema.py/authority.py/models.py; TASK171 native support and area mapping"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "conditional_network_complete": true,
+        "constant_k_policy_qualified": false,
+        "material_id": null,
+        "material_k_value": null,
+        "material_temperature_domain": null,
+        "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "production_enabled": false,
+        "canonical_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29"
+      },
+      {
+        "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+        "authority_version": "v2",
+        "capability": "NATIVE_TASK171_LOCAL_AREA_MAPPING_CYLINDRICAL_CONSTANT_K",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          },
+          {
+            "source_id": "REPO-WALL",
+            "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+            "exact_location": "R3_FROZEN, TASK037 schema.py/authority.py/models.py; TASK171 native support and area mapping"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "derivation_qualified": true,
+        "physical_event_mapping_unchanged": true,
+        "whole_R_divided_by_N_forbidden": true,
+        "production_enabled": false,
+        "canonical_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c"
+      }
+    ],
+    "domain_proof": {
+      "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+      "canonical_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+      "path": "evidence/TASK-172-water-backend-qualification-r2.json#/domain_proof"
+    },
+    "qualification_evidence": {
+      "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+      "canonical_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+      "path": "evidence/TASK-172-water-backend-qualification-r2.json"
+    },
+    "water_domain_qualification": "PROPOSED_COMPLETE",
+    "water_phase_qualification": "PROPOSED_COMPLETE",
+    "water_backend_checkpoint_qualification": "PROPOSED_COMPLETE",
+    "wall_surface_network_proposed_complete": true,
+    "constant_k_policy_qualified": false,
+    "task172_entry_authority_complete": false,
+    "review_pending": true,
+    "remaining_entry_blockers": [
+      "WATER-PROFILE-INDEPENDENT-REVIEW",
+      "WALL-SURFACE-NETWORK-INDEPENDENT-REVIEW",
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "mesh_convergence_profile_status": "PARTIALLY_CLOSED",
+    "tube_wall_correction_status": "OPEN",
+    "shell_wall_correction_status": "OPEN",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false
+  }
 }
