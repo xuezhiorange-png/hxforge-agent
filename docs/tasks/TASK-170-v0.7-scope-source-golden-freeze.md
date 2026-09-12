@@ -3,14 +3,19 @@
 ## 1. Version identity and decision status
 
 ```ini
-TASK_ID=TASK170_V0_7_TASK171_ENTRY_AUTHORITY_R4
+TASK_ID=TASK170_V0_7_TASK171_ENTRY_REVIEW_CLOSEOUT_R5
 VERSION=HXFORGE_V0_7
-CONTRACT_ID=TASK170-V07-CONTRACT-R4
+CONTRACT_ID=TASK170-V07-CONTRACT-R5
 BASE_MAIN_SHA=24099402697a6bc71be3ee112cc87d31e6341a2d
 PREDECESSOR_RELEASE=v0.6.0
 THEME=SHELL_AND_TUBE_HIGH_FIDELITY_SINGLE_PHASE_RATING_AND_SIZING
 MODEL_LEVEL=STEADY_STATE_SINGLE_PHASE_SEGMENTED_L2_L3
-TASK170_DOCUMENT_STATUS=PROPOSED_TASK171_ENTRY_AUTHORITY_R4
+TASK170_DOCUMENT_STATUS=INDEPENDENT_ENTRY_REVIEW_RECORDED_R5
+TASK170_CONTRACT_FREEZE_ELIGIBLE=true
+V07_RELEASE_AUTHORITY_COMPLETE=false
+TASK170_COMPLETE_FREEZE_ELIGIBLE=false
+TASK171_ENTRY_REVIEW_PENDING=false
+TASK171_IMPLEMENTATION_AUTHORIZED=false
 RATING_CONTRACT_DEFINED=true
 SIZING_CONTRACT_DEFINED=true
 SEGMENTED_MODEL_ARCHITECTURE_DEFINED=true
@@ -53,19 +58,20 @@ This is a documentation-only boundary and review artifact. Scope, required
 schemas, gate order and fail-closed rules below are proposed for freezing;
 they are not a claim that a new solver, an approved numerical profile, or
 six independently validated reference cases already exist. The unresolved
-items in §24 prevent a **complete TASK170 authority freeze** and entry into
-the affected production capabilities. A green documentation CI cannot close
+items in §24 prevent full **v0.7 executable/release authority completeness** and
+entry into affected later capabilities, not TASK170 contract closeout. A green documentation CI cannot close
 them. No package version, dependency, equation, test or legacy result changes
-are part of this task. R4 authorizes only TASK171 entry documentation/authority proposals,
+are part of this task. R5 records the user's independent R4 entry approval,
 commit, push on the existing PR #273 branch, Draft description update and CI. It does
-not authorize a new PR, authority approval, Ready, Merge or TASK171 work.
+not authorize a new PR, scope expansion, Ready, Merge or TASK171 work.
 
 `DEFINED` means a proposal-level contract is written and available for review.
 It does not mean repository authority has been frozen. All new v0.7 normative
 language below describes the proposed contract, even where phrased as a
-requirement. R4 does not convert this Draft into accepted repository authority.
+requirement, except the narrowly reviewed TASK171 entry package recorded in R5.
+That independent approval does not merge this Draft or authorize implementation.
 Historical v0.6 authorities retain their existing status. Passing documentation
-checks is distinct from completing the TASK170 authority freeze.
+checks is distinct from authority approval and contract/release completeness.
 
 The [R3 authority audit](TASK-170-v0.7-authority-closure-r3.md) and
 [source/qualification registry](TASK-170-v0.7-authority-registry-r3.json)
@@ -75,12 +81,19 @@ unapproved proposals. Task-specific entry blockers are in the audit's §10;
 an open Golden gap alone does not block every architecture task.
 
 The [R4 TASK171 entry package](TASK-170-v0.7-task171-entry-authority-r4.md)
-now supplies three concrete PROPOSED_AUTHORITY records for those entry blockers.
+supplied three concrete proposal records for those entry blockers.
 It narrows initial admission to explicit fixed-tubesheet straight-through 1×1
-countercurrent interfaces; this is not all-family thermal admission. Independent
-review is pending, `TASK171_ENTRY_AUTHORITY_COMPLETE=false`, and all seven R3
-gap states remain unchanged. R3 audit/registry are historical evidence, not
-rewritten approvals. Full GAP-SEG closure is distinct from TASK171 entry.
+countercurrent interfaces; this is not all-family thermal admission. The
+[R5 independent review receipt](TASK-170-v0.7-final-review-receipt-r5.md)
+registers those exact records as REVIEWED_AUTHORITY for TASK171 entry only:
+`TASK171_ENTRY_AUTHORITY_COMPLETE=true`, review pending false, entry blockers
+NONE. R4 bytes remain immutable and retain their historical proposal wording;
+R5 binds the reviewed commit/blob and supplies the subsequent decision.
+All seven R3 gap states remain unchanged. Full GAP-SEG closure is distinct
+from TASK171 entry. TASK170_CONTRACT_FREEZE_ELIGIBLE=true now means contract
+closeout eligibility; retained TASK170_COMPLETE_FREEZE_ELIGIBLE=false means
+full-version executable/release authority completeness, not a veto on contract
+closeout. V07_RELEASE_AUTHORITY_COMPLETE and SOURCE_AUTHORITY_COMPLETE stay false.
 
 ## 2. Predecessor authority
 
@@ -138,7 +151,7 @@ are `BLOCKED_OR_DEFERRED` until their mapping and method are reviewed. A legacy
 U-tube `tube_pass_count=1` token does not by itself establish the local return-leg
 temperature topology. That mapping is a required authority, not an inference.
 
-For TASK171 initial entry specifically, R4 §2 is the narrower proposed domain:
+For TASK171 initial entry specifically, R4 §2 is the narrowly reviewed domain:
 FIXED_TUBESHEET straight-through only, explicit bundle membership/area map,
 opposing physical inlet boundaries and physical event ownership. U_TUBE is
 `BLOCKED_PENDING_FUTURE_REVIEW`; FLOATING_HEAD remains vocabulary but deferred
@@ -737,7 +750,7 @@ pass topology; exact candidate retention/constraints/ranking; legacy identities;
 all six real Golden replays; source/license/hash tampering; runtime evidence
 tampering; canonical order/Decimal-context invariance; acyclic provenance.
 
-TASK170 R4 changes only its main document and entry proposal. Validate headings/required fields,
+TASK170 R5 changes only its main document and review receipt. Validate headings/required fields,
 relative links, source-role scope, unresolved ledger consistency, diff boundary
 and whitespace. No new test/CI-manifest/workflow dependency is necessary.
 Final Draft PR CI must complete on the exact PR head. Main post-merge CI remains
@@ -759,7 +772,11 @@ GAP_NUM_STATUS=PARTIALLY_CLOSED
 GAP_DP_STATUS=PARTIALLY_CLOSED
 GAP_FIV_STATUS=PARTIALLY_CLOSED
 GAP_REF_STATUS=OPEN
-TASK171_ENTRY_AUTHORITY_COMPLETE=false
+TASK171_ENTRY_AUTHORITY_COMPLETE=true
+SEG_TOPOLOGY_REVIEW=CLOSED_FOR_TASK171_ENTRY
+SEG_CELL_COMPARTMENT_INTERFACE=CLOSED_FOR_TASK171_ENTRY
+SEG_CONSERVATION_DISCRETIZATION_REVIEW=CLOSED_FOR_TASK171_ENTRY
+REMAINING_TASK171_ENTRY_BLOCKERS=NONE
 TASK172_ENTRY_AUTHORITY_COMPLETE=false
 TASK174_ENTRY_AUTHORITY_COMPLETE=false
 TASK173_ENTRY_AUTHORITY_COMPLETE=false
@@ -768,7 +785,7 @@ TASK175_RELEASE_AUTHORITY_COMPLETE=false
 
 | Gap | Missing reviewed evidence | Affected capability / required closure |
 | --- | --- | --- |
-| GAP-SEG | Exact discretization/mixing/pass mapping, physical Bell compartment allocation and N=1 equivalence proof | TASK171 topology/interface, TASK174 shell aggregation, TASK173 integration; select complete source/derivation and independently review it; no global-correction-per-cell shortcut |
+| GAP-SEG | Executable discretization/mixing, deferred pass topologies, detailed Bell allocation and N=1 equivalence proof | Initial TASK171 interface reviewed in R5; remaining TASK174 shell aggregation, TASK173 integration and TASK175 legacy bridge still require authority; no global-correction-per-cell shortcut |
 | GAP-PROP | Fluid-specific EOS/transport domains, uncertainty, pressure coupling and local snapshot qualification | TASK172; bind exact fluid/backend evidence, not general library availability |
 | GAP-WALL | Complete selected wall-viscosity relation, wall locations, coefficients/domain and coupling verification | TASK172; legally accessible full authority, not a remembered exponent or purchase-page abstract |
 | GAP-NUM | Numeric iteration/relaxation/mesh budgets, residual scales, temperature/segment error allocation | TASK171 mesh interfaces, TASK172 numeric-profile authority, TASK174 state-coupling interface and TASK173 integrated solve; reviewed precision/mesh justification |
@@ -795,7 +812,9 @@ domain, property, phase, geometry, pass map or mechanical requirement is loosene
 to pass a Golden. No source self-approval, observed-output promotion, caller
 parity declaration or green-CI implication closes an authority gap.
 
-Current endpoint: R4 TASK171 entry proposals prepared for independent review,
-with R3 source/Golden/tolerance gaps unchanged; complete freeze remains BLOCKED by
-the explicitly task-mapped remaining authority, not a blanket all-gaps switch.
-TASK171–175 production work has not started. Ready/Merge remain unauthorized.
+Current endpoint: the user's independent R4 entry approval is recorded in R5.
+TASK170 contract freeze is eligible for a separate governance decision; full
+v0.7 release authority remains incomplete with explicitly task-mapped gaps.
+TASK171–175 production work has not started. TASK171 requires separately
+authorized TASK170 Ready/Merge, successful main CI and a separate implementation
+authorization. Ready/Merge remain unauthorized in this closeout.
