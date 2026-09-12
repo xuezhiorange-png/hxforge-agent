@@ -3,15 +3,44 @@
 ## 1. Version identity and decision status
 
 ```ini
-TASK_ID=TASK170_V0_7_SCOPE_SOURCE_GOLDEN_FREEZE_R1
+TASK_ID=TASK170_V0_7_SCOPE_SOURCE_GOLDEN_FREEZE_R2
 VERSION=HXFORGE_V0_7
-CONTRACT_ID=TASK170-V07-CONTRACT-R1
+CONTRACT_ID=TASK170-V07-CONTRACT-R2
 BASE_MAIN_SHA=24099402697a6bc71be3ee112cc87d31e6341a2d
 PREDECESSOR_RELEASE=v0.6.0
 THEME=SHELL_AND_TUBE_HIGH_FIDELITY_SINGLE_PHASE_RATING_AND_SIZING
 MODEL_LEVEL=STEADY_STATE_SINGLE_PHASE_SEGMENTED_L2_L3
-DOCUMENT_STATUS=PROPOSED_FREEZE_WITH_EXPLICIT_AUTHORITY_GAPS
+TASK170_DOCUMENT_STATUS=PROPOSED_FREEZE_R2
+RATING_CONTRACT_DEFINED=true
+SIZING_CONTRACT_DEFINED=true
+SEGMENTED_MODEL_ARCHITECTURE_DEFINED=true
+SEGMENTED_COUPLING_AUTHORITY_FROZEN=false
+PROPERTY_AUTHORITY_FROZEN=false
+WALL_TEMPERATURE_AUTHORITY_FROZEN=false
+CONVERGENCE_AUTHORITY_FROZEN=false
+TUBE_DP_CONTRACT_DEFINED=true
+TUBE_DP_NUMERICAL_AUTHORITY_FROZEN=false
+SHELL_DP_INHERITANCE_DEFINED=true
+SHELL_SEGMENT_AGGREGATION_AUTHORITY_FROZEN=false
+OPERABILITY_CONTRACT_DEFINED=true
+FIV_NUMERICAL_AUTHORITY_FROZEN=false
 SOURCE_AUTHORITY_COMPLETE=false
+SOURCE_CONFLICT_POLICY=FAIL_CLOSED
+GOLDEN_CLASS_COUNT=6
+GOLDEN_CLASS_DESIGNS_DEFINED=true
+GOLDEN_REFERENCE_AUTHORITY_COMPLETE=false
+V06_GOLDEN_REGRESSION_INHERITED=true
+INHERITED_TOLERANCE_SUBSET_VERIFIED=true
+V07_COMPLETE_TOLERANCE_AUTHORITY_FROZEN=false
+RELEASE_GATE_COUNT=24
+RELEASE_GATE_ORDER_DEFINED=true
+RELEASE_GATE_AUTHORITY_FROZEN=false
+TASK171_DEFINED=true
+TASK172_DEFINED=true
+TASK173_DEFINED=true
+TASK174_DEFINED=true
+TASK175_DEFINED=true
+TASK171_IMPLEMENTATION_STARTED=false
 NUMERIC_CONVERGENCE_PROFILE_COMPLETE=false
 GOLDEN_EXPECTED_AUTHORITY_COMPLETE=false
 IMPLEMENTATION_AUTHORIZED=false
@@ -27,7 +56,16 @@ six independently validated reference cases already exist. The unresolved
 items in §24 prevent a **complete TASK170 authority freeze** and entry into
 the affected production capabilities. A green documentation CI cannot close
 them. No package version, dependency, equation, test or legacy result changes
-are part of this task. The user authorizes branch/commit/push/Draft PR only.
+are part of this task. R2 authorizes only this document's correction, commit,
+push on the existing PR #273 branch, Draft description update and CI. It does
+not authorize a new PR, authority approval, Ready, Merge or TASK171 work.
+
+`DEFINED` means a proposal-level contract is written and available for review.
+It does not mean repository authority has been frozen. All new v0.7 normative
+language below describes the proposed contract, even where phrased as a
+requirement. R2 does not convert this Draft into accepted repository authority.
+Historical v0.6 authorities retain their existing status. Passing R2 document
+correction checks is distinct from completing the TASK170 authority freeze.
 
 ## 2. Predecessor authority
 
@@ -56,6 +94,9 @@ manufacturable candidate generation → segmented rating → local properties �
 wall/viscosity iteration → thermal convergence → tube and shell DP closure →
 operability screening → hard filtering → deterministic ranking → recommendation
 and alternatives with complete provenance.
+
+This capability narrative is not task scheduling order; production capability
+dependencies are explicitly defined in §22.
 
 `RATING` and `SIZING` are separate public engineering modes. A successful
 rating is not automatically a selected design. An evaluable candidate with
@@ -175,12 +216,30 @@ source_ids; native_producer_ids; property_evaluation_ids
 inner/outer surfaces. Bulk/film evaluation and wall-side association are
 defined by the selected correlation. Hot does not necessarily mean shell.
 
-Global coordinate x increases along hot flow. In countercurrent operation
-hot inlet is at x=0, cold inlet at x=L; cold local inlet lies at the larger-x
-face. All temperatures named in/out follow **fluid travel**, not array order.
-The cold boundary is not marched as if known at x=0. Simultaneous solution or
-a reviewed bracketed boundary-value method must satisfy both inlet conditions.
-`COUNTERCURRENT` is required; `COCURRENT=BLOCKED_OR_DEFERRED` in this R1.
+Two coordinate concepts are separate:
+
+* `physical_coordinate`: the exchanger/shell geometry reference coordinate,
+  used for physical locations, compartment ownership and geometry mapping.
+* `fluid_path_coordinate`: a monotonic coordinate along one explicitly
+  identified stream flow path, increasing in that fluid's travel direction.
+
+Segment ordering follows each stream's `fluid_path_coordinate`, not necessarily
+`physical_coordinate`. Hot/cold inlet/outlet always follow actual fluid travel,
+never array index alone. A return leg may traverse decreasing physical axial
+coordinate while its fluid-path coordinate continues increasing.
+
+Countercurrent boundaries are defined by physical connections and the explicit
+fluid-path mapping. The two streams are not assumed to share one monotonic
+global x. Simultaneous solution or a reviewed boundary-value method must satisfy
+both physical inlet conditions; an unknown boundary is never silently treated
+as supplied. `COUNTERCURRENT` is required; `COCURRENT=BLOCKED_OR_DEFERRED`.
+
+U-tube segmented topology is admitted only with explicit leg identities,
+outbound/return mapping, a U-return connection, validated physical tube pairing
+authority and segment-to-flow-path mapping. Pairing alone does not establish
+thermal connectivity. If repository authority cannot supply all of these:
+`U_TUBE_SEGMENTED_THERMAL_TOPOLOGY=BLOCKED_PENDING_GAP_SEG`. No runtime inference
+of a U-return thermal path or substitution of a straight-tube path is permitted.
 
 Pass-to-cell mapping, U-return connections and shell-compartment bulk mixing
 must be explicit. A single shell bulk temperature cannot silently serve every
@@ -223,6 +282,26 @@ identity. Explicit constant-property profiles are allowed only within their
 reviewed envelope; an inlet-only snapshot is not a variable-property profile.
 Full fluid-specific transport/EOS limits and independent accuracy checks remain
 GAP-PROP in §24. No mixture or REFPROP license is inferred from CoolProp access.
+
+`PROPERTY_BACKEND_CAPABILITY != HXFORGE_SUPPORTED_FLUID_PROFILE`.
+Only reviewed `SUPPORTED_FLUID_PROFILE` entries may enter production Rating
+or Sizing. Each entry must bind:
+
+```text
+fluid_profile_id; backend_id; backend_version; fluid/composition identity
+reference_state; supported phase; temperature envelope; pressure envelope
+required properties; EOS/transport applicability
+known uncertainty/validation evidence; source/provenance; canonical hash
+review status
+```
+
+Admission verifies that exact profile and its review evidence, canonical hash,
+backend/fluid identity and all local states against its permitted envelope.
+Backend availability or a successful property call is insufficient. An
+unregistered fluid/composition yields `PROPERTY_AUTHORITY_MISSING` or
+`PROPERTY_PROFILE_UNSUPPORTED`; mixtures are not implicitly supported.
+R2 does not select or approve a supported-fluid list. GAP-PROP remains OPEN;
+no source, property domain or review status is invented by this addition.
 
 ## 11. Wall-temperature and viscosity authority
 
@@ -275,7 +354,7 @@ release requirement measured by actual runtimes, not a caller claim.
 
 Numeric iteration budgets and new temperature tolerances remain **UNBOUND**
 pending numerical-profile/reference precision review (GAP-NUM). This explicitly
-means the convergence schema/semantics are frozen for review but the executable
+means the convergence schema/semantics are defined for review but the executable
 convergence authority is **not complete**. TASK171/172 must not invent defaults.
 
 ## 13. Tube-side DP decomposition
@@ -284,6 +363,36 @@ Required outputs: `tube_friction_dp`, `tube_entrance_dp`, `tube_exit_dp`,
 `tube_pass_dp`, `tube_bend_dp`, approved other local losses, `tube_dp_total`.
 Every component has status, location, source coefficient, velocity/density
 basis, multiplicity and native result identity.
+
+The non-overlapping taxonomy uses **option B** for `tube_pass_dp`:
+
+| Field | Exclusive ownership / reporting semantics |
+| --- | --- |
+| `tube_friction_dp` | Straight-flow distributed wall friction only |
+| `tube_entrance_dp` | Physical exchanger/tube-flow-path entrance local loss only |
+| `tube_exit_dp` | Physical exchanger/tube-flow-path exit local loss only |
+| `tube_bend_dp` | Explicitly modeled bend/U-return local losses only |
+| `approved_other_local_losses` | Other source-authorized physical local events not owned by any preceding category; unique pass-specific events belong here |
+| `tube_pass_dp` | Derived per-pass reporting subtotal referencing already owned components; never an additional summand in total DP |
+
+The aggregation invariant for the required loss categories is:
+
+```text
+tube_dp_total = tube_friction_dp + tube_entrance_dp + tube_exit_dp
+              + tube_bend_dp + sum(approved_other_local_losses)
+OWNED_BY_EXACTLY_ONE_DP_COMPONENT=true
+MUST_NOT_CREATE_NEW_PHYSICAL_LOCAL_LOSS_EVENTS=true
+TUBE_PASS_DP_INCLUDED_AGAIN_IN_TOTAL=false
+```
+
+Every physical loss event has an explicit identity and exactly one owner.
+Pass subtotals reference those event identities; they cannot reclassify an
+entrance or U-return and count it again. Numerical cell splitting cannot create
+additional physical local-loss events. Missing required source coefficients
+are BLOCKED, never default `K=0`. This defines bookkeeping only: it does not
+close GAP-DP or add loss coefficients. Applicability of any required additional
+pressure contribution remains subject to the existing GAP-DP review below;
+the sum is not permission to omit a necessary hydraulic term.
 
 Reuse TASK027 straight-tube and TASK028 local-loss authority and TASK029
 composition where applicable. TASK027 currently binds constant-density and
@@ -390,9 +499,9 @@ no averaging, newer-wins rule or anonymous coefficient mixing. Missing full
 equation evidence produces `SOURCE_AUTHORITY_MISSING`. New source admission
 requires a reviewed TASK170 amendment before its production use.
 
-## 18. V07 Golden design freeze
+## 18. V07 Golden class design proposal
 
-All six **class purposes and test boundaries** below are frozen for review.
+All six **class purposes and test boundaries** below are defined for review.
 All six fixture/reference authority states are `PROPOSED_PENDING_REFERENCE`:
 none has a complete independent numeric payload in the pinned repository.
 This distinction must remain visible in receipts; class definition is not
@@ -471,8 +580,25 @@ complete executable profile. No caller override of a bound tolerance is valid.
 
 ## 21. Ordered release gates
 
-Order is frozen. Each gate records evidence hashes, applicability and a
-PASS/BLOCKED decision; missing or NOT_COMPUTABLE mandatory evidence is BLOCKED.
+The 24 IDs and their reporting order are defined in this proposal, not yet
+frozen repository release authority. Each gate records evidence hashes,
+applicability and a PASS/BLOCKED decision; missing or NOT_COMPUTABLE mandatory
+evidence is BLOCKED.
+
+```ini
+RELEASE_GATE_ORDER_IS_REPORTING_ORDER=true
+RELEASE_GATE_ORDER_IS_EXECUTION_DEPENDENCY_ORDER=false
+```
+
+Gate order is the stable release-receipt order, not a scheduling constraint.
+Actual evidence production/evaluation follows an explicit dependency DAG.
+For example, Gate01 needs property, wall, energy/convergence and hydraulic
+evidence; its number does not authorize execution before those prerequisites.
+The producer-task DAG in §22 governs capability availability; reporting it in
+01–24 order does not reverse those dependencies. A blocked required dependency
+makes the downstream gate BLOCKED, never a fabricated PASS. Final receipts
+always report 01–24 in the order below. Gate24 may PASS only if gates01–23
+all PASS, irrespective of the order in which their evidence was collected.
 
 | Order | Gate | Minimum evidence |
 | --- | --- | --- |
@@ -508,13 +634,49 @@ swapped, stale or failed runtime observation fails closed.
 
 ## 22. TASK171–TASK175 roadmap
 
-| Task | Frozen responsibility | Entry/exit boundary |
+Task numbers are identifiers, not production dependency order. The proposed
+acyclic dependency contract is:
+
+```ini
+TASK171_DEPENDS_ON=TASK170
+TASK172_DEPENDS_ON=TASK171
+TASK174_DEPENDS_ON=TASK171
+TASK173_DEPENDS_ON=TASK172,TASK174
+TASK175_DEPENDS_ON=TASK173
+```
+
+```text
+                 TASK170
+                    |
+                 TASK171
+                 /     \
+            TASK172   TASK174
+                 \     /
+                 TASK173
+                    |
+                 TASK175
+```
+
+| Task | Defined responsibility | Required boundary |
 | --- | --- | --- |
-| TASK171 | SEGMENTED_SINGLE_PHASE_THERMAL_HYDRAULIC_ENGINE | Reviewed topology/coupling source → real local model, conservation and mesh evidence |
-| TASK172 | WALL_TEMPERATURE_PROPERTY_AND_CONVERGENCE_CLOSURE | Reviewed property/wall/numeric profiles → deterministic converged state or typed failure |
-| TASK173 | FULL_RATING_AND_SIZING_SOLVER | Inlet-only Rating and source-bound discrete Sizing → full closure before recommendation |
-| TASK174 | DETAILED_HYDRAULIC_AND_OPERABILITY_SCREENING | Qualified loss/screen sources → explicit components and honest screening statuses |
-| TASK175 | V0_7_INTEGRATION_GOLDEN_AND_RELEASE_ACCEPTANCE | Independently approved six references, legacy bridge and trusted parity → all ordered gates |
+| TASK171 | SEGMENTED_THERMAL_STATE_AND_TOPOLOGY_ENGINE | TASK170 authority prerequisite; physical/fluid-path topology, local thermal-state schema, cell↔compartment mapping, countercurrent boundary topology, conservation framework, mesh ownership and Bell physical-compartment interface |
+| TASK172 | PROPERTY_WALL_AND_CONVERGENCE_CLOSURE | TASK171 interfaces; local property evaluation/domain enforcement, inner/outer wall temperatures, approved viscosity correction, deterministic iteration/failure semantics and numerical-profile binding |
+| TASK174 | DETAILED_HYDRAULIC_AND_OPERABILITY_SCREENING | TASK171 interfaces; tube entrance/exit/pass/bend/local-loss decomposition, shell compartment aggregation, variable-state hydraulic coupling, operability diagnostics and FIV screening authority |
+| TASK173 | FULL_RATING_AND_SIZING_SOLVER | Both TASK172 and TASK174 authority available; complete Rating/Sizing, hard thermal/DP constraints, filtering, deterministic ranking, recommendation and alternatives |
+| TASK175 | V0_7_INTEGRATION_GOLDEN_AND_RELEASE_ACCEPTANCE | TASK173 complete; six independently approved V07 fixtures, V06 bridge, trusted Python3.11/3.12 parity, deterministic replay, 24 gates and end-to-end release acceptance |
+
+TASK171 must not claim final variable-property closure, wall-viscosity numerical
+closure, a detailed tube-loss coefficient catalog, complete segmented Bell DP,
+numeric FIV screening or full Rating/Sizing. Its Bell interface establishes
+physical ownership; TASK174 owns hydraulic aggregation/coupling qualification.
+
+TASK172 and TASK174 can develop against TASK171's explicit interfaces in
+parallel. Their shared state/pressure interfaces must be compatible at TASK173
+integration; this is not permission to fabricate property or hydraulic evidence.
+Complete Rating/Sizing and any recommendation are blocked until **both**
+authorities are available and all required closures pass. Convergence authority
+from TASK172 includes the numerical profile consumed by the integrated solve;
+TASK174 does not create a competing convergence policy.
 
 Each task may use internal implementation slices; no one-formula-per-task
 fragmentation. All five require separate implementation authorization. This
@@ -551,12 +713,25 @@ a future separately authorized gate; a Draft is not a merged freeze.
 
 ## 24. Fail-closed rules and complete remaining authority ledger
 
+All seven gaps remain OPEN. R2 changes architecture/governance wording only;
+it does not supply missing sources or close an authority gap.
+
+```ini
+GAP_SEG_STATUS=OPEN
+GAP_PROP_STATUS=OPEN
+GAP_WALL_STATUS=OPEN
+GAP_NUM_STATUS=OPEN
+GAP_DP_STATUS=OPEN
+GAP_FIV_STATUS=OPEN
+GAP_REF_STATUS=OPEN
+```
+
 | Gap | Missing reviewed evidence | Affected capability / required closure |
 | --- | --- | --- |
-| GAP-SEG | Exact discretization/mixing/pass mapping, physical Bell compartment allocation and N=1 equivalence proof | TASK171/173; select complete source/derivation and independently review it; no global-correction-per-cell shortcut |
+| GAP-SEG | Exact discretization/mixing/pass mapping, physical Bell compartment allocation and N=1 equivalence proof | TASK171 topology/interface, TASK174 shell aggregation, TASK173 integration; select complete source/derivation and independently review it; no global-correction-per-cell shortcut |
 | GAP-PROP | Fluid-specific EOS/transport domains, uncertainty, pressure coupling and local snapshot qualification | TASK172; bind exact fluid/backend evidence, not general library availability |
 | GAP-WALL | Complete selected wall-viscosity relation, wall locations, coefficients/domain and coupling verification | TASK172; legally accessible full authority, not a remembered exponent or purchase-page abstract |
-| GAP-NUM | Numeric iteration/relaxation/mesh budgets, residual scales, temperature/segment error allocation | TASK171–173; reviewed numeric profile with precision/mesh justification |
+| GAP-NUM | Numeric iteration/relaxation/mesh budgets, residual scales, temperature/segment error allocation | TASK171 mesh interfaces, TASK172 numeric-profile authority, TASK174 state-coupling interface and TASK173 integrated solve; reviewed precision/mesh justification |
 | GAP-DP | Detailed entrance/exit/return/U-bend coefficient authority and variable-property friction applicability | TASK174; source-bound local-loss catalog and density/pressure assumptions |
 | GAP-FIV | Complete vortex/natural-frequency/instability equations and array/support-dependent coefficients | TASK174; legal source and mechanical-property snapshots, otherwise NOT_COMPUTABLE with required-screen blocker |
 | GAP-REF | Six independent fixture payloads, precision/uncertainty and reviewer-bound expectations | TASK175 and new numeric tolerances; proposal classes alone cannot authorize release |
@@ -567,7 +742,8 @@ none may silently replace the frozen hierarchy. Scope and schema review can
 proceed while production admission remains blocked.
 
 Proposed closed failure vocabulary: `SOURCE_AUTHORITY_MISSING`,
-`SOURCE_CONFLICT`, `PROPERTY_OUT_OF_RANGE`, `TOPOLOGY_AUTHORITY_INCOMPLETE`,
+`SOURCE_CONFLICT`, `PROPERTY_AUTHORITY_MISSING`, `PROPERTY_PROFILE_UNSUPPORTED`,
+`PROPERTY_OUT_OF_RANGE`, `TOPOLOGY_AUTHORITY_INCOMPLETE`,
 `CONVERGENCE_AUTHORITY_INCOMPLETE`, `MAX_ITERATIONS_REACHED`,
 `INVALID_THERMAL_STATE`, `NUMERICAL_FAILURE`, `REQUIRED_SCREEN_NOT_COMPUTABLE`,
 `UPSTREAM_IDENTITY_MISMATCH`, `GOLDEN_AUTHORITY_UNAPPROVED`,
