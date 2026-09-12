@@ -188,6 +188,7 @@ shards:
       - tests/exchangers/shell_tube/test_task166_bell_delaware.py
       - tests/exchangers/shell_tube/test_task167_engineering_screening.py
       - tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py
+      - tests/exchangers/shell_tube/segmented_thermal_state_topology/test_engine.py
       - tests/exchangers/shell_tube/test_task169_selection_release.py
       - tests/test_release_version_alignment.py
       - tests/release_demo/test_task164_integration_release_acceptance.py
