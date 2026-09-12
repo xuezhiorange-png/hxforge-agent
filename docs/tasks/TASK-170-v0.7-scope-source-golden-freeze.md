@@ -3,14 +3,14 @@
 ## 1. Version identity and decision status
 
 ```ini
-TASK_ID=TASK170_V0_7_AUTHORITY_CLOSURE_R3
+TASK_ID=TASK170_V0_7_TASK171_ENTRY_AUTHORITY_R4
 VERSION=HXFORGE_V0_7
-CONTRACT_ID=TASK170-V07-CONTRACT-R3
+CONTRACT_ID=TASK170-V07-CONTRACT-R4
 BASE_MAIN_SHA=24099402697a6bc71be3ee112cc87d31e6341a2d
 PREDECESSOR_RELEASE=v0.6.0
 THEME=SHELL_AND_TUBE_HIGH_FIDELITY_SINGLE_PHASE_RATING_AND_SIZING
 MODEL_LEVEL=STEADY_STATE_SINGLE_PHASE_SEGMENTED_L2_L3
-TASK170_DOCUMENT_STATUS=PROPOSED_AUTHORITY_CLOSURE_R3
+TASK170_DOCUMENT_STATUS=PROPOSED_TASK171_ENTRY_AUTHORITY_R4
 RATING_CONTRACT_DEFINED=true
 SIZING_CONTRACT_DEFINED=true
 SEGMENTED_MODEL_ARCHITECTURE_DEFINED=true
@@ -56,14 +56,14 @@ six independently validated reference cases already exist. The unresolved
 items in §24 prevent a **complete TASK170 authority freeze** and entry into
 the affected production capabilities. A green documentation CI cannot close
 them. No package version, dependency, equation, test or legacy result changes
-are part of this task. R3 authorizes only TASK170 documentation/evidence audit,
+are part of this task. R4 authorizes only TASK171 entry documentation/authority proposals,
 commit, push on the existing PR #273 branch, Draft description update and CI. It does
 not authorize a new PR, authority approval, Ready, Merge or TASK171 work.
 
 `DEFINED` means a proposal-level contract is written and available for review.
 It does not mean repository authority has been frozen. All new v0.7 normative
 language below describes the proposed contract, even where phrased as a
-requirement. R3 does not convert this Draft into accepted repository authority.
+requirement. R4 does not convert this Draft into accepted repository authority.
 Historical v0.6 authorities retain their existing status. Passing documentation
 checks is distinct from completing the TASK170 authority freeze.
 
@@ -73,6 +73,14 @@ extend R2 without changing its architecture or approving new numerical inputs.
 They distinguish inherited reviewed sub-scopes, newly verified sources and
 unapproved proposals. Task-specific entry blockers are in the audit's §10;
 an open Golden gap alone does not block every architecture task.
+
+The [R4 TASK171 entry package](TASK-170-v0.7-task171-entry-authority-r4.md)
+now supplies three concrete PROPOSED_AUTHORITY records for those entry blockers.
+It narrows initial admission to explicit fixed-tubesheet straight-through 1×1
+countercurrent interfaces; this is not all-family thermal admission. Independent
+review is pending, `TASK171_ENTRY_AUTHORITY_COMPLETE=false`, and all seven R3
+gap states remain unchanged. R3 audit/registry are historical evidence, not
+rewritten approvals. Full GAP-SEG closure is distinct from TASK171 entry.
 
 ## 2. Predecessor authority
 
@@ -129,6 +137,12 @@ pass, subject to an explicit physical flow-path mapping. Additional passes
 are `BLOCKED_OR_DEFERRED` until their mapping and method are reviewed. A legacy
 U-tube `tube_pass_count=1` token does not by itself establish the local return-leg
 temperature topology. That mapping is a required authority, not an inference.
+
+For TASK171 initial entry specifically, R4 §2 is the narrower proposed domain:
+FIXED_TUBESHEET straight-through only, explicit bundle membership/area map,
+opposing physical inlet boundaries and physical event ownership. U_TUBE is
+`BLOCKED_PENDING_FUTURE_REVIEW`; FLOATING_HEAD remains vocabulary but deferred
+for topology review. No numerical calculation is enabled by interface admission.
 
 ## 5. Non-scope
 
@@ -555,6 +569,11 @@ applicable tolerances in §20. A new finite-volume approximation or ideal
 counterflow relation is not automatically numerically equal to the legacy
 sectional mixing model. GAP-SEG must close this equivalence before claiming it.
 
+`N1_LEGACY_NUMERICAL_EQUIVALENCE_REQUIRED_FOR_TASK171_ENTRY=false`.
+`N1_LEGACY_BRIDGE_REQUIRED_FOR_TASK175_RELEASE=true`. The R4 interface package
+does not claim or relax numerical equivalence; it separates the entry and
+release prerequisites.
+
 Manufacturable membership, hard status, ranking and canonical replay are exact.
 New model/source semantics may intentionally create a different v0.7 result
 identity; exactness means replay of each authorized version, not reusing a
@@ -718,7 +737,7 @@ pass topology; exact candidate retention/constraints/ranking; legacy identities;
 all six real Golden replays; source/license/hash tampering; runtime evidence
 tampering; canonical order/Decimal-context invariance; acyclic provenance.
 
-TASK170 R3 changes only its documentation and evidence registry. Validate headings/required fields,
+TASK170 R4 changes only its main document and entry proposal. Validate headings/required fields,
 relative links, source-role scope, unresolved ledger consistency, diff boundary
 and whitespace. No new test/CI-manifest/workflow dependency is necessary.
 Final Draft PR CI must complete on the exact PR head. Main post-merge CI remains
@@ -776,7 +795,7 @@ domain, property, phase, geometry, pass map or mechanical requirement is loosene
 to pass a Golden. No source self-approval, observed-output promotion, caller
 parity declaration or green-CI implication closes an authority gap.
 
-Current endpoint: R3 evidence and qualification proposals prepared for independent
-**source, Golden and tolerance review**; complete freeze remains BLOCKED by
+Current endpoint: R4 TASK171 entry proposals prepared for independent review,
+with R3 source/Golden/tolerance gaps unchanged; complete freeze remains BLOCKED by
 the explicitly task-mapped remaining authority, not a blanket all-gaps switch.
 TASK171–175 production work has not started. Ready/Merge remain unauthorized.
