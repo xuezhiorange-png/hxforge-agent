@@ -3,14 +3,14 @@
 ## 1. Version identity and decision status
 
 ```ini
-TASK_ID=TASK170_V0_7_SCOPE_SOURCE_GOLDEN_FREEZE_R2
+TASK_ID=TASK170_V0_7_AUTHORITY_CLOSURE_R3
 VERSION=HXFORGE_V0_7
-CONTRACT_ID=TASK170-V07-CONTRACT-R2
+CONTRACT_ID=TASK170-V07-CONTRACT-R3
 BASE_MAIN_SHA=24099402697a6bc71be3ee112cc87d31e6341a2d
 PREDECESSOR_RELEASE=v0.6.0
 THEME=SHELL_AND_TUBE_HIGH_FIDELITY_SINGLE_PHASE_RATING_AND_SIZING
 MODEL_LEVEL=STEADY_STATE_SINGLE_PHASE_SEGMENTED_L2_L3
-TASK170_DOCUMENT_STATUS=PROPOSED_FREEZE_R2
+TASK170_DOCUMENT_STATUS=PROPOSED_AUTHORITY_CLOSURE_R3
 RATING_CONTRACT_DEFINED=true
 SIZING_CONTRACT_DEFINED=true
 SEGMENTED_MODEL_ARCHITECTURE_DEFINED=true
@@ -56,16 +56,23 @@ six independently validated reference cases already exist. The unresolved
 items in §24 prevent a **complete TASK170 authority freeze** and entry into
 the affected production capabilities. A green documentation CI cannot close
 them. No package version, dependency, equation, test or legacy result changes
-are part of this task. R2 authorizes only this document's correction, commit,
-push on the existing PR #273 branch, Draft description update and CI. It does
+are part of this task. R3 authorizes only TASK170 documentation/evidence audit,
+commit, push on the existing PR #273 branch, Draft description update and CI. It does
 not authorize a new PR, authority approval, Ready, Merge or TASK171 work.
 
 `DEFINED` means a proposal-level contract is written and available for review.
 It does not mean repository authority has been frozen. All new v0.7 normative
 language below describes the proposed contract, even where phrased as a
-requirement. R2 does not convert this Draft into accepted repository authority.
-Historical v0.6 authorities retain their existing status. Passing R2 document
-correction checks is distinct from completing the TASK170 authority freeze.
+requirement. R3 does not convert this Draft into accepted repository authority.
+Historical v0.6 authorities retain their existing status. Passing documentation
+checks is distinct from completing the TASK170 authority freeze.
+
+The [R3 authority audit](TASK-170-v0.7-authority-closure-r3.md) and
+[source/qualification registry](TASK-170-v0.7-authority-registry-r3.json)
+extend R2 without changing its architecture or approving new numerical inputs.
+They distinguish inherited reviewed sub-scopes, newly verified sources and
+unapproved proposals. Task-specific entry blockers are in the audit's §10;
+an open Golden gap alone does not block every architecture task.
 
 ## 2. Predecessor authority
 
@@ -300,8 +307,9 @@ backend/fluid identity and all local states against its permitted envelope.
 Backend availability or a successful property call is insufficient. An
 unregistered fluid/composition yields `PROPERTY_AUTHORITY_MISSING` or
 `PROPERTY_PROFILE_UNSUPPORTED`; mixtures are not implicitly supported.
-R2 does not select or approve a supported-fluid list. GAP-PROP remains OPEN;
-no source, property domain or review status is invented by this addition.
+R2 did not select or approve a supported-fluid list. R3's water qualification
+proposals remain unsupported for production; the GAP-PROP remainder is open.
+No source, property domain or review status is invented by this addition.
 
 ## 11. Wall-temperature and viscosity authority
 
@@ -437,7 +445,7 @@ Each numeric diagnostic requires its complete equation, geometry-dependent
 coefficient, supports/span/material/effective mass/damping and property sources.
 No universal Strouhal number, damping, added mass or Connors coefficient is
 assumed. The current TASK167 public evidence does not authorize a critical
-velocity coefficient; GAP-FIV remains open.
+velocity coefficient; the GAP-FIV numerical-profile remainder remains open.
 
 Status vocabulary: PASS, WARNING, BLOCKED, NOT_COMPUTABLE. A deterministic
 adapter maps legacy WARN to WARNING without changing its identity. Missing
@@ -449,9 +457,14 @@ subject to TASK012 approved-rule-pack licensing and provenance.
 
 ## 16. Source inventory and audit disposition
 
+This table preserves the R1/R2 inventory at its stated audit date. R3's
+additional full-text acquisitions and qualification decisions are recorded in
+the linked authority registry and audit; they do not silently replace any
+inherited implementation source or approve a new numerical extension.
+
 Evidence classes: **INHERITED** means the pinned repository's accepted scope,
 not an assertion of newly reading copyrighted source bytes; **VERIFIED-PUBLIC**
-means the cited primary page was read in this audit; **CANDIDATE** is discovery
+means the cited primary page was read in that audit; **CANDIDATE** is discovery
 only, never production authority. Audit date: 2026-09-11. Repository paths are
 exact implementation mappings, not substitutes for missing external evidence.
 
@@ -705,7 +718,7 @@ pass topology; exact candidate retention/constraints/ranking; legacy identities;
 all six real Golden replays; source/license/hash tampering; runtime evidence
 tampering; canonical order/Decimal-context invariance; acyclic provenance.
 
-TASK170 itself changes only this document. Validate headings/required fields,
+TASK170 R3 changes only its documentation and evidence registry. Validate headings/required fields,
 relative links, source-role scope, unresolved ledger consistency, diff boundary
 and whitespace. No new test/CI-manifest/workflow dependency is necessary.
 Final Draft PR CI must complete on the exact PR head. Main post-merge CI remains
@@ -713,17 +726,25 @@ a future separately authorized gate; a Draft is not a merged freeze.
 
 ## 24. Fail-closed rules and complete remaining authority ledger
 
-All seven gaps remain OPEN. R2 changes architecture/governance wording only;
-it does not supply missing sources or close an authority gap.
+R2 left all seven gaps OPEN. R3 explicitly separates already reviewed
+predecessor sub-scopes from missing new authority. PARTIALLY_CLOSED does not
+approve a new source/profile or enable production. No gap is CLOSED; all
+unresolved remainders below remain fail-closed. See the R3 audit and registry
+for exact inherited scopes, evidence limitations and per-task entry blockers.
 
 ```ini
-GAP_SEG_STATUS=OPEN
-GAP_PROP_STATUS=OPEN
-GAP_WALL_STATUS=OPEN
-GAP_NUM_STATUS=OPEN
-GAP_DP_STATUS=OPEN
-GAP_FIV_STATUS=OPEN
+GAP_SEG_STATUS=PARTIALLY_CLOSED
+GAP_PROP_STATUS=PARTIALLY_CLOSED
+GAP_WALL_STATUS=PARTIALLY_CLOSED
+GAP_NUM_STATUS=PARTIALLY_CLOSED
+GAP_DP_STATUS=PARTIALLY_CLOSED
+GAP_FIV_STATUS=PARTIALLY_CLOSED
 GAP_REF_STATUS=OPEN
+TASK171_ENTRY_AUTHORITY_COMPLETE=false
+TASK172_ENTRY_AUTHORITY_COMPLETE=false
+TASK174_ENTRY_AUTHORITY_COMPLETE=false
+TASK173_ENTRY_AUTHORITY_COMPLETE=false
+TASK175_RELEASE_AUTHORITY_COMPLETE=false
 ```
 
 | Gap | Missing reviewed evidence | Affected capability / required closure |
@@ -755,6 +776,7 @@ domain, property, phase, geometry, pass map or mechanical requirement is loosene
 to pass a Golden. No source self-approval, observed-output promotion, caller
 parity declaration or green-CI implication closes an authority gap.
 
-Current endpoint: documentation prepared for independent **source, Golden and
-tolerance review**; complete freeze remains BLOCKED by the ledger above.
+Current endpoint: R3 evidence and qualification proposals prepared for independent
+**source, Golden and tolerance review**; complete freeze remains BLOCKED by
+the explicitly task-mapped remaining authority, not a blanket all-gaps switch.
 TASK171–175 production work has not started. Ready/Merge remain unauthorized.
