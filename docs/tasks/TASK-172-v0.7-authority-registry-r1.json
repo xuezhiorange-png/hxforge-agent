@@ -1067,7 +1067,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "4e21c4962527c084bb361d88fbb9206e8eb228eb3de490762845fc43c92e4aaa",
+  "canonical_hash": "a4232091ca55a81534382913e9356313f0f85548e73c6a768961e1f5fde57037",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -1324,5 +1324,166 @@
     "shell_wall_correction_status": "OPEN",
     "numerical_tolerances_bound": false,
     "mesh_convergence_rule_bound": false
+  },
+  "r3_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R3",
+    "previous_head": "c3f1d9223e4731c5cc12621603695e0aa57ff770",
+    "historical_r2_root_hash": "4e21c4962527c084bb361d88fbb9206e8eb228eb3de490762845fc43c92e4aaa",
+    "document": "TASK-172-v0.7-material-active-wall-review-r3.md",
+    "independent_review_receipt": {
+      "receipt_id": "V07-T172-R2-INDEPENDENT-REVIEW-RECEIPT-R3",
+      "review_origin": "User independent R2 review accompanying TASK172 R3 instruction; no GitHub review ID asserted",
+      "reviewed_head": "c3f1d9223e4731c5cc12621603695e0aa57ff770",
+      "review_scope": {
+        "fluid": "PURE_ORDINARY_WATER",
+        "backend": "HEOS",
+        "backend_version": "8.0.0",
+        "reference": "DEF",
+        "phase": "STABLE_SINGLE_PHASE_LIQUID",
+        "t_min_k": "298.15",
+        "t_max_k": "300",
+        "p_min_pa": "100000",
+        "p_max_pa": "101325",
+        "wall": "CLEAN_SURFACE_ONLY",
+        "general_water_domain": false,
+        "glycol": false,
+        "fouled_wall": false,
+        "variable_k": false,
+        "executable_material_qualified": false
+      },
+      "decisions": [
+        {
+          "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+          "reviewed_payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+          "reviewed_payload_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+          "reviewed_payload_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+          "reviewed_payload_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+          "reviewed_payload_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        }
+      ],
+      "closed_for_task172_entry": [
+        "WATER-DOMAIN-AND-PHASE-QUALIFICATION",
+        "WATER-BACKEND-CHECKPOINT-QUALIFICATION",
+        "WATER-PROFILE-INDEPENDENT-REVIEW",
+        "WALL-SURFACE-NETWORK-INDEPENDENT-REVIEW",
+        "LOCAL-CYLINDRICAL-MAPPING-REVIEW"
+      ],
+      "historical_payloads_unchanged": true,
+      "implementation_authorized": false,
+      "canonical_hash": "fc72a78ac15a4a5700d395b6cb568fa3288f311174e0b0b52e399ab8612c0699"
+    },
+    "audit_scope": "Three material/active-correction blockers only; no numerical research",
+    "audit_findings": [
+      {
+        "finding_id": "T172-R3-MATERIAL-IDENTITY",
+        "status": "OPEN",
+        "reason": "BLOCKED_MISSING_MATERIAL_IDENTITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-WALL"
+        ],
+        "exact_location": "overall_heat_transfer_resistance models/authority; release_demo/v0_4/task039.py::_build_task037_request",
+        "observed": "FIXTURE-GRADE; fixed release-demo k at one temperature, not a TASK172 physical alloy/domain",
+        "required_evidence": "Authorized tube grade/specification then source-qualified constant-k treatment over 298.15-300 K"
+      },
+      {
+        "finding_id": "T172-R3-TUBE-TRANSFER",
+        "status": "OPEN",
+        "reason": "OPEN_NO_TRANSFERABLE_AUTHORITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-TUBE",
+          "SRC-T172-GONCALVES",
+          "SRC-T172-SIEDER-TATE"
+        ],
+        "exact_location": "nusselt_selector.py R6-R7 sections5.2,6; Goncalves section2.2 Eq75 PDFp6",
+        "required_evidence": "Lawfully reviewable primary active-correction equation, all domains and combination rule for native TASK026 base",
+        "sieder_tate_transfer_authority": "UNAVAILABLE"
+      },
+      {
+        "finding_id": "T172-R3-SHELL-TRANSFER",
+        "status": "OPEN",
+        "reason": "OPEN_NO_TRANSFERABLE_AUTHORITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-BELL",
+          "SRC-T172-GONCALVES"
+        ],
+        "exact_location": "bell_delaware/authority.py SOURCE_ROLE_BY_ID; Goncalves section2.1 Eqs36-39 PDFp4",
+        "required_evidence": "Complete Bell/Taborek or explicitly compatible supplement equation/domain/combination; origin bibliography is insufficient"
+      }
+    ],
+    "access_audit": [
+      {
+        "source_ref": "SRC-T172-GONCALVES",
+        "access": "Public university PDF read; pages4,6 visually checked",
+        "hash_or_revision": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+        "rights": "Copyright retained; not vendored; metadata/limited analysis only"
+      },
+      {
+        "source_ref": "Gnielinski1976",
+        "access_path": "https://cir.nii.ac.jp/crid/1571980075607043456",
+        "access": "Bibliographic discovery; verification page, original full text not acquired",
+        "hash_or_revision": "Int.Chem.Eng.16(2),359-368,1976",
+        "rights": "No full-text license established; no equation transcription"
+      },
+      {
+        "source_ref": "SRC-T172-SIEDER-TATE",
+        "access_path": "https://pubs.acs.org/doi/pdf/10.1021/ie50324a027",
+        "access": "Tool open failed; full text not acquired",
+        "hash_or_revision": "doi:10.1021/ie50324a027",
+        "rights": "No access/redistribution permission inferred"
+      },
+      {
+        "source_ref": "SRC-UDEL-BELL-1963-FINAL-REPORT",
+        "access": "Origin metadata inherited; correction pages not acquired",
+        "hash_or_revision": "TASK166 SOURCE_ROLE_BY_ID at c3f1d9223e4731c5cc12621603695e0aa57ff770",
+        "rights": "No new text or numerical authority acquired"
+      }
+    ],
+    "material_profile_id": null,
+    "material_constant_k_status": "OPEN",
+    "tube_wall_correction_id": null,
+    "tube_wall_correction_status": "OPEN",
+    "shell_wall_correction_id": null,
+    "shell_wall_correction_status": "OPEN",
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "mesh_convergence_profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "task172_entry_authority_complete": false,
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "e3099f59954c294d6b742899b0142ee4c4bd939f057e20051263b6cadb0903da"
   }
 }
