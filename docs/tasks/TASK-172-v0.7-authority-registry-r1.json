@@ -1,0 +1,1489 @@
+{
+  "schema_version": "task172.authority-registry.r1",
+  "task_id": "TASK172_V0_7_ENTRY_AUTHORITY_CLOSURE_R1",
+  "base_main_sha": "04d7aac8adcda13edd27d6c9511019a05ee08d96",
+  "issue": 276,
+  "audit_date": "2026-09-12",
+  "review_status_vocabulary": [
+    "CANDIDATE",
+    "VERIFIED_SOURCE",
+    "PROPOSED_AUTHORITY",
+    "REVIEWED_AUTHORITY",
+    "REJECTED"
+  ],
+  "document_status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "source_conflict_policy": "FAIL_CLOSED",
+  "source_review_complete_scope": "Bounded review of three requested blockers, not exhaustive literature or qualification",
+  "documents": [
+    "TASK-172-v0.7-entry-authority-closure-r1.md",
+    "TASK-172-v0.7-wall-numerical-proposals-r1.md"
+  ],
+  "sources": [
+    {
+      "authority_id": "SRC-T172-IAPWS95",
+      "source_id": "IAPWS95",
+      "capability": "PROPERTY_EOS",
+      "source_role": "IAPWS",
+      "title": "Revised Release on IAPWS Formulation 1995",
+      "author": "IAPWS",
+      "year": "2018",
+      "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4",
+      "access_path": "https://iapws.org/technical-guidance/release/IAPWS-95.download",
+      "license_rights": "Publication permitted with IAPWS attribution (cover)",
+      "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+      "domain": "Stable-fluid validity section 5; no extrapolation admitted",
+      "equation_or_dataset_scope": "rho/cp/h, reference convention, source uncertainty, EOS checkpoint",
+      "limitations": "Phase/critical qualification and implementation validation are not supplied by citation",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-IAPWS-MU",
+      "source_id": "IAPWS-MU",
+      "capability": "PROPERTY_VISCOSITY",
+      "source_role": "IAPWS",
+      "title": "Release on IAPWS Formulation 2008 for Viscosity of Ordinary Water Substance",
+      "author": "IAPWS",
+      "year": "2008",
+      "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4",
+      "access_path": "https://iapws.org/technical-guidance/release/viscosity.download",
+      "license_rights": "Publication permitted with IAPWS attribution (cover)",
+      "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+      "domain": "Piecewise stable-fluid T/P region and critical-enhancement conditions",
+      "equation_or_dataset_scope": "Viscosity and verification",
+      "limitations": "Section 2.8 is simplified use, NOT program verification; no extrapolation approval",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-IAPWS-K",
+      "source_id": "IAPWS-K",
+      "capability": "PROPERTY_CONDUCTIVITY",
+      "source_role": "IAPWS",
+      "title": "Release on IAPWS Formulation 2011 for Thermal Conductivity of Ordinary Water Substance",
+      "author": "IAPWS",
+      "year": "2011",
+      "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4",
+      "access_path": "https://iapws.org/technical-guidance/release/ThCond.download",
+      "license_rights": "Publication permitted with IAPWS attribution (cover)",
+      "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+      "domain": "Piecewise stable-fluid T/P region differs from viscosity",
+      "equation_or_dataset_scope": "General formulation and verification",
+      "limitations": "No industrial simplified-model substitution; critical/phase exclusion unresolved",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-IAPWS-LIQUID",
+      "source_id": "IAPWS-LIQUID",
+      "capability": "PROPERTY_CROSSCHECK",
+      "source_role": "IAPWS",
+      "title": "Revised Supplementary Release on Properties of Liquid Water at 0.1 MPa",
+      "author": "IAPWS",
+      "year": "2011",
+      "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11",
+      "access_path": "https://iapws.org/technical-guidance/release/LiquidWater.download",
+      "license_rights": "Publication permitted with IAPWS attribution (cover)",
+      "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+      "domain": "Pressure-specific approximation; only stable-liquid subset can be positive admission",
+      "equation_or_dataset_scope": "298.15 K property cross-check; independent source outputs",
+      "limitations": "Not exact HEOS oracle or general pressure profile; other check columns include metastable states",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-IAPWS-H",
+      "source_id": "IAPWS-H",
+      "capability": "ENTHALPY_UNCERTAINTY",
+      "source_role": "IAPWS",
+      "title": "Advisory Note No.1: Uncertainties in Enthalpy for IAPWS-95 and IAPWS-IF97",
+      "author": "IAPWS",
+      "year": "2003 (editorial revision 2006)",
+      "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3",
+      "access_path": "https://iapws.org/public/documents/x2LDq/Advise1.pdf",
+      "license_rights": "Public IAPWS document; attribution retained; no PDF vendored",
+      "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+      "domain": "Specific state/path uncertainty",
+      "equation_or_dataset_scope": "Absolute h versus Delta-h uncertainty",
+      "limitations": "No universal percentage or automatic RSS",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-CP-WATER",
+      "source_id": "CP-WATER",
+      "capability": "BACKEND_MAPPING",
+      "source_role": "OFFICIAL_SOFTWARE",
+      "title": "CoolProp Water fluid definition",
+      "author": "CoolProp contributors",
+      "year": "2026",
+      "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/dev/fluids/Water.json",
+      "license_rights": "MIT software; publication rights separate",
+      "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+      "domain": "HEOS pure Water, software maxima do not define profile",
+      "equation_or_dataset_scope": "Wagner-JPCRD-2002; Huber-JPCRD-2009/2012 mapping",
+      "limitations": "Not standalone engineering domain authority or implementation qualification",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-CP-TRANSPORT",
+      "source_id": "CP-TRANSPORT",
+      "capability": "BACKEND_MAPPING",
+      "source_role": "OFFICIAL_SOFTWARE",
+      "title": "CoolProp TransportRoutines.cpp",
+      "author": "CoolProp contributors",
+      "year": "2026",
+      "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/src/Backends/Helmholtz/TransportRoutines.cpp",
+      "license_rights": "MIT software; no source file vendored",
+      "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+      "domain": "Water EOS-coupled implementation",
+      "equation_or_dataset_scope": "Hardcoded transport and enhancement mapping",
+      "limitations": "Code read does not prove applicable domain or checkpoint pass",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-CP-LICENSE",
+      "source_id": "CP-LICENSE",
+      "capability": "RIGHTS",
+      "source_role": "OFFICIAL_SOFTWARE",
+      "title": "CoolProp MIT License",
+      "author": "Ian H. Bell and CoolProp developers",
+      "year": "2012-2018 copyright; v8.0.0 revision",
+      "exact_location": "LICENSE at pinned commit",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/LICENSE",
+      "license_rights": "MIT conditions and notice required",
+      "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+      "domain": "Software distribution only",
+      "equation_or_dataset_scope": "Software license",
+      "limitations": "Does not license separate publications or approve physics",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "PROP-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-GONCALVES",
+      "source_id": "GONCALVES",
+      "capability": "BASE_CORRELATION_AUDIT",
+      "source_role": "PRIMARY_PUBLICATION",
+      "title": "Linear method for the design of shell and tube heat exchangers using the Bell-Delaware Method",
+      "author": "Goncalves, Costa and Bagajewicz",
+      "year": "2019",
+      "exact_location": "AIChE Journal 65(8) e16602, section2.1 Eqs36-39 PDFp4; section2.2 Eqs75-77 PDFp6",
+      "access_path": "https://www.ou.edu/class/che-design/pub-papers/Linear%20method%20for%20the%20design%20of%20shell%20and%20tube%20heat%20exchangers%20using%20the%20Bell-Delaware%20Method%28Goncalves%20et%20al%29-19.pdf",
+      "license_rights": "Author university copy, copyrighted; redistribution not inferred; not vendored",
+      "hash_or_revision": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+      "domain": "Inherited selected equations only",
+      "equation_or_dataset_scope": "Audit selected Bell and tube equations for active wall term",
+      "limitations": "No active wall extension established; does not override native coefficients/domains",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES"
+    },
+    {
+      "authority_id": "SRC-T172-MARTIN",
+      "source_id": "MARTIN",
+      "capability": "TRANSFERABILITY_REVIEW",
+      "source_role": "PRIMARY_AUTHOR_COPY",
+      "title": "Calculation of heat transfer from pressure drop in tube bundles",
+      "author": "Holger Martin and Volker Gnielinski",
+      "year": "2000",
+      "exact_location": "3rd European Thermal Sciences Conference pp1155-1160; Appendix9.2 EqA13 p1160",
+      "access_path": "https://publikationen.bibliothek.kit.edu/1000034867/2579184",
+      "license_rights": "Copyright Edizioni ETS, all rights reserved; author copy read, not vendored",
+      "hash_or_revision": "95712ba6369536fd796ab3499bd0343c133dca0ad98a561c0e66292ceb118c70",
+      "domain": "External crossflow bundle normalization",
+      "equation_or_dataset_scope": "Property correction with defined bulk/outer-wall state",
+      "limitations": "Neither pipe extension nor demonstrated Bell supplement; transfer domain unresolved",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES"
+    },
+    {
+      "authority_id": "SRC-T172-SIEDER-TATE",
+      "source_id": "SIEDER-TATE",
+      "capability": "CORRELATION_DISCOVERY",
+      "source_role": "PRIMARY_BIBLIOGRAPHY_ONLY",
+      "title": "Heat Transfer and Pressure Drop of Liquids in Tubes",
+      "author": "E. N. Sieder and G. E. Tate",
+      "year": "1936",
+      "exact_location": "Industrial & Engineering Chemistry 28(12)1429-1435; exact equation/domain NOT_ACQUIRED",
+      "access_path": "https://doi.org/10.1021/ie50324a027",
+      "license_rights": "Publisher PDF HTTP403; full text not acquired, no redistribution assumed",
+      "hash_or_revision": "doi:10.1021/ie50324a027",
+      "domain": "UNBOUND",
+      "equation_or_dataset_scope": "Bibliographic discovery only",
+      "limitations": "No equation/coefficient/exponent/ratio/Re/Pr or heating/cooling authority transcribed",
+      "review_status": "CANDIDATE",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES"
+    },
+    {
+      "authority_id": "SRC-T172-SANDIA",
+      "source_id": "SANDIA",
+      "capability": "CORRELATION_DISCOVERY",
+      "source_role": "OFFICIAL_REPORT",
+      "title": "SIERRA Multimechanics Module: Aria User Manual Version4.40",
+      "author": "Notz, Subia, Hopkins, Moffat, Noble and Okusanya",
+      "year": "2016",
+      "exact_location": "SAND2016-4159, section4.1.203 p113",
+      "access_path": "https://www.osti.gov/servlets/purl/1262728",
+      "license_rights": "Approved public release, dissemination unlimited on cover; no PDF vendored",
+      "hash_or_revision": "1300bf8605e3a9f7f64a7e91bb4cc39c9b60f6ec551f8a1bab8f9fab0c6844bc",
+      "domain": "Software Gnielinski film-gradient interface",
+      "equation_or_dataset_scope": "Feature documented; parameters undefined in table",
+      "limitations": "No complete numerical equation/domain at cited location; not transferred",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES"
+    },
+    {
+      "authority_id": "SRC-T172-BRENT",
+      "source_id": "BRENT",
+      "capability": "METHOD_PREREQUISITES",
+      "source_role": "PRIMARY_AUTHOR_COPY",
+      "title": "Algorithms for Minimization without Derivatives",
+      "author": "Richard P. Brent",
+      "year": "1973",
+      "exact_location": "Chapter4 sections1-3 pp47-53; rounding pp51-52; author errata on publication page",
+      "access_path": "https://maths-people.anu.edu.au/brent/pd/rpb011i.pdf",
+      "license_rights": "Author-hosted scanned book, copyrighted; redistribution license not inferred",
+      "hash_or_revision": "c122c1ba50834d91e50738b01c1d704c2300c26f8a1d00809ab5bf417c308399",
+      "domain": "Continuous scalar function on valid sign-changing bracket",
+      "equation_or_dataset_scope": "Safeguarded interpolation/bisection prerequisites and rounding caveat",
+      "limitations": "No HX residual proof, implementation transcription, engineering tolerance or iteration preset",
+      "review_status": "VERIFIED_SOURCE",
+      "dependent_blocker": "NUM-PROFILE-REVIEW"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-PROP",
+      "source_id": "REPO-PROP",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "Native DEF/reference fingerprint and located snapshots",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "Controlled initialization and _verify_configuration; property_snapshot.py in tube_side_thermal",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/src/hexagent/properties/coolprop_provider.py",
+      "repository_path": "src/hexagent/properties/coolprop_provider.py",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "Native DEF/reference fingerprint and located snapshots",
+      "limitations": "Existing reference/snapshot behavior only; no V07 fluid approval",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "PROP-PROFILE-REVIEW",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-WALL",
+      "source_id": "REPO-WALL",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "TASK037 reviewed cylindrical wall and area authority",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "R3_FROZEN; review comment5461369330; engineering.py and authority.py; DOE-HDBK-1012/2-92 HT-02 Eqs2-7/2-8/2-10",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/schema.py",
+      "repository_path": "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/schema.py",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "TASK037 reviewed cylindrical wall and area authority",
+      "limitations": "Resistance/area/material/fouling only; not two-surface or viscosity solver",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-TUBE",
+      "source_id": "REPO-TUBE",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "Native TASK026 correlation",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "compute_gnielinski_nusselt and native selector; frozen R6-R7 contract",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+      "repository_path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "Native TASK026 correlation",
+      "limitations": "No active wall correction admission",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-BELL",
+      "source_id": "REPO-BELL",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "Native TASK166 Bell source authority",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "SOURCE_DEFINITION_ID and SOURCE_ROLE_BY_ID; heat_transfer.py",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/src/hexagent/exchangers/shell_tube/bell_delaware/authority.py",
+      "repository_path": "src/hexagent/exchangers/shell_tube/bell_delaware/authority.py",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "Native TASK166 Bell source authority",
+      "limitations": "Existing whole-state relations only; no new local/corrected formula",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-TOPOLOGY",
+      "source_id": "REPO-TOPOLOGY",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "TASK171 accepted topology and bookkeeping",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "R2 native event boundary correction; service.py required_boundaries; TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+      "repository_path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "TASK171 accepted topology and bookkeeping",
+      "limitations": "Structural exact boundaries only; no numerical convergence or mesh adequacy",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "NUM-PROFILE-REVIEW",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    },
+    {
+      "authority_id": "SRC-T172-REPO-CANONICAL",
+      "source_id": "REPO-CANONICAL",
+      "capability": "INHERITED_SCOPED_CONTRACT",
+      "source_role": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "title": "Shared canonical serialization",
+      "author": "HXForge reviewed predecessor",
+      "year": "pinned main",
+      "exact_location": "canonical_json_bytes/canonical_sha256, TASK012 frozen contract",
+      "access_path": "https://github.com/xuezhiorange-png/hxforge-agent/blob/04d7aac8adcda13edd27d6c9511019a05ee08d96/src/hexagent/canonical_json.py",
+      "repository_path": "src/hexagent/canonical_json.py",
+      "license_rights": "Inherited repository source/permission boundary unchanged; no external material copied",
+      "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "domain": "Exact historical admitted scope at base",
+      "equation_or_dataset_scope": "Shared canonical serialization",
+      "limitations": "Serialization identity not numerical error tolerance",
+      "review_status": "REVIEWED_AUTHORITY",
+      "dependent_blocker": "NUM-PROFILE-REVIEW",
+      "review_evidence": "Pinned accepted predecessor; TASK170 R3/R5 and TASK171 receipts; no new approval"
+    }
+  ],
+  "proposals": [
+    {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "REPO-PROP",
+        "CP-WATER",
+        "CP-TRANSPORT",
+        "CP-LICENSE",
+        "IAPWS95",
+        "IAPWS-MU",
+        "IAPWS-K",
+        "IAPWS-LIQUID",
+        "IAPWS-H"
+      ],
+      "dependent_blocker": "PROP-PROFILE-REVIEW",
+      "closure_status": "PARTIALLY_CLOSED",
+      "remaining_blockers": [
+        "WATER-DOMAIN-AND-PHASE-QUALIFICATION",
+        "WATER-BACKEND-CHECKPOINT-QUALIFICATION",
+        "WATER-PROFILE-INDEPENDENT-REVIEW"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "79a312788eec9b53d4b4e1a30cf516286219f0cbdc3d8e10f4947681d651a4f4",
+      "profile": {
+        "fluid_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R1",
+        "fluid_identity": "Water",
+        "composition": "PURE_ORDINARY_WATER",
+        "backend_name": "HEOS",
+        "backend_version": "8.0.0",
+        "backend_commit": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "tag_object": "f39e663f5573f6a142c50d425f2a46b4c9dc5dcd",
+        "binary_build_fingerprint": "UNBOUND_UNTIL_QUALIFICATION",
+        "eos_source": "IAPWS95",
+        "viscosity_source": "IAPWS-MU",
+        "conductivity_source": "IAPWS-K",
+        "enthalpy_source": "IAPWS95",
+        "enthalpy_uncertainty_source": "IAPWS-H",
+        "allowed_phase": "STABLE_SINGLE_PHASE_LIQUID_ONLY",
+        "domain_strategy": "STATE_DEPENDENT_INTERSECTION_INCOMPLETE_NO_PRODUCTION_ADMISSION",
+        "T_min": null,
+        "T_max": null,
+        "P_min": null,
+        "P_max": null,
+        "domain_predicates": [
+          "IAPWS95_section5",
+          "IAPWS-MU_Eq9",
+          "IAPWS-K_Eq14",
+          "QUALIFIED_BACKEND_DOMAIN",
+          "CERTIFIED_STABLE_LIQUID",
+          "PROFILE_EXCLUSIONS"
+        ],
+        "phase_boundary_policy": "Saturated/two-phase/metastable/solid/vapor states rejected; classifier and precision margin UNBOUND",
+        "near_critical_exclusion": "REQUIRED; certified exclusion predicate UNBOUND; blocks all production admission until bound",
+        "metastable_exclusion": "REQUIRED; no forced-liquid bypass",
+        "reference_state_policy": "DEF_WITH_NATIVE_REFERENCE_FINGERPRINT",
+        "reference_state_mutation": "PROHIBITED_DURING_EVALUATION; legacy controlled initialization documented, qualification required",
+        "rho_authority": "IAPWS95",
+        "cp_authority": "IAPWS95",
+        "h_authority": "IAPWS95",
+        "mu_authority": "IAPWS-MU",
+        "k_authority": "IAPWS-K",
+        "Pr_derivation": "cp*mu/k from SAME_PROFILE_SAME_STATE_SAME_SNAPSHOT in SI",
+        "uncertainty": "SOURCE_SPECIFIC; COMBINED_UNCERTAINTY=UNBOUND",
+        "supported_fluid_profile": false,
+        "qualification_performed": false,
+        "verification_dataset": [
+          "WATER-EOS-T300-RHO996556",
+          "WATER-MU-T298-RHO998",
+          "WATER-K-T298-RHO998",
+          "WATER-LIQUID-T298-P01",
+          "WATER-REFERENCE-DEF",
+          "WATER-DOMAIN-NEGATIVE"
+        ],
+        "limitations": [
+          "No glycol/mixture/other fluid",
+          "No reference-state mutation",
+          "No implicit whole-domain approval",
+          "No numerical acceptance band",
+          "No exchanger Golden"
+        ]
+      },
+      "source_bindings": [
+        {
+          "source_id": "REPO-PROP",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "Controlled initialization and _verify_configuration; property_snapshot.py in tube_side_thermal"
+        },
+        {
+          "source_id": "CP-WATER",
+          "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+          "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES"
+        },
+        {
+          "source_id": "CP-TRANSPORT",
+          "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+          "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water"
+        },
+        {
+          "source_id": "CP-LICENSE",
+          "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+          "exact_location": "LICENSE at pinned commit"
+        },
+        {
+          "source_id": "IAPWS95",
+          "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+          "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4"
+        },
+        {
+          "source_id": "IAPWS-MU",
+          "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+          "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4"
+        },
+        {
+          "source_id": "IAPWS-K",
+          "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+          "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4"
+        },
+        {
+          "source_id": "IAPWS-LIQUID",
+          "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+          "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11"
+        },
+        {
+          "source_id": "IAPWS-H",
+          "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+          "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ],
+      "checkpoint_bindings": [
+        {
+          "checkpoint_id": "WATER-EOS-T300-RHO996556",
+          "source_id": "IAPWS95",
+          "exact_location": "Table7 p15 first row",
+          "input": {
+            "T_K": "300",
+            "rho_kg_m3": "996.5560"
+          },
+          "expected": {
+            "pressure_MPa": "0.0992418352"
+          },
+          "role": "FORMULATION_REPRODUCTION",
+          "caveat": "Table7 low-pressure rounding caveat; does not verify cp",
+          "acceptance_tolerance": "UNBOUND",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        },
+        {
+          "checkpoint_id": "WATER-MU-T298-RHO998",
+          "source_id": "IAPWS-MU",
+          "exact_location": "section4 Table4 p8 first row",
+          "input": {
+            "T_K": "298.15",
+            "rho_kg_m3": "998"
+          },
+          "expected": {
+            "mu_microPa_s": "889.735100"
+          },
+          "role": "FORMULATION_REPRODUCTION",
+          "caveat": "Match source enhancement convention; not new production simplification",
+          "acceptance_tolerance": "UNBOUND",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        },
+        {
+          "checkpoint_id": "WATER-K-T298-RHO998",
+          "source_id": "IAPWS-K",
+          "exact_location": "section2.8 Table4 p10 second row",
+          "input": {
+            "T_K": "298.15",
+            "rho_kg_m3": "998"
+          },
+          "expected": {
+            "k_mW_m_K": "607.712868"
+          },
+          "role": "FORMULATION_REPRODUCTION",
+          "caveat": "Source enhancement condition; no whole-domain inference",
+          "acceptance_tolerance": "UNBOUND",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        },
+        {
+          "checkpoint_id": "WATER-LIQUID-T298-P01",
+          "source_id": "IAPWS-LIQUID",
+          "exact_location": "Table8 p11 middle column",
+          "input": {
+            "T_K": "298.15",
+            "P_Pa": "100000"
+          },
+          "expected": {
+            "rho_kg_m3": "997.047013",
+            "cp_J_kg_K": "4181.44618",
+            "mu_microPa_s": "889.996774",
+            "k_W_m_K": "0.606502308"
+          },
+          "role": "APPROXIMATE_REFERENCE_CROSSCHECK_NOT_EXACT_HEOS_ORACLE",
+          "caveat": "Supplementary formulation differs; h checkpoint pending source g+Ts/reference uncertainty review; other table columns not positive liquid admission",
+          "acceptance_tolerance": "UNBOUND",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        },
+        {
+          "checkpoint_id": "WATER-REFERENCE-DEF",
+          "source_id": "IAPWS95",
+          "exact_location": "section3 Eqs7-8 plus REPO-PROP fingerprint",
+          "input": "Qualified DEF reference protocol pending review",
+          "expected": "SOURCE_CONVENTION_AND_UNCHANGED_NATIVE_FINGERPRINT",
+          "role": "REFERENCE_QUALIFICATION_PENDING",
+          "acceptance_tolerance": "UNBOUND",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        },
+        {
+          "checkpoint_id": "WATER-DOMAIN-NEGATIVE",
+          "source_id": "IAPWS95",
+          "exact_location": "section5 plus transport intersection/profile exclusions",
+          "input": "Domain classifier cases pending reviewed literal states",
+          "expected": "ADMISSION_REJECTED_FOR_INVALID_PROFILE_STATE",
+          "role": "ADMISSION_TEST_DESIGN_NOT_EXECUTED",
+          "acceptance_tolerance": "NOT_NUMERICAL_PASS_RULE",
+          "review_status": "PROPOSED_AUTHORITY",
+          "executed": false,
+          "exchanger_golden": false
+        }
+      ]
+    },
+    {
+      "authority_id": "V07-T172-WALL-SURFACE-STATE-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "REPO-WALL",
+        "REPO-TOPOLOGY"
+      ],
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "closure_status": "PARTIALLY_CLOSED",
+      "remaining_blockers": [
+        "WALL-SURFACE-NETWORK-REVIEW"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "d2596e66bd88681756ccf4b36776bf15cf652c7ae1fbcf9c2da4e876280d404a",
+      "surface_contract": {
+        "q_orientation": "HOT_TO_COLD",
+        "Q_ts": "q if tube hot; -q if shell hot",
+        "branch_relation": "T_left-T_right=Q_ts*R_branch; proposal derived from inherited passive resistance laws",
+        "surface_ids": [
+          "TUBE_FLUID_BULK_STATE",
+          "TUBE_FLUID_WALL_INTERFACE",
+          "TUBE_FOULING_METAL_INTERFACE",
+          "TUBE_METAL_INNER_SURFACE",
+          "TUBE_METAL_OUTER_SURFACE",
+          "SHELL_FOULING_METAL_INTERFACE",
+          "SHELL_FLUID_WALL_INTERFACE",
+          "SHELL_FLUID_BULK_STATE"
+        ],
+        "fouling": "Only existing source-bound resistance; contact alias and local applicability require review; no deposit geometry inferred",
+        "wall_conductivity": "Approved constant value plus local temperature-domain authority required; temperature-dependent k not admitted",
+        "local_network_approved": false
+      },
+      "source_bindings": [
+        {
+          "source_id": "REPO-WALL",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "R3_FROZEN; review comment5461369330; engineering.py and authority.py; DOE-HDBK-1012/2-92 HT-02 Eqs2-7/2-8/2-10"
+        },
+        {
+          "source_id": "REPO-TOPOLOGY",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "R2 native event boundary correction; service.py required_boundaries; TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ]
+    },
+    {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "REPO-TUBE",
+        "GONCALVES",
+        "SIEDER-TATE",
+        "SANDIA"
+      ],
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "closure_status": "OPEN",
+      "remaining_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "8ea0e753250983bde1cbe0ca2319e64d867f610fd78b1ea6bea1889a1474ea52",
+      "correction": {
+        "equation": "UNBOUND",
+        "coefficient": "UNBOUND",
+        "exponent": "UNBOUND",
+        "bulk_temperature_definition": "UNBOUND_FOR_CORRELATION; located state required",
+        "wall_temperature_definition": "FLUID_FACING_INTERFACE; exact correlation location UNBOUND",
+        "heating_branch": "UNBOUND",
+        "cooling_branch": "UNBOUND",
+        "Re_domain": "UNBOUND",
+        "Pr_domain": "UNBOUND",
+        "ratio_domain": "UNBOUND",
+        "geometry_domain": "UNBOUND",
+        "thermal_boundary_assumptions": "UNBOUND",
+        "base_correlation": "NATIVE_TASK026_UNCHANGED",
+        "combination_rule": "UNBOUND",
+        "active_correction_authorized": false
+      },
+      "source_bindings": [
+        {
+          "source_id": "REPO-TUBE",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "compute_gnielinski_nusselt and native selector; frozen R6-R7 contract"
+        },
+        {
+          "source_id": "GONCALVES",
+          "hash_or_revision": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+          "exact_location": "AIChE Journal 65(8) e16602, section2.1 Eqs36-39 PDFp4; section2.2 Eqs75-77 PDFp6"
+        },
+        {
+          "source_id": "SIEDER-TATE",
+          "hash_or_revision": "doi:10.1021/ie50324a027",
+          "exact_location": "Industrial & Engineering Chemistry 28(12)1429-1435; exact equation/domain NOT_ACQUIRED"
+        },
+        {
+          "source_id": "SANDIA",
+          "hash_or_revision": "1300bf8605e3a9f7f64a7e91bb4cc39c9b60f6ec551f8a1bab8f9fab0c6844bc",
+          "exact_location": "SAND2016-4159, section4.1.203 p113"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ]
+    },
+    {
+      "authority_id": "V07-T172-SHELL-WALL-CORRECTION-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "REPO-BELL",
+        "GONCALVES",
+        "MARTIN"
+      ],
+      "dependent_blocker": "WALL-CORRELATION-AND-SURFACES",
+      "closure_status": "OPEN",
+      "remaining_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "fdb1629b44454d13074dc1c5a7fcaf498b7a76f113820c1b607567603b959929",
+      "correction": {
+        "equation": "UNBOUND",
+        "coefficient": "UNBOUND",
+        "exponent": "UNBOUND",
+        "bulk_temperature_definition": "UNBOUND_FOR_CORRELATION; located state required",
+        "wall_temperature_definition": "FLUID_FACING_INTERFACE; exact correlation location UNBOUND",
+        "heating_branch": "UNBOUND",
+        "cooling_branch": "UNBOUND",
+        "Re_domain": "UNBOUND",
+        "Pr_domain": "UNBOUND",
+        "ratio_domain": "UNBOUND",
+        "geometry_domain": "UNBOUND",
+        "thermal_boundary_assumptions": "UNBOUND",
+        "base_correlation": "NATIVE_TASK166_UNCHANGED",
+        "combination_rule": "UNBOUND",
+        "active_correction_authorized": false
+      },
+      "source_bindings": [
+        {
+          "source_id": "REPO-BELL",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "SOURCE_DEFINITION_ID and SOURCE_ROLE_BY_ID; heat_transfer.py"
+        },
+        {
+          "source_id": "GONCALVES",
+          "hash_or_revision": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+          "exact_location": "AIChE Journal 65(8) e16602, section2.1 Eqs36-39 PDFp4; section2.2 Eqs75-77 PDFp6"
+        },
+        {
+          "source_id": "MARTIN",
+          "hash_or_revision": "95712ba6369536fd796ab3499bd0343c133dca0ad98a561c0e66292ceb118c70",
+          "exact_location": "3rd European Thermal Sciences Conference pp1155-1160; Appendix9.2 EqA13 p1160"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ]
+    },
+    {
+      "authority_id": "V07-T172-NUMERICAL-PROFILE-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "BRENT",
+        "REPO-TOPOLOGY",
+        "REPO-CANONICAL"
+      ],
+      "dependent_blocker": "NUM-PROFILE-REVIEW",
+      "closure_status": "PARTIALLY_CLOSED",
+      "remaining_blockers": [
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "e41aaf467cb081bf1ed1fb9fd1d8a575093520cb895fc539bb35b9bffc224b6f",
+      "numerical_contract": {
+        "levels": [
+          "L1_DIRECT_SUPPLIED_STATE",
+          "L2A_DIRECT_QUALIFIED_PASSIVE_NETWORK",
+          "L2B_CONDITIONAL_SCALAR_COUPLING",
+          "L3_UNBOUND_CELL_CONSTITUTIVE",
+          "L4_TASK173_BOUNDARY_ORCHESTRATION_DEFERRED"
+        ],
+        "root_method": "UNBOUND; Brent candidate only after residual-specific proof",
+        "initialization": "Deterministic supplied states/qualified endpoints only; no random/reference outlet/hidden previous result",
+        "tolerances": "UNBOUND",
+        "max_iter": "UNBOUND_RESOURCE_LIMIT_NOT_CONVERGENCE",
+        "relaxation": "NOT_SELECTED",
+        "detection_rules": "UNBOUND for stagnation/oscillation windows and thresholds",
+        "last_iterate_valid": false,
+        "statuses": [
+          "WALL_ITERATION_STATUS",
+          "PROPERTY_COUPLING_STATUS",
+          "MESH_CONVERGENCE_STATUS",
+          "ENERGY_CLOSURE_STATUS"
+        ]
+      },
+      "source_bindings": [
+        {
+          "source_id": "BRENT",
+          "hash_or_revision": "c122c1ba50834d91e50738b01c1d704c2300c26f8a1d00809ab5bf417c308399",
+          "exact_location": "Chapter4 sections1-3 pp47-53; rounding pp51-52; author errata on publication page"
+        },
+        {
+          "source_id": "REPO-TOPOLOGY",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "R2 native event boundary correction; service.py required_boundaries; TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5"
+        },
+        {
+          "source_id": "REPO-CANONICAL",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "canonical_json_bytes/canonical_sha256, TASK012 frozen contract"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ]
+    },
+    {
+      "authority_id": "V07-T172-MESH-CONVERGENCE-PROFILE-R1",
+      "authority_version": "v1",
+      "review_status": "PROPOSED_AUTHORITY",
+      "approved_by": null,
+      "approval_evidence": [],
+      "production_enabled": false,
+      "source_ids": [
+        "REPO-TOPOLOGY",
+        "REPO-CANONICAL"
+      ],
+      "dependent_blocker": "NUM-PROFILE-REVIEW",
+      "closure_status": "PARTIALLY_CLOSED",
+      "remaining_blockers": [
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "physics_authority": "Only scoped inherited/source-derived laws; missing numerical terms are UNBOUND",
+      "project_rules": "See linked review package matrices; interface/governance choices are not empirical physics",
+      "implementation_design": "DEFERRED; no runtime implementation authorized",
+      "canonical_hash": "99a7e842039129fbaed95d1c8c1f9c4ba836329cc76c3e7fb1b82dfd565f882c",
+      "mesh_contract": {
+        "physical_boundaries": "Native TASK024 endpoints and baffle centers, unchanged TASK171",
+        "refinement": "Explicit parent/child partitions within same physical interval; no default split count",
+        "comparison": "Common physical supports, terminals/duty/wall extrema/residuals with approved producers",
+        "tolerance": "UNBOUND",
+        "estimator": "UNBOUND",
+        "max_mesh": "UNBOUND_RESOURCE_LIMIT_NOT_CONVERGENCE",
+        "physical_event_multiplicity_changed": false,
+        "production_rule_bound": false
+      },
+      "source_bindings": [
+        {
+          "source_id": "REPO-TOPOLOGY",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "R2 native event boundary correction; service.py required_boundaries; TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5"
+        },
+        {
+          "source_id": "REPO-CANONICAL",
+          "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+          "exact_location": "canonical_json_bytes/canonical_sha256, TASK012 frozen contract"
+        }
+      ],
+      "document_bindings": [
+        {
+          "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+          "sha256": "ea58a7573a7eff8fc5dd6b2a5659cee1c8b0060e0688b0b8b0ee876025409852"
+        },
+        {
+          "path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+          "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+        }
+      ]
+    }
+  ],
+  "checkpoints": [
+    {
+      "checkpoint_id": "WATER-EOS-T300-RHO996556",
+      "source_id": "IAPWS95",
+      "exact_location": "Table7 p15 first row",
+      "input": {
+        "T_K": "300",
+        "rho_kg_m3": "996.5560"
+      },
+      "expected": {
+        "pressure_MPa": "0.0992418352"
+      },
+      "role": "FORMULATION_REPRODUCTION",
+      "caveat": "Table7 low-pressure rounding caveat; does not verify cp",
+      "acceptance_tolerance": "UNBOUND",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    },
+    {
+      "checkpoint_id": "WATER-MU-T298-RHO998",
+      "source_id": "IAPWS-MU",
+      "exact_location": "section4 Table4 p8 first row",
+      "input": {
+        "T_K": "298.15",
+        "rho_kg_m3": "998"
+      },
+      "expected": {
+        "mu_microPa_s": "889.735100"
+      },
+      "role": "FORMULATION_REPRODUCTION",
+      "caveat": "Match source enhancement convention; not new production simplification",
+      "acceptance_tolerance": "UNBOUND",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    },
+    {
+      "checkpoint_id": "WATER-K-T298-RHO998",
+      "source_id": "IAPWS-K",
+      "exact_location": "section2.8 Table4 p10 second row",
+      "input": {
+        "T_K": "298.15",
+        "rho_kg_m3": "998"
+      },
+      "expected": {
+        "k_mW_m_K": "607.712868"
+      },
+      "role": "FORMULATION_REPRODUCTION",
+      "caveat": "Source enhancement condition; no whole-domain inference",
+      "acceptance_tolerance": "UNBOUND",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    },
+    {
+      "checkpoint_id": "WATER-LIQUID-T298-P01",
+      "source_id": "IAPWS-LIQUID",
+      "exact_location": "Table8 p11 middle column",
+      "input": {
+        "T_K": "298.15",
+        "P_Pa": "100000"
+      },
+      "expected": {
+        "rho_kg_m3": "997.047013",
+        "cp_J_kg_K": "4181.44618",
+        "mu_microPa_s": "889.996774",
+        "k_W_m_K": "0.606502308"
+      },
+      "role": "APPROXIMATE_REFERENCE_CROSSCHECK_NOT_EXACT_HEOS_ORACLE",
+      "caveat": "Supplementary formulation differs; h checkpoint pending source g+Ts/reference uncertainty review; other table columns not positive liquid admission",
+      "acceptance_tolerance": "UNBOUND",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    },
+    {
+      "checkpoint_id": "WATER-REFERENCE-DEF",
+      "source_id": "IAPWS95",
+      "exact_location": "section3 Eqs7-8 plus REPO-PROP fingerprint",
+      "input": "Qualified DEF reference protocol pending review",
+      "expected": "SOURCE_CONVENTION_AND_UNCHANGED_NATIVE_FINGERPRINT",
+      "role": "REFERENCE_QUALIFICATION_PENDING",
+      "acceptance_tolerance": "UNBOUND",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    },
+    {
+      "checkpoint_id": "WATER-DOMAIN-NEGATIVE",
+      "source_id": "IAPWS95",
+      "exact_location": "section5 plus transport intersection/profile exclusions",
+      "input": "Domain classifier cases pending reviewed literal states",
+      "expected": "ADMISSION_REJECTED_FOR_INVALID_PROFILE_STATE",
+      "role": "ADMISSION_TEST_DESIGN_NOT_EXECUTED",
+      "acceptance_tolerance": "NOT_NUMERICAL_PASS_RULE",
+      "review_status": "PROPOSED_AUTHORITY",
+      "executed": false,
+      "exchanger_golden": false
+    }
+  ],
+  "canonical_metadata_rule": "hexagent.canonical_json.canonical_sha256 per proposal; canonical_hash/mutable_review_comments excluded; identity covers source IDs whose immutable bindings are included in source_bindings",
+  "entry_authority_complete": false,
+  "entry_review_pending": true,
+  "production_code_changed": false,
+  "dependency_changed": false,
+  "implementation_started": false,
+  "new_authority_self_approval": false,
+  "new_supported_fluid_count": 0,
+  "new_approved_golden_count": 0,
+  "remaining_blockers": [
+    "WATER-DOMAIN-AND-PHASE-QUALIFICATION",
+    "WATER-BACKEND-CHECKPOINT-QUALIFICATION",
+    "WATER-PROFILE-INDEPENDENT-REVIEW",
+    "WALL-SURFACE-NETWORK-REVIEW",
+    "TUBE-WALL-CORRECTION-AUTHORITY",
+    "SHELL-WALL-CORRECTION-AUTHORITY",
+    "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+    "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+    "MESH-CONVERGENCE-QUALIFICATION"
+  ],
+  "canonical_hash": "a4232091ca55a81534382913e9356313f0f85548e73c6a768961e1f5fde57037",
+  "r2_extension": {
+    "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
+    "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
+    "historical_r1_root_hash": "80debe2dba9a003a4377be86eb7f47b2396f317c20f25957ca6f480ba4f07b38",
+    "historical_r1_records_unchanged": true,
+    "sources": [
+      {
+        "authority_id": "SRC-T172-IAPWS-MELT-R2",
+        "source_id": "IAPWS-MELT-R2",
+        "capability": "WATER_DOMAIN",
+        "source_role": "PRIMARY_FORMULATION",
+        "title": "R14-08(2011) Melting and Sublimation Curves",
+        "author": "IAPWS",
+        "year": 2011,
+        "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+        "access_path": "https://iapws.org/documents/release/MeltSub.download",
+        "license_rights": "Cover permits publication with IAPWS attribution; PDF not vendored",
+        "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "sections3.1-3.2 Eq1; Tables1/2; section5",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WATER-DOMAIN-AND-PHASE-QUALIFICATION"
+      },
+      {
+        "authority_id": "SRC-T172-IAPWS-SAT-R2",
+        "source_id": "IAPWS-SAT-R2",
+        "capability": "WATER_DOMAIN",
+        "source_role": "PRIMARY_FORMULATION",
+        "title": "SR1-86(1992) Saturation Properties",
+        "author": "IAPWS",
+        "year": 1992,
+        "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+        "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download",
+        "license_rights": "Public IAPWS release; no redistribution permission inferred; PDF not vendored",
+        "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WATER-DOMAIN-AND-PHASE-QUALIFICATION"
+      },
+      {
+        "authority_id": "SRC-T172-DOE-WALL-R2",
+        "source_id": "DOE-WALL-R2",
+        "capability": "CLEAN_WALL_NETWORK",
+        "source_role": "INHERITED_GOVERNMENT_HANDBOOK",
+        "title": "DOE-HDBK-1012/2-92, Thermodynamics Heat Transfer and Fluid Flow Vol2",
+        "author": "US DOE",
+        "year": 1992,
+        "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+        "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf",
+        "license_rights": "Official DOE public-distribution handbook; metadata/derivation only, no PDF vendored",
+        "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+        "domain": "Bounded application in R2 derivation; no new material or active correction authority",
+        "equation_or_dataset_scope": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+        "limitations": "Independent applicability review pending; no runtime implementation",
+        "review_status": "VERIFIED_SOURCE",
+        "dependent_blocker": "WALL-SURFACE-NETWORK-REVIEW-PACKAGE"
+      }
+    ],
+    "proposals": [
+      {
+        "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "authority_version": "v2",
+        "capability": "PURE_ORDINARY_WATER_HEOS8_DEF_STABLE_LIQUID",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "IAPWS95",
+            "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+            "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4",
+            "access_path": "https://iapws.org/technical-guidance/release/IAPWS-95.download"
+          },
+          {
+            "source_id": "IAPWS-MU",
+            "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+            "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4",
+            "access_path": "https://iapws.org/technical-guidance/release/viscosity.download"
+          },
+          {
+            "source_id": "IAPWS-K",
+            "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+            "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4",
+            "access_path": "https://iapws.org/technical-guidance/release/ThCond.download"
+          },
+          {
+            "source_id": "IAPWS-LIQUID",
+            "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+            "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11",
+            "access_path": "https://iapws.org/technical-guidance/release/LiquidWater.download"
+          },
+          {
+            "source_id": "IAPWS-H",
+            "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+            "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3",
+            "access_path": "https://iapws.org/public/documents/x2LDq/Advise1.pdf"
+          },
+          {
+            "source_id": "CP-WATER",
+            "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+            "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/dev/fluids/Water.json"
+          },
+          {
+            "source_id": "CP-TRANSPORT",
+            "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+            "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/src/Backends/Helmholtz/TransportRoutines.cpp"
+          },
+          {
+            "source_id": "CP-LICENSE",
+            "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+            "exact_location": "LICENSE at pinned commit",
+            "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/LICENSE"
+          },
+          {
+            "source_id": "IAPWS-MELT-R2",
+            "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+            "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+            "access_path": "https://iapws.org/documents/release/MeltSub.download"
+          },
+          {
+            "source_id": "IAPWS-SAT-R2",
+            "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+            "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+            "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download"
+          },
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "domain_authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+        "domain_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+        "bounds": {
+          "T_min_K": "298.15",
+          "T_max_K": "300",
+          "P_min_Pa": "100000",
+          "P_max_Pa": "101325"
+        },
+        "backend_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "reference_fingerprint": "8d37dea32044ee8d",
+        "evidence_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+        "evidence_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+        "production_enabled": false,
+        "canonical_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de"
+      },
+      {
+        "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+        "authority_version": "v2",
+        "capability": "CLEAN_SURFACE_ONLY_SUPPLIED_QUALIFIED_FILMS_AND_CONSTANT_K",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          },
+          {
+            "source_id": "REPO-WALL",
+            "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+            "exact_location": "R3_FROZEN, TASK037 schema.py/authority.py/models.py; TASK171 native support and area mapping"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "conditional_network_complete": true,
+        "constant_k_policy_qualified": false,
+        "material_id": null,
+        "material_k_value": null,
+        "material_temperature_domain": null,
+        "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "production_enabled": false,
+        "canonical_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29"
+      },
+      {
+        "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+        "authority_version": "v2",
+        "capability": "NATIVE_TASK171_LOCAL_AREA_MAPPING_CYLINDRICAL_CONSTANT_K",
+        "source_role": "PROPOSED_SOURCE_DERIVATION_AND_PROJECT_INTERFACE",
+        "source_bindings": [
+          {
+            "source_id": "DOE-WALL-R2",
+            "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+            "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+            "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+          },
+          {
+            "source_id": "REPO-WALL",
+            "hash_or_revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+            "exact_location": "R3_FROZEN, TASK037 schema.py/authority.py/models.py; TASK171 native support and area mapping"
+          }
+        ],
+        "document_binding": {
+          "path": "TASK-172-v0.7-water-wall-qualification-r2.md",
+          "sha256": "8b3563181a48d0efb7a8185e73ebfd5b6449af1c8e716b008ec51de345d4e23b"
+        },
+        "review_status": "PROPOSED_AUTHORITY",
+        "approved_by": null,
+        "approval_evidence": [],
+        "derivation_qualified": true,
+        "physical_event_mapping_unchanged": true,
+        "whole_R_divided_by_N_forbidden": true,
+        "production_enabled": false,
+        "canonical_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c"
+      }
+    ],
+    "domain_proof": {
+      "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+      "canonical_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+      "path": "evidence/TASK-172-water-backend-qualification-r2.json#/domain_proof"
+    },
+    "qualification_evidence": {
+      "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+      "canonical_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+      "path": "evidence/TASK-172-water-backend-qualification-r2.json"
+    },
+    "water_domain_qualification": "PROPOSED_COMPLETE",
+    "water_phase_qualification": "PROPOSED_COMPLETE",
+    "water_backend_checkpoint_qualification": "PROPOSED_COMPLETE",
+    "wall_surface_network_proposed_complete": true,
+    "constant_k_policy_qualified": false,
+    "task172_entry_authority_complete": false,
+    "review_pending": true,
+    "remaining_entry_blockers": [
+      "WATER-PROFILE-INDEPENDENT-REVIEW",
+      "WALL-SURFACE-NETWORK-INDEPENDENT-REVIEW",
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "mesh_convergence_profile_status": "PARTIALLY_CLOSED",
+    "tube_wall_correction_status": "OPEN",
+    "shell_wall_correction_status": "OPEN",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false
+  },
+  "r3_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R3",
+    "previous_head": "c3f1d9223e4731c5cc12621603695e0aa57ff770",
+    "historical_r2_root_hash": "4e21c4962527c084bb361d88fbb9206e8eb228eb3de490762845fc43c92e4aaa",
+    "document": "TASK-172-v0.7-material-active-wall-review-r3.md",
+    "independent_review_receipt": {
+      "receipt_id": "V07-T172-R2-INDEPENDENT-REVIEW-RECEIPT-R3",
+      "review_origin": "User independent R2 review accompanying TASK172 R3 instruction; no GitHub review ID asserted",
+      "reviewed_head": "c3f1d9223e4731c5cc12621603695e0aa57ff770",
+      "review_scope": {
+        "fluid": "PURE_ORDINARY_WATER",
+        "backend": "HEOS",
+        "backend_version": "8.0.0",
+        "reference": "DEF",
+        "phase": "STABLE_SINGLE_PHASE_LIQUID",
+        "t_min_k": "298.15",
+        "t_max_k": "300",
+        "p_min_pa": "100000",
+        "p_max_pa": "101325",
+        "wall": "CLEAN_SURFACE_ONLY",
+        "general_water_domain": false,
+        "glycol": false,
+        "fouled_wall": false,
+        "variable_k": false,
+        "executable_material_qualified": false
+      },
+      "decisions": [
+        {
+          "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+          "reviewed_payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+          "reviewed_payload_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+          "reviewed_payload_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+          "reviewed_payload_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        },
+        {
+          "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+          "reviewed_payload_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+          "effective_review_status": "REVIEWED_AUTHORITY"
+        }
+      ],
+      "closed_for_task172_entry": [
+        "WATER-DOMAIN-AND-PHASE-QUALIFICATION",
+        "WATER-BACKEND-CHECKPOINT-QUALIFICATION",
+        "WATER-PROFILE-INDEPENDENT-REVIEW",
+        "WALL-SURFACE-NETWORK-INDEPENDENT-REVIEW",
+        "LOCAL-CYLINDRICAL-MAPPING-REVIEW"
+      ],
+      "historical_payloads_unchanged": true,
+      "implementation_authorized": false,
+      "canonical_hash": "fc72a78ac15a4a5700d395b6cb568fa3288f311174e0b0b52e399ab8612c0699"
+    },
+    "audit_scope": "Three material/active-correction blockers only; no numerical research",
+    "audit_findings": [
+      {
+        "finding_id": "T172-R3-MATERIAL-IDENTITY",
+        "status": "OPEN",
+        "reason": "BLOCKED_MISSING_MATERIAL_IDENTITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-WALL"
+        ],
+        "exact_location": "overall_heat_transfer_resistance models/authority; release_demo/v0_4/task039.py::_build_task037_request",
+        "observed": "FIXTURE-GRADE; fixed release-demo k at one temperature, not a TASK172 physical alloy/domain",
+        "required_evidence": "Authorized tube grade/specification then source-qualified constant-k treatment over 298.15-300 K"
+      },
+      {
+        "finding_id": "T172-R3-TUBE-TRANSFER",
+        "status": "OPEN",
+        "reason": "OPEN_NO_TRANSFERABLE_AUTHORITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-TUBE",
+          "SRC-T172-GONCALVES",
+          "SRC-T172-SIEDER-TATE"
+        ],
+        "exact_location": "nusselt_selector.py R6-R7 sections5.2,6; Goncalves section2.2 Eq75 PDFp6",
+        "required_evidence": "Lawfully reviewable primary active-correction equation, all domains and combination rule for native TASK026 base",
+        "sieder_tate_transfer_authority": "UNAVAILABLE"
+      },
+      {
+        "finding_id": "T172-R3-SHELL-TRANSFER",
+        "status": "OPEN",
+        "reason": "OPEN_NO_TRANSFERABLE_AUTHORITY",
+        "authority_issued": false,
+        "source_refs": [
+          "SRC-T172-REPO-BELL",
+          "SRC-T172-GONCALVES"
+        ],
+        "exact_location": "bell_delaware/authority.py SOURCE_ROLE_BY_ID; Goncalves section2.1 Eqs36-39 PDFp4",
+        "required_evidence": "Complete Bell/Taborek or explicitly compatible supplement equation/domain/combination; origin bibliography is insufficient"
+      }
+    ],
+    "access_audit": [
+      {
+        "source_ref": "SRC-T172-GONCALVES",
+        "access": "Public university PDF read; pages4,6 visually checked",
+        "hash_or_revision": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+        "rights": "Copyright retained; not vendored; metadata/limited analysis only"
+      },
+      {
+        "source_ref": "Gnielinski1976",
+        "access_path": "https://cir.nii.ac.jp/crid/1571980075607043456",
+        "access": "Bibliographic discovery; verification page, original full text not acquired",
+        "hash_or_revision": "Int.Chem.Eng.16(2),359-368,1976",
+        "rights": "No full-text license established; no equation transcription"
+      },
+      {
+        "source_ref": "SRC-T172-SIEDER-TATE",
+        "access_path": "https://pubs.acs.org/doi/pdf/10.1021/ie50324a027",
+        "access": "Tool open failed; full text not acquired",
+        "hash_or_revision": "doi:10.1021/ie50324a027",
+        "rights": "No access/redistribution permission inferred"
+      },
+      {
+        "source_ref": "SRC-UDEL-BELL-1963-FINAL-REPORT",
+        "access": "Origin metadata inherited; correction pages not acquired",
+        "hash_or_revision": "TASK166 SOURCE_ROLE_BY_ID at c3f1d9223e4731c5cc12621603695e0aa57ff770",
+        "rights": "No new text or numerical authority acquired"
+      }
+    ],
+    "material_profile_id": null,
+    "material_constant_k_status": "OPEN",
+    "tube_wall_correction_id": null,
+    "tube_wall_correction_status": "OPEN",
+    "shell_wall_correction_id": null,
+    "shell_wall_correction_status": "OPEN",
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "mesh_convergence_profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "task172_entry_authority_complete": false,
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "e3099f59954c294d6b742899b0142ee4c4bd939f057e20051263b6cadb0903da"
+  }
+}
