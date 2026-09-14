@@ -16,7 +16,8 @@
   "source_review_complete_scope": "Bounded review of three requested blockers, not exhaustive literature or qualification",
   "documents": [
     "TASK-172-v0.7-entry-authority-closure-r1.md",
-    "TASK-172-v0.7-wall-numerical-proposals-r1.md"
+    "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+    "TASK-172-v0.7-physical-authority-semantic-source-r5.md"
   ],
   "sources": [
     {
@@ -1067,7 +1068,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "00c60c066d378347a0469bfc8be7e86013a02373b70c9367db5bedf647b2dc72",
+  "canonical_hash": "268e1d1bf13545c03c29c5049064459714e470720ed368ecdd790a2b49e104cc",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -1524,5 +1525,115 @@
     "merge_authorized": false,
     "no_step_implies_the_next": true,
     "canonical_hash": "817c7bb08a2ab5338ce8e3e93172db99530eed835ff9b4831cab3e1770d25bdf"
+  },
+  "r5_extension": {
+    "task_id": "TASK172_V0_7_PHYSICAL_AUTHORITY_SEMANTIC_AND_SOURCE_QUALIFICATION_R5",
+    "previous_head": "e314e01eff1a3d555eccf18181cd2f87be516f06",
+    "historical_r4_root_hash": "00c60c066d378347a0469bfc8be7e86013a02373b70c9367db5bedf647b2dc72",
+    "historical_r4_extension_hash": "817c7bb08a2ab5338ce8e3e93172db99530eed835ff9b4831cab3e1770d25bdf",
+    "document": "TASK-172-v0.7-physical-authority-semantic-source-r5.md",
+    "document_sha256": "9d01a10b043a9b585405dc6611bbe9109efeb0b1a2afa627568f0e7d934b3683",
+    "evidence": {
+      "authority_id": "V07-T172-PHYSICAL-AUTHORITY-SEMANTIC-REVIEW-R5",
+      "path": "evidence/TASK-172-physical-authority-semantic-review-r5.json",
+      "canonical_hash": "62560bac1d5c164bd690284fafcd929de611c0c6a4d66cbdbc4f02d499e146e8"
+    },
+    "scope": [
+      "MATERIAL_K_SEMANTIC",
+      "TUBE_WALL_CORRECTION_SEMANTIC",
+      "SHELL_WALL_CORRECTION_SEMANTIC"
+    ],
+    "source_research": {
+      "new_source_bytes_added": false,
+      "new_source_authority_promoted": false,
+      "rights_assumption_added": false,
+      "search_snippet_used_as_authority": false,
+      "secondary_source_used_as_primary": false,
+      "sieder_tate_full_text_acquired": false
+    },
+    "lineage_source_ids": [
+      "SRC-T172-REPO-WALL",
+      "SRC-T172-REPO-TUBE",
+      "SRC-T172-REPO-BELL",
+      "SRC-T172-GONCALVES",
+      "SRC-T172-MARTIN",
+      "SRC-T172-SIEDER-TATE",
+      "SRC-T172-SANDIA"
+    ],
+    "material_k": {
+      "physical_quantity": "solid_tube_wall_thermal_conductivity_w_m_k",
+      "component_scope": "tube_wall_metal_only; shell_wall_material_not_bound",
+      "formula_identity": "R_w,j=d_i*ln(d_o/d_i)/(2*k_wall*A_i,j)",
+      "equation_consumer": "TASK037.compute_wall_resistance",
+      "evaluation_temperature_basis": "UNBOUND_CONSTANT_K_INTERVAL",
+      "existing_repository_carrier_found": true,
+      "existing_complete_authority_found": false,
+      "material_identity_bound": false,
+      "new_source_authority_required": true,
+      "disposition": "DISPOSITION_BLOCKED_INSUFFICIENT_EVIDENCE",
+      "profile_id": null,
+      "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN"
+    },
+    "tube_wall_correction": {
+      "physical_type": "WALL_VISCOSITY_CORRECTION",
+      "modeled_quantity": "active wall-to-bulk property correction applied to native TASK026 tube-side Nusselt_or_HTC",
+      "base_authority": "SRC-T172-REPO-TUBE",
+      "reference_surface": "TUBE_FLUID_WALL_INTERFACE",
+      "existing_authority_found": false,
+      "sieder_tate_transfer_authority": "UNAVAILABLE",
+      "new_source_authority_required": true,
+      "disposition": "DISPOSITION_NEW_SOURCE_AUTHORITY_REQUIRED",
+      "correction_id": null,
+      "blocker": "TUBE-WALL-CORRECTION-AUTHORITY"
+    },
+    "shell_wall_correction": {
+      "physical_type": "WALL_VISCOSITY_CORRECTION",
+      "modeled_quantity": "active wall-to-bulk property correction to TASK166 Bell shell-side heat-transfer coefficient",
+      "base_authority": "SRC-T172-REPO-BELL",
+      "reference_surface": "SHELL_FLUID_WALL_INTERFACE",
+      "task034_wall_authority_reuse": "NO",
+      "task034_reuse_rejection_reason": "TASK034_BAYRAM_SEVILGEN_WALL_TERM_IS_SHELL_PRESSURE_DROP_PHI_S_NOT_A_TASK166_BELL_HEAT_TRANSFER_CORRECTION; DIFFERENT_EQUATION_PURPOSE_OUTPUT_METHOD_IDENTITY_AND_COMBINATION_RULE",
+      "existing_authority_found": false,
+      "new_source_authority_required": true,
+      "disposition": "DISPOSITION_NEW_SOURCE_AUTHORITY_REQUIRED",
+      "correction_id": null,
+      "blocker": "SHELL-WALL-CORRECTION-AUTHORITY"
+    },
+    "semantic_contract": {
+      "wall_blocker_semantics_unambiguous": true,
+      "semantic_contract_correction_required": false,
+      "cross_domain_authority_reuse": false,
+      "neutral_factor_fallback": false,
+      "silent_omission_as_authority": false,
+      "new_equation_transcribed": false
+    },
+    "numerical_boundary": {
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "profile_status": "PARTIALLY_CLOSED",
+      "numerical_tolerances_bound": false,
+      "mesh_convergence_rule_bound": false
+    },
+    "result": "PASS_WITH_REMAINING_PHYSICAL_AUTHORITY_GAPS",
+    "physical_authority_portion_closed": false,
+    "task172_entry_authority_complete": false,
+    "entry_review_pending": true,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "ad4bd1d8684e1eabcf6dd3c0fe3a65da473bbf1b76c1fc7e1f20438c96a941bb"
   }
 }
