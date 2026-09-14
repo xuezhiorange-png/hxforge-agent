@@ -30,7 +30,8 @@
     "TASK-172-v0.7-material-identity-external-scoped-approval-record-r1.md",
     "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md",
     "TASK-172-v0.7-material-thermal-property-external-scoped-approval-record-r1.md",
-    "TASK-172-v0.7-material-canonical-blocker-closure-adjudication-r1.md"
+    "TASK-172-v0.7-material-canonical-blocker-closure-adjudication-r1.md",
+    "TASK-172-v0.7-material-canonical-blocker-closure-recording-r1.md"
   ],
   "sources": [
     {
@@ -1183,14 +1184,13 @@
   "new_supported_fluid_count": 0,
   "new_approved_golden_count": 0,
   "remaining_blockers": [
-    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
     "TUBE-WALL-CORRECTION-AUTHORITY",
     "SHELL-WALL-CORRECTION-AUTHORITY",
     "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "beb7530eddf08b688e903e89aaee25e43a123c0e90e4741055731edc0a96452c",
+  "canonical_hash": "99e89c6f77442783ec1e16e136d8c905197aafa5bd99fae5bf2c0e4a5d1de6d2",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -3423,5 +3423,135 @@
       "no_step_implies_the_next": true
     },
     "canonical_hash": "cef189bebb20db06736e310b2fe85221b13cf7d99605b71b227bf7ed01b5b6c0"
+  },
+  "r19_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_CANONICAL_BLOCKER_CLOSURE_RECORDING_R1",
+    "previous_head": "5c370154d1822287eb169efa3e3b9bb52736e49f",
+    "historical_registry_root_hash": "beb7530eddf08b688e903e89aaee25e43a123c0e90e4741055731edc0a96452c",
+    "historical_r18_extension_hash": "cef189bebb20db06736e310b2fe85221b13cf7d99605b71b227bf7ed01b5b6c0",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_CANONICAL_BLOCKER_CLOSURE_RECORDING_ONLY",
+    "subject_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "adjudication": {
+      "outcome": "OUTCOME_A_MODEL_LEVEL_CLOSURE_ELIGIBLE_WITH_SEPARATE_CASE_LEVEL_FAIL_CLOSED_GATE",
+      "canonical_blocker_semantics": "MODEL_LEVEL_ENTRY_AUTHORITY",
+      "adjudication_document": "TASK-172-v0.7-material-canonical-blocker-closure-adjudication-r1.md",
+      "adjudication_document_sha256": "4825bd0c8c5c4fe613dd46f18932dcbc53987d8e7bfcf0f6af0e59a41f062222",
+      "adjudication_evidence_canonical_hash": "3edbdc2ffa971207fca63059c642aec6777ca85c54a85125b0c443811906e10b",
+      "adjudication_registry_extension": "r18_extension",
+      "adjudication_registry_extension_hash": "cef189bebb20db06736e310b2fe85221b13cf7d99605b71b227bf7ed01b5b6c0",
+      "semantic_contract_correction_required": false
+    },
+    "closure_recording": {
+      "model_level_material_authority_complete": true,
+      "model_level_material_entry_authority_status": "CLOSED",
+      "material_constant_k_canonical_blocker_closure_eligible": true,
+      "material_constant_k_canonical_blocker_removed": true,
+      "removed_exactly": [
+        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN"
+      ],
+      "removed_count": 1,
+      "other_canonical_blockers_changed": false,
+      "closure_recording_performed": true
+    },
+    "layer_state": {
+      "layer_a": {
+        "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "changed": false
+      },
+      "layer_b": {
+        "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "changed": false
+      },
+      "layer_c": {
+        "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "changed": false
+      }
+    },
+    "case_level_fail_closed_gate": {
+      "gate_id": "TASK172-CASE-LEVEL-MATERIAL-AUTHORITY-ADMISSION",
+      "status": "DEFINED_ACTIVE_FAIL_CLOSED_IMPLEMENTATION_PENDING",
+      "contract_defined": true,
+      "runtime_implemented": false,
+      "active_means_governance_contract_effective": true,
+      "production_without_case_level_material_authority": "BLOCKED",
+      "blocking_conditions": [
+        "missing reviewed Layer A material identity instance",
+        "missing Layer B property body",
+        "missing reviewed Layer C case qualification",
+        "missing or invalid wall-state temperature-domain coverage",
+        "incomplete source rights or evidence",
+        "identity, hash, case, configuration, geometry, or physical-support mismatch",
+        "hidden, default, legacy, caller-asserted, or runtime-database material or k",
+        "interpolation without a source rule",
+        "extrapolation",
+        "out-of-domain state"
+      ],
+      "material_profile_none_blocks_production": true
+    },
+    "effective_state_after_recording": {
+      "model_level_contract_state": "COMPLETE_REVIEWED",
+      "case_level_material_authority_required": true,
+      "case_level_material_authority_present": false,
+      "case_level_material_authority_state": "REQUIRED_ABSENT",
+      "production_admission_state": "BLOCKED_FAIL_CLOSED",
+      "material_identity_actual_value_bound": false,
+      "material_property_body_actual_value_bound": false,
+      "material_profile_id": null,
+      "actual_material_case_accepted": false,
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "material_constant_k_canonical_blocker_closure_eligible": true,
+      "material_constant_k_canonical_blocker_removed": true,
+      "remaining_task172_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false,
+      "task172_entry_review_pending": true
+    },
+    "governance": {
+      "historical_records_rewritten": false,
+      "layer_a_payload_changed": false,
+      "layer_b_payload_changed": false,
+      "layer_c_payload_changed": false,
+      "material_selection_performed": false,
+      "material_profile_created": false,
+      "property_value_or_curve_introduced": false,
+      "constant_k_case_qualification_performed": false,
+      "case_level_runtime_gate_implemented": false,
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "golden_approved": false,
+      "new_authority_self_approval": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "AWAIT_REVIEW_OF_MATERIAL_CANONICAL_BLOCKER_CLOSURE_RECORDING",
+      "no_step_implies_the_next": true
+    },
+    "document": {
+      "path": "TASK-172-v0.7-material-canonical-blocker-closure-recording-r1.md",
+      "sha256": "06053b8bc32f40578ec5d0c0997940fbfa5c4123c19da8d03d841cb1353aded8"
+    },
+    "evidence": {
+      "authority_id": "TASK172-MATERIAL-CANONICAL-BLOCKER-CLOSURE-RECORDING-R1",
+      "path": "evidence/TASK-172-material-canonical-blocker-closure-recording-r1.json",
+      "file_sha256": "9fcd1b5324d779923ce0d390649aca6dc3e092e81314403eaf8359eba184842e",
+      "canonical_hash": "5e28f71ee42deae968c53b600e19ec10d67f41cccf276324625940a69ee8fd16"
+    },
+    "next_gate": "AWAIT_REVIEW_OF_MATERIAL_CANONICAL_BLOCKER_CLOSURE_RECORDING",
+    "canonical_hash": "4a59605e3189a79e41d888632963941e9e3613da1f70720d673b7be9a1025a41"
   }
 }
