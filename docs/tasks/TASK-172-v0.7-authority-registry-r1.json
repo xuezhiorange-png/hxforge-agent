@@ -28,7 +28,8 @@
     "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md",
     "TASK-172-v0.7-material-identity-input-contract-independent-review-r1.md",
     "TASK-172-v0.7-material-identity-external-scoped-approval-record-r1.md",
-    "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md"
+    "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md",
+    "TASK-172-v0.7-material-thermal-property-external-scoped-approval-record-r1.md"
   ],
   "sources": [
     {
@@ -1188,7 +1189,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "6beca69d64fbd6a6fb6ce002c2f7ab1cb75a44830b0c33787a1f0eaeeaf11f51",
+  "canonical_hash": "a94cc124928a77dfd55f2775d8a588d20eea0cf767c23e83f6082dc18f45d69f",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -3158,5 +3159,136 @@
       "no_step_implies_the_next": true
     },
     "canonical_hash": "78d726aa5b36892a745263142f74712cd54ded0d98337bcad73272565a22d74d"
+  },
+  "r17_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_THERMAL_PROPERTY_EXTERNAL_SCOPED_APPROVAL_RECORD_R1",
+    "previous_head": "783721fe755a6598166602e1bd9314f184d17f25",
+    "historical_registry_root_hash": "6beca69d64fbd6a6fb6ce002c2f7ab1cb75a44830b0c33787a1f0eaeeaf11f51",
+    "historical_r16_extension_hash": "78d726aa5b36892a745263142f74712cd54ded0d98337bcad73272565a22d74d",
+    "historical_records_unchanged": true,
+    "review_type": "EXTERNAL_REVIEW_DECISION_RECORDING_ONLY",
+    "subject_authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+    "document": {
+      "path": "TASK-172-v0.7-material-thermal-property-external-scoped-approval-record-r1.md",
+      "sha256": "bef437e052ff8fad240129da51e862509e20437b8e4b0e0774a08e7317d33098"
+    },
+    "evidence": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "path": "evidence/TASK-172-material-thermal-property-external-scoped-approval-record-r1.json",
+      "file_sha256": "d168387ac6102d08ebe7689d82470c2a684bc3989a74194b9cb619334ad2a9cf",
+      "canonical_hash": "e39be8c4d5a06d2947e1de54ce46dc9fee92b1752e266cce2158a82b98b319ea"
+    },
+    "external_review": {
+      "decision": "ACCEPT_SCOPED_MODEL_LEVEL_LAYER_B_CONTRACT",
+      "scope": "MODEL_LEVEL_MATERIAL_THERMAL_PROPERTY_AUTHORITY_CONTRACT_ONLY",
+      "layer_b_model_contract_accepted": true,
+      "evidence_bound": true,
+      "source_type": "EXTERNAL_REVIEW_DECISION",
+      "source_id": "TASK172-EXTERNAL-REVIEW-DECISION-LAYER-B-R1",
+      "source_description": "External ChatGPT decision supplied in the authorized task instruction; not a GitHub review event or human expert signature.",
+      "github_reviewer_identity_claimed": false,
+      "human_expert_identity_claimed": false,
+      "organization_identity_claimed": false,
+      "professional_signature_claimed": false,
+      "approval_identity_disclosed": false,
+      "self_approval": false,
+      "approval_evidence": [
+        "TASK_AUTHORIZATION_EXTERNAL_SCOPED_ACCEPTANCE",
+        "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md",
+        "evidence/TASK-172-material-thermal-property-contract-independent-review-r1.json"
+      ]
+    },
+    "authority_promotion": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "authority_version": "r1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "contract_frozen": true,
+      "production_enabled": false,
+      "actual_material_property_instance_bound": false,
+      "material_property_body_actual_value_bound": false,
+      "material_profile_id": null,
+      "actual_material_case_accepted": false,
+      "promotion_scope": "MODEL_LEVEL_CONTRACT_SHAPE_AND_FAIL_CLOSED_BOUNDARY_ONLY",
+      "material_case_or_production_promotion": false,
+      "new_authority_self_approval": false
+    },
+    "upstream_layers": {
+      "layer_a_material_identity": {
+        "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "unchanged": true
+      },
+      "layer_c_constant_k": {
+        "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "unchanged": true
+      }
+    },
+    "effective_state": {
+      "material_identity_input_contract_status": "REVIEWED_AUTHORITY",
+      "material_identity_input_contract_independent_review": "ACCEPTED",
+      "material_thermal_property_contract_status": "REVIEWED_AUTHORITY",
+      "material_thermal_property_contract_independent_review": "ACCEPTED",
+      "material_property_body_actual_value_bound": false,
+      "material_identity_actual_value_bound": false,
+      "material_profile_id": null,
+      "actual_material_case_accepted": false,
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "material_constant_k_canonical_blocker_removed": false,
+      "remaining_entry_blockers": [
+        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_entry_blocker_count": 6,
+      "task172_entry_authority_complete": false,
+      "task172_entry_review_pending": true
+    },
+    "scope": {
+      "promotion_scope": "MODEL_LEVEL_MATERIAL_THERMAL_PROPERTY_AUTHORITY_CONTRACT_ONLY",
+      "property_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+      "component_scope": "TUBE_WALL_METAL",
+      "actual_property_value_or_curve_approved": false,
+      "material_profile_created": false,
+      "case_level_property_authority_approved": false,
+      "layer_a_or_c_changed": false,
+      "production_admission_enabled": false
+    },
+    "provenance": {
+      "acyclic": true,
+      "audit_document": "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md",
+      "audit_document_sha256": "4de752915c08d664a2d6d4c228ae4bc9f3792fbaf006633e5c55ad640c28edfd",
+      "audit_evidence": "evidence/TASK-172-material-thermal-property-contract-independent-review-r1.json",
+      "audit_evidence_file_sha256": "3dd8adbceea402b953bd55b42aa4601116ec0088b619ff7b90c2bb560337d910",
+      "audit_evidence_canonical_hash": "61468b868f9f9fbe71ecec4e89f357ead8b1826ab9bcce624d4d9325dc0aa6fe",
+      "historical_registry_root_hash": "6beca69d64fbd6a6fb6ce002c2f7ab1cb75a44830b0c33787a1f0eaeeaf11f51",
+      "historical_r16_extension_hash": "78d726aa5b36892a745263142f74712cd54ded0d98337bcad73272565a22d74d",
+      "historical_records_unchanged": true,
+      "actual_material_or_property_fabricated": false,
+      "reviewer_identity_fabricated": false
+    },
+    "governance": {
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "tube_wall_correction_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "material_profile_created": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "AUTHORIZE_TASK172_MATERIAL_CANONICAL_BLOCKER_CLOSURE_ADJUDICATION_R1_ONLY",
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "024ade34f4dfee5f052774784d715a698315669879a833176d26d6bdb04836ee"
   }
 }
