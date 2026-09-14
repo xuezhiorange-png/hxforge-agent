@@ -18,7 +18,8 @@
     "TASK-172-v0.7-entry-authority-closure-r1.md",
     "TASK-172-v0.7-wall-numerical-proposals-r1.md",
     "TASK-172-v0.7-physical-authority-semantic-source-r5.md",
-    "TASK-172-v0.7-targeted-physical-source-authority-construction-r1.md"
+    "TASK-172-v0.7-targeted-physical-source-authority-construction-r1.md",
+    "TASK-172-v0.7-material-identity-authority-input-contract-r1.md"
   ],
   "sources": [
     {
@@ -1069,7 +1070,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "81ec7775e17d777544542cc03a752b15e5f225acc5993fb1c1795279ec2033b3",
+  "canonical_hash": "069a5183093f24dbfbd5a68563391a8d4f6b853b4c630b3528944fad6d5ea694",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -1769,5 +1770,103 @@
     "merge_authorized": false,
     "no_step_implies_the_next": true,
     "canonical_hash": "87595915464abe93d65ba32d590b6cc0254406e5d9e8e45049f06b804d605f96"
+  },
+  "r7_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_IDENTITY_AUTHORITY_INPUT_CONTRACT_R1",
+    "previous_head": "86871ca25a02b7d70e2a657f6b649f4d43bc9737",
+    "historical_r6_root_hash": "87595915464abe93d65ba32d590b6cc0254406e5d9e8e45049f06b804d605f96",
+    "document": "TASK-172-v0.7-material-identity-authority-input-contract-r1.md",
+    "document_sha256": "1cffabd1aa25ade7cf67f224150b8e455c130f7eb6a4899b94f88803a18e4856",
+    "evidence": {
+      "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "path": "evidence/TASK-172-material-identity-authority-input-contract-r1.json",
+      "canonical_hash": "3414779c84cd526cc3f1068e559035205711c025f7fa781904138b52f1fddf97"
+    },
+    "scope": [
+      "MATERIAL_IDENTITY_OWNERSHIP",
+      "MATERIAL_IDENTITY_INPUT_SCHEMA",
+      "MATERIAL_IDENTITY_CASE_AND_GEOMETRY_BINDING",
+      "MATERIAL_IDENTITY_CANONICAL_HASH_RULE",
+      "LEGACY_FIELD_RECONCILIATION"
+    ],
+    "ownership": {
+      "owner": "TASK172_CASE_INPUT_AUTHORITY_BOUNDARY",
+      "decision": "OPTION_A_ADOPTED_CALLER_SUPPLIED_EXPLICIT_SOURCE_BOUND_MATERIAL_IDENTITY",
+      "existing_upstream_owner_found": false,
+      "upstream_contract_amendment_required": false,
+      "hidden_default_forbidden": true,
+      "task020_task021_task025_semantics_changed": false
+    },
+    "component_scope": {
+      "component_role": "TUBE_WALL_METAL",
+      "component_scope": "TASK037_CYLINDRICAL_TUBE_WALL_RESISTANCE_AND_TASK171_TUBE_METAL_WALL_INTERFACE",
+      "shell_wall_material_identity_contract_created": false
+    },
+    "schema": {
+      "schema_version": "task172.material-identity.v1",
+      "required_fields_bound": true,
+      "thermal_property_fields_in_schema": false,
+      "required_source_provenance": true,
+      "required_case_binding": true,
+      "required_geometry_binding": true,
+      "required_independent_approval_for_production": true
+    },
+    "canonical_identity": {
+      "serializer": "hexagent.canonical_json.canonical_sha256",
+      "authority_hash_excluded_from_own_preimage": true,
+      "source_revision_change_changes_identity": true,
+      "component_or_case_rebinding_changes_identity": true
+    },
+    "legacy_reconciliation": {
+      "legacy_tube_thermal_conductivity_field_found": true,
+      "legacy_field_current_main_present": true,
+      "legacy_field_frozen_authority": false,
+      "legacy_field_source_provenance_complete": false,
+      "legacy_field_reusable_for_task172": false,
+      "reuse": "FORBIDDEN",
+      "disposition": "RETAIN_FORBIDDEN_FIELD_TOKEN_AS_TASK026_T025_BOUNDARY_METADATA;DO_NOT_TREAT_AS_MATERIAL_AUTHORITY;NO_REUSE"
+    },
+    "wall_temperature_dependency": {
+      "required": true,
+      "authority_bound": false,
+      "bulk_temperature_substitution_allowed": false,
+      "implementation_started": false
+    },
+    "blockers": {
+      "canonical_remaining_entry_blockers": [
+        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "dependency_blockers": [
+        "MATERIAL-IDENTITY-INPUT-CONTRACT",
+        "WALL-TEMPERATURE-STATE-AUTHORITY"
+      ],
+      "semantic_contract_correction_required": false
+    },
+    "result": {
+      "result": "PASS",
+      "contract_definition_complete": true,
+      "actual_material_value_bound": false,
+      "material_profile_id": null,
+      "material_k_source_authority_status": "BLOCKED",
+      "material_constant_k_status": "OPEN",
+      "tube_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_status": "BLOCKED",
+      "task172_entry_authority_complete": false,
+      "entry_review_pending": true,
+      "next_gate": "AUTHORIZE_TASK172_MATERIAL_THERMAL_PROPERTY_AUTHORITY_CONSTRUCTION_R1_ONLY"
+    },
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "73631e6bd90982367962610f41718634353d9eece3e8bab0d421f85d93732fde"
   }
 }
