@@ -24,7 +24,8 @@
     "TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
     "TASK-172-v0.7-constant-k-qualification-r1.md",
     "TASK-172-v0.7-constant-k-governance-state-correction-r1.md",
-    "TASK-172-v0.7-constant-k-authority-independent-review-r1.md"
+    "TASK-172-v0.7-constant-k-authority-independent-review-r1.md",
+    "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md"
   ],
   "sources": [
     {
@@ -1184,7 +1185,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "dd5698a637970dd32e4a997c4e4c2dbc73f4b57a2bf28e47ca70c8cef52ef1e3",
+  "canonical_hash": "7ba0674e734f111d272538410843b0ea6b03659e3aec7cf701cd7a97f15a5d71",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -2673,5 +2674,122 @@
       "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_MODEL_LEVEL_CONSTANT_K_ACCEPTANCE"
     },
     "canonical_hash": "4c3d918019c5931d2df73ea8f8d00360dd97607005a5354bbd6c8907b7bbb72d"
+  },
+  "r13_extension": {
+    "task_id": "TASK172_V0_7_CONSTANT_K_EXTERNAL_SCOPED_APPROVAL_RECORD_R1",
+    "previous_head": "b17d2f7d7f94bd73c1165611d37510cfed91d21b",
+    "historical_registry_root_hash": "dd5698a637970dd32e4a997c4e4c2dbc73f4b57a2bf28e47ca70c8cef52ef1e3",
+    "historical_r12_extension_hash": "4c3d918019c5931d2df73ea8f8d00360dd97607005a5354bbd6c8907b7bbb72d",
+    "historical_records_unchanged": true,
+    "review_type": "EXTERNAL_SCOPED_REVIEW_DECISION_RECORDING_ONLY",
+    "subject_authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+    "document": {
+      "path": "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md",
+      "sha256": "4cc3ae88ea6f1ca2387f6b0f02ab15076de663f0808db62f3e3d2372a6a57992"
+    },
+    "evidence": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "path": "evidence/TASK-172-constant-k-external-scoped-approval-record-r1.json",
+      "file_sha256": "90a9b029dabcc669667a4624b9d2efdb56cdf3cbddcb3d9cce1a5122525ade75",
+      "canonical_hash": "ad0e447c6fc1a34f68a237b218c38f0a8d9404500fc5ab8e0cf58f00b863e46d"
+    },
+    "external_review": {
+      "decision": "ACCEPT_SCOPED_MODEL_LEVEL_LAYER_C_CONTRACT",
+      "scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY",
+      "layer_c_model_contract_accepted": true,
+      "evidence_bound": true,
+      "source_type": "EXTERNAL_REVIEW_DECISION",
+      "source_id": "TASK172-EXTERNAL-REVIEW-DECISION-R1",
+      "source_description": "External ChatGPT review decision supplied in the authorized task instruction; not a GitHub review event or human expert signature.",
+      "github_reviewer_identity_claimed": false,
+      "human_expert_identity_claimed": false,
+      "approval_identity_disclosed": false,
+      "self_approval": false,
+      "approval_evidence": [
+        "TASK_AUTHORIZATION_EXTERNAL_REVIEW_DECISION",
+        "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md",
+        "evidence/TASK-172-constant-k-external-scoped-approval-record-r1.json"
+      ]
+    },
+    "authority_promotion": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "authority_version": "r1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "contract_frozen": true,
+      "production_enabled": false,
+      "actual_material_instance_bound": false,
+      "material_profile_id": null,
+      "actual_material_case_accepted": false,
+      "promotion_scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY",
+      "material_case_or_production_promotion": false,
+      "new_authority_self_approval": false
+    },
+    "upstream_layers": {
+      "layer_a_material_identity": {
+        "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "implicit_promotion": false
+      },
+      "layer_b_material_thermal_property": {
+        "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "implicit_promotion": false
+      }
+    },
+    "scope": {
+      "component_scope": "TUBE_WALL_METAL",
+      "property_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+      "qualification_mode": "CASE_LEVEL_AUTHORITY_REQUIRED",
+      "admitted_constant_model": "FIXED_SOURCE_VALUE_WITH_EXPLICIT_SOURCE_DECLARED_DOMAIN",
+      "source_bound_k_of_t_to_constant_conversion": "NOT_ADMITTED",
+      "required_wall_states": [
+        "TUBE_METAL_INNER_SURFACE",
+        "TUBE_METAL_OUTER_SURFACE"
+      ],
+      "wall_profile": "CLEAN_SURFACE_ONLY",
+      "fouled_wall_profile_approved": false,
+      "variable_k_wall_approved": false,
+      "u_tube_admitted": false,
+      "floating_head_admitted": false,
+      "additional_passes_admitted": false,
+      "active_wall_corrections_closed": false,
+      "numerical_authority_introduced": false
+    },
+    "effective_state": {
+      "material_profile_id": null,
+      "material_identity_actual_value_bound": false,
+      "actual_material_case_accepted": false,
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "canonical_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "canonical_blocker_removed": false,
+      "remaining_entry_blockers": [
+        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_entry_blocker_count": 6,
+      "task172_entry_authority_complete": false,
+      "entry_review_pending": true
+    },
+    "governance_reason": "Layer C model-level constant-k qualification contract is independently accepted,\nbut the material canonical blocker remains active because the Layer A material\nidentity input contract and Layer B material thermal-property contract remain\nPROPOSED_AUTHORITY / independent-review PENDING.\n\nLayer C approval does not imply Layer A/B approval and does not approve an\nactual material, conductivity value, temperature domain, or production case.",
+    "governance": {
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "AUTHORIZE_TASK172_MATERIAL_IDENTITY_INPUT_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+      "no_step_implies_the_next": true
+    },
+    "canonical_blocker_removed": false,
+    "canonical_hash": "99cb9d8473d26aea36c10ab81849c95e25c057c57b7f2cb8e25660ab1323b114"
   }
 }
