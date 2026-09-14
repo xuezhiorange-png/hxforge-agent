@@ -1,0 +1,179 @@
+{
+  "schema_version": "task172.material-thermal-property-contract-evidence.r1",
+  "task_id": "TASK172_V0_7_MATERIAL_THERMAL_PROPERTY_AUTHORITY_CONSTRUCTION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "bd2456095258aec9e28026eb19b3e3b44670f68b",
+  "authority": {
+    "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+    "authority_version": "r1",
+    "status": "PROPOSED_AUTHORITY",
+    "new_authority_self_approval": false,
+    "contract_definition_complete": true,
+    "contract_shape_frozen": true,
+    "actual_material_property_instance_bound": false,
+    "approved_by": null,
+    "approval_evidence": []
+  },
+  "dependency_reconciliation": {
+    "material_identity_authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+    "material_identity_input_contract_frozen": true,
+    "material_identity_input_contract_blocker_closed": true,
+    "material_identity_actual_value_bound": false,
+    "active_dependency_blockers": [
+      "WALL-TEMPERATURE-STATE-AUTHORITY"
+    ],
+    "semantic_contract_correction_required": false,
+    "canonical_remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ]
+  },
+  "ownership": {
+    "owner": "TASK172_CASE_INPUT_AUTHORITY_BOUNDARY",
+    "decision": "OPTION_A_ADOPTED_EXPLICIT_SOURCE_BOUND_MATERIAL_THERMAL_PROPERTY_BODY",
+    "caller_transport_is_self_approval": false,
+    "identity_or_hash_without_body_allowed": false,
+    "hidden_default_k_forbidden": true,
+    "runtime_material_database_lookup": false,
+    "task020_task021_task025_semantics_changed": false
+  },
+  "component_scope": {
+    "component_role": "TUBE_WALL_METAL",
+    "property_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+    "property_units": "W_PER_M_K",
+    "shell_wall_material_contract_created": false,
+    "legacy_tube_thermal_conductivity_reuse": "FORBIDDEN"
+  },
+  "required_fields": [
+    "schema_version",
+    "authority_id",
+    "authority_version",
+    "review_status",
+    "property_quantity_kind",
+    "material_identity_authority_id",
+    "material_identity_authority_hash",
+    "component_scope",
+    "case_or_configuration_binding",
+    "geometry_binding",
+    "property_model",
+    "k_value_or_k_curve",
+    "property_units",
+    "temperature_basis",
+    "temperature_domain",
+    "source_provenance",
+    "interpolation_policy",
+    "extrapolation_policy",
+    "out_of_domain_policy",
+    "constant_k_policy",
+    "evidence_refs",
+    "authority_hash"
+  ],
+  "property_body_contract": {
+    "body_required": true,
+    "allowed_property_models": [
+      "FIXED_SOURCE_VALUE",
+      "SOURCE_BOUND_K_OF_T"
+    ],
+    "exact_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+    "value_or_curve_exclusive": true,
+    "source_representation_required": true,
+    "material_id_only_pseudo_property": false,
+    "actual_value_selected": false,
+    "material_profile_id": null
+  },
+  "binding_rules": {
+    "material_identity_id_and_hash_pair_required": true,
+    "component_scope_exact": "TUBE_WALL_METAL",
+    "case_or_configuration_binding_required": true,
+    "case_or_configuration_binding_fields": [
+      "task172_case_id",
+      "task172_request_id",
+      "task172_request_hash",
+      "configuration_authority_id",
+      "configuration_authority_hash",
+      "upstream_identity_refs",
+      "binding_rule_revision"
+    ],
+    "geometry_binding_required": true,
+    "geometry_binding_fields": [
+      "component_role",
+      "geometry_authority_id",
+      "geometry_authority_hash",
+      "physical_support_id",
+      "physical_support_hash",
+      "upstream_geometry_identity_refs"
+    ],
+    "source_provenance_required": true,
+    "caller_assertion_sufficient": false,
+    "missing_body_blocks": true,
+    "body_hash_mismatch_blocks": true,
+    "same_hash_different_body_blocks": true
+  },
+  "canonical_identity_rule": {
+    "serializer": "hexagent.canonical_json.canonical_sha256",
+    "authority_hash_excluded_from_own_preimage": true,
+    "preimage_includes_property_body": true,
+    "preimage_includes_material_identity_id_and_hash": true,
+    "preimage_includes_case_and_geometry_binding": true,
+    "preimage_includes_source_and_domain_policy": true,
+    "body_change_changes_recomputed_hash": true,
+    "source_revision_change_changes_identity": true,
+    "binding_change_changes_identity": true
+  },
+  "source_and_domain_policy": {
+    "material_k_source_authority_status": "BLOCKED",
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "interpolation_policy": "EXPLICIT_SOURCE_RULE_REQUIRED",
+    "interpolation_without_source_rule": "FORBIDDEN",
+    "extrapolation_policy": "FORBIDDEN",
+    "out_of_domain_policy": "BLOCKED",
+    "source_rights_must_be_bound": true,
+    "no_source_selected_in_this_task": true
+  },
+  "layer_separation": {
+    "layer_a_property_source_authority_defined": true,
+    "layer_b_constant_k_qualification_defined": true,
+    "layer_a_instance_bound": false,
+    "layer_b_qualification_bound": false,
+    "constant_k_not_inferred_from_identity": true
+  },
+  "wall_temperature_dependency": {
+    "wall_temperature_state_required": true,
+    "wall_temperature_state_authority_bound": false,
+    "bulk_temperature_substitution_allowed": false,
+    "wall_temperature_solver_started": false
+  },
+  "unchanged_downstream_scope": {
+    "tube_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_status": "BLOCKED",
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false,
+    "legacy_task037_semantics_changed": false,
+    "task171_semantics_changed": false
+  },
+  "result": {
+    "result": "PASS",
+    "material_thermal_property_contract_definition_complete": true,
+    "material_thermal_property_authority_contract_frozen": true,
+    "material_identity_input_contract_blocker_closed": true,
+    "material_identity_actual_value_bound": false,
+    "material_profile_id": null,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true,
+    "next_gate": "AUTHORIZE_TASK172_WALL_TEMPERATURE_STATE_AUTHORITY_DEFINITION_R1_ONLY",
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "b1c3ea77d6762d4cd9b41dab1370059218515d633a2effda2f71789c52be82bc"
+}
