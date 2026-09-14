@@ -1067,7 +1067,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "a4232091ca55a81534382913e9356313f0f85548e73c6a768961e1f5fde57037",
+  "canonical_hash": "00c60c066d378347a0469bfc8be7e86013a02373b70c9367db5bedf647b2dc72",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -1485,5 +1485,44 @@
     "merge_authorized": false,
     "no_step_implies_the_next": true,
     "canonical_hash": "e3099f59954c294d6b742899b0142ee4c4bd939f057e20051263b6cadb0903da"
+  },
+  "r4_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R4",
+    "previous_head": "f2c87be7aaec1eaaf59fafbbb8e667257a0eb07d",
+    "historical_r3_root_hash": "a4232091ca55a81534382913e9356313f0f85548e73c6a768961e1f5fde57037",
+    "document": "TASK-172-v0.7-material-active-wall-review-r4.md",
+    "evidence": {
+      "authority_id": "V07-T172-MATERIAL-ACTIVE-WALL-REVIEW-R4",
+      "path": "evidence/TASK-172-material-active-wall-review-r4.json",
+      "canonical_hash": "eb7819604a10922a9d20bb71a87496682b8520f48bc3628a294e9af1aaa91042"
+    },
+    "scope": "Three physical blockers only; numerical qualification deliberately excluded",
+    "material_profile_id": null,
+    "material_profile_status": "BLOCKED",
+    "material_constant_k_status": "OPEN",
+    "tube_wall_correction_id": null,
+    "tube_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_id": null,
+    "shell_wall_correction_status": "BLOCKED",
+    "physical_authority_portion_closed": false,
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "817c7bb08a2ab5338ce8e3e93172db99530eed835ff9b4831cab3e1770d25bdf"
   }
 }
