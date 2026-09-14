@@ -22,7 +22,8 @@
     "TASK-172-v0.7-material-identity-authority-input-contract-r1.md",
     "TASK-172-v0.7-material-thermal-property-authority-construction-r1.md",
     "TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
-    "TASK-172-v0.7-constant-k-qualification-r1.md"
+    "TASK-172-v0.7-constant-k-qualification-r1.md",
+    "TASK-172-v0.7-constant-k-governance-state-correction-r1.md"
   ],
   "sources": [
     {
@@ -963,13 +964,22 @@
         "REPO-WALL",
         "REPO-CANONICAL"
       ],
-      "dependent_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
-      "closure_status": "MODEL_LEVEL_CONTRACT_COMPLETE_REVIEW_PENDING",
-      "remaining_blockers": [],
+  "dependent_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+  "closure_status": "MODEL_LEVEL_CONTRACT_COMPLETE_REVIEW_PENDING",
+  "remaining_blockers": [
+    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "TUBE-WALL-CORRECTION-AUTHORITY",
+    "SHELL-WALL-CORRECTION-AUTHORITY",
+    "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+    "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+    "MESH-CONVERGENCE-QUALIFICATION"
+  ],
+  "canonical_blocker_removed": false,
+  "effective_lifecycle_status": "PROPOSED_AUTHORITY_INDEPENDENT_REVIEW_PENDING",
       "physics_authority": "No new material physics; only exact source-declared fixed-value admission and wall-state domain coverage",
       "project_rules": "Case-level authority is required; no material default, k(T)-to-constant conversion, or numerical tolerance is inferred",
       "implementation_design": "DEFERRED; no property runtime or wall solver authorized",
-      "canonical_hash": "234aef6f438c98dc77eddc86e4ec5cf86230a91bdbe9162b457a1cc1fb35d06b",
+  "canonical_hash": "393198e0676bade74d4b4988a7e1ab0d2146757a64e0c1b69dfa2dc659f27964",
       "constant_k_contract": {
         "schema_version": "task172.constant-k-qualification.v1",
         "qualification_mode": "CASE_LEVEL_AUTHORITY_REQUIRED",
@@ -1166,13 +1176,14 @@
   "new_supported_fluid_count": 0,
   "new_approved_golden_count": 0,
   "remaining_blockers": [
+    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
     "TUBE-WALL-CORRECTION-AUTHORITY",
     "SHELL-WALL-CORRECTION-AUTHORITY",
     "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "dee388a5eba23704da44333b6dddcae8690125649657090353438c6ee2966392",
+  "canonical_hash": "8814c988bdb7bbd3e825aee7fb304383cd184d147a425f85f7204ed9cf4860e5",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -2456,5 +2467,102 @@
       "next_gate": "AUTHORIZE_TASK172_MATERIAL_CONSTANT_K_AUTHORITY_INDEPENDENT_REVIEW_R1_ONLY"
     },
     "canonical_hash": "272c583fe1515c4b97a94f05de67c1ae31dae1726eda9f79dcf123ce62542f78"
+  },
+  "r11_extension": {
+    "task_id": "TASK172_V0_7_MATERIAL_CONSTANT_K_GOVERNANCE_STATE_CORRECTION_R1",
+    "previous_head": "5aca5434aefb59b56900dfd6901094e3a04bbb64",
+    "historical_registry_root_hash": "dee388a5eba23704da44333b6dddcae8690125649657090353438c6ee2966392",
+    "historical_r10_extension_hash": "272c583fe1515c4b97a94f05de67c1ae31dae1726eda9f79dcf123ce62542f78",
+    "historical_records_unchanged": true,
+    "correction_type": "GOVERNANCE_STATE_ONLY",
+    "document": {
+      "path": "TASK-172-v0.7-constant-k-governance-state-correction-r1.md",
+      "sha256": "bb75ac358a97abcb42cbbbb187c42e7cf63ea91ba46baee7a7da9c7f17fedc00"
+    },
+    "evidence": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "path": "evidence/TASK-172-constant-k-governance-state-correction-r1.json",
+      "file_sha256": "7691e59dcfa575e83c707ec47ba1245568e46ee7305b395bcfcb5aaeae742a30",
+      "canonical_hash": "a63c613d5c587f096b2c71315040cb1e05e908c94d12b2df00b197f1bfb5ecc2"
+    },
+    "authority": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "authority_version": "r1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "contract_definition_complete": true,
+      "contract_frozen": true,
+      "independently_reviewed": false,
+      "production_enabled": false,
+      "actual_material_instance_bound": false,
+      "material_profile_id": null,
+      "new_authority_self_approval": false,
+      "approved_by": null,
+      "approval_evidence": []
+    },
+    "upstream_authority_layers": {
+      "material_identity": {
+        "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "implicit_promotion": false
+      },
+      "material_thermal_property": {
+        "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "implicit_promotion": false
+      }
+    },
+    "effective_state": {
+      "constant_k_qualification_contract_frozen": true,
+      "material_profile_id": null,
+      "material_identity_actual_value_bound": false,
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "canonical_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "canonical_blocker_removed": false,
+      "remaining_entry_blockers": [
+        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_entry_blocker_count": 6,
+      "task172_entry_dependency_blockers": "NONE",
+      "task172_entry_authority_complete": false,
+      "entry_review_pending": true,
+      "next_gate": "AUTHORIZE_TASK172_MATERIAL_CONSTANT_K_AUTHORITY_INDEPENDENT_REVIEW_R1_ONLY"
+    },
+    "scope_preservation": {
+      "fixed_source_value_semantics_unchanged": true,
+      "source_bound_k_of_t_semantics_unchanged": true,
+      "wall_temperature_coverage_unchanged": true,
+      "interpolation_policy_unchanged": true,
+      "extrapolation_policy_unchanged": true,
+      "out_of_domain_policy_unchanged": true,
+      "hash_rule_unchanged": true,
+      "provenance_rule_unchanged": true,
+      "material_selection_performed": false,
+      "material_profile_introduced": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "implementation_started": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_identity": {
+      "serializer": "hexagent.canonical_json.canonical_sha256",
+      "correction_overlay_hash_excluded_from_own_preimage": true,
+      "historical_authority_identity_rewritten": false,
+      "effective_lifecycle_state_bound": true,
+      "source_and_provenance_bindings_preserved": true
+    },
+    "canonical_blocker_removed": false,
+    "result": "PASS",
+    "canonical_hash": "691f2fe298c1494e3f97ec76b29712163854e35b7fc673f75af3cd217aacf0a4"
   }
 }
