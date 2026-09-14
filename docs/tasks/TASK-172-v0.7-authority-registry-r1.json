@@ -17,7 +17,8 @@
   "documents": [
     "TASK-172-v0.7-entry-authority-closure-r1.md",
     "TASK-172-v0.7-wall-numerical-proposals-r1.md",
-    "TASK-172-v0.7-physical-authority-semantic-source-r5.md"
+    "TASK-172-v0.7-physical-authority-semantic-source-r5.md",
+    "TASK-172-v0.7-targeted-physical-source-authority-construction-r1.md"
   ],
   "sources": [
     {
@@ -1068,7 +1069,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "268e1d1bf13545c03c29c5049064459714e470720ed368ecdd790a2b49e104cc",
+  "canonical_hash": "81ec7775e17d777544542cc03a752b15e5f225acc5993fb1c1795279ec2033b3",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -1635,5 +1636,138 @@
     "merge_authorized": false,
     "no_step_implies_the_next": true,
     "canonical_hash": "ad4bd1d8684e1eabcf6dd3c0fe3a65da473bbf1b76c1fc7e1f20438c96a941bb"
+  },
+  "r6_extension": {
+    "task_id": "TASK172_V0_7_TARGETED_PHYSICAL_SOURCE_AUTHORITY_CONSTRUCTION_R1",
+    "previous_head": "5a5c8954a0ddd509f489b6bc6d2c35e86f2bb4f0",
+    "historical_r5_root_hash": "ad4bd1d8684e1eabcf6dd3c0fe3a65da473bbf1b76c1fc7e1f20438c96a941bb",
+    "document": "TASK-172-v0.7-targeted-physical-source-authority-construction-r1.md",
+    "document_sha256": "94d5e9a04cd591bc31af9a6f175dedb0a1c33be9742cbdd462a4de00e6397fca",
+    "evidence": {
+      "authority_id": "V07-T172-TARGETED-PHYSICAL-SOURCE-AUTHORITY-CONSTRUCTION-R1",
+      "path": "evidence/TASK-172-targeted-physical-source-authority-construction-r1.json",
+      "canonical_hash": "32cf979e002eaeebbaaca586d6212751a6ec286d410436e34788f6258aef48a2"
+    },
+    "scope": [
+      "MATERIAL_IDENTITY_AUTHORITY",
+      "SOLID_MATERIAL_THERMAL_CONDUCTIVITY_AUTHORITY",
+      "TUBE_ACTIVE_WALL_CORRECTION_AUTHORITY",
+      "SHELL_ACTIVE_WALL_CORRECTION_AUTHORITY",
+      "CROSS_BINDING_AUTHORITY_REVIEW"
+    ],
+    "lineage_source_ids": [
+      "SRC-T172-REPO-WALL",
+      "SRC-T172-REPO-TUBE",
+      "SRC-T172-REPO-BELL"
+    ],
+    "historical_anomaly": {
+      "legacy_tube_thermal_conductivity_field_found": true,
+      "legacy_field_current_main_present": true,
+      "current_main_occurrence_type": "TASK026_FORBIDDEN_FIELDS_TOKEN_NOT_REQUEST_OR_RESULT_FIELD",
+      "introduced_by_commit": "37f39d902143e4938f83cd7edb48231d5fabf937",
+      "upstream_read_set_contains_field": false,
+      "legacy_field_frozen_authority": false,
+      "legacy_field_source_provenance_complete": false,
+      "legacy_field_reusable_for_task172": false,
+      "reachable_task026_design_authority_found": false,
+      "legacy_field_disposition": "RETAIN_FORBIDDEN_FIELD_TOKEN_AS_TASK026_T025_BOUNDARY_METADATA;DO_NOT_TREAT_AS_MATERIAL_AUTHORITY;NO_REUSE"
+    },
+    "material_identity_contract": {
+      "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "authority_version": "r1",
+      "status": "PROPOSED_AUTHORITY",
+      "component_role": "TUBE_WALL_METAL",
+      "required_fields": [
+        "component_role",
+        "material_id",
+        "material_grade_or_specification",
+        "material_standard",
+        "product_form",
+        "source_id",
+        "source_version",
+        "source_location",
+        "source_class",
+        "permission_status",
+        "evidence_refs",
+        "approval_status",
+        "canonical_hash",
+        "upstream_configuration_identity_binding"
+      ],
+      "material_identity_bound": false,
+      "input_contract_missing": true,
+      "material_profile_id": null,
+      "default_forbidden": true,
+      "production_enabled": false,
+      "canonical_hash": null
+    },
+    "material_conductivity": {
+      "source_authority_status": "BLOCKED",
+      "constant_k_status": "OPEN",
+      "temperature_domain_bound": false,
+      "material_profile_id": null,
+      "authority_id": null,
+      "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "blocking_prerequisite": "MATERIAL_IDENTITY_INPUT_CONTRACT_MISSING",
+      "new_equation": false
+    },
+    "tube_wall_correction": {
+      "correction_id": null,
+      "status": "BLOCKED",
+      "base_authority": "SRC-T172-REPO-TUBE",
+      "source_bound": false,
+      "base_compatibility_bound": false,
+      "applicability_bound": false,
+      "material_profile_bound": false,
+      "wall_temperature_state_bound": false,
+      "sieder_tate_transfer_authority": "UNAVAILABLE",
+      "disposition": "DISPOSITION_BLOCKED_UPSTREAM_MATERIAL_IDENTITY_AND_WALL_STATE_PREREQUISITE_MISSING;NO_TRANSFER_ATTEMPTED"
+    },
+    "shell_wall_correction": {
+      "correction_id": null,
+      "status": "BLOCKED",
+      "base_authority": "SRC-T172-REPO-BELL",
+      "source_bound": false,
+      "base_compatibility_bound": false,
+      "applicability_bound": false,
+      "material_profile_bound": false,
+      "wall_temperature_state_bound": false,
+      "task034_wall_authority_reuse": "NO",
+      "disposition": "DISPOSITION_BLOCKED_UPSTREAM_MATERIAL_IDENTITY_AND_WALL_STATE_PREREQUISITE_MISSING;NO_TRANSFER_ATTEMPTED"
+    },
+    "cross_binding": {
+      "status": "NOT_READY",
+      "wall_temperature_state_required": true,
+      "wall_temperature_state_authority_bound": false,
+      "material_source_domain_surface_geometry_unit_correlation_checks_defined": true
+    },
+    "numerical_boundary": {
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "profile_status": "PARTIALLY_CLOSED",
+      "numerical_tolerances_bound": false,
+      "mesh_convergence_rule_bound": false
+    },
+    "result": "BLOCKED",
+    "block_reason": "MATERIAL_IDENTITY_INPUT_CONTRACT_MISSING",
+    "physical_authority_portion_closed": false,
+    "task172_entry_authority_complete": false,
+    "entry_review_pending": true,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "new_authority_self_approval": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "canonical_hash": "87595915464abe93d65ba32d590b6cc0254406e5d9e8e45049f06b804d605f96"
   }
 }
