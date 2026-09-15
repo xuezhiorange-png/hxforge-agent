@@ -37,7 +37,8 @@
     "TASK-172-v0.7-tube-native-base-selector-parity-adjudication-r1.md",
     "TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r2.md",
     "TASK-172-v0.7-tube-wall-correction-authority-independent-review-r1.md",
-    "TASK-172-v0.7-tube-wall-correction-source-provenance-correction-r1.md"
+    "TASK-172-v0.7-tube-wall-correction-source-provenance-correction-r1.md",
+    "TASK-172-v0.7-tube-wall-correction-external-scoped-approval-record-r1.md"
   ],
   "sources": [
     {
@@ -1215,7 +1216,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "276f3949c9624251ebbb1c9b4704d9cab3c16da9f556d6b9ff6be516e3b83143",
+  "canonical_hash": "aa34aa3aebedd61c68cd2e33fc6c4862e0fac39e8fa314ed8d30d47858acd052",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -4498,5 +4499,156 @@
     },
     "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_TUBE_WALL_CORRECTION_ACCEPTANCE",
     "canonical_hash": "e404f463da6cf274825caba156575ca477812a4cb2c401b3c566ec0453ca6b29"
+  },
+  "r26_extension": {
+    "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_EXTERNAL_SCOPED_APPROVAL_RECORD_R1",
+    "previous_head": "8401b0ac6f1313cbede53c1630252f40672ad824",
+    "historical_registry_root_hash": "276f3949c9624251ebbb1c9b4704d9cab3c16da9f556d6b9ff6be516e3b83143",
+    "historical_r25_extension_hash": "e404f463da6cf274825caba156575ca477812a4cb2c401b3c566ec0453ca6b29",
+    "historical_records_unchanged": true,
+    "review_type": "EXTERNAL_REVIEW_DECISION_RECORDING_ONLY",
+    "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "subject_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "external_review": {
+      "decision": "ACCEPT_SCOPED_TUBE_WALL_CORRECTION_AUTHORITY",
+      "scope": "MODEL_LEVEL_TUBE_TURBULENT_WALL_PROPERTY_CORRECTION_ONLY",
+      "evidence_bound": true,
+      "scoped_acceptance": true,
+      "source_type": "EXTERNAL_REVIEW_DECISION",
+      "source_id": "TASK172-EXTERNAL-REVIEW-DECISION-TUBE-WALL-R1",
+      "source_description": "External ChatGPT decision supplied in the authorized task instruction; not a GitHub review event or human expert signature.",
+      "github_reviewer_identity_claimed": false,
+      "human_expert_identity_claimed": false,
+      "organization_identity_claimed": false,
+      "professional_signature_claimed": false,
+      "approval_identity_disclosed": false,
+      "self_approval": false
+    },
+    "source": {
+      "source_registry_id": "INL-EXT-14-31366-R3",
+      "source_title": "RELAP-7 Theory Manual",
+      "source_revision": "INL/EXT-14-31366 Revision 3",
+      "source_author_last": "J.E. Hansel",
+      "source_status": "VERIFIED_SOURCE",
+      "source_bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+      "access_path": "https://inldigitallibrary.inl.gov/content/uploads/50/2026/04/Sort_4964.pdf",
+      "rights_status": "Unlimited Release; approved for public release; further dissemination unlimited"
+    },
+    "native_base": {
+      "authority_id": "SRC-T172-REPO-TUBE",
+      "selector_version": "R8",
+      "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+      "base_formula_algebraic_equivalence": "PASS_EXACT",
+      "friction_convention_mapping_valid": true,
+      "turbulent_branch_separable": true,
+      "relap_system_orchestration_transfer_required": false
+    },
+    "scope": {
+      "formula": "Nu_turb = Nu_Gnielinski * (Pr_liq / Pr_w)^0.11",
+      "property_ratio_orientation": "Pr_liq_DIVIDED_BY_Pr_w",
+      "property_ratio_domain": "0.05<=Pr_liq/Pr_w<=20",
+      "property_ratio_exponent": 0.11,
+      "combination_mode": "MULTIPLICATIVE_CORRECTION",
+      "transfer_re_domain": "3000<Re<5000000",
+      "endpoint_3000_transfer_authorized": false,
+      "endpoint_5000000_transfer_authorized": false,
+      "source_pr_numeric_interval_stated": false,
+      "target_pr_domain": "0.5<=Pr<=2000",
+      "pr_domain_transfer_justified": "PASS_AS_STRICT_NATIVE_INTERSECTION",
+      "pr_domain_transfer_extends_source": false,
+      "bulk_state_id": "TUBE_FLUID_BULK_STATE",
+      "wall_state_id": "TUBE_FLUID_WALL_INTERFACE",
+      "metal_surface_automatic_alias": false,
+      "heating_cooling_semantics": "UNBRANCHED_SOURCE_RELATION_VALID_FOR_BOTH_DIRECTIONS",
+      "fluid_scope": "SINGLE_PHASE_LIQUID; target restricted to reviewed pure-water profile",
+      "geometry_scope": "INTERNAL_CIRCULAR_TUBE_NATIVE_DH",
+      "roughness_domain_type": "NEGATIVE_SCOPE_PRECONDITION",
+      "fully_developed_scope_valid": true,
+      "out_of_scope_transfers": [
+        "ROUGHNESS_DEPENDENT_EXTENSION",
+        "ENTRANCE_OR_SHORT_PIPE_EXTENSION",
+        "ANNULUS",
+        "ROD_BUNDLE",
+        "GAS",
+        "TWO_PHASE",
+        "NATURAL_CIRCULATION",
+        "SHELL_SIDE_BELL_TRANSFER"
+      ]
+    },
+    "authority_promotion": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "authority_version": "v1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "lifecycle_promotion_performed": true,
+      "promotion_scope": "MODEL_LEVEL_TUBE_TURBULENT_WALL_PROPERTY_CORRECTION_ONLY",
+      "source_lifecycle_promotion": false,
+      "production_enabled": false,
+      "case_level_material_or_property_instance_bound": false,
+      "material_profile_id": null,
+      "case_level_execution_authorized": false,
+      "new_authority_self_approval": false
+    },
+    "case_level_fail_closed": {
+      "required": true,
+      "gate_status": "ACTIVE_CONTRACT_IMPLEMENTATION_PENDING",
+      "runtime_implemented": false,
+      "missing_state_or_ratio": "BLOCKED",
+      "out_of_domain": "BLOCKED",
+      "extrapolation": "FORBIDDEN",
+      "native_base_identity_mismatch": "BLOCKED",
+      "source_revision_or_bytes_mismatch": "BLOCKED",
+      "case_or_geometry_binding_mismatch": "BLOCKED",
+      "unreviewed_or_missing_material_property_authority": "BLOCKED"
+    },
+    "effective_state": {
+      "source_provenance_corrected": true,
+      "source_status": "VERIFIED_SOURCE",
+      "tube_wall_correction_status": "REVIEWED_AUTHORITY",
+      "tube_wall_correction_independent_review": "ACCEPTED",
+      "tube_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false
+    },
+    "governance": {
+      "engineering_semantics_changed": false,
+      "equation_changed": false,
+      "exponent_changed": false,
+      "domain_changed": false,
+      "transferability_changed": false,
+      "state_mapping_changed": false,
+      "combination_rule_changed": false,
+      "historical_records_rewritten": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task026_changed": false,
+      "task172_implementation_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_CANONICAL_BLOCKER_CLOSURE_ADJUDICATION_R1_ONLY",
+      "no_step_implies_the_next": true
+    },
+    "document": {
+      "path": "TASK-172-v0.7-tube-wall-correction-external-scoped-approval-record-r1.md",
+      "sha256": "41dcc7abe70ad3171cad8f9f873d57a45ab4f4885543d1049e89f98157b70bd2"
+    },
+    "evidence": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "path": "evidence/TASK-172-tube-wall-correction-external-scoped-approval-record-r1.json",
+      "file_sha256": "690159604ffd1605d7e3cdde854797c1aaa219da6f819d183593652cc4ac194e",
+      "canonical_hash": "009ced2f2203bca76221bf64316f37fd914d1687da8a54e2d8a135e094ac6fdc"
+    },
+    "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_CANONICAL_BLOCKER_CLOSURE_ADJUDICATION_R1_ONLY",
+    "canonical_hash": "acd10f93c02c7feed8c65d55d36eaf0ab19895b3aafdbc887aacde5ef72e7b15"
   }
 }
