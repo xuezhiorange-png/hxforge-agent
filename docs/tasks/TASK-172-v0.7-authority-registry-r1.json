@@ -1219,7 +1219,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "bd5d1cdc5a8167859916496d16803c52c05ca81e6e3147c002a7d36b2be3e1f4",
+  "canonical_hash": "8f227fe3bc7a79a83875525a6b15926b08ed5665a28b2afbe23c73e890a4d1ac",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -5544,5 +5544,149 @@
     },
     "next_gate": "AWAIT_COMPLETE_LAMINAR_PRIMARY_SOURCE_AUTHORITY",
     "canonical_hash": "298ff60ad3d745cda0aefe3e212f1eea5382943f200b2e2a2c3a588a5fca6bc4"
+  },
+  "r32_extension": {
+    "task_id": "TASK172_V0_7_TUBE_LAMINAR_CONSTANT_PROPERTY_SCOPE_DISPOSITION_ADJUDICATION_R1",
+    "previous_head": "e35f1508613e129350e5af5a8290526b9b66bc7a",
+    "historical_registry_root_hash": "bd5d1cdc5a8167859916496d16803c52c05ca81e6e3147c002a7d36b2be3e1f4",
+    "historical_r31_extension_hash": "298ff60ad3d745cda0aefe3e212f1eea5382943f200b2e2a2c3a588a5fca6bc4",
+    "historical_records_unchanged": true,
+    "review_type": "LAMINAR_SOURCE_SCOPE_DISPOSITION_ADJUDICATION_ONLY",
+    "parent_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+    "result": "PASS_WITH_BLOCKER_RETAINED",
+    "adjudication": {
+      "outcome": "CONSTANT_PROPERTY_BRANCH_SCOPE_DISPOSITION_VALID",
+      "source_scope_excludes_variable_property_extension": true,
+      "exclusion_meaning": "NOT_COVERED_BY_THIS_AUTHORITY_NOT_PHYSICALLY_IMPOSSIBLE",
+      "cwt_scope_authority_candidate_complete": true,
+      "chf_scope_authority_candidate_complete": true,
+      "lifecycle_promotion_performed": false,
+      "new_authority_self_approval": false,
+      "no_active_wall_correction_required": "NOT_CLAIMED",
+      "active_correction_authority": "NONE",
+      "variable_property_outcome": "BLOCKED_MISSING_LAMINAR_VARIABLE_PROPERTY_EXTENSION_AUTHORITY"
+    },
+    "source_authority": {
+      "source_id": "NASA-CR-189922",
+      "source_role": "VERIFIED_SOURCE_FOR_EXACT_CONSTANT_PROPERTY_DERIVATIONS",
+      "source_class": "OFFICIAL_GOVERNMENT_TECHNICAL_REPORT",
+      "source_revision": "NASA-CR-189922; NAS 1.26:189922; December 1991",
+      "source_body_sha256": "46c1af47bf173cd0a33f7b491d73e635e3335ce67277df50f4f8df2840e5cd5e",
+      "source_access_path": "https://ntrs.nasa.gov/citations/19920012099",
+      "rights_status": "US_GOVERNMENT_WORK_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+      "body_acquired": true,
+      "body_reviewed_for_scope": true,
+      "cwt_location": "Chapter 3 §3.3.3; report pp.14-16 and 19-20; Eqs.3.20a,3.28,3.47-3.51; PDF pp.28-34 (1-indexed)",
+      "chf_location": "Chapter 3 §3.3.2; report pp.14-19; Eqs.3.20a,3.28,3.39-3.46; PDF pp.28-33 (1-indexed)",
+      "cwt_equation_scope": "Fully developed circular-tube constant-property CWT; Eq.3.51 Nu_D=3.658",
+      "chf_equation_scope": "Fully developed circular-tube constant-property CHF; Eq.3.46 Nu_D=4.364",
+      "variable_property_extension_reviewed": false
+    },
+    "constant_property_case": {
+      "frozen_snapshot_required": true,
+      "wall_or_bulk_property_reevaluation": false,
+      "wall_state_property_pair_consumed": false,
+      "property_ratio_evaluated": false,
+      "correction_or_replacement_claimed": false,
+      "native_identity_domain_boundary_required": true,
+      "caller_assertion_as_authority": false,
+      "hidden_default_as_authority": false,
+      "unbound_database_lookup_as_authority": false,
+      "definition": "ONE_FROZEN_PROPERTY_SNAPSHOT;NO_WALL_OR_BULK_PROPERTY_REEVALUATION;NO_PROPERTY_RATIO;NO_VARIABLE_PROPERTY_CORRECTION_OR_REPLACEMENT;EXACT_NATIVE_BRANCH_DOMAIN_AND_BOUNDARY_REQUIRED"
+    },
+    "wall_temperature_semantics": {
+      "wall_temperature_difference_alone_implies_variable_property": false,
+      "wall_state_property_reevaluation_implies_variable_property": true,
+      "reevaluation_rule": "TRUE_ONLY_WHEN_THE_LAMINAR_BRANCH_CONSUMES_OR_RECOMPUTES_PROPERTIES_AS_A_FUNCTION_OF_LOCAL_BULK_FILM_OR_WALL_TEMPERATURE",
+      "nonisothermal_wall_field_can_coexist_with_frozen_branch_properties": true,
+      "wall_solver_authorized": false,
+      "wall_correction_authorized": false
+    },
+    "branch_scope_candidates": {
+      "cwt": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CWT-PROPERTY-SCOPE-R1",
+        "authority_type": "CONSTANT_PROPERTY_BRANCH_SCOPE",
+        "component_scope": "TUBE_LAMINAR_CWT",
+        "native_correlation_id": "tube_laminar_cwt@1.0.0",
+        "thermal_boundary": "CONSTANT_WALL_TEMPERATURE",
+        "source_id": "SRC-T172-NASA-CR-189922-CWT-R1",
+        "constant_property_use": "AUTHORIZED_WITHIN_NATIVE_SOURCE_SCOPE",
+        "variable_property_use": "BLOCKED_WITHOUT_SEPARATE_EXTENSION_AUTHORITY",
+        "active_wall_property_correction": "NOT_DEFINED_BY_THIS_AUTHORITY",
+        "no_active_wall_correction_required": "NOT_CLAIMED",
+        "candidate_complete": true,
+        "candidate_status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "production_enabled": false
+      },
+      "chf": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CHF-PROPERTY-SCOPE-R1",
+        "authority_type": "CONSTANT_PROPERTY_BRANCH_SCOPE",
+        "component_scope": "TUBE_LAMINAR_CHF",
+        "native_correlation_id": "tube_laminar_chf@1.0.0",
+        "thermal_boundary": "CONSTANT_HEAT_FLUX",
+        "source_id": "SRC-T172-NASA-CR-189922-CHF-R1",
+        "constant_property_use": "AUTHORIZED_WITHIN_NATIVE_SOURCE_SCOPE",
+        "variable_property_use": "BLOCKED_WITHOUT_SEPARATE_EXTENSION_AUTHORITY",
+        "active_wall_property_correction": "NOT_DEFINED_BY_THIS_AUTHORITY",
+        "no_active_wall_correction_required": "NOT_CLAIMED",
+        "candidate_complete": true,
+        "candidate_status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "production_enabled": false
+      }
+    },
+    "native_bindings": {
+      "cwt_native_equation": "Nu_D = 3.66",
+      "chf_native_equation": "Nu_D = 4.36",
+      "cwt_native_wall_viscosity_flag": false,
+      "chf_native_wall_viscosity_flag": false,
+      "turbulent_c3_scope": "TURBULENT_C3_ONLY",
+      "turbulent_c3_transferred_to_laminar": false
+    },
+    "effective_state": {
+      "all_admitted_tube_branches_authority_covered": false,
+      "tube_wall_correction_canonical_blocker_closure_eligible": false,
+      "tube_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false,
+      "next_gate": "AUTHORIZE_TASK172_TUBE_LAMINAR_CONSTANT_PROPERTY_SCOPE_AUTHORITIES_INDEPENDENT_REVIEW_R1_ONLY"
+    },
+    "governance": {
+      "historical_records_rewritten": false,
+      "task026_changed": false,
+      "task026_equations_changed": false,
+      "task026_constants_changed": false,
+      "task026_domains_changed": false,
+      "turbulent_c3_changed": false,
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "golden_approved": false,
+      "new_authority_self_approval": false,
+      "lifecycle_promotion_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "TASK-172-v0.7-tube-laminar-constant-property-scope-disposition-adjudication-r1.md",
+      "document_sha256": "5f741017c0ce63d347e11794b249a334ffc7aa5e0c46b5994062202f00a7459d",
+      "evidence_path": "evidence/TASK-172-tube-laminar-constant-property-scope-disposition-adjudication-r1.json",
+      "evidence_file_sha256": "f36f65c5387e083a8d1e71c46181bc0a386f4e04b083440449ddaf4bf6787f8f",
+      "evidence_canonical_hash": "9bbca0c113deca6f012f7af76a2c599965b5c87c0939d504ca6aaf8888fc3a67"
+    },
+    "next_gate": "AUTHORIZE_TASK172_TUBE_LAMINAR_CONSTANT_PROPERTY_SCOPE_AUTHORITIES_INDEPENDENT_REVIEW_R1_ONLY",
+    "canonical_hash": "e73432601a43a67cacd87647b0b0eaf71bfe661832fd4e3e693bf05288545c9b"
   }
 }
