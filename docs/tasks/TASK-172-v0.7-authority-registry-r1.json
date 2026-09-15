@@ -7037,5 +7037,235 @@
     "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_STATE_DOMAIN_TRANSFER_CONTRACT_R1_ONLY",
     "canonical_hash": "3541e8dc463a48b15e2be227a20b6e4ddb685c687017b4e9c74f551f74b2d256"
   },
-  "canonical_hash": "b774f54e5fa737bba4cbc857d417288562a9cd598e9d8665dacd474ab8c17f41"
+  "r42_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_JMU_STATE_DOMAIN_TRANSFER_CONTRACT_R1",
+    "previous_head": "6de453f73c4c6a0944b3fc960ba4c2011df6d1c9",
+    "historical_registry_root_hash": "b774f54e5fa737bba4cbc857d417288562a9cd598e9d8665dacd474ab8c17f41",
+    "historical_r41_extension_hash": "3541e8dc463a48b15e2be227a20b6e4ddb685c687017b4e9c74f551f74b2d256",
+    "historical_records_unchanged": true,
+    "review_type": "TARGETED_JMU_STATE_DOMAIN_TRANSFER_CONTRACT_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "source_rule_vs_transfer": {
+      "jmu_equation_source_rule_bound": true,
+      "jmu_equation_transfer_authority_bound": false,
+      "jmu_exponent_source_rule_bound": true,
+      "jmu_exponent_transfer_authority_bound": false,
+      "jmu_exponent_source_rule": "LIQUID_HEATING_AND_COOLING_USUALLY_M_0.14",
+      "fluid_scope_source_rule_bound": true,
+      "fluid_scope_transfer_authority_bound": false,
+      "heating_cooling_source_rule_bound": true,
+      "heating_cooling_transfer_authority_bound": false,
+      "geometry_scope_source_rule_bound": true,
+      "geometry_scope_transfer_authority_bound": false
+    },
+    "source_artifacts": {
+      "jamil": {
+        "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+        "body_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+        "exact_locations": [
+          "Section 2.2.2 PDF p.11 Eq.6",
+          "Section 2.2.2 PDF p.11 Eq.7",
+          "Appendix PDF p.57 Table A.1",
+          "Appendix PDF pp.58-59 Table A.2",
+          "References PDF p.50/printed p.51 Ref.[9]"
+        ],
+        "jmu_form": "Jmu=(mu/mu_wall)^m",
+        "jmu_position": "SEPARATE_FACTOR_AFTER_HC_ALONGSIDE_JC_JL_JB_JS_JR",
+        "symbolic_form_bound": true,
+        "numeric_exponent_in_body": false
+      },
+      "thome": {
+        "source_target_id": "THOME-2004-EDB3-CH3-CROSSCHECK",
+        "body_acquired": true,
+        "body_complete": true,
+        "body_scope": "RELEVANT_CHAPTER_COMPLETE_FOR_SECTIONS_3.4.6_AND_3.4.7",
+        "body_sha256": "326cf8a5c26d6010b701acc9459424391a59a67c08e28e0a41c699c5b9146ea4",
+        "edition_identity_bound": true,
+        "edition_identity_scope": "RELEVANT_CHAPTER_CONTENT_ONLY",
+        "rights_status": "COPY_RESTRICTED_RIGHTS_UNVERIFIED",
+        "source_role": "ACQUIRED_RELEVANT_CHAPTER_CROSS_CHECK_ONLY",
+        "authority_status": "NOT_PROMOTED_PENDING_RIGHTS_AND_INDEPENDENT_REVIEW",
+        "exact_locations": [
+          "Section 3.4.6 printed p.3-12 Eq.3.4.23",
+          "Section 3.4.6 printed p.3-12 liquid heating/cooling paragraph",
+          "Section 3.4.6 printed p.3-12 gas branch paragraph and Eq.3.4.24",
+          "Section 3.4.7 printed pp.3-12-3-13 Eqs.3.4.25-3.4.27",
+          "Table 3.1 printed p.3-13"
+        ],
+        "jmu_form": "Jmu=(mu/mu_wall)^m",
+        "liquid_exponent_rule": "LIQUID_HEATING_AND_COOLING_USUALLY_M_0.14",
+        "bulk_rule": "MEAN_OF_INLET_AND_OUTLET_BULK_TEMPERATURES",
+        "wall_rule": "WALL_TEMPERATURE_FROM_PRELIMINARY_HEAT_TRANSFER_FOR_MU_WALL",
+        "ideal_bank_form": "alpha_I=j_I*cp*G*Pr^(-2/3)",
+        "gas_branch_is_distinct": true
+      },
+      "task032": {
+        "document_path": "docs/tasks/TASK-032-shell-and-tube-shell-side-single-phase-flow-state.md",
+        "document_sha256": "750f95ab3869f2024ed57639e5754d9d36b9382e573c0a32b8899145f054d188",
+        "profile_id": "SHELL_SIDE_SINGLE_PHASE_NEWTONIAN_BULK_FLOW_STATE_SCREENING_V1",
+        "state_role": "BULK_SHELL_SIDE_STATE",
+        "semantics": "SINGLE_BULK_PROPERTY_SNAPSHOT_ALGEBRAIC_FLOW_STATE_SCREENING"
+      },
+      "task166": {
+        "document_path": "docs/tasks/TASK-166-bell-delaware-shell-side-thermal-hydraulic-model.md",
+        "document_sha256": "fe61dcd297a28400756e52f7f5a52800e080c8dae5ef71ec5d4e3731f2f70926",
+        "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+        "native_re_evaluator_domain": "0<Re_s<=100000"
+      },
+      "task172_wall_state": {
+        "document_path": "docs/tasks/TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
+        "document_sha256": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9",
+        "authority_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+        "status": "PROPOSED_AUTHORITY"
+      },
+      "goncalves_si": {
+        "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+        "supporting_information_filename": "aic16602-sup-0001-Supinfo.docx",
+        "body_acquired": false,
+        "download_observation": "OFFICIAL_ENDPOINT_HTTP_403",
+        "jmu_present": "UNDETERMINED"
+      }
+    },
+    "state_mapping": {
+      "source_bulk_temperature_definition": "MEAN_OF_SOURCE_STREAM_INLET_AND_OUTLET_BULK_TEMPERATURES",
+      "source_bulk_property_definition": "PHYSICAL_PROPERTIES_AT_SOURCE_MEAN_BULK_FLUID_TEMPERATURE",
+      "source_bulk_viscosity_definition": "MU_AT_SOURCE_MEAN_INLET_OUTLET_BULK_TEMPERATURE",
+      "task032_bulk_state_id": "task032.shell-side-flow-state.v1::PROPERTY_SNAPSHOT::BULK_SHELL_SIDE_STATE",
+      "task032_bulk_state_semantics": "SINGLE_BULK_PROPERTY_SNAPSHOT_ALGEBRAIC_FLOW_STATE_SCREENING",
+      "source_to_task032_bulk_mapping_bound": false,
+      "source_to_task032_bulk_mapping_rule": "REQUIRES_EXPLICIT_CASE_LEVEL_MEAN_INLET_OUTLET_BINDING_BEFORE_TASK032_REUSE",
+      "source_to_task032_bulk_mapping_error_or_limitation": "TASK032_HAS_ONE_BULK_SNAPSHOT_AND_NO_SOURCE_BOUND_INLET_OUTLET_PAIR_OR_MEAN_STATE_SEMANTICS",
+      "jmu_required_wall_surface_identity_bound": false,
+      "jmu_required_wall_surface_identity": "SOURCE_HEAT_TRANSFER_SURFACE_WALL_TEMPERATURE;FLUID_SIDE_VS_METAL_SURFACE_NOT_EXPLICITLY_BOUND",
+      "task172_wall_state": "SHELL_FLUID_WALL_INTERFACE",
+      "task172_wall_state_mapping_valid": false,
+      "jmu_wall_temperature_producer_bound": false,
+      "candidate_wall_producer_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+      "candidate_compatible_with_jmu_source_state": false
+    },
+    "application_granularity": {
+      "source_granularity": "WHOLE_EXCHANGER_MEAN_TUBE_BUNDLE_SOURCE_OBSERVATION",
+      "jmu_application_granularity_bound": false,
+      "localization_transfer_authority_bound": false,
+      "cellwise_reapplication_authorized": false,
+      "whole_exchanger_factor_divided_or_repeated_by_cell_count": false
+    },
+    "wall_coupling": {
+      "jmu_wall_coupling_circularity_present": true,
+      "dependency_cycle": "J_mu -> h_shell -> wall_state -> mu_wall -> J_mu",
+      "jmu_wall_coupling_closure_authority_bound": false,
+      "iteration_policy": "UNBOUND;NO_ITERATION_OR_LAST_ITERATE_ACCEPTANCE_AUTHORIZED"
+    },
+    "heating_cooling_and_fluid_scope": {
+      "source_heating_definition": "SOURCE_LIQUID_HEATING_BRANCH_NAMED_BY_ACQUIRED_THOME_TEXT;EXACT_TASK172_LOCAL_DIRECTION_PREDICATE_NOT_BOUND",
+      "source_cooling_definition": "SOURCE_LIQUID_COOLING_BRANCH_NAMED_BY_ACQUIRED_THOME_TEXT;EXACT_TASK172_LOCAL_DIRECTION_PREDICATE_NOT_BOUND",
+      "jmu_exponent_source_rule_bound": true,
+      "jmu_exponent_source_rule": "LIQUID_HEATING_AND_COOLING_USUALLY_M_0.14",
+      "jmu_exponent_transfer_authority_bound": false,
+      "heating_cooling_source_rule_bound": true,
+      "heating_cooling_transfer_authority_bound": false,
+      "task172_heating_cooling_direction_mapping_bound": false,
+      "task172_target_fluid_class": "PURE_ORDINARY_WATER_STABLE_SINGLE_PHASE_LIQUID_ONLY",
+      "fluid_scope_source_rule_bound": true,
+      "fluid_scope_transfer_authority_bound": false,
+      "gas_rule_in_scope": false
+    },
+    "jmu_domain_review": {
+      "jmu_re_domain_source_bound": false,
+      "jmu_re_domain_source": "NOT_SPECIFIED_BY_ACQUIRED_SOURCE",
+      "jmu_pr_domain_source_bound": false,
+      "jmu_pr_domain_source": "NOT_SPECIFIED_BY_ACQUIRED_SOURCE",
+      "jmu_viscosity_ratio_domain_source_bound": false,
+      "jmu_viscosity_ratio_domain_source": "NOT_SPECIFIED_BY_ACQUIRED_SOURCE",
+      "jmu_temperature_domain_source_bound": false,
+      "jmu_temperature_domain_source": "NOT_SPECIFIED_BY_ACQUIRED_SOURCE",
+      "task166_re_domain_reused": false,
+      "extrapolation_authorized": false
+    },
+    "geometry_transfer": {
+      "task166_source_geometry_identity": "TASK166_TEMA_E_SINGLE_SEGMENTAL_BAFFLE_BELL_DELAWARE_LAYOUT_30_45_90_ONE_SHELL_PASS_NATIVE_SCOPE_WITH_FIXED_TUBESHEET_UTUBE_FLOATING_HEAD_APPLICABILITY",
+      "jmu_source_geometry_identity": "THOME_TABOREK_DELAWARE_SINGLE_PHASE_SHELL_SIDE_SINGLE_SEGMENTAL_BAFFLE_PRIMARILY_TEMA_E_SPECIFIED_TUBE_LAYOUT_CONTEXT",
+      "geometry_scope_source_rule_bound": true,
+      "geometry_scope_transfer_authority_bound": false,
+      "task166_geometry_transfer_compatible": false,
+      "no_u_tube_or_floating_head_transfer": true
+    },
+    "rights_and_lifecycle": {
+      "thome_source_identity_confidence": "RELEVANT_CHAPTER_CONTENT_IDENTITY_BOUND;EXACT_CITED_2004_EDITION_CHAIN_NOT_FULLY_PROVEN",
+      "thome_rights_review_complete": false,
+      "thome_independent_authority_review_complete": false,
+      "thome_production_authority_promoted": false,
+      "jmu_executable_authority_bound": false,
+      "no_copyrighted_source_vendored": true
+    },
+    "combination": {
+      "combination_rule_source_bound": true,
+      "combination_rule_transfer_authority_bound": false,
+      "jmu_combination_position": "SEPARATE_JMU_MULTIPLIER_AFTER_HC_WITH_JC_JL_JB_JS_JR",
+      "jmu_separate_from_ji": true,
+      "jmu_merged_into_ji": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "acquisition_outcome": "OUTCOME_B_STATE_DOMAIN_TRANSFER_CONTRACT_INCOMPLETE_WITH_WALL_CLOSURE_DEPENDENCY",
+      "jamil_jmu_symbolic_form_bound": true,
+      "jmu_executable_authority_bound": false,
+      "candidate_created": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "missing_authority": [
+        "JMU_WALL_TEMPERATURE_PRODUCER",
+        "JMU_REQUIRED_WALL_SURFACE_IDENTITY_AND_FLUID_SIDE_MAPPING",
+        "SOURCE_TO_TASK032_BULK_STATE_MAPPING",
+        "JMU_APPLICATION_GRANULARITY_AND_LOCALIZATION_RULE",
+        "JMU_RE_DOMAIN",
+        "JMU_PR_DOMAIN",
+        "JMU_VISCOSITY_RATIO_DOMAIN",
+        "JMU_TEMPERATURE_DOMAIN",
+        "TASK166_GEOMETRY_AND_METHOD_TRANSFERABILITY",
+        "THOME_RIGHTS_AND_INDEPENDENT_AUTHORITY_REVIEW",
+        "JMU_WALL_COUPLING_CLOSURE_AUTHORITY"
+      ]
+    },
+    "effective_state": {
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "governance": {
+      "source_rule_and_transfer_review_only": true,
+      "new_authority_self_approval": false,
+      "lifecycle_promotion_performed": false,
+      "historical_records_rewritten": false,
+      "engineering_rules_changed": false,
+      "task166_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "blocker_removed": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-state-domain-transfer-contract-r1.md",
+      "document_sha256": "6f5f13ba99ac3d87310b3238a04fd0bb61783b37cfbbb5adcb3a96722c6db9b6",
+      "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-state-domain-transfer-contract-r1.json",
+      "evidence_canonical_hash": "6e21d75890ce27a1f50c6b42e93086b7d0b7646e573768a36005ed14591486b6",
+      "evidence_file_sha256": "97bb7e093415b8bde9143caf39450015234c87fa465ccfa639dfa0ecf529de12",
+      "evidence_file_hash_excluded_from_self_preimage": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_WALL_PRODUCER_AND_STATE_MAPPING_AUTHORITY_R1_ONLY",
+    "canonical_hash": "81dc2d5d5c9faecd9486bd690519cb0909d247644806538b0624b77e04ec7246"
+  },
+  "canonical_hash": "accd6df22ef66d655d67c5575ecbcfbef54943432ee8aa6a3ec1311b54b3ed2c"
 }
