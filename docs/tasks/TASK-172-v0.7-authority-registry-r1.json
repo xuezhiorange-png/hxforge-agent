@@ -5992,5 +5992,108 @@
     "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_COMPLETE_BRANCH_COVERAGE_CLOSURE_ADJUDICATION_R2_ONLY",
     "canonical_hash": "e61157697acaca86862a576b39f771777e4d0f819621d352aa94e3ab4e03aab1"
   },
-  "canonical_hash": "ab395e1c6b1cb463a321480a96177512e903b8793a4e8515624d40d248719c9e"
+  "r35_extension": {
+    "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_COMPLETE_BRANCH_COVERAGE_CLOSURE_ADJUDICATION_R2",
+    "previous_head": "22dc2ac2d380aad76a17e82399ced0df71eb6045",
+    "historical_registry_root_hash": "ab395e1c6b1cb463a321480a96177512e903b8793a4e8515624d40d248719c9e",
+    "historical_r34_extension_hash": "e61157697acaca86862a576b39f771777e4d0f819621d352aa94e3ab4e03aab1",
+    "historical_records_unchanged": true,
+    "review_type": "COMPLETE_TUBE_BRANCH_COVERAGE_CLOSURE_ADJUDICATION_ONLY",
+    "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+    "canonical_blocker_semantics": "MODEL_LEVEL_COMPLETE_TUBE_BRANCH_COVERAGE_AUTHORITY",
+    "inherited_authorities": {
+      "cwt": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CWT-PROPERTY-SCOPE-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "native_correlation_id": "tube_laminar_cwt@1.0.0",
+        "model_level_disposition": "CONSTANT_PROPERTY_ONLY_VARIABLE_PROPERTY_EXTENSION_BLOCKED",
+        "explicit_reviewed_disposition_complete": true
+      },
+      "chf": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CHF-PROPERTY-SCOPE-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "native_correlation_id": "tube_laminar_chf@1.0.0",
+        "model_level_disposition": "CONSTANT_PROPERTY_ONLY_VARIABLE_PROPERTY_EXTENSION_BLOCKED",
+        "explicit_reviewed_disposition_complete": true
+      },
+      "turbulent_c3": {
+        "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "native_correlation_id": "tube_turbulent_gnielinski@1.0.0",
+        "model_level_disposition": "ACTIVE_WALL_PROPERTY_CORRECTION_WITH_STRICT_FAIL_CLOSED_DOMAIN",
+        "transfer_re_domain": "3000<Re<5000000",
+        "explicit_reviewed_disposition_complete": true
+      }
+    },
+    "boundary_dispositions": {
+      "re_3000_model_level_disposition": "EXPLICIT_FAIL_CLOSED_OUTSIDE_REVIEWED_TRANSFER_DOMAIN",
+      "re_3000_explicit_blocked_disposition_counts_as_branch_coverage": true,
+      "upper_re_out_of_authority_disposition": "EXPLICIT_FAIL_CLOSED_AT_AND_ABOVE_RE_5000000",
+      "upper_re_explicit_blocked_disposition_counts_as_branch_coverage": true,
+      "transition_band_disposition": "EXPLICIT_SELECTOR_LEVEL_NO_CORRELATION_BLOCKED",
+      "transition_band_requires_wall_correction_authority": false,
+      "transition_band_counts_as_missing_branch_coverage": false,
+      "transition_disposition_complete": true
+    },
+    "coverage_decision": {
+      "cwt_branch_coverage_complete": true,
+      "chf_branch_coverage_complete": true,
+      "turbulent_c3_branch_coverage_complete": true,
+      "transition_disposition_complete": true,
+      "all_task026_selector_paths_explicitly_disposed": true,
+      "all_admitted_tube_branches_authority_covered": true,
+      "adjudication_outcome": "COMPLETE_MODEL_LEVEL_TUBE_BRANCH_COVERAGE_ESTABLISHED",
+      "tube_wall_correction_canonical_blocker_closure_eligible": true
+    },
+    "case_level_fail_closed": {
+      "case_level_tube_correction_gate_runtime_implemented": false,
+      "case_level_reference_state_authority_present": false,
+      "case_level_property_snapshot_present": false,
+      "case_level_execution_authorized": false
+    },
+    "effective_state": {
+      "tube_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false,
+      "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_CANONICAL_BLOCKER_CLOSURE_RECORDING_R2_ONLY"
+    },
+    "governance": {
+      "lifecycle_promotion_performed": false,
+      "historical_records_rewritten": false,
+      "task026_changed": false,
+      "task026_equations_changed": false,
+      "task026_constants_changed": false,
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "new_authority_self_approval": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "TASK-172-v0.7-tube-wall-correction-complete-branch-coverage-closure-adjudication-r2.md",
+      "document_sha256": "e0dc12615cdd9ea46c6fef07e001ccbc2486f8d59215511ba1604e81f3246d30",
+      "evidence_path": "evidence/TASK-172-tube-wall-correction-complete-branch-coverage-closure-adjudication-r2.json",
+      "evidence_file_sha256": "f60b4c27df7c6415279e0efb4769b9a6bc20e6b24897ebb0e702d4ecedee4554",
+      "evidence_canonical_hash": "a0199e965a14d320ab1dc12fd01db691e865df69f5cfe48b701eb07fae58141b"
+    },
+    "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_CANONICAL_BLOCKER_CLOSURE_RECORDING_R2_ONLY",
+    "canonical_hash": "609f72914a9a75e61b5649ca85b10ce3b5394a296616cea4862a88c3e53ca5e3"
+  },
+  "canonical_hash": "65f69aabb0e3c44c05b010806533e8fbb372f855f3bc7c75cd21cf4072a24861"
 }
