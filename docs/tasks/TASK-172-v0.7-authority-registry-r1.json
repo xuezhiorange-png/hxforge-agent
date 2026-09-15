@@ -36,7 +36,8 @@
     "TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r1.md",
     "TASK-172-v0.7-tube-native-base-selector-parity-adjudication-r1.md",
     "TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r2.md",
-    "TASK-172-v0.7-tube-wall-correction-authority-independent-review-r1.md"
+    "TASK-172-v0.7-tube-wall-correction-authority-independent-review-r1.md",
+    "TASK-172-v0.7-tube-wall-correction-source-provenance-correction-r1.md"
   ],
   "sources": [
     {
@@ -399,7 +400,7 @@
       "capability": "TUBE_WALL_PROPERTY_CORRECTION",
       "source_role": "OFFICIAL_GOVERNMENT_LABORATORY_TECHNICAL_MANUAL",
       "title": "RELAP-7 Theory Manual",
-      "author": "R.A. Berry, L. Zou, H. Zhao, H. Zhang, J.W. Peterson, R.C. Martineau, S.Y. Kadioglu, D. Andrs, E.J. Hansel",
+      "author": "R.A. Berry, L. Zou, H. Zhao, H. Zhang, J.W. Peterson, R.C. Martineau, S.Y. Kadioglu, D. Andrs, J.E. Hansel",
       "year": "2018",
       "exact_location": "INL/EXT-14-31366 Rev3; section 2.2.3 Eqs. (41)-(43), report pp. 30-31; section 7.4.1.1.1 Eqs. (741)-(744), report pp. 177-179",
       "access_path": "https://inldigitallibrary.inl.gov/content/uploads/50/2026/04/Sort_4964.pdf",
@@ -1214,7 +1215,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "2dc5dd8a1943c1a8b8d3fe33294a5e8fc4eb7b959a3be5a9780c15ae1ad19e7e",
+  "canonical_hash": "276f3949c9624251ebbb1c9b4704d9cab3c16da9f556d6b9ff6be516e3b83143",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -4420,5 +4421,82 @@
     },
     "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_TUBE_WALL_CORRECTION_ACCEPTANCE",
     "canonical_hash": "3d93103483b3024d748470a6e4a19f1a6ce6788732e72993ad24a15e5da93174"
+  },
+  "r25_extension": {
+    "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_SOURCE_PROVENANCE_CORRECTION_R1",
+    "previous_head": "1f3641c985f8ce66c290abd19e8f208cc2b29481",
+    "historical_registry_root_hash": "2dc5dd8a1943c1a8b8d3fe33294a5e8fc4eb7b959a3be5a9780c15ae1ad19e7e",
+    "historical_r24_extension_hash": "3d93103483b3024d748470a6e4a19f1a6ce6788732e72993ad24a15e5da93174",
+    "historical_records_unchanged": true,
+    "correction_type": "BIBLIOGRAPHIC_SOURCE_METADATA_ONLY",
+    "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "subject_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "source_registry_id": "INL-EXT-14-31366-R3",
+    "source_integrity": {
+      "source_title": "RELAP-7 Theory Manual",
+      "source_revision": "INL/EXT-14-31366 Revision 3",
+      "source_printed": "March 2018",
+      "source_author_recorded": "E.J. Hansel",
+      "source_author_correct": "J.E. Hansel",
+      "source_author_correction_required": true,
+      "source_provenance_corrected": true,
+      "source_bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+      "access_path": "https://inldigitallibrary.inl.gov/content/uploads/50/2026/04/Sort_4964.pdf",
+      "rights_status": "Unlimited Release; approved for public release; further dissemination unlimited",
+      "effective_author": "R.A. Berry, L. Zou, H. Zhao, H. Zhang, J.W. Peterson, R.C. Martineau, S.Y. Kadioglu, D. Andrs, J.E. Hansel"
+    },
+    "historical_metadata": {
+      "old_effective_author": "R.A. Berry, L. Zou, H. Zhao, H. Zhang, J.W. Peterson, R.C. Martineau, S.Y. Kadioglu, D. Andrs, E.J. Hansel",
+      "new_effective_author": "R.A. Berry, L. Zou, H. Zhao, H. Zhang, J.W. Peterson, R.C. Martineau, S.Y. Kadioglu, D. Andrs, J.E. Hansel",
+      "source_projection_corrected": true,
+      "source_bytes_unchanged": true,
+      "source_revision_unchanged": true
+    },
+    "engineering_semantics": {
+      "changed": false,
+      "equation_changed": false,
+      "exponent_changed": false,
+      "domain_changed": false,
+      "transferability_changed": false,
+      "state_mapping_changed": false,
+      "combination_rule_changed": false,
+      "independent_review_engineering_conclusion_changed": false
+    },
+    "effective_review_state": {
+      "independent_review_result": "PASS_FOR_SCOPED_TUBE_WALL_CORRECTION_AUTHORITY",
+      "tube_wall_correction_status": "PROPOSED_AUTHORITY",
+      "tube_wall_correction_independent_review": "PENDING",
+      "lifecycle_promotion_performed": false,
+      "canonical_blocker_removed": false,
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false
+    },
+    "governance": {
+      "historical_records_rewritten": false,
+      "effective_source_projection_corrected": true,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task026_changed": false,
+      "task172_implementation_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_TUBE_WALL_CORRECTION_ACCEPTANCE",
+      "no_step_implies_the_next": true
+    },
+    "document": {
+      "path": "TASK-172-v0.7-tube-wall-correction-source-provenance-correction-r1.md",
+      "sha256": "65d7725aa4e67ce82b0fcd4059c16cb10790ff58f84c895de9f1aa188e2fb71b"
+    },
+    "evidence": {
+      "authority_id": "TASK172-TUBE-WALL-CORRECTION-SOURCE-PROVENANCE-CORRECTION-R1",
+      "path": "evidence/TASK-172-tube-wall-correction-source-provenance-correction-r1.json",
+      "file_sha256": "7648e3e329bba7b4c21fa6ff6423a25012872e1cbfef350acf36c270f28f81f6",
+      "canonical_hash": "840da6970ddd1ce163fc60ddc325633fc8da8a4e41ee02fa9f72c798c4d5b4e7"
+    },
+    "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_TUBE_WALL_CORRECTION_ACCEPTANCE",
+    "canonical_hash": "e404f463da6cf274825caba156575ca477812a4cb2c401b3c566ec0453ca6b29"
   }
 }
