@@ -1,0 +1,119 @@
+{
+  "schema_version": "task172.tube-native-base-selector-parity-adjudication.r1",
+  "task_id": "TASK172_V0_7_TUBE_NATIVE_BASE_SELECTOR_PARITY_ADJUDICATION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "366fd35facb486dea081974b4d2332ee49c5cfad",
+  "mode": "NATIVE_BASE_AUTHORITY_SEMANTIC_ADJUDICATION_ONLY",
+  "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "target_base_authority_id": "SRC-T172-REPO-TUBE",
+  "target_selector_version": "R8",
+  "authority_ownership_map": {
+    "task026_selector_owner": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py::select_regime",
+    "task026_orchestrator_owner": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py::compute_tube_side_heat_transfer_coefficient",
+    "task026_single_phase_owner": "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py::compute_single_phase",
+    "generic_flow_classifier_owner": "src/hexagent/correlations/flow.py::classify_regime",
+    "correlation_validity_owner": "src/hexagent/correlations/tube.py::TubeTurbulentGnielinski and src/hexagent/correlations/registry.py::InMemoryCorrelationRegistry",
+    "service_admission_owner": "src/hexagent/correlations/service.py::compute_correlation and src/hexagent/correlations/selection.py"
+  },
+  "call_graph_evidence": {
+    "task026_path": [
+      "stage_pipeline.compute_tube_side_heat_transfer_coefficient",
+      "single_phase.compute_single_phase",
+      "nusselt_selector.select_regime"
+    ],
+    "task026_imports_generic_classifier": false,
+    "task026_imports_generic_service": false,
+    "generic_path": [
+      "correlations.service.compute_correlation",
+      "correlations.flow.classify_regime",
+      "correlations.selection / registry applicability"
+    ],
+    "generic_policy_controls_task026_dispatch": false,
+    "task026_transition_blocker": "BL_REGIME_NO_CORRELATION_APPLICABLE",
+    "generic_transition_blocker": "CORRELATION_FLOW_REGIME_INCOMPATIBLE"
+  },
+  "r8_selector_provenance": {
+    "source_definition_issue": 163,
+    "source_definition_body_sha256": "11a542048d666cd2022ca7f965462d558e128fd73f7b94d867ee087718cd9102",
+    "source_review_package_sha256": "384f1b829cc834dc0d1119d0451b9028bd988224b2c031786d281bca7220bf06",
+    "design_contract_sha256": "238786b68250832ba083a56f0d6ba35dffa627a237b5fead80a6ee322de69f58",
+    "r8_implementation_commit": "37f39d902143e4938f83cd7edb48231d5fabf937",
+    "r9_remediation_commit": "3b8f4143d8c1c3d88503868505f94c94eeb17631",
+    "merged_pr": 164,
+    "merge_commit": "b11a7d46ac6a726c2bbdff85166c78e6753289a0",
+    "pre_merge_ci_run": "30631066197",
+    "post_merge_main_ci_run": "30638479580",
+    "authority_checker": "9/9 EXACT_EQUAL",
+    "cross_version_canonical_sha256": "fff1d74469502f02769e74f0e1c4234cac03c4662328a6d8bba15dfe21a500a5",
+    "production_status": "REVIEWED_PRODUCTION_AUTHORITY_ON_PINNED_MAIN",
+    "historical_design_contract_in_repository": false,
+    "historical_design_contract_recreated": false
+  },
+  "regime_semantics": {
+    "c3_source_validity_re_domain": "Gnielinski source documented as 3000 < Re < 5000000; repository C3 metadata/evaluator declares and checks 3000 <= Re <= 5000000",
+    "task026_selector_dispatch_re_domain": "Re < 2300 laminar; 2300 <= Re < 3000 transition blocked; Re >= 3000 TASK026 C3 dispatch; select_regime itself has no upper-Re comparison, while the C3 identity/evaluator declares [3000, 5000000]",
+    "generic_service_turbulent_re_domain": "Re > 10000",
+    "task026_selector_pr_domain": "C1/C2 Pr > 0.6; C3 0.5 <= Pr <= 2000",
+    "generic_classifier_transition_domain": "2300 <= Re <= 10000",
+    "parity_meaning": "RESOLVED_BY_SCOPE_NOT_NUMERICAL_THRESHOLD_EQUALITY",
+    "upper_bound_not_widened": true
+  },
+  "adjudication": {
+    "outcome": "SCOPED_AUTHORITY_PRECEDENCE_VALID",
+    "native_selector_document_parity": "RESOLVED_BY_SCOPE",
+    "native_base_binding_status": "BOUND",
+    "native_base_binding_bound": true,
+    "task026_native_base_authority": "R8_TASK026_SELECTOR",
+    "generic_service_policy_applies_to_task026": false,
+    "semantic_correction_required": false,
+    "semantic_contract_clarification_required": false,
+    "basis": [
+      "R8 selector is a separately scoped TASK026 production authority",
+      "TASK026 production call graph reaches R8 selector directly",
+      "generic classifier/service is not on TASK026 call graph",
+      "TASK026 and generic FlowRegime types are separate runtime types",
+      "TASK026 R8/R9 implementation and merged PR governance evidence is recorded"
+    ],
+    "limitation": "This does not approve a wall-property correction or widen C3 applicability."
+  },
+  "inherited_wall_correction_state": {
+    "selected_primary_source_id": null,
+    "primary_source_bound": false,
+    "correction_equation_bound": false,
+    "transferability_established": false,
+    "tube_wall_correction_status": "BLOCKED",
+    "tube_wall_correction_independent_review": "PENDING",
+    "tube_wall_correction_canonical_blocker_removed": false
+  },
+  "effective_state": {
+    "native_tube_correlation_changed": false,
+    "legacy_tube_result_semantics_changed": false,
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "task026_files_changed": false,
+    "task007_files_changed": false,
+    "generic_service_policy_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_PRIMARY_TRANSFER_AUTHORITY_ACQUISITION_R2_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "e5090325b39607c91af3eb46e67d45fda776f651979afb22c9f0fe51f0b97b0d"
+}

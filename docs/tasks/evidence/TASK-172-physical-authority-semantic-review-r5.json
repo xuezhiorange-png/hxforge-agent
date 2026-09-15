@@ -1,0 +1,272 @@
+{
+  "schema_version": "task172.r5.physical-authority-semantic-review.v1",
+  "task_id": "TASK172_V0_7_PHYSICAL_AUTHORITY_SEMANTIC_AND_SOURCE_QUALIFICATION_R5",
+  "issue": 276,
+  "pr_number": 277,
+  "previous_head_sha": "e314e01eff1a3d555eccf18181cd2f87be516f06",
+  "review_date": "2026-09-14",
+  "mode": "READ_FIRST_CONTROLLED_AUTHORITY_QUALIFICATION_ONLY",
+  "scope": [
+    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "TUBE-WALL-CORRECTION-AUTHORITY",
+    "SHELL-WALL-CORRECTION-AUTHORITY"
+  ],
+  "planned_allowlist": {
+    "file_count": 3,
+    "files": [
+      "docs/tasks/TASK-172-v0.7-physical-authority-semantic-source-r5.md",
+      "docs/tasks/evidence/TASK-172-physical-authority-semantic-review-r5.json",
+      "docs/tasks/TASK-172-v0.7-authority-registry-r1.json"
+    ],
+    "production_path_count": 0,
+    "dependency_file_count": 0
+  },
+  "inherited_reviewed_authorities": [
+    {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+      "payload_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+      "payload_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+      "payload_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+      "payload_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+      "status": "REVIEWED_AUTHORITY"
+    }
+  ],
+  "historical_receipts_preserved": [
+    "TASK172_V0_7_ENTRY_AUTHORITY_CLOSURE_R1",
+    "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
+    "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R3",
+    "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R4"
+  ],
+  "lineage": [
+    {
+      "lineage_id": "TASK026_NATIVE_TUBE_BASE",
+      "task": "TASK026",
+      "source_ids": [
+        "SRC-T172-REPO-TUBE",
+        "SRC-T172-GONCALVES",
+        "SRC-T172-SIEDER-TATE",
+        "SRC-T172-SANDIA"
+      ],
+      "repository_paths": [
+        "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py",
+        "docs/tasks/TASK-007-tube-annulus-correlations.md"
+      ],
+      "authority_scope": "Native base/defer semantics only; no active wall-property extension",
+      "r5_reuse": "BASE_ONLY"
+    },
+    {
+      "lineage_id": "TASK033_NATIVE_SHELL_HTC",
+      "task": "TASK033",
+      "source_ids": [
+        "SRC-INTECHOPEN-100450-KHARAJI-2021"
+      ],
+      "repository_paths": [
+        "src/hexagent/exchangers/shell_tube/shell_side_heat_transfer",
+        "docs/tasks/TASK-033-shell-and-tube-shell-side-single-phase-heat-transfer.md"
+      ],
+      "authority_scope": "Kern/Kharaji Eq58 no-wall-correction shell HTC",
+      "r5_reuse": "NOT_TRANSFERABLE_TO_TASK166"
+    },
+    {
+      "lineage_id": "TASK034_SHELL_DP_WALL_TERM",
+      "task": "TASK034",
+      "source_ids": [
+        "SRC-MDPI-ENERGIES-2017-1156-BAYRAM-SEVILGEN"
+      ],
+      "repository_paths": [
+        "src/hexagent/exchangers/shell_tube/shell_side_pressure_drop",
+        "docs/tasks/TASK-034-shell-and-tube-shell-side-modeled-pressure-drop.md"
+      ],
+      "authority_scope": "Shell pressure-drop phi_s wall-property term only",
+      "r5_reuse": "REJECTED_FOR_TASK166_HEAT_TRANSFER"
+    },
+    {
+      "lineage_id": "TASK037_CYLINDRICAL_WALL",
+      "task": "TASK037",
+      "source_ids": [
+        "SRC-T172-REPO-WALL",
+        "DOE-WALL-R2"
+      ],
+      "repository_paths": [
+        "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/models.py",
+        "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/authority.py",
+        "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/engineering.py",
+        "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/schema.py"
+      ],
+      "authority_scope": "Cylindrical resistance and typed material/conductivity carriers",
+      "r5_reuse": "EQUATION_AND_AREA_MAPPING_ONLY"
+    }
+  ],
+  "material_k": {
+    "physical_quantity": "solid_tube_wall_thermal_conductivity_w_m_k",
+    "component_scope": "tube_wall_metal_only; shell_wall_material_not_bound",
+    "formula_identity": "R_w,j=d_i*ln(d_o/d_i)/(2*k_wall*A_i,j)",
+    "equation_consumer": "TASK037.compute_wall_resistance",
+    "reference_surface": "tube_inner_and_outer_metal_surfaces",
+    "temperature_basis": "UNBOUND_CONSTANT_K_INTERVAL",
+    "geometry_basis": "TASK025_ACCEPTED_TUBE_DIAMETERS_AND_LOCAL_PHYSICAL_SUPPORT_AREA",
+    "input_fields": [
+      "material_id",
+      "material_grade_or_specification",
+      "thermal_conductivity_w_m_k",
+      "temperature_basis",
+      "applicable_temperature_interval",
+      "source_id",
+      "source_revision",
+      "authority_hash"
+    ],
+    "output_field": "wall_bundle_conduction_resistance_k_w",
+    "unit": "W/(m K) for k; K/W for resistance",
+    "source_ids": [
+      "SRC-T172-REPO-WALL",
+      "DOE-WALL-R2"
+    ],
+    "applicability": "TASK172 water profile wall-temperature hull, not yet bound",
+    "upstream_identity": "TASK020_023_MATERIAL_IDENTITY_MISSING; TASK037_TYPED_CARRIER_ONLY",
+    "existing_repository_carrier_found": true,
+    "existing_complete_authority_found": false,
+    "existing_authority_found": false,
+    "material_identity_bound": false,
+    "new_source_authority_required": true,
+    "disposition": "DISPOSITION_BLOCKED_INSUFFICIENT_EVIDENCE",
+    "profile_id": null,
+    "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN"
+  },
+  "tube_wall_correction": {
+    "physical_type": "WALL_VISCOSITY_CORRECTION",
+    "modeled_quantity": "active wall-to-bulk property correction applied to native TASK026 tube-side Nusselt_or_HTC",
+    "reference_surface": "TUBE_FLUID_WALL_INTERFACE; exact wall-state producer unbound",
+    "inputs": [
+      "TASK026_BASE_CORRELATION_ID",
+      "located_bulk_state",
+      "located_wall_fluid_state",
+      "mu_bulk",
+      "mu_wall",
+      "Re",
+      "Pr",
+      "heating_or_cooling_branch",
+      "geometry_and_development_state"
+    ],
+    "output": "source-defined corrected tube-side Nu or h_i with combination rule",
+    "base_authority": "SRC-T172-REPO-TUBE",
+    "candidate_source_ids": [
+      "SRC-T172-GONCALVES",
+      "SRC-T172-SIEDER-TATE",
+      "SRC-T172-SANDIA"
+    ],
+    "existing_authority_found": false,
+    "source_bound": false,
+    "applicability_bound": false,
+    "base_compatibility_bound": false,
+    "surface_basis_bound": false,
+    "material_profile_bound": false,
+    "sieder_tate_transfer_authority": "UNAVAILABLE",
+    "new_source_authority_required": true,
+    "disposition": "DISPOSITION_NEW_SOURCE_AUTHORITY_REQUIRED",
+    "correction_id": null,
+    "blocker": "TUBE-WALL-CORRECTION-AUTHORITY"
+  },
+  "shell_wall_correction": {
+    "physical_type": "WALL_VISCOSITY_CORRECTION",
+    "modeled_quantity": "active wall-to-bulk property correction to TASK166 Bell shell-side heat-transfer coefficient",
+    "reference_surface": "SHELL_FLUID_WALL_INTERFACE; Bell mapping to be qualified",
+    "inputs": [
+      "TASK166_BELL_BASE_AUTHORITY_ID",
+      "located_shell_bulk_state",
+      "located_shell_wall_fluid_state",
+      "mu_bulk",
+      "mu_wall",
+      "Re",
+      "Pr",
+      "Bell_geometry_and_layout_state"
+    ],
+    "output": "source-defined corrected Bell shell-side h_s with combination rule",
+    "base_authority": "SRC-T172-REPO-BELL",
+    "candidate_source_ids": [
+      "SRC-T172-GONCALVES",
+      "SRC-T172-MARTIN",
+      "SRC-T172-SANDIA"
+    ],
+    "task034_wall_authority_reuse": "NO",
+    "task034_reuse_rejection_reason": "TASK034_BAYRAM_SEVILGEN_WALL_TERM_IS_SHELL_PRESSURE_DROP_PHI_S_NOT_TASK166_BELL_HEAT_TRANSFER; DIFFERENT_EQUATION_PURPOSE_OUTPUT_METHOD_IDENTITY_AND_COMBINATION_RULE",
+    "existing_authority_found": false,
+    "source_bound": false,
+    "applicability_bound": false,
+    "base_compatibility_bound": false,
+    "surface_basis_bound": false,
+    "material_profile_bound": false,
+    "new_source_authority_required": true,
+    "disposition": "DISPOSITION_NEW_SOURCE_AUTHORITY_REQUIRED",
+    "correction_id": null,
+    "blocker": "SHELL-WALL-CORRECTION-AUTHORITY"
+  },
+  "semantic_contract": {
+    "wall_blocker_semantics_unambiguous": true,
+    "semantic_contract_correction_required": false,
+    "cross_domain_authority_reuse": false,
+    "neutral_factor_fallback": false,
+    "silent_omission_as_authority": false,
+    "new_equation_transcribed": false
+  },
+  "numerical_boundary": {
+    "local_residual_and_method_qualification": "OPEN",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN",
+    "profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false
+  },
+  "final_decision": {
+    "result": "PASS_WITH_REMAINING_PHYSICAL_AUTHORITY_GAPS",
+    "physical_authority_portion_closed": false,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "next_gate": "AUTHORIZE_TASK172_TARGETED_PHYSICAL_SOURCE_AUTHORITY_CONSTRUCTION_R1_ONLY"
+  },
+  "source_research": {
+    "new_source_bytes_added": false,
+    "new_source_authority_promoted": false,
+    "rights_assumption_added": false,
+    "search_snippet_used_as_authority": false,
+    "secondary_source_used_as_primary": false,
+    "sieder_tate_full_text_acquired": false
+  },
+  "document_binding": {
+    "path": "TASK-172-v0.7-physical-authority-semantic-source-r5.md",
+    "sha256": "9d01a10b043a9b585405dc6611bbe9109efeb0b1a2afa627568f0e7d934b3683"
+  },
+  "production_code_changed": false,
+  "dependency_changed": false,
+  "implementation_started": false,
+  "new_authority_self_approval": false,
+  "ready_authorized": false,
+  "merge_authorized": false,
+  "no_step_implies_the_next": true,
+  "canonical_hash": "62560bac1d5c164bd690284fafcd929de611c0c6a4d66cbdbc4f02d499e146e8"
+}

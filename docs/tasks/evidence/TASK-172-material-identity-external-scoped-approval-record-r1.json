@@ -1,0 +1,132 @@
+{
+  "schema_version": "task172.material-identity-external-approval-evidence.r1",
+  "task_id": "TASK172_V0_7_MATERIAL_IDENTITY_EXTERNAL_SCOPED_APPROVAL_RECORD_R1",
+  "pr_number": 277,
+  "previous_head_sha": "60891ff1a989a1e5a75f45ddf8bddaf48a76ecd3",
+  "subject_authority": {
+    "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+    "authority_version": "r1",
+    "previous_status": "PROPOSED_AUTHORITY",
+    "previous_independent_review": "PENDING",
+    "promoted_status": "REVIEWED_AUTHORITY",
+    "promoted_independent_review": "ACCEPTED",
+    "promotion_scope": "MODEL_LEVEL_MATERIAL_IDENTITY_INPUT_CONTRACT_ONLY",
+    "contract_shape_accepted": true,
+    "actual_material_instance_bound": false,
+    "material_profile_id": null,
+    "actual_material_case_accepted": false
+  },
+  "external_review": {
+    "decision": "ACCEPT_SCOPED_MODEL_LEVEL_LAYER_A_CONTRACT",
+    "scope": "MODEL_LEVEL_MATERIAL_IDENTITY_INPUT_CONTRACT_ONLY",
+    "layer_a_model_contract_accepted": true,
+    "evidence_bound": true,
+    "source_type": "EXTERNAL_REVIEW_DECISION",
+    "source_id": "TASK172-EXTERNAL-REVIEW-DECISION-LAYER-A-R1",
+    "source_description": "External ChatGPT decision supplied in the authorized task instruction; not a GitHub review event or human expert signature.",
+    "github_reviewer_identity_claimed": false,
+    "human_expert_identity_claimed": false,
+    "organization_identity_claimed": false,
+    "approval_identity_disclosed": false,
+    "self_approval": false,
+    "approval_evidence": [
+      "TASK_AUTHORIZATION_EXTERNAL_SCOPED_ACCEPTANCE",
+      "TASK-172-v0.7-material-identity-input-contract-independent-review-r1.md",
+      "evidence/TASK-172-material-identity-input-contract-independent-review-r1.json"
+    ]
+  },
+  "promotion_guardrails": {
+    "actual_material_identity_selected": false,
+    "material_grade_or_alloy_approved": false,
+    "material_profile_created": false,
+    "conductivity_approved": false,
+    "layer_b_approved": false,
+    "case_level_material_instance_approved": false,
+    "production_admission_enabled": false,
+    "constant_k_blocker_removed": false,
+    "layer_c_changed": false,
+    "new_authority_self_approval": false
+  },
+  "contract_scope_accepted": {
+    "owner": "TASK172_CASE_INPUT_AUTHORITY_BOUNDARY",
+    "component_role": "TUBE_WALL_METAL",
+    "identity_disambiguation_fields_required": true,
+    "source_revision_location_class_permission_evidence_required": true,
+    "case_configuration_binding_required": true,
+    "geometry_component_physical_support_binding_required": true,
+    "canonical_identity_rules_required": true,
+    "caller_transport_is_approval": false,
+    "bare_grade_name_or_assertion_is_authority": false,
+    "hidden_default_allowed": false,
+    "runtime_material_database_lookup_allowed": false,
+    "legacy_tube_thermal_conductivity_reuse": "FORBIDDEN",
+    "layer_a_property_or_wall_values_included": false
+  },
+  "upstream_layers": {
+    "layer_b_material_thermal_property": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "unchanged": true
+    },
+    "layer_c_constant_k": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "unchanged": true,
+      "promotion_scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY"
+    }
+  },
+  "effective_state": {
+    "material_identity_input_contract_status": "REVIEWED_AUTHORITY",
+    "material_identity_input_contract_independent_review": "ACCEPTED",
+    "material_identity_actual_value_bound": false,
+    "material_profile_id": null,
+    "actual_material_case_accepted": false,
+    "material_thermal_property_contract_status": "PROPOSED_AUTHORITY",
+    "material_thermal_property_contract_independent_review": "PENDING",
+    "constant_k_qualification_authority_status": "REVIEWED_AUTHORITY",
+    "constant_k_qualification_independent_review": "ACCEPTED",
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "material_constant_k_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 6,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true
+  },
+  "provenance": {
+    "acyclic": true,
+    "prior_layer_a_audit_document": "TASK-172-v0.7-material-identity-input-contract-independent-review-r1.md",
+    "prior_layer_a_audit_document_sha256": "7102171e6065e8a0f2d7c29d1f7126c3efcb31cd269de395722a209c8872dbdd",
+    "prior_layer_a_audit_evidence": "evidence/TASK-172-material-identity-input-contract-independent-review-r1.json",
+    "prior_layer_a_audit_evidence_canonical_hash": "2072919bf73a68388de41c931958b8597333c78e0494aeab885758680cd29bb5",
+    "historical_registry_root_hash": "5228d20e5bfb8c663f3b0cb654400ad32bb2362b333ea169ed81bc79cd521dc1",
+    "historical_r14_extension_hash": "2e264c3ecc5e5cbda3744cab1e8e5e67067dc3c102743dcb23b5ab6fbc9eee9e",
+    "material_instance_fabricated": false,
+    "reviewer_identity_fabricated": false,
+    "layer_b_promoted": false,
+    "layer_c_changed": false
+  },
+  "governance": {
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_MATERIAL_THERMAL_PROPERTY_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "04625dac1bf22961f338b59f572a01a063fadf0beea8aeec9ce8d3d720a536d2"
+}

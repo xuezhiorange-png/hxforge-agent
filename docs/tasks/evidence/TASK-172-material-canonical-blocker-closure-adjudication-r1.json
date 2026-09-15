@@ -1,0 +1,173 @@
+{
+  "schema_version": "task172.material-canonical-blocker-adjudication.r1",
+  "task_id": "TASK172_V0_7_MATERIAL_CANONICAL_BLOCKER_CLOSURE_ADJUDICATION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "1a4da06710843e70c8c677ae573443fa57637022",
+  "mode": "CANONICAL_BLOCKER_SEMANTIC_ADJUDICATION_ONLY",
+  "subject_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+  "decision": {
+    "result": "PASS",
+    "outcome": "OUTCOME_A_MODEL_LEVEL_CLOSURE_ELIGIBLE_WITH_SEPARATE_CASE_LEVEL_FAIL_CLOSED_GATE",
+    "canonical_blocker_semantics": "MODEL_LEVEL_ENTRY_AUTHORITY",
+    "semantic_contract_correction_required": false,
+    "model_level_closure_eligible": true,
+    "closure_recording_performed": false,
+    "lifecycle_promotion_performed": false,
+    "new_authority_self_approval": false,
+    "review_basis": "AUTHORIZED_TASK_INSTRUCTION_AND_IMMUTABLE_REPOSITORY_HISTORY",
+    "reviewer_identity_fabricated": false,
+    "github_review_event_claimed": false,
+    "human_expert_identity_claimed": false
+  },
+  "historical_audit": {
+    "repository_revision": "1a4da06710843e70c8c677ae573443fa57637022",
+    "records_inspected": [
+      {
+        "path": "TASK-172-v0.7-entry-authority-closure-r1.md",
+        "role": "INITIAL_CANONICAL_BLOCKER_TAXONOMY",
+        "anchors": ["sections 1, 4"],
+        "finding": "Blocker was a parent TASK172 entry item; R1 did not close any blocker."
+      },
+      {
+        "path": "TASK-172-v0.7-constant-k-qualification-r1.md",
+        "role": "ORIGINAL_CONSTANT_K_PROPOSAL",
+        "anchors": ["sections 2, 10"],
+        "finding": "CASE_LEVEL_AUTHORITY_REQUIRED coexisted with a historical model-level CLOSED projection; future case without authority remained blocked."
+      },
+      {
+        "path": "TASK-172-v0.7-constant-k-governance-state-correction-r1.md",
+        "role": "EFFECTIVE_STATE_CORRECTION",
+        "anchors": ["sections 2, 3"],
+        "finding": "Contract definition, independent review and canonical blocker closure were made distinct; effective blocker restored to OPEN."
+      },
+      {
+        "path": "TASK-172-v0.7-constant-k-authority-independent-review-r1.md",
+        "role": "MODEL_VS_CASE_SEMANTIC_REVIEW",
+        "anchors": ["sections 3, 5, 6, 9"],
+        "finding": "Model-level acceptance was lawful if approved; actual material case and production remained fail-closed."
+      },
+      {
+        "path": "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md",
+        "role": "LAYER_C_ACCEPTANCE",
+        "anchors": ["sections 2-6"],
+        "finding": "Only model-level Layer C contract was accepted; no actual case was promoted."
+      },
+      {
+        "path": "TASK-172-v0.7-material-identity-external-scoped-approval-record-r1.md",
+        "role": "LAYER_A_ACCEPTANCE",
+        "anchors": ["sections 1, 6"],
+        "finding": "Identity contract accepted without selecting a material instance or profile."
+      },
+      {
+        "path": "TASK-172-v0.7-material-thermal-property-external-scoped-approval-record-r1.md",
+        "role": "LAYER_B_ACCEPTANCE",
+        "anchors": ["sections 1, 5, 6"],
+        "finding": "Property contract accepted without a property body, profile or case; adjudication was explicitly deferred."
+      },
+      {
+        "path": "TASK-172-v0.7-authority-registry-r1.json",
+        "role": "APPEND_ONLY_LIFECYCLE_REGISTRY",
+        "anchors": ["r10_extension through r17_extension", "remaining_blockers"],
+        "finding": "R11 onward governs the effective state; r10 is preserved as historical pre-correction evidence."
+      }
+    ],
+    "historical_records_unchanged": true,
+    "r10_projection_is_effective": false,
+    "r11_lifecycle_separation_effective": true,
+    "r12_model_level_closure_semantics_explicit": true,
+    "r17_adjudication_deferred_explicitly": true
+  },
+  "effective_layer_state": {
+    "layer_a": {
+      "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED"
+    },
+    "layer_b": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED"
+    },
+    "layer_c": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED"
+    },
+    "model_level_contract_state": "COMPLETE_REVIEWED",
+    "model_level_material_authority_complete": true,
+    "case_level_material_authority_required": true,
+    "case_level_material_authority_present": false,
+    "case_level_material_authority_state": "REQUIRED_ABSENT",
+    "production_admission_state": "BLOCKED_FAIL_CLOSED",
+    "production_without_case_level_material_authority": "BLOCKED"
+  },
+  "case_level_fail_closed_gate": {
+    "gate_id": "TASK172-CASE-LEVEL-MATERIAL-AUTHORITY-ADMISSION",
+    "status": "DEFINED_ACTIVE_FAIL_CLOSED_IMPLEMENTATION_PENDING",
+    "contract_defined": true,
+    "runtime_implemented": false,
+    "authority_basis": [
+      "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "V07-T172-CONSTANT-K-QUALIFICATION-R1"
+    ],
+    "blocking_conditions": [
+      "missing reviewed Layer A material identity instance",
+      "missing Layer B property body",
+      "missing reviewed Layer C case qualification",
+      "missing or invalid wall-state temperature-domain coverage",
+      "unreviewed authority or incomplete source rights/evidence",
+      "identity/hash/case/configuration/geometry/support mismatch",
+      "hidden/default/legacy/caller/runtime-database material authority",
+      "interpolation without source rule, extrapolation or out-of-domain state"
+    ],
+    "material_profile_none_is_blocked": true,
+    "production_admission_without_case_authority": "BLOCKED"
+  },
+  "effective_state_preserved": {
+    "material_identity_actual_value_bound": false,
+    "material_property_body_actual_value_bound": false,
+    "material_profile_id": null,
+    "actual_material_case_accepted": false,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "material_constant_k_canonical_blocker_closure_eligible": true,
+    "material_constant_k_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 6,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true
+  },
+  "field_semantics": {
+    "material_k_temperature_domain_bound": "CASE_LEVEL_QUALIFIED_WALL_STATE_DOMAIN_COVERAGE",
+    "material_constant_k_status": "EFFECTIVE_CASE_AND_ENTRY_BLOCKER_STATE",
+    "layer_c_status": "MODEL_LEVEL_CONTRACT_LIFECYCLE_STATE",
+    "material_profile_id_none": "MODEL_CONTRACT_MAY_BE_COMPLETE_BUT_CASE_ADMISSION_BLOCKED"
+  },
+  "governance": {
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "material_selection_performed": false,
+    "material_profile_created": false,
+    "property_value_or_curve_introduced": false,
+    "constant_k_case_qualification_performed": false,
+    "wall_correction_started": false,
+    "numerical_work_started": false,
+    "canonical_blocker_closure_performed": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_MATERIAL_CANONICAL_BLOCKER_CLOSURE_RECORDING_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "3edbdc2ffa971207fca63059c642aec6777ca85c54a85125b0c443811906e10b"
+}

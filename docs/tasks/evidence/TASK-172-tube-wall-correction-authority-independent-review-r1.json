@@ -1,0 +1,266 @@
+{
+  "schema_version": "task172.tube-wall-correction-authority-independent-review.r1",
+  "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_AUTHORITY_INDEPENDENT_REVIEW_R1",
+  "pr_number": 277,
+  "expected_start_head": "4cc4b6253a2b99a19fb25fa8f2adfd1173f50836",
+  "mode": "INDEPENDENT_AUTHORITY_REVIEW_ONLY",
+  "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+  "subject_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+  "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "result": "PASS_FOR_SCOPED_TUBE_WALL_CORRECTION_AUTHORITY",
+  "independent_review_scope": "MODEL_LEVEL_TUBE_TURBULENT_WALL_PROPERTY_CORRECTION_ONLY",
+  "source_integrity": {
+    "source_registry_id": "INL-EXT-14-31366-R3",
+    "title": "RELAP-7 Theory Manual",
+    "revision": "INL/EXT-14-31366 Revision 3",
+    "printed": "March 2018",
+    "issuer": "Idaho National Laboratory for the United States Department of Energy",
+    "authors": [
+      "R.A. Berry",
+      "L. Zou",
+      "H. Zhao",
+      "H. Zhang",
+      "J.W. Peterson",
+      "R.C. Martineau",
+      "S.Y. Kadioglu",
+      "D. Andrs",
+      "E.J. Hansel"
+    ],
+    "access_path": "https://inldigitallibrary.inl.gov/content/uploads/50/2026/04/Sort_4964.pdf",
+    "rights_status": "Unlimited Release; approved for public release; further dissemination unlimited; PDF not vendored",
+    "acquired_bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+    "reviewed_locations": [
+      "§2.2.3 Eqs. (41)-(43), report pp. 30-31",
+      "§7.4.1.1 and §7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179"
+    ],
+    "source_status": "VERIFIED_SOURCE",
+    "source_formula_facts": {
+      "single_phase_liquid": true,
+      "tube_geometry": true,
+      "gnielinski_turbulent_branch": true,
+      "wall_temperature_correction": true,
+      "correction_equation": "Nu_turb = Nu_Gnielinski * (Pr_liq / Pr_w)^0.11",
+      "property_ratio_domain": "0.05 <= Pr_liq/Pr_w <= 20",
+      "source_re_domain": "Re > 1000",
+      "source_pr_numeric_interval_stated": false,
+      "fully_developed_assumption": true,
+      "short_pipe_or_entrance_extension": false
+    }
+  },
+  "native_base": {
+    "base_authority_id": "SRC-T172-REPO-TUBE",
+    "selector_version": "R8",
+    "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+    "selector_document_parity": "RESOLVED_BY_SCOPE",
+    "base_binding_status": "BOUND",
+    "base_binding_bound": true,
+    "task026_native_base_authority": "R8_TASK026_SELECTOR",
+    "generic_service_policy_applies_to_task026": false,
+    "native_tube_correlation_changed": false,
+    "legacy_tube_result_semantics_changed": false,
+    "task026_dispatch_re_domain": "Re >= 3000 for C3; 2300 <= Re < 3000 transition/blocked",
+    "c3_repository_evaluator_re_domain": "3000 <= Re <= 5000000",
+    "c3_source_validity_re_domain": "3000 < Re < 5000000",
+    "native_pr_domain": "0.5 <= Pr <= 2000",
+    "source_artifacts": [
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py",
+        "sha256": "c9cc6444a79975edd3b5b37249a2ee0909a5f07987b3783d70d99e5342f3ff08"
+      },
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "sha256": "e9cd8d26d47821f81810ff8382547d1c907d1ed0182ceabe2d1bcdb1a0ffb526"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "sha256": "e137959f5bf04784f78383db27a13736098ea47f926b323510d80dbe23f6fe9e"
+      }
+    ]
+  },
+  "algebraic_compatibility": {
+    "native_formula": "f_native = (0.790 ln(Re) - 1.64)^-2; native Gnielinski uses f_native/8",
+    "source_formula": "f_RELAP = [1.58 ln(Re) - 3.28]^-2; source Gnielinski uses f_RELAP/2",
+    "substitution": [
+      "a = 0.790 ln(Re) - 1.64",
+      "1.58 ln(Re) - 3.28 = 2a",
+      "f_RELAP = (2a)^-2 = f_native/4",
+      "f_RELAP/2 = f_native/8"
+    ],
+    "base_formula_algebraic_equivalence": "PASS_EXACT",
+    "friction_convention_mapping_valid": true,
+    "native_base_formula_changed": false,
+    "native_base_result_identity_changed": false,
+    "experimental_validation_claimed": false
+  },
+  "system_model_extraction": {
+    "source_system_rule": "h_wall,liq = max(h_lam, h_turb, h_NC)",
+    "source_turbulent_branch_explicit": true,
+    "turbulent_branch_separable": true,
+    "relap_system_orchestration_transfer_required": false,
+    "source_system_max_orchestration_imported": false,
+    "natural_circulation_transferred": false,
+    "laminar_branch_transferred": false,
+    "selected_context": "§7.4.1.1.1 tube turbulent wall branch",
+    "unselected_context": "§2.2.3.1 generic internal-pipe default Dittus-Boelter relation",
+    "source_context_selection_bound": true,
+    "source_context_conflict_resolved_by_explicit_scope": true,
+    "unselected_relap_internal_pipe_default_imported": false,
+    "reason": "Eq. (741) plus Eq. (744) is an explicitly named turbulent branch; TASK026 independently owns forced-turbulent C3 admission, so the larger RELAP max selector is not transferred."
+  },
+  "domain_review": {
+    "source_correction_re_domain": "Re > 1000",
+    "task026_dispatch_re_domain": "Re >= 3000 for C3; 2300 <= Re < 3000 transition/blocked",
+    "native_c3_repository_re_domain": "3000 <= Re <= 5000000",
+    "native_c3_source_validity_re_domain": "3000 < Re < 5000000",
+    "transfer_re_domain": "3000 < Re < 5000000",
+    "transfer_re_domain_bound": true,
+    "endpoint_3000_transfer_authorized": false,
+    "endpoint_5000000_transfer_authorized": false,
+    "source_pr_numeric_interval_stated": false,
+    "target_pr_domain": "0.5 <= Pr <= 2000 for each admitted bulk/wall Pr state",
+    "pr_domain_transfer_justified": "PASS_AS_STRICT_NATIVE_INTERSECTION",
+    "pr_domain_transfer_extends_source": false,
+    "pr_domain_bound": true,
+    "property_ratio": "Pr_liq/Pr_w",
+    "property_ratio_orientation": "Pr_liq_DIVIDED_BY_Pr_w",
+    "property_ratio_domain": "0.05 <= Pr_liq/Pr_w <= 20",
+    "property_ratio_exponent": 0.11,
+    "property_ratio_domain_bound": true,
+    "ratio_clamping_allowed": false,
+    "ratio_extrapolation_allowed": false,
+    "domain_rationale": "The source supplies the exact ratio bound and no conflicting narrower numeric Pr bound. The target uses the already reviewed native C3 Pr domain as a hard, non-widening intersection for both property states; it does not claim an unstated source interval."
+  },
+  "state_review": {
+    "source_bulk_state": "area-average liquid/bulk temperature over the fluid cross-section",
+    "source_wall_state": "fluid property state evaluated at source wall temperature for Pr_w",
+    "bulk_state_id": "TUBE_FLUID_BULK_STATE",
+    "wall_state_id": "TUBE_FLUID_WALL_INTERFACE",
+    "bulk_state_mapping_valid": true,
+    "wall_state_mapping_valid": true,
+    "wall_state_mapping_authority_bound": true,
+    "metal_surface_automatic_alias": false,
+    "metal_temperature_substitution_authorized": false,
+    "same_property_authority_family_required": true,
+    "missing_or_mismatched_state_policy": "BLOCKED"
+  },
+  "heating_cooling_review": {
+    "source_relation_branching": "unbranched in Eq. (744); no direction-specific exponent or coefficient",
+    "heating_cooling_semantics": "UNBRANCHED_SOURCE_RELATION_VALID_FOR_BOTH_DIRECTIONS",
+    "heating_branch_admitted": true,
+    "cooling_branch_admitted": true,
+    "direction_specific_exponent": false,
+    "condition": "Both signs require actual valid wall/bulk states, positive Pr values, ratio bound, and all source/native domains."
+  },
+  "geometry_and_fluid_scope": {
+    "source_fluid_scope": "SINGLE_PHASE_LIQUID",
+    "task172_initial_admission_fluid_scope": "REVIEWED_PURE_WATER_PROFILE_ONLY",
+    "geometry_scope": "INTERNAL_CIRCULAR_TUBE_NATIVE_DH",
+    "geometry_scope_valid": true,
+    "roughness_domain_type": "NEGATIVE_SCOPE_PRECONDITION",
+    "roughness_domain_valid": true,
+    "roughness_extension_admitted": false,
+    "fully_developed_scope_valid": true,
+    "entrance_or_short_pipe_extension_admitted": false,
+    "annulus_transferred": false,
+    "rod_bundle_transferred": false,
+    "gas_transferred": false,
+    "two_phase_transferred": false,
+    "natural_circulation_transferred": false
+  },
+  "canonical_review": {
+    "preimage_complete": true,
+    "required_identity_fields": [
+      "authority_id_and_version",
+      "source_id_revision_location_rights_and_acquired_bytes_hash",
+      "native_task026_base_id_version_and_artifact_hashes",
+      "equation_exponent_and_friction_convention_mapping",
+      "transfer_re_domain_and_native_pr_domain",
+      "ratio_orientation_and_bounds",
+      "fluid_geometry_roughness_and_development_scope",
+      "bulk_and_fluid_facing_wall_state_ids",
+      "source_context_selection_and_relap_orchestration_exclusion",
+      "combination_mode",
+      "out_of_domain_and_extrapolation_policies",
+      "lifecycle_state"
+    ],
+    "identity_change_requires_new_authority": true,
+    "source_revision_change_requires_new_identity": true,
+    "equation_or_exponent_change_requires_new_identity": true,
+    "domain_change_requires_new_identity": true,
+    "state_mapping_change_requires_new_identity": true,
+    "native_base_identity_change_requires_new_identity": true,
+    "caller_assertion_as_authority": false,
+    "library_availability_as_permission": false,
+    "neutral_factor_as_correction": false,
+    "last_iterate_as_valid_result": false,
+    "out_of_domain_policy": "BLOCKED",
+    "extrapolation_policy": "FORBIDDEN"
+  },
+  "decision": {
+    "source_integrity": "PASS",
+    "base_formula_algebraic_equivalence": "PASS_EXACT",
+    "friction_convention_mapping_valid": true,
+    "turbulent_branch_separable": true,
+    "relap_system_orchestration_transfer_required": false,
+    "pr_domain_transfer_justified": true,
+    "property_ratio_review": "PASS_EXACT_ORIENTATION_AND_SOURCE_BOUND",
+    "bulk_state_mapping_valid": true,
+    "wall_state_mapping_valid": true,
+    "heating_cooling_semantics": "UNBRANCHED_SOURCE_RELATION_VALID_FOR_BOTH_DIRECTIONS",
+    "geometry_scope_valid": true,
+    "roughness_scope": "NEGATIVE_SCOPE_PRECONDITION",
+    "fully_developed_scope_valid": true,
+    "canonical_preimage_complete": true,
+    "transferability_established": true,
+    "independent_review_result": "PASS_FOR_SCOPED_TUBE_WALL_CORRECTION_AUTHORITY",
+    "independent_review_scope": "MODEL_LEVEL_TUBE_TURBULENT_WALL_PROPERTY_CORRECTION_ONLY",
+    "lifecycle_promotion_performed": false,
+    "tube_wall_correction_status": "PROPOSED_AUTHORITY",
+    "tube_wall_correction_independent_review": "PENDING",
+    "tube_wall_correction_canonical_blocker_removed": false,
+    "new_authority_self_approval": false
+  },
+  "effective_state": {
+    "tube_wall_correction_status": "PROPOSED_AUTHORITY",
+    "shell_wall_correction_status": "OPEN",
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "task026_files_changed": false,
+    "task007_files_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_TUBE_WALL_CORRECTION_ACCEPTANCE",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "TASK-172-v0.7-tube-wall-correction-authority-independent-review-r1.md",
+    "sha256": "eef5302d59439c32bd3aa3b669c196a253bf043adc8be2b78edee270f6dc7eb2"
+  },
+  "canonical_hash": "444d1034cfb6cf5a0375c3822be7dd2499d31ca1c8e92df5800a2f4b3098ec05"
+}
