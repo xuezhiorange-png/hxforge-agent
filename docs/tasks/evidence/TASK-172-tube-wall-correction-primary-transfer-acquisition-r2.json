@@ -1,0 +1,268 @@
+{
+  "schema_version": "task172.tube-wall-correction-primary-transfer-acquisition.r2",
+  "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_PRIMARY_TRANSFER_AUTHORITY_ACQUISITION_R2",
+  "pr_number": 277,
+  "previous_head_sha": "96cb245390972e24fb3569b248d9fb385da968dd",
+  "mode": "TARGETED_PRIMARY_TRANSFER_AUTHORITY_ACQUISITION_ONLY",
+  "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "target_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+  "result": "PASS_WITH_PROPOSED_AUTHORITY_CANDIDATE",
+  "native_target": {
+    "base_authority_id": "SRC-T172-REPO-TUBE",
+    "selector_version": "R8",
+    "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+    "selector_document_parity": "RESOLVED_BY_SCOPE",
+    "base_binding_status": "BOUND",
+    "base_binding_bound": true,
+    "task026_native_base_authority": "R8_TASK026_SELECTOR",
+    "generic_service_policy_applies_to_task026": false,
+    "native_tube_correlation_changed": false,
+    "legacy_tube_result_semantics_changed": false,
+    "task026_dispatch_re_domain": "Re < 2300 laminar; 2300 <= Re < 3000 transition/blocked; Re >= 3000 TASK026 C3 dispatch; C3 applicability remains separately enforced",
+    "c3_repository_evaluator_re_domain": "3000 <= Re <= 5000000",
+    "c3_source_validity_re_domain": "3000 < Re < 5000000",
+    "pr_domain": "0.5 <= Pr <= 2000",
+    "geometry": "internal circular tube; native tube inside diameter as Dh",
+    "wall_correction_before_acquisition": "NONE",
+    "source_artifacts": [
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py",
+        "sha256": "c9cc6444a79975edd3b5b37249a2ee0909a5f07987b3783d70d99e5342f3ff08"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py",
+        "sha256": "2ec94d18f061c88ca05f7d64f7bac1ea604c6f2c3aa62e994597fd3bd68852c2"
+      },
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "sha256": "e9cd8d26d47821f81810ff8382547d1c907d1ed0182ceabe2d1bcdb1a0ffb526"
+      },
+      {
+        "path": "src/hexagent/correlations/flow.py",
+        "sha256": "3a77d59459548d0fa310c9e2c0902c6fc2bfc333cc51c93dfe1da3d0f3b634f7"
+      },
+      {
+        "path": "src/hexagent/correlations/service.py",
+        "sha256": "2166c5bb70fc911bfa03b7c93ba14b1f2bcfa6b0fc40aeea48c7dc4611036293"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "sha256": "e137959f5bf04784f78383db27a13736098ea47f926b323510d80dbe23f6fe9e"
+      }
+    ]
+  },
+  "source_acquisition": {
+    "source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "source_revision": "INL/EXT-14-31366 Revision 3; printed March 2018",
+    "source_class": "OFFICIAL_GOVERNMENT_LABORATORY_TECHNICAL_MANUAL",
+    "title": "RELAP-7 Theory Manual",
+    "authors": [
+      "R.A. Berry",
+      "L. Zou",
+      "H. Zhao",
+      "H. Zhang",
+      "J.W. Peterson",
+      "R.C. Martineau",
+      "S.Y. Kadioglu",
+      "D. Andrs",
+      "E.J. Hansel"
+    ],
+    "publisher_or_issuer": "Idaho National Laboratory; U.S. Department of Energy laboratory",
+    "source_location": "§2.2.3 Eqs. (41)-(43), report pp. 30-31; §7.4.1.1 and §7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179",
+    "access_path": "https://inldigitallibrary.inl.gov/content/uploads/50/2026/04/Sort_4964.pdf",
+    "rights_status": "Unlimited Release; Approved for public release; further dissemination unlimited; PDF not vendored",
+    "acquired_bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+    "source_role": "authoritative implementation manual for a proposed transfer candidate, not original Gnielinski publication",
+    "source_status": "VERIFIED_SOURCE",
+    "equation_scope": "Single-phase liquid tube-geometry Gnielinski Nu (741), friction convention (742), liquid Re (743), wall-temperature correction (744)",
+    "source_domain": {
+      "flow": "steady-state wall heat transfer model; fully developed; short-pipe/entrance effects excluded",
+      "phase": "single-phase liquid",
+      "geometry": "tube geometry; target transfer restricted to native internal circular tube",
+      "reynolds": "Re > 1000 at the source relation; effective transfer intersection is narrower",
+      "property_ratio": "0.05 <= Pr_liq/Pr_w <= 20",
+      "prandtl": "not separately bounded at Eq. (744); effective transfer retains the reviewed native C3 range 0.5 <= Pr <= 2000 without widening"
+    },
+    "source_limitations": [
+      "The manual follows TRACE closures and is not the original Gnielinski publication.",
+      "No roughness correction or rough-tube extension is admitted.",
+      "No separate heating/cooling branch is stated for Eq. (744); the candidate remains an unbranched single-phase-liquid relation.",
+      "No shell-side Bell-Delaware transfer is authorized.",
+      "Independent reviewer has not yet accepted this transfer candidate."
+    ]
+  },
+  "transfer_domain": {
+    "task026_dispatch_re_domain": "Re >= 3000 for C3 dispatch, with transition 2300 <= Re < 3000 blocked",
+    "native_c3_repository_evaluator_re_domain": "3000 <= Re <= 5000000",
+    "native_c3_source_validity_re_domain": "3000 < Re < 5000000",
+    "source_correction_re_domain": "Re > 1000",
+    "effective_transfer_re_domain": "3000 < Re < 5000000",
+    "transfer_re_domain_bound": true,
+    "endpoint_3000_transfer_authorized": false,
+    "endpoint_5000000_transfer_authorized": false,
+    "effective_pr_domain": "0.5 <= Pr <= 2000; inherited native C3 domain, no widening",
+    "pr_domain_bound": true,
+    "property_ratio_domain": "0.05 <= Pr_liq/Pr_w <= 20",
+    "property_ratio_domain_bound": true
+  },
+  "correction": {
+    "equation_bound": true,
+    "equation_reference": "INL/EXT-14-31366 Rev3 Eq. (744)",
+    "equation": "Nu_turb = Nu_Gnielinski * (Pr_liq / Pr_w)^0.11",
+    "coefficients_exponents_bound": true,
+    "exponent": 0.11,
+    "bulk_state_id": "TUBE_FLUID_BULK_STATE",
+    "wall_state_id": "TUBE_FLUID_WALL_INTERFACE",
+    "bulk_state_definition_bound": true,
+    "bulk_state_definition": "source §2.2.3 Eq. (41): area-average bulk temperature of the fluid cross-section",
+    "wall_state_definition_bound": true,
+    "wall_state_definition": "source §2.2.3 Eq. (41) and Eq. (744): wall temperature/perimeter state used for Pr_w",
+    "wall_state_mapping_authority_bound": true,
+    "wall_state_mapping": "source wall-temperature Pr state maps to TASK172 TUBE_FLUID_WALL_INTERFACE; no automatic metal-surface alias",
+    "fluid_family_domain_bound": true,
+    "fluid_family_domain": "single-phase liquid only; current target admission restricted to reviewed pure-water profile",
+    "geometry_domain_bound": true,
+    "geometry_domain": "native internal circular tube and native D_h; no annulus, rod bundle, or alternate geometry",
+    "roughness_domain_bound": true,
+    "roughness_domain": "native smooth/Petukhov-style base representation only; roughness-dependent use blocked",
+    "length_development_domain_bound": true,
+    "length_development_domain": "fully developed only; no entrance or short-pipe extension",
+    "thermal_boundary_domain_bound": true,
+    "thermal_boundary_domain": "steady single-phase forced wall heat transfer with explicitly supplied wall temperature; no boiling or phase-change branch",
+    "heating_cooling_branches_bound": true,
+    "heating_cooling_branch_rule": "UNBRANCHED_SINGLE_PHASE_LIQUID; Eq. (744) has no direction-specific branch; both heat-flow signs require the same valid ratio and wall-state semantics",
+    "combination_mode": "MULTIPLICATIVE_CORRECTION",
+    "combination_rule_bound": true,
+    "direct_transfer_evidence_bound": true,
+    "direct_transfer_evidence": {
+      "source_base": "INL Eq. (741) uses Gnielinski with source friction factor Eq. (742)",
+      "native_base": "TASK026 C3 uses f_native=(0.790 ln(Re)-1.64)^-2 and f_native/8 in the same Gnielinski structure",
+      "algebraic_identity": "Let a=0.790 ln(Re)-1.64; f_source=[1.58 ln(Re)-3.28]^-2=(2a)^-2=f_native/4; therefore f_source/2=f_native/8",
+      "combination_identity": "INL Eq. (744) explicitly multiplies the Gnielinski result by (Pr_liq/Pr_w)^0.11",
+      "scope": "formula/base compatibility evidence only; not experimental validation and not a native result change"
+    },
+    "transferability_established": true
+  },
+  "candidate_policy": {
+    "out_of_domain_policy": "BLOCKED",
+    "extrapolation_policy": "FORBIDDEN",
+    "missing_state_or_ratio_policy": "BLOCKED",
+    "roughness_or_geometry_mismatch_policy": "BLOCKED",
+    "source_revision_or_bytes_mismatch_policy": "BLOCKED",
+    "native_base_identity_mismatch_policy": "BLOCKED",
+    "wall_state_metal_alias_policy": "NOT_AUTOMATICALLY_ALLOWED"
+  },
+  "non_selected_evidence": [
+    {
+      "source_id": "SIEDER-TATE",
+      "revision": "doi:10.1021/ie50324a027",
+      "access_path": "https://doi.org/10.1021/ie50324a027",
+      "status": "CANDIDATE_INSUFFICIENT",
+      "reason": "publisher full text/equation pages and rights-cleared review copy not acquired"
+    },
+    {
+      "source_id": "ASME-PTC-12.5",
+      "revision": "PTC 12.5-2000 (R2025) official catalog page",
+      "access_path": "https://www.asme.org/codes-standards/find-codes-standards/single-phase-heat-exchangers",
+      "status": "CANDIDATE_NOT_SELECTED",
+      "reason": "normative standard text is copyrighted/purchase-only for this review; official catalog page is not the equation body"
+    },
+    {
+      "source_id": "SANDIA-ARIA",
+      "revision": "SAND2016-4159",
+      "access_path": "https://www.osti.gov/servlets/purl/1262728",
+      "status": "VERIFIED_SOURCE_NOT_TRANSFERABLE",
+      "reason": "Type 72-74 taxonomy/interface is source-specific; no complete liquid circular-tube TASK026 combination package"
+    },
+    {
+      "source_id": "GNIELINSKI-2013",
+      "revision": "doi:10.1016/j.ijheatmasstransfer.2013.04.015",
+      "access_path": "https://publikationen.bibliothek.kit.edu/1000041280",
+      "status": "CANDIDATE_INSUFFICIENT",
+      "reason": "publication metadata acquired; complete lawful transfer package not acquired in this gate"
+    }
+  ],
+  "decision": {
+    "selected_primary_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "selected_primary_source_class": "OFFICIAL_GOVERNMENT_LABORATORY_TECHNICAL_MANUAL",
+    "selected_primary_source_revision": "INL/EXT-14-31366 Revision 3",
+    "selected_primary_source_location": "§7.4.1.1.1 Eqs. (741)-(744), report pp. 177-179",
+    "selected_primary_source_rights": "Unlimited Release; approved for public release; further dissemination unlimited",
+    "primary_source_bound": true,
+    "source_rights_bound": true,
+    "correction_equation_bound": true,
+    "correction_coefficients_exponents_bound": true,
+    "re_domain_bound": true,
+    "pr_domain_bound": true,
+    "property_ratio_domain_bound": true,
+    "fluid_family_domain_bound": true,
+    "geometry_domain_bound": true,
+    "roughness_domain_bound": true,
+    "length_development_domain_bound": true,
+    "thermal_boundary_domain_bound": true,
+    "heating_cooling_branches_bound": true,
+    "bulk_state_id": "TUBE_FLUID_BULK_STATE",
+    "wall_state_id": "TUBE_FLUID_WALL_INTERFACE",
+    "bulk_state_definition_bound": true,
+    "wall_state_definition_bound": true,
+    "wall_state_mapping_authority_bound": true,
+    "combination_mode": "MULTIPLICATIVE_CORRECTION",
+    "combination_rule_bound": true,
+    "direct_transfer_evidence_bound": true,
+    "transferability_established": true,
+    "out_of_domain_policy": "BLOCKED",
+    "extrapolation_policy": "FORBIDDEN",
+    "resolution_result": "AUTHORITY_CANDIDATE_COMPLETE",
+    "status": "PROPOSED_AUTHORITY",
+    "independent_review": "PENDING",
+    "canonical_blocker_removed": false,
+    "new_authority_self_approval": false
+  },
+  "effective_state": {
+    "native_base_binding_bound": true,
+    "native_tube_correlation_changed": false,
+    "legacy_tube_result_semantics_changed": false,
+    "tube_wall_correction_status": "PROPOSED_AUTHORITY",
+    "tube_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "task026_files_changed": false,
+    "task007_files_changed": false,
+    "generic_service_policy_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "material_layer_changed": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_TUBE_WALL_CORRECTION_AUTHORITY_INDEPENDENT_REVIEW_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "docs/tasks/TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r2.md",
+    "sha256": "f2051a46b4fc6b6099ef2718e1f83c73d54318d13658052059e60f2c469de083"
+  },
+  "canonical_hash": "422f5899977492b89659f59df53b1f3d0730ca1c5aea63a67b99b7430c85c1bb"
+}
