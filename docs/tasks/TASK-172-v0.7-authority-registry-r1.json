@@ -6727,5 +6727,164 @@
     "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_COEFFICIENT_LINEAGE_RESOLUTION_R1_ONLY",
     "canonical_hash": "500af5192406c5e371cfb0607ebbddaca73c7fd1d7ffc51783a7421616a79ff7"
   },
-  "canonical_hash": "70e01e3bcb52571377671c2e7829b03f17bfd4ecebb8d76eb52d426ba5b99e9c"
+  "r40_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_COEFFICIENT_LINEAGE_RESOLUTION_R1",
+    "previous_head": "b33bf9060e32c13458a34066ccb5219e3ab78be8",
+    "historical_registry_root_hash": "70e01e3bcb52571377671c2e7829b03f17bfd4ecebb8d76eb52d426ba5b99e9c",
+    "historical_r39_extension_hash": "500af5192406c5e371cfb0607ebbddaca73c7fd1d7ffc51783a7421616a79ff7",
+    "historical_records_unchanged": true,
+    "review_type": "TARGETED_BELL_COEFFICIENT_LINEAGE_RESOLUTION_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "result": "RESOLVED",
+    "adjudication_outcome": "OUTCOME_B_UNNORMALIZED_NATIVE_J_FACTOR_LINEAGE_PROVEN",
+    "native_coefficient_fingerprint": {
+      "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+      "table": "Jamil Appendix Table A.1 a1-a4",
+      "source_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+      "fingerprint_sha256": "b6e0b32a794b43d43e6a976e42683f271c2ed25de5c055645b325f9c514bead0",
+      "rows": 5,
+      "layouts": ["30_DEG", "45_DEG", "90_DEG"],
+      "table_to_native_values": "EXACT_MATCH",
+      "runtime_selection": "explicit_layout_and_reynolds_row;no_interpolation_or_generation"
+    },
+    "source_lineage": {
+      "jamil": {
+        "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+        "body_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+        "exact_locations": ["§2.2.2 PDF p.11 Eqs.6-9", "Appendix PDF p.57 Table A.1", "Appendix PDF pp.58-59 Table A.2", "References PDF p.50/printed p.51 Ref.[9]"],
+        "observed_definition": "hc=ji*cp*G*Pr^(-2/3);Jmu is a separate factor after hc",
+        "coefficient_provenance": "BOUND_TO_JAMIL_OPERATIONAL_REPRESENTATION;ANCESTRAL_THOME_BODY_NOT_ACQUIRED",
+        "coefficient_match": "EXACT_MATCH"
+      },
+      "goncalves": {
+        "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+        "doi": "10.1002/aic.16602",
+        "body_sha256": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+        "exact_locations": ["Eqs.36-43 PDF pp.4-5"],
+        "equation_provenance_bound": true,
+        "supporting_information_filename": "aic16602-sup-0001-Supinfo.docx",
+        "supporting_information_body_acquired": false,
+        "supporting_information_table_verified": false,
+        "coefficient_provenance_bound": false
+      },
+      "bell_1960": {
+        "source_target_id": "BELL-1960-DELAWARE-DESIGN",
+        "body_sha256": "4657ebfb78bda433528b7f1197fff32e299361d39379bb6839e871f43bc2ed11",
+        "exact_locations": ["C-32-C-33 j normalization", "C-40a reconstruction", "C-40c nomenclature"],
+        "normalized_j_ratio": "(mu_w/mu)^0.14",
+        "reconstruction_ratio": "(mu/mu_w)^0.14",
+        "coefficient_mapping_to_native_jamil": false,
+        "transfer_to_task166": false
+      },
+      "bell_1963": {
+        "source_target_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+        "body_acquired": false,
+        "body_sha256": "NONE",
+        "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+        "lineage_status": "UNDETERMINED"
+      },
+      "bergelin_1958": {
+        "source_target_id": "BERGELIN-1958-DELAWARE-BULLETIN-4",
+        "body_acquired": false,
+        "body_sha256": "NONE",
+        "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+        "lineage_status": "UNDETERMINED"
+      },
+      "taborek_hedh": {
+        "source_target_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+        "body_acquired": false,
+        "body_sha256": "NONE",
+        "status": "BIBLIOGRAPHIC_LINEAGE_ONLY",
+        "lineage_status": "UNVERIFIED"
+      },
+      "thome_crosscheck": {
+        "source_target_id": "THOME-2004-EDB3-CH3-CROSSCHECK",
+        "body_acquired": true,
+        "body_sha256": "326cf8a5c26d6010b701acc9459424391a59a67c08e28e0a41c699c5b9146ea4",
+        "source_role": "SECONDARY_CROSS_CHECK_ONLY",
+        "rights_status": "COPY_RESTRICTED_RIGHTS_UNVERIFIED",
+        "transfer_authority": false
+      }
+    },
+    "identity_adjudication": {
+      "native_jamil_operational_identity_bound": true,
+      "j_factor_lineage_identity_scope": "TASK166_NATIVE_JAMIL_OPERATIONAL_VARIANT",
+      "j_factor_lineage_identity_bound": true,
+      "j_factor_normalization_contains_wall_viscosity": false,
+      "bell_1960_factor_transfer_rejected": true,
+      "coefficient_lineage_conflict": false,
+      "correction_is_part_of_native_task166_ideal_bank_base": false,
+      "correction_is_optional_engineering_extension": false,
+      "ancestral_primary_coefficient_preimage_complete": false,
+      "identity_note": "Native Jamil equation/table placement is bound; ancestry beyond Jamil's cited Thome representation is not claimed. Bell 1960's normalized source variant is not transferable by method name or exponent coincidence."
+    },
+    "transfer_contract": {
+      "correction_equation_bound": false,
+      "property_ratio_bound": true,
+      "property_ratio_scope": "BELL_1960_SOURCE_SYNTAX_AND_JAMIL_JMU_OBSERVATION_ONLY",
+      "exponent_bound": true,
+      "exponent_scope": "BELL_1960_SOURCE_SYNTAX_OBSERVATION_ONLY",
+      "bulk_state_bound": false,
+      "wall_state_bound": false,
+      "re_domain_bound": false,
+      "pr_domain_bound": false,
+      "fluid_scope_bound": false,
+      "heating_cooling_scope_bound": false,
+      "geometry_layout_domain_bound": false,
+      "combination_rule_bound": false,
+      "task032_bulk_state_mapping_valid": false,
+      "task172_wall_state_mapping_established": false,
+      "wall_temperature_producer_bound": false
+    },
+    "negative_lineage": {
+      "task034_wall_authority_reuse": false,
+      "task034_transfer_to_task166_heat_transfer": false,
+      "tube_RELAP_correction_transfer_to_task166": false,
+      "martin_gnielinski_crossflow_transfer_to_task166": false,
+      "secondary_taborek_transfer_to_task166": false,
+      "transfer_by_equal_exponent": false,
+      "bell_1960_factor_inserted": false
+    },
+    "effective_state": {
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_transfer_authority_candidate_created": false,
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JAMIL_THOME_ACTIVE_JMU_TRANSFER_AUTHORITY_R1_ONLY"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-coefficient-lineage-resolution-r1.md",
+      "document_sha256": "0228c5713e3ffd899de910bf2ba34831d1ad905cf3d8a2d94a73c29392a0ae7f",
+      "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-coefficient-lineage-resolution-r1.json",
+      "evidence_canonical_hash": "2b99eb5780a277078b99544de5fe94d42eb61cc10f17e033658de67ba491d06d",
+      "evidence_file_sha256": "f3131d73cd4c934d79e429eb0dc14716f3ce9bd6f1be2e8dd399bbc694153440"
+    },
+    "governance": {
+      "source_acquisition_and_adjudication_only": true,
+      "new_authority_self_approval": false,
+      "lifecycle_promotion_performed": false,
+      "historical_records_rewritten": false,
+      "task166_changed": false,
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "blocker_removed": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JAMIL_THOME_ACTIVE_JMU_TRANSFER_AUTHORITY_R1_ONLY",
+    "canonical_hash": "6bf00da772cf733e01ee1b4708b4f9e6d5e782fc36038b31b5c792d2d4ae07c7"
+  },
+  "canonical_hash": "471e8c071834008747297b14d66b9ca362d4f86f83914fce566d9b8eb71242fc"
 }
