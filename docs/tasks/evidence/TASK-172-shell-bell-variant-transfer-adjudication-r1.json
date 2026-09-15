@@ -1,0 +1,330 @@
+{
+  "schema_version": "task172.shell-bell-variant-transfer-adjudication.r1",
+  "task_id": "TASK172_V0_7_SHELL_BELL_VARIANT_TRANSFER_ADJUDICATION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "7743621dce676c85e63cf30257bb86e738232295",
+  "mode": "TARGETED_BELL_VARIANT_TRANSFER_ADJUDICATION_ONLY",
+  "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+  "result": "BLOCKED",
+  "adjudication_outcome": "OUTCOME_C_J_FACTOR_LINEAGE_IDENTITY_NOT_PROVEN",
+  "native_task166": {
+    "task_id": "TASK-166",
+    "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+    "method": "BELL_DELAWARE",
+    "ideal_htc_form": "ji*cp*G*Pr^(-2/3)",
+    "corrected_htc_form": "ideal_h*Jc*Jl*Jb*Js*Jr",
+    "correction_factors": [
+      "Jc",
+      "Jl",
+      "Jb",
+      "Js",
+      "Jr"
+    ],
+    "re_evaluator_domain": "0<Re_s<=100000",
+    "wall_property_term_present": false,
+    "wall_temperature_input_present": false,
+    "native_implementation_source": {
+      "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+      "doi": "10.1002/aic.16602",
+      "body_sha256": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+      "exact_relation": "hi=ji*Cp_s*G_s*Pr_s^(-2/3);hs=hi*Jc*Jl*Jb*Js*Jr",
+      "reviewed_location": "Goncalves 2019 equations 37-43 as mapped by TASK-166"
+    },
+    "factor_disposition": {
+      "Jc": "PURE_CROSSFLOW_TUBE_FRACTION_GEOMETRY_CORRECTION_NOT_WALL_PROPERTY",
+      "Jl": "LEAKAGE_GEOMETRY_CORRECTION_NOT_WALL_PROPERTY",
+      "Jb": "BYPASS_GEOMETRY_CORRECTION_NOT_WALL_PROPERTY",
+      "Js": "UNEQUAL_BAFFLE_SPACING_CORRECTION_NOT_WALL_PROPERTY",
+      "Jr": "LOW_REYNOLDS_CROSS_FLOW_TUBE_ROW_CORRECTION_NOT_WALL_PROPERTY"
+    }
+  },
+  "bell_1960": {
+    "source_target_id": "BELL-1960-DELAWARE-DESIGN",
+    "author": "Kenneth J. Bell",
+    "title": "Exchanger Design Based on the Delaware Research Program",
+    "publication": "Petro/Chem Engineer",
+    "volume": "32",
+    "issue": "11",
+    "year": 1960,
+    "body_acquired": true,
+    "body_complete": true,
+    "bytes_sha256": "4657ebfb78bda433528b7f1197fff32e299361d39379bb6839e871f43bc2ed11",
+    "pdf_page_count": 14,
+    "printed_page_sequence": "C-26-C-36;C-40a-C-40c",
+    "public_access_path": "https://www.ing.unp.edu.ar/asignaturas/operaciones_fisicas_2/Versiones%20PDF/Exchanger%20design%20based%20on%20the%20Delaware%20research%20program-%20Kenneth%20Bell.pdf",
+    "rights_status": "PUBLIC_SCAN_ACCESSIBLE_RIGHTS_UNVERIFIED_NOT_VENDORED",
+    "review_status": "VERIFIED_SOURCE_FOR_VARIANT_OBSERVATION_ONLY",
+    "exact_source_observations": [
+      {
+        "printed_location": "C-28",
+        "observation": "The non-isothermal discussion reports (mu/mu_w)^0.14 for the studied friction and j behavior; a separate Hull laminar friction refinement is also mentioned.",
+        "transfer_effect": "Wall-property factor observed, but TASK166 coefficient lineage and transfer domain remain unbound."
+      },
+      {
+        "printed_location": "C-30",
+        "observation": "The crossflow friction discussion uses (mu/mu_w)^0.14.",
+        "transfer_effect": "Friction evidence is not TASK166 heat-transfer authority."
+      },
+      {
+        "printed_location": "C-32-C-33",
+        "observation": "The ideal or non-leakage tube-bank j normalization contains (mu_w/mu)^0.14.",
+        "transfer_effect": "The factor belongs to the Bell 1960 j normalization and is not established as a post-J multiplier."
+      },
+      {
+        "printed_location": "C-36",
+        "observation": "The design procedure selects ideal-tube-bank j and then applies source geometry, leakage, and bypass steps.",
+        "transfer_effect": "Source ordering differs from the native TASK166 identity unless an exact mapping is proved."
+      },
+      {
+        "printed_location": "C-40a",
+        "observation": "The worked example reconstructs h from j with coefficient-side orientation (mu/mu_w)^0.14.",
+        "transfer_effect": "Source orientation is bound as an observation, not as a TASK166 transfer rule."
+      },
+      {
+        "printed_location": "C-40c",
+        "observation": "The nomenclature defines mu as absolute viscosity and mu_w as absolute viscosity at the heat-transfer surface.",
+        "transfer_effect": "Symbols are source-bound; target state locations and producer mapping remain unbound."
+      }
+    ],
+    "dimensionless_j_ratio": "(mu_w/mu)^0.14",
+    "coefficient_reconstruction_ratio": "(mu/mu_w)^0.14",
+    "exponent": "0.14",
+    "mu_definition": "absolute_viscosity;exact_bulk_location_not_bound",
+    "mu_w_definition": "absolute_viscosity_at_heat_transfer_surface",
+    "wall_temperature_definition": "not_separately_defined",
+    "combination_position": "inside_ideal_or_non_leakage_tube_bank_j_normalization_before_source_geometry_steps",
+    "source_correction_equation_observed": true,
+    "source_property_ratio_observed": true,
+    "source_exponent_observed": true
+  },
+  "source_targets": {
+    "bell_1963": {
+      "source_target_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "author": "Kenneth J. Bell",
+      "title": "Final Report of the Cooperative Research Program on Shell and Tube Heat Exchangers",
+      "issuer": "University of Delaware Engineering Experimental Station",
+      "report": "Bulletin No. 5",
+      "year": 1963,
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+      "viscosity_correction_present": "UNDETERMINED_BODY_NOT_ACQUIRED",
+      "bibliographic_access_path": "https://search.worldcat.org/title/final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers/oclc/16107403",
+      "rights_status": "NOT_ASSESSED_FOR_BODY"
+    },
+    "bergelin_1958": {
+      "source_target_id": "BERGELIN-1958-DELAWARE-BULLETIN-4",
+      "authors": [
+        "O.P. Bergelin",
+        "M.D. Leighton",
+        "W.L. Lafferty Jr.",
+        "R.L. Pigford"
+      ],
+      "title": "Heat Transfer and Pressure Drop During Viscous and Turbulent Flow Across Baffled and Unbaffled Tube Banks",
+      "issuer": "University of Delaware Engineering Experimental Station",
+      "report": "Bulletin No. 4",
+      "year": 1958,
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+      "viscosity_correction_present": "UNDETERMINED_BODY_NOT_ACQUIRED",
+      "correction_physical_quantity": "UNDETERMINED",
+      "transfer_to_bell_ideal_bank": "NOT_ASSESSED_WITHOUT_BODY",
+      "rights_status": "NOT_ASSESSED_FOR_BODY"
+    },
+    "taborek_hedh": {
+      "source_target_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "author": "J. Taborek",
+      "work": "Heat Exchanger Design Handbook",
+      "section": "3.3 shell-and-tube heat exchangers / single-phase flow",
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_LINEAGE_ONLY",
+      "viscosity_correction_present": "UNVERIFIED_EXACT_BODY_NOT_ACQUIRED",
+      "transfer_to_task166": false,
+      "secondary_cross_check_not_authority": true
+    }
+  },
+  "coefficient_lineage": {
+    "bell_delaware_original_j_definition": "BELL_1960_NORMALIZED_J_OBSERVATION_VERIFIED",
+    "bell_bergelin_ideal_bank_coefficients": "CURRENT_JAMIL_ROWS_NOT_MAPPED_TO_BELL_1960_COEFFICIENT_PREIMAGE",
+    "bell_1963_lineage": "UNDETERMINED_BODY_NOT_ACQUIRED",
+    "later_bell_delaware_lineage": "GONCALVES_2019_AND_JAMIL_TABLE_A1_BOUND_NATIVELY_ONLY",
+    "goncalves_ji": "ji=JAMIL_TABLE_A1_ROW_AND_GONCALVES_RELATION;EXACT_NATIVE_IDENTITY_BOUND",
+    "task166_ideal_h": "hi=ji*Cp_s*G_s*Pr_s^(-2/3);NO_WALL_PROPERTY_TERM",
+    "identity_conclusion": "BELL_1960_NORMALIZATION_TO_TASK166_JI_IDENTITY_NOT_PROVEN"
+  },
+  "variant_difference_matrix": [
+    {
+      "dimension": "ideal_htc_base",
+      "task166_goncalves": "hi=ji*Cp_s*G_s*Pr_s^(-2/3)",
+      "bell_1960": "Source-specific ideal or non-leakage tube-bank j reconstruction",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "viscosity_correction",
+      "task166_goncalves": "Absent",
+      "bell_1960": "Present in source j normalization and coefficient reconstruction",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "ratio_orientation",
+      "task166_goncalves": "None",
+      "bell_1960": "j=(mu_w/mu)^0.14; coefficient reconstruction=(mu/mu_w)^0.14",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "coefficient_identity",
+      "task166_goncalves": "Jamil Table A.1 rows with Goncalves relation",
+      "bell_1960": "Source ideal-bank plots and relations; no mapping to current Jamil rows",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "bulk_state",
+      "task166_goncalves": "Native TASK166 shell flow state",
+      "bell_1960": "mu named absolute viscosity; exact bulk location not bound",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "wall_state",
+      "task166_goncalves": "No wall state input",
+      "bell_1960": "mu_w at heat-transfer surface; producer and temperature algorithm absent",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "re_domain",
+      "task166_goncalves": "0<Re_s<=100000 native evaluator interval",
+      "bell_1960": "Source study range only; strict wall-factor transfer interval not bound",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "pr_domain",
+      "task166_goncalves": "Native input domain",
+      "bell_1960": "Not bound for wall factor",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "geometry_layout",
+      "task166_goncalves": "Selected TASK166 Bell geometry identity",
+      "bell_1960": "Ideal-bank and Model 9 context; exact TASK166 mapping not bound",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "Baffled/unbaffled tube-bank title only",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    },
+    {
+      "dimension": "combination_position",
+      "task166_goncalves": "ideal_h*Jc*Jl*Jb*Js*Jr",
+      "bell_1960": "Within source ideal-bank j normalization before source geometry steps",
+      "bell_1963": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "bergelin_1958": "NOT_DETERMINED_BODY_NOT_ACQUIRED",
+      "taborek": "NOT_DETERMINED_EXACT_BODY_NOT_ACQUIRED"
+    }
+  ],
+  "transfer_contract": {
+    "j_factor_lineage_identity_bound": false,
+    "correction_equation_bound": false,
+    "property_ratio_bound": true,
+    "exponent_bound": true,
+    "bulk_state_bound": false,
+    "wall_state_bound": false,
+    "re_domain_bound": false,
+    "pr_domain_bound": false,
+    "fluid_scope_bound": false,
+    "heating_cooling_scope_bound": false,
+    "geometry_layout_domain_bound": false,
+    "combination_rule_bound": false,
+    "source_observation_note": "property_ratio and exponent are bound only as Bell 1960 source syntax observations; they are not a TASK166 transfer authority"
+  },
+  "state_mapping": {
+    "source_bulk_state": "BELL_1960_MU_ABSOLUTE_VISCOSITY_EXACT_BULK_LOCATION_NOT_BOUND",
+    "source_wall_state": "BELL_1960_MU_W_ABSOLUTE_VISCOSITY_AT_HEAT_TRANSFER_SURFACE",
+    "task172_bulk_state": "SHELL_FLUID_BULK_STATE",
+    "task172_wall_state": "SHELL_FLUID_WALL_INTERFACE",
+    "task032_bulk_state_mapping_valid": false,
+    "task032_bulk_state_mapping_reason": "TASK032 shell state is not source-proven equivalent to Bell 1960's unspecified bulk-viscosity location",
+    "task172_state_mapping_established": false,
+    "wall_temperature_producer_bound": false
+  },
+  "negative_lineage": {
+    "task034_wall_authority_reuse": false,
+    "task034_transfer_to_task166_heat_transfer": false,
+    "tube_RELAP_correction_transfer_to_task166": false,
+    "martin_gnielinski_crossflow_transfer_to_task166": false,
+    "secondary_taborek_transfer_to_task166": false,
+    "transfer_by_equal_exponent": false
+  },
+  "effective_state": {
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_COEFFICIENT_LINEAGE_RESOLUTION_R1_ONLY"
+  },
+  "governance": {
+    "adjudication_only": true,
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "historical_records_rewritten": false,
+    "task166_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "blocker_removed": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "source_artifacts": {
+    "bell_delaware_authority_py": "6ba2fea3eb6008a9e92e025efad924bf956c60ee67da3a0436bc1c3a965f75b5",
+    "bell_delaware_heat_transfer_py": "bc442493dbdc52ca0a8c52361276becc2e2e73a246ea5e7f6ab3cecb0306c2ad",
+    "bell_delaware_models_py": "bcc7f850a8a33d7d2a3ef540d7d123d88d4bbb09cce36511caeb3f9cea08f668",
+    "bell_delaware_geometry_py": "785e757e7b589c25e31a399d0a35e145cbebde2ba6b17912a598d62935a2d7ba",
+    "bell_delaware_validation_py": "1c1e14e9d84e8f858fcbd8cc249f97c92851728c22849ac500acb8be84a3721d",
+    "bell_delaware_service_py": "e576e925118933756205279c8ed248f769c496453073eb5dca8265b971cba017",
+    "bell_delaware_schema_py": "b428b66484ccecc6e922358667e3a34483c9a398126e3d9ef7929c706cabb193",
+    "bell_delaware_provenance_py": "03d1250b5c619e2c26e10f8a0df904a33d98778a09ee7075db6a0c996223ed57",
+    "task166_doc": "fe61dcd297a28400756e52f7f5a52800e080c8dae5ef71ec5d4e3731f2f70926",
+    "task032_doc": "750f95ab3869f2024ed57639e5754d9d36b9382e573c0a32b8899145f054d188",
+    "task172_wall_state_doc": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9",
+    "historical_acquisition_evidence_canonical_hash": "d4a27e2df4f3092870c18435efa9c7c1af872062e43a58d87174f107e729fe12"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-shell-bell-variant-transfer-adjudication-r1.md",
+    "evidence_path": "docs/tasks/evidence/TASK-172-shell-bell-variant-transfer-adjudication-r1.json",
+    "document_sha256": "62ae405ce619224781f76a2ff400a93b6c8fd024e259d77a596134cc28282ba4",
+    "evidence_canonical_hash": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_HASH"
+  },
+  "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_COEFFICIENT_LINEAGE_RESOLUTION_R1_ONLY",
+  "canonical_hash": "92bcbdf9179236e5aec2d35e31e92ac9152d5ee3edcf54cd7f4b6f2143e70727"
+}
