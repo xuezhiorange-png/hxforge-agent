@@ -31,7 +31,8 @@
     "TASK-172-v0.7-material-thermal-property-contract-independent-review-r1.md",
     "TASK-172-v0.7-material-thermal-property-external-scoped-approval-record-r1.md",
     "TASK-172-v0.7-material-canonical-blocker-closure-adjudication-r1.md",
-    "TASK-172-v0.7-material-canonical-blocker-closure-recording-r1.md"
+    "TASK-172-v0.7-material-canonical-blocker-closure-recording-r1.md",
+    "TASK-172-v0.7-tube-wall-correction-authority-resolution-r1.md"
   ],
   "sources": [
     {
@@ -1190,7 +1191,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "99e89c6f77442783ec1e16e136d8c905197aafa5bd99fae5bf2c0e4a5d1de6d2",
+  "canonical_hash": "1dedb9150340e47ac38e6d729a1fda50c80de025b7fcc5e68d5e65f33e9fcabc",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -3553,5 +3554,162 @@
     },
     "next_gate": "AWAIT_REVIEW_OF_MATERIAL_CANONICAL_BLOCKER_CLOSURE_RECORDING",
     "canonical_hash": "4a59605e3189a79e41d888632963941e9e3613da1f70720d673b7be9a1025a41"
+  },
+  "r20_extension": {
+    "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1",
+    "previous_head": "57a70e1c7eee22526a719c09e7a6d71a715e0f47",
+    "historical_registry_root_hash": "99e89c6f77442783ec1e16e136d8c905197aafa5bd99fae5bf2c0e4a5d1de6d2",
+    "historical_r19_extension_hash": "4a59605e3189a79e41d888632963941e9e3613da1f70720d673b7be9a1025a41",
+    "historical_records_unchanged": true,
+    "review_type": "PHYSICAL_AUTHORITY_RESOLUTION_ONLY",
+    "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+    "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "native_boundary": {
+      "correlation_ids": [
+        "tube_laminar_cwt@1.0.0",
+        "tube_laminar_chf@1.0.0",
+        "tube_turbulent_gnielinski@1.0.0"
+      ],
+      "native_correlation_changed": false,
+      "legacy_tube_result_semantics_changed": false,
+      "native_wall_correction_implemented": false,
+      "task026_source_artifact_in_repository": false
+    },
+    "source_disposition": {
+      "selected_correction_source_id": null,
+      "selected_correction_source_class": null,
+      "selected_correction_source_revision": null,
+      "selected_correction_source_location": null,
+      "selected_correction_source_rights": null,
+      "sieder_tate_authority": "INSUFFICIENT",
+      "candidates_reviewed": [
+        {
+          "source_id": "SIEDER-TATE",
+          "status": "CANDIDATE",
+          "transferable": false,
+          "reason": "Exact equation, coefficient/exponent, domains, state definitions, rights-cleared review copy and TASK026 transfer rule are not all bound"
+        },
+        {
+          "source_id": "GONCALVES",
+          "status": "VERIFIED_SOURCE",
+          "transferable": false,
+          "reason": "Selected base relations and separate laminar relation do not authorize an extension of the native TASK026 selector"
+        },
+        {
+          "source_id": "SANDIA",
+          "status": "VERIFIED_SOURCE",
+          "transferable": false,
+          "reason": "Official interface description does not supply complete numerical/domain/combination authority"
+        },
+        {
+          "source_id": "MARTIN",
+          "status": "CANDIDATE",
+          "transferable": false,
+          "reason": "External crossflow normalization cannot be silently transferred to internal TASK026 tube flow"
+        },
+        {
+          "source_id": "REPO-TUBE",
+          "status": "REVIEWED_AUTHORITY",
+          "transferable": false,
+          "reason": "Reviewed as unchanged native base only; explicitly no active wall correction"
+        }
+      ]
+    },
+    "transferability": {
+      "source_correlation_family": "UNBOUND",
+      "target_task026_correlation_family": "BOUND_FOR_TARGET_ONLY",
+      "internal_external_flow": "UNBOUND",
+      "regime": "UNBOUND",
+      "re_domain": "UNBOUND",
+      "pr_domain": "UNBOUND",
+      "property_ratio_domain": "UNBOUND",
+      "fluid_family_domain": "UNBOUND",
+      "geometry_domain": "UNBOUND",
+      "roughness_domain": "UNBOUND",
+      "length_development_domain": "UNBOUND",
+      "thermal_boundary_domain": "UNBOUND",
+      "heating_branch": "UNBOUND",
+      "cooling_branch": "UNBOUND",
+      "bulk_state_definition": "UNBOUND",
+      "wall_fluid_state_definition": "UNBOUND",
+      "metal_vs_fluid_surface_mapping": "UNBOUND",
+      "base_combination_rule": "UNBOUND",
+      "source_rights": "UNBOUND",
+      "transfer_evidence": "UNBOUND",
+      "transferability_established": false
+    },
+    "wall_state_mapping": {
+      "bulk_state_id": null,
+      "wall_state_id": null,
+      "required_bulk_state": "TUBE_FLUID_BULK_STATE",
+      "required_wall_state": "TUBE_FLUID_WALL_INTERFACE",
+      "authority_bound": false,
+      "metal_temperature_substitution_authorized": false
+    },
+    "decision": {
+      "correction_equation_bound": false,
+      "correction_coefficients_exponents_bound": false,
+      "re_domain_bound": false,
+      "pr_domain_bound": false,
+      "property_ratio_domain_bound": false,
+      "fluid_family_domain_bound": false,
+      "geometry_domain_bound": false,
+      "thermal_boundary_domain_bound": false,
+      "heating_cooling_branches_bound": false,
+      "base_correlation_binding_bound": false,
+      "combination_rule_bound": false,
+      "out_of_domain_policy": "BLOCKED",
+      "extrapolation_policy": "FORBIDDEN",
+      "resolution_result": "BLOCKED",
+      "status": "BLOCKED",
+      "independent_review": "PENDING",
+      "canonical_blocker_removed": false
+    },
+    "effective_state": {
+      "model_level_material_entry_authority_status": "CLOSED",
+      "material_constant_k_canonical_blocker_removed": true,
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "material_identity_actual_value_bound": false,
+      "material_property_body_actual_value_bound": false,
+      "material_profile_id": null,
+      "actual_material_case_accepted": false,
+      "remaining_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false
+    },
+    "governance": {
+      "historical_records_rewritten": false,
+      "task026_changed": false,
+      "material_layer_changed": false,
+      "shell_correction_started": false,
+      "numerical_work_started": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "golden_approved": false,
+      "new_authority_self_approval": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "REVIEW_TUBE_WALL_CORRECTION_BLOCKER_OR_PROVIDE_COMPLETE_PRIMARY_TRANSFER_AUTHORITY",
+      "no_step_implies_the_next": true
+    },
+    "document": {
+      "path": "TASK-172-v0.7-tube-wall-correction-authority-resolution-r1.md",
+      "sha256": "6480959ac6c8d48bf342ec208be7e4a8bf2398db5c720bb92b8264cdb165fcb1"
+    },
+    "evidence": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "path": "evidence/TASK-172-tube-wall-correction-authority-resolution-r1.json",
+      "file_sha256": "142a87f9da6e8433b098741e393a38c7c33e27f6e0c1534ab2f9220604fb9f8a",
+      "canonical_hash": "cc31108e1816f9c7a89a3ade512e7b0b0b1691ee6140ab2d80b2827857c4b4f2"
+    },
+    "canonical_hash": "607a93509d9d3fd45b33f42ef905f8af2e7b95174bf21459adb88cfc87b50a73"
   }
 }
