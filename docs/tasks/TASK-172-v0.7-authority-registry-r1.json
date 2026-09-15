@@ -1219,7 +1219,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
-  "canonical_hash": "8f227fe3bc7a79a83875525a6b15926b08ed5665a28b2afbe23c73e890a4d1ac",
+  "canonical_hash": "8e2369ead8e06a24371237904c9f46c69651472e1723167b74745187979e24d3",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -5688,5 +5688,153 @@
     },
     "next_gate": "AUTHORIZE_TASK172_TUBE_LAMINAR_CONSTANT_PROPERTY_SCOPE_AUTHORITIES_INDEPENDENT_REVIEW_R1_ONLY",
     "canonical_hash": "e73432601a43a67cacd87647b0b0eaf71bfe661832fd4e3e693bf05288545c9b"
+  },
+  "r33_extension": {
+    "task_id": "TASK172_V0_7_TUBE_LAMINAR_CONSTANT_PROPERTY_SCOPE_AUTHORITIES_INDEPENDENT_REVIEW_R1",
+    "previous_head": "e82b5fadec6d9de2f8b0901f775197ad0e511c32",
+    "historical_registry_root_hash": "8f227fe3bc7a79a83875525a6b15926b08ed5665a28b2afbe23c73e890a4d1ac",
+    "historical_r32_extension_hash": "e73432601a43a67cacd87647b0b0eaf71bfe661832fd4e3e693bf05288545c9b",
+    "historical_records_unchanged": true,
+    "review_type": "INDEPENDENT_BRANCH_SCOPE_AUTHORITY_REVIEW_ONLY",
+    "parent_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+    "result": "PASS_FOR_SCOPED_LAMINAR_CONSTANT_PROPERTY_BRANCH_AUTHORITIES",
+    "subject_authorities": {
+      "cwt": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CWT-PROPERTY-SCOPE-R1",
+        "authority_type": "CONSTANT_PROPERTY_BRANCH_SCOPE",
+        "scope_review_result": "PASS",
+        "scope_candidate_complete": true,
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "production_enabled": false,
+        "source_scope_valid": true,
+        "source_scope_excludes_variable_property_extension": true,
+        "branch_disposition": "CONSTANT_PROPERTY_ONLY_VARIABLE_PROPERTY_EXTENSION_BLOCKED",
+        "no_active_wall_correction_required": "NOT_CLAIMED",
+        "active_correction_authority": "NONE",
+        "omission_authority_created": false,
+        "active_correction_created": false,
+        "native_correlation_id": "tube_laminar_cwt@1.0.0",
+        "source_id": "SRC-T172-NASA-CR-189922-CWT-R1",
+        "source_equation": "Nu_D=3.658; NASA-CR-189922 Eq.3.51",
+        "native_equation": "Nu_D=3.66"
+      },
+      "chf": {
+        "authority_id": "V07-T172-TUBE-LAMINAR-CHF-PROPERTY-SCOPE-R1",
+        "authority_type": "CONSTANT_PROPERTY_BRANCH_SCOPE",
+        "scope_review_result": "PASS",
+        "scope_candidate_complete": true,
+        "status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "production_enabled": false,
+        "source_scope_valid": true,
+        "source_scope_excludes_variable_property_extension": true,
+        "branch_disposition": "CONSTANT_PROPERTY_ONLY_VARIABLE_PROPERTY_EXTENSION_BLOCKED",
+        "no_active_wall_correction_required": "NOT_CLAIMED",
+        "active_correction_authority": "NONE",
+        "omission_authority_created": false,
+        "active_correction_created": false,
+        "native_correlation_id": "tube_laminar_chf@1.0.0",
+        "source_id": "SRC-T172-NASA-CR-189922-CHF-R1",
+        "source_equation": "Nu_D=4.364; NASA-CR-189922 Eq.3.46",
+        "native_equation": "Nu_D=4.36"
+      }
+    },
+    "source_authority": {
+      "source_id": "NASA-CR-189922",
+      "source_body_sha256": "46c1af47bf173cd0a33f7b491d73e635e3335ce67277df50f4f8df2840e5cd5e",
+      "source_access_path": "https://ntrs.nasa.gov/citations/19920012099",
+      "rights_status": "US_GOVERNMENT_WORK_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+      "body_acquired": true,
+      "body_reviewed_for_scope": true,
+      "variable_property_extension_reviewed": false,
+      "exclusion_meaning": "NOT_COVERED_BY_THIS_AUTHORITY_NOT_PHYSICALLY_IMPOSSIBLE"
+    },
+    "property_snapshot_contract": {
+      "identity_required": true,
+      "components": [
+        "density",
+        "dynamic_viscosity",
+        "thermal_conductivity",
+        "specific_heat_capacity",
+        "units",
+        "property_authority_id_and_hash",
+        "reference_state_identity"
+      ],
+      "case_identity_required": true,
+      "segment_identity_required": true,
+      "binding_granularity": "EXPLICIT_CASE_SCOPE_OR_EXPLICIT_PHYSICAL_SEGMENT_SCOPE;NO_UNSCOPED_CALCULATION_SCOPE",
+      "immutability_required": true,
+      "lifetime": "ALL_EVALUATIONS_AND_ALL_NONLINEAR_ITERATIONS_OF_THE_BOUND_AUTHORITY_INSTANCE",
+      "iteration_refresh_allowed": false,
+      "per_segment_distinct_frozen_snapshot_policy": "FORBIDDEN_WITHOUT_VARIABLE_PROPERTY_EXTENSION",
+      "changed_snapshot_is_new_authority_instance": true,
+      "pr_derived_from_same_snapshot": true,
+      "missing_component_policy": "BLOCKED",
+      "identity_or_hash_mismatch_policy": "BLOCKED",
+      "caller_assertion_as_authority": false,
+      "hidden_default_as_authority": false,
+      "unbound_database_lookup_as_authority": false
+    },
+    "reference_state_review": {
+      "branch_scope_selects_reference_state": false,
+      "case_level_reference_state_authority_required": true,
+      "implicit_temperature_selection": false,
+      "unbound_reference_state_policy": "BLOCKED"
+    },
+    "interaction_audit": {
+      "upstream_temperature_driven_property_refresh_counts_as_variable_property": true,
+      "thermal_conductivity_refresh_is_variable_property_use": true,
+      "wall_temperature_difference_alone_implies_variable_property": false,
+      "wall_state_property_reevaluation_implies_variable_property": true,
+      "native_laminar_constants_unchanged": true,
+      "native_task026_formula_unchanged": true
+    },
+    "fail_closed": {
+      "variable_property_outcome": "BLOCKED_MISSING_LAMINAR_VARIABLE_PROPERTY_EXTENSION_AUTHORITY",
+      "out_of_scope_policy": "BLOCKED",
+      "extrapolation_policy": "FORBIDDEN",
+      "no_silent_fallback_to_native_constants": true
+    },
+    "effective_state": {
+      "all_admitted_tube_branches_authority_covered": false,
+      "tube_wall_correction_canonical_blocker_closure_eligible": false,
+      "tube_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "TUBE-WALL-CORRECTION-AUTHORITY",
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 5,
+      "task172_entry_authority_complete": false,
+      "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_LAMINAR_CONSTANT_PROPERTY_BRANCH_AUTHORITIES"
+    },
+    "governance": {
+      "lifecycle_promotion_performed": false,
+      "new_authority_self_approval": false,
+      "historical_records_rewritten": false,
+      "task026_changed": false,
+      "engineering_rules_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "shell_wall_correction_started": false,
+      "numerical_work_started": false,
+      "golden_approved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "TASK-172-v0.7-tube-laminar-constant-property-scope-authorities-independent-review-r1.md",
+      "document_sha256": "337f44bcbf3f69664b37c04696c63384fc69fad0609ef0f9f36374f555d9538c",
+      "evidence_path": "evidence/TASK-172-tube-laminar-constant-property-scope-authorities-independent-review-r1.json",
+      "evidence_file_sha256": "648dc247a1e15bf2999bfe1170a8e244ba3b5b9e4c10c4711956f27ccbfbce3b",
+      "evidence_canonical_hash": "2d3a606cfe1b8341bfaecb37985aba020b5d3ae9412106f4f56f708b6c1fffdb"
+    },
+    "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_LAMINAR_CONSTANT_PROPERTY_BRANCH_AUTHORITIES",
+    "canonical_hash": "5b307058f7c07eb43c810401f4cd70e771bdaaafc18c6c3a4010cf9d19bdd3a2"
   }
 }
