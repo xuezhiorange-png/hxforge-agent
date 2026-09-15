@@ -6229,5 +6229,149 @@
     "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1_ONLY",
     "canonical_hash": "f1f0d284163d0e2cecbd10ee6e2d89624f2fd93c3556f9784ab7b4f1dd8196ba"
   },
-  "canonical_hash": "677f67f26f896577b31f59afd25a40fa537d33377ab37e98bfba46bd689a2c80"
+  "r37_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1",
+    "previous_head": "0ac9bfd307dca82cb30928a643b71424e16063c2",
+    "historical_registry_root_hash": "677f67f26f896577b31f59afd25a40fa537d33377ab37e98bfba46bd689a2c80",
+    "historical_r36_extension_hash": "f1f0d284163d0e2cecbd10ee6e2d89624f2fd93c3556f9784ab7b4f1dd8196ba",
+    "historical_records_unchanged": true,
+    "review_type": "SHELL_WALL_CORRECTION_NATIVE_TARGET_AND_AUTHORITY_RESOLUTION_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "native_task166": {
+      "task_id": "TASK-166",
+      "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+      "method": "BELL_DELAWARE",
+      "ideal_htc_form": "ji*cp*G*Pr^(-2/3)",
+      "corrected_htc_form": "ideal_h*Jc*Jl*Jb*Js*Jr",
+      "correction_factors": ["Jc", "Jl", "Jb", "Js", "Jr"],
+      "re_evaluator_domain": "0<Re_s<=100000",
+      "construction_families": ["FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"],
+      "task172_current_family": "FIXED_TUBESHEET",
+      "native_applicability_to_task172_target": "TASK166_BELL_FIXED_GEOMETRY_SHELL_PATH_FOR_FIXED_TUBESHEET_E_SHELL_SINGLE_SEGMENTAL_SINGLE_PHASE_NEWTONIAN_ONE_SHELL_PASS_LAYOUT_30_DEG_OR_45_DEG_OR_90_DEG_0<RE_S<=100000;NO_WALL_CORRECTION_AUTHORITY"
+    },
+    "factor_audit": {
+      "Jc": "PURE_CROSSFLOW_TUBE_FRACTION_GEOMETRY_CORRECTION;NOT_WALL_PROPERTY",
+      "Jl": "LEAKAGE_GEOMETRY_CORRECTION;NOT_WALL_PROPERTY",
+      "Jb": "BYPASS_GEOMETRY_CORRECTION;NOT_WALL_PROPERTY",
+      "Js": "UNEQUAL_BAFFLE_SPACING_CORRECTION;NOT_WALL_PROPERTY",
+      "Jr": "LOW_REYNOLDS_CROSS_FLOW_TUBE_ROW_CORRECTION;NOT_WALL_PROPERTY",
+      "Jr_uses_mu_wall": false,
+      "Jr_uses_wall_temperature": false
+    },
+    "native_input_audit": {
+      "wall_viscosity_input_present": false,
+      "wall_temperature_input_present": false,
+      "bulk_wall_property_ratio_present": false,
+      "bulk_property_source": "TASK032_ACCEPTED_SHELL_SIDE_FLOW_STATE",
+      "bulk_property_state_role": "BULK_SHELL_SIDE_STATE"
+    },
+    "wall_target": {
+      "physical_type": "WALL_VISCOSITY_CORRECTION",
+      "reference_surface": "SHELL_FLUID_WALL_INTERFACE",
+      "wall_temperature_state_authority_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+      "wall_temperature_state_lifecycle": "PROPOSED_AUTHORITY",
+      "shell_fluid_wall_interface_identity_defined": true,
+      "shell_fluid_wall_interface_runtime_available": false
+    },
+    "source_lineage": {
+      "bell_origin": {
+        "source_id": "SRC-UDEL-BELL-1963-FINAL-REPORT",
+        "role": "METHOD_ORIGIN_AND_PROVENANCE",
+        "body_available": false,
+        "body_status": "METADATA_ONLY_IN_EFFECTIVE_REPOSITORY_AUTHORITY",
+        "wall_property_correction_present": false,
+        "wall_property_correction_complete": false
+      },
+      "goncalves": {
+        "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+        "role": "PRIMARY_IMPLEMENTATION_EQUATION_AUTHORITY",
+        "body_available": true,
+        "body_hash": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+        "wall_property_correction_present": false,
+        "wall_property_correction_complete": false,
+        "reviewed_locations": [
+          "TASK-166 section 5; Goncalves equations 37--43",
+          "TASK-166 section 8; variable-property and wall-temperature iteration outside native scope",
+          "TASK172 wall-state definition section 8; shell target remains unbound"
+        ]
+      },
+      "jamil": {
+        "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+        "role": "SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_A1_A4_AND_B1_B4",
+        "wall_property_correction_transfer": false
+      },
+      "saif_tariq": {
+        "source_id": "SRC-SAIF-TARIQ-2025-JMES-UNEQUAL-BAFFLE-SPACING-JS",
+        "role": "SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_JS_ONLY",
+        "wall_property_correction_transfer": false
+      },
+      "task032": {
+        "source_id": "TASK032_ACCEPTED_SHELL_SIDE_FLOW_STATE",
+        "role": "UPSTREAM_REYNOLDS_PRANDTL_AND_BULK_PROPERTY_STATE",
+        "wall_state_provided": false
+      }
+    },
+    "negative_lineage": {
+      "TASK034_wall_authority_reuse": "NO",
+      "TASK034_transfer_to_TASK166_heat_transfer": false,
+      "TASK033_Kern_transfer_to_TASK166": false,
+      "Martin_Gnielinski_crossflow_transfer_to_TASK166": false,
+      "tube_RELAP_correction_transfer_to_TASK166": false
+    },
+    "resolution": {
+      "outcome": "NEW_BELL_COMPATIBLE_PRIMARY_SOURCE_AUTHORITY_REQUIRED",
+      "outcome_code": "D",
+      "existing_active_Bell_candidate": false,
+      "explicit_Bell_omission_authority": false,
+      "explicit_no_extension_authority": false,
+      "source_bound": false,
+      "base_compatibility_bound": false,
+      "applicability_bound": false,
+      "status": "BLOCKED",
+      "new_source_authority_required": true
+    },
+    "case_level": {
+      "case_level_shell_correction_authority_present": false,
+      "case_level_shell_bulk_state_present": false,
+      "case_level_shell_wall_state_present": false,
+      "case_level_shell_property_snapshot_present": false,
+      "case_level_shell_execution_authorized": false
+    },
+    "effective_state": {
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_PRIMARY_SOURCE_ACQUISITION_R1_ONLY"
+    },
+    "governance": {
+      "resolution_only": true,
+      "new_authority_self_approval": false,
+      "historical_records_rewritten": false,
+      "engineering_rules_changed": false,
+      "task166_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "TASK-172-v0.7-shell-wall-correction-authority-resolution-r1.md",
+      "document_sha256": "ddbfcffc1128714988e3f5f8eaa5d8b92fbebdca3361c76d598b309157553f79",
+      "evidence_path": "evidence/TASK-172-shell-wall-correction-authority-resolution-r1.json",
+      "evidence_file_sha256": "6c024cdfcfdbaae03e33e23bb21aeff6d465bc9fcbc843179e81b261486b166c",
+      "evidence_canonical_hash": "2195ec361d078ff95c7892e31ca7a1c7aa3a0b3b62552d61a92533b4dee0de4a"
+    },
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_PRIMARY_SOURCE_ACQUISITION_R1_ONLY",
+    "canonical_hash": "5c5dae25ab5cf859565858a5091ffc480b7a6f76121ec6d3d63551bb850d74ac"
+  },
+  "canonical_hash": "a818089d862b7d344d563465207b840e19a6e6b425873840002832803bdf0973"
 }
