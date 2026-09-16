@@ -1,0 +1,416 @@
+{
+  "schema_version": "task172.shell-wall-correction-jmu-external-q-authority-contract.r3",
+  "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_JMU_EXTERNAL_Q_AUTHORITY_CONTRACT_R3",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "e94d8eb5c1b236569d65196be7245de22715d461",
+  "mode": "EXTERNAL_CASE_BOUND_SIGNED_Q_AUTHORITY_CONTRACT_ONLY",
+  "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+  "scope_exclusions": [
+    "REAL_EXTERNAL_Q_INSTANCE",
+    "TASK162_MODIFICATION",
+    "TASK163_MODIFICATION",
+    "PRELIMINARY_SHELL_FILM",
+    "PRELIMINARY_TUBE_FILM",
+    "MATERIAL_AND_K_WALL",
+    "SOURCE_MEAN_BULK_STATE",
+    "GLOBAL_TO_LOCAL_Q_MAPPING",
+    "JMU_IMPLEMENTATION",
+    "WALL_TEMPERATURE_SOLVE",
+    "FIXED_POINT_ITERATION",
+    "JMU_DOMAINS",
+    "NUMERICAL_QUALIFICATION",
+    "TASK166_MODIFICATION"
+  ],
+  "predecessor_effective_state": {
+    "qualified_q_authority_bound": false,
+    "q_input_authority_bound": false,
+    "q_producer_authority_bound": false,
+    "q_authority_source_id": "NONE",
+    "task171_q_observation_input_admissible": true,
+    "task171_q_observation_case_authority_bound": false,
+    "direct_case_duty_authority_bound": false,
+    "tube_enthalpy_duty_authority_bound": false,
+    "shell_enthalpy_duty_authority_bound": false,
+    "two_side_duty_reconciliation_authority_bound": false,
+    "external_q_authority_injection_supported": false,
+    "external_q_authority_contract_id": "NONE",
+    "global_q_to_local_wall_q_mapping_bound": false,
+    "jmu_wall_coupling_circularity_active": "undetermined",
+    "preliminary_shell_film_definition_status": "UNBOUND",
+    "preliminary_tube_film_definition_status": "UNBOUND",
+    "wall_producer_k_wall_authority_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false
+  },
+  "semantic_clarification": {
+    "qualified_q_authority_dependency_status": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY",
+    "best_available_internal_q_producer_id": "TASK162_Q_METHOD",
+    "best_available_internal_q_producer_depends_on_u": true,
+    "best_available_internal_q_producer_depends_on_tube_film": true,
+    "best_available_internal_q_producer_depends_on_shell_film": true,
+    "best_available_internal_q_producer_jmu_dependency": "FUTURE_REBINDING_UNDETERMINED",
+    "historical_r2_rewritten": false
+  },
+  "contract_authority": {
+    "contract_id": "V07-T172-EXTERNAL-SIGNED-Q-INPUT-AUTHORITY-CONTRACT-R3",
+    "status": "PROPOSED_EXTERNAL_Q_AUTHORITY",
+    "model_contract_bound": true,
+    "candidate_created": true,
+    "lifecycle_promotion_performed": false,
+    "actual_instance_present": false,
+    "qualified_q_authority_bound": false,
+    "runtime_injection_supported": false,
+    "production_admission_permitted_by_contract_alone": false
+  },
+  "external_q_classes": [
+    {
+      "class": "MEASURED_HEAT_RATE",
+      "potentially_admissible": true,
+      "contract_complete": true,
+      "instance_present": false,
+      "required_route_fields": [
+        "instrument_or_measurement_method_identity",
+        "measurement_interval",
+        "calibration_or_status_where_applicable",
+        "timestamp_or_event_binding",
+        "case_topology_support_binding",
+        "source_rights_and_evidence"
+      ],
+      "disposition": "CONTRACT_DEFINED_NO_INSTANCE"
+    },
+    {
+      "class": "CASE_SPECIFIED_RATED_DUTY",
+      "potentially_admissible": true,
+      "contract_complete": true,
+      "instance_present": false,
+      "restriction": "MUST_BE_ACTUAL_SIGNED_HEAT_RATE_FOR_EXACT_CASE;REQUIRED_DUTY_OR_SELECTION_THRESHOLD_IS_NOT_HEAT_RATE_AUTHORITY",
+      "disposition": "CONTRACT_DEFINED_NO_INSTANCE"
+    },
+    {
+      "class": "INDEPENDENT_ENERGY_BALANCE",
+      "potentially_admissible": true,
+      "contract_complete": true,
+      "instance_present": false,
+      "required_route_fields": [
+        "MASS_FLOW_STATE_IDENTITIES",
+        "LOCATED_ENTHALPY_STATE_IDENTITIES",
+        "PROPERTY_AUTHORITY",
+        "EQUATION_IDENTITY",
+        "SIGN_AND_SUPPORT"
+      ],
+      "disposition": "CONTRACT_DEFINED_NO_INSTANCE"
+    },
+    {
+      "class": "EXTERNAL_ENGINEERING_CALCULATION",
+      "potentially_admissible": true,
+      "contract_complete": true,
+      "instance_present": false,
+      "dependency_unknown_is_blocked": true,
+      "disposition": "CONTRACT_DEFINED_NO_INSTANCE"
+    },
+    {
+      "class": "CALLER_ASSERTION_WITHOUT_PROVENANCE",
+      "potentially_admissible": false,
+      "contract_complete": false,
+      "instance_present": false,
+      "disposition": "REJECTED"
+    },
+    {
+      "class": "UA_OR_HTC_DERIVED_EXTERNAL_CALCULATION",
+      "potentially_admissible_as_independent_q": false,
+      "contract_complete_as_declared_external_calculation": true,
+      "instance_present": false,
+      "dependency_disclosure_required": true,
+      "disposition": "NOT_INDEPENDENT_Q;DEPENDENCY_MUST_BE_DECLARED"
+    }
+  ],
+  "physical_quantity_contract": {
+    "quantity_type": "HEAT_RATE",
+    "unit": "W",
+    "sign_convention": "TASK171_HOT_TO_COLD",
+    "positive_q_meaning": "HEAT_FLOW_FROM_HOT_STREAM_TO_COLD_STREAM",
+    "physical_meaning": "SIGNED_HEAT_RATE_ACROSS_EXACT_PHYSICAL_SUPPORT",
+    "contract_fields_bound": true,
+    "actual_signed_q_present": false,
+    "unsigned_absolute_duty_rejected_without_reviewed_sign_mapping": true,
+    "forbidden_transforms": [
+      "ABS_Q",
+      "WHOLE_Q_DIVIDED_BY_CELL_COUNT",
+      "WHOLE_Q_DIVIDED_BY_TUBE_COUNT",
+      "WHOLE_Q_DIVIDED_BY_AREA",
+      "WHOLE_Q_DIVIDED_BY_LENGTH",
+      "WHOLE_Q_DIVIDED_BY_MESH_RESOLUTION"
+    ]
+  },
+  "identity_and_support_contract": {
+    "case_identity_fields": [
+      "CASE_CONFIGURATION_ID",
+      "CASE_CONFIGURATION_HASH",
+      "CASE_REVISION"
+    ],
+    "topology_identity_fields": [
+      "TASK171_TOPOLOGY_ID",
+      "TASK171_TOPOLOGY_HASH"
+    ],
+    "support_identity_fields": [
+      "PHYSICAL_SUPPORT_TYPE",
+      "PHYSICAL_SUPPORT_ID",
+      "PHYSICAL_SUPPORT_INTERVAL_ID",
+      "WALL_INTERFACE_ID",
+      "PHYSICAL_SUPPORT_START",
+      "PHYSICAL_SUPPORT_END",
+      "PHYSICAL_SUPPORT_GEOMETRY_ID",
+      "STREAM_ROLE_AND_SIDE_ASSIGNMENT",
+      "HOT_COLD_ROLE_ASSIGNMENT"
+    ],
+    "allowed_support_types": [
+      "WHOLE_EXCHANGER",
+      "PHYSICAL_INTERVAL",
+      "CELL",
+      "WALL_INTERFACE",
+      "OTHER_EXPLICIT_SUPPORT"
+    ],
+    "case_identity_contract_bound": true,
+    "topology_identity_contract_bound": true,
+    "physical_support_contract_bound": true,
+    "same_name_substitution_allowed": false,
+    "hash_mismatch_fail_closed": true,
+    "whole_exchanger_is_local_wall_q": false,
+    "global_to_local_mapping_bound": false,
+    "global_to_local_mapping_required": true
+  },
+  "granularity_contract": {
+    "declared_granularity_required": true,
+    "granularity_must_agree_with_support": true,
+    "allowed_granularities": [
+      "WHOLE_EXCHANGER",
+      "PHYSICAL_INTERVAL",
+      "CELL",
+      "WALL_INTERFACE",
+      "OTHER_EXPLICIT_SUPPORT"
+    ],
+    "whole_to_local_split_without_separate_authority": false,
+    "support_averaging_without_separate_authority": false,
+    "native_event_boundary_crossing": false,
+    "local_q_acceptable_only_with_exact_support": true
+  },
+  "source_provenance_contract": {
+    "required_fields": [
+      "EXTERNAL_Q_SOURCE_ID",
+      "EXTERNAL_Q_SOURCE_REVISION",
+      "EXTERNAL_Q_SOURCE_CLASS",
+      "EXTERNAL_Q_SOURCE_LOCATION",
+      "EXTERNAL_Q_PRODUCER_OR_MEASUREMENT_METHOD",
+      "EXTERNAL_Q_AUTHORITY_OWNER",
+      "EXTERNAL_Q_EVIDENCE_REFERENCES",
+      "EXTERNAL_Q_SOURCE_RIGHTS_STATUS",
+      "EXTERNAL_Q_EVIDENCE_REVIEW_PERMISSION_STATUS"
+    ],
+    "source_identity_contract_bound": true,
+    "producer_method_contract_bound": true,
+    "caller_assertion_admissible": false,
+    "runtime_database_lookup_is_authority": false,
+    "library_availability_is_engineering_permission": false
+  },
+  "route_contracts": {
+    "measured_q": {
+      "contract_complete": true,
+      "instance_present": false,
+      "required_fields": [
+        "instrument_or_measurement_method_identity",
+        "measurement_interval",
+        "calibration_or_status_where_applicable",
+        "timestamp_or_event_binding",
+        "source_governed_uncertainty_or_accuracy_metadata_where_required"
+      ],
+      "threshold_invented": false
+    },
+    "independent_energy_balance_q": {
+      "contract_complete": true,
+      "instance_present": false,
+      "required_fields": [
+        "mass_flow_identity",
+        "inlet_enthalpy_state_identity",
+        "outlet_enthalpy_state_identity",
+        "state_locations",
+        "property_authority",
+        "equation_identity",
+        "signed_support"
+      ],
+      "balance_executed": false
+    },
+    "external_engineering_calculation_q": {
+      "contract_complete": true,
+      "instance_present": false,
+      "required_dependency_fields": [
+        "DEPENDS_ON_U",
+        "DEPENDS_ON_TUBE_FILM",
+        "DEPENDS_ON_SHELL_FILM",
+        "DEPENDS_ON_JMU",
+        "DEPENDS_ON_WALL_K",
+        "OTHER_DEPENDENCIES"
+      ],
+      "unknown_dependency_is_blocked": true
+    }
+  },
+  "dependency_and_independence_contract": {
+    "dependency_declaration_contract_bound": true,
+    "independence_requires_affirmative_support": true,
+    "unknown_is_false": false,
+    "current_qualified_q_dependency_status": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY",
+    "current_q_authority_is_independent_of_u": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY",
+    "current_q_authority_is_independent_of_tube_film": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY",
+    "current_q_authority_is_independent_of_shell_film": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY",
+    "current_q_authority_is_independent_of_jmu": "NOT_APPLICABLE_NO_QUALIFIED_Q_AUTHORITY"
+  },
+  "lifecycle_contract": {
+    "states": [
+      "PROPOSED_EXTERNAL_Q_AUTHORITY",
+      "REVIEWED_EXTERNAL_Q_AUTHORITY",
+      "ACCEPTED_EXTERNAL_Q_AUTHORITY",
+      "REJECTED_EXTERNAL_Q_AUTHORITY"
+    ],
+    "contract_lifecycle_bound": true,
+    "actual_instance_lifecycle_state": "NONE",
+    "independent_review_required": true,
+    "codex_lifecycle_promotion_performed": false,
+    "runtime_injection_supported": false
+  },
+  "receipt_shape": {
+    "actual_receipt_created": false,
+    "required_fields": [
+      "EXTERNAL_Q_AUTHORITY_RECEIPT_ID",
+      "SCHEMA_VERSION",
+      "SOURCE_ID",
+      "SOURCE_REVISION",
+      "SOURCE_CLASS",
+      "SOURCE_LOCATION",
+      "CASE_CONFIGURATION_ID",
+      "CASE_CONFIGURATION_HASH",
+      "CASE_REVISION",
+      "TASK171_TOPOLOGY_ID",
+      "TASK171_TOPOLOGY_HASH",
+      "PHYSICAL_SUPPORT_TYPE",
+      "PHYSICAL_SUPPORT_ID",
+      "PHYSICAL_SUPPORT_INTERVAL_ID",
+      "WALL_INTERFACE_ID",
+      "SIGNED_Q_W",
+      "Q_QUANTITY_TYPE",
+      "Q_UNIT",
+      "Q_SIGN_CONVENTION",
+      "GRANULARITY",
+      "PRODUCER_OR_MEASUREMENT_METHOD",
+      "DEPENDENCY_DECLARATION",
+      "EVIDENCE_REFERENCES",
+      "RIGHTS_STATUS",
+      "LIFECYCLE_STATUS",
+      "CANONICAL_HASH"
+    ],
+    "canonical_preimage_fields_bound": true,
+    "canonical_preimage_includes": [
+      "SCHEMA_VERSION",
+      "CASE_AND_TOPOLOGY_IDENTITIES",
+      "PHYSICAL_SUPPORT",
+      "SIGNED_Q_AND_UNITS",
+      "SOURCE_PROVENANCE_AND_RIGHTS",
+      "DEPENDENCY_DECLARATION",
+      "GRANULARITY",
+      "SIGN_SEMANTICS",
+      "LIFECYCLE",
+      "EVIDENCE_REFERENCES"
+    ],
+    "identity_changes_required_for": [
+      "Q_VALUE_CHANGE",
+      "SOURCE_REVISION_CHANGE",
+      "CASE_CONFIGURATION_CHANGE",
+      "TOPOLOGY_CHANGE",
+      "PHYSICAL_SUPPORT_CHANGE",
+      "GRANULARITY_CHANGE",
+      "DEPENDENCY_CHANGE",
+      "LIFECYCLE_CHANGE"
+    ],
+    "real_q_value_added": false
+  },
+  "task171_binding_boundary": {
+    "task171_binding_can_reference_external_q_receipt": false,
+    "opaque_evidence_reference_only": true,
+    "future_implementation_schema_gate_required": true,
+    "task171_production_changed": false
+  },
+  "preserved_scope": {
+    "preliminary_shell_film_definition_status": "UNBOUND",
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "preliminary_shell_film_uses_jmu": "undetermined",
+    "preliminary_tube_film_definition_status": "UNBOUND",
+    "preliminary_tube_film_transfer_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_wall_coupling_circularity_active": "undetermined",
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false
+  },
+  "effective_state": {
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true,
+    "external_q_instance_present": false,
+    "qualified_q_authority_bound": false
+  },
+  "decision": {
+    "result": "RESOLVED",
+    "outcome": "OUTCOME_A_EXTERNAL_Q_CONTRACT_COMPLETE_NO_INSTANCE",
+    "external_q_input_authority_contract_bound": true,
+    "external_q_authority_contract_candidate_created": true,
+    "qualified_q_authority_bound": false,
+    "q_input_authority_bound": false,
+    "q_producer_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_EXTERNAL_Q_RECEIPT_INDEPENDENT_REVIEW_R1_ONLY"
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "historical_records_rewritten": false,
+    "engineering_rules_changed": false,
+    "task162_changed": false,
+    "task163_changed": false,
+    "task166_changed": false,
+    "task171_semantics_changed": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "wall_temperature_solve_executed": false,
+    "fixed_point_iteration_performed": false,
+    "real_external_q_receipt_created": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-external-q-authority-contract-r3.md",
+    "document_sha256": "4da059dcdd8e78d5847c2b39ade9f234d03f36748b1c79236018b6b25ec9e580",
+    "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-external-q-authority-contract-r3.json",
+    "evidence_canonical_hash": "TO_BE_RECORDED_AFTER_EVIDENCE_FINALIZATION",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_file_hash_excluded_from_self_preimage": true,
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_canonical_hash": "TO_BE_RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "TO_BE_RECORDED_IN_APPEND_ONLY_REGISTRY"
+  },
+  "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_EXTERNAL_Q_RECEIPT_INDEPENDENT_REVIEW_R1_ONLY",
+  "canonical_hash": "a3ceebf71fb023eddd45e5d3ea3e88c94e74275e27a68947cd2fa3e48817d9e9"
+}
