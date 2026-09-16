@@ -7762,5 +7762,193 @@
     "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_Q_AND_PRELIMINARY_FILM_AUTHORITY_R1_ONLY",
     "canonical_hash": "97e7075ee3c3397eec1357a031cd0fccf7310a7867970c7175fb5733f7a6a911"
   },
-  "canonical_hash": "efacd04df2a232006b7821bf690fe73dc40255c746d23b5a9f11f10e990bd11c"
+  "r45_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_JMU_Q_AND_PRELIMINARY_FILM_AUTHORITY_R1",
+    "previous_head": "948ad8ca0a60c3edba22d3f0cfaa3ed75d27c99d",
+    "historical_registry_root_hash": "efacd04df2a232006b7821bf690fe73dc40255c746d23b5a9f11f10e990bd11c",
+    "historical_r44_extension_hash": "97e7075ee3c3397eec1357a031cd0fccf7310a7867970c7175fb5733f7a6a911",
+    "historical_records_unchanged": true,
+    "review_type": "TARGETED_JMU_Q_AND_PRELIMINARY_TUBE_SHELL_FILM_AUTHORITY_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "scope_exclusions": [
+      "MATERIAL_AND_K_WALL",
+      "SOURCE_MEAN_BULK_STATE_PRODUCER",
+      "WHOLE_LOCAL_JMU_MAPPING",
+      "JMU_RE_PR_VISCOSITY_RATIO_AND_TEMPERATURE_DOMAINS",
+      "THOME_RIGHTS_AND_PRODUCTION_PROMOTION",
+      "NUMERICAL_QUALIFICATION",
+      "TASK166_MODIFICATION",
+      "TASK172_IMPLEMENTATION"
+    ],
+    "q_authority": {
+      "qualified_q_authority_bound": false,
+      "q_authority_source_id": "NONE",
+      "q_authority_granularity": "UNBOUND",
+      "q_authority_is_independent_of_u": "undetermined",
+      "q_authority_is_independent_of_jmu": "undetermined",
+      "task171_q_observation_input_admissible": true,
+      "task171_q_observation_case_authority_bound": false,
+      "independent_case_duty_authority_bound": false,
+      "independent_case_duty_source_id": "NONE",
+      "independent_case_duty_signed": false,
+      "independent_case_duty_granularity": "UNBOUND",
+      "global_q_to_local_wall_q_mapping_bound": false,
+      "global_q_to_local_wall_q_mapping_rule": "NONE;NO_DIVISION_BY_CELL_COUNT_TUBE_COUNT_AREA_OR_LENGTH",
+      "wall_producer_heat_rate_authority_status": "NO_QUALIFIED_Q_AUTHORITY",
+      "wall_producer_heat_rate_source_id": "NONE",
+      "wall_producer_heat_rate_source": "NONE;TASK171_OBSERVATION_ONLY;TASK162_TASK163_WHOLE_EXCHANGER_DUTY_NOT_LOCAL_TASK172_PRODUCER",
+      "wall_producer_heat_rate_granularity": "UNBOUND",
+      "candidate_sources_audited": [
+        "TASK171_BOOKKEEPING_HEAT_OBSERVATION",
+        "TASK162_Q_METHOD_WHOLE_EXCHANGER_LEGACY_CLOSURE",
+        "TASK163_TASK162_DUTY_PROJECTION",
+        "CASE_DUTY_OR_CALLER_ASSERTION"
+      ]
+    },
+    "preliminary_shell_film": {
+      "definition_status": "UNBOUND",
+      "definition": "NO_AUTHORIZED_SELECTION_AMONG_IDEAL_HC_GEOMETRY_CORRECTED_WITHOUT_JMU_OR_FULL_JMU_CORRECTED_FILM",
+      "source_id": "NONE",
+      "source_location": "NONE;JAMIL_THOME_ONLY_STATES_PRELIMINARY_HEAT_TRANSFER",
+      "source_authority": "UNBOUND_BY_ACQUIRED_SOURCE_TEXT",
+      "transfer_authority_bound": false,
+      "uses_jmu": "undetermined",
+      "candidate_a": "IDEAL_HC_ONLY;NOT_SOURCE_SELECTED",
+      "candidate_b": "HC*JC*JL*JB*JS*JR_WITHOUT_JMU;NOT_SOURCE_SELECTED",
+      "candidate_c": "FULL_CORRECTED_FILM_INCLUDING_JMU;NOT_SOURCE_SELECTED;WOULD_CREATE_CONDITIONAL_LOOP",
+      "candidate_d": "OTHER_EXPLICIT_SOURCE_DEFINED_FILM;NO_RULE_BOUND",
+      "convenience_selection_forbidden": true
+    },
+    "preliminary_tube_film": {
+      "definition_status": "UNBOUND",
+      "source_id": "NONE",
+      "definition": "TASK026_NATIVE_FILM_EXISTS_BUT_TASK172_PRELIMINARY_WALL_PRODUCER_TRANSFER_RULE_IS_UNBOUND",
+      "source_authority": "TASK026_NATIVE_AUTHORITY_NOT_SELECTED_AS_TASK172_PRELIMINARY_INPUT",
+      "active_wall_correction_required": "undetermined",
+      "transfer_authority_bound": false,
+      "qualified_input_available": false,
+      "tube_correction_lifecycle_reopened": false
+    },
+    "q_film_dependency_matrix": [
+      {
+        "candidate_path": "TASK171_OBSERVATION_PLUS_IDEAL_HC",
+        "q_independent_of_jmu": true,
+        "q_independent_of_u": "not_applicable_observation_only",
+        "shell_film_uses_jmu": "undetermined",
+        "tube_film_qualified": false,
+        "disposition": "NOT_QUALIFIED_PATH"
+      },
+      {
+        "candidate_path": "TASK162_Q_METHOD_PLUS_IDEAL_HC",
+        "q_independent_of_jmu": "current_form_only",
+        "q_independent_of_u": false,
+        "shell_film_uses_jmu": "undetermined",
+        "tube_film_qualified": false,
+        "disposition": "NOT_QUALIFIED_PATH"
+      },
+      {
+        "candidate_path": "TASK162_Q_METHOD_PLUS_GEOMETRY_CORRECTED_FILM_WITHOUT_JMU",
+        "q_independent_of_jmu": "current_form_only",
+        "q_independent_of_u": false,
+        "shell_film_uses_jmu": false,
+        "tube_film_qualified": false,
+        "disposition": "NOT_SOURCE_SELECTED_AND_NOT_TASK172_Q_AUTHORITY"
+      },
+      {
+        "candidate_path": "TASK162_Q_METHOD_PLUS_FULL_JMU_FILM",
+        "q_independent_of_jmu": false,
+        "q_independent_of_u": false,
+        "shell_film_uses_jmu": true,
+        "tube_film_qualified": false,
+        "disposition": "CONDITIONAL_FIXED_POINT_IF_SELECTED;NO_SELECTION_AUTHORIZED"
+      },
+      {
+        "candidate_path": "INDEPENDENT_CASE_DUTY_PLUS_ANY_SHELL_FILM",
+        "q_independent_of_jmu": "unknown_without_bound_case_duty",
+        "q_independent_of_u": "unknown_without_bound_case_duty",
+        "shell_film_uses_jmu": "undetermined",
+        "tube_film_qualified": false,
+        "disposition": "NO_INDEPENDENT_CASE_DUTY_BOUND"
+      }
+    ],
+    "preserved_dependencies": {
+      "wall_producer_k_wall_authority_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "source_bulk_state_available_in_task172": false,
+      "source_jmu_wall_state_granularity_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "wall_temperature_aggregation_rule_bound": false,
+      "localization_transfer_authority_bound": false,
+      "jmu_re_domain_source_bound": false,
+      "jmu_pr_domain_source_bound": false,
+      "jmu_viscosity_ratio_domain_source_bound": false,
+      "jmu_temperature_domain_source_bound": false
+    },
+    "circularity": {
+      "path_identified": true,
+      "path": "CONDITIONAL_SELECTED_Q_OR_PRELIMINARY_SHELL_FILM_TO_CLEAN_RADIAL_WALL_STATE_TO_MU_WALL_TO_JMU",
+      "active": "undetermined",
+      "shell_film_creates_jmu_fixed_point": "undetermined",
+      "closure_authority_bound": false,
+      "iteration_authorized": false,
+      "last_iterate_acceptance": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "outcome": "OUTCOME_F_Q_AND_FILM_REMAIN_UNBOUND",
+      "jmu_q_and_preliminary_film_authority_candidate_created": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "smallest_immediate_missing_authorities": [
+        "QUALIFIED_SIGNED_Q_AUTHORITY",
+        "PRELIMINARY_SHELL_FILM_DEFINITION_AND_JMU_DEPENDENCY",
+        "PRELIMINARY_TUBE_FILM_INPUT_CONTRACT"
+      ]
+    },
+    "effective_state": {
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "task172_entry_review_pending": true,
+      "blocker_removed": false
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "new_authority_self_approval": false,
+      "lifecycle_promotion_performed": false,
+      "historical_records_rewritten": false,
+      "engineering_rules_changed": false,
+      "task166_changed": false,
+      "production_code_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "wall_temperature_solve_executed": false,
+      "fixed_point_iteration_performed": false,
+      "blocker_removed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-q-and-preliminary-film-authority-r1.md",
+      "document_sha256": "a3c6efbc71bf59a9e0c00ca3107ac39fb176964431bcae902c8b9df581c43a1c",
+      "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-q-and-preliminary-film-authority-r1.json",
+      "evidence_canonical_hash": "bf140ec9c01324139b215381437093f18dfcbc6321b88b6e55bfc9552bd0c8d0",
+      "evidence_file_sha256": "a4e9edad979cf1d0bb1f2379c6049a5670d4bd0ae3263da569ec179a3df1fe28",
+      "evidence_file_hash_excluded_from_self_preimage": true,
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY"
+    },
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_Q_AUTHORITY_R2_ONLY",
+    "canonical_hash": "fc57056002f146544ad3dce1765241d5b41a7814b85cea9882f53f7bb90481ff"
+  },
+  "canonical_hash": "2537308e9fff5c347bff61a9f694118e59924d0c82a945b4c64a876f75b77e76"
 }
