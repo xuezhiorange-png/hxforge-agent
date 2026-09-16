@@ -8480,5 +8480,156 @@
     "next_gate": "NONE_UNTIL_REAL_EXTERNAL_Q_RECEIPT_EXISTS",
     "canonical_hash": "df0069d2f094ed96b6fb7c151adca952dc4216dd59cdecbc284d9bd1d7d048cf"
   },
-  "canonical_hash": "75fe5521c89da1f8e09807c8a7b22f4e01a43e3c15161361c1975ea6ed280561"
+  "r49_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_JMU_PRELIMINARY_FILM_AUTHORITY_R2",
+    "previous_head": "45dcc0e8a0364c0707e664f3fe33fa8f0011cabb",
+    "historical_registry_root_hash": "75fe5521c89da1f8e09807c8a7b22f4e01a43e3c15161361c1975ea6ed280561",
+    "historical_r48_extension_hash": "df0069d2f094ed96b6fb7c151adca952dc4216dd59cdecbc284d9bd1d7d048cf",
+    "historical_records_unchanged": true,
+    "review_type": "JMU_PRELIMINARY_TUBE_AND_SHELL_FILM_AUTHORITY_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "scope_exclusions": [
+      "EXTERNAL_Q_INSTANCE",
+      "EXTERNAL_Q_RECEIPT",
+      "TASK162_Q_METHOD_AS_PRELIMINARY_Q",
+      "TASK163_DUTY_PROJECTION",
+      "MATERIAL_AND_K_WALL",
+      "SOURCE_MEAN_BULK_PRODUCER",
+      "GLOBAL_TO_LOCAL_JMU_MAPPING",
+      "JMU_IMPLEMENTATION",
+      "WALL_TEMPERATURE_SOLVE",
+      "FIXED_POINT_ITERATION",
+      "TASK026_MODIFICATION",
+      "TASK166_MODIFICATION",
+      "NUMERICAL_QUALIFICATION",
+      "READY",
+      "MERGE"
+    ],
+    "source_chain": {
+      "jamil_source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+      "jamil_body_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+      "jamil_locations": "SECTION_2.2.2_PDF_P11_EQ6_EQ7;APPENDIX_PDF_PP58-59_TABLE_A2",
+      "thome_source_id": "THOME-2004-EDB3-CH3-CROSSCHECK",
+      "thome_body_sha256": "326cf8a5c26d6010b701acc9459424391a59a67c08e28e0a41c699c5b9146ea4",
+      "thome_locations": "SECTION_3.4.6_PRINTED_P3-12_EQ3.4.23_AND_PRELIMINARY_HEAT_TRANSFER_WORDING",
+      "thome_edition_identity_scope": "RELEVANT_CHAPTER_CONTENT_ONLY",
+      "thome_exact_cited_2004_edition_chain_bound": false,
+      "thome_rights_review_complete": false,
+      "thome_production_authority_promoted": false,
+      "new_external_body_acquired": false
+    },
+    "shell_film": {
+      "source_rule_bound": false,
+      "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS;THOME-2004-EDB3-CH3-CROSSCHECK",
+      "source_location": "JAMIL_EQ6_EQ7_TABLE_A2;THOME_SECTION_3.4.6_PRINTED_P3-12_EQ3.4.23_AND_PRELIMINARY_HEAT_TRANSFER_WORDING",
+      "definition_status": "UNBOUND",
+      "definition": "SOURCE_REQUIRES_PRELIMINARY_HEAT_TRANSFER_CALCULATION_BUT_DOES_NOT_SELECT_HC_GEOMETRY_CORRECTED_NO_JMU_FULL_JMU_OR_OTHER_FILM",
+      "includes": "UNRESOLVED",
+      "uses_jmu": "undetermined",
+      "transfer_authority_bound": false,
+      "task166_native_ideal_film_identity_bound": true,
+      "task166_native_geometry_correction_set_identity_bound": true,
+      "task166_transfer_compatible": false
+    },
+    "tube_film": {
+      "source_rule_bound": true,
+      "source_id": "R8_TASK026_SELECTOR;SRC-T172-REPO-TUBE",
+      "definition_status": "PARTIALLY_BOUND",
+      "definition": "CASE_SELECTED_EXACT_TASK026_R8_BRANCH_REQUIRED;CWT_OR_CHF_OR_TURBULENT_C3;NO_SINGLE_PRELIMINARY_BRANCH_SELECTED",
+      "branch_id": "TASK026_NATIVE_BRANCH_SELECTED_BY_CASE",
+      "method": "TASK026_R8_SINGLE_PHASE_TUBE_THERMAL_PIPELINE",
+      "state_basis": "CALLER_SUPPLIED_SINGLE_PROPERTY_SNAPSHOT_RHO_MU_K_CP;NO_NATIVE_JMU_WALL_STATE_INPUT",
+      "area_basis": "TOTAL_PARALLEL_FLOW_AREA_AND_HYDRAULIC_DIAMETER;LOCAL_WALL_AREA_TRANSFER_UNBOUND",
+      "active_wall_correction_required": "undetermined",
+      "transfer_authority_bound": false
+    },
+    "dependency_state": {
+      "shell_film_depends_on_jmu": "undetermined",
+      "tube_film_depends_on_wall_state": "undetermined",
+      "tube_film_depends_on_active_wall_correction": "undetermined",
+      "shell_film_creates_jmu_fixed_point": "undetermined",
+      "jmu_wall_coupling_circularity_path_identified": true,
+      "jmu_wall_coupling_circularity_active": "undetermined",
+      "jmu_wall_coupling_iteration_authorized": false
+    },
+    "preserved_q_state": {
+      "external_q_contract_status": "REVIEWED_CONTRACT",
+      "external_q_contract_independent_review_complete": true,
+      "external_q_contract_independent_review_result": "PASS",
+      "external_q_instance_status": "NONE",
+      "external_q_instance_present": false,
+      "real_external_q_receipt_created": false,
+      "external_q_receipt_review_eligible": false,
+      "qualified_q_authority_bound": false,
+      "q_input_authority_bound": false,
+      "q_producer_authority_bound": false,
+      "external_q_authority_injection_supported": false,
+      "next_lifecycle_event": "REAL_CASE_BOUND_EXTERNAL_Q_RECEIPT_REQUIRED",
+      "global_q_to_local_wall_q_mapping_bound": false
+    },
+    "preserved_wall_state": {
+      "wall_producer_k_wall_authority_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "outcome": "OUTCOME_F_SOURCE_AMBIGUITY_REMAINS",
+      "jmu_preliminary_film_authority_candidate_created": false,
+      "smallest_direct_gaps": [
+        "NO_SOURCE_RULE_SELECTS_PRELIMINARY_SHELL_FILM",
+        "NO_TASK172_TRANSFER_EDGE_FOR_PRELIMINARY_SHELL_FILM",
+        "NO_SINGLE_CASE_SELECTED_TASK026_PRELIMINARY_TUBE_BRANCH",
+        "NO_TASK172_TRANSFER_EDGE_FOR_PRELIMINARY_TUBE_FILM"
+      ],
+      "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_PRELIMINARY_FILM_SOURCE_AND_TRANSFER_RESOLUTION_R3_ONLY"
+    },
+    "effective_state": {
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "task172_entry_review_pending": true
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "new_authority_self_approval": false,
+      "lifecycle_promotion_performed": false,
+      "historical_records_rewritten": false,
+      "engineering_rules_changed": false,
+      "task162_changed": false,
+      "task163_changed": false,
+      "task166_changed": false,
+      "task171_semantics_changed": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "q_receipt_created": false,
+      "wall_temperature_solve_executed": false,
+      "fixed_point_iteration_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-preliminary-film-authority-r2.md",
+      "document_sha256": "07aeea9a328c4ecf4fd90005aa6e5080c59f11e40eebb6728b82e107f66773d2",
+      "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-preliminary-film-authority-r2.json",
+      "evidence_canonical_hash": "98cfe34bc30fe7725465c74c5024a86ea5c7ea76ca6d5e7a5dcd8d562aea7cd2",
+      "evidence_file_sha256": "5c7361d0e3d5b903229f15301548bb346a73a3a281e5e11b2d6172bf100e0f7e",
+      "evidence_file_hash_excluded_from_self_preimage": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JMU_PRELIMINARY_FILM_SOURCE_AND_TRANSFER_RESOLUTION_R3_ONLY",
+    "canonical_hash": "3dd6e3de988d94d9e7ac45dc0d26537903955eccc20c5e1b45e7e9154d278c7a"
+  },
+  "canonical_hash": "a6498bb231fbd20cf083415edceec75afac417fb70c738cb4e483df26a24ea96"
 }
