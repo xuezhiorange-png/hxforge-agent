@@ -1,0 +1,420 @@
+{
+  "schema": "hxforge.task172.jmu_preliminary_tube_film_transfer_contract.r5",
+  "schema_version": "1",
+  "task_id": "TASK172_V0_7_JMU_PRELIMINARY_TUBE_FILM_CASE_AND_SUPPORT_TRANSFER_CONTRACT_CONSTRUCTION_R5",
+  "task_scope": "MODEL_LEVEL_TASK026_TO_TASK172_PRELIMINARY_TUBE_FILM_CASE_SUPPORT_TRANSFER_CONTRACT_ONLY",
+  "mode": "MODEL_LEVEL_TRANSFER_CONTRACT_CONSTRUCTION_ONLY",
+  "authorized_predecessor_head": "827100606c0ab615104ba9c0a45ae8e20497a050",
+  "pr": {
+    "number": 277,
+    "state": "OPEN",
+    "draft": true,
+    "base_branch": "main",
+    "head_branch": "docs/v0-7-task172-entry-authority",
+    "body_updated": false
+  },
+  "predecessor": {
+    "r4_task_id": "TASK172_V0_7_JMU_PRELIMINARY_TUBE_FILM_CASE_BRANCH_ROLE_AND_SUPPORT_TRANSFER_CLOSURE_R4",
+    "r4_head": "827100606c0ab615104ba9c0a45ae8e20497a050",
+    "r4_document_path": "docs/tasks/TASK-172-v0.7-jmu-preliminary-tube-film-case-branch-role-and-support-transfer-closure-r4.md",
+    "r4_document_sha256": "76c6cc425d070a1b23d60d991ffe9edc3eb21e56aa3a8d5865a332dcc9804a33",
+    "r4_evidence_path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-case-branch-role-and-support-transfer-closure-r4.json",
+    "r4_evidence_canonical_hash": "d02894726ffa33034c99f4b230c3585e48f719e4fdd67bb1e0d99e5709f45ecb",
+    "historical_payloads_immutable": true
+  },
+  "native_source_objects": [
+    {
+      "source_id": "TASK026_NATIVE_NUSSELT_SELECTOR",
+      "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+      "git_blob_sha1": "750d92e2da2284202190afe93cf47589eb3a6bb2",
+      "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109",
+      "role": "deterministic_native_branch_selection"
+    },
+    {
+      "source_id": "TASK026_NATIVE_SINGLE_PHASE_CALCULATION",
+      "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py",
+      "git_blob_sha1": "90a39ab66dd3b2600f228cf513bf398c9c0cb254",
+      "sha256": "c9cc6444a79975edd3b5b37249a2ee0909a5f07987b3783d70d99e5342f3ff08",
+      "role": "native_scalar_hi_and_property_snapshot_consumption"
+    },
+    {
+      "source_id": "TASK026_NATIVE_STAGE_PIPELINE",
+      "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py",
+      "git_blob_sha1": "51034d2efdfdbeb5b5149467da323de95d8d474f",
+      "sha256": "2ec94d18f061c88ca05f7d64f7bac1ea604c6f2c3aa62e994597fd3bd68852c2",
+      "role": "native_result_identity_and_provenance"
+    },
+    {
+      "source_id": "TASK026_NATIVE_REQUEST_AND_PROPERTY_SNAPSHOT",
+      "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/request.py",
+      "git_blob_sha1": "492d269fd82222c6c04b442d9ef90fa600d70730",
+      "sha256": "d438504563e4c48adb6cdaa00b5552b121909d344781e4a9a99c049fbcf84ab4",
+      "role": "typed_request_thermal_boundary_and_property_snapshot_identity"
+    },
+    {
+      "source_id": "TASK007_TUBE_ANNULUS_CORRELATION_SCOPE",
+      "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+      "git_blob_sha1": "35b51c5007cbd48556d93d14e0106431c60a0cb9",
+      "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb",
+      "role": "native_correlation_scope_and_limitations"
+    }
+  ],
+  "inherited_authorities": {
+    "task171_topology": {
+      "authority_id": "V07-T171-TOPOLOGY-R4-V1",
+      "status": "REVIEWED_AUTHORITY",
+      "semantic_use": "native_event_bounded_physical_intervals_wall_interfaces_and_state_locations"
+    },
+    "clean_wall_network": {
+      "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+      "hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+      "status": "REVIEWED_AUTHORITY",
+      "semantic_use": "clean_surface_nodes_and_supplied-film_radial_resistance_network"
+    },
+    "local_cylindrical_mapping": {
+      "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+      "hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+      "status": "REVIEWED_AUTHORITY",
+      "semantic_use": "local_inside_outside_area_and_cylindrical_wall_resistance_mapping"
+    },
+    "cwt": {
+      "authority_id": "V07-T172-TUBE-LAMINAR-CWT-PROPERTY-SCOPE-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "nu_d": 3.66,
+      "active_wall_correction": false
+    },
+    "chf": {
+      "authority_id": "V07-T172-TUBE-LAMINAR-CHF-PROPERTY-SCOPE-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "nu_d": 4.36,
+      "active_wall_correction": false
+    },
+    "c3": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "preliminary_role_policy_bound": false,
+      "preliminary_role_policy": "UNRESOLVED_PRELIMINARY_ROLE_MUST_NOT_SILENTLY_SELECT_UNCORRECTED_C3_OR_APPLY_ACCEPTED_C3_CORRECTION"
+    }
+  },
+  "model_level_contract": {
+    "transfer_authority_id": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5",
+    "lifecycle_status": "PROPOSED_TUBE_FILM_TRANSFER_CONTRACT",
+    "independent_review": "PENDING",
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "task172_preliminary_film_case_contract_shape_bound": true,
+    "task172_preliminary_branch_role_contract_bound": true,
+    "task026_to_task172_transfer_contract_bound": true,
+    "task026_to_task172_preliminary_transfer_contract_bound": false,
+    "task172_preliminary_film_case_contract_bound": false,
+    "task172_preliminary_film_case_instance_bound": false,
+    "future_transfer_record_required_fields": [
+      "TRANSFER_RECEIPT_ID",
+      "SCHEMA_VERSION",
+      "TASK172_CASE_ID",
+      "TASK172_CASE_HASH",
+      "TASK171_TOPOLOGY_ID",
+      "TASK171_TOPOLOGY_HASH",
+      "PHYSICAL_SEGMENT_ID",
+      "PHYSICAL_INTERVAL_ID",
+      "PHYSICAL_INTERVAL_START",
+      "PHYSICAL_INTERVAL_END",
+      "WALL_INTERFACE_ID",
+      "TASK171_STATE_ID",
+      "TUBE_SIDE_STREAM_ID",
+      "TUBE_SIDE_ROLE",
+      "TASK026_REQUEST_ID",
+      "TASK026_RESULT_ID",
+      "TASK026_RESULT_HASH",
+      "TASK026_BRANCH_ID",
+      "TASK025_GEOMETRY_ID",
+      "TASK025_GEOMETRY_HASH",
+      "TASK026_PROPERTY_SNAPSHOT_HASH",
+      "PROPERTY_SOURCE_ID",
+      "PROPERTY_SOURCE_VERSION",
+      "PROPERTY_SOURCE_REVISION_OR_HASH",
+      "PROPERTY_SOURCE_EVIDENCE_REFS",
+      "PROPERTY_SOURCE_RIGHTS_STATUS",
+      "THERMAL_BOUNDARY_CONDITION",
+      "FILM_COEFFICIENT_W_M2K",
+      "FILM_ROLE",
+      "C3_CORRECTION_POLICY",
+      "TRANSFER_AUTHORITY_ID",
+      "LIFECYCLE_STATUS",
+      "CANONICAL_HASH"
+    ],
+    "future_transfer_record_population": "NO_REAL_INSTANCE_VALUES_POPULATED_IN_R5",
+    "canonical_preimage_scope": [
+      "schema_version",
+      "case_and_configuration",
+      "task171_topology_and_physical_support",
+      "located_state_and_property_snapshot",
+      "task026_request_result_and_branch",
+      "task025_geometry",
+      "property_source_provenance_and_rights",
+      "thermal_boundary_and_film_role",
+      "c3_policy",
+      "transfer_authority_and_lifecycle"
+    ],
+    "canonical_hash_rule": "shared hexagent.canonical_json.canonical_sha256; canonical_hash excluded from its own preimage"
+  },
+  "case_contract": {
+    "shape_bound": true,
+    "required_bindings": [
+      "TASK172_CASE_ID_AND_HASH",
+      "TASK171_TOPOLOGY_ID_AND_HASH",
+      "STREAM_AND_TUBE_SIDE_ROLE",
+      "TASK026_REQUEST_IDENTITY",
+      "TASK026_RESULT_IDENTITY_AND_HASH",
+      "TASK025_GEOMETRY_IDENTITY_AND_HASH",
+      "TASK026_PROPERTY_SNAPSHOT_HASH_AND_SOURCE_PROVENANCE",
+      "THERMAL_BOUNDARY_IDENTITY",
+      "PHYSICAL_SEGMENT_AND_INTERVAL",
+      "WALL_INTERFACE",
+      "PRELIMINARY_TUBE_FILM_ROLE"
+    ],
+    "binding_rules": {
+      "case_to_task171_topology": "exact TASK172 case hash must name the exact TASK171 topology identity and matching hash",
+      "case_to_task026_request": "request must be the exact native request for the bound case, tube stream/side, thermal boundary and geometry",
+      "case_to_task026_result": "result identity and hash must be the result of that exact request; missing or mismatched result is blocked",
+      "case_to_task025_geometry": "geometry identity and hash must match the geometry consumed by the native result",
+      "case_to_property_snapshot": "snapshot hash and source provenance must match the located TASK171 state; numerical equality is insufficient"
+    },
+    "caller_assertion_is_authority": false,
+    "hidden_default_is_authority": false,
+    "name_similarity_substitution": false,
+    "missing_or_mismatched_binding": "BLOCKED"
+  },
+  "branch_role_contract": {
+    "shape_bound": true,
+    "cwt": {
+      "contract_bound": true,
+      "requirements": [
+        "exact native CWT branch identity",
+        "exact CWT thermal boundary",
+        "exact TASK026 request/result identity and hash",
+        "exact property snapshot and source provenance",
+        "exact TASK172 case",
+        "exact TASK171 physical interval and wall interface",
+        "exact tube-side stream and role",
+        "no additional wall-property correction"
+      ],
+      "real_instance_bound": false
+    },
+    "chf": {
+      "contract_bound": true,
+      "requirements": [
+        "exact native CHF branch identity",
+        "exact CHF thermal boundary",
+        "exact TASK026 request/result identity and hash",
+        "exact property snapshot and source provenance",
+        "exact TASK172 case",
+        "exact TASK171 physical interval and wall interface",
+        "exact tube-side stream and role",
+        "no additional wall-property correction"
+      ],
+      "real_instance_bound": false
+    },
+    "transition": {
+      "preliminary_film_available": false,
+      "admission_rule": "BLOCK; no fallback, interpolation or branch substitution"
+    },
+    "c3": {
+      "transfer_contract_shape_bound": true,
+      "preliminary_role_policy_required": true,
+      "preliminary_role_policy_bound": false,
+      "admission_rule": "BLOCK until an independent C3 preliminary role policy is bound"
+    },
+    "native_selector_deterministic_is_task172_role": false
+  },
+  "state_mapping_contract": {
+    "contract_bound": true,
+    "required_identities": [
+      "TASK171_STATE_ID",
+      "STREAM_ID",
+      "TUBE_SIDE_ROLE",
+      "STATE_LOCATION",
+      "PHYSICAL_SEGMENT_ID",
+      "PHYSICAL_INTERVAL_ID",
+      "TEMPERATURE",
+      "PRESSURE",
+      "PROPERTY_AUTHORITY_ID",
+      "PROPERTY_SNAPSHOT_HASH"
+    ],
+    "identity_rule": "exact identity and provenance binding; numerical equality does not substitute",
+    "rejection_conditions": [
+      "stream_or_side_mismatch",
+      "state_location_mismatch",
+      "physical_support_mismatch",
+      "property_authority_mismatch",
+      "property_snapshot_hash_mismatch",
+      "case_or_configuration_mismatch",
+      "source_revision_mismatch",
+      "implicit_interpolation",
+      "arithmetic_or_index_matching"
+    ],
+    "real_state_mapping_bound": false,
+    "task026_to_task172_tube_bulk_state_mapping_bound": false
+  },
+  "property_snapshot_granularity_contract": {
+    "contract_bound": true,
+    "allowed_declared_granularities": [
+      "WHOLE_EXCHANGER",
+      "PHYSICAL_INTERVAL",
+      "CELL",
+      "OTHER_EXPLICIT_SUPPORT"
+    ],
+    "required_preliminary_film_support_granularity": "PHYSICAL_INTERVAL",
+    "matching_rule": "future snapshot granularity must explicitly match the intended physical interval support; CELL alone is not a physical-interval mapping",
+    "projection_authority_for_cell_to_interval": "NONE",
+    "real_granularity_selected": false,
+    "task026_property_snapshot_granularity_bound": false
+  },
+  "physical_support_contract": {
+    "contract_bound": true,
+    "minimum_support_granularity": "PHYSICAL_INTERVAL",
+    "required_fields": [
+      "TASK171_TOPOLOGY_ID",
+      "TASK171_TOPOLOGY_HASH",
+      "PHYSICAL_SEGMENT_ID",
+      "PHYSICAL_INTERVAL_ID",
+      "PHYSICAL_INTERVAL_START",
+      "PHYSICAL_INTERVAL_END",
+      "WALL_INTERFACE_ID",
+      "TUBE_SIDE_ROLE"
+    ],
+    "boundary_rule": "native TASK171 physical-event boundaries are immutable",
+    "mesh_rule": "mesh refinement may occur inside a physical interval but cannot create, merge, cross or delete its physical identity",
+    "array_index_matching": false,
+    "mesh_cell_promoted_to_physical_interval": false,
+    "real_physical_support_bound": false,
+    "task026_to_task172_physical_support_mapping_bound": false
+  },
+  "area_and_resistance_contract": {
+    "hi_scalar_transfer_requires_area_mapping": false,
+    "wall_resistance_construction_requires_area_mapping": true,
+    "resistance_contract_bound": true,
+    "local_tube_inside_area_rule_source_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+    "local_tube_inside_area_rule_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+    "local_tube_inside_area_rule_bound": true,
+    "local_area_required_fields": [
+      "TUBE_INNER_HEAT_TRANSFER_AREA",
+      "PHYSICAL_INTERVAL",
+      "TUBE_COUNT_OR_AUTHORITATIVE_ACTIVE_TUBE_COUNT",
+      "INNER_DIAMETER",
+      "PHYSICAL_LENGTH",
+      "GEOMETRY_ID",
+      "AREA_AUTHORITY_ID"
+    ],
+    "local_resistance_equation": "R_i,j = 1/(h_i,j*A_i,j)",
+    "local_cylindrical_invariants": [
+      "d_o>d_i>0",
+      "A_i,j>0",
+      "A_o,j>0",
+      "A_o,j/A_i,j=d_o/d_i",
+      "sum(local inside areas)=corresponding native inside area",
+      "sum(local outside areas)=corresponding native outside area"
+    ],
+    "flow_area_is_wall_area": false,
+    "whole_resistance_divided_by_mesh_count": false,
+    "real_area_bound": false,
+    "task026_to_task172_area_mapping_bound": false
+  },
+  "result_reuse_policy": {
+    "default_reuse_across_multiple_supports": false,
+    "override_requires_authority_id": true,
+    "multi_support_reuse_authority_id": null,
+    "cross_support_reuse_authorized": false
+  },
+  "instance_state": {
+    "real_case_bound_tube_film_transfer_instance_present": false,
+    "real_task172_case_id_bound": false,
+    "real_task171_physical_interval_bound": false,
+    "real_task026_property_snapshot_bound": false,
+    "real_preliminary_tube_film_instance_present": false,
+    "preliminary_tube_film_instance_authority_bound": false,
+    "task026_to_task172_tube_bulk_state_mapping_bound": false,
+    "task026_to_task172_physical_support_mapping_bound": false,
+    "task026_to_task172_result_instance_bound": false,
+    "instance_values_populated_in_r5": false
+  },
+  "preserved_downstream_state": {
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_definition_status": "UNBOUND",
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "shell_preliminary_film_source_branch_status": "PAUSED_PENDING_CONCRETE_SOURCE_LEAD",
+    "external_q_contract_status": "REVIEWED_CONTRACT",
+    "external_q_instance_status": "NONE",
+    "qualified_q_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "decision": {
+    "result": "RESOLVED",
+    "outcome": "MODEL_LEVEL_TRANSFER_CONTRACT_SHAPE_RESOLVED_INSTANCE_ABSENT",
+    "contract_shape_bound": true,
+    "candidate_created": true,
+    "production_admission": "BLOCKED_FAIL_CLOSED",
+    "blocking_conditions_for_future_instance": [
+      "missing exact TASK172 case and configuration binding",
+      "missing exact TASK171 topology/segment/physical interval/wall interface binding",
+      "missing exact native TASK026 request/result/branch binding",
+      "missing exact property snapshot and provenance binding",
+      "missing matching physical support granularity",
+      "missing separate C3 preliminary role policy for C3 disposition",
+      "missing independently reviewed transfer receipt",
+      "identity/hash/source/geometry/support mismatch",
+      "hidden/default/legacy property or caller assertion",
+      "unauthorized interpolation, extrapolation or cross-support reuse"
+    ],
+    "parent_shell_blocker_removed": false,
+    "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_CASE_AND_SUPPORT_TRANSFER_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY"
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "task026_changed": false,
+    "task166_changed": false,
+    "task171_semantics_changed": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "shell_preliminary_film_researched": false,
+    "external_q_work_started": false,
+    "material_work_started": false,
+    "wall_solve_executed": false,
+    "fixed_point_iteration_performed": false,
+    "new_production_behavior_tests_added": false,
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "historical_records_rewritten": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "intermediate_github_ci_runs": 0
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-preliminary-tube-film-case-and-support-transfer-contract-construction-r5.md",
+    "document_sha256": "f2bde9025c8f9d9e55c9db94b1e3e426d91c845161860eea7877058257188755",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-case-and-support-transfer-contract-construction-r5.json",
+    "evidence_file_sha256_recorded_in_registry": true,
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r52_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY"
+  },
+  "canonical_hash": "6693d16ef0e391dac0ce6226f8623e3349172583cf7074509ac3ba4903a78b68"
+}
