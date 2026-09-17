@@ -10434,5 +10434,199 @@
     },
     "canonical_hash": "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b"
   },
-  "canonical_hash": "3a669bb67565b1eec8820dab0316c008611b022f7b8acf809f5c178a97cd3877"
+  "r60_extension": {
+    "task_id": "TASK172_V0_7_NUMERICAL_PROFILE_FRAMEWORK_INDEPENDENT_REVIEW_RECEIPT_R1",
+    "previous_head": "64ce3d96e38e86dfb7d4a4c6050cb663879f8481",
+    "historical_registry_root_hash": "3a669bb67565b1eec8820dab0316c008611b022f7b8acf809f5c178a97cd3877",
+    "historical_r59_extension_hash": "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b",
+    "historical_records_unchanged": true,
+    "review_type": "EXTERNAL_INDEPENDENT_REVIEW_DECISION_RECORDING_ONLY",
+    "subject": "V07-T172-NUMERICAL-PROFILE-R1",
+    "external_review": {
+      "decision": "PASS",
+      "scope": "MODEL_LEVEL_NUMERICAL_OWNERSHIP_RESIDUAL_TAXONOMY_METHOD_PRECONDITIONS_FAIL_CLOSED_TASK172_VS_TASK173_BOUNDARY",
+      "source_type": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+      "reviewer_identity_asserted": false,
+      "github_reviewer_asserted": false,
+      "human_expert_or_organization_asserted": false,
+      "professional_signature_asserted": false,
+      "codex_independent_approval_claimed": false
+    },
+    "reviewed_authority": {
+      "authority_id": "V07-T172-NUMERICAL-PROFILE-R1",
+      "historical_review_status": "PROPOSED_AUTHORITY",
+      "historical_authority_canonical_hash": "e41aaf467cb081bf1ed1fb9fd1d8a575093520cb895fc539bb35b9bffc224b6f",
+      "source_document_path": "TASK-172-v0.7-wall-numerical-proposals-r1.md",
+      "source_document_sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+    },
+    "artifacts": {
+      "document": {
+        "path": "TASK-172-v0.7-numerical-profile-framework-independent-review-receipt-r1.md",
+        "sha256": "6b526d8489ec01697e17df420196fe0f6ea289df1e770702b2a3907d65edd40b"
+      },
+      "evidence": {
+        "path": "evidence/TASK-172-numerical-profile-framework-independent-review-receipt-r1.json",
+        "file_sha256": "d6c615e14bbc1087a0306584a60a9a871e4c9655b98bbf5e27c4a496580c86a2",
+        "canonical_hash": "d656c18b28795a7f7f8d8ec6d8351e7d1032355e92e42d171ca50ec812b8860b"
+      },
+      "registry_path": "TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r60_extension"
+    },
+    "framework_review": {
+      "numerical_profile_framework_independent_review_complete": true,
+      "numerical_profile_framework_independent_review_result": "PASS",
+      "effective_numerical_profile_framework_status": "REVIEWED_MODEL_LEVEL_FRAMEWORK",
+      "lifecycle_promotion_scope": "MODEL_LEVEL_NUMERICAL_OWNERSHIP_RESIDUAL_TAXONOMY_METHOD_PRECONDITIONS_AND_FAIL_CLOSED_FRAMEWORK_ONLY",
+      "lifecycle_promotion_performed": true,
+      "numerical_level_ownership_framework_bound": true,
+      "task172_full_exchanger_boundary_solver_authorized": false,
+      "task173_boundary_solver_scope_preserved": true,
+      "numerical_residual_taxonomy_bound": true,
+      "separate_numerical_status_model_bound": true,
+      "l1_direct_property_evaluation_framework_bound": true,
+      "l2a_supplied_coefficient_wall_framework_bound": true,
+      "l2b_method_status": "METHOD_UNBOUND",
+      "l3_method_status": "METHOD_UNBOUND"
+    },
+    "method_admission": {
+      "required_prerequisite_list_bound": true,
+      "required_prerequisites": [
+        "SCALAR_REDUCTION_BOUND",
+        "RESIDUAL_DEFINITION_BOUND",
+        "RESIDUAL_CONTINUITY_ON_VALID_INTERVAL_BOUND",
+        "VALID_PHYSICAL_INTERVAL_BOUND",
+        "SIGN_CHANGE_OR_OTHER_REQUIRED_BRACKET_EVIDENCE_BOUND",
+        "ROOT_SELECTION_POLICY_BOUND",
+        "DOMAIN_SAFE_TRIAL_POLICY_BOUND",
+        "FINITE_PRECISION_SAFEGUARDS_BOUND"
+      ],
+      "actual_task172_prerequisites_bound": false,
+      "actual_task172_residual_method_bound": false,
+      "brent_approved": false,
+      "real_bracket_bound": false,
+      "executable_nonlinear_solve_authorized": false
+    },
+    "residual_taxonomy": {
+      "residuals": [
+        "PROPERTY_STATE_RESIDUAL",
+        "WALL_HEAT_RATE_CONTINUITY_RESIDUAL",
+        "INNER_WALL_TEMPERATURE_RESIDUAL",
+        "OUTER_WALL_TEMPERATURE_RESIDUAL",
+        "SEGMENT_CONSTITUTIVE_HEAT_TRANSFER_RESIDUAL",
+        "HOT_COLD_ENTHALPY_RESIDUAL",
+        "GLOBAL_DUTY_RESIDUAL",
+        "BOUNDARY_OUTLET_RESIDUAL"
+      ],
+      "units_and_ownership_preserved": true,
+      "generic_dimensionless_collapse_allowed": false
+    },
+    "separate_statuses": {
+      "statuses": [
+        "WALL_ITERATION_STATUS",
+        "PROPERTY_COUPLING_STATUS",
+        "MESH_CONVERGENCE_STATUS",
+        "ENERGY_CLOSURE_STATUS"
+      ],
+      "converged_iteration_equals_engineering_acceptance": false,
+      "zero_bookkeeping_residual_equals_physical_closure": false
+    },
+    "failure_semantics": {
+      "failure_classes": [
+        "NONFINITE",
+        "INVALID_PROPERTY_STATE",
+        "DOMAIN_EXCURSION",
+        "NO_BRACKET",
+        "SURFACE_INCONSISTENCY",
+        "STAGNATION",
+        "OSCILLATION",
+        "RESOURCE_EXHAUSTION",
+        "NOT_CONVERGED"
+      ],
+      "last_iterate_accepted_as_valid_result": false,
+      "random_search_fallback_allowed": false,
+      "hidden_cache_seed_allowed": false,
+      "unapproved_extrapolation_allowed": false,
+      "numeric_detection_windows_or_thresholds_bound": false
+    },
+    "unbound_parameters": {
+      "local_residual_tolerance_bound": false,
+      "property_coupling_tolerance_bound": false,
+      "wall_temperature_tolerance_bound": false,
+      "energy_closure_tolerance_bound": false,
+      "max_iter_bound": false,
+      "relaxation_factor_bound": false,
+      "stagnation_threshold_bound": false,
+      "oscillation_threshold_bound": false,
+      "numerical_tolerances_bound": false,
+      "combined_numerical_error_budget_bound": false,
+      "mesh_convergence_rule_bound": false,
+      "mesh_refinement_sequence_bound": false,
+      "mesh_comparison_norm_bound": false,
+      "mesh_termination_threshold_bound": false,
+      "max_mesh_refinement_bound": false,
+      "library_default_promoted": false
+    },
+    "physical_guards": {
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "pair_transfer_contract_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "source_mean_bulk_state_producer_contract_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "jmu_bulk_temperature_aggregation_rule_bound": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED"
+    },
+    "entry_blockers": {
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "blocker_removed_by_receipt": false
+    },
+    "lifecycle": {
+      "self_approval": false,
+      "codex_independent_approval_claimed": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false
+    },
+    "decision": {
+      "result": "REVIEWED",
+      "outcome": "EXTERNAL_REVIEW_ACCEPTED_MODEL_LEVEL_NUMERICAL_FRAMEWORK_ONLY",
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "next_gate": "AUTHORIZE_TASK172_LOCAL_RESIDUAL_AND_METHOD_QUALIFICATION_R1_ONLY",
+      "stop": true
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "historical_authority_payload_rewritten": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "new_golden_value_created": false,
+      "task026_changed": false,
+      "task166_changed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "intermediate_github_ci_runs": 0,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "334dbfea5e8f4c0e62f14e8d4c8977a31655c41009db8158e4b51d9e192d2669"
+  },
+  "canonical_hash": "6171077c800036585bdaaae306daa806ee7fbd8a2bdb9863620e9076ae69914a"
 }
