@@ -9557,5 +9557,228 @@
     "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_ORDERING_AUTHORITY_RESOLUTION_R2_ONLY",
     "canonical_hash": "30bd83bfd27492a28df88ce7e1cd6c0ff94bf80a3da30951e4e33ba4441967e3"
   },
-  "canonical_hash": "57eadf5889cba42317096da5e03cdb24bcd91ad883cf3862abc547f05a54374c"
+  "r56_extension": {
+    "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_JMU_WALL_PRODUCER_K_WALL_MATERIAL_TRANSFER_AUTHORITY_R1",
+    "previous_head": "01e0647cf20289796a2539640fd64d04e14f77f3",
+    "historical_registry_root_hash": "57eadf5889cba42317096da5e03cdb24bcd91ad883cf3862abc547f05a54374c",
+    "historical_r55_extension_hash": "30bd83bfd27492a28df88ce7e1cd6c0ff94bf80a3da30951e4e33ba4441967e3",
+    "historical_records_unchanged": true,
+    "review_type": "JMU_WALL_PRODUCER_K_WALL_MATERIAL_TRANSFER_AUTHORITY_ONLY",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "document": {
+      "path": "TASK-172-v0.7-shell-wall-correction-jmu-wall-producer-k-wall-material-transfer-authority-r1.md",
+      "sha256": "0d8f4c61322ba7d71ecdc3df3e7be9f1cb34b4ff36c0b348016312dcec42e1c8"
+    },
+    "evidence": {
+      "authority_id": "TASK172-JMU-WALL-PRODUCER-K-WALL-MATERIAL-TRANSFER-AUTHORITY-R1",
+      "path": "evidence/TASK-172-shell-wall-correction-jmu-wall-producer-k-wall-material-transfer-authority-r1.json",
+      "file_sha256": "127371399bdfa794acc5709521068d77de9151f78c066579ad40d87a9839dc9e",
+      "canonical_hash": "6d4bbdc5d42adb34e9494ed9321d337fbc51e9161739b16353c9327085f3dc72"
+    },
+    "authority_inventory": [
+      {
+        "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+        "lifecycle_status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "scope": "MODEL_LEVEL_MATERIAL_IDENTITY_INPUT_CONTRACT",
+        "case_instance_present": false,
+        "evidence_canonical_hash": "04625dac1bf22961f338b59f572a01a063fadf0beea8aeec9ce8d3d720a536d2"
+      },
+      {
+        "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+        "lifecycle_status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "scope": "MODEL_LEVEL_SOURCE_BOUND_SOLID_THERMAL_CONDUCTIVITY_PROPERTY_BODY",
+        "case_instance_present": false,
+        "evidence_canonical_hash": "e39be8c4d5a06d2947e1de54ce46dc9fee92b1752e266cce2158a82b98b319ea"
+      },
+      {
+        "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+        "lifecycle_status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "scope": "MODEL_LEVEL_CASE_BOUND_FIXED_VALUE_AND_WALL_DOMAIN_COVERAGE_CONTRACT",
+        "case_instance_present": false,
+        "evidence_canonical_hash": "5e28f71ee42deae968c53b600e19ec10d67f41cccf276324625940a69ee8fd16"
+      },
+      {
+        "authority_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+        "lifecycle_status": "PROPOSED_AUTHORITY",
+        "independent_review": "PENDING",
+        "scope": "WALL_STATE_DEFINITION_AND_DEPENDENCY_VOCABULARY_ONLY",
+        "case_instance_present": false,
+        "evidence_canonical_hash": "0cc4d4a620cbb11c52b024c8c3497d98d11bfbace0dc4854c05f8d027ff69bf0"
+      },
+      {
+        "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+        "lifecycle_status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "scope": "CLEAN_RADIAL_WALL_NETWORK_WITH_SUPPLIED_FILMS_AND_QUALIFIED_K_WALL_INPUT",
+        "case_instance_present": false,
+        "authority_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29"
+      },
+      {
+        "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+        "lifecycle_status": "REVIEWED_AUTHORITY",
+        "independent_review": "ACCEPTED",
+        "scope": "LOCAL_INSIDE_OUTSIDE_AREA_AND_CYLINDRICAL_RESISTANCE_MAPPING",
+        "case_instance_present": false,
+        "authority_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c"
+      }
+    ],
+    "material_identity": {
+      "contract_bound": true,
+      "reviewed_authority_available": true,
+      "real_case_identity_bound": false,
+      "component_role": "TUBE_WALL_METAL",
+      "required_identity_fields": [
+        "MATERIAL_AUTHORITY_ID",
+        "MATERIAL_STANDARD_OR_SPECIFICATION",
+        "MATERIAL_GRADE_OR_ALLOY",
+        "MATERIAL_FORM",
+        "MATERIAL_CONDITION_OR_TEMPER_WHERE_APPLICABLE",
+        "MATERIAL_SOURCE_ID_AND_REVISION",
+        "RIGHTS_STATUS",
+        "CASE_CONFIGURATION_BINDING",
+        "WALL_GEOMETRY_AND_PHYSICAL_SUPPORT_BINDING"
+      ],
+      "bare_grade_is_authority": false,
+      "material_name_generates_property": false,
+      "caller_assertion_is_authority": false,
+      "hidden_default_allowed": false,
+      "runtime_database_is_authority": false,
+      "legacy_tube_thermal_conductivity_reuse": false
+    },
+    "fixture_guard": {
+      "t039_fixture_grade": "TEST_FIXTURE_OR_DEMO_CARRIER_NOT_TASK172_AUTHORITY",
+      "sa_106_b_records": "GENERIC_EXAMPLE_OR_SEPARATE_TASK_AUTHORITY_NOT_TASK172_AUTHORITY",
+      "ss304_double_pipe_goldens": "OTHER_SCOPE_FROZEN_GOLDEN_NOT_TASK172_AUTHORITY",
+      "fixture_promotion_performed": false,
+      "generic_material_promotion_performed": false
+    },
+    "thermal_property": {
+      "contract_bound": true,
+      "reviewed_authority_available": true,
+      "real_case_property_body_bound": false,
+      "property_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+      "component_scope": "TUBE_WALL_METAL",
+      "allowed_property_models": [
+        "FIXED_SOURCE_VALUE",
+        "SOURCE_BOUND_K_OF_T"
+      ],
+      "property_body_required": true,
+      "source_provenance_and_rights_required": true,
+      "case_configuration_binding_required": true,
+      "geometry_physical_support_binding_required": true,
+      "interpolation_without_source_rule": "FORBIDDEN",
+      "extrapolation": "FORBIDDEN",
+      "out_of_domain": "BLOCKED",
+      "hidden_default_k": false,
+      "legacy_k_reuse": false
+    },
+    "constant_k": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "authority_status": "REVIEWED_AUTHORITY",
+      "model_level_contract_complete": true,
+      "case_instance_required": true,
+      "case_value_required": true,
+      "case_temperature_domain_required": true,
+      "admitted_constant_path": "FIXED_SOURCE_VALUE_WITH_EXPLICIT_SOURCE_DECLARED_DOMAIN",
+      "source_bound_k_of_t_to_constant_conversion": "NOT_ADMITTED_BY_R1",
+      "value_bound": false,
+      "temperature_domain_bound": false,
+      "material_identity_bound": false,
+      "case_transfer_bound": false,
+      "model_level_temperature_domain_rule_bound": true,
+      "model_level_temperature_domain_rule": "COMPLETE_TUBE_METAL_INNER_AND_OUTER_SURFACE_STATE_COVERAGE",
+      "bulk_temperature_substitution_forbidden": true
+    },
+    "wall_property_and_geometry": {
+      "k_wall_model_type": "UNBOUND_NO_CASE_PROPERTY_MODEL_SELECTED",
+      "k_wall_model_source_id": "NONE_NO_CASE_PROPERTY_SOURCE_SELECTED",
+      "k_wall_model_domain_bound": false,
+      "property_temperature_state_rule_bound": true,
+      "property_temperature_state": "COMPLETE_TUBE_METAL_INNER_AND_OUTER_SURFACE_STATE_COVERAGE;NO_SINGLE_MEAN_SUBSTITUTION",
+      "wall_temperature_state_authority_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+      "wall_temperature_state_definition_status": "PROPOSED_AUTHORITY",
+      "material_to_wall_geometry_mapping_contract_bound": true,
+      "real_material_to_wall_geometry_mapping_bound": false,
+      "local_cylindrical_mapping_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+      "local_cylindrical_mapping_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c"
+    },
+    "case_and_producer": {
+      "material_k_wall_transfer_contract_bound": true,
+      "real_case_material_identity_bound": false,
+      "real_case_k_wall_profile_bound": false,
+      "material_profile_id": null,
+      "material_identity_actual_value_bound": false,
+      "material_property_body_actual_value_bound": false,
+      "actual_material_case_accepted": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "clean_radial_network_runtime_producer_bound": false,
+      "clean_radial_network_numerical_execution_authorized": false,
+      "jmu_executable_authority_bound": false,
+      "case_level_fail_closed_gate_id": "TASK172-CASE-LEVEL-MATERIAL-AUTHORITY-ADMISSION",
+      "case_level_fail_closed_gate_status": "DEFINED_ACTIVE_FAIL_CLOSED_IMPLEMENTATION_PENDING",
+      "case_level_fail_closed_gate_runtime_implemented": false,
+      "production_without_case_level_material_authority": "BLOCKED"
+    },
+    "effective_state": {
+      "material_constant_k_status": "OPEN",
+      "material_k_temperature_domain_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "preserved_unrelated_state": {
+      "cwt_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+      "chf_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+      "c3_branch_status": "PAUSED_PENDING_CONCRETE_ORDERING_SOURCE_LEAD",
+      "preliminary_shell_film_source_rule_bound": false,
+      "qualified_q_authority_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "numerical_tolerances_bound": false,
+      "mesh_convergence_rule_bound": false
+    },
+    "decision": {
+      "result": "RESOLVED",
+      "outcome": "OUTCOME_B_MODEL_LEVEL_MATERIAL_K_WALL_TRANSFER_CONTRACT_COMPLETE_NO_INSTANCE",
+      "model_level_state": "COMPLETE_REVIEWED",
+      "case_level_material_authority_state": "REQUIRED_ABSENT",
+      "production_admission_state": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "AUTHORIZE_TASK172_JMU_WALL_PRODUCER_CASE_LEVEL_MATERIAL_K_WALL_INSTANCE_BINDING_R1_ONLY",
+      "stop": true
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "material_selection_performed": false,
+      "material_profile_created": false,
+      "conductivity_value_or_curve_introduced": false,
+      "case_level_qualification_performed": false,
+      "wall_temperature_solve_performed": false,
+      "jmu_implemented": false,
+      "task026_changed": false,
+      "task166_changed": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "historical_records_rewritten": false,
+      "new_authority_self_approval": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_JMU_WALL_PRODUCER_CASE_LEVEL_MATERIAL_K_WALL_INSTANCE_BINDING_R1_ONLY",
+    "canonical_hash": "63234875dfefd918b463c42769e20f84cf3a75375691bdce84970e1b59028c75"
+  },
+  "canonical_hash": "35a9d3324ae0f37d7698a2c99a2c0587eadc201cd671474253b7119986684f12"
 }
