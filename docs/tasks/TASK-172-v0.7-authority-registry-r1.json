@@ -9382,5 +9382,180 @@
     },
     "canonical_hash": "6b94e8b4af13240228f7f5eb8c1d09efe04043415937371c7341381afdc97a95"
   },
-  "canonical_hash": "4d18087fcd78d9c0727b9c5d02a7a29b9209247e66421834ddf7cd7bb9a1033d"
+  "r55_extension": {
+    "task_id": "TASK172_V0_7_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_POLICY_AUTHORITY_R1",
+    "previous_head": "2a864b0be7622328132ad3faccac34ef11d0cec9",
+    "historical_registry_root_hash": "4d18087fcd78d9c0727b9c5d02a7a29b9209247e66421834ddf7cd7bb9a1033d",
+    "historical_r54_extension_hash": "6b94e8b4af13240228f7f5eb8c1d09efe04043415937371c7341381afdc97a95",
+    "review_type": "C3_PRELIMINARY_ROLE_POLICY_AUTHORITY_ONLY",
+    "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+    "result": "BLOCKED",
+    "outcome": "OUTCOME_D_SOURCE_ORDERING_AMBIGUOUS",
+    "accepted_c3_authority": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "lifecycle_status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+      "source_location": "§7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179",
+      "source_bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+      "correction_form": "Nu_turb=Nu_Gnielinski*(Pr_liq/Pr_w)^0.11; h_i=Nu*k/D_h",
+      "ordering_statement_present": false
+    },
+    "predecessor_contract": {
+      "transfer_authority_id": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5",
+      "transfer_contract_status": "REVIEWED_TUBE_FILM_TRANSFER_CONTRACT",
+      "task026_to_task172_transfer_contract_bound": true,
+      "cwt_preliminary_transfer_contract_bound": true,
+      "chf_preliminary_transfer_contract_bound": true,
+      "transition_preliminary_film_available": false,
+      "c3_preliminary_transfer_contract_shape_bound": true,
+      "c3_preliminary_role_policy_required": true,
+      "c3_preliminary_film_wall_correction_policy_bound": false,
+      "r54_receipt_canonical_hash": "6b94e8b4af13240228f7f5eb8c1d09efe04043415937371c7341381afdc97a95"
+    },
+    "ordering_review": {
+      "c3_preliminary_ordering_source_rule_bound": false,
+      "c3_preliminary_ordering_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+      "c3_preliminary_ordering_source_location": "§7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179; no preliminary-role ordering statement",
+      "c3_preliminary_ordering_rule": "UNSPECIFIED_BY_ACCEPTED_C3_SOURCE_AND_AUTHORITY",
+      "candidate_roles_reviewed": [
+        "NATIVE_BASE_C3_FILM",
+        "ACTIVE_CORRECTED_C3_FILM",
+        "OTHER_SOURCE_DEFINED_C3_FILM",
+        "FAIL_CLOSED_NO_SELECTED_C3_PRELIMINARY_FILM"
+      ],
+      "source_observations": [
+        {
+          "location": "§7.4.1.1.1 Eqs. (739)-(741)",
+          "observation": "The source defines the liquid model and a Gnielinski turbulent branch.",
+          "preliminary_role_consequence": "No preliminary-film coefficient is selected."
+        },
+        {
+          "location": "§7.4.1.1.1 Eq. (744)",
+          "observation": "The turbulent result uses (Pr_liq/Pr_w)^0.11 and Pr_w at wall temperature.",
+          "preliminary_role_consequence": "The correction requires a wall state but does not specify whether corrected C3 produces that preliminary state."
+        },
+        {
+          "location": "V07-T172-TUBE-WALL-CORRECTION-R1",
+          "observation": "The accepted authority defines the active correction only.",
+          "preliminary_role_consequence": "No bootstrap, sequencing, or fixed-point role rule is present."
+        },
+        {
+          "location": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5 and R54 receipt",
+          "observation": "C3 preliminary use requires a separate role policy.",
+          "preliminary_role_consequence": "C3 remains blocked pending that policy."
+        }
+      ]
+    },
+    "candidate_dispositions": {
+      "base_c3": {
+        "source_authorized": false,
+        "reason": "No accepted source states that native/base C3 is the preliminary wall-temperature film."
+      },
+      "corrected_c3": {
+        "source_authorized": false,
+        "reason": "No accepted source states that active corrected C3 participates in producing the preliminary wall state."
+      },
+      "other": {
+        "source_authorized": false,
+        "reason": "No other source-defined preliminary C3 coefficient or sequence is bound."
+      },
+      "fail_closed": {
+        "current_disposition": true,
+        "is_neutral_film_value": false
+      }
+    },
+    "dependency_state": {
+      "c3_active_correction_depends_on_wall_state": true,
+      "c3_preliminary_film_depends_on_wall_state": "undetermined",
+      "c3_preliminary_film_depends_on_active_correction": "undetermined",
+      "c3_preliminary_film_creates_wall_state_loop": "undetermined",
+      "fixed_point_iteration_authorized": false,
+      "fixed_point_iteration_performed": false,
+      "neutral_factor_or_omission_shortcut_used": false
+    },
+    "role_policy_state": {
+      "c3_preliminary_role_source_rule_bound": false,
+      "c3_preliminary_role_transfer_authority_bound": false,
+      "c3_preliminary_film_wall_correction_policy_bound": false,
+      "c3_preliminary_film_wall_correction_policy": "UNRESOLVED_BASE_OR_CORRECTED_C3_PRELIMINARY_ROLE",
+      "jmu_preliminary_c3_role_policy_authority_candidate_created": false
+    },
+    "branch_and_instance_guards": {
+      "cwt_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+      "chf_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+      "c3_branch_status": "ACTIONABLE_AUTHORITY_GAP",
+      "real_case_bound_tube_film_transfer_instance_present": false,
+      "real_preliminary_tube_film_instance_present": false,
+      "preliminary_tube_film_instance_authority_bound": false,
+      "c3_case_bound_transfer_receipt_review_eligible": false,
+      "task026_to_task172_tube_bulk_state_mapping_bound": false,
+      "task026_to_task172_physical_support_mapping_bound": false
+    },
+    "preserved_downstream_state": {
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_definition_status": "UNBOUND",
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "qualified_q_authority_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "numerical_work_started": false
+    },
+    "effective_current_state": {
+      "remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "outcome": "OUTCOME_D_SOURCE_ORDERING_AMBIGUOUS",
+      "policy_candidate_created": false,
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_ORDERING_AUTHORITY_RESOLUTION_R2_ONLY",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-preliminary-tube-film-c3-preliminary-role-policy-authority-r1.md",
+      "document_sha256": "d590368dace0ec3a13e45dd328ca32afb1a429efb3cccddf958e4d6c11e674b6",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-c3-preliminary-role-policy-authority-r1.json",
+      "evidence_canonical_hash": "2c2cace911af3c8f0ea41cc2a12ca98cd103fb0ef51c520e32f7672bcf78e5a6",
+      "evidence_file_sha256": "6e50ccb1ea950c47d715628ecd984ca171e72b789b9a53f943c9782014fe14b9",
+      "registry_extension_key": "r55_extension"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "historical_records_rewritten": false,
+      "task026_changed": false,
+      "task166_changed": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "real_case_constructed": false,
+      "real_transfer_instance_constructed": false,
+      "wall_temperature_created": false,
+      "fixed_point_iteration_performed": false,
+      "new_authority_self_approval": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "intermediate_github_ci_runs": 0
+    },
+    "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_ORDERING_AUTHORITY_RESOLUTION_R2_ONLY",
+    "canonical_hash": "30bd83bfd27492a28df88ce7e1cd6c0ff94bf80a3da30951e4e33ba4441967e3"
+  },
+  "canonical_hash": "57eadf5889cba42317096da5e03cdb24bcd91ad883cf3862abc547f05a54374c"
 }
