@@ -10628,5 +10628,180 @@
     },
     "canonical_hash": "334dbfea5e8f4c0e62f14e8d4c8977a31655c41009db8158e4b51d9e192d2669"
   },
-  "canonical_hash": "6171077c800036585bdaaae306daa806ee7fbd8a2bdb9863620e9076ae69914a"
+  "r61_extension": {
+    "task_id": "TASK172_V0_7_LOCAL_RESIDUAL_AND_METHOD_QUALIFICATION_R1",
+    "previous_head": "cf2f01814eb9237b371f8645729ed609c26d2330",
+    "historical_registry_root_hash": "6171077c800036585bdaaae306daa806ee7fbd8a2bdb9863620e9076ae69914a",
+    "historical_r60_extension_hash": "334dbfea5e8f4c0e62f14e8d4c8977a31655c41009db8158e4b51d9e192d2669",
+    "historical_records_unchanged": true,
+    "review_type": "TASK172_LOCAL_RESIDUAL_DEFINITION_AND_METHOD_CLASSIFICATION_ONLY",
+    "subject": "TASK172_LOCAL_RESIDUALS_AND_ADMISSIBLE_METHOD_CLASSES",
+    "scope": {
+      "task172_local_residual_set_bound": true,
+      "task173_global_residual_exclusion_bound": true,
+      "task172_owned_residuals": [
+        "PROPERTY_STATE_RESIDUAL",
+        "WALL_HEAT_RATE_CONTINUITY_RESIDUAL",
+        "INNER_WALL_TEMPERATURE_RESIDUAL",
+        "OUTER_WALL_TEMPERATURE_RESIDUAL",
+        "SEGMENT_CONSTITUTIVE_HEAT_TRANSFER_RESIDUAL",
+        "HOT_COLD_ENTHALPY_RESIDUAL"
+      ],
+      "task173_excluded_residuals": [
+        "GLOBAL_DUTY_RESIDUAL",
+        "BOUNDARY_OUTLET_RESIDUAL"
+      ],
+      "generic_dimensionless_collapse_allowed": false
+    },
+    "l1": {
+      "residual_definition_bound": true,
+      "unknown_set": "NONE_TASK172_ROOT_UNKNOWN;SUPPLIED_STATE_IDENTITY_AND_DOMAIN_FIELDS_ONLY",
+      "method_class": "DIRECT_STATE_EVALUATION_NO_ROOT_SOLVE"
+    },
+    "l2a": {
+      "wall_heat_rate_continuity_residual_definition_bound": true,
+      "unknown_set_bound": true,
+      "direct_evaluation_valid": true,
+      "method_class": "DIRECT_SERIES_EVALUATION_NO_ITERATION",
+      "method_contract_bound": true,
+      "real_executable_case_present": false
+    },
+    "l2b": {
+      "unknown_set_bound": false,
+      "unknown_count": "UNRESOLVED",
+      "residual_set_bound": false,
+      "residual_count": "UNRESOLVED",
+      "equation_count_bound": false,
+      "degrees_of_freedom_status": "UNRESOLVED",
+      "scalar_reduction_bound": false,
+      "scalar_residual_definition_bound": false,
+      "scalar_dependency_graph_bound": false,
+      "residual_continuity_on_valid_interval_bound": false,
+      "valid_physical_interval_contract_bound": false,
+      "bracket_construction_contract_bound": false,
+      "real_case_bracket_present": false,
+      "root_uniqueness_proven": "undetermined",
+      "root_selection_policy_bound": false,
+      "finite_precision_safeguard_contract_bound": true,
+      "method_class_bound": false,
+      "method_class": "METHOD_UNBOUND",
+      "method_contract_bound": false,
+      "method_status": "METHOD_UNBOUND",
+      "brent_method_transfer_candidate_created": false
+    },
+    "l3": {
+      "state_reconstruction_contract_bound": false,
+      "segment_heat_transfer_residual_definition_bound": true,
+      "hot_cold_enthalpy_residual_definition_bound": true,
+      "unknown_set_bound": false,
+      "residual_set_bound": true,
+      "scalar_reduction_bound": false,
+      "method_class_bound": false,
+      "method_class": "METHOD_UNBOUND",
+      "method_status": "METHOD_UNBOUND",
+      "task171_bookkeeping_residual_identity_preserved": true,
+      "task171_zero_bookkeeping_residual_implies_task172_constitutive_closure": false
+    },
+    "residual_method_disposition_matrix": {
+      "bound": true,
+      "scope": "MODEL_LEVEL_FAIL_CLOSED_CLASSIFICATION_NO_EXECUTABLE_METHOD_PROMOTION",
+      "direct_or_iterative_dispositions": {
+        "PROPERTY_STATE_RESIDUAL": "DIRECT_IDENTITY_OR_DOMAIN_CHECK",
+        "WALL_HEAT_RATE_CONTINUITY_RESIDUAL_L2A": "DIRECT_ALGEBRAIC_EVALUATION",
+        "WALL_HEAT_RATE_CONTINUITY_RESIDUAL_L2B": "METHOD_UNBOUND",
+        "INNER_WALL_TEMPERATURE_RESIDUAL_L2A": "DIRECT_ALGEBRAIC_EVALUATION",
+        "INNER_WALL_TEMPERATURE_RESIDUAL_L2B": "METHOD_UNBOUND",
+        "OUTER_WALL_TEMPERATURE_RESIDUAL_L2A": "DIRECT_ALGEBRAIC_EVALUATION",
+        "OUTER_WALL_TEMPERATURE_RESIDUAL_L2B": "METHOD_UNBOUND",
+        "SEGMENT_CONSTITUTIVE_HEAT_TRANSFER_RESIDUAL": "METHOD_UNBOUND",
+        "HOT_COLD_ENTHALPY_RESIDUAL": "METHOD_UNBOUND",
+        "GLOBAL_DUTY_RESIDUAL": "OUT_OF_TASK172_SCOPE",
+        "BOUNDARY_OUTLET_RESIDUAL": "OUT_OF_TASK172_SCOPE"
+      }
+    },
+    "physical_guards": {
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "pair_transfer_contract_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "source_mean_bulk_state_producer_contract_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "jmu_bulk_temperature_aggregation_rule_bound": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED"
+    },
+    "unbound_numerical_parameters": {
+      "local_residual_tolerance_bound": false,
+      "property_coupling_tolerance_bound": false,
+      "wall_temperature_tolerance_bound": false,
+      "energy_closure_tolerance_bound": false,
+      "max_iter_bound": false,
+      "relaxation_factor_bound": false,
+      "stagnation_threshold_bound": false,
+      "oscillation_threshold_bound": false,
+      "numerical_tolerances_bound": false,
+      "combined_numerical_error_budget_bound": false,
+      "mesh_convergence_rule_bound": false,
+      "mesh_refinement_sequence_bound": false,
+      "mesh_comparison_norm_bound": false,
+      "mesh_termination_threshold_bound": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false
+    },
+    "entry_blockers": {
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "local_residual_and_method_canonical_blocker_removed": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "outcome": "OUTCOME_G_MULTIPLE_LOCAL_METHOD_GAPS_REMAIN",
+      "local_residual_method_authority_candidate_created": false,
+      "local_residual_and_method_qualification_status": "OPEN",
+      "next_gate": "AUTHORIZE_TASK172_L2B_L3_LOCAL_RESIDUAL_DEFINITION_AND_STATE_RECONSTRUCTION_CLOSURE_R2_ONLY",
+      "stop": true
+    },
+    "artifacts": {
+      "document": {
+        "path": "TASK-172-v0.7-local-residual-and-method-qualification-r1.md",
+        "sha256": "60d2e0e9d20aaabe0cbd7ae81a3e5762956d3fb0845b3cc8fd4243fbb62cf42e"
+      },
+      "evidence": {
+        "path": "evidence/TASK-172-local-residual-and-method-qualification-r1.json",
+        "file_sha256": "46f717c46c7b29921955f5a56ea0b73fc54c8b5b296f9627c61de71cd8672cd3",
+        "canonical_hash": "c08b9fe50c1c1a1ecd1db3ad5607fc07cfef898b7f88f36b6c15a0d961152bc3"
+      },
+      "registry_path": "TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r61_extension"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "historical_authority_payload_rewritten": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task026_changed": false,
+      "task166_changed": false,
+      "task172_implementation_started": false,
+      "numerical_work_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "new_golden_value_created": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "d07e1d431617b91cbc07ce39a9a89a2ea9614eef6f1fc04b7036be53404185d8"
+  },
+  "canonical_hash": "b0554ad5bf75390de2169543a68194e9c8f38b25ededa9153975c0b62a8b4a1a"
 }
