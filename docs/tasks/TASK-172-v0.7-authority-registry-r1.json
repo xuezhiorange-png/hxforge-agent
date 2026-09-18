@@ -10956,5 +10956,199 @@
     },
     "canonical_hash": "70795002032f47678b575e8f8b730daedfa524a7fd19b99bc7d2a7bbfc2c8c91"
   },
-  "canonical_hash": "79e2586a5f31e1a37d06fd2a79187c4ab439598eb300cb2169b962a55102f960"
+  "r63_extension": {
+    "task_id": "TASK172_V0_7_L3_LOCAL_STATE_RECONSTRUCTION_CONTRACT_R2",
+    "previous_head": "10aeabf2a2ce0da2bc4693454d8dc74abc77934f",
+    "historical_registry_root_hash": "79e2586a5f31e1a37d06fd2a79187c4ab439598eb300cb2169b962a55102f960",
+    "historical_r62_extension_hash": "70795002032f47678b575e8f8b730daedfa524a7fd19b99bc7d2a7bbfc2c8c91",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_L3_LOCAL_STATE_IDENTITY_AND_RECONSTRUCTION_ADMISSION_CONTRACT_ONLY",
+    "subject": "V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2",
+    "scope": {
+      "task171_local_state_structural_vocabulary_bound": true,
+      "task171_local_thermodynamic_state_producer_bound": false,
+      "task171_cell_mean_schema_implies_reconstruction_rule": false,
+      "l3_upstream_face_state_role_bound": true,
+      "l3_downstream_face_state_role_bound": true,
+      "l3_constitutive_evaluation_state_role_bound": true,
+      "l3_constitutive_evaluation_state_location": "CONSTITUTIVE_EVALUATION_STATE;EXACT_LOCATION_AND_PRODUCER_REQUIRED;NOT_ASSUMED_CELL_MEAN",
+      "l3_tube_local_state_contract_bound": true,
+      "l3_shell_local_state_contract_bound": true,
+      "l3_local_state_identity_contract_bound": true,
+      "l3_face_state_identity_contract_bound": true,
+      "l3_face_to_local_support_mapping_contract_bound": true,
+      "l3_face_to_cell_same_case_required": true,
+      "l3_face_to_cell_same_stream_required": true,
+      "l3_face_to_cell_same_topology_required": true,
+      "l3_face_to_cell_same_physical_interval_required": true
+    },
+    "producer_and_operator_boundary": {
+      "l3_direct_local_state_producer_class_supported": true,
+      "l3_reconstructed_local_state_producer_class_supported": true,
+      "l3_reconstruction_operator_authority_required": true,
+      "l3_existing_reconstruction_operator_authority_found": false,
+      "l3_reconstruction_operator_authority_id": "NONE",
+      "l3_reconstruction_operator_lifecycle": "NONE",
+      "l3_reconstruction_operator_rule": "NONE",
+      "l3_reconstruction_operator_domain": "NONE",
+      "l3_state_reconstruction_operator_bound": false,
+      "l3_arithmetic_face_temperature_mean_authorized": false,
+      "l3_arithmetic_face_pressure_mean_authorized": false,
+      "l3_property_value_averaging_authorized": false,
+      "l3_enthalpy_to_temperature_inversion_authorized": false,
+      "l3_midpoint_operator_authorized": false,
+      "l3_mass_weighted_operator_authorized": false,
+      "l3_enthalpy_equivalent_operator_authorized": false,
+      "l3_constitutive_mixing_operator_authorized": false,
+      "audit_disposition": "LOCATION_AND_IDENTITY_VOCABULARY_FOUND;NO_REVIEWED_FACE_TO_CELL_RECONSTRUCTION_OPERATOR_FOUND"
+    },
+    "bookkeeping_boundary": {
+      "task171_bookkeeping_residual_identity_preserved": true,
+      "task171_zero_bookkeeping_residual_implies_task172_constitutive_closure": false,
+      "task171_face_enthalpy_observation_is_l3_state_producer": false
+    },
+    "property_and_wall_contract": {
+      "jmu_bulk_property_authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "l3_local_property_authority_contract_bound": true,
+      "real_l3_local_property_snapshot_present": false,
+      "l3_wall_state_identity_prerequisite_reviewed": true,
+      "l3_local_fluid_to_wall_support_mapping_contract_bound": true,
+      "l3_common_physical_intersection_mapping_authority_bound": false,
+      "different_mesh_local_constitutive_mapping_allowed": false
+    },
+    "receipt_contract": {
+      "l3_state_reconstruction_receipt_schema_bound": true,
+      "real_l3_state_reconstruction_receipt_present": false,
+      "required_fields": [
+        "RECONSTRUCTION_RECEIPT_ID",
+        "SCHEMA_VERSION",
+        "CASE_ID",
+        "CASE_HASH",
+        "TASK171_TOPOLOGY_ID",
+        "TASK171_TOPOLOGY_HASH",
+        "FLOW_PATH_ID",
+        "STREAM_ID",
+        "SIDE",
+        "PHYSICAL_INTERVAL_ID",
+        "PHYSICAL_SUPPORT_ID",
+        "NUMERICAL_CELL_ID",
+        "UPSTREAM_FACE_STATE_ID",
+        "UPSTREAM_FACE_STATE_HASH",
+        "DOWNSTREAM_FACE_STATE_ID",
+        "DOWNSTREAM_FACE_STATE_HASH",
+        "CONSTITUTIVE_EVALUATION_STATE_ID",
+        "CONSTITUTIVE_EVALUATION_STATE_HASH",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_ID",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_HASH",
+        "PROPERTY_AUTHORITY_ID",
+        "PROPERTY_AUTHORITY_VERSION",
+        "PROVENANCE_REFS",
+        "LIFECYCLE_STATUS",
+        "CANONICAL_HASH"
+      ]
+    },
+    "dependency_and_residual_status": {
+      "l3_local_constitutive_dependency_graph_bound": true,
+      "l3_segment_heat_transfer_residual_definition_bound": true,
+      "l3_hot_cold_enthalpy_residual_definition_bound": true,
+      "l3_residual_set_bound": true,
+      "l3_unknown_set_bound": false,
+      "l3_unknown_set": "UNRESOLVED_UNTIL_DIRECT_OR_RECONSTRUCTED_STATE_PRODUCER_AND_CONSTITUTIVE_INPUTS_ARE_BOUND",
+      "l3_method_status": "METHOD_UNBOUND"
+    },
+    "candidate_lifecycle": {
+      "l3_state_reconstruction_contract_bound": true,
+      "l3_local_state_reconstruction_authority_candidate_created": true,
+      "candidate_authority_id": "V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2",
+      "candidate_lifecycle": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "new_authority_self_approval": false,
+      "local_residual_and_method_canonical_blocker_removed": false
+    },
+    "real_instance_guards": {
+      "real_l3_upstream_face_state_present": false,
+      "real_l3_downstream_face_state_present": false,
+      "real_l3_constitutive_evaluation_state_present": false,
+      "real_l3_state_reconstruction_receipt_present": false,
+      "real_l3_local_property_snapshot_present": false,
+      "real_l3_local_constitutive_instance_present": false
+    },
+    "preserved_physical_and_numerical_guards": {
+      "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+      "l2b_unknown_set_bound": false,
+      "l2b_residual_set_bound": false,
+      "l2b_scalar_reduction_bound": false,
+      "l2b_method_status": "METHOD_UNBOUND",
+      "l2b_brent_method_transfer_candidate_created": false,
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "source_mean_bulk_state_producer_contract_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "jmu_bulk_temperature_aggregation_rule_bound": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "numerical_tolerances_bound": false,
+      "mesh_convergence_rule_bound": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false
+    },
+    "entry_blockers": {
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "decision": {
+      "result": "RESOLVED",
+      "outcome": "OUTCOME_A_MODEL_LEVEL_L3_RECONSTRUCTION_CONTRACT_COMPLETE_OPERATOR_UNBOUND",
+      "l3_state_reconstruction_contract_bound": true,
+      "l3_state_reconstruction_operator_bound": false,
+      "real_l3_local_constitutive_instance_present": false,
+      "next_gate": "AUTHORIZE_TASK172_L3_LOCAL_STATE_RECONSTRUCTION_CONTRACT_R2_INDEPENDENT_REVIEW_ONLY",
+      "stop": true
+    },
+    "artifacts": {
+      "document": {
+        "path": "TASK-172-v0.7-l3-local-state-reconstruction-contract-r2.md",
+        "sha256": "c11cc0f0dfd4db927d8de3fd8717b472fc8087f323273ef8c098cb911f3d1f0b"
+      },
+      "evidence": {
+        "path": "evidence/TASK-172-l3-local-state-reconstruction-contract-r2.json",
+        "file_sha256": "778edc13332bdae26ae5baad69894c70d391ed96993e15a6d741aafc8580b401",
+        "canonical_hash": "99597a5e9466b54ed3dbbf139dffc117c024abe88e8592efef67c428fa86ef74"
+      },
+      "registry_path": "TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r63_extension"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task171_changed": false,
+      "task166_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "state_instance_created": false,
+      "property_backend_called": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "4fdfba4cc043ff547af53299c0b84c22666a9931ccde1339e018621b3fe9a733"
+  },
+  "canonical_hash": "c6aed33d0f196319f99a749f5fcabbe1eadbe9415cb6763de1cb63477c4f1a5a"
 }
