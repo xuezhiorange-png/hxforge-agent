@@ -11150,5 +11150,204 @@
     },
     "canonical_hash": "4fdfba4cc043ff547af53299c0b84c22666a9931ccde1339e018621b3fe9a733"
   },
-  "canonical_hash": "c6aed33d0f196319f99a749f5fcabbe1eadbe9415cb6763de1cb63477c4f1a5a"
+  "r64_extension": {
+    "task_id": "TASK172_V0_7_L3_LOCAL_STATE_PRODUCER_CLASS_AND_RECEIPT_SCHEMA_CORRECTION_R2A",
+    "previous_head": "2ba908584ff81888ace37435d918864f3455ccac",
+    "historical_registry_root_hash": "c6aed33d0f196319f99a749f5fcabbe1eadbe9415cb6763de1cb63477c4f1a5a",
+    "historical_r63_extension_hash": "4fdfba4cc043ff547af53299c0b84c22666a9931ccde1339e018621b3fe9a733",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_PRODUCER_CLASS_AND_RECEIPT_SCHEMA_CORRECTION_ONLY",
+    "subject": "V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2",
+    "correction": {
+      "result": "CORRECTED",
+      "defect": "R2 receipt shape unconditionally required face-state reconstruction inputs and reconstruction-operator authority fields",
+      "direct_producer_path_requires_reconstruction_inputs": false,
+      "direct_producer_path_requires_reconstruction_operator": false,
+      "reconstructed_producer_path_requires_face_inputs": true,
+      "reconstructed_producer_path_requires_reconstruction_operator": true,
+      "r2_original_artifacts_changed": false,
+      "r63_extension_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "producer_class_contract": {
+      "l3_local_state_producer_class_contract_bound": true,
+      "allowed_values": [
+        "DIRECT_LOCAL_STATE_PRODUCER",
+        "RECONSTRUCTED_LOCAL_STATE_PRODUCER"
+      ],
+      "implicit_default_allowed": false,
+      "l3_local_state_producer_authority_identity_contract_bound": true,
+      "required_authority_fields": [
+        "LOCAL_STATE_PRODUCER_AUTHORITY_ID",
+        "LOCAL_STATE_PRODUCER_AUTHORITY_HASH",
+        "LOCAL_STATE_PRODUCER_LIFECYCLE_STATUS"
+      ]
+    },
+    "direct_receipt_variant": {
+      "l3_direct_local_state_receipt_schema_bound": true,
+      "variant_id": "L3_DIRECT_LOCAL_STATE_RECEIPT",
+      "l3_reconstruction_operator_authority_required_for_direct_class": false,
+      "upstream_face_reconstruction_input_required_for_direct_class": false,
+      "downstream_face_reconstruction_input_required_for_direct_class": false,
+      "direct_variant_requires_reconstruction_operator_fields": false,
+      "operator_field_placeholder_values_allowed": false,
+      "common_identity_and_authority_required": true
+    },
+    "reconstructed_receipt_variant": {
+      "l3_reconstructed_local_state_receipt_schema_bound": true,
+      "variant_id": "L3_RECONSTRUCTED_LOCAL_STATE_RECEIPT",
+      "l3_reconstruction_operator_authority_required_for_reconstructed_class": true,
+      "required_additional_fields": [
+        "UPSTREAM_FACE_STATE_ID",
+        "UPSTREAM_FACE_STATE_HASH",
+        "DOWNSTREAM_FACE_STATE_ID",
+        "DOWNSTREAM_FACE_STATE_HASH",
+        "CONSTITUTIVE_EVALUATION_STATE_ID",
+        "CONSTITUTIVE_EVALUATION_STATE_HASH",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_ID",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_HASH",
+        "RECONSTRUCTION_OPERATOR_LIFECYCLE_STATUS"
+      ],
+      "real_reconstructed_local_state_receipt_eligible": false,
+      "operator_authority_currently_bound": false
+    },
+    "receipt_variant_contract": {
+      "l3_local_state_receipt_variant_contract_bound": true,
+      "l3_receipt_conditional_requiredness_rule_bound": true,
+      "semantic_output": "L3_CONSTITUTIVE_EVALUATION_STATE",
+      "direct_class_operator_fields_required": false,
+      "reconstructed_class_operator_fields_required": true,
+      "direct_class_face_reconstruction_fields_required": false,
+      "reconstructed_class_face_reconstruction_fields_required": true
+    },
+    "canonical_preimage_rule": {
+      "l3_local_state_receipt_canonical_preimage_rule_bound": true,
+      "always_included": [
+        "LOCAL_STATE_PRODUCER_CLASS",
+        "LOCAL_STATE_PRODUCER_AUTHORITY_ID",
+        "LOCAL_STATE_PRODUCER_AUTHORITY_HASH",
+        "LOCAL_STATE_PRODUCER_LIFECYCLE_STATUS"
+      ],
+      "reconstructed_additional": [
+        "UPSTREAM_FACE_STATE_ID",
+        "UPSTREAM_FACE_STATE_HASH",
+        "DOWNSTREAM_FACE_STATE_ID",
+        "DOWNSTREAM_FACE_STATE_HASH",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_ID",
+        "RECONSTRUCTION_OPERATOR_AUTHORITY_HASH",
+        "RECONSTRUCTION_OPERATOR_LIFECYCLE_STATUS"
+      ],
+      "producer_class_change_changes_receipt_identity": true,
+      "same_numeric_states_across_variants_share_identity": false
+    },
+    "preserved_r2_state": {
+      "l3_state_reconstruction_contract_bound": true,
+      "l3_state_reconstruction_operator_bound": false,
+      "l3_existing_reconstruction_operator_authority_found": false,
+      "l3_reconstruction_operator_authority_id": "NONE",
+      "l3_arithmetic_face_temperature_mean_authorized": false,
+      "l3_arithmetic_face_pressure_mean_authorized": false,
+      "l3_property_value_averaging_authorized": false,
+      "l3_enthalpy_to_temperature_inversion_authorized": false,
+      "l3_midpoint_operator_authorized": false,
+      "l3_mass_weighted_operator_authorized": false,
+      "l3_enthalpy_equivalent_operator_authorized": false,
+      "l3_constitutive_mixing_operator_authorized": false,
+      "l3_unknown_set_bound": false,
+      "l3_method_status": "METHOD_UNBOUND"
+    },
+    "candidate_lifecycle": {
+      "l3_local_state_reconstruction_authority_candidate_created": true,
+      "candidate_authority_id": "V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2",
+      "candidate_lifecycle": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "new_authority_self_approval": false
+    },
+    "real_instance_guards": {
+      "real_l3_direct_local_state_instance_present": false,
+      "real_l3_reconstructed_local_state_instance_present": false,
+      "real_l3_upstream_face_state_present": false,
+      "real_l3_downstream_face_state_present": false,
+      "real_l3_constitutive_evaluation_state_present": false,
+      "real_l3_state_reconstruction_receipt_present": false,
+      "real_l3_local_property_snapshot_present": false,
+      "real_l3_local_constitutive_instance_present": false
+    },
+    "preserved_physical_and_numerical_guards": {
+      "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+      "l2b_unknown_set_bound": false,
+      "l2b_residual_set_bound": false,
+      "l2b_scalar_reduction_bound": false,
+      "l2b_method_status": "METHOD_UNBOUND",
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "source_mean_bulk_state_producer_contract_bound": false,
+      "source_mean_bulk_temperature_producer_bound": false,
+      "jmu_bulk_temperature_aggregation_rule_bound": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "local_residual_and_method_qualification": "OPEN",
+      "local_residual_and_method_canonical_blocker_removed": false,
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "numerical_tolerances_bound": false,
+      "mesh_convergence_rule_bound": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false
+    },
+    "entry_blockers": {
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "decision": {
+      "l3_state_reconstruction_contract_bound": true,
+      "l3_state_reconstruction_operator_bound": false,
+      "local_residual_and_method_canonical_blocker_removed": false,
+      "next_gate": "AUTHORIZE_TASK172_L3_LOCAL_STATE_RECONSTRUCTION_CONTRACT_R2_INDEPENDENT_REVIEW_ONLY",
+      "stop": true
+    },
+    "artifacts": {
+      "document": {
+        "path": "TASK-172-v0.7-l3-local-state-producer-class-and-receipt-schema-correction-r2a.md",
+        "sha256": "db411da67bf261d6f14e0dd60d5e2419d879be5bbc19f5b50708e65f0568aaeb"
+      },
+      "evidence": {
+        "path": "evidence/TASK-172-l3-local-state-producer-class-and-receipt-schema-correction-r2a.json",
+        "file_sha256": "f9ec6a9013e23d8a590599b8908a9d442ac6185bc4552466d8a31a17011b20d9",
+        "canonical_hash": "a34ec096ae6ead6ca4c7a82130bf42a9d1fdc90bd624af4ef8b280a3b3fb56ca"
+      },
+      "registry_path": "TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r64_extension"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task171_changed": false,
+      "task166_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "real_state_instance_created": false,
+      "property_backend_called": false,
+      "reconstruction_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "d4d65b26bc1ac17372d37cd62b85c1e71b37c7a2220eb03ce6cc182b2c23b359"
+  },
+  "canonical_hash": "15ba2c2bb8e6ed1756f8a96174046a76c71a922a8a06e00e5243de97f3ac6f22"
 }
