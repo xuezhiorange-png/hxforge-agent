@@ -13045,5 +13045,167 @@
     },
     "canonical_hash": "c94b88a814d616bf87a72adfa8e0f5cb7da3da0a7e049d877dbd1c4a3c27aa51"
   },
-  "canonical_hash": "8a0ab2c1a26830b333f72b33db3310b3023448e64d92d3af583ee80d53dbca39"
+  "r75_extension": {
+    "task_id": "TASK172_V0_7_JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_CONTRACT_INDEPENDENT_REVIEW_R1",
+    "previous_head": "a383575b5600f11c9d0df0022729d8827b593854",
+    "historical_registry_root_hash": "8a0ab2c1a26830b333f72b33db3310b3023448e64d92d3af583ee80d53dbca39",
+    "historical_r74_extension_hash": "c94b88a814d616bf87a72adfa8e0f5cb7da3da0a7e049d877dbd1c4a3c27aa51",
+    "historical_records_unchanged": true,
+    "review_type": "INDEPENDENT_REVIEW_OF_FROZEN_R74_CONTRACT_ONLY",
+    "review_source": {
+      "source_type": "FROZEN_REPOSITORY_ARTIFACT_AUDIT",
+      "independent_review_result": "FAIL",
+      "correction_required": true,
+      "self_approval": false,
+      "codex_independent_approval_claimed": false
+    },
+    "head_precondition": {
+      "expected_head_sha": "a383575b5600f11c9d0df0022729d8827b593854",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT"
+    },
+    "review_target": {
+      "authority_id": "V07-T172-JMU-SOURCE-MEAN-FAIL-CLOSED-ADMISSION-RULE-CONTRACT-R1",
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-fail-closed-admission-rule-contract-r1.md",
+      "document_sha256": "c51499a08830244936e676ab782d2093200f5fe06c873254ac012ce237a2c3a3",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-fail-closed-admission-rule-contract-r1.json",
+      "evidence_file_sha256": "14bece65d1c1ceb8a0f272f5830189bd7c0d3a89c52663d9f174bbeb70b28feb",
+      "evidence_canonical_hash": "511b8d5f251bde7a4251f85509f417197df95076f831ae9c6db8d4ba39589435",
+      "registry_extension": "r74_extension",
+      "registry_extension_canonical_hash": "c94b88a814d616bf87a72adfa8e0f5cb7da3da0a7e049d877dbd1c4a3c27aa51",
+      "historical_lifecycle": "PROPOSED",
+      "historical_independent_review": "PENDING"
+    },
+    "historical_immutability": {
+      "r71_extension_rewritten": false,
+      "r72_extension_rewritten": false,
+      "r73_extension_rewritten": false,
+      "r74_contract_document_changed": false,
+      "r74_contract_evidence_changed": false,
+      "r74_extension_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "review_adjudication": {
+      "default_reject_review": "PASS",
+      "temperature_fail_closed_review": "PASS",
+      "pressure_fail_closed_review": "PASS",
+      "endpoint_pair_fail_closed_review": "PASS",
+      "property_fail_closed_review": "PASS",
+      "identity_provenance_fail_closed_review": "PASS",
+      "lifecycle_fail_closed_review": "PASS",
+      "unknown_undetermined_review": "PASS",
+      "cross_layer_leakage_review": "PASS",
+      "positive_admission_conjunction_review": "PASS",
+      "rejection_matrix_rule_count": 64,
+      "rejection_matrix_unique_rule_id_count": 64,
+      "rejection_matrix_duplicate_rule_id_count": 0,
+      "rejection_matrix_non_reject_decision_count": 0,
+      "rejection_matrix_required_coverage_complete": false,
+      "rejection_matrix_contradiction_count": 0,
+      "missing_matrix_conditions": ["HIDDEN_OR_DEFAULT_STATE", "LEGACY_RESULT_RELABELING"],
+      "defects": [
+        {
+          "defect_id": "R74-MATRIX-001",
+          "condition": "HIDDEN_OR_DEFAULT_STATE",
+          "severity": "SUBSTANTIVE",
+          "source_location": "R74 document line 225",
+          "finding": "REJECT_IF_HIDDEN_OR_DEFAULT_STATE=true has no corresponding machine-matrix condition."
+        },
+        {
+          "defect_id": "R74-MATRIX-002",
+          "condition": "LEGACY_RESULT_RELABELING",
+          "severity": "SUBSTANTIVE",
+          "source_location": "R74 document line 228",
+          "finding": "REJECT_IF_LEGACY_RESULT_RELABELING=true has no corresponding machine-matrix condition."
+        }
+      ],
+      "independent_review_result": "FAIL",
+      "correction_required": true
+    },
+    "predicate_state": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_fail_closed_predicate_satisfied": "undetermined",
+      "source_mean_model_level_predicate_status_bound": false,
+      "source_mean_model_level_unsatisfied_or_undetermined_predicates": ["JMU_BULK_PRESSURE_RULE_BOUND", "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND"],
+      "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 2,
+      "source_mean_model_level_sole_blocker": "NOT_PROVEN",
+      "pressure_is_proven_sole_model_level_blocker": false
+    },
+    "lifecycle": {
+      "historical_lifecycle": "PROPOSED",
+      "historical_independent_review": "PENDING",
+      "effective_lifecycle": "PROPOSED",
+      "effective_independent_review": "FAIL",
+      "r74_original_lifecycle_rewritten": false,
+      "lifecycle_promotion_recorded_append_only": false,
+      "new_contract_created": false,
+      "contract_rules_changed": false
+    },
+    "real_instance_layer": {
+      "source_mean_bulk_state_authority_candidate_created": false,
+      "real_reviewed_shell_inlet_producer_found": false,
+      "real_reviewed_shell_outlet_producer_found": false,
+      "real_reviewed_shell_endpoint_pair_producer_found": false,
+      "real_shell_inlet_state_instance_present": false,
+      "real_shell_outlet_state_instance_present": false,
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "real_jmu_bulk_state_instance_present": false,
+      "real_jmu_bulk_property_snapshot_present": false
+    },
+    "preserved_parent_state": {
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-fail-closed-admission-rule-contract-independent-review-r1.md",
+      "document_sha256": "9e26bc882caa7ed72da533e081ece94157f110e26ca13fcd560af5c15efc61df",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-fail-closed-admission-rule-contract-independent-review-r1.json",
+      "evidence_file_sha256": "a17811278e486203714f4a3447f895ff0b8006348707fca5ab85213a887e5e88",
+      "evidence_canonical_hash": "346c6408d4e0cf00582dc5e078ae92dcd7cf87b83908ba0661990e820f8fc742",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r75_extension"
+    },
+    "decision": {
+      "result": "REVIEWED",
+      "outcome": "R74_CONTRACT_REVIEW_FAILED_MATRIX_COVERAGE_INCOMPLETE",
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "AUTHORIZE_TASK172_JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_CONTRACT_CORRECTION_R1_ONLY",
+      "stop": true
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "pressure_rule_researched": false,
+      "pressure_rule_selected": false,
+      "pressure_authority_created": false,
+      "endpoint_producer_created": false,
+      "endpoint_state_created": false,
+      "property_snapshot_created": false,
+      "property_backend_called": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "task166_changed": false,
+      "task171_changed": false,
+      "tests_changed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "e8f4f3ef76619b67cb6a098ad84d51cb97712dac83fcd3eae8fb7730d9ba0f8a"
+  },
+  "canonical_hash": "190a00c8f5848358c0dfb42d3a582bdba9b79ae529f6e22c22a5751e18ec6d33"
 }
