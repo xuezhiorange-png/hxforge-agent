@@ -11688,5 +11688,216 @@
   },
     "canonical_hash": "1176f6dc1acd6074f889dc599b07a80fdaedcde57772480a22b9fdf71b4ff949"
   },
-  "canonical_hash": "862e6ba67d26fde4420f40a5bf8439a76ed03958fdaef5634d052ddca4c6ff36"
+  "r67_extension": {
+    "task_id": "TASK172_V0_7_NUMERICAL_ERROR_BUDGET_AND_STOPPING_CONTRACT_R1",
+    "previous_head": "42a35271b791188da8215f79d044c492b6cff675",
+    "historical_registry_root_hash": "862e6ba67d26fde4420f40a5bf8439a76ed03958fdaef5634d052ddca4c6ff36",
+    "historical_r66_extension_hash": "1176f6dc1acd6074f889dc599b07a80fdaedcde57772480a22b9fdf71b4ff949",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_ERROR_BUDGET_AND_STOPPING_CONTRACT_CONSTRUCTION_ONLY",
+    "subject": "V07-T172-NUMERICAL-ERROR-BUDGET-STOPPING-CONTRACT-R1",
+    "review_source": {
+      "source_type": "TASK172_AUTHORIZED_MODEL_LEVEL_GATE",
+      "decision": "RESOLVED_MODEL_LEVEL_CONTRACT",
+      "independent_review": "PENDING",
+      "new_authority_self_approval": false
+    },
+    "error_budget_contract": {
+      "numerical_error_budget_component_taxonomy_bound": true,
+      "numerical_error_component_schema_bound": true,
+      "components": [
+        "REFERENCE_DATA_ERROR",
+        "PROPERTY_FORMULATION_ERROR",
+        "CORRELATION_MODEL_FORM_ERROR",
+        "DISCRETIZATION_ERROR",
+        "ITERATION_ROOT_ERROR",
+        "SERIALIZATION_QUANTIZATION_ERROR"
+      ],
+      "reference_data_error_contract_bound": true,
+      "reference_data_error_automatically_random": false,
+      "reference_data_error_automatic_rss_eligible": false,
+      "property_formulation_error_contract_bound": true,
+      "property_model_uncertainty_equals_solver_tolerance": false,
+      "property_backend_reproduction_tolerance_reusable_as_root_tolerance": false,
+      "correlation_model_form_error_contract_bound": true,
+      "correlation_model_form_error_automatic_rss_eligible": false,
+      "correlation_domain_uncertainty_reusable_as_iteration_tolerance": false,
+      "discretization_error_contract_bound": true,
+      "discretization_error_estimator_bound": false,
+      "discretization_error_delegated_to_mesh_qualification": true,
+      "iteration_root_error_contract_bound": true,
+      "actual_iteration_root_error_quantified": false,
+      "serialization_quantization_error_contract_bound": true,
+      "display_rounding_equals_internal_numerical_error": false,
+      "canonical_serialization_precision_automatically_engineering_acceptable": false
+    },
+    "combination_policy": {
+      "error_component_combination_policy_contract_bound": true,
+      "automatic_root_sum_square_allowed": false,
+      "automatic_linear_sum_allowed": false,
+      "automatic_worst_case_max_allowed": false,
+      "quantitative_numerical_error_budget_bound": false,
+      "combined_numerical_error_budget_bound": false,
+      "numerical_error_must_not_dominate_accepted_engineering_uncertainty": true,
+      "engineering_acceptance_budget_actual_value_bound": false,
+      "numerical_error_allocation_actual_value_bound": false
+    },
+    "stopping_contract": {
+      "stopping_policy_residual_specific": true,
+      "generic_single_stopping_error_metric_allowed": false,
+      "stopping_admission_predicate_schema_bound": true,
+      "required_predicates": [
+        "RESIDUAL_IDENTITY_VALID",
+        "STATE_IDENTITY_VALID",
+        "ALL_REQUIRED_INPUT_AUTHORITIES_VALID",
+        "FINITE_VALUES",
+        "DOMAIN_SAFE",
+        "METHOD_STATUS_VALID",
+        "RESIDUAL_CRITERION_SATISFIED",
+        "STATE_UPDATE_CRITERION_IF_REQUIRED",
+        "ENERGY_CLOSURE_CRITERION_IF_REQUIRED",
+        "PROPERTY_COUPLING_CRITERION_IF_REQUIRED",
+        "MESH_STATUS_IF_REQUIRED",
+        "NO_FAILURE_CLASS_ACTIVE"
+      ],
+      "converged_local_iteration_equals_engineering_acceptance": false,
+      "zero_bookkeeping_residual_equals_physical_closure": false,
+      "wall_iteration_status_separate": true,
+      "property_coupling_status_separate": true,
+      "mesh_convergence_status_separate": true,
+      "energy_closure_status_separate": true,
+      "separate_numerical_status_model_preserved": true,
+      "numerical_tolerance_class_schema_bound": true,
+      "absolute_relative_tolerance_policy_schema_bound": true,
+      "zero_duty_stopping_policy_required": true,
+      "zero_duty_stopping_policy_bound": false,
+      "resource_cap_policy_contract_bound": true,
+      "max_iter_bound": false,
+      "max_mesh_refinement_bound": false,
+      "max_iter_is_convergence_proof": false,
+      "max_mesh_is_mesh_adequacy_proof": false,
+      "resource_cap_reached_without_convergence": "NOT_CONVERGED_BLOCKED",
+      "stagnation_detection_contract_schema_bound": true,
+      "stagnation_window_bound": false,
+      "stagnation_progress_metric_bound": false,
+      "stagnation_threshold_bound": false,
+      "oscillation_detection_contract_schema_bound": true,
+      "oscillation_window_bound": false,
+      "oscillation_threshold_bound": false,
+      "last_iterate_accepted_as_valid_result": false,
+      "last_iterate_available_for_diagnostics": true,
+      "numerical_failure_taxonomy_bound": true,
+      "failure_classes": [
+        "NONFINITE",
+        "INVALID_PROPERTY_STATE",
+        "DOMAIN_EXCURSION",
+        "NO_BRACKET",
+        "SURFACE_INCONSISTENCY",
+        "STAGNATION",
+        "OSCILLATION",
+        "RESOURCE_EXHAUSTION",
+        "NOT_CONVERGED"
+      ],
+      "under_relaxation_status": "NOT_SELECTED",
+      "relaxation_factor_bound": false,
+      "library_default_numerical_tolerance_promoted": false,
+      "library_default_max_iter_promoted": false,
+      "library_default_stopping_policy_promoted": false
+    },
+    "threshold_inventory": {
+      "existing_numerical_threshold_inventory_bound": true,
+      "existing_numerical_threshold_transfer_authority_bound": false,
+      "observed_thresholds_promoted": false,
+      "inventory_classes": [
+        "SOURCE_SPECIFIC",
+        "LEGACY_ACCEPTANCE_ONLY",
+        "TEST_FIXTURE_ONLY",
+        "RESOURCE_LIMIT_ONLY",
+        "UNRELATED_METHOD",
+        "POTENTIALLY_TRANSFERABLE_WITH_REVIEW"
+      ],
+      "audited_sources": [
+        "TASK-170-v0.7-scope-source-golden-freeze",
+        "TASK-169 v0.6 acceptance ledger",
+        "TASK-171 v0.7 segmented topology engine",
+        "TASK-166 Bell-Delaware shell-side model",
+        "TASK-037/TASK-025 geometry and area authority",
+        "TASK-160/161/162 v0.6 thermal closure authority",
+        "TASK-009/TASK-010 legacy solver material",
+        "repository property backend implementations"
+      ]
+    },
+    "dependency_graphs": {
+      "numerical_error_budget_dependency_graph_bound": true,
+      "stopping_policy_dependency_graph_bound": true,
+      "executable_stopping_policy_bound": false,
+      "missing_nodes_preserved_unbound": true
+    },
+    "candidate_lifecycle": {
+      "candidate_created": true,
+      "authority_id": "V07-T172-NUMERICAL-ERROR-BUDGET-STOPPING-CONTRACT-R1",
+      "lifecycle": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "new_authority_self_approval": false
+    },
+    "preserved_downstream_state": {
+      "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+      "l2b_method_status": "METHOD_UNBOUND",
+      "l3_local_state_reconstruction_branch_status": "PAUSED_PENDING_DIRECT_LOCAL_STATE_PRODUCER_AUTHORITY_OR_RECONSTRUCTION_OPERATOR_AUTHORITY",
+      "l3_method_status": "METHOD_UNBOUND",
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "numerical_error_budget_and_stopping_canonical_blocker_removed": false,
+      "mesh_convergence_qualification": "OPEN",
+      "mesh_convergence_rule_bound": false,
+      "numerical_tolerances_bound": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "jmu_executable_authority_bound": false
+    },
+    "entry_blockers": {
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-numerical-error-budget-and-stopping-contract-r1.md",
+      "document_sha256": "aefc12d3846ea8a52f40a3581afccf3eb5e721aac2828e41e90125527c61f442",
+      "evidence_path": "docs/tasks/evidence/TASK-172-numerical-error-budget-and-stopping-contract-r1.json",
+      "evidence_file_sha256": "c80d8dcba9381fd58c282d1c9dd0ff107d2df4b895637646e461e05237ab0e31",
+      "evidence_canonical_hash": "3cac95c7daa8507c6057553472a5a07b6d7eecd09810c97e57bcdc3abe501814",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r67_extension"
+    },
+    "decision": {
+      "result": "RESOLVED",
+      "outcome": "OUTCOME_A_MODEL_LEVEL_ERROR_BUDGET_AND_STOPPING_CONTRACT_COMPLETE_QUANTITATIVE_ALLOCATION_UNBOUND",
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "AUTHORIZE_TASK172_NUMERICAL_ERROR_BUDGET_STOPPING_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+      "stop": true
+    },
+    "historical_payloads_immutable": true,
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "historical_records_rewritten": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "27ff86769978f9672580a3006c68b897b67b9ad6047c1fd5ee712861e4db384b"
+  },
+  "canonical_hash": "09b28fb08dd09a87644e5027bb3198b7a36d48dc24bf39905de1f1c48e870c84"
 }
