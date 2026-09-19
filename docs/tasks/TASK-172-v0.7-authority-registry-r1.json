@@ -12691,10 +12691,10 @@
     },
     "artifacts": {
       "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.md",
-      "document_sha256": "6cd3caa13314bb9fe75a5df6d8ae6f0d365ec889642f8b5d8e9ef09c737df4a4",
+      "document_sha256": "2be29f0fed768699e17e875555542854b6c406ae9632945f6db0ac54a0fc11ad",
       "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.json",
-      "evidence_file_sha256": "bc7c568e1a6f098b54f3bfb2aa2cd258e61ee080289eb256f4a3f6567e3ea559",
-      "evidence_canonical_hash": "fbca8af7d36d92321f0aa530e8853f5b4b1589b9ea1f70f9fb332e4ecd6e6d7c",
+      "evidence_file_sha256": "78252227360988f59b635c8a4256bb76060103ea602f0dbdf41ff58014879639",
+      "evidence_canonical_hash": "81c11bc1819c9f138f9286b13202d74873589bd09ba9d074847fc0b4b709f821",
       "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
       "registry_extension_key": "r72_extension"
     },
@@ -12722,7 +12722,7 @@
       "merge_authorized": false,
       "no_step_implies_the_next": true
     },
-    "canonical_hash": "b7ec2408df13cc0f58ebb25979558c6df300c10f8e7ab20f917889d503623880"
+    "canonical_hash": "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638"
   },
-  "canonical_hash": "53f79ab04aa709e756f1f8913a59360c44b611a555f5b685c5a6d65394ef0d9c"
+  "canonical_hash": "4cef1df9f20304ea1dec7b14de0897d4d3741ba31c7e78b4342512f1aba84d85"
 }
