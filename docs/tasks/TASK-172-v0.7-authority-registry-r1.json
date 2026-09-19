@@ -12038,5 +12038,214 @@
     },
     "canonical_hash": "a6fa72869e1e74fb29579d5fc7c64cefad8c2c8a0034a691d299afc32f9ff65d"
   },
-  "canonical_hash": "ece81808a73fc9e5c4166849efdb346306c479b8e96ea254b123c93303dfbd2b"
+  "r69_extension": {
+    "task_id": "TASK172_V0_7_MESH_CONVERGENCE_CONTRACT_R1",
+    "previous_head": "0468938bc96b8da4b652fbae5ecb2ca3f5932c28",
+    "historical_registry_root_hash": "ece81808a73fc9e5c4166849efdb346306c479b8e96ea254b123c93303dfbd2b",
+    "historical_r68_extension_hash": "a6fa72869e1e74fb29579d5fc7c64cefad8c2c8a0034a691d299afc32f9ff65d",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_MESH_CONVERGENCE_CONTRACT_CONSTRUCTION_ONLY",
+    "subject": "V07-T172-MESH-CONVERGENCE-CONTRACT-R1",
+    "review_source": {
+      "source_type": "TASK172_AUTHORIZED_MODEL_LEVEL_GATE",
+      "decision": "RESOLVED_MODEL_LEVEL_CONTRACT",
+      "independent_review": "PENDING",
+      "codex_independent_approval_claimed": false,
+      "self_approval": false
+    },
+    "accepted_contract": {
+      "mesh_physical_vs_numerical_identity_contract_bound": true,
+      "mesh_refinement_may_create_physical_event": false,
+      "mesh_refinement_may_cross_physical_event_boundary": false,
+      "mesh_identity_contract_bound": true,
+      "mesh_parent_child_refinement_contract_bound": true,
+      "child_partition_coverage_contract_bound": true,
+      "mesh_refinement_sequence_schema_bound": true,
+      "mesh_refinement_sequence_bound": false,
+      "default_mesh_doubling_authorized": false,
+      "default_uniform_refinement_authorized": false,
+      "default_cell_count_authorized": false,
+      "default_refinement_ratio_authorized": false,
+      "common_physical_support_comparison_contract_bound": true,
+      "array_index_mesh_comparison_authorized": false,
+      "cell_count_positional_pairing_authorized": false,
+      "comparison_observable_taxonomy_bound": true,
+      "mesh_comparison_requires_approved_observable_producer": true,
+      "mesh_comparison_aggregation_authority_required": true,
+      "different_mesh_comparison_mapping_contract_required": true,
+      "different_mesh_comparison_mapping_schema_bound": true,
+      "different_mesh_comparison_operator_bound": false,
+      "extensive_quantity_conservative_mapping_policy_required": true,
+      "extensive_quantity_conservative_mapping_policy_bound": false,
+      "intensive_quantity_comparison_policy_required": true,
+      "intensive_quantity_comparison_policy_bound": false,
+      "mesh_comparison_metric_schema_bound": true,
+      "mesh_comparison_norm_bound": false,
+      "mesh_relative_comparison_policy_schema_bound": true,
+      "single_mesh_pair_proves_asymptotic_convergence": false,
+      "two_similar_mesh_results_prove_asymptotic_convergence": false,
+      "observed_order_of_convergence_bound": false,
+      "theoretical_order_of_convergence_bound": false,
+      "asymptotic_regime_proven": false,
+      "richardson_extrapolation_authorized": false,
+      "grid_convergence_index_authorized": false,
+      "mesh_convergence_criterion_schema_bound": true,
+      "mesh_termination_threshold_bound": false,
+      "mesh_precision_floor_contract_required": true,
+      "mesh_precision_floor_bound": false,
+      "identical_serialized_results_prove_mesh_convergence": false,
+      "rounding_plateau_proves_mesh_convergence": false,
+      "numerical_no_change_proves_asymptotic_regime": false,
+      "discretization_error_estimator_schema_bound": true,
+      "discretization_error_estimator_bound": false,
+      "mesh_to_error_budget_interface_contract_bound": true,
+      "mesh_status_model_bound": true,
+      "mesh_converged_equals_engineering_acceptance": false,
+      "mesh_converged_equals_physical_model_validated": false,
+      "mesh_converged_equals_correlation_authority_complete": false,
+      "mesh_resource_cap_policy_contract_bound": true,
+      "max_mesh_refinement_bound": false,
+      "task171_record_limit_is_mesh_adequacy_proof": false,
+      "resource_cap_reached_without_mesh_convergence": "MESH_NOT_CONVERGED",
+      "mesh_failure_taxonomy_bound": true,
+      "last_mesh_accepted_as_valid_converged_result": false,
+      "last_mesh_available_for_diagnostics": true,
+      "executable_mesh_convergence_qualification_bound": false,
+      "real_task172_mesh_study_present": false,
+      "real_task172_mesh_convergence_receipt_present": false
+    },
+    "observable_classes": [
+      "TERMINAL_STATE_OBSERVABLE",
+      "TOTAL_WALL_DUTY_OBSERVABLE",
+      "PHYSICAL_INTERVAL_DUTY_OBSERVABLE",
+      "WALL_INTERFACE_DUTY_OBSERVABLE",
+      "WALL_SURFACE_EXTREMA_OBSERVABLE",
+      "CONSERVATION_RESIDUAL_OBSERVABLE",
+      "LOCAL_CONSTITUTIVE_STATE_OBSERVABLE"
+    ],
+    "status_vocabulary": [
+      "MESH_NOT_EVALUATED",
+      "MESH_EVALUATED_NOT_ASSESSED",
+      "MESH_CONVERGED",
+      "MESH_NOT_CONVERGED",
+      "MESH_INVALID_MAPPING",
+      "MESH_INVALID_REFINEMENT",
+      "MESH_RESOURCE_EXHAUSTED"
+    ],
+    "failure_taxonomy": [
+      "INVALID_PARENT_CHILD_RELATION",
+      "PHYSICAL_BOUNDARY_CROSSED",
+      "INCOMPLETE_PARENT_COVERAGE",
+      "OVERLAPPING_CHILDREN",
+      "INVALID_COMMON_SUPPORT_MAPPING",
+      "MISSING_OBSERVABLE_AUTHORITY",
+      "NONFINITE_COMPARISON",
+      "PRECISION_FLOOR_UNRESOLVED",
+      "REFINEMENT_SEQUENCE_INSUFFICIENT",
+      "RESOURCE_EXHAUSTION",
+      "MESH_NOT_CONVERGED"
+    ],
+    "historical_rule_inventory": {
+      "existing_mesh_threshold_and_rule_inventory_bound": true,
+      "existing_mesh_rule_transfer_authority_bound": false,
+      "n1_equivalence_automatic_mesh_convergence_authority": false,
+      "sources": [
+        {
+          "source": "TASK-171 topology engine",
+          "classification": "STRUCTURAL_ONLY_OR_RESOURCE_LIMIT_ONLY",
+          "transfer": "no mesh adequacy value transferred"
+        },
+        {
+          "source": "TASK-170 TASK171-entry authority",
+          "classification": "FUTURE_RELEASE_REQUIREMENT",
+          "transfer": "no TASK172 count, threshold, estimator or N=1 value transferred"
+        },
+        {
+          "source": "TASK-170 scope/source freeze",
+          "classification": "POTENTIALLY_TRANSFERABLE_WITH_REVIEW",
+          "transfer": "contract obligations only"
+        },
+        {
+          "source": "TASK-172 wall numerical proposal",
+          "classification": "POTENTIALLY_TRANSFERABLE_WITH_REVIEW",
+          "transfer": "model-level schema only"
+        },
+        {
+          "source": "TASK175 artifact audit",
+          "classification": "FUTURE_RELEASE_REQUIREMENT",
+          "transfer": "no standalone TASK175 mesh authority found"
+        },
+        {
+          "source": "TASK-009/TASK-010 legacy solver and Golden/release fixtures",
+          "classification": "UNRELATED_METHOD_OR_TEST_FIXTURE_OR_LEGACY_ACCEPTANCE_ONLY",
+          "transfer": "no mesh rule transferred"
+        }
+      ]
+    },
+    "dependency_graph_bound": true,
+    "dependency_graph_missing_nodes_remain_unbound": true,
+    "candidate_lifecycle": {
+      "candidate_created": true,
+      "authority_id": "V07-T172-MESH-CONVERGENCE-CONTRACT-R1",
+      "lifecycle": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "new_authority_self_approval": false,
+      "mesh_convergence_qualification": "OPEN",
+      "mesh_convergence_canonical_blocker_removed": false
+    },
+    "preserved_downstream_state": {
+      "shell_wall_correction_status": "BLOCKED",
+      "jmu_executable_authority_bound": false,
+      "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+      "l2b_method_status": "METHOD_UNBOUND",
+      "l3_branch_status": "PAUSED_PENDING_DIRECT_LOCAL_STATE_PRODUCER_AUTHORITY_OR_RECONSTRUCTION_OPERATOR_AUTHORITY",
+      "l3_method_status": "METHOD_UNBOUND",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "numerical_error_budget_stopping_branch_status": "PAUSED_PENDING_ACTUAL_METHOD_SENSITIVITY_QUANTITATIVE_ERROR_ALLOCATION_AND_MESH_QUALIFICATION",
+      "numerical_tolerances_bound": false,
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false,
+      "effective_remaining_task172_entry_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-mesh-convergence-contract-r1.md",
+      "document_sha256": "3577f64cc5280d7988068c145fe3e495d58d6548392c6fb7329df070b077cf7c",
+      "evidence_path": "docs/tasks/evidence/TASK-172-mesh-convergence-contract-r1.json",
+      "evidence_canonical_hash": "f33ad1e61de3ccc425fd79a0d2fbce129458fd5f8c862f34b42b7d0c89533ce7",
+      "evidence_file_sha256": "709d8c04190dec0fa1b327d91d07bf4753777846950fa83f63d07a646ad63fa8",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r69_extension"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "append_only_registry_extension": true,
+      "historical_payloads_immutable": true,
+      "historical_records_rewritten": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "decision": {
+      "result": "RESOLVED",
+      "outcome": "OUTCOME_A_MODEL_LEVEL_MESH_CONVERGENCE_CONTRACT_COMPLETE_QUANTITATIVE_RULE_UNBOUND",
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "AUTHORIZE_TASK172_MESH_CONVERGENCE_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "c9d09016d541d5394a65e50a19e0550a8c987d24e9f42e70c57beae82d622900"
+  },
+  "canonical_hash": "981cb6af799193b06a3a4de2a644cab870404f54cc68ae26566f8d7056626f57"
 }
