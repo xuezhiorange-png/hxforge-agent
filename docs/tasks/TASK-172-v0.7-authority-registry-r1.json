@@ -12935,5 +12935,115 @@
     },
     "canonical_hash": "652ff715630ee33c272e9ad3e63e4ba820ec9526e4a870f846fe5f8c47064ae8"
   },
-  "canonical_hash": "33927fd9af45de48aea5fcba6b8d2947f63e8f8d7f98578b1a41ece4ee1ad67e"
+  "r74_extension": {
+    "task_id": "TASK172_V0_7_JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_CONTRACT_R1",
+    "previous_head": "99e74b81476508e942604fccb38317e8985f5177",
+    "historical_registry_root_hash": "33927fd9af45de48aea5fcba6b8d2947f63e8f8d7f98578b1a41ece4ee1ad67e",
+    "historical_r71_extension_hash": "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+    "historical_r72_extension_hash": "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638",
+    "historical_r73_extension_hash": "652ff715630ee33c272e9ad3e63e4ba820ec9526e4a870f846fe5f8c47064ae8",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_FAIL_CLOSED_ADMISSION_CONTRACT_ONLY",
+    "subject": "JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE",
+    "head_precondition": {
+      "expected_head_sha": "99e74b81476508e942604fccb38317e8985f5177",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT"
+    },
+    "historical_immutability": {
+      "r71_extension_rewritten": false,
+      "r72_extension_rewritten": false,
+      "r73_extension_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "contract_layers": {
+      "endpoint_pair_fail_closed_rules_reused_by_reference": true,
+      "source_mean_specific_fail_closed_coverage_added": true,
+      "endpoint_pair_rules_alone_sufficient": false,
+      "real_source_mean_instance_admission_rules_completed": false,
+      "real_endpoint_producer_required_for_model_level_source_mean_contract": false,
+      "real_endpoint_pair_required_for_model_level_source_mean_contract": false,
+      "real_endpoint_producer_required_for_real_source_mean_instance": true,
+      "real_endpoint_pair_required_for_real_source_mean_instance": true
+    },
+    "admission_contract": {
+      "authority_id": "V07-T172-JMU-SOURCE-MEAN-FAIL-CLOSED-ADMISSION-RULE-CONTRACT-R1",
+      "lifecycle": "PROPOSED",
+      "independent_review": "PENDING",
+      "default_admission_decision": "REJECT",
+      "all_required_model_level_predicates_must_be_satisfied": true,
+      "unknown_or_undetermined_is_not_accepted": true,
+      "source_mean_fail_closed_admission_rule_bound": false,
+      "source_mean_fail_closed_predicate_satisfied": "undetermined",
+      "rejection_matrix_rule_count": 64,
+      "rejection_matrix_rule_id_prefixes": [
+        "SMFC-TEMP-",
+        "SMFC-PRES-",
+        "SMFC-PAIR-",
+        "SMFC-PROP-",
+        "SMFC-ID-",
+        "SMFC-LIFE-",
+        "SMFC-FAIL-",
+        "SMFC-XLYR-"
+      ],
+      "positive_admission_requires_all_six_predicates": true,
+      "candidate_created": false,
+      "real_instance_created": false
+    },
+    "predicate_status": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_model_level_unsatisfied_or_undetermined_predicates": [
+        "JMU_BULK_PRESSURE_RULE_BOUND",
+        "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND"
+      ],
+      "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 2,
+      "source_mean_model_level_sole_blocker": "NOT_PROVEN"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-fail-closed-admission-rule-contract-r1.md",
+      "document_sha256": "c51499a08830244936e676ab782d2093200f5fe06c873254ac012ce237a2c3a3",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-fail-closed-admission-rule-contract-r1.json",
+      "evidence_file_sha256": "14bece65d1c1ceb8a0f272f5830189bd7c0d3a89c52663d9f174bbeb70b28feb",
+      "evidence_canonical_hash": "511b8d5f251bde7a4251f85509f417197df95076f831ae9c6db8d4ba39589435",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r74_extension"
+    },
+    "decision": {
+      "result": "PROPOSED_FAIL_CLOSED_CONTRACT_CREATED",
+      "source_mean_bulk_state_producer_contract_bound": false,
+      "source_mean_bulk_state_authority_candidate_created": false,
+      "source_mean_bulk_state_authority_id": "NONE",
+      "source_mean_bulk_state_authority_lifecycle": "NONE",
+      "source_mean_bulk_state_independent_review": "NONE",
+      "next_gate": "AUTHORIZE_TASK172_JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+      "stop": true
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "pressure_rule_selected": false,
+      "pressure_authority_created": false,
+      "endpoint_producer_created": false,
+      "endpoint_state_created": false,
+      "property_snapshot_created": false,
+      "property_backend_called": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "task166_changed": false,
+      "task171_changed": false,
+      "tests_changed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "c94b88a814d616bf87a72adfa8e0f5cb7da3da0a7e049d877dbd1c4a3c27aa51"
+  },
+  "canonical_hash": "8a0ab2c1a26830b333f72b33db3310b3023448e64d92d3af583ee80d53dbca39"
 }
