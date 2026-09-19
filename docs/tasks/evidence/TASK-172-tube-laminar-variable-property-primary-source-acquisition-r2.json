@@ -1,0 +1,265 @@
+{
+  "schema_version": "task172.tube-laminar-variable-property-primary-source-acquisition.r2",
+  "task_id": "TASK172_V0_7_TUBE_LAMINAR_VARIABLE_PROPERTY_PRIMARY_SOURCE_ACQUISITION_R2",
+  "pr_number": 277,
+  "expected_start_head": "7cf4dd6e6a2c92c210a7a3563fa924f00a84986e",
+  "previous_head_sha": "7cf4dd6e6a2c92c210a7a3563fa924f00a84986e",
+  "mode": "TARGETED_LAMINAR_VARIABLE_PROPERTY_PRIMARY_SOURCE_ACQUISITION_ONLY",
+  "parent_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "result": "PASS_WITH_BLOCKER_RETAINED",
+  "source_acquisition": {
+    "naca_tn_2410": {
+      "source_target_id": "NACA-TN-2410",
+      "record_id": "19930088965",
+      "report_number": "NACA-TN-2410",
+      "title": "Analytical investigation of fully developed laminar flow in tubes with heat transfer with fluid properties variable along the radius",
+      "author": "Robert G. Deissler",
+      "issuer": "National Advisory Committee for Aeronautics; Lewis Flight Propulsion Laboratory",
+      "year": 1951,
+      "report_date": "July 1951",
+      "source_class": "US_GOVERNMENT_PRIMARY_TECHNICAL_REPORT",
+      "source_role": "PRIMARY_VARIABLE_PROPERTY_PHYSICS_LINEAGE",
+      "ntrs_record": "https://ntrs.nasa.gov/citations/19930088965",
+      "pdf_access_path": "https://ntrs.nasa.gov/api/citations/19930088965/downloads/19930088965.pdf",
+      "fulltext_access_path": "https://ntrs.nasa.gov/api/citations/19930088965/downloads/19930088965.txt",
+      "source_revision": "NACA-TN-2410; July 1951",
+      "retrieved_on": "2026-09-15",
+      "source_bytes_sha256": "7bea2670ad3fb974dcbc9b761f3cbfdede7c79768be8e6909a78c4223681ef9f",
+      "fulltext_bytes_sha256": "96f20fd5946a6783fa0410b6dd000b4e9ee0dd94d28339e01f07a9a59a02212d",
+      "pdf_page_count": 29,
+      "body_acquired": true,
+      "body_review_method": "RENDERED_INSPECTION_OF_ALL_29_PDF_PAGES_WITH_TEXT_ENDPOINT_LOCATION_CROSS_CHECK",
+      "rights_status": "GOV_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+      "source_pdf_vendored": false,
+      "source_status": "VERIFIED_SOURCE_NOT_TASK172_TRANSFER_AUTHORITY",
+      "exact_body_locations": [
+        "Summary and introduction; report pp.1-2; PDF pp.2-3",
+        "Gas assumptions and variable-property derivation; report pp.4-10; PDF pp.5-11",
+        "Liquid-metal assumptions and derivation; report pp.10-12; PDF pp.11-13",
+        "Nusselt/friction relations and uniform-property special case; report pp.11-17; PDF pp.12-18"
+      ]
+    },
+    "yang_1962": {
+      "source_target_id": "YANG-1962-VARIABLE-VISCOSITY",
+      "title": "Laminar Forced Convection of Liquids in Tubes With Variable Viscosity",
+      "author": "Kwang-Tzu Yang",
+      "journal": "Journal of Heat Transfer",
+      "volume": 84,
+      "issue": 4,
+      "pages": "353-361",
+      "publication_date": "1962-11-01",
+      "doi": "10.1115/1.3684396",
+      "source_class": "PEER_REVIEWED_PRIMARY_JOURNAL_ARTICLE",
+      "source_role": "PRIMARY_SOURCE_TARGET_BODY_NOT_ACQUIRED",
+      "doi_access_path": "https://doi.org/10.1115/1.3684396",
+      "publisher_record": "https://asmedigitalcollection.asme.org/heattransfer/article/84/4/353/430308/Laminar-Forced-Convection-of-Liquids-in-Tubes-With",
+      "publisher_pdf_access_path": "https://asmedigitalcollection.asme.org/heattransfer/article-pdf/84/4/353/5717440/353_1.pdf",
+      "crossref_metadata_sha256": "5efd29f0734e9dedf10f3928c2d417ec78a35756ab5d12dfdd744f3eb7ea0fe1",
+      "source_bytes_sha256": null,
+      "body_acquired": false,
+      "body_acquisition_attempted": true,
+      "publisher_pdf_http_status": 403,
+      "publisher_pdf_access_result": "OFFICIAL_PUBLISHER_ACCESS_CONTROLLED",
+      "openalex_cross_check": {
+        "is_oa": false,
+        "oa_status": "closed",
+        "any_repository_has_fulltext": false,
+        "role": "ACQUISITION_STATUS_CROSS_CHECK_ONLY"
+      },
+      "rights_status": "NO_COMPLETE_RIGHTS_CLEARED_BODY_ACQUIRED",
+      "source_status": "BIBLIOGRAPHIC_DISCOVERY_ONLY",
+      "abstract_semantics": {
+        "circular_tubes": true,
+        "temperature_dependent_viscosity": true,
+        "wall_temperature_case_named": true,
+        "wall_heat_flux_case_named": true,
+        "equation_body_available": false,
+        "domain_available": false,
+        "combination_rule_available": false
+      }
+    }
+  },
+  "naca_body_semantics": {
+    "flow_regime": "FULLY_DEVELOPED_LAMINAR",
+    "geometry": "CIRCULAR_TUBE",
+    "fluid_family": "GASES_AND_LIQUID_METALS",
+    "heating_cooling_scope": "BOTH_HEATING_AND_COOLING",
+    "thermal_boundary": "FULLY_DEVELOPED_RADIAL_WALL_TO_BULK_TEMPERATURE_FORMULATION;EXACT_TASK026_CWT_CHF_PAIRING_NOT_STATED",
+    "property_variation_model": "GAS_MU_K_RHO_VARIABLE_WITH_TEMPERATURE;LIQUID_METAL_MU_ONLY",
+    "property_state_definitions": "WALL_TEMPERATURE_T0;BULK_TEMPERATURE_TB;INTERMEDIATE_FLUID_TEMPERATURE_TX",
+    "wall_to_bulk_variable": "T0_OVER_TB",
+    "nusselt_relation": "SOURCE_RELATIONS_NU_O_NU_B_NU_X;NO_TASK026_VARIABLE_PROPERTY_COMBINATION_RULE",
+    "reference_property_temperature_rule": "SOURCE_SPECIFIC_EVALUATION_TEMPERATURES;NOT_TRANSFERRED_TO_TASK172_WATER",
+    "cwt_transferability": false,
+    "chf_transferability": false,
+    "to_task172_water_transfer_established": false,
+    "limitations": [
+      "The source declares gases and liquid metals rather than the reviewed pure-water production profile.",
+      "The gas model holds specific heat and Prandtl number constant and uses a source-specific property variation model.",
+      "The liquid-metal model treats only viscosity as temperature-varying under its stated assumptions.",
+      "The report does not provide an exact TASK026 CWT/CHF wall-state combination rule.",
+      "The report does not authorize transfer to CoolProp water semantics or to a TASK172 property backend profile."
+    ]
+  },
+  "yang_body_semantics": {
+    "cwt_boundary": "ABSTRACT_ONLY_STEP_CHANGE_TUBE_WALL_TEMPERATURE",
+    "chf_boundary": "ABSTRACT_ONLY_STEP_CHANGE_WALL_HEAT_FLUX",
+    "variable_property_type": "ABSTRACT_ONLY_TEMPERATURE_DEPENDENT_VISCOSITY",
+    "viscosity_temperature_model": null,
+    "cwt_correction_equation": null,
+    "cwt_correction_domain": null,
+    "cwt_bulk_state": null,
+    "cwt_wall_state": null,
+    "cwt_heating_cooling_scope": null,
+    "chf_correction_equation": null,
+    "chf_correction_domain": null,
+    "chf_bulk_state": null,
+    "chf_wall_state": null,
+    "chf_heating_cooling_scope": null,
+    "to_task172_water_transfer_established": false,
+    "no_equation_transcription": true
+  },
+  "native_task026_bindings": {
+    "selector_artifacts_unchanged": true,
+    "cwt": {
+      "correlation_id": "tube_laminar_cwt@1.0.0",
+      "boundary_condition": "CONSTANT_WALL_TEMPERATURE",
+      "native_equation": "Nu_D = 3.66",
+      "native_wall_viscosity_flag": false,
+      "native_variable_property_extension": false
+    },
+    "chf": {
+      "correlation_id": "tube_laminar_chf@1.0.0",
+      "boundary_condition": "CONSTANT_HEAT_FLUX",
+      "native_equation": "Nu_D = 4.36",
+      "native_wall_viscosity_flag": false,
+      "native_variable_property_extension": false
+    },
+    "turbulent_c3": {
+      "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "changed": false
+    }
+  },
+  "branch_audits": {
+    "LAMINAR_CWT": {
+      "correlation_id": "tube_laminar_cwt@1.0.0",
+      "source_ids": [
+        "SRC-T172-NACA-TN-2410-CWT-R2",
+        "SRC-T172-YANG-1962-CWT-R2"
+      ],
+      "source_body_complete_for_variable_property": false,
+      "source_body_finding": "NACA_VARIABLE_PROPERTY_LINEAGE_NON_WATER;YANG_ABSTRACT_ONLY",
+      "cwt_boundary": "CONSTANT_WALL_TEMPERATURE",
+      "correction_equation_bound": false,
+      "property_ratio_bound": false,
+      "bulk_state_bound": false,
+      "wall_state_bound": false,
+      "heating_cooling_scope_bound": false,
+      "domain_bound": false,
+      "combination_rule_bound": false,
+      "variable_property_use_authorized": false,
+      "variable_property_exclusion_proved": false,
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "branch_disposition": "SOURCE_EVIDENCE_STILL_INSUFFICIENT",
+      "authority_type": "NONE",
+      "authority_candidate_status": "NOT_CREATED"
+    },
+    "LAMINAR_CHF": {
+      "correlation_id": "tube_laminar_chf@1.0.0",
+      "source_ids": [
+        "SRC-T172-NACA-TN-2410-CHF-R2",
+        "SRC-T172-YANG-1962-CHF-R2"
+      ],
+      "source_body_complete_for_variable_property": false,
+      "source_body_finding": "NACA_VARIABLE_PROPERTY_LINEAGE_NON_WATER;YANG_ABSTRACT_ONLY",
+      "chf_boundary": "CONSTANT_HEAT_FLUX",
+      "correction_equation_bound": false,
+      "property_ratio_bound": false,
+      "bulk_state_bound": false,
+      "wall_state_bound": false,
+      "heating_cooling_scope_bound": false,
+      "domain_bound": false,
+      "combination_rule_bound": false,
+      "variable_property_use_authorized": false,
+      "variable_property_exclusion_proved": false,
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "branch_disposition": "SOURCE_EVIDENCE_STILL_INSUFFICIENT",
+      "authority_type": "NONE",
+      "authority_candidate_status": "NOT_CREATED"
+    }
+  },
+  "source_finding_decision": {
+    "naca_body_acquired": true,
+    "naca_water_transfer_established": false,
+    "yang_body_acquired": false,
+    "yang_bibliographic_discovery_only": true,
+    "cwt_branch_disposition": "SOURCE_EVIDENCE_STILL_INSUFFICIENT",
+    "chf_branch_disposition": "SOURCE_EVIDENCE_STILL_INSUFFICIENT",
+    "active_correction_candidates_created": false,
+    "explicit_omission_candidates_created": false,
+    "variable_property_exclusion_candidates_created": false,
+    "all_admitted_tube_branches_authority_covered": false,
+    "reason": "NACA TN 2410 supplies a complete non-water variable-property lineage, while Yang 1962 is identifiable only through official metadata and abstract because the publisher body was not publicly acquired. Neither package supplies a complete source-qualified TASK172 disposition for the exact pure-water native CWT and CHF branches."
+  },
+  "limited_evidence": [
+    {
+      "source_id": "NASA-SECONDARY-YANG-DEISSLER-SUMMARY",
+      "status": "SOURCE_DISCOVERY_AND_CROSS_CHECK_ONLY",
+      "equation_use": "NONE",
+      "reason": "Secondary NASA material identifies Yang for uniform wall temperature and Deissler for constant heat rate, but it is not used to copy an exponent or transfer rule."
+    },
+    {
+      "source_id": "SIEDER-TATE-1936",
+      "status": "NOT_USED",
+      "equation_use": "NONE",
+      "reason": "No lawful complete transfer package was acquired; no remembered factor is used."
+    },
+    {
+      "source_id": "TURBULENT-C3-AUTHORITY",
+      "status": "NOT_TRANSFERRED",
+      "equation_use": "NONE",
+      "reason": "Accepted turbulent C3 wall correction remains branch-specific and is not moved to laminar CWT or CHF."
+    }
+  ],
+  "effective_state": {
+    "tube_wall_correction_canonical_blocker_closure_eligible": false,
+    "tube_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "task026_changed": false,
+    "task026_equations_changed": false,
+    "task026_constants_changed": false,
+    "task026_domains_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "turbulent_c3_changed": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AWAIT_COMPLETE_LAMINAR_PRIMARY_SOURCE_AUTHORITY",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "docs/tasks/TASK-172-v0.7-tube-laminar-variable-property-primary-source-acquisition-r2.md"
+  },
+    "canonical_hash": "d4c34927ff6e6d61ee596706aae228c60019e3647ebcf98d6a602fb2d0661bd0"
+}

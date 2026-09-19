@@ -1,0 +1,179 @@
+{
+  "schema_version": "task172.r4.physical-authority-review.v1",
+  "task_id": "TASK172_V0_7_MATERIAL_AND_ACTIVE_WALL_CORRECTION_R4",
+  "issue": 276,
+  "pr_number": 277,
+  "previous_head_sha": "f2c87be7aaec1eaaf59fafbbb8e667257a0eb07d",
+  "review_date": "2026-09-14",
+  "mode": "CONTROLLED_AUTHORITY_REMEDIATION_ONLY",
+  "scope": [
+    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "TUBE-WALL-CORRECTION-AUTHORITY",
+    "SHELL-WALL-CORRECTION-AUTHORITY"
+  ],
+  "planned_allowlist": {
+    "file_count": 3,
+    "files": [
+      "docs/tasks/TASK-172-v0.7-material-active-wall-review-r4.md",
+      "docs/tasks/evidence/TASK-172-material-active-wall-review-r4.json",
+      "docs/tasks/TASK-172-v0.7-authority-registry-r1.json"
+    ],
+    "production_path_count": 0,
+    "dependency_file_count": 0
+  },
+  "inherited_reviewed_authorities": [
+    {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+      "payload_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+      "payload_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+      "payload_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+      "status": "REVIEWED_AUTHORITY"
+    },
+    {
+      "authority_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+      "payload_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+      "status": "REVIEWED_AUTHORITY"
+    }
+  ],
+  "material_audit": {
+    "profile_id": null,
+    "profile_status": "BLOCKED",
+    "constant_k_status": "OPEN",
+    "blocker": "MATERIAL_IDENTITY_NOT_BOUND",
+    "identity_bound": false,
+    "k_value_bound": false,
+    "k_unit_bound": false,
+    "k_source_bound": false,
+    "temperature_domain_bound": false,
+    "constant_model_authorized": false,
+    "repository_paths_checked": [
+      "src/hexagent/exchangers/shell_tube/models.py",
+      "src/hexagent/exchangers/shell_tube/tube_layout/models.py",
+      "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/models.py",
+      "src/hexagent/shell_geometry_catalogs/models.py",
+      "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/models.py",
+      "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/authority.py",
+      "src/hexagent/release_demo/v0_4/task039.py"
+    ],
+    "observed_fixture_material": {
+      "material_id": "T039-MAT-001",
+      "material_grade": "FIXTURE-GRADE",
+      "conductivity_w_m_k": "16",
+      "evaluation_temperature_k": "300"
+    },
+    "generic_material_records_not_reused": [
+      "TASK017/TASK013 generic material governance",
+      "SA-106-B test fixtures"
+    ],
+    "required_missing_evidence": [
+      "authorized tube material identity/form/grade",
+      "source-bound conductivity",
+      "temperature-domain constant-k justification",
+      "out-of-domain block rule"
+    ]
+  },
+  "tube_wall_correction_audit": {
+    "correction_id": null,
+    "status": "BLOCKED",
+    "type": "TASK026_ACTIVE_WALL_PROPERTY_CORRECTION_NOT_QUALIFIED",
+    "source_bound": false,
+    "applicability_bound": false,
+    "material_profile_bound": false,
+    "geometry_mapping_bound": false,
+    "surface_basis_bound": false,
+    "cross_binding_pass": false,
+    "base_authority": "SRC-T172-REPO-TUBE / TASK026 native selector",
+    "repository_source_location": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py; docs/tasks/TASK-007-tube-annulus-correlations.md",
+    "source_findings": [
+      "TASK007 explicitly says turbulent Gnielinski has no viscosity correction implemented.",
+      "Goncalves 2019 section 2.2 Eq75 does not provide the requested active wall-property multiplier.",
+      "Goncalves Eq77 is a separate alternative laminar relation and is not a transfer rule for native TASK026.",
+      "Sieder-Tate full text/equation/domain was not lawfully acquired; no exponent was transcribed."
+    ],
+    "missing_evidence": [
+      "lawfully reviewable primary equation compatible with exact TASK026 base",
+      "bulk/wall property definitions",
+      "heating/cooling branch",
+      "Re/Pr/ratio/geometry/development domains",
+      "combination rule"
+    ]
+  },
+  "shell_wall_correction_audit": {
+    "correction_id": null,
+    "status": "BLOCKED",
+    "type": "TASK166_BELL_ACTIVE_WALL_PROPERTY_CORRECTION_NOT_QUALIFIED",
+    "source_bound": false,
+    "applicability_bound": false,
+    "material_profile_bound": false,
+    "geometry_mapping_bound": false,
+    "surface_basis_bound": false,
+    "cross_binding_pass": false,
+    "base_authority": "SRC-T172-REPO-BELL / TASK166 Bell-Delaware source definition",
+    "repository_source_location": "src/hexagent/exchangers/shell_tube/bell_delaware/authority.py; src/hexagent/exchangers/shell_tube/bell_delaware/heat_transfer.py",
+    "source_findings": [
+      "TASK166 Bell source roles do not provide a complete active wall-property multiplier for Bell heat transfer.",
+      "Goncalves 2019 section 2.1 Eqs36-39 does not close a Bell heat-transfer wall correction.",
+      "TASK034 Bayram-Sevilgen (mu_b/mu_w)^(7/50) is a TASK034 modeled shell pressure-drop term, not a TASK166 heat-transfer supplement.",
+      "TASK033 Kharaji relation is explicitly NO_WALL_CORRECTION and is a different Kern method family.",
+      "Martin/Gnielinski crossflow normalization is not transferable Bell authority."
+    ],
+    "missing_evidence": [
+      "Bell-compatible primary equation or explicit supplement",
+      "exact surface/property states",
+      "geometry/layout and Re/Pr/ratio domain",
+      "combination and transfer rule"
+    ]
+  },
+  "cross_binding": {
+    "material_to_k": "BLOCKED_NO_MATERIAL_IDENTITY",
+    "k_to_local_cylindrical_network": "CONDITIONAL_REVIEWED_NETWORK_BUT_K_UNQUALIFIED",
+    "material_to_tube_correction": "BLOCKED",
+    "material_to_shell_correction": "BLOCKED",
+    "task034_pressure_drop_correction_to_task166_heat_transfer": "FORBIDDEN",
+    "silent_fallback": false,
+    "unit_or_surface_basis_substitution": false,
+    "competing_authority_detected": false
+  },
+  "numerical_boundary": {
+    "local_residual_and_method_qualification": "OPEN",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN",
+    "profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false
+  },
+  "final_decision": {
+    "physical_authority_portion_closed": false,
+    "task172_entry_authority_complete": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "next_gate": "BLOCKED_PENDING_TASK172_PHYSICAL_AUTHORITY_REMEDIATION"
+  },
+  "production_code_changed": false,
+  "dependency_changed": false,
+  "implementation_started": false,
+  "new_authority_self_approval": false,
+  "ready_authorized": false,
+  "merge_authorized": false,
+  "no_step_implies_the_next": true,
+  "canonical_hash": "eb7819604a10922a9d20bb71a87496682b8520f48bc3628a294e9af1aaa91042"
+}

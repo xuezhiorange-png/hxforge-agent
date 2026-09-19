@@ -1,0 +1,252 @@
+{
+  "schema_version": "task172.tube-wall-correction-primary-transfer-acquisition.r1",
+  "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_PRIMARY_TRANSFER_AUTHORITY_ACQUISITION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "2855ef3aa84211250b47130e5c459fd6dca37327",
+  "mode": "TARGETED_PRIMARY_AUTHORITY_ACQUISITION_ONLY",
+  "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "target_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+  "result": "BLOCKED",
+  "native_target": {
+    "selector_authority_id": "SRC-T172-REPO-TUBE",
+    "selector_version": "R8",
+    "task026_target_path": "stage_pipeline -> compute_single_phase -> nusselt_selector",
+    "correlation_ids": [
+      "tube_laminar_cwt@1.0.0",
+      "tube_laminar_chf@1.0.0",
+      "tube_turbulent_gnielinski@1.0.0"
+    ],
+    "effective_re_domain": "C1/C2 Re < 2300; R8 selector blocks 2300 <= Re < 3000; C3 dispatch Re >= 3000 with declared C3 maximum 5e6",
+    "pr_domain": "C1/C2 Pr > 0.6; C3 0.5 <= Pr <= 2000",
+    "geometry": "circular_tube",
+    "characteristic_length": "tube inside diameter",
+    "wall_correction": "NONE",
+    "source_files": [
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py",
+        "sha256": "2ec94d18f061c88ca05f7d64f7bac1ea604c6f2c3aa62e994597fd3bd68852c2"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/single_phase.py",
+        "sha256": "c9cc6444a79975edd3b5b37249a2ee0909a5f07987b3783d70d99e5342f3ff08"
+      },
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "sha256": "e9cd8d26d47821f81810ff8382547d1c907d1ed0182ceabe2d1bcdb1a0ffb526"
+      },
+      {
+        "path": "src/hexagent/correlations/flow.py",
+        "sha256": "3a77d59459548d0fa310c9e2c0902c6fc2bfc333cc51c93dfe1da3d0f3b634f7"
+      },
+      {
+        "path": "src/hexagent/correlations/service.py",
+        "sha256": "2166c5bb70fc911bfa03b7c93ba14b1f2bcfa6b0fc40aeea48c7dc4611036293"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "sha256": "e137959f5bf04784f78383db27a13736098ea47f926b323510d80dbe23f6fe9e"
+      }
+    ],
+    "selector_document_parity": "UNRESOLVED",
+    "base_binding_status": "BLOCKED_SEMANTIC_DISCREPANCY",
+    "native_base_binding_bound": false,
+    "native_correlation_changed": false,
+    "legacy_result_semantics_changed": false,
+    "task026_source_artifact_in_repository": false
+  },
+  "source_acquisition": [
+    {
+      "source_id": "SANDIA-ARIA-2016-FILM-GRADIENT-AUDIT",
+      "registry_source_id": "SANDIA",
+      "source_class": "OFFICIAL_PUBLIC_REPORT",
+      "title": "SIERRA Multimechanics Module: Aria User Manual - Version 4.40",
+      "authors": [
+        "Patrick K. Notz",
+        "Samuel R. Subia",
+        "Matthew M. Hopkins",
+        "Harry K. Moffat",
+        "David R. Noble",
+        "Tolulope O. Okusanya"
+      ],
+      "year": 2016,
+      "revision": "SAND2016-4159",
+      "exact_location": "section 34.1.1 classification; section 34.1.2 Types 72-74; sections 34.2.4 and 34.2.10; section 4.1.203 p113",
+      "access_path": "https://www.osti.gov/servlets/purl/1262728",
+      "rights_status": "Approved for public release; further dissemination unlimited (report cover); PDF not vendored",
+      "acquired_bytes_sha256": "1300bf8605e3a9f7f64a7e91bb4cc39c9b60f6ec551f8a1bab8f9fab0c6844bc",
+      "source_binding_status": "VERIFIED_SOURCE_NOT_TRANSFERABLE",
+      "evidence": {
+        "type_72": "Turbulent gas, internal smooth circular tube, Gnielinski; dependencies K, Dh, Re, Pr, f; 3000 < Re < 5000000 and 0.5 < Pr < 2000; no wall-property correction defined for the circular-tube target",
+        "type_73": "Modified Gnielinski, turbulent internal annulus, inner wall heated and outer wall insulated; gas or liquid; annulus-specific geometry and wall-state semantics",
+        "type_74": "Modified Gnielinski, turbulent internal annulus, inner wall insulated and outer wall heated; gas or liquid; annulus-specific geometry and wall-state semantics",
+        "section_34_2_4": "Film-gradient correction feature for pipe and annulus Types 72-74",
+        "section_34_2_10": "Gas-oriented film-gradient exponent parameter; does not establish liquid circular-tube TASK026 transfer",
+        "section_4_1_203": "Input/interface description; not a complete target equation/domain/combination authority"
+      },
+      "transferable_to_task026": false,
+      "blocking_reason": "The circular Type 72 context is gas and has no wall correction; Types 73/74 are annulus-specific. No target-compatible liquid circular-tube combination rule or direct transfer evidence is bound."
+    },
+    {
+      "source_id": "SIEDER-TATE",
+      "source_class": "PRIMARY_BIBLIOGRAPHY_ONLY",
+      "revision": "doi:10.1021/ie50324a027",
+      "exact_location": "Industrial & Engineering Chemistry 28(12), 1429-1435; equation pages not acquired",
+      "access_path": "https://doi.org/10.1021/ie50324a027",
+      "rights_status": "Publisher full text not acquired; no redistribution assumed",
+      "source_binding_status": "CANDIDATE_INSUFFICIENT",
+      "transferable_to_task026": false,
+      "blocking_reason": "No lawful complete equation, coefficient/exponent, domains, state definitions, rights-cleared review copy or TASK026 transfer rule."
+    },
+    {
+      "source_id": "GONCALVES",
+      "source_class": "PRIMARY_PUBLICATION",
+      "revision": "AIChE Journal 65(8) e16602",
+      "exact_location": "section 2.1 Eqs 36-39 and section 2.2 Eqs 75-77 in recorded author copy",
+      "source_binding_status": "VERIFIED_SOURCE_NOT_TRANSFERABLE",
+      "transferable_to_task026": false,
+      "blocking_reason": "The reviewed relations do not establish an active wall-property extension compatible with the exact native TASK026 Gnielinski selector."
+    },
+    {
+      "source_id": "MARTIN",
+      "source_class": "PRIMARY_AUTHOR_COPY",
+      "revision": "2000, Appendix 9.2 Eq A13",
+      "source_binding_status": "VERIFIED_SOURCE_NOT_TRANSFERABLE",
+      "transferable_to_task026": false,
+      "blocking_reason": "External crossflow bundle normalization is not an internal circular-tube TASK026 transfer authority."
+    },
+    {
+      "source_id": "REPO-TUBE",
+      "source_class": "EXISTING_REVIEWED_REPOSITORY_AUTHORITY",
+      "revision": "git:04d7aac8adcda13edd27d6c9511019a05ee08d96",
+      "source_binding_status": "REVIEWED_NATIVE_BASE_ONLY",
+      "transferable_to_task026": false,
+      "blocking_reason": "The native base is reviewed and unchanged, but its policy explicitly has no active wall correction."
+    }
+  ],
+  "transferability": {
+    "source_correlation_family": "UNBOUND",
+    "target_task026_correlation_family": "BOUND_FOR_TARGET_ONLY",
+    "native_base_binding": "BLOCKED_SEMANTIC_DISCREPANCY",
+    "internal_external_flow": "UNBOUND",
+    "regime": "UNBOUND",
+    "re_domain": "UNBOUND",
+    "pr_domain": "UNBOUND",
+    "property_ratio_domain": "UNBOUND",
+    "fluid_family_domain": "UNBOUND",
+    "geometry_domain": "UNBOUND",
+    "roughness_domain": "UNBOUND",
+    "length_development_domain": "UNBOUND",
+    "thermal_boundary_domain": "UNBOUND",
+    "heating_branch": "UNBOUND",
+    "cooling_branch": "UNBOUND",
+    "bulk_state_definition": "UNBOUND",
+    "wall_fluid_state_definition": "UNBOUND",
+    "metal_vs_fluid_surface_mapping": "UNBOUND",
+    "base_combination_rule": "UNBOUND",
+    "direct_transfer_evidence": "UNBOUND",
+    "transferability_established": false
+  },
+  "decision": {
+    "selected_primary_source_id": null,
+    "selected_primary_source_class": null,
+    "selected_primary_source_revision": null,
+    "selected_primary_source_location": null,
+    "selected_primary_source_rights": null,
+    "primary_source_bound": false,
+    "correction_equation_bound": false,
+    "correction_coefficients_exponents_bound": false,
+    "re_domain_bound": false,
+    "pr_domain_bound": false,
+    "property_ratio_domain_bound": false,
+    "fluid_family_domain_bound": false,
+    "geometry_domain_bound": false,
+    "roughness_domain_bound": false,
+    "length_development_domain_bound": false,
+    "thermal_boundary_domain_bound": false,
+    "heating_cooling_branches_bound": false,
+    "bulk_state_id": null,
+    "wall_state_id": null,
+    "bulk_state_definition_bound": false,
+    "wall_state_definition_bound": false,
+    "wall_state_mapping_authority_bound": false,
+    "native_base_binding_bound": false,
+    "combination_rule_bound": false,
+    "transferability_established": false,
+    "out_of_domain_policy": "BLOCKED",
+    "extrapolation_policy": "FORBIDDEN",
+    "resolution_result": "BLOCKED_NO_TRANSFERABLE_PRIMARY_AUTHORITY",
+    "status": "BLOCKED",
+    "independent_review": "PENDING",
+    "canonical_blocker_removed": false
+  },
+  "unresolved_authority_fields": [
+    "NATIVE_BASE_SEMANTIC_DISCREPANCY",
+    "SOURCE_CORRELATION_FAMILY",
+    "TARGET_COMPATIBLE_EQUATION",
+    "COEFFICIENTS_OR_EXPONENTS",
+    "RE_DOMAIN",
+    "PR_DOMAIN",
+    "PROPERTY_RATIO_DOMAIN",
+    "FLUID_FAMILY_DOMAIN",
+    "GEOMETRY_DOMAIN",
+    "ROUGHNESS_DOMAIN",
+    "LENGTH_DEVELOPMENT_DOMAIN",
+    "THERMAL_BOUNDARY_DOMAIN",
+    "HEATING_COOLING_BRANCHES",
+    "BULK_STATE_DEFINITION",
+    "WALL_FLUID_STATE_DEFINITION",
+    "WALL_STATE_MAPPING",
+    "BASE_COMBINATION_RULE",
+    "DIRECT_TRANSFER_EVIDENCE",
+    "SIEDER_TATE_FULL_TEXT_RIGHTS_CLEARED_REVIEW_COPY"
+  ],
+  "effective_state": {
+    "model_level_material_entry_authority_status": "CLOSED",
+    "material_constant_k_canonical_blocker_removed": true,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "material_identity_actual_value_bound": false,
+    "material_property_body_actual_value_bound": false,
+    "material_profile_id": null,
+    "actual_material_case_accepted": false,
+    "remaining_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "task026_changed": false,
+    "material_layer_changed": false,
+    "shell_correction_started": false,
+    "numerical_work_started": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "selected_correction_proposal_created": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "REVIEW_TUBE_WALL_CORRECTION_BLOCKER_OR_PROVIDE_COMPLETE_PRIMARY_TRANSFER_AUTHORITY",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r1.md",
+    "sha256": "ad977380b1aadcdf9a04399b5884280cfe5c4be8a115b5ec2b0353e12ff94eb1"
+  },
+  "canonical_hash": "e65ad80cd1cf57fa9ea7fb994fd334912ca1d4a31a0d266fccf9f0717a731bff"
+}

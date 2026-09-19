@@ -1,0 +1,259 @@
+{
+  "schema_version": "task172.shell-wall-correction-authority-resolution.r1",
+  "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "0ac9bfd307dca82cb30928a643b71424e16063c2",
+  "mode": "SHELL_WALL_CORRECTION_NATIVE_TARGET_AND_AUTHORITY_RESOLUTION_ONLY",
+  "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+  "native_task166": {
+    "task_id": "TASK-166",
+    "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+    "method": "BELL_DELAWARE",
+    "implementation_software_version": "task166.bell-delaware-impl-v1",
+    "schema_version": "task166.bell-delaware-request.v1",
+    "ideal_htc_form": "ji*cp*G*Pr^(-2/3)",
+    "corrected_htc_form": "ideal_h*Jc*Jl*Jb*Js*Jr",
+    "correction_factors": ["Jc", "Jl", "Jb", "Js", "Jr"],
+    "re_evaluator_domain": "0<Re_s<=100000",
+    "native_applicability": "TASK166_BELL_FIXED_GEOMETRY_SHELL_PATH_FOR_FIXED_TUBESHEET_E_SHELL_SINGLE_SEGMENTAL_SINGLE_PHASE_NEWTONIAN_ONE_SHELL_PASS_LAYOUT_30_DEG_OR_45_DEG_OR_90_DEG_0<RE_S<=100000;NO_WALL_CORRECTION_AUTHORITY",
+    "construction_families": ["FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"],
+    "current_task172_family": "FIXED_TUBESHEET"
+  },
+  "native_input_audit": {
+    "wall_viscosity_input_present": false,
+    "wall_temperature_input_present": false,
+    "bulk_wall_property_ratio_present": false,
+    "bulk_property_inputs": [
+      "shell_side_reynolds_number",
+      "shell_side_prandtl_number",
+      "shell_side_mass_velocity_kg_m2_s",
+      "density_kg_m3",
+      "dynamic_viscosity_pa_s",
+      "specific_heat_capacity_j_kg_k"
+    ],
+    "property_source": "TASK032_ACCEPTED_SHELL_SIDE_FLOW_STATE",
+    "property_state_role": "BULK_SHELL_SIDE_STATE",
+    "wall_property_evaluation": "NOT_PRESENT"
+  },
+  "factor_classification": {
+    "Jc": {
+      "role": "PURE_CROSSFLOW_TUBE_FRACTION_GEOMETRY_CORRECTION",
+      "active_wall_property_correction": false,
+      "wall_inputs": false
+    },
+    "Jl": {
+      "role": "LEAKAGE_GEOMETRY_CORRECTION",
+      "active_wall_property_correction": false,
+      "wall_inputs": false
+    },
+    "Jb": {
+      "role": "BYPASS_GEOMETRY_CORRECTION",
+      "active_wall_property_correction": false,
+      "wall_inputs": false
+    },
+    "Js": {
+      "role": "UNEQUAL_BAFFLE_SPACING_CORRECTION",
+      "active_wall_property_correction": false,
+      "wall_inputs": false
+    },
+    "Jr": {
+      "role": "LOW_REYNOLDS_CROSS_FLOW_TUBE_ROW_CORRECTION",
+      "active_wall_property_correction": false,
+      "wall_inputs": false,
+      "uses_mu_wall": false,
+      "uses_wall_temperature": false,
+      "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+      "input_projection": ["central_crossflow_tube_rows", "reynolds"]
+    }
+  },
+  "wall_target": {
+    "physical_type": "WALL_VISCOSITY_CORRECTION",
+    "reference_surface": "SHELL_FLUID_WALL_INTERFACE",
+    "wall_temperature_state_authority_id": "V07-T172-WALL-TEMPERATURE-STATE-R1",
+    "wall_temperature_state_lifecycle": "PROPOSED_AUTHORITY",
+    "shell_fluid_wall_interface_identity_defined": true,
+    "shell_fluid_wall_interface_runtime_available": false
+  },
+  "source_lineage": {
+    "bell_origin": {
+      "source_id": "SRC-UDEL-BELL-1963-FINAL-REPORT",
+      "role": "METHOD_ORIGIN_AND_PROVENANCE",
+      "body_available": false,
+      "body_status": "METADATA_ONLY_IN_EFFECTIVE_REPOSITORY_AUTHORITY",
+      "wall_property_correction_present": false,
+      "wall_property_correction_complete": false
+    },
+    "goncalves": {
+      "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+      "role": "PRIMARY_IMPLEMENTATION_EQUATION_AUTHORITY",
+      "body_available": true,
+      "body_hash": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+      "body_status": "PUBLIC_ARTICLE_COPY_REVIEWED_NOT_VENDORED",
+      "wall_property_correction_present": false,
+      "wall_property_correction_complete": false,
+      "reviewed_locations": [
+        "TASK-166 section 5; Goncalves equations 37--43",
+        "TASK-166 section 8; variable-property and wall-temperature iteration outside native scope",
+        "TASK172 wall-state definition section 8; shell target remains unbound"
+      ]
+    },
+    "jamil": {
+      "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+      "role": "SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_A1_A4_AND_B1_B4",
+      "wall_property_correction_transfer": false
+    },
+    "saif_tariq": {
+      "source_id": "SRC-SAIF-TARIQ-2025-JMES-UNEQUAL-BAFFLE-SPACING-JS",
+      "role": "SUPPLEMENTAL_IMPLEMENTATION_AUTHORITY_FOR_JS_ONLY",
+      "wall_property_correction_transfer": false
+    },
+    "task032": {
+      "source_id": "TASK032_ACCEPTED_SHELL_SIDE_FLOW_STATE",
+      "role": "UPSTREAM_REYNOLDS_PRANDTL_AND_BULK_PROPERTY_STATE",
+      "wall_state_provided": false
+    }
+  },
+  "required_wall_authority": {
+    "base_correlation_identity": true,
+    "complete_equation": true,
+    "coefficients_and_exponents": true,
+    "bulk_state_definition": true,
+    "wall_state_definition": true,
+    "property_ratio_definition": true,
+    "heating_cooling_semantics": true,
+    "re_pr_ratio_domain": true,
+    "geometry_layout_roughness_domain": true,
+    "thermal_boundary_and_development_assumptions": true,
+    "bell_combination_rule": true,
+    "surface_area_and_support_basis": true,
+    "source_body_revision_rights_evidence": true
+  },
+  "negative_lineage": {
+    "TASK034_wall_authority_reuse": "NO",
+    "TASK034_transfer_to_TASK166_heat_transfer": false,
+    "TASK034_rejection": "Bayram-Sevilgen phi_s belongs to TASK034 shell pressure drop, with a different equation purpose, output and identity",
+    "TASK033_Kern_transfer_to_TASK166": false,
+    "Martin_Gnielinski_crossflow_transfer_to_TASK166": false,
+    "tube_RELAP_correction_transfer_to_TASK166": false
+  },
+  "resolution": {
+    "outcome": "NEW_BELL_COMPATIBLE_PRIMARY_SOURCE_AUTHORITY_REQUIRED",
+    "outcome_code": "D",
+    "existing_active_Bell_candidate": false,
+    "explicit_Bell_omission_authority": false,
+    "explicit_no_extension_authority": false,
+    "source_bound": false,
+    "base_compatibility_bound": false,
+    "applicability_bound": false,
+    "status": "BLOCKED",
+    "reason": "No complete Bell-compatible wall-property equation, state/domain definition and combination rule is bound by the current source set; absence of a factor in native equations is not an omission approval"
+  },
+  "case_level": {
+    "case_level_shell_correction_authority_present": false,
+    "case_level_shell_bulk_state_present": false,
+    "case_level_shell_wall_state_present": false,
+    "case_level_shell_property_snapshot_present": false,
+    "case_level_shell_execution_authorized": false
+  },
+  "effective_state": {
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_PRIMARY_SOURCE_ACQUISITION_R1_ONLY"
+  },
+  "governance": {
+    "resolution_only": true,
+    "new_authority_self_approval": false,
+    "engineering_rules_changed": false,
+    "task166_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "historical_records_rewritten": false,
+    "no_step_implies_the_next": true
+  },
+  "source_artifacts": [
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/authority.py",
+      "sha256": "6ba2fea3eb6008a9e92e025efad924bf956c60ee67da3a0436bc1c3a965f75b5"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/heat_transfer.py",
+      "sha256": "bc442493dbdc52ca0a8c52361276becc2e2e73a246ea5e7f6ab3cecb0306c2ad"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/models.py",
+      "sha256": "bcc7f850a8a33d7d2a3ef540d7d123d88d4bbb09cce36511caeb3f9cea08f668"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/geometry.py",
+      "sha256": "785e757e7b589c25e31a399d0a35e145cbebde2ba6b17912a598d62935a2d7ba"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/validation.py",
+      "sha256": "1c1e14e9d84e8f858fcbd8cc249f97c92851728c22849ac500acb8be84a3721d"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/service.py",
+      "sha256": "e576e925118933756205279c8ed248f769c496453073eb5dca8265b971cba017"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/schema.py",
+      "sha256": "b428b66484ccecc6e922358667e3a34483c9a398126e3d9ef7929c706cabb193"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/provenance.py",
+      "sha256": "03d1250b5c619e2c26e10f8a0df904a33d98778a09ee7075db6a0c996223ed57"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/shell_side_flow_state/models.py",
+      "sha256": "68245fc4c07a14b075ced5ff6a356a00baf9dae2c197951612976bf1350b034d"
+    },
+    {
+      "path": "src/hexagent/exchangers/shell_tube/shell_side_flow_state/engineering_authority_snapshot.py",
+      "sha256": "cc3476b87d6fcb5eac2378a730949fac00b2413fb865f2235ae67c8903e1941c"
+    },
+    {
+      "path": "docs/tasks/TASK-166-bell-delaware-shell-side-thermal-hydraulic-model.md",
+      "sha256": "fe61dcd297a28400756e52f7f5a52800e080c8dae5ef71ec5d4e3731f2f70926"
+    },
+    {
+      "path": "docs/tasks/TASK-032-shell-and-tube-shell-side-single-phase-flow-state.md",
+      "sha256": "750f95ab3869f2024ed57639e5754d9d36b9382e573c0a32b8899145f054d188"
+    },
+    {
+      "path": "docs/tasks/TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
+      "sha256": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9"
+    },
+    {
+      "path": "docs/tasks/TASK-172-v0.7-material-active-wall-review-r4.md",
+      "sha256": "730bebfb09a2fdf6939152f3b8aab70f196eb4a8afa21d6f49667d6ced9d52c8"
+    },
+    {
+      "path": "docs/tasks/TASK-172-v0.7-wall-numerical-proposals-r1.md",
+      "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+    },
+    {
+      "path": "docs/tasks/TASK-172-v0.7-targeted-physical-source-authority-construction-r1.md",
+      "sha256": "94d5e9a04cd591bc31af9a6f175dedb0a1c33be9742cbdd462a4de00e6397fca"
+    }
+  ],
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-authority-resolution-r1.md",
+    "document_sha256": "ddbfcffc1128714988e3f5f8eaa5d8b92fbebdca3361c76d598b309157553f79",
+    "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-authority-resolution-r1.json"
+  },
+  "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_PRIMARY_SOURCE_ACQUISITION_R1_ONLY",
+  "canonical_hash": "2195ec361d078ff95c7892e31ca7a1c7aa3a0b3b62552d61a92533b4dee0de4a"
+}

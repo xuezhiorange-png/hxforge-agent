@@ -1,0 +1,254 @@
+{
+  "schema_version": "task172.jmu.source-mean.model-level-predicate-evidence-closure.r2a1",
+  "task_id": "TASK172_V0_7_JMU_SOURCE_MEAN_MODEL_LEVEL_PREDICATE_EVIDENCE_CLOSURE_R2A1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "106878ad0e711443459f12059ce666d6c1206622",
+  "mode": "APPEND_ONLY_MACHINE_EVIDENCE_CLOSURE_ONLY",
+  "head_precondition": {
+    "expected_head_sha": "106878ad0e711443459f12059ce666d6c1206622",
+    "verified": true,
+    "pr_state_verified": "OPEN_DRAFT"
+  },
+  "historical_immutability": {
+    "r71_original_document_changed": false,
+    "r71_original_evidence_changed": false,
+    "r71_extension_rewritten": false,
+    "r2a_original_document_changed": false,
+    "r2a_original_evidence_changed": false,
+    "r72_extension_rewritten": false,
+    "historical_payloads_immutable": true,
+    "historical_registry_extensions": {
+      "r71_extension": "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+      "r72_extension": "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638"
+    }
+  },
+  "audit_rule": "Do not infer predicate satisfaction from the R2A required-predicate list; each result requires existing repository authority and canonical evidence.",
+  "model_level_predicate_matrix": [
+    {
+      "predicate": "SOURCE_MEAN_BULK_TEMPERATURE_OPERATOR_CONTRACT_BOUND",
+      "current_status": "BOUND_BY_REVIEWED_R71_SOURCE_ADJUDICATION",
+      "satisfied": true,
+      "evidence_authority_ids": [
+        "ASME-PTC-12.5-2000-R2015-PUBLIC-COPY",
+        "THOME-2004-EDB3-CH3-CROSSCHECK"
+      ],
+      "evidence_registry_extensions": ["r71_extension", "r72_extension"],
+      "evidence_canonical_hashes": [
+        "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+        "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638",
+        "197da80102bfa08336d772f534eae693aef9ce31e75d8914c9512dbf6595fbe2"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r71_extension/source_adjudication",
+        "docs/tasks/evidence/TASK-172-jmu-source-mean-bulk-state-aggregation-and-endpoint-binding-r2.json#/temperature_operator_adjudication",
+        "docs/tasks/TASK-172-v0.7-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.md:43-52"
+      ],
+      "reason": "R71 binds the exact transferred arithmetic operator and R72 preserves it without broadening scope."
+    },
+    {
+      "predicate": "JMU_BULK_PRESSURE_RULE_BOUND",
+      "current_status": "UNBOUND",
+      "satisfied": false,
+      "evidence_authority_ids": ["THOME-2004-EDB3-CH3-CROSSCHECK"],
+      "evidence_registry_extensions": ["r71_extension", "r72_extension"],
+      "evidence_canonical_hashes": [
+        "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+        "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638",
+        "197da80102bfa08336d772f534eae693aef9ce31e75d8914c9512dbf6595fbe2"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r71_extension/source_adjudication/jmu_bulk_pressure_rule_bound",
+        "docs/tasks/evidence/TASK-172-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.json#/preserved_pressure_state"
+      ],
+      "reason": "Existing records explicitly set the pressure rule and pressure-insensitivity authority to absent. This closure selects no pressure convention."
+    },
+    {
+      "predicate": "PAIR_TRANSFER_CONTRACT_STATUS",
+      "current_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+      "satisfied": true,
+      "evidence_authority_ids": ["V07-T172-JMU-SHELL-INLET-OUTLET-STATE-PAIR-CONTRACT-R2"],
+      "evidence_registry_extensions": ["r58_extension", "r59_extension"],
+      "evidence_canonical_hashes": [
+        "8dbd14422d496be610ec518d011799e0aa9fa6986af4afce7f58dc4049e6db74",
+        "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b",
+        "f3bfa0709e9675974500439d5fa112a606560e679f366c3276d11a4e7ec41bb8"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r59_extension/lifecycle_promotion",
+        "docs/tasks/evidence/TASK-172-jmu-shell-inlet-outlet-state-pair-transfer-contract-independent-review-receipt-r1.json#/lifecycle_promotion",
+        "docs/tasks/evidence/TASK-172-jmu-shell-inlet-outlet-state-pair-transfer-contract-independent-review-receipt-r1.json#/decision"
+      ],
+      "reason": "R59 independently promotes the model-level endpoint-pair input contract; its real endpoint and real pair guards remain false."
+    },
+    {
+      "predicate": "JMU_BULK_PROPERTY_AUTHORITY_CONTRACT_VALID",
+      "current_status": "REVIEWED_NARROW_SCOPE_AUTHORITY_REFERENCE_VALID",
+      "satisfied": true,
+      "evidence_authority_ids": [
+        "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "V07-T172-WATER-DOMAIN-PROOF-R2",
+        "V07-T172-WATER-BACKEND-QUALIFICATION-R2"
+      ],
+      "evidence_registry_extensions": ["r2_extension", "r3_extension", "r59_extension", "r71_extension"],
+      "evidence_canonical_hashes": [
+        "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+        "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+        "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+        "fc72a78ac15a4a5700d395b6cb568fa3288f311174e0b0b52e399ab8612c0699",
+        "f3bfa0709e9675974500439d5fa112a606560e679f366c3276d11a4e7ec41bb8"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r3_extension/independent_review_receipt/decisions/0",
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r3_extension/independent_review_receipt/review_scope",
+        "docs/tasks/TASK-172-v0.7-material-active-wall-review-r4.md:38-49",
+        "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r71_extension/property_and_granularity",
+        "docs/tasks/evidence/TASK-172-jmu-shell-inlet-outlet-state-pair-transfer-contract-independent-review-receipt-r1.json#/accepted_contract/jmu_bulk_property_authority_id"
+      ],
+      "reason": "The exact profile payload has reviewed lifecycle and reviewed hash, with explicit fluid/backend/version/reference/phase/domain scope. R71 and R59 reference it conditionally; no real snapshot or backend call is claimed."
+    },
+    {
+      "predicate": "SOURCE_MEAN_IDENTITY_AND_PROVENANCE_SCHEMA_BOUND",
+      "current_status": "BOUND_AS_MODEL_LEVEL_REQUIRED_FIELD_SCHEMA_ONLY",
+      "satisfied": true,
+      "evidence_authority_ids": [
+        "TASK172-JMU-SOURCE-MEAN-BULK-STATE-PRODUCER-AUTHORITY-R1",
+        "THOME-2004-EDB3-CH3-CROSSCHECK"
+      ],
+      "evidence_registry_extensions": ["r57_extension", "r71_extension", "r72_extension"],
+      "evidence_canonical_hashes": [
+        "2d91fb0aa77ef7b79d2b1e22f5c3dce06e06b6f033cdc0a2c378cb0da27e39f6",
+        "88761027997bd7ad06395b882fcf9b2ef9eb4c09352db37a5b20074d755fbe9b",
+        "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+        "197da80102bfa08336d772f534eae693aef9ce31e75d8914c9512dbf6595fbe2"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/TASK-172-v0.7-jmu-source-mean-bulk-state-aggregation-and-endpoint-binding-r2.md:183-205",
+        "docs/tasks/evidence/TASK-172-jmu-source-mean-bulk-state-aggregation-and-endpoint-binding-r2.json#/producer_contract/required_future_fields",
+        "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-source-mean-bulk-state-producer-authority-r1.json#/producer_authority/source_mean_bulk_state_producer_contract_required_fields"
+      ],
+      "reason": "R71 explicitly defines the complete required field shape for a future source-mean producer, including identity, endpoint references, authority/version, snapshot, lifecycle, provenance, and canonical hash. The separate producer contract and all values remain unbound."
+    },
+    {
+      "predicate": "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND",
+      "current_status": "UNDETERMINED_SOURCE_MEAN_COVERAGE",
+      "satisfied": "undetermined",
+      "evidence_authority_ids": [
+        "V07-T172-JMU-SHELL-INLET-OUTLET-STATE-PAIR-CONTRACT-R2",
+        "TASK172-JMU-SOURCE-MEAN-BULK-STATE-PRODUCER-AUTHORITY-R1"
+      ],
+      "evidence_registry_extensions": ["r57_extension", "r59_extension", "r71_extension", "r72_extension"],
+      "evidence_canonical_hashes": [
+        "88761027997bd7ad06395b882fcf9b2ef9eb4c09352db37a5b20074d755fbe9b",
+        "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b",
+        "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
+        "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638"
+      ],
+      "exact_repository_locations": [
+        "docs/tasks/evidence/TASK-172-jmu-shell-inlet-outlet-state-pair-transfer-contract-independent-review-receipt-r1.json#/fail_closed",
+        "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-source-mean-bulk-state-producer-authority-r1.json#/producer_authority/source_mean_bulk_state_producer_contract_required_fields",
+        "docs/tasks/TASK-172-v0.7-jmu-source-mean-bulk-state-aggregation-and-endpoint-binding-r2.md:289-307",
+        "docs/tasks/TASK-172-v0.7-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.md:177-204"
+      ],
+      "reason": "The existing fail-closed rules are explicitly endpoint-pair rules. Source-mean records only name a future FAIL_CLOSED_RULES requirement and candidate predicates; they do not bind source-mean admission coverage for every required missing/mismatch condition."
+    }
+  ],
+  "derived_adjudication": {
+    "source_mean_temperature_predicate_satisfied": true,
+    "source_mean_pressure_predicate_satisfied": false,
+    "source_mean_endpoint_pair_predicate_satisfied": true,
+    "source_mean_property_authority_predicate_satisfied": true,
+    "source_mean_identity_provenance_predicate_satisfied": true,
+    "source_mean_fail_closed_predicate_satisfied": "undetermined",
+    "source_mean_model_level_predicate_status_bound": false,
+    "source_mean_model_level_unsatisfied_or_undetermined_predicates": [
+      "JMU_BULK_PRESSURE_RULE_BOUND",
+      "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND"
+    ],
+    "source_mean_model_level_unsatisfied_predicate_count": 2,
+    "source_mean_model_level_sole_blocker": "NOT_PROVEN",
+    "pressure_is_only_explicit_false_predicate": true,
+    "pressure_is_proven_sole_model_level_blocker": false
+  },
+  "real_instance_layer": {
+    "source_mean_real_instance_primary_endpoint_blockers": [
+      "REAL_REVIEWED_SHELL_INLET_PRODUCER_MISSING",
+      "REAL_REVIEWED_SHELL_OUTLET_PRODUCER_MISSING",
+      "REAL_ENDPOINT_PAIR_INSTANCE_MISSING"
+    ],
+    "real_source_mean_instance_eligibility_requirements": [
+      "REVIEWED_REAL_SHELL_INLET_PRODUCER",
+      "REVIEWED_REAL_SHELL_OUTLET_PRODUCER",
+      "CASE_BOUND_INLET_STATE",
+      "CASE_BOUND_OUTLET_STATE",
+      "REAL_ENDPOINT_PAIR_RECEIPT",
+      "ACTUAL_PRESSURE_STATE_AND_RULE_APPLICATION",
+      "ACTUAL_PROPERTY_SNAPSHOT",
+      "ADMITTED_PRODUCER_LIFECYCLE_AND_PROVENANCE"
+    ],
+    "real_reviewed_shell_inlet_producer_found": false,
+    "real_reviewed_shell_outlet_producer_found": false,
+    "real_reviewed_shell_endpoint_pair_producer_found": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false
+  },
+  "preserved_parent_state": {
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "decision": {
+    "result": "CORRECTED_ADDITIONAL_MODEL_LEVEL_GAPS_FOUND",
+    "source_mean_bulk_state_producer_contract_bound": false,
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "source_mean_bulk_state_authority_id": "NONE",
+    "source_mean_bulk_state_authority_lifecycle": "NONE",
+    "source_mean_bulk_state_independent_review": "NONE",
+    "next_gate": "NONE_UNTIL_ADDITIONAL_MODEL_LEVEL_GAPS_ARE_SEPARATELY_ADJUDICATED",
+    "stop": true
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "source_reacquired": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "endpoint_producer_created": false,
+    "endpoint_state_created": false,
+    "property_snapshot_created": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "q_work_started": false,
+    "preliminary_film_work_started": false,
+    "l2b_l3_numerical_work_started": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "tests_changed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-model-level-predicate-evidence-closure-r2a1.md",
+    "document_sha256": "ca7d9a1742f99a0cd2a5403852464888785903c5927969c40f48013412a3245d",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-model-level-predicate-evidence-closure-r2a1.json",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_canonical_hash": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r73_extension"
+  },
+  "canonical_hash": "5529a5016c9d6dc5cf8c592086ba08929fea36d559f90f31a0fd07272d61e0b1"
+}

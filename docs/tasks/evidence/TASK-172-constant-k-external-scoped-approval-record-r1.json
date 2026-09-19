@@ -1,0 +1,145 @@
+{
+  "schema_version": "task172.constant-k-external-scoped-approval-record.r1",
+  "task_id": "TASK172_V0_7_CONSTANT_K_EXTERNAL_SCOPED_APPROVAL_RECORD_R1",
+  "pr_number": 277,
+  "previous_head_sha": "b17d2f7d7f94bd73c1165611d37510cfed91d21b",
+  "subject_authority": {
+    "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+    "authority_version": "r1",
+    "status": "REVIEWED_AUTHORITY",
+    "independent_review": "ACCEPTED",
+    "review_scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY",
+    "model_level_contract_accepted": true,
+    "contract_frozen": true,
+    "production_enabled": false,
+    "actual_material_instance_bound": false,
+    "material_profile_id": null,
+    "actual_material_case_accepted": false,
+    "new_authority_self_approval": false
+  },
+  "external_review": {
+    "decision": "ACCEPT_SCOPED_MODEL_LEVEL_LAYER_C_CONTRACT",
+    "scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY",
+    "source_type": "EXTERNAL_REVIEW_DECISION",
+    "source_id": "TASK172-EXTERNAL-REVIEW-DECISION-R1",
+    "source_description": "External ChatGPT review decision supplied in the authorized task instruction; not a GitHub review event or human expert signature.",
+    "evidence_bound": true,
+    "github_reviewer_identity_claimed": false,
+    "human_expert_identity_claimed": false,
+    "approval_identity_disclosed": false,
+    "self_approval": false,
+    "approval_evidence": [
+      "TASK_AUTHORIZATION_EXTERNAL_REVIEW_DECISION",
+      "TASK-172-v0.7-constant-k-external-scoped-approval-record-r1.md"
+    ]
+  },
+  "historical_bindings": {
+    "proposal_document": {
+      "path": "TASK-172-v0.7-constant-k-qualification-r1.md",
+      "sha256": "987e3f7293e30d26c38db0496cbbc968fb0006a3e0faba0a904b45770a949bb6"
+    },
+    "proposal_evidence": {
+      "path": "evidence/TASK-172-constant-k-qualification-r1.json",
+      "file_sha256": "aa21865d47b052d0313d1cb6b8f92867b81891f961ca7018485ab97a68134d9d",
+      "canonical_hash": "4b0e173a772958b2fd766fe41ce771764e0ebe2b4a1799e1b0aa19147eca42cf"
+    },
+    "governance_correction_document": {
+      "path": "TASK-172-v0.7-constant-k-governance-state-correction-r1.md",
+      "sha256": "bb75ac358a97abcb42cbbbb187c42e7cf63ea91ba46baee7a7da9c7f17fedc00"
+    },
+    "governance_correction_evidence": {
+      "path": "evidence/TASK-172-constant-k-governance-state-correction-r1.json",
+      "file_sha256": "7691e59dcfa575e83c707ec47ba1245568e46ee7305b395bcfcb5aaeae742a30",
+      "canonical_hash": "a63c613d5c587f096b2c71315040cb1e05e908c94d12b2df00b197f1bfb5ecc2"
+    },
+    "internal_review_document": {
+      "path": "TASK-172-v0.7-constant-k-authority-independent-review-r1.md",
+      "sha256": "2e17f06d7ef8543cc03dfe12d1009d819ae5eb7e10cc17fc953d8cf02db38a59"
+    },
+    "internal_review_evidence": {
+      "path": "evidence/TASK-172-constant-k-authority-independent-review-r1.json",
+      "file_sha256": "67a691e778b1a438305433c7efea63dc1ea092598027b329542b8997e23fc5bc",
+      "canonical_hash": "c82145f1329ba6454e200996c74135d36e97e8a2cb82b9d6b0c2701b0d15938e"
+    }
+  },
+  "scope": {
+    "component_scope": "TUBE_WALL_METAL",
+    "property_quantity_kind": "SOLID_THERMAL_CONDUCTIVITY",
+    "qualification_mode": "CASE_LEVEL_AUTHORITY_REQUIRED",
+    "admitted_constant_model": "FIXED_SOURCE_VALUE_WITH_EXPLICIT_SOURCE_DECLARED_DOMAIN",
+    "source_bound_k_of_t_to_constant_conversion": "NOT_ADMITTED",
+    "required_wall_states": [
+      "TUBE_METAL_INNER_SURFACE",
+      "TUBE_METAL_OUTER_SURFACE"
+    ],
+    "wall_profile": "CLEAN_SURFACE_ONLY",
+    "fouled_wall_profile_approved": false,
+    "variable_k_wall_approved": false,
+    "u_tube_admitted": false,
+    "floating_head_admitted": false,
+    "additional_passes_admitted": false,
+    "active_wall_corrections_closed": false,
+    "numerical_authority_introduced": false
+  },
+  "upstream_layers": {
+    "layer_a_material_identity": {
+      "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "implicit_promotion": false
+    },
+    "layer_b_material_thermal_property": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "implicit_promotion": false
+    }
+  },
+  "effective_state": {
+    "material_profile_id": null,
+    "material_identity_actual_value_bound": false,
+    "actual_material_case_accepted": false,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "canonical_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "canonical_blocker_removed": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_entry_blocker_count": 6,
+    "task172_entry_authority_complete": false,
+    "entry_review_pending": true
+  },
+  "governance_reason": "Layer C model-level constant-k qualification contract is independently accepted,\nbut the material canonical blocker remains active because the Layer A material\nidentity input contract and Layer B material thermal-property contract remain\nPROPOSED_AUTHORITY / independent-review PENDING.\n\nLayer C approval does not imply Layer A/B approval and does not approve an\nactual material, conductivity value, temperature domain, or production case.",
+  "provenance": {
+    "acyclic": true,
+    "historical_records_rewritten": false,
+    "caller_assertion_promoted": false,
+    "actual_material_source_selected": false,
+    "production_case_created": false,
+    "golden_approved": false,
+    "source_authority_ids": [
+      "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "V07-T172-WALL-TEMPERATURE-STATE-R1",
+      "V07-T172-CLEAN-WALL-SURFACE-NETWORK-R2",
+      "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2"
+    ]
+  },
+  "governance": {
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_MATERIAL_IDENTITY_INPUT_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "ad0e447c6fc1a34f68a237b218c38f0a8d9404500fc5ab8e0cf58f00b863e46d"
+}

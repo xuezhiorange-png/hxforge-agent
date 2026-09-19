@@ -1,0 +1,192 @@
+{
+  "schema_version": "task172.jmu-preliminary-tube-film-c3-preliminary-role-policy-authority.r1",
+  "task_id": "TASK172_V0_7_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_POLICY_AUTHORITY_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "2a864b0be7622328132ad3faccac34ef11d0cec9",
+  "mode": "C3_PRELIMINARY_ROLE_POLICY_AUTHORITY_ONLY",
+  "subject_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+  "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+  "result": "BLOCKED",
+  "outcome": "OUTCOME_D_SOURCE_ORDERING_AMBIGUOUS",
+  "accepted_c3_authority": {
+    "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "lifecycle_status": "REVIEWED_AUTHORITY",
+    "independent_review": "ACCEPTED",
+    "source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "source_location": "§7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179",
+    "correction_form": "Nu_turb=Nu_Gnielinski*(Pr_liq/Pr_w)^0.11; h_i=Nu*k/D_h",
+    "required_inputs": [
+      "TASK026_NATIVE_C3_BASE",
+      "Pr_liq",
+      "Pr_w",
+      "0.05<=Pr_liq/Pr_w<=20",
+      "wall_property_state",
+      "native_Re_and_Pr_domains",
+      "internal_circular_tube_geometry"
+    ],
+    "source_artifact": {
+      "registry_id": "INL-EXT-14-31366-R3",
+      "source_status": "VERIFIED_SOURCE",
+      "bytes_sha256": "ff25dc788b5fbefd91e9dda2e643332c35ff2e2f9acce7f9bfcb2bc8e2d48c75",
+      "rights_status": "Unlimited Release; approved for public release; further dissemination unlimited",
+      "accepted_authority_evidence_path": "docs/tasks/evidence/TASK-172-tube-wall-correction-authority-independent-review-r1.json",
+      "accepted_authority_evidence_canonical_hash": "009ced2f2203bca76221bf64316f37fd914d1687da8a54e2d8a135e094ac6fdc"
+    }
+  },
+  "predecessor_contract": {
+    "transfer_authority_id": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5",
+    "transfer_contract_status": "REVIEWED_TUBE_FILM_TRANSFER_CONTRACT",
+    "task026_to_task172_transfer_contract_bound": true,
+    "cwt_preliminary_transfer_contract_bound": true,
+    "chf_preliminary_transfer_contract_bound": true,
+    "transition_preliminary_film_available": false,
+    "c3_preliminary_transfer_contract_shape_bound": true,
+    "c3_preliminary_role_policy_required": true,
+    "c3_preliminary_film_wall_correction_policy_bound": false,
+    "r54_receipt_canonical_hash": "6b94e8b4af13240228f7f5eb8c1d09efe04043415937371c7341381afdc97a95"
+  },
+  "ordering_review": {
+    "c3_preliminary_ordering_source_rule_bound": false,
+    "c3_preliminary_ordering_source_id": "SRC-T172-RELAP7-TUBE-GNIELINSKI-WALL-R3",
+    "c3_preliminary_ordering_source_location": "§7.4.1.1.1 Eqs. (739)-(744), report pp. 177-179; no preliminary-role ordering statement",
+    "c3_preliminary_ordering_rule": "UNSPECIFIED_BY_ACCEPTED_C3_SOURCE_AND_AUTHORITY",
+    "source_observations": [
+      {
+        "location": "§7.4.1.1.1 Eqs. (739)-(741)",
+        "observation": "The source defines a liquid wall-heat-transfer model and an explicit Gnielinski turbulent branch.",
+        "ordering_consequence": "No preliminary-film coefficient is selected."
+      },
+      {
+        "location": "§7.4.1.1.1 Eq. (744)",
+        "observation": "Nu_turb is multiplied by (Pr_liq/Pr_w)^0.11 and Pr_w is evaluated at wall temperature.",
+        "ordering_consequence": "The corrected relation requires a wall state, but the source does not say whether it produces or consumes the preliminary wall state."
+      },
+      {
+        "location": "V07-T172-TUBE-WALL-CORRECTION-R1 accepted authority",
+        "observation": "The wall-property correction is source-qualified and separate from the native C3 base.",
+        "ordering_consequence": "No preliminary-role, bootstrap, or fixed-point rule is added by the accepted authority."
+      },
+      {
+        "location": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5 and R54 receipt",
+        "observation": "C3 preliminary use is conditional on a separate role policy.",
+        "ordering_consequence": "The role remains blocked pending this missing authority."
+      }
+    ]
+  },
+  "candidate_dispositions": {
+    "base_c3": {
+      "definition": "TASK026 native C3 Gnielinski h_i without the accepted active wall-property correction",
+      "source_authorized": false,
+      "reason": "No accepted source states that the native/base C3 result is the preliminary wall-temperature film."
+    },
+    "corrected_c3": {
+      "definition": "TASK026 native C3 h_i with V07-T172-TUBE-WALL-CORRECTION-R1",
+      "source_authorized": false,
+      "reason": "The correction requires a wall-property state, but no source ordering says the corrected result participates in producing that same preliminary wall state."
+    },
+    "other": {
+      "definition": "Another source-defined preliminary C3 coefficient or sequence",
+      "source_authorized": false,
+      "reason": "No other source-defined preliminary coefficient is bound in the accepted C3 chain."
+    },
+    "fail_closed": {
+      "definition": "No selected coefficient; C3 preliminary use is blocked",
+      "current_disposition": true,
+      "is_neutral_film_value": false
+    }
+  },
+  "dependency_state": {
+    "c3_active_correction_depends_on_wall_state": true,
+    "c3_preliminary_film_depends_on_wall_state": "undetermined",
+    "c3_preliminary_film_depends_on_active_correction": "undetermined",
+    "c3_preliminary_film_creates_wall_state_loop": "undetermined",
+    "jmu_wall_coupling_path_is_not_resolved_by_this_gate": true,
+    "fixed_point_iteration_authorized": false,
+    "fixed_point_iteration_performed": false,
+    "neutral_factor_or_omission_shortcut_used": false
+  },
+  "role_policy_state": {
+    "c3_preliminary_role_source_rule_bound": false,
+    "c3_preliminary_role_transfer_authority_bound": false,
+    "c3_preliminary_film_wall_correction_policy_bound": false,
+    "c3_preliminary_film_wall_correction_policy": "UNRESOLVED_BASE_OR_CORRECTED_C3_PRELIMINARY_ROLE",
+    "jmu_preliminary_c3_role_policy_authority_candidate_created": false
+  },
+  "branch_and_instance_guards": {
+    "cwt_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+    "chf_branch_status": "PAUSED_PENDING_REAL_CASE_BOUND_TRANSFER_RECEIPT",
+    "c3_branch_status": "ACTIONABLE_AUTHORITY_GAP",
+    "real_case_bound_tube_film_transfer_instance_present": false,
+    "real_preliminary_tube_film_instance_present": false,
+    "preliminary_tube_film_instance_authority_bound": false,
+    "c3_case_bound_transfer_receipt_review_eligible": false,
+    "task026_to_task172_tube_bulk_state_mapping_bound": false,
+    "task026_to_task172_physical_support_mapping_bound": false
+  },
+  "preserved_downstream_state": {
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_definition_status": "UNBOUND",
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "qualified_q_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false
+  },
+  "effective_state": {
+    "effective_remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false
+  },
+  "decision": {
+    "result": "BLOCKED",
+    "outcome": "OUTCOME_D_SOURCE_ORDERING_AMBIGUOUS",
+    "policy_candidate_created": false,
+    "production_admission": "BLOCKED_FAIL_CLOSED",
+    "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_C3_PRELIMINARY_ROLE_ORDERING_AUTHORITY_RESOLUTION_R2_ONLY",
+    "stop": true
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "c3_policy_invented": false,
+    "task026_changed": false,
+    "task166_changed": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "real_case_constructed": false,
+    "real_transfer_instance_constructed": false,
+    "wall_temperature_created": false,
+    "fixed_point_iteration_performed": false,
+    "new_authority_self_approval": false,
+    "historical_records_rewritten": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-preliminary-tube-film-c3-preliminary-role-policy-authority-r1.md",
+    "document_sha256": "d590368dace0ec3a13e45dd328ca32afb1a429efb3cccddf958e4d6c11e674b6",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-c3-preliminary-role-policy-authority-r1.json",
+    "evidence_canonical_hash": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_file_hash_excluded_from_self_preimage": true,
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r55_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY"
+  },
+  "canonical_hash": "2c2cace911af3c8f0ea41cc2a12ca98cd103fb0ef51c520e32f7672bcf78e5a6"
+}

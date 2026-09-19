@@ -1,0 +1,105 @@
+{
+  "schema_version": "task172.constant-k-governance-state-correction.r1",
+  "task_id": "TASK172_V0_7_MATERIAL_CONSTANT_K_GOVERNANCE_STATE_CORRECTION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "5aca5434aefb59b56900dfd6901094e3a04bbb64",
+  "correction_type": "GOVERNANCE_STATE_ONLY",
+  "authority": {
+    "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+    "authority_version": "r1",
+    "status": "PROPOSED_AUTHORITY",
+    "independent_review": "PENDING",
+    "new_authority_self_approval": false,
+    "approved_by": null,
+    "approval_evidence": [],
+    "contract_definition_complete": true,
+    "contract_frozen": true,
+    "independently_reviewed": false,
+    "production_enabled": false
+  },
+  "material_state": {
+    "material_profile_id": null,
+    "material_identity_actual_value_bound": false,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "canonical_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "canonical_blocker_removed": false
+  },
+  "upstream_authority_layers": {
+    "material_identity": {
+      "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "implicit_promotion": false
+    },
+    "material_thermal_property": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "implicit_promotion": false
+    }
+  },
+  "contract_semantics": {
+    "qualification_mode": "CASE_LEVEL_AUTHORITY_REQUIRED",
+    "fixed_source_value_semantics_unchanged": true,
+    "source_bound_k_of_t_semantics_unchanged": true,
+    "hidden_default_k_forbidden": true,
+    "legacy_k_reuse_forbidden": true,
+    "material_selection_performed": false,
+    "material_profile_introduced": false,
+    "engineering_rules_changed": false,
+    "wall_temperature_coverage_changed": false,
+    "interpolation_policy_changed": false,
+    "extrapolation_policy_changed": false,
+    "out_of_domain_policy_changed": false,
+    "provenance_rules_changed": false,
+    "hash_rules_changed": false
+  },
+  "dependency_reconciliation": {
+    "canonical_blocker_removed": false,
+    "active_dependency_blockers": [],
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_entry_blocker_count": 6,
+    "task172_entry_dependency_blockers": "NONE",
+    "task172_entry_authority_complete": false,
+    "entry_review_pending": true
+  },
+  "historical_preservation": {
+    "historical_registry_extension": "r10_extension",
+    "historical_r10_root_hash": "272c583fe1515c4b97a94f05de67c1ae31dae1726eda9f79dcf123ce62542f78",
+    "historical_r10_evidence_file_sha256": "aa21865d47b052d0313d1cb6b8f92867b81891f961ca7018485ab97a68134d9d",
+    "historical_r10_evidence_canonical_hash": "4b0e173a772958b2fd766fe41ce771764e0ebe2b4a1799e1b0aa19147eca42cf",
+    "historical_authority_body_unchanged": true,
+    "historical_lifecycle_snapshot_unchanged": true,
+    "effective_overlay_supersedes_historical_lifecycle_only": true
+  },
+  "result": {
+    "result": "PASS",
+    "constant_k_qualification_contract_frozen": true,
+    "constant_k_qualification_authority_status": "PROPOSED_AUTHORITY",
+    "constant_k_qualification_independent_review": "PENDING",
+    "material_profile_id": null,
+    "material_identity_actual_value_bound": false,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "canonical_blocker_removed": false,
+    "remaining_task172_entry_blocker_count": 6,
+    "task172_entry_dependency_blockers": "NONE",
+    "task172_entry_authority_complete": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_MATERIAL_CONSTANT_K_AUTHORITY_INDEPENDENT_REVIEW_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "a63c613d5c587f096b2c71315040cb1e05e908c94d12b2df00b197f1bfb5ecc2"
+}

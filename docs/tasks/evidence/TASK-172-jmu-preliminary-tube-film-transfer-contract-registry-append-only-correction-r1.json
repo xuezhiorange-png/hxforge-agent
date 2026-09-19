@@ -1,0 +1,124 @@
+{
+  "schema_version": "task172.jmu-preliminary-tube-film-transfer-contract-registry-append-only-correction.r1",
+  "task_id": "TASK172_V0_7_JMU_PRELIMINARY_TUBE_FILM_TRANSFER_CONTRACT_REGISTRY_APPEND_ONLY_CORRECTION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "b3737938e50ab51d3f9ca1446f5c9ea1c288cb73",
+  "correction_type": "APPEND_ONLY_HISTORICAL_REGISTRY_REPAIR",
+  "subject": "Restore the R4 registry remaining_blockers payload while keeping R5 effective blockers in a new overlay",
+  "historical_registry_audit": {
+    "r4_predecessor_head": "827100606c0ab615104ba9c0a45ae8e20497a050",
+    "r4_registry_root_canonical_hash": "12cf00535b9f20b18a4d1f8e807ffac2aee3771c3c44a431b5648a0412f26ce7",
+    "r5_head_before_correction": "b3737938e50ab51d3f9ca1446f5c9ea1c288cb73",
+    "r5_registry_root_canonical_hash_before_correction": "a681c7451ee0cffacc18cce7fd715302034686496f2982975c6eca79caa84f0f",
+    "r5_extension_key": "r52_extension",
+    "mutated_preexisting_location": "remaining_blockers",
+    "r4_historical_value": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "r5_observed_value": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "restored_value": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "legacy_entry_restored": true,
+    "restoration_byte_semantics": true,
+    "prior_registry_extensions_rewritten": false,
+    "historical_payloads_immutable": true
+  },
+  "r5_model_level_contract_preservation": {
+    "r5_model_level_transfer_contract_preserved": true,
+    "contract_candidate_id": "V07-T172-JMU-PRELIMINARY-TUBE-FILM-TRANSFER-CONTRACT-R5",
+    "lifecycle_status": "PROPOSED_TUBE_FILM_TRANSFER_CONTRACT",
+    "independent_review": "PENDING",
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "task172_preliminary_film_case_contract_shape_bound": true,
+    "task172_preliminary_branch_role_contract_bound": true,
+    "cwt_preliminary_transfer_contract_bound": true,
+    "chf_preliminary_transfer_contract_bound": true,
+    "transition_preliminary_film_available": false,
+    "c3_preliminary_transfer_contract_shape_bound": true,
+    "c3_preliminary_role_policy_required": true,
+    "c3_preliminary_film_wall_correction_policy_bound": false,
+    "task026_to_task172_state_mapping_contract_bound": true,
+    "task026_property_snapshot_granularity_contract_bound": true,
+    "task026_to_task172_support_mapping_contract_bound": true,
+    "task026_to_task172_resistance_area_contract_bound": true,
+    "task026_to_task172_transfer_contract_bound": true,
+    "hi_scalar_transfer_requires_area_mapping": false,
+    "wall_resistance_construction_requires_area_mapping": true,
+    "local_tube_inside_area_rule_source_id": "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
+    "local_tube_inside_area_rule_bound": true,
+    "jmu_preliminary_tube_film_transfer_contract_candidate_created": true,
+    "r5_contract_document_sha256": "f2bde9025c8f9d9e55c9db94b1e3e426d91c845161860eea7877058257188755",
+    "r5_evidence_canonical_hash": "6693d16ef0e391dac0ce6226f8623e3349172583cf7074509ac3ba4903a78b68",
+    "r5_evidence_file_sha256": "195138c59f290c90b3d0d6ed20f843e84236852837708ebf548dcc8f7575f361"
+  },
+  "instance_guards": {
+    "real_case_bound_tube_film_transfer_instance_present": false,
+    "real_preliminary_tube_film_instance_present": false,
+    "preliminary_tube_film_instance_authority_bound": false,
+    "task026_to_task172_tube_bulk_state_mapping_bound": false,
+    "task026_to_task172_physical_support_mapping_bound": false,
+    "real_case_or_support_values_created": false
+  },
+  "effective_current_state": {
+    "effective_remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "effective_state_source": "NEW_R53_APPEND_ONLY_CORRECTION_EXTENSION",
+    "legacy_tube_wall_entry_is_effective_current_blocker": false,
+    "r5_contract_semantics_changed": false
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "independent_review_performed": false,
+    "task026_changed": false,
+    "task166_changed": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "intermediate_github_ci_runs": 0
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-preliminary-tube-film-transfer-contract-registry-append-only-correction-r1.md",
+    "document_sha256": "29203ac14251c70c041bf2fdd92578b4f91b1c8fe9ef6ae7bc9d727265fa22ed",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-transfer-contract-registry-append-only-correction-r1.json",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r53_extension",
+    "registry_final_root_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY"
+  },
+  "decision": {
+    "result": "CORRECTED",
+    "r5_unauthorized_historical_registry_mutation_reverted": true,
+    "historical_payloads_immutable": true,
+    "prior_registry_extensions_rewritten": false,
+    "legacy_tube_wall_blocker_entry_restored": true,
+    "new_correction_extension_created": true,
+    "next_gate": "AUTHORIZE_TASK172_JMU_PRELIMINARY_TUBE_FILM_CASE_AND_SUPPORT_TRANSFER_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+    "stop": true
+  },
+  "canonical_hash": "edda4461843169529e7ff280b7fffbce9306166cc525bf8d06da09a20484e5a7"
+}

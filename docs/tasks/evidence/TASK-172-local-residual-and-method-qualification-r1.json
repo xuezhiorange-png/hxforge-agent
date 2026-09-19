@@ -1,0 +1,330 @@
+{
+  "schema_version": "task172.local-residual-and-method-qualification.r1",
+  "task_id": "TASK172_V0_7_LOCAL_RESIDUAL_AND_METHOD_QUALIFICATION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "cf2f01814eb9237b371f8645729ed609c26d2330",
+  "mode": "TASK172_LOCAL_RESIDUAL_DEFINITION_AND_METHOD_CLASSIFICATION_ONLY",
+  "authority_id": "V07-T172-LOCAL-RESIDUAL-METHOD-QUALIFICATION-R1",
+  "framework_authority_id": "V07-T172-NUMERICAL-PROFILE-R1",
+  "framework_status": "REVIEWED_MODEL_LEVEL_FRAMEWORK",
+  "source_bindings": {
+    "numerical_proposal": {
+      "path": "docs/tasks/TASK-172-v0.7-wall-numerical-proposals-r1.md",
+      "sha256": "f770b8a693210e403c8771d65dc556977c67ac7d2408385df54e6cb87fa0ff02"
+    },
+    "wall_state_authority": {
+      "path": "docs/tasks/TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
+      "sha256": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9"
+    },
+    "task171_topology": {
+      "path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+      "sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943"
+    },
+    "task170_entry_authority": {
+      "path": "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md",
+      "sha256": "ecf01cb2b019a7b43a4dd6241893fb4238a0a11dec4a1c4e91d780c9e08ca"
+    },
+    "task171_models": {
+      "path": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/models.py",
+      "sha256": "6e62e569bbb637a8159c4ab3661773beea64612afb92a8e180bc6e49c08f455b",
+      "symbols": ["FaceObservation", "HeatObservation", "Bookkeeping", "Residual"]
+    },
+    "task171_service": {
+      "path": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/service.py",
+      "sha256": "90ec89297615d0d1f525fb6f884c6986edc405296c16adea7b9017fd136280a3",
+      "locations": ["_bookkeeping", "validate_request"]
+    },
+    "jmu_q_and_film_audit": {
+      "path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-q-and-preliminary-film-authority-r1.md",
+      "sha256": "a3c6efbc71bf59a9e0c00ca3107ac39fb176964431bcae902c8b9df581c43a1c"
+    },
+    "jmu_wall_producer_audit": {
+      "path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-wall-producer-state-mapping-closure-authority-r2.md",
+      "sha256": "d21e3799e2bcae2812ebd68f848c88daa67db893ca97569166c1d5f9582d8edd"
+    }
+  },
+  "scope": {
+    "task172_local_residual_set_bound": true,
+    "task173_global_residual_exclusion_bound": true,
+    "task172_residuals": [
+      "PROPERTY_STATE_RESIDUAL",
+      "WALL_HEAT_RATE_CONTINUITY_RESIDUAL",
+      "INNER_WALL_TEMPERATURE_RESIDUAL",
+      "OUTER_WALL_TEMPERATURE_RESIDUAL",
+      "SEGMENT_CONSTITUTIVE_HEAT_TRANSFER_RESIDUAL",
+      "HOT_COLD_ENTHALPY_RESIDUAL"
+    ],
+    "task173_excluded_residuals": [
+      "GLOBAL_DUTY_RESIDUAL",
+      "BOUNDARY_OUTLET_RESIDUAL"
+    ],
+    "generic_dimensionless_collapse_allowed": false
+  },
+  "l1_property_state": {
+    "residual_definition_bound": true,
+    "residual_semantics": "SUPPLIED_STATE_IDENTITY_PHASE_DOMAIN_PROPERTY_AUTHORITY_AND_BACKEND_FINGERPRINT_VALIDATION;NOT_A_TASK172_ROOT_EQUATION",
+    "unknown_set": "NONE_TASK172_ROOT_UNKNOWN;SUPPLIED_STATE_IDENTITY_AND_DOMAIN_FIELDS_ONLY",
+    "method_class": "DIRECT_STATE_EVALUATION_NO_ROOT_SOLVE",
+    "method_authority_status": "FRAMEWORK_BOUND_DIRECT_VALIDATION_BACKEND_INTERNALS_REMAIN_BACKEND_OWNED",
+    "reproduction_tolerance_bound": false,
+    "failure_behavior": [
+      "NONFINITE",
+      "INVALID_PROPERTY_STATE",
+      "DOMAIN_EXCURSION",
+      "PROPERTY_AUTHORITY_OR_FINGERPRINT_MISMATCH"
+    ]
+  },
+  "l2a_supplied_coefficient_wall": {
+    "wall_heat_rate_continuity_residual_definition_bound": true,
+    "unknown_set_bound": true,
+    "unknown_set": "NONE_FOR_DIRECT_SUPPLIED_INPUT_EVALUATION",
+    "supplied_inputs": [
+      "LOCATED_TUBE_BULK_STATE",
+      "LOCATED_SHELL_BULK_STATE",
+      "H_I",
+      "H_O",
+      "LOCAL_INSIDE_AND_OUTSIDE_AREAS",
+      "QUALIFIED_CONSTANT_K_WALL",
+      "GEOMETRY",
+      "SIGNED_Q_TS",
+      "EXPLICITLY_ADMITTED_FOULING_ONLY"
+    ],
+    "branch_residuals": [
+      {
+        "id": "L2A_TUBE_FILM_HEAT_RATE_RESIDUAL",
+        "equation": "(T_tube_bulk-T_inner)/R_i-Q_ts",
+        "units": "W"
+      },
+      {
+        "id": "L2A_WALL_CONDUCTION_HEAT_RATE_RESIDUAL",
+        "equation": "(T_inner-T_outer)/R_w-Q_ts",
+        "units": "W"
+      },
+      {
+        "id": "L2A_SHELL_FILM_HEAT_RATE_RESIDUAL",
+        "equation": "(T_outer-T_shell_bulk)/R_o-Q_ts",
+        "units": "W"
+      }
+    ],
+    "series_identity": {
+      "equation": "T_tube_bulk-T_shell_bulk-Q_ts*(R_i+R_w+R_o)",
+      "units": "K",
+      "role": "EQUIVALENT_ALGEBRAIC_IDENTITY;DO_NOT_COLLAPSE_W_RESIDUALS"
+    },
+    "direct_evaluation_valid": true,
+    "method_class": "DIRECT_SERIES_EVALUATION_NO_ITERATION",
+    "method_contract_bound": true,
+    "real_executable_case_present": false,
+    "acceptance_tolerance_bound": false
+  },
+  "l2b_property_correction_wall_coupling": {
+    "candidate_unknowns": [
+      "TUBE_FLUID_WALL_TEMPERATURE",
+      "TUBE_METAL_INNER_TEMPERATURE",
+      "TUBE_METAL_OUTER_TEMPERATURE",
+      "SHELL_FLUID_WALL_TEMPERATURE",
+      "COMMON_SIGNED_WALL_HEAT_RATE",
+      "PROPERTY_DEPENDENT_FILM_OR_CORRECTION_STATES_IF_INDEPENDENTLY_REQUIRED"
+    ],
+    "unknown_set_bound": false,
+    "unknown_set_status": "UNRESOLVED_CONDITIONAL_CANDIDATE_SET_ONLY",
+    "unknown_count": "UNRESOLVED",
+    "residual_set_bound": false,
+    "residual_set_status": "UNRESOLVED_COMMON_HEAT_RATE_VERSUS_BRANCH_CONSTITUTIVE_RATES_NOT_CASE_BOUND",
+    "residual_count": "UNRESOLVED",
+    "equation_count_bound": false,
+    "degrees_of_freedom_status": "UNRESOLVED",
+    "missing_physical_edges": [
+      "QUALIFIED_Q_AUTHORITY",
+      "PRELIMINARY_SHELL_FILM_SOURCE_RULE",
+      "REAL_K_WALL_PROFILE",
+      "SOURCE_MEAN_BULK_STATE_PRODUCER",
+      "ACTIVE_JMU_LOCAL_MAPPING",
+      "C3_PRELIMINARY_ROLE_POLICY_WHERE_APPLICABLE"
+    ],
+    "scalar_reduction_bound": false,
+    "scalar_unknown": "UNRESOLVED",
+    "scalar_residual_definition_bound": false,
+    "scalar_dependency_graph_bound": false,
+    "residual_continuity_on_valid_interval_bound": false,
+    "valid_physical_interval_contract_bound": false,
+    "valid_physical_interval_rule": "UNBOUND_INTERSECTION_OF_PROPERTY_MATERIAL_CORRELATION_AND_PHYSICAL_SUPPORT_DOMAINS_NOT_CASE_BOUND",
+    "real_case_valid_interval_present": false,
+    "bracket_construction_contract_bound": false,
+    "real_case_bracket_present": false,
+    "root_uniqueness_proven": "undetermined",
+    "root_selection_policy_bound": false,
+    "root_selection_policy": "UNRESOLVED",
+    "finite_precision_safeguard_contract_bound": true,
+    "finite_precision_safeguards": [
+      "FINITE_INPUT_OUTPUT_CHECK",
+      "DOMAIN_CHECK_BEFORE_EVERY_TRIAL",
+      "NO_INVALID_EXTRAPOLATION",
+      "BRACKET_INVARIANT_IF_A_BRACKET_IS_LATER_BOUND",
+      "NO_LAST_ITERATE_ACCEPTANCE",
+      "CANONICAL_RESIDUAL_AND_STATE_IDENTITY"
+    ],
+    "method_class_bound": false,
+    "method_class": "METHOD_UNBOUND",
+    "method_contract_bound": false,
+    "method_status": "METHOD_UNBOUND",
+    "brent_method_transfer_candidate_created": false
+  },
+  "l3_local_constitutive_coupling": {
+    "state_reconstruction_contract_bound": false,
+    "state_reconstruction_gap": "NO_AUTHORITY_FOR_CELL_MEAN_OR_FACE_TO_LOCAL_PROPERTY_AND_WALL_STATE_RECONSTRUCTION",
+    "segment_heat_transfer_residual_definition_bound": true,
+    "segment_heat_transfer_residual": "CONSTITUTIVE_LOCAL_WALL_RATE_MINUS_OWNED_WALL_EVENT_RATE",
+    "segment_heat_transfer_residual_units": "W",
+    "hot_cold_enthalpy_residual_definition_bound": true,
+    "hot_cold_enthalpy_residual": "SIGNED_MASS_FLOW_TIMES_FACE_ENTHALPY_CHANGE_MINUS_OWNED_HEAT_RATE",
+    "hot_cold_enthalpy_residual_units": "W",
+    "unknown_set_bound": false,
+    "unknown_set": "UNRESOLVED_FACE_CELL_MEAN_PROPERTY_AND_WALL_RECONSTRUCTION_NOT_BOUND",
+    "residual_set_bound": true,
+    "scalar_reduction_bound": false,
+    "method_class_bound": false,
+    "method_class": "METHOD_UNBOUND",
+    "method_status": "METHOD_UNBOUND"
+  },
+  "residual_method_disposition_matrix": {
+    "bound": true,
+    "scope": "MODEL_LEVEL_FAIL_CLOSED_CLASSIFICATION_NO_EXECUTABLE_METHOD_PROMOTION",
+    "rows": [
+      {
+        "residual_id": "PROPERTY_STATE_RESIDUAL",
+        "level": "L1",
+        "disposition": "DIRECT_IDENTITY_OR_DOMAIN_CHECK"
+      },
+      {
+        "residual_id": "WALL_HEAT_RATE_CONTINUITY_RESIDUAL",
+        "level": "L2A",
+        "disposition": "DIRECT_ALGEBRAIC_EVALUATION"
+      },
+      {
+        "residual_id": "WALL_HEAT_RATE_CONTINUITY_RESIDUAL",
+        "level": "L2B",
+        "disposition": "METHOD_UNBOUND"
+      },
+      {
+        "residual_id": "INNER_WALL_TEMPERATURE_RESIDUAL",
+        "level": "L2A",
+        "disposition": "DIRECT_ALGEBRAIC_EVALUATION"
+      },
+      {
+        "residual_id": "INNER_WALL_TEMPERATURE_RESIDUAL",
+        "level": "L2B",
+        "disposition": "METHOD_UNBOUND"
+      },
+      {
+        "residual_id": "OUTER_WALL_TEMPERATURE_RESIDUAL",
+        "level": "L2A",
+        "disposition": "DIRECT_ALGEBRAIC_EVALUATION"
+      },
+      {
+        "residual_id": "OUTER_WALL_TEMPERATURE_RESIDUAL",
+        "level": "L2B",
+        "disposition": "METHOD_UNBOUND"
+      },
+      {
+        "residual_id": "SEGMENT_CONSTITUTIVE_HEAT_TRANSFER_RESIDUAL",
+        "level": "L3",
+        "disposition": "METHOD_UNBOUND"
+      },
+      {
+        "residual_id": "HOT_COLD_ENTHALPY_RESIDUAL",
+        "level": "L3",
+        "disposition": "METHOD_UNBOUND"
+      },
+      {
+        "residual_id": "GLOBAL_DUTY_RESIDUAL",
+        "level": "L4_TASK173",
+        "disposition": "OUT_OF_TASK172_SCOPE"
+      },
+      {
+        "residual_id": "BOUNDARY_OUTLET_RESIDUAL",
+        "level": "L4_TASK173",
+        "disposition": "OUT_OF_TASK172_SCOPE"
+      }
+    ]
+  },
+  "preserved_physical_guards": {
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "pair_transfer_contract_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "source_mean_bulk_state_producer_contract_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "jmu_bulk_temperature_aggregation_rule_bound": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED"
+  },
+  "unbound_parameters": {
+    "local_residual_tolerance_bound": false,
+    "property_coupling_tolerance_bound": false,
+    "wall_temperature_tolerance_bound": false,
+    "energy_closure_tolerance_bound": false,
+    "max_iter_bound": false,
+    "relaxation_factor_bound": false,
+    "stagnation_threshold_bound": false,
+    "oscillation_threshold_bound": false,
+    "numerical_tolerances_bound": false,
+    "combined_numerical_error_budget_bound": false,
+    "mesh_convergence_rule_bound": false,
+    "mesh_refinement_sequence_bound": false,
+    "mesh_comparison_norm_bound": false,
+    "mesh_termination_threshold_bound": false
+  },
+  "entry_blockers": {
+    "effective_remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "local_residual_and_method_canonical_blocker_removed": false
+  },
+  "decision": {
+    "result": "BLOCKED",
+    "outcome": "OUTCOME_G_MULTIPLE_LOCAL_METHOD_GAPS_REMAIN",
+    "local_residual_method_authority_candidate_created": false,
+    "local_residual_and_method_qualification_status": "OPEN",
+    "production_numerical_method_authorized": false,
+    "task172_numerical_execution_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_L2B_L3_LOCAL_RESIDUAL_DEFINITION_AND_STATE_RECONSTRUCTION_CLOSURE_R2_ONLY",
+    "stop": true
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "append_only_registry_extension": true,
+    "historical_authority_payload_rewritten": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task026_changed": false,
+    "task166_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "new_golden_value_created": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-local-residual-and-method-qualification-r1.md",
+    "document_sha256": "60d2e0e9d20aaabe0cbd7ae81a3e5762956d3fb0845b3cc8fd4243fbb62cf42e",
+    "evidence_path": "docs/tasks/evidence/TASK-172-local-residual-and-method-qualification-r1.json",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r61_extension"
+  },
+  "canonical_hash": "c08b9fe50c1c1a1ecd1db3ad5607fc07cfef898b7f88f36b6c15a0d961152bc3"
+}

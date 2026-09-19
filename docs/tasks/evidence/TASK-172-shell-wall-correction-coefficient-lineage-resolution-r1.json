@@ -1,0 +1,276 @@
+{
+  "schema_version": "task172.shell-wall-correction-coefficient-lineage-resolution.r1",
+  "task_id": "TASK172_V0_7_SHELL_WALL_CORRECTION_COEFFICIENT_LINEAGE_RESOLUTION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "b33bf9060e32c13458a34066ccb5219e3ab78be8",
+  "mode": "TARGETED_BELL_COEFFICIENT_LINEAGE_RESOLUTION_ONLY",
+  "subject_blocker": "SHELL-WALL-CORRECTION-AUTHORITY",
+  "result": "RESOLVED",
+  "adjudication_outcome": "OUTCOME_B_UNNORMALIZED_NATIVE_J_FACTOR_LINEAGE_PROVEN",
+  "native_j_factor_identity_scope": "TASK166_NATIVE_JAMIL_OPERATIONAL_VARIANT",
+  "native_task166": {
+    "task_id": "TASK-166",
+    "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+    "method": "BELL_DELAWARE",
+    "ideal_htc_form": "ji*cp*G*Pr^(-2/3)",
+    "corrected_htc_form": "ideal_h*Jc*Jl*Jb*Js*Jr",
+    "wall_property_term_present": false,
+    "wall_temperature_input_present": false,
+    "native_equation_source": {
+      "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+      "doi": "10.1002/aic.16602",
+      "body_sha256": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
+      "access_path": "https://aiche.onlinelibrary.wiley.com/doi/10.1002/aic.16602",
+      "alternate_access_path": "https://www.ou.edu/class/che-design/pub-papers/Linear%20method%20for%20the%20design%20of%20shell%20and%20tube%20heat%20exchangers%20using%20the%20Bell-Delaware%20Method%28Goncalves%20et%20al%29-19.pdf",
+      "rights_status": "ARTICLE_RECORD_AND_AUTHORIZED_COPY_RECORDED_NO_SI_REPUBLICATION",
+      "access_path": "https://aiche.onlinelibrary.wiley.com/doi/10.1002/aic.16602",
+      "alternate_access_path": "https://www.ou.edu/class/che-design/pub-papers/Linear%20method%20for%20the%20design%20of%20shell%20and%20tube%20heat%20exchangers%20using%20the%20Bell-Delaware%20Method%28Goncalves%20et%20al%29-19.pdf",
+      "rights_status": "ARTICLE_RECORD_AND_AUTHORIZED_COPY_RECORDED_NO_SI_REPUBLICATION",
+      "exact_location": "Eqs. 36-43, PDF pp.4-5",
+      "equation_provenance_bound": true,
+      "supporting_information_body_acquired": false,
+      "supporting_information_table_content_verified": false,
+      "coefficient_provenance_bound": false
+    },
+    "native_parameter_source": {
+      "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+      "doi": "10.1016/j.enconman.2020.113462",
+      "body_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+      "access_path": "https://nrl.northumbria.ac.uk/45157/1/sthx.pdf",
+      "rights_status": "INSTITUTIONAL_ACCEPTED_MANUSCRIPT_PUBLIC_ACCESS_RIGHTS_SCOPE_RECORDED_IN_TASK166_AUTHORITY",
+      "access_path": "https://nrl.northumbria.ac.uk/45157/1/sthx.pdf",
+      "rights_status": "INSTITUTIONAL_ACCEPTED_MANUSCRIPT_PUBLIC_ACCESS_RIGHTS_SCOPE_RECORDED_IN_TASK166_AUTHORITY",
+      "exact_location": "Appendix Table A.1, accepted manuscript PDF p.57",
+      "table_scope": "a1-a4 and b1-b4 rows",
+      "coefficient_provenance_bound": true
+    },
+    "code_source": {
+      "path": "src/hexagent/exchangers/shell_tube/bell_delaware/heat_transfer.py",
+      "sha256": "bc442493dbdc52ca0a8c52361276becc2e2e73a246ea5e7f6ab3cecb0306c2ad",
+      "symbols": ["_ROWS", "_A_TABLE", "calculate_heat_transfer"],
+      "runtime_selection": "explicit layout and Reynolds row; no interpolation or generation"
+    }
+  },
+  "native_coefficient_fingerprint": {
+    "source": "Jamil Appendix Table A.1 a1-a4 as bound by TASK166",
+    "table": "Jamil Appendix A Table A.1 a1-a4",
+    "rows": [
+      {"id": "RE_LT_10", "lower": "0", "upper": "10"},
+      {"id": "RE_10_TO_LT_100", "lower": "10", "upper": "100"},
+      {"id": "RE_100_TO_LT_1000", "lower": "100", "upper": "1000"},
+      {"id": "RE_1000_TO_LT_10000", "lower": "1000", "upper": "10000"},
+      {"id": "RE_10000_TO_100000", "lower": "10000", "upper": "100000"}
+    ],
+    "layouts": {
+      "LAYOUT_30_DEG": [
+        ["1.400", "-0.667", "1.450", "0.519"],
+        ["1.360", "-0.657", "1.450", "0.519"],
+        ["0.593", "-0.477", "1.450", "0.519"],
+        ["0.321", "-0.388", "1.450", "0.519"],
+        ["0.321", "-0.388", "1.450", "0.519"]
+      ],
+      "LAYOUT_45_DEG": [
+        ["1.550", "-0.667", "1.930", "0.500"],
+        ["0.498", "-0.656", "1.930", "0.500"],
+        ["0.730", "-0.500", "1.930", "0.500"],
+        ["0.370", "-0.396", "1.930", "0.500"],
+        ["0.370", "-0.396", "1.930", "0.500"]
+      ],
+      "LAYOUT_90_DEG": [
+        ["0.970", "-0.667", "1.187", "0.370"],
+        ["0.900", "-0.631", "1.187", "0.370"],
+        ["0.408", "-0.460", "1.187", "0.370"],
+        ["0.107", "-0.266", "1.187", "0.370"],
+        ["0.370", "-0.395", "1.187", "0.370"]
+      ]
+    },
+    "fingerprint_preimage_rule": "RFC8785 canonical JSON of the table, rows and layouts object shown in this record",
+    "fingerprint_sha256": "b6e0b32a794b43d43e6a976e42683f271c2ed25de5c055645b325f9c514bead0",
+    "fingerprint_bound": true
+  },
+  "source_lineage": {
+    "jamil_equation_locations": [
+      {
+        "location": "Jamil accepted manuscript §2.2.2, PDF p.11, Eq.6",
+        "observation": "hs=hc*JC*JL*JB*JS*JR*Jmu; Jmu is a separate product factor"
+      },
+      {
+        "location": "Jamil accepted manuscript §2.2.2, PDF p.11, Eq.7",
+        "observation": "hc=ji*cp*G*Pr^(-2/3)"
+      },
+      {
+        "location": "Jamil accepted manuscript §2.2.2, PDF p.11, Eqs.8-9",
+        "observation": "ji uses a1-a4 and Reynolds-dependent exponent a"
+      },
+      {
+        "location": "Jamil accepted manuscript Appendix, PDF p.57, Table A.1",
+        "observation": "Empirical coefficients for ji and fi [9]"
+      },
+      {
+        "location": "Jamil accepted manuscript Appendix, PDF pp.58-59, Table A.2",
+        "observation": "Jmu is listed separately as wall-viscosity correction"
+      },
+      {
+        "location": "Jamil accepted manuscript References, [9], PDF p.50/printed p.51",
+        "observation": "Thome JR. Engineering Data Book III. Wolverine Tube, Inc.; 2004."
+      }
+    ],
+    "jamil_table_to_native_values": "EXACT_MATCH",
+    "jamil_operational_j_definition": "UNNORMALIZED_WITH_RESPECT_TO_WALL_VISCOSITY",
+    "jamil_property_factor_placement": "SEPARATE_JMU_AFTER_IDEAL_HC",
+    "goncalves_equation_locations": "Eqs.36-43, PDF pp.4-5",
+    "goncalves_ji_equation_bound": true,
+    "goncalves_supporting_information_body_acquired": false,
+    "goncalves_supporting_information_table_content_verified": false,
+    "goncalves_coefficient_preimage_bound": false,
+    "bell_1960_same_coefficient_definition_as_native": false,
+    "bell_1960_reason": "Bell 1960 normalized j observation is source-specific and is not mapped to the native Jamil coefficient preimage"
+  },
+  "source_targets": {
+    "bell_1960": {
+      "source_target_id": "BELL-1960-DELAWARE-DESIGN",
+      "body_acquired": true,
+      "body_complete": true,
+      "bytes_sha256": "4657ebfb78bda433528b7f1197fff32e299361d39379bb6839e871f43bc2ed11",
+      "access_path": "https://www.ing.unp.edu.ar/asignaturas/operaciones_fisicas_2/Versiones%20PDF/Exchanger%20design%20based%20on%20the%20Delaware%20research%20program-%20Kenneth%20Bell.pdf",
+      "rights_status": "PUBLIC_SCAN_ACCESSIBLE_RIGHTS_UNVERIFIED_NOT_VENDORED",
+      "access_path": "https://www.ing.unp.edu.ar/asignaturas/operaciones_fisicas_2/Versiones%20PDF/Exchanger%20design%20based%20on%20the%20Delaware%20research%20program-%20Kenneth%20Bell.pdf",
+      "rights_status": "PUBLIC_SCAN_ACCESSIBLE_RIGHTS_UNVERIFIED_NOT_VENDORED",
+      "dimensionless_j_ratio": "(mu_w/mu)^0.14",
+      "coefficient_reconstruction_ratio": "(mu/mu_w)^0.14",
+      "factor_scope": "SOURCE_VARIANT_SPECIFIC_IDEAL_OR_NON_LEAKAGE_TUBE_BANK_J_NORMALIZATION",
+      "transfer_to_task166": false
+    },
+    "bell_1963": {
+      "source_target_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+      "coefficient_lineage_observation": "UNDETERMINED_BODY_NOT_ACQUIRED"
+    },
+    "bergelin_1958": {
+      "source_target_id": "BERGELIN-1958-DELAWARE-BULLETIN-4",
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_PRIMARY_SOURCE_TARGET_ONLY",
+      "coefficient_lineage_observation": "UNDETERMINED_BODY_NOT_ACQUIRED"
+    },
+    "taborek_hedh": {
+      "source_target_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "body_acquired": false,
+      "body_complete": false,
+      "bytes_sha256": "NONE",
+      "status": "BIBLIOGRAPHIC_LINEAGE_ONLY",
+      "coefficient_lineage_observation": "UNVERIFIED_EXACT_BODY_NOT_ACQUIRED",
+      "transfer_to_task166": false
+    },
+    "thome_edb_crosscheck": {
+      "source_target_id": "THOME-2004-EDB3-CH3-CROSSCHECK",
+      "body_acquired": true,
+      "body_complete": true,
+      "bytes_sha256": "326cf8a5c26d6010b701acc9459424391a59a67c08e28e0a41c699c5b9146ea4",
+      "access_path": "https://files.engineering.com/files/e01daa74-5d7f-4923-a8fc-fa05132408b2/WOLVERINE_Single_Phase_Shell-Side_Flow_and_Heat_Transfer.pdf",
+      "rights_status": "COPY_RESTRICTED_RIGHTS_UNVERIFIED",
+      "source_role": "SECONDARY_CROSS_CHECK_ONLY",
+      "authority_status": "NOT_AUTHORITY",
+      "observations": [
+        "§3.4.6 separates Jmu=(mu/mu_wall)^m from the ideal coefficient",
+        "§3.4.7 gives alpha_I=j_I*cp*G*Pr^(-2/3)",
+        "Table 3.1 is attributed to Taborek (1983)"
+      ]
+    }
+  },
+  "variant_identity": {
+    "j_factor_lineage_identity_bound": true,
+    "j_factor_lineage_identity_scope": "TASK166_NATIVE_JAMIL_OPERATIONAL_VARIANT",
+    "j_factor_normalization_contains_wall_viscosity": false,
+    "correction_equation_bound_for_task166": false,
+    "property_ratio_bound": true,
+    "property_ratio_scope": "SOURCE_SYNTAX_OBSERVATION_ONLY",
+    "exponent_bound": true,
+    "exponent_scope": "BELL_1960_SOURCE_SYNTAX_OBSERVATION_ONLY",
+    "correction_is_part_of_native_task166_ideal_bank_base": false,
+    "correction_is_optional_engineering_extension": false,
+    "bell_1960_factor_transfer_rejected": true,
+    "coefficient_lineage_conflict": false,
+    "transfer_rejection_reason": "Bell 1960 is a source-specific normalized-j variant; the native Jamil representation places Jmu separately from ji, and no cross-variant insertion is authorized"
+  },
+  "transfer_contract": {
+    "bulk_state_bound": false,
+    "bulk_state_source_definition": "Jamil equation placement does not complete TASK172 local shell-bulk state mapping",
+    "task032_bulk_state_mapping_valid": false,
+    "wall_state_bound": false,
+    "wall_state_source_definition": "Jamil Jmu names wall viscosity but does not bind the TASK172 produced shell-fluid wall-interface state",
+    "task172_state_mapping_established": false,
+    "wall_temperature_producer_bound": false,
+    "re_domain_bound": false,
+    "pr_domain_bound": false,
+    "fluid_scope_bound": false,
+    "heating_cooling_scope_bound": false,
+    "geometry_layout_domain_bound": false,
+    "combination_rule_bound": false
+  },
+  "negative_lineage": {
+    "task034_wall_authority_reuse": false,
+    "task034_transfer_to_task166_heat_transfer": false,
+    "tube_RELAP_correction_transfer_to_task166": false,
+    "martin_gnielinski_crossflow_transfer_to_task166": false,
+    "secondary_taborek_transfer_to_task166": false,
+    "transfer_by_equal_exponent": false,
+    "bell_1960_factor_inserted": false
+  },
+  "effective_state": {
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_transfer_authority_candidate_created": false,
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JAMIL_THOME_ACTIVE_JMU_TRANSFER_AUTHORITY_R1_ONLY"
+  },
+  "governance": {
+    "source_acquisition_and_adjudication_only": true,
+    "new_authority_self_approval": false,
+    "lifecycle_promotion_performed": false,
+    "historical_records_rewritten": false,
+    "task166_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_work_started": false,
+    "blocker_removed": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "forbidden_transfers": {
+    "TASK034_WALL_AUTHORITY_REUSE": "NO",
+    "TASK034_TRANSFER_TO_TASK166_HEAT_TRANSFER": false,
+    "TUBE_RELAP_CORRECTION_TRANSFER_TO_TASK166": false,
+    "MARTIN_GNIELINSKI_CROSSFLOW_TRANSFER_TO_TASK166": false,
+    "SECONDARY_TABOREK_TRANSFER_TO_TASK166": false
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-coefficient-lineage-resolution-r1.md",
+    "document_sha256": "0228c5713e3ffd899de910bf2ba34831d1ad905cf3d8a2d94a73c29392a0ae7f",
+    "evidence_path": "docs/tasks/evidence/TASK-172-shell-wall-correction-coefficient-lineage-resolution-r1.json",
+    "evidence_canonical_hash": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY"
+  },
+  "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_JAMIL_THOME_ACTIVE_JMU_TRANSFER_AUTHORITY_R1_ONLY",
+  "canonical_hash": "2b99eb5780a277078b99544de5fe94d42eb61cc10f17e033658de67ba491d06d"
+}
