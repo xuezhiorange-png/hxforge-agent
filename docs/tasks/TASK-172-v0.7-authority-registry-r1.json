@@ -11648,7 +11648,7 @@
       "document_path": "docs/tasks/TASK-172-v0.7-l3-local-state-reconstruction-contract-r2-independent-review-receipt-r1.md",
       "document_sha256": "82f20bf83f2fde881c295ec9568eaed0ef775a4812451b5ffc98db38ef185750",
       "evidence_path": "docs/tasks/evidence/TASK-172-l3-local-state-reconstruction-contract-r2-independent-review-receipt-r1.json",
-      "evidence_file_sha256": "254087e7eac8ec9837c1929f1c3a3e4700035a7751fe312d6f6a3aa09841f85f",
+      "evidence_file_sha256": "ac35f12d41bd340e937c250a8f706a566d99eb66a29006c87d0952aaaf44d8d9",
       "evidence_canonical_hash": "8ba12a0d586a475f7895334ed2a9a73714757d773ca3aad553ad4fee06b1341a",
       "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
       "registry_extension_key": "r66_extension"
@@ -11686,7 +11686,7 @@
     "merge_authorized": false,
     "no_step_implies_the_next": true
   },
-  "canonical_hash": "79d600d9454708c45c7c7d24b4c4c02e09aad9c1d83a4be2e80066e1aa626a18"
+    "canonical_hash": "1176f6dc1acd6074f889dc599b07a80fdaedcde57772480a22b9fdf71b4ff949"
   },
-  "canonical_hash": "d882636b65f67e864c7caf852432248304a52fed11377054d2ca06f458ab1004"
+  "canonical_hash": "dba0d989d7644ad508e88be16affc1bbb0a73dc5593b4ce79ce898d53c818ca9"
 }
