@@ -13587,5 +13587,191 @@
     },
     "canonical_hash": "8589fd1e1389c7788a51eecd734ce19333b367777c07bf8c7e511dcb2375ea54"
   },
-  "canonical_hash": "59160f7ac956fe207d5d11313460449e5d7c7a77ddf2a7f3856d08a007b7b9ef"
+  "r78_extension": {
+    "task_id": "TASK172_V0_7_JMU_BULK_PRESSURE_REFERENCE_CONVENTION_QUALIFICATION_R1",
+    "previous_head": "7ea615cab486bb8ad2140e610d2788d4b13ed109",
+    "historical_registry_root_hash": "59160f7ac956fe207d5d11313460449e5d7c7a77ddf2a7f3856d08a007b7b9ef",
+    "historical_r77_extension_hash": "8589fd1e1389c7788a51eecd734ce19333b367777c07bf8c7e511dcb2375ea54",
+    "historical_records_unchanged": true,
+    "review_type": "TARGETED_PRESSURE_REFERENCE_SOURCE_ACQUISITION_AND_TRANSFER_QUALIFICATION_ONLY",
+    "subject": "JMU_BULK_PRESSURE_REFERENCE_FOR_NATIVE_TASK166_JAMIL_THOME_SOURCE_MEAN",
+    "head_precondition": {
+      "expected_head_sha": "7ea615cab486bb8ad2140e610d2788d4b13ed109",
+      "verified_head_sha": "7ea615cab486bb8ad2140e610d2788d4b13ed109",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT"
+    },
+    "historical_immutability": {
+      "r71_extension_rewritten": false,
+      "r72_extension_rewritten": false,
+      "r73_extension_rewritten": false,
+      "r74_extension_rewritten": false,
+      "r75_extension_rewritten": false,
+      "r76_extension_rewritten": false,
+      "r77_extension_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "target_boundary": {
+      "whole_exchanger_source_state_granularity_preserved": true,
+      "temperature_operator_reopened": false,
+      "pressure_convention_selected": false,
+      "endpoint_pressure_identities_define_source_mean_pressure": false,
+      "temperature_operator_implies_pressure_operator": false
+    },
+    "source_acquisition": {
+      "pressure_source_search_performed": true,
+      "primary_or_recognized_source_count": 8,
+      "relevant_body_acquired_count": 5,
+      "exact_pressure_rule_body_count": 0,
+      "exact_pressure_rule_location_count": 0,
+      "recognized_lineage_bodies_not_acquired_count": 2,
+      "pressure_source_body_acquired": true,
+      "pressure_source_exact_location_bound": true,
+      "pressure_rule_text_observed": false,
+      "recognized_sources": [
+        "THOME-2004-EDB3-CH3-CROSSCHECK",
+        "ASME-PTC-12.5-2000-R2025-CATALOG",
+        "ASME-PTC-12.5-2000-R2015-PUBLIC-COPY",
+        "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+        "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+        "BELL-1960-DELAWARE-DESIGN",
+        "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+        "BELL-1963-DELAWARE-FINAL-REPORT"
+      ]
+    },
+    "route_a_explicit_pressure_convention": {
+      "found": false,
+      "source_id": "NONE",
+      "exact_location": "NONE",
+      "physical_quantity_match": false,
+      "stream_role_match": false,
+      "granularity_match": false,
+      "method_context_match": false,
+      "property_evaluation_role_match": false,
+      "transfer_compatible": false,
+      "transfer_conflicts": [
+        "Observed pressure statements are pressure-drop or test-measurement semantics",
+        "No source statement pairs pressure with the JMU source-mean bulk property state",
+        "No source-backed operator is available to compare with the narrow property domain"
+      ]
+    },
+    "route_b_pressure_insensitivity": {
+      "source_found": false,
+      "domain_bound": false,
+      "acceptance_rule_bound": false,
+      "authority_found": false,
+      "source_id": "NONE",
+      "domain": "NONE",
+      "required_inputs": "NONE",
+      "acceptance_rule": "NONE"
+    },
+    "source_conflict": {
+      "pressure_source_conflict_found": false,
+      "pressure_source_conflict_adjudicated": true,
+      "reason": "No competing admissible source-mean pressure conventions were found; excluded pressure-drop/test conventions are outside the target quantity and role"
+    },
+    "property_authority_compatibility": {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "contract_valid": true,
+      "reviewed_payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "effective_review_status": "REVIEWED_AUTHORITY",
+      "scope": "PURE_ORDINARY_WATER;HEOS;CoolProp 8.0.0;DEF;STABLE_SINGLE_PHASE_LIQUID",
+      "domain": "T=298.15..300 K;P=100000..101325 Pa",
+      "pressure_rule_compatibility": "NOT_EVALUABLE_NO_PRESSURE_RULE_FOUND",
+      "real_property_snapshot_present": false,
+      "backend_called": false
+    },
+    "predicate_state": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_fail_closed_predicate_satisfied": true,
+      "source_mean_model_level_predicate_status_bound": true,
+      "source_mean_model_level_unsatisfied_or_undetermined_predicates": [
+        "JMU_BULK_PRESSURE_RULE_BOUND"
+      ],
+      "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 1,
+      "source_mean_model_level_sole_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+      "pressure_is_proven_sole_model_level_blocker": true,
+      "source_mean_model_level_authority_candidate_eligible": false
+    },
+    "pressure_state": {
+      "jmu_bulk_pressure_rule_authority_found": false,
+      "jmu_bulk_pressure_rule": "NONE",
+      "jmu_bulk_pressure_rule_source_id": "NONE",
+      "jmu_bulk_pressure_rule_source_location": "NONE",
+      "jmu_bulk_pressure_rule_bound": false,
+      "pressure_insensitivity_authority_found": false,
+      "pressure_assumption_introduced": false,
+      "jmu_bulk_pressure_rule_authority_candidate_created": false,
+      "jmu_bulk_pressure_rule_authority_id": "NONE",
+      "jmu_bulk_pressure_rule_authority_lifecycle": "NONE",
+      "jmu_bulk_pressure_rule_independent_review": "NONE"
+    },
+    "real_instance_and_parent_state": {
+      "source_mean_bulk_state_authority_candidate_created": false,
+      "real_reviewed_shell_inlet_producer_found": false,
+      "real_reviewed_shell_outlet_producer_found": false,
+      "real_reviewed_shell_endpoint_pair_producer_found": false,
+      "real_shell_inlet_state_instance_present": false,
+      "real_shell_outlet_state_instance_present": false,
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "real_jmu_bulk_state_instance_present": false,
+      "real_jmu_bulk_property_snapshot_present": false,
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "decision": {
+      "result": "BLOCKED",
+      "outcome": "OUTCOME_C_NO_LEGAL_PRESSURE_AUTHORITY_FOUND",
+      "production_admission": "BLOCKED_FAIL_CLOSED",
+      "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-bulk-pressure-reference-convention-qualification-r1.md",
+      "document_sha256": "02bcc78cba643bc79f9ec9cf0e6ab47df7141459c610e2fbe744951614049483",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-bulk-pressure-reference-convention-qualification-r1.json",
+      "evidence_file_sha256": "1bfe172b3d01e786a634cdcb5afc7d3328928cff64fa6a8f87a10c320ef5f748",
+      "evidence_canonical_hash": "6a2e98be4a456491ab13ea73f3552b5dd499b10caaf387f77bbb9766d01bd68c",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r78_extension",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "pressure_rule_researched": true,
+      "pressure_rule_selected": false,
+      "pressure_authority_created": false,
+      "property_backend_called": false,
+      "endpoint_producer_created": false,
+      "endpoint_state_created": false,
+      "source_mean_state_created": false,
+      "property_snapshot_created": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "lockfile_changed": false,
+      "workflow_changed": false,
+      "task166_changed": false,
+      "task171_changed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "34be5a730e86070b14ebeabe809ac1ca2274f0aef1e90a3bed1aed3c38789d39"
+  },
+  "canonical_hash": "1d0f723445191485a7e6c7f4de03781a532e45ad8edf65146aba04b4a886e176"
 }
