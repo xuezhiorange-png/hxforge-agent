@@ -1,0 +1,365 @@
+{
+  "schema_version": "task172.jmu.bulk-pressure.missing-lineage-source-acquisition.r2",
+  "task_id": "TASK172_V0_7_JMU_BULK_PRESSURE_MISSING_LINEAGE_SOURCE_ACQUISITION_R2",
+  "mode": "TARGETED_MISSING_PRIMARY_LINEAGE_BODY_ACQUISITION_AND_PRESSURE_TEXT_INSPECTION_ONLY",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "a7e4baa51f406d9cc69d4e9f428fa19373c6be74",
+  "head_precondition": {
+    "expected_head_sha": "a7e4baa51f406d9cc69d4e9f428fa19373c6be74",
+    "verified_head_sha": "a7e4baa51f406d9cc69d4e9f428fa19373c6be74",
+    "pr_state": "OPEN_DRAFT",
+    "verified": true
+  },
+  "historical_immutability": {
+    "r71_extension_rewritten": false,
+    "r72_extension_rewritten": false,
+    "r73_extension_rewritten": false,
+    "r74_extension_rewritten": false,
+    "r75_extension_rewritten": false,
+    "r76_extension_rewritten": false,
+    "r77_extension_rewritten": false,
+    "r78_extension_rewritten": false,
+    "historical_payloads_immutable": true
+  },
+  "scope": {
+    "targeted_source_acquisition_only": true,
+    "temperature_operator_reopened": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "source_mean_candidate_created": false,
+    "real_state_created": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "production_code_changed": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflow_changed": false
+  },
+  "source_targets": [
+    {
+      "source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "title": "Final Report of the Cooperative Research Program on Shell and Tube Heat Exchangers, Bulletin No. 5",
+      "author": "Kenneth J. Bell",
+      "publisher_or_institution": "University of Delaware Engineering Experimental Station",
+      "year": "1963",
+      "edition_or_revision": "Bulletin No. 5",
+      "source_role": "HISTORICAL_METHOD_ORIGIN_TARGET",
+      "primary_or_secondary": "HISTORICAL_PRIMARY_ORIGIN_TARGET",
+      "access_paths": [
+        "https://search.worldcat.org/title/Final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers/oclc/16107403",
+        "https://de.scribd.com/document/443127855/149314721-Final-Report-of-the-Cooperative-Research-Program-on-Shell-And-Tube-Heat-Exchangers-pdf",
+        "https://pdfcoffee.com/final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers-pdf-free.html"
+      ],
+      "body_acquired": false,
+      "body_complete_for_pressure_question": false,
+      "body_sha256": "NONE",
+      "exact_location": "NONE_EXACT_BODY_NOT_ACQUIRED",
+      "rights_status": "BODY_ACCESS_NOT_ESTABLISHED_BIBLIOGRAPHIC_RECORD_ONLY",
+      "review_permission_status": "NOT_REVIEWABLE_AS_EXACT_BODY",
+      "pressure_rule_text_observed": "undetermined",
+      "pressure_observation": "Exact body unavailable; no pressure-text adjudication permitted",
+      "transfer_scope": "NONE"
+    },
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "title": "Heat Exchanger Design Handbook, shell-and-tube single-phase Section 3.3",
+      "author": "J. Taborek; HEDH editorial team",
+      "publisher_or_institution": "Hemisphere Publishing Corporation",
+      "year": "1983",
+      "edition_or_revision": "1983 body; Rev. 1986 contents imprint",
+      "source_role": "RECOGNIZED_PRIMARY_LINEAGE_ENGINEERING_REFERENCE",
+      "primary_or_secondary": "PRIMARY_LINEAGE_REFERENCE",
+      "access_path": "https://kostmash.ru/assets/1schlunder_e_u_heat_exchanger_design_handbook.pdf",
+      "body_acquired": true,
+      "body_complete_for_pressure_question": true,
+      "body_sha256": "afa94a401269ce34de5833c555ad6116d53812047d4caf9a771a262c8ce8a6e7",
+      "body_metadata": {
+        "page_count": 2305,
+        "section_identity": "3.3 SHELL-AND-TUBE HEAT EXCHANGERS",
+        "target_subsections": ["3.3.3", "3.3.5", "3.3.7"],
+        "copyright_notice_observed": true
+      },
+      "exact_location": "Section 3.3.3 printed pp.3.3.3-1-to-3.3.3-5; Section 3.3.5 printed pp.3.3.5-14-to-3.3.5-17; Section 3.3.7 printed pp.3.3.7-1-to-3.3.7-2; Section 3.3.3 references printed p.3.3.3-5",
+      "rights_status": "COPYRIGHT_RETAINED_PUBLIC_REPOST_RIGHTS_UNVERIFIED_NOT_VENDORED",
+      "review_permission_status": "PUBLICLY_ACCESSIBLE_REVIEW_ONLY_NO_REDISSEMINATION_PERMISSION_CONFIRMED",
+      "pressure_rule_text_observed": false,
+      "pressure_observation": "Exact target sections contain pressure-drop/mechanical-pressure material but no pressure paired with the J_mu whole-exchanger shell-stream source-mean bulk property state",
+      "temperature_operator_observation": "Arithmetic mean of terminal shell and tube temperatures is used for the method's physical-property evaluation; no pressure operator is implied",
+      "transfer_scope": "TEMPERATURE_TEXT_ONLY_NO_PRESSURE_RULE_TRANSFER"
+    },
+    {
+      "source_id": "ASME-PTC-12.5-2000-R2025-CATALOG",
+      "title": "PTC 12.5 - Single Phase Heat Exchangers",
+      "author": "ASME",
+      "publisher_or_institution": "ASME",
+      "year": "2000, reaffirmed R2025",
+      "edition_or_revision": "Official current catalogue/product identity",
+      "source_role": "OFFICIAL_NORMATIVE_TEST_CODE_IDENTITY_CROSS_CHECK",
+      "primary_or_secondary": "PRIMARY_NORMATIVE_SOURCE_IDENTITY",
+      "access_path": "https://www.asme.org/codes-standards/find-codes-standards/single-phase-heat-exchangers",
+      "body_acquired": false,
+      "body_complete_for_pressure_question": false,
+      "body_sha256": "NONE_OFFICIAL_BODY_NOT_ACQUIRED",
+      "exact_location": "Official product page/catalogue description only",
+      "rights_status": "PURCHASE_AND_COPYRIGHT_BOUNDARY",
+      "review_permission_status": "PUBLIC_CATALOG_REVIEW_ONLY",
+      "pressure_rule_text_observed": "undetermined",
+      "pressure_observation": "Official body not acquired; catalogue identity is not a pressure-rule text review",
+      "transfer_scope": "NONE_OFFICIAL_BODY_NOT_ACQUIRED"
+    }
+  ],
+  "source_acquisition_attempts": [
+    {
+      "attempt_id": "BELL-WORLDCAT-IDENTITY",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "WorldCat bibliographic record",
+      "result": "BIBLIOGRAPHIC_IDENTITY_ONLY_NO_BODY",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-SCRIBD-CANDIDATE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Public title-matching Scribd page",
+      "result": "NOT_ACCEPTED_EXACT_BODY; VISIBLE_CONTENT_UNRELATED_1995_PAPER; COPYRIGHT_REVIEW_BOUNDARY",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-PDFCOFFEE-CANDIDATE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Public title-matching PDFCoffee page",
+      "result": "NOT_ACCEPTED_EXACT_BODY; VISIBLE_CONTENT_UNRELATED_1995_PAPER",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "HEDH-PUBLIC-BODY",
+      "target_source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "path": "Direct public PDF URL",
+      "result": "BODY_OBTAINED_FOR_PRIVATE_TARGETED_REVIEW_ONLY",
+      "resulting_body_sha256": "afa94a401269ce34de5833c555ad6116d53812047d4caf9a771a262c8ce8a6e7",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "HEDH-GOOGLE-BOOKS-METADATA",
+      "target_source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "path": "Google Books metadata and snippet view",
+      "result": "BIBLIOGRAPHIC_CONFIRMATION_NO_FULL_BODY",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "ASME-OFFICIAL-CATALOG",
+      "target_source_id": "ASME-PTC-12.5-2000-R2025-CATALOG",
+      "path": "Official ASME product page",
+      "result": "CATALOGUE_ONLY_BODY_REQUIRES_PURCHASE_OR_AUTHORIZED_ACCESS",
+      "access_control_bypassed": false
+    }
+  ],
+  "acquired_source_bodies": [
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "body_sha256": "afa94a401269ce34de5833c555ad6116d53812047d4caf9a771a262c8ce8a6e7",
+      "body_complete_for_pressure_question": true,
+      "review_scope": "Section 3.3 shell-and-tube single-phase method and directly connected references",
+      "exact_locations": [
+        "3.3.3-2-to-3.3.3-5",
+        "3.3.5-14-to-3.3.5-17",
+        "3.3.7-1-to-3.3.7-2"
+      ],
+      "pressure_rule_text_observed": false,
+      "rights_boundary": "PRIVATE_REVIEW_ONLY; COPYRIGHT_RETAINED; NOT_VENDORED"
+    }
+  ],
+  "unresolved_source_targets": [
+    {
+      "source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "unresolved_reason": "EXACT_BODY_NOT_LEGALLY_ACQUIRED_OR_VERIFIABLY_REVIEWABLE",
+      "pressure_rule_text_observed": "undetermined",
+      "access_failure_type": "BIBLIOGRAPHIC_RECORDS_AND_MISIDENTIFIED_TITLE_MATCHES_ONLY",
+      "rights_or_access_boundary": "NO_EXACT_BODY_PERMISSION_OR_STABLE_FULL_TEXT_CONFIRMED",
+      "search_paths_attempted": ["WorldCat", "title-matching public web copies", "citation-chain lead from HEDH"]
+    }
+  ],
+  "optional_unresolved_source_targets": [
+    {
+      "source_id": "ASME-PTC-12.5-2000-R2025-CATALOG",
+      "reason": "OFFICIAL_CURRENT_BODY_NOT_PUBLICLY_ACQUIRED; LOWER_PRIORITY_OPTIONAL_TARGET",
+      "pressure_rule_text_observed": "undetermined"
+    }
+  ],
+  "citation_chain_leads": [
+    {
+      "lead_id": "HEDH-3.3.3-REF-BELL-1963",
+      "from_source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "cited_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "exact_location": "References for Section 3.3.3, printed p.3.3.3-5",
+      "reason_for_following": "Direct Bell–Delaware lineage citation relevant to the missing primary body",
+      "body_acquired": false,
+      "pressure_rule_text_observed": "undetermined"
+    }
+  ],
+  "pressure_text_observations": [
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "exact_location": "Section 3.3.5-16(c)(b), printed p.3.3.5-16",
+      "observation_type": "TEMPERATURE_ONLY",
+      "observation": "Shell and tube physical properties are evaluated at arithmetic mean terminal temperatures",
+      "jmu_source_mean_property_pressure_rule": false,
+      "transfer_disposition": "DO_NOT_TRANSFER_TEMPERATURE_OPERATOR_TO_PRESSURE"
+    },
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "exact_location": "Section 3.3.5 item 30, printed p.3.3.5-14",
+      "observation_type": "VISCOSITY_TEMPERATURE_ROLE",
+      "observation": "Shell viscosity is required at approximately average shell-fluid temperature, with wall-temperature value for liquid viscosity effects",
+      "jmu_source_mean_property_pressure_rule": false,
+      "transfer_disposition": "NO_PRESSURE_PAIRING_DEFINED"
+    },
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "exact_location": "Section 3.3.7-1-to-3.3.7-2",
+      "observation_type": "BULK_AND_WALL_VISCOSITY_CORRECTION",
+      "observation": "Shell-side viscosity correction distinguishes average bulk temperature from wall temperature",
+      "jmu_source_mean_property_pressure_rule": false,
+      "transfer_disposition": "NO_PRESSURE_RULE"
+    },
+    {
+      "source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "exact_location": "Section 3.3.3-2-to-3.3.3-5 and Section 3.3.5-14-to-3.3.5-15",
+      "observation_type": "PRESSURE_CONTEXT_OUTSIDE_TARGET_ROLE",
+      "observation": "Pressure-drop, operating-pressure, and mechanical-design pressure statements are present but are not paired with J_mu bulk-property evaluation",
+      "jmu_source_mean_property_pressure_rule": false,
+      "transfer_disposition": "EXCLUDED_PRESSURE_DROP_OR_MECHANICAL_CONTEXT"
+    },
+    {
+      "source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "exact_location": "NONE",
+      "observation_type": "BODY_UNAVAILABLE",
+      "observation": "No exact body available; pressure rule status is undetermined",
+      "jmu_source_mean_property_pressure_rule": "undetermined",
+      "transfer_disposition": "NO_ADJUDICATION"
+    }
+  ],
+  "candidate_pressure_rules": [],
+  "source_conflicts": [],
+  "pressure_adjudication": {
+    "pressure_rule_source_candidate_found": false,
+    "candidate_pressure_rule_type": "NONE",
+    "candidate_pressure_rule_source_id": "NONE",
+    "candidate_pressure_rule_exact_location": "NONE",
+    "pressure_insensitivity_source_rule_found": false,
+    "pressure_source_conflict_found": false,
+    "temperature_operator_does_not_imply_pressure_operator": true,
+    "endpoint_pressure_identities_do_not_define_source_mean_pressure_convention": true,
+    "backend_requirement_does_not_define_physical_pressure_rule": true,
+    "missing_lineage_body_gap_closed": false,
+    "outcome": "OUTCOME_C_MISSING_LINEAGE_BODY_REMAINS_UNAVAILABLE"
+  },
+  "preserved_predicate_state": {
+    "source_mean_temperature_predicate_satisfied": true,
+    "source_mean_pressure_predicate_satisfied": false,
+    "source_mean_endpoint_pair_predicate_satisfied": true,
+    "source_mean_property_authority_predicate_satisfied": true,
+    "source_mean_identity_provenance_predicate_satisfied": true,
+    "source_mean_fail_closed_predicate_satisfied": true,
+    "source_mean_model_level_unsatisfied_or_undetermined_predicates": ["JMU_BULK_PRESSURE_RULE_BOUND"],
+    "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 1,
+    "source_mean_model_level_sole_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+    "pressure_is_proven_sole_model_level_blocker": true,
+    "source_mean_model_level_authority_candidate_eligible": false,
+    "jmu_bulk_pressure_rule_authority_found": false,
+    "jmu_bulk_pressure_rule_bound": false
+  },
+  "real_instance_guards": {
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "real_reviewed_shell_inlet_producer_found": false,
+    "real_reviewed_shell_outlet_producer_found": false,
+    "real_reviewed_shell_endpoint_pair_producer_found": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false
+  },
+  "preserved_parent_state": {
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "source_bodies_vendored": false,
+    "source_access_control_bypassed": false,
+    "pressure_rule_researched": true,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "property_backend_called": false,
+    "endpoint_producer_created": false,
+    "endpoint_state_created": false,
+    "source_mean_state_created": false,
+    "property_snapshot_created": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "workflow_changed": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-bulk-pressure-missing-lineage-source-acquisition-r2.md",
+    "document_sha256": "69f236dbd92543b843026620c86d17778dd8db9f10cef74a63ea595a21229656",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-bulk-pressure-missing-lineage-source-acquisition-r2.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r79_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "validation": {
+    "json_parse": "PASS",
+    "canonical_hash_validation": "PASS",
+    "registry_extension_uniqueness": "PASS",
+    "historical_immutability": "PASS",
+    "source_body_sha256_validation": "PASS",
+    "source_identity_validation": "PASS",
+    "exact_location_binding": "PASS",
+    "citation_chain_binding": "PASS",
+    "acquisition_status_consistency": "PASS",
+    "negative_vs_undetermined_semantics": "PASS",
+    "artifact_hash_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "format_check": "PASS",
+    "mypy": "PASS",
+    "manifest_validation": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci_run": null,
+    "exact_final_head_ci": null
+  },
+  "result": {
+    "result": "BLOCKED_MISSING_LINEAGE_BODY",
+    "unresolved_source_target_count": 1,
+    "unresolved_source_targets": ["BELL-1963-DELAWARE-FINAL-REPORT"],
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+    "stop": true
+  },
+  "canonical_hash": "adefb1422ce37918e6238986126b8940a8b55c83a568086d78871588ee043ebf"
+}
