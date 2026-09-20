@@ -1,0 +1,241 @@
+# TASK172 v0.7 — Jμ source-mean fail-closed admission contract independent re-review R2
+
+## 1. Frozen effective review target and precondition
+
+```ini
+TASK_ID=TASK172_V0_7_JMU_SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_CONTRACT_INDEPENDENT_REVIEW_R2
+MODE=INDEPENDENT_REVIEW_OF_CORRECTED_EFFECTIVE_FAIL_CLOSED_CONTRACT_ONLY
+PR_NUMBER=277
+PR_STATE=OPEN_DRAFT
+PREVIOUS_HEAD_SHA=8097d0304cf20155467e6bebb6896f19f1474a23
+HEAD_PRECONDITION_VERIFIED=true
+RESULT=REVIEWED
+INDEPENDENT_REVIEW_RESULT=PASS
+CORRECTION_REQUIRED=false
+```
+
+This receipt independently re-audits the effective contract formed by the
+immutable R74 contract and the immutable R76 append-only correction overlay:
+
+```text
+frozen R74 contract + R76 correction overlay = corrected effective 66-row matrix
+```
+
+No R74, R75, or R76 artifact is amended by this review.
+
+## 2. Review targets and historical immutability
+
+```ini
+REVIEW_TARGET_CONTRACT_ID=V07-T172-JMU-SOURCE-MEAN-FAIL-CLOSED-ADMISSION-RULE-CONTRACT-R1
+R74_DOCUMENT_SHA256=c51499a08830244936e676ab782d2093200f5fe06c873254ac012ce237a2c3a3
+R74_EVIDENCE_FILE_SHA256=14bece65d1c1ceb8a0f272f5830189bd7c0d3a89c52663d9f174bbeb70b28feb
+R74_EVIDENCE_CANONICAL_HASH=511b8d5f251bde7a4251f85509f417197df95076f831ae9c6db8d4ba39589435
+R74_EXTENSION_CANONICAL_HASH=c94b88a814d616bf87a72adfa8e0f5cb7da3da0a7e049d877dbd1c4a3c27aa51
+R75_REVIEW_DOCUMENT_SHA256=9e26bc882caa7ed72da533e081ece94157f110e26ca13fcd560af5c15efc61df
+R75_REVIEW_EVIDENCE_CANONICAL_HASH=346c6408d4e0cf00582dc5e078ae92dcd7cf87b83908ba0661990e820f8fc742
+R75_EXTENSION_CANONICAL_HASH=e8f4f3ef76619b67cb6a098ad84d51cb97712dac83fcd3eae8fb7730d9ba0f8a
+R76_CORRECTION_DOCUMENT_SHA256=25fa41fad538f54ef0487aec9fe502cfddc46ba9e9fbda59aabeb5463786c9c2
+R76_CORRECTION_EVIDENCE_CANONICAL_HASH=7042036ae69d5486182c34e86b519cf5de7cb33ed4d25b93952298dbd79ed71f
+R76_EXTENSION_CANONICAL_HASH=6c91ef0fcba2445dffbaefc9fee293422527fcd9ab8e623fa032f8d55474e271
+```
+
+```ini
+R74_CONTRACT_DOCUMENT_CHANGED=false
+R74_CONTRACT_EVIDENCE_CHANGED=false
+R74_EXTENSION_REWRITTEN=false
+R75_REVIEW_DOCUMENT_CHANGED=false
+R75_REVIEW_EVIDENCE_CHANGED=false
+R75_EXTENSION_REWRITTEN=false
+R76_CORRECTION_DOCUMENT_CHANGED=false
+R76_CORRECTION_EVIDENCE_CHANGED=false
+R76_EXTENSION_REWRITTEN=false
+HISTORICAL_PAYLOADS_IMMUTABLE=true
+```
+
+R74 remains historical `PROPOSED/PENDING`; R75 remains the historical failed
+review; R76 remains the correction overlay. The R2 result is a new effective
+lifecycle overlay only.
+
+## 3. Independent effective-matrix recomposition
+
+The audit loaded the R74 evidence matrix, loaded the R76 overlay rows, and
+recomposed the effective matrix without relying on either artifact's summary
+counts.
+
+```ini
+FROZEN_R74_MATRIX_RULE_COUNT=64
+R76_CORRECTION_OVERLAY_RULE_COUNT=2
+EFFECTIVE_REJECTION_MATRIX_RULE_COUNT=66
+EFFECTIVE_REJECTION_MATRIX_UNIQUE_RULE_ID_COUNT=66
+EFFECTIVE_REJECTION_MATRIX_DUPLICATE_RULE_ID_COUNT=0
+EFFECTIVE_REJECTION_MATRIX_NON_REJECT_DECISION_COUNT=0
+EFFECTIVE_REJECTION_MATRIX_CONTRADICTION_COUNT=0
+```
+
+The only overlay rows are:
+
+```json
+{"rule_id":"SMFC-ID-015","condition":"HIDDEN_OR_DEFAULT_STATE","layer":"SOURCE_MEAN_MODEL_LEVEL","decision":"REJECT","source_basis":"R74_FROZEN_NORMATIVE_RULE_MACHINE_BINDING_CORRECTION"}
+{"rule_id":"SMFC-ID-016","condition":"LEGACY_RESULT_RELABELING","layer":"SOURCE_MEAN_MODEL_LEVEL","decision":"REJECT","source_basis":"R74_FROZEN_NORMATIVE_RULE_MACHINE_BINDING_CORRECTION"}
+```
+
+```ini
+R74_MATRIX_001_CORRECTED=true
+R74_MATRIX_002_CORRECTED=true
+HIDDEN_OR_DEFAULT_STATE_EFFECTIVELY_BOUND=true
+LEGACY_RESULT_RELABELING_EFFECTIVELY_BOUND=true
+```
+
+No third row, rename, or normalization was introduced.
+
+## 4. Frozen normative coverage re-audit
+
+The audit independently extracted all 64 explicit `REJECT_IF_*=true` rules
+from the frozen R74 document and compared their condition names with the
+effective matrix. The five existing R75-approved cross-layer naming aliases
+were applied as review precedent only; no alias was changed. The two
+pre-existing matrix-only safeguards remain unchanged.
+
+```ini
+FROZEN_NORMATIVE_REJECT_CONDITION_COUNT=64
+EXACT_CONDITION_MATCH_COUNT=59
+ACCEPTED_EXISTING_SEMANTIC_ALIAS_COUNT=5
+MISSING_NORMATIVE_CONDITION_COUNT=0
+MISSING_NORMATIVE_CONDITIONS=NONE
+UNEXPECTED_CONFLICTING_CONDITION_COUNT=0
+EFFECTIVE_REJECTION_MATRIX_REQUIRED_COVERAGE_COMPLETE=true
+```
+
+The two corrected conditions are exact effective rows, not inferred coverage.
+All 66 effective rows have `decision=REJECT`; there are no duplicate rule IDs,
+duplicate conditions, non-reject rows, or conflicting decisions.
+
+## 5. Fail-closed category adjudication
+
+The frozen contract and effective matrix pass all required category reviews:
+
+```ini
+DEFAULT_REJECT_REVIEW=PASS
+TEMPERATURE_FAIL_CLOSED_REVIEW=PASS
+PRESSURE_FAIL_CLOSED_REVIEW=PASS
+ENDPOINT_PAIR_FAIL_CLOSED_REVIEW=PASS
+PROPERTY_FAIL_CLOSED_REVIEW=PASS
+IDENTITY_PROVENANCE_FAIL_CLOSED_REVIEW=PASS
+LIFECYCLE_FAIL_CLOSED_REVIEW=PASS
+UNKNOWN_UNDETERMINED_REVIEW=PASS
+CROSS_LAYER_LEAKAGE_REVIEW=PASS
+POSITIVE_ADMISSION_CONJUNCTION_REVIEW=PASS
+```
+
+The review verified `DEFAULT_ADMISSION_DECISION=REJECT`, all six model-level
+predicates are required conjunctively, and unknown/undetermined/missing values
+cannot continue. It verified temperature, pressure, endpoint, property,
+identity/provenance, lifecycle, unknown, and cross-layer rejection rows. No
+pressure convention was researched or selected. The narrow property scope is
+unchanged and no backend was called.
+
+The only positive candidate-eligibility path is:
+
+```ini
+SOURCE_MEAN_CANDIDATE_REQUIRES_ALL_MODEL_LEVEL_PREDICATES=true
+PARTIAL_PREDICATE_SATISFACTION_NOT_ADMISSIBLE=true
+CANDIDATE_ELIGIBLE_DOES_NOT_EQUAL_CANDIDATE_CREATED=true
+```
+
+The review found no `false`, `undetermined`, missing, caller-asserted,
+fallback, hidden-default, legacy-relabeling, or lifecycle-bypass path that
+admits a candidate. Reviewed endpoint/property/schema contracts remain
+distinct from real endpoint instances, property snapshots, identity
+instances, candidate creation, and real state admission.
+
+## 6. Effective lifecycle promotion
+
+The R2 review promotes only the corrected effective fail-closed contract. It
+does not rewrite R74, R75, or R76 and does not create a new contract:
+
+```ini
+R74_ORIGINAL_LIFECYCLE=PROPOSED
+R74_ORIGINAL_INDEPENDENT_REVIEW=PENDING
+R75_INDEPENDENT_REVIEW_RESULT=FAIL
+R75_REVIEW_RESULT_OVERRIDDEN=false
+R76_CORRECTION_HISTORICAL_LIFECYCLE=PROPOSED
+R76_CORRECTION_HISTORICAL_INDEPENDENT_REVIEW=PENDING_RE_REVIEW
+SOURCE_MEAN_FAIL_CLOSED_ADMISSION_CONTRACT_EFFECTIVE_LIFECYCLE=REVIEWED
+SOURCE_MEAN_FAIL_CLOSED_ADMISSION_CONTRACT_INDEPENDENT_REVIEW=PASS
+SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND=true
+SOURCE_MEAN_FAIL_CLOSED_PREDICATE_SATISFIED=true
+LIFECYCLE_PROMOTION_RECORDED_APPEND_ONLY=true
+CONTRACT_RULES_CHANGED=false
+NEW_CONTRACT_CREATED=false
+SELF_APPROVAL=false
+```
+
+## 7. Predicate result and preserved blockers
+
+The independently re-evaluated six-predicate matrix is:
+
+```ini
+SOURCE_MEAN_TEMPERATURE_PREDICATE_SATISFIED=true
+SOURCE_MEAN_PRESSURE_PREDICATE_SATISFIED=false
+SOURCE_MEAN_ENDPOINT_PAIR_PREDICATE_SATISFIED=true
+SOURCE_MEAN_PROPERTY_AUTHORITY_PREDICATE_SATISFIED=true
+SOURCE_MEAN_IDENTITY_PROVENANCE_PREDICATE_SATISFIED=true
+SOURCE_MEAN_FAIL_CLOSED_PREDICATE_SATISFIED=true
+SOURCE_MEAN_MODEL_LEVEL_PREDICATE_STATUS_BOUND=true
+SOURCE_MEAN_MODEL_LEVEL_UNSATISFIED_OR_UNDETERMINED_PREDICATES=JMU_BULK_PRESSURE_RULE_BOUND
+SOURCE_MEAN_MODEL_LEVEL_UNSATISFIED_OR_UNDETERMINED_PREDICATE_COUNT=1
+SOURCE_MEAN_MODEL_LEVEL_SOLE_BLOCKER=JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING
+PRESSURE_IS_PROVEN_SOLE_MODEL_LEVEL_BLOCKER=true
+```
+
+The pressure result is still only a proven fail-closed blocker. This review
+does not choose pressure, create pressure authority, or create a source-mean
+candidate.
+
+```ini
+SOURCE_MEAN_BULK_STATE_AUTHORITY_CANDIDATE_CREATED=false
+REAL_REVIEWED_SHELL_INLET_PRODUCER_FOUND=false
+REAL_REVIEWED_SHELL_OUTLET_PRODUCER_FOUND=false
+REAL_REVIEWED_SHELL_ENDPOINT_PAIR_PRODUCER_FOUND=false
+REAL_SHELL_INLET_STATE_INSTANCE_PRESENT=false
+REAL_SHELL_OUTLET_STATE_INSTANCE_PRESENT=false
+REAL_SHELL_INLET_OUTLET_STATE_PAIR_BOUND=false
+REAL_JMU_BULK_STATE_INSTANCE_PRESENT=false
+REAL_JMU_BULK_PROPERTY_SNAPSHOT_PRESENT=false
+```
+
+```ini
+QUALIFIED_Q_AUTHORITY_BOUND=false
+PRELIMINARY_SHELL_FILM_SOURCE_RULE_BOUND=false
+PRELIMINARY_SHELL_FILM_TRANSFER_AUTHORITY_BOUND=false
+WALL_PRODUCER_K_WALL_AUTHORITY_BOUND=false
+JMU_EXECUTABLE_AUTHORITY_BOUND=false
+SHELL_WALL_CORRECTION_STATUS=BLOCKED
+SHELL_WALL_CORRECTION_CANONICAL_BLOCKER_REMOVED=false
+EFFECTIVE_REMAINING_TASK172_ENTRY_BLOCKER_COUNT=4
+TASK172_ENTRY_AUTHORITY_COMPLETE=false
+```
+
+## 8. Governance and next gate
+
+```ini
+PRODUCTION_CODE_CHANGED=false
+ENGINEERING_CALCULATION_CHANGED=false
+DEPENDENCY_CHANGED=false
+TASK172_IMPLEMENTATION_STARTED=false
+PRESSURE_RULE_RESEARCHED=false
+PRESSURE_RULE_SELECTED=false
+PRESSURE_AUTHORITY_CREATED=false
+PROPERTY_BACKEND_CALLED=false
+ENDPOINT_PRODUCER_CREATED=false
+ENDPOINT_STATE_CREATED=false
+SOURCE_MEAN_STATE_CREATED=false
+READY_AUTHORIZED=false
+MERGE_AUTHORIZED=false
+NEXT_GATE=AUTHORIZE_TASK172_JMU_BULK_PRESSURE_REFERENCE_CONVENTION_QUALIFICATION_R1_ONLY
+NO_STEP_IMPLIES_THE_NEXT=true
+STOP=true
+```
+
+The next gate is separately authorized pressure-reference qualification only.
+It is not executed by this review.
