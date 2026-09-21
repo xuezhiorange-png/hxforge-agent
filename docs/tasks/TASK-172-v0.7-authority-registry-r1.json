@@ -14316,5 +14316,212 @@
     },
       "canonical_hash": "f3d93fda81e329300130c128a5773d763d5b766c7cadc0277de95f478cc38c84"
   },
-  "canonical_hash": "d16ead39e47544654f0b5d0a6c930499656514883f0b23b288504b5076bd8d87"
+  "r82_extension": {
+    "task_id": "TASK172_V0_7_JMU_BULK_PRESSURE_RULE_AUTHORITY_RESOLUTION_R1",
+    "previous_head": "c7c2a9630364ad7543ba51b11a530fdbf3e9ee19",
+    "historical_registry_root_hash": "d16ead39e47544654f0b5d0a6c930499656514883f0b23b288504b5076bd8d87",
+    "historical_r81_extension_hash": "f3d93fda81e329300130c128a5773d763d5b766c7cadc0277de95f478cc38c84",
+    "historical_records_unchanged": true,
+    "review_type": "TARGETED_JMU_SOURCE_MEAN_PRESSURE_RULE_AUTHORITY_RESOLUTION_ONLY",
+    "subject": "NATIVE_TASK166_JAMIL_THOME_JMU_WHOLE_EXCHANGER_SHELL_STREAM_SOURCE_MEAN_BULK_PROPERTY_PRESSURE_STATE",
+    "head_precondition": {
+      "expected_head_sha": "c7c2a9630364ad7543ba51b11a530fdbf3e9ee19",
+      "verified_head_sha": "c7c2a9630364ad7543ba51b11a530fdbf3e9ee19",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT"
+    },
+    "historical_immutability": {
+      "r71_through_r81_documents_unchanged": true,
+      "r71_through_r81_evidence_unchanged": true,
+      "r71_through_r81_extensions_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "scope_boundary": {
+      "whole_exchanger_source_state_granularity_preserved": true,
+      "temperature_operator_reopened": false,
+      "temperature_operator_does_not_imply_pressure_operator": true,
+      "new_unled_source_search_performed": false,
+      "pressure_convention_selected": false,
+      "pressure_authority_created": false,
+      "property_backend_called": false,
+      "real_instance_creation_authorized": false,
+      "jmu_execution_authorized": false
+    },
+    "source_review_basis": {
+      "r78_pressure_reference_qualification_reused": true,
+      "r79_missing_lineage_acquisition_reused": true,
+      "r80_bell_1963_unavailable_status_preserved": true,
+      "r81_bell_1988_unavailable_status_preserved": true,
+      "recognized_pressure_context_bodies_reviewed": 6,
+      "exact_scope_compatible_pressure_rule_count": 0,
+      "pressure_insensitivity_authority_count": 0,
+      "source_review_conclusion": "NO_ACCEPTABLE_AUTHORITY_FOUND"
+    },
+    "pressure_rule_adjudication": {
+      "source_acquired": false,
+      "source_id": "NONE",
+      "body_sha256": "NONE",
+      "exact_location": "NONE",
+      "pressure_rule_type": "UNRESOLVED",
+      "semantics": "NO_SCOPE_COMPATIBLE_SOURCE_MEAN_PROPERTY_PRESSURE_RULE;PRESSURE_DROP_AND_TEST_MEASUREMENT_CONTEXT_NON_TRANSFERABLE",
+      "transferable_to_task172_native_jmu": false,
+      "explicit_pressure_rule_authority_found": false,
+      "pressure_insensitivity_authority_found": false,
+      "pressure_insensitivity_source_id": "NONE",
+      "pressure_insensitivity_domain": "NONE",
+      "pressure_insensitivity_acceptance_rule": "NONE",
+      "source_conflict_found": false,
+      "source_conflict_adjudicated": true,
+      "source_conflict_reason": "No competing admissible source-mean pressure conventions were found; observed pressure-drop/test contexts are outside the target physical quantity and stream role",
+      "temperature_operator_does_not_imply_pressure_operator": true,
+      "endpoint_pressure_identities_do_not_define_source_mean_pressure_convention": true,
+      "operating_pressure_does_not_define_property_evaluation_pressure": true,
+      "pressure_drop_does_not_define_property_evaluation_pressure": true,
+      "backend_requirement_does_not_define_physical_pressure_rule": true
+    },
+    "rejected_candidate_ledger": [
+      {
+        "candidate_id": "PRESSURE_DROP_OR_TEST_MEASUREMENT_PRESSURE",
+        "decision": "REJECTED",
+        "reason": "Hydraulic/test context is not JMU source-mean property evaluation"
+      },
+      {
+        "candidate_id": "OPERATING_OR_DESIGN_PRESSURE",
+        "decision": "REJECTED",
+        "reason": "Input/design quantity without source-defined property pairing"
+      },
+      {
+        "candidate_id": "INLET_PRESSURE_DEFAULT",
+        "decision": "REJECTED",
+        "reason": "No reviewed authority assigns it to the source-mean property state"
+      },
+      {
+        "candidate_id": "OUTLET_PRESSURE_DEFAULT",
+        "decision": "REJECTED",
+        "reason": "No reviewed authority assigns it to the source-mean property state"
+      },
+      {
+        "candidate_id": "ARITHMETIC_MEAN_ENDPOINT_PRESSURE_DEFAULT",
+        "decision": "REJECTED",
+        "reason": "Unsupported construction; no source authority"
+      },
+      {
+        "candidate_id": "REPRESENTATIVE_OR_CONSTANT_SHELL_PRESSURE_DEFAULT",
+        "decision": "REJECTED",
+        "reason": "No exact source rule or domain-qualified acceptance rule"
+      },
+      {
+        "candidate_id": "PRESSURE_INSENSITIVITY_FROM_SMALL_BACKEND_RESPONSE",
+        "decision": "REJECTED",
+        "reason": "No source-backed domain or acceptance boundary; backend not called"
+      },
+      {
+        "candidate_id": "BELL_1963_OR_BELL_1988_UNAVAILABLE_BODY_RULE",
+        "decision": "NOT_ACCEPTED",
+        "reason": "Exact bodies unavailable in R80/R81"
+      },
+      {
+        "candidate_id": "HEDH_LINEAGE_PRESSURE_RULE",
+        "decision": "REJECTED",
+        "reason": "R79 exact-body review found no target pressure pairing"
+      }
+    ],
+    "property_authority_boundary": {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "reviewed_payload_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "effective_review_status": "REVIEWED_AUTHORITY",
+      "scope": "PURE_ORDINARY_WATER;HEOS;CoolProp 8.0.0;DEF;STABLE_SINGLE_PHASE_LIQUID",
+      "domain": "T=298.15..300 K;P=100000..101325 Pa",
+      "pressure_rule_compatibility": "NOT_EVALUABLE_NO_PRESSURE_RULE_FOUND",
+      "real_property_snapshot_present": false,
+      "backend_called": false
+    },
+    "predicate_state": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_fail_closed_predicate_satisfied": true,
+      "source_mean_model_level_sole_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+      "pressure_is_proven_sole_model_level_blocker": true,
+      "source_mean_model_level_authority_candidate_eligible": false,
+      "jmu_bulk_pressure_rule_authority_found": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "jmu_bulk_pressure_rule": "NONE",
+      "pressure_rule_selected": false,
+      "pressure_authority_created": false
+    },
+    "candidate_and_real_instance_guards": {
+      "source_mean_bulk_state_authority_candidate_eligible": false,
+      "source_mean_bulk_state_authority_candidate_created": false,
+      "jmu_bulk_pressure_rule_authority_candidate_created": false,
+      "real_reviewed_shell_inlet_producer_found": false,
+      "real_reviewed_shell_outlet_producer_found": false,
+      "real_reviewed_shell_endpoint_pair_producer_found": false,
+      "real_shell_inlet_state_instance_present": false,
+      "real_shell_outlet_state_instance_present": false,
+      "real_shell_inlet_outlet_state_pair_bound": false,
+      "real_jmu_bulk_state_instance_present": false,
+      "real_jmu_bulk_property_snapshot_present": false
+    },
+    "parent_and_downstream_guards": {
+      "qualified_q_authority_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "shell_wall_correction_canonical_blocker_removed": false,
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false
+    },
+    "decision": {
+      "result": "BLOCKED_JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+      "outcome": "NO_AUTHORITY_FOUND",
+      "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-jmu-bulk-pressure-rule-authority-resolution-r1.md",
+      "document_sha256": "347edb5e21091a71fc72c15d93bd659a53a8f35393c8b44e13f10e83f1255639",
+      "evidence_path": "docs/tasks/evidence/TASK-172-jmu-bulk-pressure-rule-authority-resolution-r1.json",
+      "evidence_file_sha256": "3957d31571d3edf09aa8753282feee96e08699eb24ff6634808e97110745aace",
+      "evidence_canonical_hash": "4f4b16aa67452dbea2c9479431fbeadabde36acc72c080efdf0dac64fede23c8",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r82_extension",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "source_bodies_vendored": false,
+      "new_unled_source_search_performed": false,
+      "pressure_rule_selected": false,
+      "pressure_authority_created": false,
+      "endpoint_producer_created": false,
+      "endpoint_state_created": false,
+      "source_mean_state_created": false,
+      "property_snapshot_created": false,
+      "property_backend_called": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "task166_changed": false,
+      "task171_changed": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "lockfile_changed": false,
+      "workflow_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "991965484e2bd7cf1be51ab19bd810ea98a1cd53e0d54eee581e09658c4d6ca7"
+  },
+  "canonical_hash": "51e2c328763e42e89382ca9f5ec6625b97ac4d98292f71b0e8d8ed5f3033caa7"
 }
