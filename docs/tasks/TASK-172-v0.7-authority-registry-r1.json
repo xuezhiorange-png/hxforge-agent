@@ -14627,5 +14627,157 @@
     },
     "canonical_hash": "642e8d244e7dfefdf5436eda2d19301251cdf1af76b943009d6793a0662e2e55"
   },
-  "canonical_hash": "c31fd3d4587dfbdfc68349577b9c78a8fc0c85af9c24016d8e9dc917be8fcee0"
+  "r84_extension": {
+    "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_CLOSURE_ARCHITECTURE_CORRECTION_R1",
+    "previous_head": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+    "historical_registry_root_hash": "c31fd3d4587dfbdfc68349577b9c78a8fc0c85af9c24016d8e9dc917be8fcee0",
+    "historical_r83_extension_hash": "642e8d244e7dfefdf5436eda2d19301251cdf1af76b943009d6793a0662e2e55",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_LOCAL_CONSTITUTIVE_ARCHITECTURE_CORRECTION_ONLY",
+    "subject": "TASK172_SEGMENT_LOCAL_PROPERTY_WALL_CONSTITUTIVE_AND_CONVERGENCE_CLOSURE_DEPENDENCY_CLASSIFICATION",
+    "head_precondition": {
+      "expected_head_sha": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+      "verified_head_sha": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT",
+      "rebase_performed": false,
+      "reset_performed": false,
+      "force_push_performed": false
+    },
+    "ownership_replay": {
+      "task170_task172_owner_replay": "PASS",
+      "task171_interface_replay": "PASS",
+      "task173_boundary_preserved": true,
+      "task174_boundary_preserved": true,
+      "task175_boundary_preserved": true
+    },
+    "dependency_correction": {
+      "external_q_required_for_native_local_wall_closure": false,
+      "local_constitutive_q_is_unknown_or_derived_output": true,
+      "real_case_required_for_model_level_task172_closure": false,
+      "real_case_required_for_production_replay_or_validation": true,
+      "real_case_required_for_task175_golden_release": true,
+      "whole_exchanger_mean_pressure_required_for_segment_local_jmu": false,
+      "local_property_pressure_is_state_input": true,
+      "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+      "task172_generates_hydraulic_pressure_field": false,
+      "mean_pressure_rule_required_for_local_property_evaluation": false,
+      "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+      "jmu_neutral_initialization_allowed": true,
+      "jmu_neutral_initialization_execution_authorized": false,
+      "jmu_equals_one_is_physical_production_correction": false,
+      "final_active_jmu_required": true,
+      "historical_external_q_contract_preserved": true,
+      "r71_r82_source_mean_research_historically_valid": true,
+      "r71_r82_source_mean_path_selected_for_task172_runtime": false,
+      "jmu_bulk_pressure_rule_authority_missing_is_not_task172_local_model_blocker": true
+    },
+    "local_constitutive_system": {
+      "unknown_set": [
+        "q_local",
+        "T_wall_inner",
+        "T_wall_outer"
+      ],
+      "residual_set": [
+        "r_i",
+        "r_w",
+        "r_o"
+      ],
+      "equation_count": 3,
+      "unknown_count": 3,
+      "degrees_of_freedom_status": "CLOSED_MODEL_LEVEL_THREE_PRIMARY_UNKNOWNS_THREE_PRIMARY_RESIDUALS",
+      "scalar_reduction_bound": false,
+      "vector_method_review_required": true,
+      "method_status": "METHOD_UNBOUND",
+      "solver_selected": false,
+      "tolerances_selected": false,
+      "max_iter_selected": false,
+      "relaxation_factor_selected": false
+    },
+    "physical_authority_boundary": {
+      "jmu_physical_form_observed": "J_mu=(mu_bulk/mu_wall)^m",
+      "jmu_runtime_transfer_bound": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "jmu_executable_authority_bound": false,
+      "qualified_q_authority_bound": false,
+      "wall_producer_k_wall_authority_bound": false,
+      "physical_authority_gaps_remain": [
+        "JMU_EQUATION_TRANSFER",
+        "JMU_EXPONENT_AND_APPLICABILITY_TRANSFER",
+        "JMU_FLUID_AND_PROPERTY_DOMAIN_TRANSFER",
+        "WALL_INTERFACE_STATE_MAPPING",
+        "K_WALL_AUTHORITY",
+        "BASE_SHELL_FILM_AUTHORITY"
+      ]
+    },
+    "entry_blocker_recomputation": {
+      "recomputed_from_ownership_and_required_authority": true,
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "blocker_classification": {
+        "SHELL-WALL-CORRECTION-AUTHORITY": "MODEL_DESIGN_ENTRY_BLOCKER",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION": "MODEL_DESIGN_AND_EXECUTION_ADMISSION_BLOCKER",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW": "EXECUTION_ADMISSION_BLOCKER",
+        "MESH-CONVERGENCE-QUALIFICATION": "PRODUCTION_VALIDATION_RELEASE_BLOCKER"
+      }
+    },
+    "preserved_state": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_fail_closed_predicate_satisfied": true,
+      "jmu_bulk_pressure_rule_authority_found": false,
+      "jmu_bulk_pressure_rule_bound": false,
+      "shell_wall_correction_status": "BLOCKED",
+      "local_residual_and_method_qualification": "OPEN",
+      "numerical_error_budget_and_stopping_review": "OPEN",
+      "mesh_convergence_qualification": "OPEN",
+      "production_numerical_method_authorized": false,
+      "task172_numerical_execution_authorized": false
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "historical_source_research_reopened": false,
+      "real_case_created": false,
+      "external_q_receipt_created": false,
+      "property_snapshot_created": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "decision": {
+      "result": "CORRECTED_LOCAL_CONSTITUTIVE_ARCHITECTURE",
+      "whole_exchanger_mean_pressure_rule_as_native_local_blocker": false,
+      "external_q_as_native_local_prerequisite": false,
+      "real_case_as_model_level_prerequisite": false,
+      "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-closure-architecture-correction-r1.md",
+      "document_sha256": "bb53aa76f57fb18e3fc867c9652462d15d22c3ffb7242829bb86c32037cfbf3d",
+      "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-closure-architecture-correction-r1.json",
+      "evidence_file_sha256": "1b7b94670a17d304bb5eae88930aab9957dd43ed80c4a29c5cd22b15f50e8e1e",
+      "evidence_canonical_hash": "1f4668d99ba6c8b92ff1b74be941403e031d96624fb58099b9bb8f085107577c",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r84_extension",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "canonical_hash": "d1a949e76e45d6cdcef367acf09d65359956badd0639edaebb9e86eeb51c62e5"
+  },
+  "canonical_hash": "27c1b670ec1771ff2f4acb4790a771787b621a74d45780962307f672ecb9ad27"
 }
