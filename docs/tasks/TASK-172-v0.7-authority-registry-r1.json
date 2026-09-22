@@ -14779,5 +14779,193 @@
     },
     "canonical_hash": "d1a949e76e45d6cdcef367acf09d65359956badd0639edaebb9e86eeb51c62e5"
   },
-  "canonical_hash": "27c1b670ec1771ff2f4acb4790a771787b621a74d45780962307f672ecb9ad27"
+  "r85_extension": {
+    "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS_CORRECTION_R1",
+    "previous_head": "2f66a000cf079b5d11c317466113cf2fff894766",
+    "historical_registry_root_hash": "27c1b670ec1771ff2f4acb4790a771787b621a74d45780962307f672ecb9ad27",
+    "historical_r84_extension_hash": "d1a949e76e45d6cdcef367acf09d65359956badd0639edaebb9e86eeb51c62e5",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS_CORRECTION_ONLY",
+    "subject": "TASK172_SIGNED_HOT_TO_COLD_HEAT_RATE_AND_TUBE_SHELL_ORIENTATION",
+    "head_precondition": {
+      "expected_head_sha": "2f66a000cf079b5d11c317466113cf2fff894766",
+      "verified_head_sha": "2f66a000cf079b5d11c317466113cf2fff894766",
+      "verified": true,
+      "pr_state": "OPEN_DRAFT",
+      "rebase_performed": false,
+      "reset_performed": false,
+      "force_push_performed": false
+    },
+    "historical_immutability": {
+      "r1_through_r84_documents_unchanged": true,
+      "r1_through_r84_evidence_unchanged": true,
+      "r1_through_r84_extensions_rewritten": false,
+      "r84_original_document_changed": false,
+      "r84_original_evidence_changed": false,
+      "r84_extension_rewritten": false,
+      "historical_payloads_immutable": true
+    },
+    "authority_replay": {
+      "task170_task172_owner_replay": "PASS",
+      "task171_positive_q_semantics": "HOT_TO_COLD",
+      "task171_tube_hot_and_shell_hot_supported": true,
+      "task171_interface_replay": "PASS",
+      "r84_architecture_replay": "PASS",
+      "r84_architecture_preserved": true,
+      "source_document_hashes": {
+        "task170": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0",
+        "task171": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+        "wall_temperature_authority": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9",
+        "jmu_wall_authority": "2cacb821e92ad38db9f6721d784b65c255c0e895525bdad519c2aa4a41b5c73b",
+        "r84_document": "bb53aa76f57fb18e3fc867c9652462d15d22c3ffb7242829bb86c32037cfbf3d",
+        "r84_evidence_canonical": "1f4668d99ba6c8b92ff1b74be941403e031d96624fb58099b9bb8f085107577c"
+      }
+    },
+    "sign_role_contract": {
+      "task171_positive_q_semantics": "HOT_TO_COLD",
+      "tube_hot_and_shell_hot_supported": true,
+      "q_hc_is_primary_unknown": true,
+      "q_hc_sign_semantics": "HOT_TO_COLD_ORIENTATION",
+      "q_hc_positive_means_hot_to_cold": true,
+      "s_ts_is_known_input": true,
+      "s_ts_is_unknown": false,
+      "s_ts_allowed_values": [1, -1],
+      "tube_hot_s_ts": 1,
+      "shell_hot_s_ts": -1,
+      "q_ts_relation": "q_ts=s_ts*q_hc",
+      "q_ts_is_derived": true,
+      "reject_if_orientation_missing": true,
+      "reject_if_orientation_invalid": true,
+      "reject_if_hot_cold_role_unbound": true,
+      "absolute_heat_rate_substitution_forbidden": true,
+      "equipment_side_used_as_hot_cold_authority": false
+    },
+    "corrected_local_constitutive_system": {
+      "unknown_set": [
+        "q_hc",
+        "T_wall_inner",
+        "T_wall_outer"
+      ],
+      "derived_set": [
+        "q_ts"
+      ],
+      "derived_relation": "q_ts=s_ts*q_hc",
+      "residual_set": [
+        "r_i",
+        "r_w",
+        "r_o"
+      ],
+      "equation_count": 3,
+      "unknown_count": 3,
+      "degrees_of_freedom_status": "CLOSED_MODEL_LEVEL_THREE_PRIMARY_UNKNOWNS_THREE_PRIMARY_RESIDUALS",
+      "scalar_reduction_bound": false,
+      "vector_method_review_required": true,
+      "method_status": "METHOD_UNBOUND",
+      "solver_selected": false,
+      "tolerances_selected": false,
+      "max_iter_selected": false,
+      "relaxation_factor_selected": false,
+      "residual_definitions": {
+        "r_i": "q_ts - h_i(T_wall_inner, located_tube_state, admitted_tube_profile) * A_i * (T_tube_bulk - T_wall_inner)",
+        "r_w": "q_ts - (T_wall_inner - T_wall_outer) / R_wall",
+        "r_o": "q_ts - h_o(T_wall_outer, located_shell_state, admitted_shell_profile) * A_o * (T_wall_outer - T_shell_bulk)"
+      }
+    },
+    "orientation_audit": {
+      "tube_hot_residual_orientation_consistent": true,
+      "shell_hot_residual_orientation_consistent": true,
+      "same_residual_family_across_role_swap": true,
+      "same_surface_identity_across_role_swap": true,
+      "hard_coded_tube_hot_assumption": false,
+      "hard_coded_shell_cold_assumption": false,
+      "numerical_execution_performed": false
+    },
+    "jmu_ownership": {
+      "jmu_shell_side_interface_owned": true,
+      "mu_bulk_source": "LOCATED_LOCAL_SHELL_BULK_PROPERTY_STATE",
+      "mu_wall_source": "LOCATED_LOCAL_SHELL_FLUID_WALL_INTERFACE_PROPERTY_STATE",
+      "jmu_sign_orientation_factor": false,
+      "jmu_physical_transfer_bound": false,
+      "jmu_executable_authority_bound": false
+    },
+    "preserved_r84_architecture": {
+      "external_q_required_for_native_local_wall_closure": false,
+      "local_constitutive_q_is_unknown_or_derived_output": true,
+      "real_case_required_for_model_level_task172_closure": false,
+      "real_case_required_for_production_replay_or_validation": true,
+      "real_case_required_for_task175_golden_release": true,
+      "whole_exchanger_source_mean_path_selected_for_task172_runtime": false,
+      "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+      "mean_pressure_rule_required_for_local_runtime": false,
+      "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+      "jmu_neutral_initialization_allowed": true,
+      "jmu_neutral_initialization_execution_authorized": false,
+      "final_active_jmu_required": true
+    },
+    "entry_blocker_state": {
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ]
+    },
+    "preserved_predicate_state": {
+      "source_mean_temperature_predicate_satisfied": true,
+      "source_mean_pressure_predicate_satisfied": false,
+      "source_mean_endpoint_pair_predicate_satisfied": true,
+      "source_mean_property_authority_predicate_satisfied": true,
+      "source_mean_identity_provenance_predicate_satisfied": true,
+      "source_mean_fail_closed_predicate_satisfied": true,
+      "jmu_bulk_pressure_rule_bound": false,
+      "preliminary_shell_film_source_rule_bound": false,
+      "preliminary_shell_film_transfer_authority_bound": false,
+      "jmu_executable_authority_bound": false,
+      "shell_wall_correction_status": "BLOCKED"
+    },
+    "decision": {
+      "result": "CORRECTED_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS",
+      "r84_architecture_preserved": true,
+      "sign_role_semantics_corrected": true,
+      "pressure_rule_selected": false,
+      "source_mean_path_selected_for_task172_runtime": false,
+      "candidate_created": false,
+      "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-sign-role-semantics-correction-r1.md",
+      "document_sha256": "ba4d5538bc8134023fcf058d2ceec81ecab3ff32b47c16f685c4309db60d0f14",
+      "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-sign-role-semantics-correction-r1.json",
+      "evidence_file_sha256": "0e804c8c8caa94ee6e3ef0af93682b3c613802f605e3bad82556f75e18f2679d",
+      "evidence_canonical_hash": "b3be3bd297c1d3cfea94df93e7ef0b6274ddc225edfe4a0c13d54aa9167c1214",
+      "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "registry_extension_key": "r85_extension",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "documentation_evidence_only": true,
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "real_case_created": false,
+      "external_q_receipt_created": false,
+      "property_snapshot_created": false,
+      "pressure_authority_created": false,
+      "jmu_executed": false,
+      "wall_state_solved": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true
+    },
+    "canonical_hash": "6b89349c35b2b2d651e4fca87f9bf45e919768a94db7a04d7b93759ea593f278"
+  },
+  "canonical_hash": "6c61d2739fff3475e5ff225eec442b69d351a2928e0d5a0226fe535236b7a847"
 }
