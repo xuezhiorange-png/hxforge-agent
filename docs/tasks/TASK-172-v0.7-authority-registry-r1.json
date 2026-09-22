@@ -15234,5 +15234,135 @@
     },
     "canonical_hash": "b6ba916042c7100be42ffb48bf6812185e237cfd23377bee86aae6c3d8003d19"
   },
-  "canonical_hash": "280ea72505e43b0bb2c81dbbbf7cdd657f2870425071d5f91e528a9d1f95f658"
+  "r88_extension": {
+    "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1",
+    "previous_head": "c9a9f6a664dd6f15f128f08a6e2b1325d2505088",
+    "historical_registry_root_canonical_hash": "280ea72505e43b0bb2c81dbbbf7cdd657f2870425071d5f91e528a9d1f95f658",
+    "historical_r87_extension_canonical_hash": "b6ba916042c7100be42ffb48bf6812185e237cfd23377bee86aae6c3d8003d19",
+    "historical_records_unchanged": true,
+    "review_type": "MODEL_LEVEL_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_ONLY",
+    "method_adjudication": {
+      "local_residual_structure_bound": true,
+      "method_family": "BOUND_AWARE_TRUST_REGION_VECTOR_NONLINEAR_LEAST_SQUARES",
+      "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+      "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+      "scipy_method": "trf",
+      "loss": "linear",
+      "scalar_reduction_mathematically_possible": true,
+      "scalar_reduction_robustly_authorized": false,
+      "scalar_reduction_selected": false,
+      "production_solver_execution_authorized": false
+    },
+    "initialization": {
+      "initialization_architecture_bound": true,
+      "stages": ["I0_INPUT_AND_DOMAIN_ADMISSION", "I1_NEUTRAL_BASE_FILM_INITIALIZATION", "I2_FULL_EQUATION_RESTORE"],
+      "jmu_neutral_initialization_candidate_value": 1.0,
+      "jmu_zero_initialization_forbidden": true,
+      "jmu_neutral_initialization_is_production_physics": false,
+      "final_accepted_result_must_use_full_active_jmu": true,
+      "direct_algebraic_seed_bound": true,
+      "seed_is_accepted_result": false
+    },
+    "domain_and_failure_policy": {
+      "domain_policy_bound": true,
+      "q_hc_domain": "SIGNED",
+      "automatic_wall_temperature_clipping": false,
+      "property_extrapolation": false,
+      "invalid_trial_typed_failure_path": true,
+      "fake_penalty_residual_allowed": false,
+      "failure_taxonomy_bound": true,
+      "failure_may_return_authoritative_partial_result": false,
+      "negative_q_numerically_allowed": true,
+      "negative_q_applicability_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY"
+    },
+    "acceptance_and_profile": {
+      "solver_success_is_engineering_acceptance": false,
+      "residual_acceptance_separate": true,
+      "residual_scaling_required_for_review": true,
+      "residual_scaling_policy_status": "CONTRACT_SHAPE_BOUND_QUANTITATIVE_SCALE_UNBOUND",
+      "jacobian_strategy": "UNBOUND_PENDING_NUMERICAL_PROFILE",
+      "executable_numerical_profile_bound": false,
+      "all_quantitative_tolerances_bound": false,
+      "resource_cap_bound": false
+    },
+    "blocker_state": {
+      "local_residual_and_method_model_level_complete": true,
+      "removed_blocker": "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "effective_remaining_task172_entry_blocker_count": 3,
+      "remaining_blockers": [
+        "SHELL-WALL-CORRECTION-AUTHORITY",
+        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "MESH-CONVERGENCE-QUALIFICATION"
+      ],
+      "task172_entry_authority_complete": false
+    },
+    "governance": {
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "lockfile_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": false,
+      "mesh_study_performed": false,
+      "production_solver_execution_authorized": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "validation": {
+      "predecessor_head": "PASS",
+      "r85a_equation_replay": "PASS",
+      "r87_reference_architecture_replay": "PASS",
+      "scalar_reduction_adjudication": "PASS",
+      "vector_method_adjudication": "PASS",
+      "initialization_seed_algebra": "PASS",
+      "tube_hot_initialization_sign": "PASS",
+      "shell_hot_initialization_sign": "PASS",
+      "zero_q_initialization": "PASS",
+      "negative_q_no_clamp": "PASS",
+      "full_equation_restore": "PASS",
+      "no_initialization_equation_as_final": "PASS",
+      "domain_intersection_policy": "PASS",
+      "invalid_trial_fail_closed": "PASS",
+      "no_fake_penalty_residual": "PASS",
+      "solver_status_vs_residual_acceptance_separation": "PASS",
+      "failure_taxonomy": "PASS",
+      "no_scipy_default_tolerance_promotion": "PASS",
+      "no_hidden_max_iter": "PASS",
+      "no_hidden_diff_step": "PASS",
+      "jmu_neutral_one_not_zero": "PASS",
+      "r1_r87_immutability": "PASS",
+      "json_parse": "PASS",
+      "canonical_hash": "PASS",
+      "artifact_linkage": "PASS",
+      "diff_allowlist": "PASS",
+      "git_diff_check": "PASS",
+      "ruff": "PASS",
+      "ruff_format": "PASS",
+      "mypy": "PASS",
+      "manifest": "PASS",
+      "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+      "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-numerical-method-and-failure-contract-r1.md",
+      "document_sha256": "44782186c5a2a9ff43ac1bac95e6dae907db310368e54b1ec90dc7ab199398cd",
+      "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-numerical-method-and-failure-contract-r1.json",
+      "evidence_file_sha256": "41611ab6fa31f5ea5adbbe58e526aee3c4fc8fa3efe1a182cc417acf100877ad",
+      "evidence_canonical_hash": "4827325196cef5ce4c87ac36403fad66b4ba505c2f2accc8582e43d78991ae7c",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "decision": {
+      "result": "RESOLVED_LOCAL_CONSTITUTIVE_METHOD_CONTRACT",
+      "local_residual_and_method_model_level_complete": true,
+      "executable_numerical_profile_bound": false,
+      "next_minimal_gate": "AUTHORIZE_TASK172_NUMERICAL_ERROR_BUDGET_STOPPING_QUANTITATIVE_ALLOCATION_AND_METHOD_SENSITIVITY_R1_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "cd9eadb045cd8625a601f43340633d8a787fd36b1fca4c5e85c486429cf6c7f7"
+  },
+  "canonical_hash": "4aa093a26bcd9205f597d77390a35e6cbe40bdcde2179522f8deaff4a66aa06e"
 }
