@@ -15109,5 +15109,130 @@
     },
     "canonical_hash": "c59d57851d278386a7b27d921720981a12fef0e214b09996ed1a6039d46d0678"
   },
-  "canonical_hash": "fd6a3d169046a3946614d5fae849a87698abb24262b0fbf4ad7c7df83c17260b"
+  "r87_extension": {
+    "task_id": "TASK172_V0_7_OPEN_SOURCE_REFERENCE_ARCHITECTURE_AUDIT_R1",
+    "previous_head": "53d4f3b7617407957b44662df1c3610720c3ca13",
+    "historical_registry_root_canonical_hash": "fd6a3d169046a3946614d5fae849a87698abb24262b0fbf4ad7c7df83c17260b",
+    "historical_r86_extension_canonical_hash": "c59d57851d278386a7b27d921720981a12fef0e214b09996ed1a6039d46d0678",
+    "historical_records_unchanged": true,
+    "review_type": "PINNED_PUBLIC_OPEN_SOURCE_ARCHITECTURE_AUDIT_ONLY",
+    "access_date": "2026-09-22",
+    "pinned_sources": [
+      {
+        "repository": "IDAES/idaes-pse",
+        "commit": "84532d7f99a9f976b05170948147afdd69cfa5f6",
+        "license": "BSD_LICENSE_TEXT",
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
+      },
+      {
+        "repository": "CalebBell/ht",
+        "commit": "85e0ee686ec91b35919925fd31d73d140a9de135",
+        "license": "MIT",
+        "source_roles": ["IMPLEMENTATION_PATTERN_REFERENCE", "NUMERIC_CROSSCHECK_REFERENCE", "TEST_PATTERN_REFERENCE"]
+      },
+      {
+        "repository": "oemof/tespy",
+        "commit": "18dc773f6ebbfedfc262df7087c768b1c74d2081",
+        "license": "MIT",
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
+      },
+      {
+        "repository": "lbl-srg/modelica-buildings",
+        "commit": "a3cfdde4e2fa1605f351875c2199b6aafaee7fe0",
+        "license": "REVISED_THREE_CLAUSE_BSD_WITH_ADDITIONAL_IMPROVEMENTS_TERM",
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"]
+      },
+      {
+        "repository": "jjgomera/pychemqt",
+        "commit": "d34339ea62b719185baffd3cbf8b47b5cfd931a6",
+        "license": "GPL-3.0",
+        "source_roles": ["NUMERIC_CROSSCHECK_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+        "code_reuse": "FORBIDDEN"
+      }
+    ],
+    "review_conclusions": {
+      "local_q_constitutive_unknown_or_output_supported": true,
+      "external_q_native_local_closure_prerequisite": false,
+      "explicit_wall_state_pattern_supported": true,
+      "staged_initialization_pattern_supported": true,
+      "jmu_zero_initialization_physical_authority_granted": false,
+      "segment_local_state_pattern_supported": true,
+      "scalar_reduction_proven": false,
+      "vector_nonlinear_review_recommended": true,
+      "r85_r85a_signed_q_and_role_semantics_preserved": true
+    },
+    "recommendations": {
+      "local_solver_architecture": "BLOCK_INITIALIZATION_THEN_SIMULTANEOUS_VECTOR_NONLINEAR_REVIEW",
+      "initialization_architecture": "STAGED_INITIALIZATION_WITH_TEMPORARY_SIMPLIFICATION_AND_FULL_EQUATION_RESTORE",
+      "wall_state_architecture": "TWO_SURFACE_WALL_STATE_PRESERVED_INTERFACE_NODES_ONLY_IF_REQUIRED",
+      "section_state_architecture": "PHYSICAL_SUPPORT_KEYED_LOCAL_STATE_WITH_EXPLICIT_SECTION_IDENTITY",
+      "scalar_reduction_recommended": "UNDETERMINED",
+      "staged_initialization_recommended": true,
+      "next_minimal_gate": "AUTHORIZE_TASK172_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1_ONLY"
+    },
+    "blocker_state": {
+      "effective_remaining_task172_entry_blocker_count": 4,
+      "task172_entry_authority_complete": false,
+      "blockers_closed_by_this_audit": []
+    },
+    "governance": {
+      "production_code_changed": false,
+      "engineering_calculation_changed": false,
+      "dependency_changed": false,
+      "external_code_vendored": false,
+      "task172_implementation_started": false,
+      "physical_authority_promoted_from_open_source": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-open-source-reference-architecture-audit-r1.md",
+      "document_sha256": "3e0eaf908a2fa3efc4c5c6a5a5743c474cb9d8ce76813d32761f2b4e71c59bdd",
+      "evidence_path": "docs/tasks/evidence/TASK-172-open-source-reference-architecture-audit-r1.json",
+      "evidence_file_sha256": "db7dbb99157cfb85d6942287555daa60c1513011b66a57652540930e4cef37e2",
+      "evidence_canonical_hash": "7613b2a5622d117222f46124c9d7afcc63e313bb259d8956f7871c9badabda5f",
+      "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+      "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "validation": {
+      "external_repository_identity": "PASS",
+      "external_commit_pin": "PASS",
+      "external_file_identity": "PASS",
+      "license_classification": "PASS",
+      "idaes_architecture_review": "PASS",
+      "ht_reference_review": "PASS",
+      "tespy_architecture_review": "PASS",
+      "modelica_architecture_review": "PASS",
+      "pychemqt_crosscheck_review": "PASS",
+      "physical_authority_separation": "PASS",
+      "no_direct_code_import": "PASS",
+      "no_dependency_change": "PASS",
+      "comparison_matrix_complete": "PASS",
+      "hxforge_ownership_preserved": "PASS",
+      "r85_r85a_semantics_preserved": "PASS",
+      "r1_r86_immutability": "PASS",
+      "json_parse": "PASS",
+      "canonical_hash": "PASS",
+      "artifact_linkage": "PASS",
+      "diff_allowlist": "PASS",
+      "git_diff_check": "PASS",
+      "ruff": "PASS",
+      "ruff_format": "PASS",
+      "mypy": "PASS",
+      "manifest": "PASS",
+      "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+      "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+    },
+    "decision": {
+      "result": "COMPLETED_OPEN_SOURCE_ARCHITECTURE_AUDIT",
+      "physical_authority_promoted_from_open_source": false,
+      "next_gate": "AUTHORIZE_TASK172_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "b6ba916042c7100be42ffb48bf6812185e237cfd23377bee86aae6c3d8003d19"
+  },
+  "canonical_hash": "280ea72505e43b0bb2c81dbbbf7cdd657f2870425071d5f91e528a9d1f95f658"
 }
