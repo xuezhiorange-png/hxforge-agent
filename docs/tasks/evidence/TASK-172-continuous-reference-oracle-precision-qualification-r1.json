@@ -1,0 +1,315 @@
+{
+  "schema_version": "1.0",
+  "task_id": "TASK172_V0_7_CONTINUOUS_REFERENCE_ORACLE_PRECISION_QUALIFICATION_R1",
+  "mode": "CONTINUOUS_REFERENCE_ORACLE_PRECISION_QUALIFICATION_ONLY",
+  "result": "CONTINUOUS_REFERENCE_ORACLE_PRECISION_CANDIDATE_COMPLETED",
+  "pr": {
+    "number": 277,
+    "state": "OPEN_DRAFT",
+    "authorized_branch": "docs/v0-7-task172-entry-authority"
+  },
+  "authorized_predecessor_head": "bc940cb8abe74ec33c56935a2a2a0b60ff628c8a",
+  "final_head_sha": "RECORDED_IN_FINAL_RECEIPT",
+  "historical_replay": {
+    "r99_result": "BLOCKED_MESH_CONVERGENCE_QUALIFICATION_R2",
+    "r99_extension_canonical_hash": "004f8d19ffd85b0d1429e3d2da298676d953c40fa61635a8a8144a3117a0a934",
+    "r99_registry_root_canonical_hash": "72b1e6519fca031b54ec21169bb71de5f6bacea4658ef1de348bd9e89a3b6057",
+    "r99_m05_historical_gauss_Q_W": {
+      "128": 0.2222234220550436,
+      "256": 0.22222342205515927,
+      "512": 0.22222342205526033
+    },
+    "r99_m05_abs_Q256_minus_Q512_W": 1.0105805081650487e-13,
+    "r99_m05_64_ulp_criterion_W": 1.7763568394002505e-15,
+    "r99_m05_historical_gate_reproduced": true,
+    "r95_input_matrix_canonical_hash": "b13d4306f3a2a60f248fbd1b222a6069599ec08a3c094996b17019ac315ae2d8",
+    "r98_effective_C_round": 1.0,
+    "r98_candidate_lifecycle": "REVIEWED_AUTHORITY",
+    "r98_resume_authorized": true,
+    "r95_fixture_definitions_changed": false,
+    "r95_mesh_sequences_changed": false,
+    "r95_threshold_grid_changed": false,
+    "r98_overlay_changed": false
+  },
+  "historical_64_ulp_adjudication": {
+    "final_result_ulp_only_is_total_continuous_reference_error_bound": false,
+    "r95_64_ulp_rule_status": "HISTORICAL_REFERENCE_STABILITY_HEURISTIC_NOT_TOTAL_ORACLE_ERROR_BOUND",
+    "scope_statement": "The final-result ULP heuristic is insufficient for this compound oracle; this does not claim it is invalid in every context.",
+    "compound_pipeline_includes": [
+      "PROPERTY_EVALUATIONS",
+      "LOCAL_SCALAR_NONLINEAR_ROOT_AT_EACH_QUADRATURE_NODE",
+      "QUADRATURE_MULTIPLICATION",
+      "FLOATING_POINT_REDUCTION"
+    ],
+    "historical_gate_superseded_in_effective_reference_policy": true
+  },
+  "reference_precision_policy": {
+    "classification": "PROJECT_REFERENCE_PRECISION_POLICY",
+    "oracle_to_mesh_threshold_separation_factor": 0.001,
+    "smallest_frozen_duty_relative_mesh_threshold": 1e-5,
+    "smallest_frozen_near_zero_duty_absolute_threshold_W": 1e-5,
+    "smallest_frozen_wall_extrema_threshold_K": 1e-5,
+    "non_near_zero_reference_relative_limit": 1e-8,
+    "near_zero_M05_reference_absolute_limit_W": 1e-8,
+    "wall_reference_stability_criterion_K": 1e-8,
+    "independent_quadrature_family_count": 2,
+    "gauss_legendre_orders": [
+      128,
+      256,
+      512,
+      1024
+    ],
+    "composite_simpson_subinterval_counts": [
+      512,
+      1024,
+      2048
+    ],
+    "second_local_root_method": "TOMS748",
+    "second_root_method_is_validation_only": true,
+    "production_scalar_reduction_selected": false,
+    "continuous_duty_reference_producer": "GAUSS_LEGENDRE_ORDER_1024",
+    "uncertainty_definition": "U_Q=U_GL+U_SIMPSON+U_CROSS+U_ROOT_INTEGRATED+U_REDUCTION",
+    "uncertainty_classification": "MEASURED_CONSERVATIVE_NUMERICAL_REFERENCE_UNCERTAINTY",
+    "oracle_uncertainty_is_formal_true_error_bound": false,
+    "reference_uncertainty_propagation_required": true,
+    "wall_reference_policy_changed": false
+  },
+  "m05_new_reference": {
+    "historical_64_ulp_gate_fails": true,
+    "Q_GL_W": {
+      "128": 0.2222234220550436,
+      "256": 0.22222342205515927,
+      "512": 0.22222342205526033,
+      "1024": 0.22222342205523007
+    },
+    "Q_composite_simpson_W": {
+      "512": 0.22222342205521967,
+      "1024": 0.2222234220552501,
+      "2048": 0.22222342205524148
+    },
+    "U_GL_W": 1.0105805081650487e-13,
+    "U_SIMPSON_W": 3.044786645034492e-14,
+    "U_CROSS_W": 1.1407541578023483e-14,
+    "U_ROOT_POINTWISE_W": 7.579464833540328e-12,
+    "U_ROOT_INTEGRATED_W": 7.579464833540328e-12,
+    "U_REDUCTION_W": 4.996003610813204e-16,
+    "U_Q_W": 7.722877892746283e-12,
+    "Q_ref_W": 0.22222342205523007,
+    "qualification_limit_W": 1e-8,
+    "new_precision_policy_pass": true,
+    "root_uncertainty_assumption": "NORMALIZED_SUPPORT_LENGTH_IS_ONE",
+    "formal_true_error_bound": false
+  },
+  "fixture_results_summary": [
+    {
+      "fixture_id": "M01",
+      "Q_ref_W": 17.05145358632239,
+      "python311": {
+        "U_Q_W": 2.2662760557068395e-11,
+        "observed_relative_metric": 1.3290808576740443e-12,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 2.262723342028039e-11,
+        "observed_relative_metric": 1.326997332266181e-12,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    },
+    {
+      "fixture_id": "M02",
+      "Q_ref_W": 18.597879246107475,
+      "python311": {
+        "U_Q_W": 8.039791055125534e-12,
+        "observed_relative_metric": 4.3229612090377093e-13,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 8.004263918337529e-12,
+        "observed_relative_metric": 4.303858419779912e-13,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    },
+    {
+      "fixture_id": "M03",
+      "Q_ref_W": 13.187854026392502,
+      "python311": {
+        "U_Q_W": 5.7909232964448165e-12,
+        "observed_relative_metric": 4.391103575197404e-13,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 5.778488798569015e-12,
+        "observed_relative_metric": 4.381674825189307e-13,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    },
+    {
+      "fixture_id": "M04",
+      "Q_ref_W": 16.941719921100418,
+      "python311": {
+        "U_Q_W": 9.64206492426456e-12,
+        "observed_relative_metric": 5.691314086866197e-13,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 9.620748642191757e-12,
+        "observed_relative_metric": 5.678731962871643e-13,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    },
+    {
+      "fixture_id": "M05",
+      "Q_ref_W": 0.22222342205523007,
+      "python311": {
+        "U_Q_W": 7.722877892746283e-12,
+        "observed_absolute_metric_W": 7.722877892746283e-12,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 7.722378292385201e-12,
+        "observed_absolute_metric_W": 7.722378292385201e-12,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    },
+    {
+      "fixture_id": "M06",
+      "Q_ref_W": 13.526962848693813,
+      "python311": {
+        "U_Q_W": 4.8618886694384855e-12,
+        "observed_relative_metric": 3.5942204645810094e-13,
+        "pass": true
+      },
+      "python312": {
+        "U_Q_W": 4.835243316847482e-12,
+        "observed_relative_metric": 3.574522508070693e-13,
+        "pass": true
+      },
+      "wall_extrema_stability_pass_both": true
+    }
+  ],
+  "runtime_replay": {
+    "python311": {
+      "python": "3.11.15",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "platform": "macOS-27.2-arm64-arm-64bit",
+      "full_qualification_repeat_byte_identical": true,
+      "worker_output_sha256": "68316f95b2041b5c761cb71b0801d4194069364bc8e822e589f736c486a887c2"
+    },
+    "python312": {
+      "python": "3.12.13",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "platform": "macOS-27.2-arm64-arm-64bit",
+      "full_qualification_repeat_byte_identical": true,
+      "worker_output_sha256": "b03aa9d7cd355d41e8157f02050c4d4be9704880b58d57053f4ea83f4c2d36d7"
+    },
+    "cross_runtime_exact_equality_required": false,
+    "Q_ref_equal_across_runtimes_for_all_fixtures": true,
+    "U_GL_SIMPSON_CROSS_ROOT_equal_across_runtimes_for_all_fixtures": true,
+    "maximum_observed_U_REDUCTION_and_U_Q_difference_W": 3.552713678800501e-14
+  },
+  "candidate": {
+    "continuous_reference_oracle_precision_policy_bound": true,
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "new_authority_self_approval": false,
+    "mesh_convergence_canonical_blocker_removed": false,
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "task172_entry_authority_complete": false,
+    "next_gate": "AUTHORIZE_TASK172_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW_R1_ONLY"
+  },
+  "validation": {
+    "predecessor_head_pass": true,
+    "r99_blocker_replay_pass": true,
+    "r95_historical_oracle_replay_pass": true,
+    "r98_overlay_replay_pass": true,
+    "gauss_128_256_512_historical_reproduction_pass": true,
+    "gauss_1024_pass": true,
+    "composite_simpson_512_pass": true,
+    "composite_simpson_1024_pass": true,
+    "composite_simpson_2048_pass": true,
+    "brent_toms748_crosscheck_pass": true,
+    "reference_uncertainty_components_pass": true,
+    "M01_reference_precision_pass": true,
+    "M02_reference_precision_pass": true,
+    "M03_reference_precision_pass": true,
+    "M04_reference_precision_pass": true,
+    "M05_reference_precision_pass": true,
+    "M06_reference_precision_pass": true,
+    "wall_extrema_reference_replay_pass": true,
+    "oracle_to_mesh_separation_policy_pass": true,
+    "reference_uncertainty_propagation_contract_pass": true,
+    "dual_runtime_replay_pass": true,
+    "deterministic_replay_pass": true,
+    "no_mesh_threshold_selection_pass": true,
+    "no_full_mesh_rerun_pass": true,
+    "no_TASK173_solve_pass": true,
+    "no_TASK174_solve_pass": true,
+    "R1_R99_immutability_pass": true,
+    "evidence_canonical_hash_nonempty_pass": true,
+    "json_pass": true,
+    "canonical_hash_pass": true,
+    "artifact_linkage_pass": true,
+    "diff_allowlist_pass": true,
+    "git_diff_check_pass": true,
+    "ruff_pass": true,
+    "ruff_format_pass": true,
+    "mypy_pass": true,
+    "manifest_pass": true,
+    "exact_final_head_CI": "PENDING_FINAL_HEAD_CI"
+  },
+  "mesh_policy": {
+    "mesh_threshold_grid_changed": false,
+    "mesh_threshold_sensitivity_performed": false,
+    "full_mesh_matrix_rerun": false,
+    "mesh_convergence_status_adjudicated": false,
+    "mesh_convergence_canonical_blocker_removed": false,
+    "remaining_blockers": [
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "reference_oracle_numerical_experiment_performed": true,
+    "numerical_experiment_is_production_solve": false,
+    "mesh_study_performed": false,
+    "mesh_threshold_sensitivity_performed": false,
+    "full_mesh_matrix_rerun": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-continuous-reference-oracle-precision-qualification-r1.md",
+    "evidence_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-qualification-r1.json",
+    "results_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-results-r1.json",
+    "runner_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-runner-r1.py",
+    "registry_extension_key": "r100_extension",
+    "document_sha256": "c7a5415006e319a6f999937d883bb0d520eee6f84d4e05ee4ef752df1448d118",
+    "results_file_sha256": "b7844e566faab902fef1bc90eda3c991f3e1271da96effe78c693efe4fac6b43",
+    "results_canonical_hash": "17799de16c5b4a7362bda4595d4d5af9e46ee1633d89e852e51cc58419caf5d0",
+    "runner_sha256": "a6ea1850bca18bed700f8313ffd208d4a27fa8750604a1529fad9a4a4a2084ba",
+    "evidence_file_sha256": "BOUND_IN_REGISTRY",
+    "evidence_canonical_hash": "BOUND_BY_REGISTRY",
+    "r100_extension_canonical_hash": "BOUND_BY_REGISTRY_EXTENSION_SELF_HASH",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+    "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
+  },
+  "canonical_hash": "d4be20147aa641c189bef443fd497987230fe6bd1d7b4edf4f2171af3ca356bb"
+}

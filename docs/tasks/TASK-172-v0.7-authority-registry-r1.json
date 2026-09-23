@@ -17212,5 +17212,129 @@
       "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
     },
     "canonical_hash": "004f8d19ffd85b0d1429e3d2da298676d953c40fa61635a8a8144a3117a0a934"
-  }
+  },
+  "r100_extension": {
+    "task_id": "TASK172_V0_7_CONTINUOUS_REFERENCE_ORACLE_PRECISION_QUALIFICATION_R1",
+    "mode": "CONTINUOUS_REFERENCE_ORACLE_PRECISION_QUALIFICATION_ONLY",
+    "result": "CONTINUOUS_REFERENCE_ORACLE_PRECISION_CANDIDATE_COMPLETED",
+    "previous_head": "bc940cb8abe74ec33c56935a2a2a0b60ff628c8a",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "historical_registry_root_canonical_hash": "72b1e6519fca031b54ec21169bb71de5f6bacea4658ef1de348bd9e89a3b6057",
+    "historical_boundary": {
+      "r1_r99_payloads_immutable": true,
+      "r1_r99_extensions_rewritten": false,
+      "r99_result_preserved": "BLOCKED_MESH_CONVERGENCE_QUALIFICATION_R2",
+      "r99_m05_precision_blocker_preserved": true,
+      "r95_inputs_fixtures_and_sequences_changed": false,
+      "r98_overlay_changed": false,
+      "frozen_mesh_threshold_grid_changed": false
+    },
+    "precision_policy": {
+      "classification": "PROJECT_REFERENCE_PRECISION_POLICY",
+      "oracle_to_mesh_threshold_separation_factor": 0.001,
+      "non_near_zero_relative_limit": 1e-8,
+      "near_zero_M05_absolute_limit_W": 1e-8,
+      "wall_reference_stability_criterion_K": 1e-8,
+      "reference_producer": "GAUSS_LEGENDRE_ORDER_1024",
+      "uncertainty_definition": "U_Q=U_GL+U_SIMPSON+U_CROSS+U_ROOT_INTEGRATED+U_REDUCTION",
+      "uncertainty_is_formal_true_error_bound": false,
+      "reference_uncertainty_propagation_required": true
+    },
+    "qualification_summary": {
+      "fixture_ids": ["M01", "M02", "M03", "M04", "M05", "M06"],
+      "all_fixtures_pass_both_runtimes": true,
+      "independent_quadrature_families": ["GAUSS_LEGENDRE", "COMPOSITE_SIMPSON"],
+      "historical_M05_128_256_512_values_reproduced": true,
+      "historical_64_ulp_rule_superseded_in_effective_policy": true,
+      "brent_vs_TOMS748_validation_only": true,
+      "wall_extrema_replay_passed": true,
+      "dual_runtime_deterministic_replay_passed": true,
+      "python311_worker_sha256": "68316f95b2041b5c761cb71b0801d4194069364bc8e822e589f736c486a887c2",
+      "python312_worker_sha256": "b03aa9d7cd355d41e8157f02050c4d4be9704880b58d57053f4ea83f4c2d36d7",
+      "maximum_cross_runtime_uncertainty_component_difference_W": 3.552713678800501e-14
+    },
+    "m05": {
+      "Q_GL128_W": 0.2222234220550436,
+      "Q_GL256_W": 0.22222342205515927,
+      "Q_GL512_W": 0.22222342205526033,
+      "Q_GL1024_W": 0.22222342205523007,
+      "Q_SIMPSON512_W": 0.22222342205521967,
+      "Q_SIMPSON1024_W": 0.2222234220552501,
+      "Q_SIMPSON2048_W": 0.22222342205524148,
+      "U_GL_W": 1.0105805081650487e-13,
+      "U_SIMPSON_W": 3.044786645034492e-14,
+      "U_CROSS_W": 1.1407541578023483e-14,
+      "U_ROOT_INTEGRATED_W": 7.579464833540328e-12,
+      "U_REDUCTION_W": 4.996003610813204e-16,
+      "U_Q_W": 7.722877892746283e-12,
+      "qualification_limit_W": 1e-8,
+      "historical_64_ulp_gate_still_fails": true,
+      "new_precision_policy_pass": true
+    },
+    "candidate_lifecycle": {
+      "candidate_created": true,
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "new_authority_self_approval": false,
+      "mesh_convergence_canonical_blocker_removed": false
+    },
+    "blocker_ledger": {
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
+      "effective_remaining_task172_entry_blocker_count": 1,
+      "task172_entry_authority_complete": false
+    },
+    "validation": {
+      "predecessor_head": "PASS",
+      "r99_blocker_replay": "PASS",
+      "r95_historical_oracle_replay": "PASS",
+      "r98_overlay_replay": "PASS",
+      "two_quadrature_families_all_six": "PASS",
+      "brent_toms748_crosscheck": "PASS",
+      "reference_uncertainty_and_precision_policy": "PASS",
+      "wall_extrema_replay": "PASS",
+      "dual_runtime_and_deterministic_replay": "PASS",
+      "no_mesh_threshold_selection_or_full_mesh_rerun": "PASS",
+      "no_task173_or_task174_solve": "PASS",
+      "r1_r99_immutability": "PASS",
+      "json_canonical_hash_artifact_linkage": "PASS",
+      "diff_allowlist_git_diff_check": "PASS",
+      "ruff_ruff_format_mypy_manifest": "PASS",
+      "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "numerical_experiment_performed": true,
+      "numerical_experiment_is_production_solve": false,
+      "mesh_study_performed": false,
+      "mesh_threshold_sensitivity_performed": false,
+      "full_mesh_matrix_rerun": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "new_authority_self_approval": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW_R1_ONLY",
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-continuous-reference-oracle-precision-qualification-r1.md",
+      "document_sha256": "c7a5415006e319a6f999937d883bb0d520eee6f84d4e05ee4ef752df1448d118",
+      "evidence_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-qualification-r1.json",
+      "evidence_file_sha256": "0d719a48ef4ccee07c5f0b161e844f635e0c97ed101964825880b744e1fdd0c5",
+      "evidence_canonical_hash": "d4be20147aa641c189bef443fd497987230fe6bd1d7b4edf4f2171af3ca356bb",
+      "results_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-results-r1.json",
+      "results_file_sha256": "b7844e566faab902fef1bc90eda3c991f3e1271da96effe78c693efe4fac6b43",
+      "results_canonical_hash": "17799de16c5b4a7362bda4595d4d5af9e46ee1633d89e852e51cc58419caf5d0",
+      "runner_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-precision-runner-r1.py",
+      "runner_sha256": "a6ea1850bca18bed700f8313ffd208d4a27fa8750604a1529fad9a4a4a2084ba",
+      "registry_extension_key": "r100_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
+    },
+    "canonical_hash": "9e1210f35c3e52f83cdffde3b23f0fc78f8b8b75e1fbbd2e35c07039095b6701"
+  },
+  "canonical_hash": "2d31fa7eeaf9b5c688ce94223b03f6288e2f8e4b1294c03af7c3d7c737228ab1"
 }
