@@ -1,0 +1,244 @@
+{
+  "schema_version": "task172.real-case-mesh-admission-contract.r1",
+  "task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_R1",
+  "mode": "APPEND_ONLY_REAL_CASE_MESH_ADMISSION_CONTRACT_CANDIDATE",
+  "result": "REAL_CASE_MESH_ADMISSION_CONTRACT_CANDIDATE_COMPLETED",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "authorized_predecessor_head": "8703d17e88b9215b755d402bd4686d36f14ad673",
+  "previous_head_sha": "8703d17e88b9215b755d402bd4686d36f14ad673",
+  "frozen_authority_replay": {
+    "R1_R103_historical_payloads_immutable": true,
+    "R1_R103_registry_extensions_rewritten": false,
+    "predecessor_registry_root_canonical_hash": "d1849d3f46b1d4c465a3ff3a2d86a3bfd8429f0120460c60b1f10c66a5ffd362",
+    "R103_result": "PASS_MESH_CONVERGENCE_QUALIFICATION",
+    "R103_lifecycle": "REVIEWED_AUTHORITY",
+    "R103_scope": "FROZEN_SYNTHETIC_FIXTURE_PROFILE_ONLY",
+    "R103_real_case_generalization_present": false,
+    "R102_lifecycle": "REVIEWED_AUTHORITY",
+    "R102_scope": "FROZEN_SYNTHETIC_CONTINUOUS_REFERENCE_FIXTURE_PROFILE_ONLY",
+    "R98_C_round": 1.0,
+    "R98_transfer_scope": "REVIEWED_MESH_CELL_SCALE_FIXED_TRAINING_AND_HOLDOUT_ONLY"
+  },
+  "source_artifacts": {
+    "TASK170_freeze": {
+      "path": "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md",
+      "sha256": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0"
+    },
+    "TASK171_reviewed_topology_implementation": {
+      "path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+      "sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943"
+    },
+    "TASK171_R4_entry_authority": {
+      "path": "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md",
+      "sha256": "ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca"
+    },
+    "TASK172_mesh_model_contract": {
+      "path": "docs/tasks/TASK-172-v0.7-mesh-convergence-contract-r1.md",
+      "sha256": "3577f64cc5280d7988068c145fe3e495d58d6548392c6fb7329df070b077cf7c"
+    },
+    "R98_independent_review": {
+      "path": "docs/tasks/TASK-172-v0.7-mesh-cell-scale-numerical-acceptance-extension-independent-review-r1.md",
+      "sha256": "0e3fbb2204f0335201a577fba29cc7210467b7648d10fee0658a449ec67a2aad"
+    },
+    "R102_canonical_reference_binding": {
+      "path": "docs/tasks/TASK-172-v0.7-continuous-reference-oracle-scipy-canonical-envelope-binding-correction-r1.md",
+      "sha256": "300eee99502beb815bf72a64b57d2c66a771c8d2cf795e5fa8148ac875c5e5d8"
+    },
+    "R103_mesh_qualification": {
+      "document_path": "docs/tasks/TASK-172-v0.7-mesh-convergence-final-qualification-r1.md",
+      "document_sha256": "4ab8c5c6ae1a7f499feaa2411c701d57c0b75b5aef4533e27991c187d019d431",
+      "evidence_path": "docs/tasks/evidence/TASK-172-mesh-convergence-final-qualification-r1.json",
+      "evidence_file_sha256": "7d35d3af7d1396daf746bdbf09c9cbf2e6fa707fd0a6a38d64c3695ea5cd1f90",
+      "results_path": "docs/tasks/evidence/TASK-172-mesh-convergence-final-qualification-results-r1.json",
+      "results_file_sha256": "1a759a9f7b83c8ec5033dd3e234be11ee9ee4b36d65739246c466213536876a8",
+      "extension_canonical_hash": "331bb73c09f0b2ec00260886abb1ceec65b3a2996dcb02a17d144e252ef51ac9"
+    }
+  },
+  "existing_authority_search": {
+    "searched": [
+      "docs/tasks/TASK-170 through TASK-172 reviewed contracts and authority registry",
+      "docs/tasks historical real-case/production mesh admission and selection references",
+      "src/ production mesh/profile/admission implementation and typed status vocabulary"
+    ],
+    "reviewed_real_case_production_mesh_authority_found": false,
+    "findings": [
+      "TASK171 binds structural cell/physical mapping invariants but explicitly does not bind numeric production mesh presets.",
+      "TASK172 mesh-convergence contract binds schemas but no real sequence, count, threshold, estimator, or profile.",
+      "R103 binds only six frozen synthetic fixtures and their synthetic qualification profile."
+    ]
+  },
+  "contract": {
+    "contract_id": "TASK172-REAL-CASE-MESH-ADMISSION-CONTRACT-R1",
+    "schema_version": "hxforge.task172.real-case-mesh-admission.v1",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "defined": true,
+    "candidate_created": true,
+    "reviewed_authority": false,
+    "production_admission_enabled": false,
+    "supported_topology_scope": {
+      "bound": true,
+      "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "authority_ids": [
+        "V07-T171-TOPOLOGY-R4-V1",
+        "V07-T171-CELL-COMPARTMENT-R4-V1",
+        "V07-T171-CONSERVATION-R4-V1"
+      ],
+      "allowed": [
+        "FIXED_TUBESHEET",
+        "E_SHELL",
+        "ONE_SHELL_PASS",
+        "ONE_DECLARED_STRAIGHT_THROUGH_TUBE_PASS",
+        "EXPLICIT_COUNTERCURRENT_HOT_AND_COLD_PATHS",
+        "NATIVE_TASK020_024_ACCEPTED_GEOMETRY",
+        "EXISTING_SINGLE_SEGMENTAL_BAFFLE_AND_BELL_COMPATIBILITY_GATES"
+      ],
+      "excluded": [
+        "U_TUBE",
+        "FLOATING_HEAD",
+        "ADDITIONAL_PASSES",
+        "SPLIT_OR_BRANCHED_OR_REVERSING_PATHS",
+        "COCURRENT",
+        "ALTERNATE_SHELL_OR_BAFFLE_FAMILY",
+        "TWO_PHASE_OR_TRANSIENT",
+        "UNMODELED_LEAKAGE_OR_AXIAL_WALL_CONDUCTION_OR_AMBIENT_LOSS"
+      ]
+    },
+    "required_case_authority_bindings": [
+      "CASE_ID",
+      "CONFIGURATION_ID",
+      "GEOMETRY_ID",
+      "TOPOLOGY_AUTHORITY_ID",
+      "FLOW_PATH_MAPPING_ID",
+      "PHYSICAL_COMPARTMENT_MAP_ID",
+      "AREA_OWNERSHIP_MAP_ID",
+      "LENGTH_OWNERSHIP_MAP_ID",
+      "HOT_STREAM_PATH_ID",
+      "COLD_STREAM_PATH_ID",
+      "PROPERTY_PROFILE_AUTHORITY_ID",
+      "MATERIAL_AUTHORITY_ID",
+      "WALL_AUTHORITY_ID",
+      "TUBE_HTC_AUTHORITY_ID",
+      "SHELL_HTC_AUTHORITY_ID",
+      "WALL_CORRECTION_AUTHORITY_ID",
+      "NUMERICAL_PROFILE_AUTHORITY_ID",
+      "MESH_PROFILE_AUTHORITY_ID"
+    ],
+    "each_binding_requires": [
+      "VERSION",
+      "CANONICAL_HASH",
+      "LIFECYCLE",
+      "ALLOWED_SCOPE",
+      "CASE_BINDING",
+      "APPLICABILITY_PROOF",
+      "SOURCE_REVISION_AND_EVIDENCE"
+    ],
+    "identity_schema_bound": true,
+    "physical_support_identity_required": true,
+    "physical_to_cell_mapping_contract_bound": true,
+    "physical_vs_numerical_mesh_separated": true,
+    "refinement_may_create_physical_event": false,
+    "refinement_may_change_manufacturable_geometry": false,
+    "mapping_requires_canonical_hash": true,
+    "mapping_cell_fields": [
+      "CELL_ID",
+      "MESH_ID",
+      "REFINEMENT_LEVEL",
+      "PHYSICAL_SUPPORT_ID",
+      "PHYSICAL_INTERVAL_START",
+      "PHYSICAL_INTERVAL_END",
+      "FLUID_PATH_INTERVAL_START",
+      "FLUID_PATH_INTERVAL_END",
+      "PHYSICAL_COMPARTMENT_ID",
+      "HOT_FLOW_PATH_ID",
+      "COLD_FLOW_PATH_ID",
+      "TUBE_AREA_I_M2",
+      "TUBE_AREA_O_M2",
+      "CELL_LENGTH_M",
+      "LOCAL_GEOMETRY_BINDING_ID",
+      "PHYSICAL_EVENT_OWNERSHIP"
+    ],
+    "countercurrent_pairing_uses_array_index": false,
+    "initial_mesh_rule_bound": false,
+    "initial_mesh_rule": "UNBOUND",
+    "refinement_rule_bound": false,
+    "refinement_split_operator": "UNBOUND",
+    "convergence_rule_bound": false,
+    "headroom_rule_bound": false,
+    "resource_policy_bound": false,
+    "production_maximum_cell_count": "UNBOUND",
+    "normalized_real_case_mesh_descriptor_bound": false,
+    "reference_policy_bound": false,
+    "production_reference_oracle_required": "UNBOUND",
+    "R102_Q_ref_online_production_selected_for_real_case_production": false,
+    "wall_observable_schema_bound": true,
+    "wall_observables": [
+      "T_wall_inner_by_physical_support_and_location",
+      "T_wall_outer_by_physical_support_and_location",
+      "admitted_min_max_extrema_with_support_and_mapping_identity"
+    ],
+    "wall_acceptance_rule_bound": false,
+    "C_round_real_case_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+    "R102_Q_ref_real_case_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+    "R102_U_Q_real_case_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING",
+    "typed_failure_contract_complete": true,
+    "new_runtime_error_enum_created": false,
+    "case_production_admission_distinct_from_mesh_admission": true,
+    "mesh_admissible_formula_bound": true,
+    "effective_mesh_admissible_for_real_case": false,
+    "no_hidden_defaults": true,
+    "unproven_generalization_blocked": true,
+    "case_level_authority_gates_preserved": true
+  },
+  "R103_transfer_matrix": {
+    "path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-transfer-matrix-r1.json",
+    "canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+    "row_count": 14,
+    "required_rows_complete": true
+  },
+  "validation": {
+    "predecessor_head_and_pr_state": "PASS",
+    "R1_R103_historical_immutability": "PASS",
+    "R103_synthetic_scope_replay": "PASS",
+    "existing_reviewed_real_case_authority_search": "PASS_NONE_FOUND",
+    "supported_topology_scope_replay": "PASS",
+    "identity_and_mapping_contract_completeness": "PASS",
+    "R103_transfer_matrix_completeness": "PASS",
+    "unproven_transfer_fail_closed_audit": "PASS",
+    "case_level_authority_gate_preservation": "PASS",
+    "JSON_and_canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist_and_git_diff_check": "PASS",
+    "ruff_ruff_format_mypy_manifest": "PASS",
+    "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "production_rating_performed": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "mesh_policy_retuned": false,
+    "precision_policy_retuned": false,
+    "reference_oracle_redefined": false,
+    "R103_rewritten": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "next_gate": "AUTHORIZE_TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_ONLY",
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-r1.md",
+    "document_sha256": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+    "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-r1.json",
+    "evidence_file_sha256": "BOUND_BY_REGISTRY",
+    "transfer_matrix_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-transfer-matrix-r1.json",
+    "transfer_matrix_file_sha256": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+    "registry_extension_key": "r104_extension",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+    "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d"
+}

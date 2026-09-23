@@ -17618,5 +17618,109 @@
     },
     "canonical_hash": "331bb73c09f0b2ec00260886abb1ceec65b3a2996dcb02a17d144e252ef51ac9"
   },
-  "canonical_hash": "d1849d3f46b1d4c465a3ff3a2d86a3bfd8429f0120460c60b1f10c66a5ffd362"
+  "r104_extension": {
+    "task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_R1",
+    "mode": "APPEND_ONLY_REAL_CASE_MESH_ADMISSION_CONTRACT_CANDIDATE",
+    "result": "REAL_CASE_MESH_ADMISSION_CONTRACT_CANDIDATE_COMPLETED",
+    "previous_head": "8703d17e88b9215b755d402bd4686d36f14ad673",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "historical_boundary": {
+      "r1_r103_payloads_immutable": true,
+      "r1_r103_registry_extensions_rewritten": false,
+      "pre_append_registry_root_canonical_hash": "d1849d3f46b1d4c465a3ff3a2d86a3bfd8429f0120460c60b1f10c66a5ffd362",
+      "R103_scope": "FROZEN_SYNTHETIC_FIXTURE_PROFILE_ONLY",
+      "R103_real_case_generalization_bound": false
+    },
+    "existing_authority_search": {
+      "reviewed_real_case_production_mesh_authority_found": false,
+      "scope": "TASK170_TASK172_CONTRACTS_AUTHORITY_REGISTRY_AND_PRODUCTION_SOURCE"
+    },
+    "candidate_contract": {
+      "contract_id": "TASK172-REAL-CASE-MESH-ADMISSION-CONTRACT-R1",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "defined": true,
+      "reviewed_authority": false,
+      "supported_topology_scope_bound": true,
+      "real_case_mesh_identity_schema_bound": true,
+      "physical_to_cell_mapping_contract_bound": true,
+      "initial_real_case_mesh_rule_bound": false,
+      "real_case_refinement_rule_bound": false,
+      "real_case_convergence_rule_bound": false,
+      "real_case_headroom_rule_bound": false,
+      "real_case_resource_policy_bound": false,
+      "real_case_wall_observable_schema_bound": true,
+      "real_case_wall_acceptance_rule_bound": false,
+      "real_case_reference_policy_bound": false,
+      "normalized_real_case_mesh_descriptor_bound": false,
+      "no_hidden_defaults": true,
+      "unproven_generalization_blocked": true,
+      "case_level_authority_gates_preserved": true,
+      "mesh_authority_real_case_generalization_bound": false,
+      "production_mesh_selection_contract_bound": false,
+      "production_mesh_admission_enabled": false
+    },
+    "R103_transfer_matrix": {
+      "path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-transfer-matrix-r1.json",
+      "row_count": 14,
+      "canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+      "r103_primary_sequence_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "r103_secondary_sequence_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "r103_threshold_grid_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "r103_two_consecutive_pair_rule_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "r103_headroom_rule_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "r103_resource_cap_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "R98_C_round_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "R102_Q_ref_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "R102_U_Q_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING",
+      "wall_extrema_numeric_acceptance_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING"
+    },
+    "lifecycle_and_blockers": {
+      "candidate_created": true,
+      "reviewed_authority": false,
+      "production_admission_enabled": false,
+      "next_gate": "AUTHORIZE_TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_ONLY"
+    },
+    "validation": {
+      "predecessor_and_pr_state": "PASS",
+      "R1_R103_immutability_and_append_only": "PASS",
+      "R103_scope_and_existing_authority_search": "PASS",
+      "topology_identity_mapping_and_transfer_matrix": "PASS",
+      "no_hidden_defaults_and_fail_closed_admission": "PASS",
+      "JSON_canonical_hash_linkage": "PASS",
+      "ruff_ruff_format_mypy_manifest": "PASS",
+      "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "production_rating_performed": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "mesh_policy_retuned": false,
+      "precision_policy_retuned": false,
+      "reference_oracle_redefined": false,
+      "R103_rewritten": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "next_gate": "AUTHORIZE_TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_ONLY",
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-r1.md",
+      "document_sha256": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+      "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-r1.json",
+      "evidence_file_sha256": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+      "evidence_canonical_hash": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d",
+      "transfer_matrix_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-transfer-matrix-r1.json",
+      "transfer_matrix_file_sha256": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+      "transfer_matrix_canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+      "registry_extension_key": "r104_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "canonical_hash": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d"
+  },
+  "canonical_hash": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887"
 }
