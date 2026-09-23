@@ -1,0 +1,166 @@
+{
+  "schema_version": "1.0",
+  "task_id": "TASK172_V0_7_MESH_CONVERGENCE_QUALIFICATION_R2",
+  "study_status": "BLOCKED_MESH_CONVERGENCE_QUALIFICATION_R2",
+  "candidate_profile_bound": false,
+  "authorized_predecessor_head": "fe9377cc1ea67370572b95338e54e861eda8a870",
+  "input_matrix_canonical_hash": "b13d4306f3a2a60f248fbd1b222a6069599ec08a3c094996b17019ac315ae2d8",
+  "input_matrix_hash_verified": true,
+  "r95_fixture_definitions_changed": false,
+  "r95_mesh_sequence_changed": false,
+  "r95_threshold_grid_changed": false,
+  "effective_profile": {
+    "candidate_id": "P1_ACCEPTANCE_EXTENSION",
+    "method": "trf",
+    "loss": "linear",
+    "ftol": 1e-6,
+    "xtol": 1e-12,
+    "gtol": 1e-12,
+    "jacobian": "2-point",
+    "diff_step": 1e-5,
+    "x_scale": "INITIALIZATION_DERIVED",
+    "max_nfev": 6,
+    "residual_callback_cap": 24,
+    "residual_scale": "abs(q_ts_seed)",
+    "c_round": 1.0,
+    "tr_solver": "exact",
+    "tr_options": {},
+    "f_scale": 1.0,
+    "jac_sparsity": null
+  },
+  "former_blocking_cell_replay": {
+    "fixture_id": "M01",
+    "sequence_id": "PRIMARY",
+    "cell_count": 8,
+    "cell_interval_exact": ["1/4", "3/8"],
+    "residuals_W": [
+      2.0605739337042905e-13,
+      -3.3173463975799677e-13,
+      2.0472512574087887e-13
+    ],
+    "bounds_W": [
+      3.398902209176952e-13,
+      1.1859623542126045e-12,
+      2.371635179802862e-12
+    ],
+    "residual_to_bound_ratios": [
+      0.6062469017616311,
+      0.2797176812397601,
+      0.08632235155066989
+    ],
+    "nfev": 4,
+    "residual_callback_count": 16,
+    "accepted": true
+  },
+  "pointwise_role_audit": {
+    "fixture_id": "M05",
+    "explicit_hot_side": "TUBE",
+    "sample_count": 4097,
+    "minimum_same_coordinate_hot_minus_cold_K": 0.008600000000001273,
+    "local_role_crossover": false,
+    "global_temperature_ranges_overlap": true,
+    "all_sampled_states_in_reviewed_domain": true
+  },
+  "execution": {
+    "required_fixture_count": 6,
+    "complete_mesh_result_matrix_available": false,
+    "primary_sequence": [1, 2, 4, 8, 16, 32, 64, 128],
+    "secondary_sequence": [3, 6, 12, 24, 48, 96],
+    "completed_fixtures_before_blocker": ["M01", "M02", "M03", "M04"],
+    "accepted_local_cell_solves_before_blocker": 1776,
+    "blocking_fixture": "M05",
+    "m05_cells_started": false,
+    "m06_reached": false,
+    "threshold_sensitivity_performed": false
+  },
+  "continuous_reference": {
+    "fixture_id": "M05",
+    "blocking_code": "PRECISION_FLOOR_UNRESOLVED",
+    "blocking_predicate": "FROZEN_GAUSS_REFERENCE_STABILITY_PASS_FOR_M05=false",
+    "quadrature_orders": [128, 256, 512],
+    "Q_ref_W": {
+      "128": 0.2222234220550436,
+      "256": 0.22222342205515927,
+      "512": 0.22222342205526033
+    },
+    "abs_Q128_minus_Q256_W": 1.1565748359032568e-13,
+    "abs_Q256_minus_Q512_W": 1.0105805081650487e-13,
+    "frozen_criterion": "64 * ulp(Q512)",
+    "criterion_W": 1.7763568394002505e-15,
+    "criterion_units_128_256": 65.109375,
+    "criterion_units_256_512": 56.890625,
+    "quadrature_stability_pass": false,
+    "wall_extrema_sampling_counts": [257, 513],
+    "wall_extrema_sampling_difference_K": {
+      "Twi_min": 0.0,
+      "Twi_max": 0.0,
+      "Two_min": 0.0,
+      "Two_max": 0.0
+    },
+    "wall_extrema_sampling_stability_pass": true
+  },
+  "runtime_replay": {
+    "py311": {
+      "python": "3.11.15",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "m05_oracle_values_and_failure_reproduced": true,
+      "full_r2_worker_reached_failure": true
+    },
+    "py312": {
+      "python": "3.12.13",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "m05_oracle_values_and_failure_reproduced": true,
+      "full_mesh_matrix_replayed": false
+    },
+    "dual_runtime_replay_scope": "M05_CONTINUOUS_ORACLE_BLOCKER_ONLY",
+    "same_values_across_runtimes": true
+  },
+  "failure_fixture_audit": {
+    "failure_fixture_count": 8,
+    "all_expected_typed_outcomes_observed": true
+  },
+  "threshold_sensitivity": {
+    "performed": false,
+    "frozen_grid": ["1e-2", "1e-3", "1e-4", "1e-5"],
+    "reason": "complete independent continuous reference unavailable"
+  },
+  "precision_floor": {
+    "bound": false,
+    "q_W": null,
+    "wall_K": null,
+    "reason": "M05 frozen Gauss reference stability criterion failed"
+  },
+  "authority_candidate": {
+    "created": false,
+    "lifecycle": "NONE",
+    "mesh_convergence_canonical_blocker_removed": false,
+    "remaining_blockers": ["MESH-CONVERGENCE-QUALIFICATION"],
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "task172_entry_authority_complete": false,
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED"
+  },
+  "governance": {
+    "mesh_study_performed": true,
+    "mesh_study_is_production_rating": false,
+    "production_code_changed": false,
+    "engineering_calculation_production_path_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "task173_solver_executed": false,
+    "task174_hydraulic_solver_executed": false,
+    "production_mesh_selected": false,
+    "richardson_extrapolation_used": false,
+    "grid_convergence_index_used": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "canonical_hash": "cf7c1567dffa1cf84c679e94a18a5f6f18701cc85ad312e1d744d45b4610ba3e"
+}
