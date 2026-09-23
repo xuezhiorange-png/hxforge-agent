@@ -17722,5 +17722,117 @@
     },
     "canonical_hash": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d"
   },
-  "canonical_hash": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887"
+  "r105_extension": {
+    "task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_R1",
+    "mode": "APPEND_ONLY_INDEPENDENT_REVIEW",
+    "result": "BLOCKED_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW",
+    "previous_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "historical_boundary": {
+      "r1_r103_payloads_immutable": true,
+      "r1_r103_registry_extensions_rewritten": false,
+      "r104_payloads_immutable": true,
+      "r104_extension_rewritten": false,
+      "r104_predecessor_head": "8703d17e88b9215b755d402bd4686d36f14ad673"
+    },
+    "independent_replay": {
+      "R103_result": "PASS_MESH_CONVERGENCE_QUALIFICATION",
+      "R103_lifecycle": "REVIEWED_AUTHORITY",
+      "R103_scope": "FROZEN_SYNTHETIC_FIXTURE_PROFILE_ONLY",
+      "existing_reviewed_real_case_mesh_authority_found": false,
+      "r104_direct_file_sha_values_match": true,
+      "r104_shared_canonical_hashes_match": false,
+      "r104_declared_evidence_canonical_hash": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d",
+      "r104_recomputed_evidence_canonical_hash": "2164dcfcdc585281238598d6bc271bbe015b72ce97fa5cc5326a888993457135",
+      "r104_declared_matrix_canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+      "r104_recomputed_matrix_canonical_hash": "5b5e92f7346b22cd1de0e5c28caa0ef67e211df91febb70d3354f9ed3f94e14a",
+      "r104_declared_extension_canonical_hash": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d",
+      "r104_recomputed_extension_canonical_hash": "e035372e976e1ede05482c30c59c0d8a3defd4c3bfc802c87321144ba3f1d8bc",
+      "r104_declared_registry_root_canonical_hash": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887",
+      "r104_recomputed_registry_root_canonical_hash": "00353f88e0c6c5aba94f2043403e41208014e769a05c8461ffada76169af41d7"
+    },
+    "review_adjudication": {
+      "supported_topology_review_pass": true,
+      "physical_to_cell_mapping_review_pass": true,
+      "mesh_identity_schema_structural_review_pass": true,
+      "canonicalization_review_pass": false,
+      "determinism_contract_review_pass": true,
+      "r103_transfer_matrix_row_count": 14,
+      "r103_transfer_matrix_independent_review_complete": true,
+      "r103_transfer_matrix_all_rows_pass": false,
+      "no_hidden_defaults_review_pass": true,
+      "unbound_policy_slots_preserved": true,
+      "case_level_authority_gates_preserved_review_pass": true,
+      "typed_failure_vocabulary_review_pass": true,
+      "r104_headroom_transfer_basis_correction_required": true,
+      "admission_predicate_unbound_operand_correction_required": true,
+      "lifecycle_promoted": false,
+      "real_case_mesh_admission_contract_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "mesh_authority_real_case_generalization_bound": false,
+      "production_mesh_selection_contract_bound": false,
+      "production_mesh_admission_enabled": false
+    },
+    "findings": [
+      "R104-HASH-01",
+      "R104-PREDICATE-02",
+      "R104-XFER-07"
+    ],
+    "quantitative_mesh_gaps": [
+      "REAL-MESH-INITIAL",
+      "REAL-MESH-REFINEMENT",
+      "REAL-MESH-CONVERGENCE",
+      "REAL-MESH-HEADROOM",
+      "REAL-MESH-RESOURCE",
+      "REAL-MESH-REFERENCE",
+      "REAL-MESH-WALL-ACCEPTANCE",
+      "REAL-MESH-ROUNDING",
+      "REAL-MESH-NORMALIZATION"
+    ],
+    "next_gate": "AUTHORIZE_TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_ONLY",
+    "validation": {
+      "predecessor_pr_state_and_head": "PASS",
+      "R104_parent_and_provenance": "PASS",
+      "R1_R104_payload_immutability": "PASS",
+      "r104_direct_sha256_replay": "PASS",
+      "r104_shared_canonical_hash_replay": "FAIL",
+      "R103_scope_replay": "PASS",
+      "independent_real_case_authority_search": "PASS_NONE_FOUND",
+      "supported_topology_and_mapping_review": "PASS",
+      "14_row_transfer_review": "COMPLETE_ONE_BASIS_CORRECTION_REQUIRED",
+      "unbound_policy_and_predicate_review": "CORRECTION_REQUIRED",
+      "case_level_gates_and_failure_vocabulary": "PASS",
+      "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-independent-review-r1.md",
+      "document_sha256": "1eaea1c248d4cf7fe2c27fe511f9df9a605772936036fb367135e0851e29785a",
+      "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-independent-review-r1.json",
+      "evidence_file_sha256": "936f87ee9bd2fe89d9952fc2797b7f2c0a9fd9ba8059174ca684f33269159d51",
+      "evidence_canonical_hash": "0c743257e2424410feddd2383c1baba5b7892237a61f98717549c6d47a74af64",
+      "matrix_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-independent-review-matrix-r1.json",
+      "matrix_file_sha256": "c3139f305d4b24ec175fbf8c2cfbcd46daf9e616de3c6111465e358d53d3ce7f",
+      "matrix_canonical_hash": "c251394811ac1d2aa073581594907047e13024df27a12e0c8823e4b4de3dbe75",
+      "registry_extension_key": "r105_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "numerical_or_mesh_experiment_performed": false,
+      "mesh_policy_retuned": false,
+      "precision_policy_retuned": false,
+      "reference_oracle_redefined": false,
+      "r104_rewritten": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "canonical_hash": "4ee3f0ef68b19f8e2ae801bb283d5983e5972d0fc9a8709087b94518240c4de9"
+  },
+  "canonical_hash": "ffb1f2324c7a7cb95563399d28540043bbcdddd1d07139a5a8e986fa5298f1e0"
 }

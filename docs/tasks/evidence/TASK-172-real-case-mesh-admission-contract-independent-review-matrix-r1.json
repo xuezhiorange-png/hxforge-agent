@@ -1,0 +1,146 @@
+{
+  "schema_version": "task172.real-case-mesh-admission-independent-review-matrix.r1",
+  "task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_R1",
+  "review_target": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_R1",
+  "reviewed_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+  "row_count": 14,
+  "matrix": [
+    {
+      "r103_element": "physical_support_and_event_preservation",
+      "r104_transfer_status": "DIRECTLY_TRANSFERABLE",
+      "independent_review_status": "PASS",
+      "source_basis": "TASK170 v0.7 engineering-model boundary; TASK171 reviewed R4/R5 topology and cell-compartment contracts; TASK171 implemented structural mapping invariants. Transfer is based on structural authority, not R103 synthetic outcomes.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "primary_sequence_cell_counts",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R103 final qualification results bind [1,2,4,8,16,32,64,128] to the six frozen synthetic fixtures; TASK171 explicitly leaves numeric production mesh counts unbound.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "secondary_alignment_sequence_cell_counts",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R103 final qualification results bind [3,6,12,24,48,96] as the synthetic secondary sequence only; no real-case independently mapped sequence is reviewed.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "three_axis_threshold_grid_and_selected_tuple",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R103 frozen 64-tuple sensitivity matrix and its selected (0.01, 0.01 W, 0.01 K) tuple are synthetic-profile results; TASK171 and TASK172 leave production thresholds unbound.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "componentwise_loosest_feasible_threshold_selection_rule",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R103 applies this objective only to its frozen synthetic sensitivity matrix; no real-case objective or candidate feasibility set is authority-bound.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "two_consecutive_passing_pairs",
+      "r104_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "independent_review_status": "PASS",
+      "source_basis": "TASK172 mesh-convergence contract §11 requires a future criterion to bind required consecutive evidence, but does not transfer R103's numeric value 2; R103's count remains fixture-specific.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "one_later_headroom_level",
+      "r104_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "independent_review_status": "BLOCKED_BASIS_ATTRIBUTION",
+      "source_basis": "R103's one-later-level rule is synthetic-only. TASK172 mesh-convergence contract §11 requires consecutive evidence but contains no headroom requirement; R104 may propose a new headroom slot, but cannot describe that slot as inherited TASK172 authority.",
+      "scope_correct": false,
+      "overclaim_present": true,
+      "correction_required": true
+    },
+    {
+      "r103_element": "resource_cap_grid_and_selected_cap",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R103's [32,64,128,256] cap study and selected synthetic cap 128 are fixture feasibility evidence. TASK171 §resource limits classifies 4096 raw records as a structural admission safeguard, not a mesh-cell cap.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "R98_C_round_overlay",
+      "r104_transfer_status": "ADDITIONAL_AUTHORITY_REQUIRED",
+      "independent_review_status": "PASS",
+      "source_basis": "R98 independent review binds C_round=1.0 to its fixed mesh-cell-scale training/holdout scope and R103 consumes it only on frozen synthetic fixtures; no general real-case transfer is established.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "R102_canonical_Q_ref",
+      "r104_transfer_status": "VALIDATION_ONLY_NOT_PRODUCTION_POLICY",
+      "independent_review_status": "PASS",
+      "source_basis": "R102 reviews SciPy roots_legendre order 1024 as a continuous-reference producer for frozen synthetic fixtures; it does not require an online production oracle for each real case.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "R102_U_Q_uncertainty_envelope",
+      "r104_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING",
+      "independent_review_status": "PASS_WITH_LIMITATION",
+      "source_basis": "R102 establishes only the measured empirical-envelope classification and its non-formal-bound limitation for frozen references; R104 explicitly leaves numeric U_Q values and any real-case reference propagation formula unbound.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "wall_extrema_observables_and_thresholds",
+      "r104_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING",
+      "independent_review_status": "PASS_WITH_LIMITATION",
+      "source_basis": "TASK170 requires local wall temperatures and TASK171 binds physical wall/support identities; R103's synthetic extrema and 0.01 K threshold are not real-case expected values or acceptance limits.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "deterministic_replay",
+      "r104_transfer_status": "TRANSFERABLE_WITH_REAL_CASE_BINDING",
+      "independent_review_status": "PASS_WITH_LIMITATION",
+      "source_basis": "TASK171 requires canonical identity/provenance and deterministic replay semantics; R103's numerical and cross-runtime observations remain limited to its six fixtures and tested runtimes.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    },
+    {
+      "r103_element": "failure_taxonomy_and_fail_closed_behavior",
+      "r104_transfer_status": "DIRECTLY_TRANSFERABLE",
+      "independent_review_status": "PASS_WITH_LAYER_BOUNDARY",
+      "source_basis": "The structural codes are present in TASK171 segmented-topology errors; mesh statuses and missing-observable/precision-floor vocabulary are present in TASK172 mesh-convergence contract §§11–12. R104 says no runtime enum is created.",
+      "scope_correct": true,
+      "overclaim_present": false,
+      "correction_required": false
+    }
+  ],
+  "summary": {
+    "semantic_transfer_dispositions_independently_reviewed": true,
+    "rows_passing_without_correction": 13,
+    "rows_requiring_source_basis_correction": 1,
+    "all_rows_pass": false,
+    "notes": [
+      "The headroom disposition itself remains fail-closed as ADDITIONAL_AUTHORITY_REQUIRED; the defect is the claim that the existing TASK172 contract requires headroom, which it does not state.",
+      "This matrix is an independent review record, not a production mesh policy or authority promotion."
+    ]
+  },
+  "canonical_hash": "c251394811ac1d2aa073581594907047e13024df27a12e0c8823e4b4de3dbe75"
+}
