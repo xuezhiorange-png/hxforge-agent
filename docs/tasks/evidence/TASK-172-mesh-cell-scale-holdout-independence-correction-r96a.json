@@ -1,0 +1,295 @@
+{
+  "schema_version": "task172.mesh-cell-scale-holdout-correction.r1",
+  "task_id": "TASK172_V0_7_MESH_CELL_SCALE_HOLDOUT_INDEPENDENCE_CORRECTION_R96A",
+  "mode": "APPEND_ONLY_HOLDOUT_INDEPENDENCE_CORRECTION_ONLY",
+  "result": "CORRECTED_NON_DYADIC_HOLDOUT_FROZEN",
+  "predecessor": {
+    "authorized_head": "328cec44fe37299346da3ccda97c35fd06dfa1cb",
+    "observed_local_head": "328cec44fe37299346da3ccda97c35fd06dfa1cb",
+    "observed_pr_head": "328cec44fe37299346da3ccda97c35fd06dfa1cb",
+    "pr_number": 277,
+    "pr_state": "OPEN",
+    "pr_is_draft": true,
+    "branch": "docs/v0-7-task172-entry-authority",
+    "pass": true
+  },
+  "r96_candidate_preservation": {
+    "selected_candidate_id": "P1_ACCEPTANCE_EXTENSION",
+    "selected_candidate_profile": {
+      "candidate_id": "P1_ACCEPTANCE_EXTENSION",
+      "method": "trf",
+      "loss": "linear",
+      "ftol": 1e-6,
+      "xtol": 1e-12,
+      "gtol": 1e-12,
+      "jacobian": "2-point",
+      "diff_step": 1e-5,
+      "x_scale": "INITIALIZATION_DERIVED",
+      "max_nfev": 6,
+      "residual_callback_cap": 24,
+      "residual_scale": "abs(q_ts_seed)",
+      "tr_solver": "exact",
+      "tr_options": {},
+      "f_scale": 1.0,
+      "jac_sparsity": null,
+      "c_round": 1.0
+    },
+    "selected_profile_canonical_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
+    "r96_dyadic_scale_training_valid": true,
+    "r96_training_case_count": 72,
+    "r96_selected_result_matrix_canonical_hash": "f8cdc67fd28aac5baf85ca21a3b4eb1edc02401aef522eebcf66b9c53faa00d1",
+    "r96_results_file_canonical_hash": "091ba119c4f1fd99d12b2484bd295aff7640ce8ab5432cc4fe54e0e805a16cc9",
+    "r96_r95_diagnostic_valid": true,
+    "r95_diagnostic": {
+      "fixture_id": "M01",
+      "sequence": "PRIMARY",
+      "cell_count": 8,
+      "cell_interval_exact": ["1/4", "3/8"],
+      "cell_fraction_exact": "1/8",
+      "solver_success": true,
+      "solver_status": 3,
+      "r94_c_round_0_5_residual_to_bound_ratio": 1.2124938035232622,
+      "p1_c_round_1_0_diagnostic_pass": true
+    },
+    "replay_mode": "STATIC_IMMUTABLE_ARTIFACT_AND_HASH_REPLAY_ONLY",
+    "numerical_rerun_performed": false,
+    "candidate_reselected": false
+  },
+  "original_holdout_contamination": {
+    "path": "docs/tasks/evidence/TASK-172-mesh-cell-scale-numerical-acceptance-holdout-input-r1.json",
+    "file_sha256": "d1d49c6a9079a9b7a39f3a4b1b819ae82c15bcd367883c739a1d119bc55f7998",
+    "canonical_hash": "9c0d41a78836a24b55d21ff76ccb88b1c83d3df291f310cb106e9c653463f60a",
+    "independence_valid": false,
+    "must_not_be_executed": true,
+    "historical_artifact_rewritten": false,
+    "exact_duplicates": [
+      {
+        "holdout_case_id": "K04",
+        "prior_case_id": "R94:H05",
+        "exact_duplicate": true,
+        "matched_fields": [
+          "tube_bulk_K",
+          "shell_bulk_K",
+          "s_ts",
+          "pressure_Pa",
+          "reynolds",
+          "total_resistance_base_K_W",
+          "resistance_fractions.tube_film",
+          "resistance_fractions.wall",
+          "resistance_fractions.shell_film",
+          "tube_c3_active",
+          "shell_jmu_active"
+        ]
+      },
+      {
+        "holdout_case_id": "K05",
+        "prior_case_id": "R94:H04",
+        "exact_duplicate": true,
+        "matched_fields": [
+          "tube_bulk_K",
+          "shell_bulk_K",
+          "s_ts",
+          "pressure_Pa",
+          "reynolds",
+          "total_resistance_base_K_W",
+          "resistance_fractions.tube_film",
+          "resistance_fractions.wall",
+          "resistance_fractions.shell_film",
+          "tube_c3_active",
+          "shell_jmu_active"
+        ]
+      }
+    ]
+  },
+  "prior_reference_bindings": {
+    "r94": {
+      "path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-holdout-r1.json",
+      "file_sha256": "50c0733aba84a3a1d375a0c15e690d342e6c4c7c75589d7d33246e81d0500511",
+      "artifact_canonical_hash": "0cf13bf360d24937d156b7a7c80849222bccdc3d6fa0c6ee8cfd6d71812ccf5d",
+      "h01_h08_matrix_canonical_hash": "a82da762b4c70ac2c7adf412d417a5e979603b37074c5cf246cce4e3c85c99f2",
+      "case_ids": ["H01", "H02", "H03", "H04", "H05", "H06", "H07", "H08"]
+    },
+    "r95": {
+      "fixture_definition_runner_path": "docs/tasks/evidence/TASK-172-mesh-convergence-qualification-runner-r1.py",
+      "fixture_definition_runner_sha256": "eba64d853371d95c3a62a954ab7620365394bc496256a1abafa2df48972a924d",
+      "evidence_path": "docs/tasks/evidence/TASK-172-mesh-convergence-qualification-r1.json",
+      "evidence_file_sha256": "ab0c091ddb1a83e2b1cee459fb5a3c641ae3acf1c8edaf0fa7d60a6bd29d2dd2",
+      "evidence_canonical_hash": "61d399b8ae557c7ee2912ef48715f10491aab64a4e5c4259b403e71143f6502a",
+      "results_path": "docs/tasks/evidence/TASK-172-mesh-convergence-qualification-results-r1.json",
+      "results_file_sha256": "6dfa196e71de9997e5a10e9bcff76d546c20721753ab26e898346db7330e620f",
+      "results_canonical_hash": "46cb34272f69bec5ff72bd07e704e80f697a4302b6fe35759514ce260731a2bf",
+      "case_ids": ["M01", "M02", "M03", "M04", "M05", "M06"],
+      "temperature_identity": "Support-dependent functions as frozen in the runner, compared as complete profile identities rather than sampled local values"
+    }
+  },
+  "duplicate_audit": {
+    "normalization": {
+      "numeric_values": "Decimal(str(value)) exact value equality",
+      "resistance_fraction_order": ["tube_film", "wall", "shell_film"],
+      "case_tuple_fields": [
+        "tube_bulk_K",
+        "shell_bulk_K",
+        "s_ts",
+        "pressure_Pa",
+        "reynolds",
+        "total_resistance_base_K_W",
+        "resistance_fractions.tube_film",
+        "resistance_fractions.wall",
+        "resistance_fractions.shell_film",
+        "tube_c3_active",
+        "shell_jmu_active"
+      ],
+      "r95_temperature_comparison": "Compare the full support-dependent profile function identity, not a sampled midpoint; each frozen R95 tube/shell temperature formula is nonconstant and therefore differs from any single constant K bulk-state identity."
+    },
+    "prior_case_ids": [
+      "R94:H01",
+      "R94:H02",
+      "R94:H03",
+      "R94:H04",
+      "R94:H05",
+      "R94:H06",
+      "R94:H07",
+      "R94:H08",
+      "R95:M01",
+      "R95:M02",
+      "R95:M03",
+      "R95:M04",
+      "R95:M05",
+      "R95:M06"
+    ],
+    "corrected_pairwise_exact_duplicate_matrix": [
+      {"case_id": "K01", "exact_duplicate_by_prior_case": [false, false, false, false, false, false, false, false, false, false, false, false, false, false]},
+      {"case_id": "K02", "exact_duplicate_by_prior_case": [false, false, false, false, false, false, false, false, false, false, false, false, false, false]},
+      {"case_id": "K03", "exact_duplicate_by_prior_case": [false, false, false, false, false, false, false, false, false, false, false, false, false, false]},
+      {"case_id": "K04", "exact_duplicate_by_prior_case": [false, false, false, false, false, false, false, false, false, false, false, false, false, false]},
+      {"case_id": "K05", "exact_duplicate_by_prior_case": [false, false, false, false, false, false, false, false, false, false, false, false, false, false]}
+    ],
+    "corrected_duplicate_case_counts": {"K01": 0, "K02": 0, "K03": 0, "K04": 0, "K05": 0},
+    "original_holdout_exact_duplicates": [
+      {
+        "holdout_case_id": "K04",
+        "prior_case_id": "R94:H05",
+        "matched_fields": ["tube_bulk_K", "shell_bulk_K", "s_ts", "pressure_Pa", "reynolds", "total_resistance_base_K_W", "resistance_fractions.tube_film", "resistance_fractions.wall", "resistance_fractions.shell_film", "tube_c3_active", "shell_jmu_active"],
+        "exact_duplicate": true
+      },
+      {
+        "holdout_case_id": "K05",
+        "prior_case_id": "R94:H04",
+        "matched_fields": ["tube_bulk_K", "shell_bulk_K", "s_ts", "pressure_Pa", "reynolds", "total_resistance_base_K_W", "resistance_fractions.tube_film", "resistance_fractions.wall", "resistance_fractions.shell_film", "tube_c3_active", "shell_jmu_active"],
+        "exact_duplicate": true
+      }
+    ],
+    "corrected_holdout_exact_prior_duplicate_count": 0,
+    "all_corrected_cases_have_no_exact_prior_base_duplicate": true,
+    "canonical_hash": "a8a18e1003f4ed09ed198a5a0bee90247408d07e9d1e6215aec80679109c697a"
+  },
+  "semantic_diversity": {
+    "prior_base_duplicate_status": {
+      "K01_PRIOR_BASE_DUPLICATE": false,
+      "K02_PRIOR_BASE_DUPLICATE": false,
+      "K03_PRIOR_BASE_DUPLICATE": false,
+      "K04_REPLACEMENT_PRIOR_BASE_DUPLICATE": false,
+      "K05_REPLACEMENT_PRIOR_BASE_DUPLICATE": false
+    },
+    "case_classes": [
+      "K01_DUAL_ACTIVE_TUBE_HOT",
+      "K02_DUAL_ACTIVE_SHELL_HOT",
+      "K03_DUAL_ACTIVE_NEAR_ZERO",
+      "K04_TUBE_C3_ONLY",
+      "K05_DUAL_ACTIVE_NEGATIVE_Q"
+    ],
+    "role_sign_class_coverage_complete": true,
+    "statistical_independence_claimed": false
+  },
+  "corrected_holdout": {
+    "path": "docs/tasks/evidence/TASK-172-mesh-cell-scale-numerical-acceptance-holdout-input-r96a.json",
+    "file_sha256": "a4d4658c0abb680662ecb058de3f5ffcae2f73f80dabf493a322fd84b11df2a3",
+    "canonical_hash": "5efc368eedee738d507fbf15bf592539d4c68b8017b4d254b6cc4c27ccfbd3e0",
+    "base_case_matrix_canonical_hash": "8bfa38ae0c28a047000782b2dc484ddf62797ccbf6d55faa1034f8ddc2fa06d0",
+    "duplicate_audit_canonical_hash": "a8a18e1003f4ed09ed198a5a0bee90247408d07e9d1e6215aec80679109c697a",
+    "selected_profile_canonical_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
+    "case_count": 5,
+    "scale_count": 6,
+    "expected_case_count": 30,
+    "scale_fractions_exact": ["1/3", "1/6", "1/12", "1/24", "1/48", "1/96"],
+    "lifecycle": "FROZEN_NOT_EXECUTED",
+    "executed": false,
+    "property_backend_called": false,
+    "solver_called": false,
+    "independent_review_required_before_execution": true
+  },
+  "lifecycle_and_blockers": {
+    "r96_scale_extension_candidate_preserved": true,
+    "r96_selected_candidate": "P1_ACCEPTANCE_EXTENSION",
+    "extension_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "new_authority_self_approval": false,
+    "numerical_error_budget_and_stopping_canonical_blocker_removed": true,
+    "mesh_convergence_canonical_blocker_removed": false,
+    "remaining_parent_blockers": ["MESH-CONVERGENCE-QUALIFICATION"],
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "task172_entry_authority_complete": false,
+    "r95_mesh_qualification_resume_authorized": false
+  },
+  "historical_boundary": {
+    "r1_r96_payloads_immutable": true,
+    "r1_r96_extensions_rewritten": false,
+    "r96_original_holdout_rewritten": false,
+    "historical_registry_root_canonical_hash": "7571610badc8e78cb38a3012748539670812b87d6d439ccd2f1644336bfa4e75"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "corrected_holdout_executed": false,
+    "property_backend_called_for_holdout": false,
+    "solver_called_for_holdout": false,
+    "mesh_threshold_sensitivity_performed": false,
+    "r95_rerun_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-mesh-cell-scale-holdout-independence-correction-r96a.md",
+    "document_sha256": "d02b42ba3118dd2ba97560219d0781a875aff0a3edf1ed1fcd6537a9381fb644",
+    "corrected_holdout_path": "docs/tasks/evidence/TASK-172-mesh-cell-scale-numerical-acceptance-holdout-input-r96a.json",
+    "corrected_holdout_file_sha256": "a4d4658c0abb680662ecb058de3f5ffcae2f73f80dabf493a322fd84b11df2a3",
+    "corrected_holdout_canonical_hash": "5efc368eedee738d507fbf15bf592539d4c68b8017b4d254b6cc4c27ccfbd3e0",
+    "evidence_file_sha256_is_bound_by_registry": true,
+    "evidence_canonical_hash_is_bound_by_registry": true,
+    "registry_extension_key": "r97_extension",
+    "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
+  },
+  "validation": {
+    "predecessor_head": "PASS",
+    "r96_selected_profile_replay": "PASS_STATIC_ARTIFACT_HASH",
+    "r96_training_result_replay": "PASS_STATIC_RESULT_HASH_NO_NUMERICAL_RERUN",
+    "r96_diagnostic_result_replay": "PASS_STATIC_DIAGNOSTIC_MATCH_NO_RERUN",
+    "original_holdout_contamination_confirmed": "PASS",
+    "k01_prior_duplicate_audit": "PASS_NO_DUPLICATE",
+    "k02_prior_duplicate_audit": "PASS_NO_DUPLICATE",
+    "k03_prior_duplicate_audit": "PASS_NO_DUPLICATE",
+    "k04_replacement_duplicate_audit": "PASS_NO_DUPLICATE",
+    "k05_replacement_duplicate_audit": "PASS_NO_DUPLICATE",
+    "normalized_numeric_duplicate_comparison": "PASS",
+    "corrected_holdout_freeze": "PASS",
+    "corrected_holdout_not_executed": "PASS",
+    "selected_profile_hash_unchanged": "PASS",
+    "no_property_backend_call": "PASS",
+    "no_solver_call": "PASS",
+    "no_mesh_threshold_work": "PASS",
+    "no_r95_rerun": "PASS",
+    "r1_r96_immutability": "PASS",
+    "json": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "manifest": "PASS",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+  },
+  "next_gate": "AUTHORIZE_TASK172_MESH_CELL_SCALE_NUMERICAL_ACCEPTANCE_EXTENSION_INDEPENDENT_REVIEW_R1_ONLY",
+  "canonical_hash": "497576e508a3a22b281b22fae4833de1b36e57e0635129c7dabf9f648c9355bb"
+}
