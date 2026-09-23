@@ -1,0 +1,351 @@
+{
+  "schema_version": "task172.quantitative-numerical-profile-independent-review-evidence.r1",
+  "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1",
+  "mode": "INDEPENDENT_REPLAY_AND_FROZEN_HOLDOUT_REVIEW_ONLY",
+  "pr": {
+    "number": 277,
+    "required_state": "OPEN_DRAFT",
+    "predecessor_head": "d4cf5e8c58188d648fb25b50dc0f5b5ce6206622"
+  },
+  "result": "REVIEWED_QUANTITATIVE_NUMERICAL_PROFILE_BLOCKER_CLOSED",
+  "review_target": {
+    "frozen_candidate_profile": {
+      "method": "trf",
+      "loss": "linear",
+      "ftol": 0.000001,
+      "xtol": 1e-12,
+      "gtol": 1e-12,
+      "jacobian": "2-point",
+      "diff_step": 0.00001,
+      "x_scale": [
+        "abs(q_hc_seed)",
+        "abs(T_tube_bulk-T_shell_bulk)",
+        "abs(T_tube_bulk-T_shell_bulk)"
+      ],
+      "residual_scale": "abs(q_ts_seed)",
+      "max_nfev": 6,
+      "residual_callback_cap": 24,
+      "tr_solver": "exact",
+      "tr_options": {},
+      "f_scale": 1,
+      "jac_sparsity": null
+    },
+    "residual_acceptance": {
+      "id": "C_RESIDUAL_SPECIFIC_ULP_OPERATION_BOUND",
+      "C_round": 0.5,
+      "authority_class": "METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
+      "formal_floating_point_theorem": false,
+      "versioned_project_acceptance_policy": true
+    }
+  },
+  "historical_replay": {
+    "r1_r93_immutable": true,
+    "r92": {
+      "document_sha256": "8bb263780ab1a4e6306eb559175a72fd42fcf25ec1cf094c9415946268230be3",
+      "evidence_file_sha256": "e750e08948482be6ac0d936f92fc2bfcbad44ae90b281aff75b8430fc2adbcc2",
+      "evidence_canonical_hash": "d50ebbbaa4d851376068e0a7efe8e53b6da1ecd095698e480bb8d88621352f1e",
+      "results_file_sha256": "65f0f9d0ef51d1d51865864d39a8836f43e65e0f6f13fb27601c102b5d965b7f",
+      "results_canonical_hash": "f86ba9b324323dc15bcd3c15c624b5235ae52fd8955b48990095279684818e65",
+      "runner_sha256": "fcae918100081984844207ced8e34cd2aa8fc6b1220013e583c4d400c56da649",
+      "extension_canonical_hash": "10ac107e91490158dc1a268651243af8115b6f1407a93cbc67002c7298ebbf7f",
+      "analytic_fixture_count": 10,
+      "analytic_oracle_replay": "PASS",
+      "shell_jmu_fixture_count": 4,
+      "shell_jmu_oracle_replay": "PASS",
+      "failure_policy_fixture_count": 9,
+      "failure_policy_replay": "PASS",
+      "exact_zero_branch": "PASS",
+      "serialization_replay": "PASS"
+    },
+    "r92a": {
+      "document_sha256": "df60a1884f7bec47f92748c8581e1a1a2e011a657be2f00398d26ca8f476866b",
+      "evidence_file_sha256": "dadd98da7591e843bcc20c243df01bee5b446cfee4b6530e5597b379ad012054",
+      "evidence_canonical_hash": "cb7ee75488d4a11e4c7898f9a20607cd74409a209ba40862ca2b3512b24f471c",
+      "results_file_sha256": "664c73b18b7f1fef29cb0996f3749ba24c551002f367718c4bd84c0f4f71aeac",
+      "results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae776c3f5f99b84d4077523cfea0c",
+      "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
+      "extension_canonical_hash": "1d363476516bbef0706fcece75c03b2176c1b34443e067df39067c0b0d1f7773",
+      "tube_c3_fixture_count": 8,
+      "dual_active_fixture_count": 8,
+      "dynamic_range_stress_fixture_count": 8,
+      "all_16_fixture_and_oracle_replay": "PASS",
+      "tube_c3_callback_review": "PASS",
+      "shell_jmu_callback_review": "PASS",
+      "dual_active_full_residual_review": "PASS"
+    }
+  },
+  "holdout": {
+    "path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-holdout-r1.json",
+    "pre_execution_file_sha256": "23f707ba9eb21a34a01a7da454c7a34a6923f8e9e03a6a80bd812d55eb81b5c1",
+    "pre_execution_canonical_hash": "205268c463409502dbedf04ca97121a4364f301718fe3f1c24b5ef29df6873cf",
+    "input_matrix_canonical_hash": "a82da762b4c70ac2c7adf412d417a5e979603b37074c5cf246cce4e3c85c99f2",
+    "frozen_profile_canonical_hash": "654dc963b6ca5a8fb934d9b2224c551c4e4329a4d8b7a5ce436c0e2488f4f4a4",
+    "fixture_ids": [
+      "H01",
+      "H02",
+      "H03",
+      "H04",
+      "H05",
+      "H06",
+      "H07",
+      "H08"
+    ],
+    "fixture_count": 8,
+    "accepted_count": 8,
+    "all_pass": true,
+    "result_matrix_canonical_hash": "915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99",
+    "input_matrix_hash_recorded_before_execution": true,
+    "c_round_frozen_before_holdout": true,
+    "c_round_reestimated_from_holdout": false,
+    "parameter_retuning_after_holdout": false,
+    "independent_oracle": "4097-point valid-domain, strict monotonicity/sign-bracket audit plus Brent; validation-only",
+    "production_scalar_reduction_selected": false,
+    "negative_signed_q_case_numerically_accepted": true,
+    "negative_q_applicability_policy_decided": false
+  },
+  "parameter_reviews": {
+    "ftol": {
+      "value": 0.000001,
+      "result": "PASS",
+      "basis": "R92/R92A sensitivity records; selected frozen profile passes all R92A and holdout fixtures"
+    },
+    "xtol": {
+      "value": 1e-12,
+      "result": "PASS",
+      "basis": "frozen candidate and sensitivity replay; no post-holdout change"
+    },
+    "gtol": {
+      "value": 1e-12,
+      "result": "PASS",
+      "basis": "frozen candidate and sensitivity replay; no post-holdout change"
+    },
+    "jacobian": {
+      "value": "2-point",
+      "result": "PASS",
+      "basis": "all reviewed cases accepted; 3-point sensitivity required 28 residual callbacks, beyond cap 24"
+    },
+    "diff_step": {
+      "value": 0.00001,
+      "result": "PASS",
+      "basis": "selected frozen step passes; 1e-6 sensitivity rejected 2 of 16 on Candidate C; no retuning"
+    },
+    "x_scale": {
+      "value": "INITIALIZATION_DERIVED",
+      "result": "PASS",
+      "basis": "dimensionally grounded duty and temperature scales; replayed alongside alternatives"
+    },
+    "max_nfev": {
+      "value": 6,
+      "result": "PASS",
+      "authority_class": "PROJECT_RESOURCE_POLICY",
+      "basis": "37 nonzero cases max nfev 4, p95 4, headroom 2; cap hit remains failure"
+    },
+    "residual_callback_cap": {
+      "value": 24,
+      "result": "PASS",
+      "basis": "37 nonzero cases max callback count 16, headroom 8; catches numerical-Jacobian calls"
+    }
+  },
+  "numerical_acceptance": {
+    "residual_acceptance_independent_review": "PASS",
+    "rule_is_formal_error_bound": false,
+    "rule_is_versioned_project_acceptance_policy": true,
+    "c_round": 0.5,
+    "holdout_reused_for_parameter_selection": false,
+    "physical_residual_units": "W",
+    "zero_duty_exact_branch": {
+      "review": "PASS",
+      "selected": true,
+      "solver_required": false,
+      "epsilon_or_deadband": false
+    },
+    "solver_success_is_engineering_acceptance": false,
+    "solver_success_with_unacceptable_residual_rejected": true,
+    "serialization": {
+      "review": "PASS",
+      "path": "hexagent.canonical_json.canonical_json_bytes_then_json.loads",
+      "tested_fields": [
+        "q_hc_W",
+        "T_wall_inner_K",
+        "T_wall_outer_K",
+        "r_i_W",
+        "r_w_W",
+        "r_o_W"
+      ],
+      "bitwise_round_trip": true,
+      "max_quantization_error_W": 0,
+      "max_quantization_error_K": 0
+    },
+    "error_budget": {
+      "iteration_root_error_quantified": true,
+      "serialization_quantization_error_quantified": true,
+      "combination_rule": "COMPONENTWISE_LINEAR_SUM_OF_OBSERVED_COMPONENT_ENVELOPES",
+      "composite_max_q_oracle_error_W": 2.9345414986892138e-12,
+      "composite_max_twi_oracle_error_K": 3.410605131648481e-13,
+      "composite_max_two_oracle_error_K": 5.684341886080802e-14,
+      "serialization_quantization_error_W": 0,
+      "serialization_quantization_error_K": 0,
+      "envelope_classification": "VALIDATION_ENVELOPE_ONLY",
+      "universal_production_error_bound": false,
+      "excluded": [
+        "PROPERTY_FORMULATION_ERROR",
+        "CORRELATION_MODEL_FORM_ERROR",
+        "REFERENCE_DATA_ERROR",
+        "DISCRETIZATION_ERROR",
+        "EXPERIMENTAL_UNCERTAINTY"
+      ]
+    },
+    "stagnation_detector_enabled": false,
+    "oscillation_detector_enabled": false,
+    "root_interval_tolerance_applicable": false,
+    "separate_wall_temperature_iteration_tolerance_applicable": false,
+    "separate_property_coupling_tolerance_applicable": false
+  },
+  "reproducibility": {
+    "runtimes": [
+      {
+        "python": "3.11.15",
+        "scipy": "1.17.1",
+        "numpy": "2.4.6",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "same_environment_raw_output_sha256_repeat_1": "2cfa1dbc22e619c94269a5a18e497b35ea965ca79362cf0303891acc3cf417f2",
+        "same_environment_raw_output_sha256_repeat_2": "2cfa1dbc22e619c94269a5a18e497b35ea965ca79362cf0303891acc3cf417f2"
+      },
+      {
+        "python": "3.12.13",
+        "scipy": "1.18.0",
+        "numpy": "2.5.0",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm-64bit",
+        "same_environment_raw_output_sha256_repeat_1": "aca9fdb6b3123e165729fb695e4be91aa59c4e1355ba23a207f79e2d24887874",
+        "same_environment_raw_output_sha256_repeat_2": "aca9fdb6b3123e165729fb695e4be91aa59c4e1355ba23a207f79e2d24887874"
+      },
+      {
+        "python": "3.14.5",
+        "scipy": "1.18.0",
+        "numpy": "2.5.0",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+        "same_environment_raw_output_sha256_repeat_1": "7877b96c6cc51bb4910259c625c6d0a83ccb8bd63c2db1f2211fa804634fbfea",
+        "same_environment_raw_output_sha256_repeat_2": "7877b96c6cc51bb4910259c625c6d0a83ccb8bd63c2db1f2211fa804634fbfea"
+      }
+    ],
+    "same_input_same_result_bytes": true,
+    "same_input_same_result_hash": true,
+    "numeric_hashes_identical_across_runtimes": true,
+    "cross_runtime_numeric_summary_hash": "c7eb241673520b8954fff78b66c451eaac0be9c418bf28afb9da997f4ea73061",
+    "r92_numeric_result_hash": "44747246ee473f87024cf9b24cb90347b2b4342659e4ea1a6ad7eff28208e265",
+    "r92a_numeric_result_hash": "9190c9622c1e298c18f7e8243500e3978bebab9995a85b52b9628e07c9d13be1",
+    "holdout_numeric_result_hash": "915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99"
+  },
+  "composite_validation_envelope": {
+    "classification": "VALIDATION_ENVELOPE_ONLY",
+    "nonzero_solver_fixture_count": 37,
+    "max_nfev": 4,
+    "p95_nfev": 4,
+    "max_residual_callback_count": 16,
+    "nfev_headroom_to_cap": 2,
+    "callback_headroom_to_cap": 8
+  },
+  "scope": {
+    "reviewed_model_level_profile": [
+      "clean wall profile",
+      "reviewed tube branches",
+      "reviewed shell J_mu",
+      "pure ordinary water property profile where active wall-property fixtures require it",
+      "signed q semantics",
+      "R88 three-unknown/three-residual system",
+      "deterministic direct algebraic initialization"
+    ],
+    "no_fouled_wall_authority_extension": true,
+    "no_new_fluid_or_correlation_authority": true,
+    "no_real_case_requirement_reopened": true,
+    "mesh_convergence_remains_open": true,
+    "production_solver_execution_authorized": false,
+    "production_implementation_started": false
+  },
+  "adjudication": {
+    "numerical_error_budget_stopping_review_result": "PASS",
+    "numerical_profile_authority_status": "REVIEWED_AUTHORITY",
+    "numerical_error_budget_and_stopping_canonical_blocker_removed": true,
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "remaining_blockers": [
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "task172_entry_authority_complete": false,
+    "executable_numerical_profile_bound": false,
+    "next_minimal_gate": "AUTHORIZE_TASK172_MESH_CONVERGENCE_QUALIFICATION_R1_ONLY"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "engineering_calculation_production_path_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "production_solver_execution_authorized": false,
+    "numerical_review_executed": true,
+    "mesh_study_performed": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "validation": {
+    "predecessor_head": "PASS",
+    "r92_independent_artifact_replay": "PASS",
+    "r92a_independent_artifact_replay": "PASS",
+    "tube_c3_callback_review": "PASS",
+    "shell_jmu_callback_review": "PASS",
+    "dual_active_full_residual_review": "PASS",
+    "holdout_preexecution_hash": "PASS",
+    "holdout_independent_oracle": "PASS",
+    "holdout_8_of_8": "PASS",
+    "c_round_anti_retuning": "PASS",
+    "residual_acceptance_policy_review": "PASS",
+    "ftol_review": "PASS",
+    "xtol_review": "PASS",
+    "gtol_review": "PASS",
+    "jacobian_review": "PASS",
+    "diff_step_review": "PASS",
+    "x_scale_review": "PASS",
+    "max_nfev_review": "PASS",
+    "callback_cap_review": "PASS",
+    "zero_duty_review": "PASS",
+    "solver_success_residual_rejection": "PASS",
+    "serialization_review": "PASS",
+    "error_component_separation": "PASS",
+    "cross_runtime_replay": "PASS",
+    "no_mesh_study": "PASS",
+    "r1_r93_immutability": "PASS",
+    "evidence_canonical_hash_nonempty": "PASS",
+    "json": "PASS",
+    "canonical_hash": "PENDING",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI",
+    "full_pytest": "NOT_RUN_EVIDENCE_AND_CONTROLLED_REVIEW_ONLY"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-independent-review-and-blocker-closure-r1.md",
+    "document_sha256": "c2c2a11b9bd9072d90571b9abc3568f20583e2c68928e6995dc301851672680a",
+    "evidence_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-and-blocker-closure-r1.json",
+    "holdout_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-holdout-r1.json",
+    "holdout_file_sha256": "50c0733aba84a3a1d375a0c15e690d342e6c4c7c75589d7d33246e81d0500511",
+    "holdout_canonical_hash": "0cf13bf360d24937d156b7a7c80849222bccdc3d6fa0c6ee8cfd6d71812ccf5d",
+    "runner_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-runner-r1.py",
+    "runner_sha256": "7e342f6cad0589616a3efdcf4b053d7b8d608c05be4f0c591c11d332025274f1",
+    "evidence_canonical_hash": "RECORDED_IN_R94_EXTENSION",
+    "extension_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT",
+    "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
+  },
+  "canonical_hash": "78dcd5dad1c5207e12a5732ad67c5d5a74140c53c1c504ab9eae0ed8728bf1d7"
+}

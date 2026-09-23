@@ -1,0 +1,120 @@
+{
+  "schema_version": "task172-numerical-profile-independent-review-holdout-input-v1",
+  "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1",
+  "review_target_head": "d4cf5e8c58188d648fb25b50dc0f5b5ce6206622",
+  "holdout_matrix": {
+    "area_i_m2": 0.04,
+    "area_o_m2": 0.055,
+    "parameter_class": "NUMERICAL_METHOD_FIXTURE_PARAMETERS_ONLY",
+    "fixtures": [
+      {
+        "case_id": "H01",
+        "type": "DUAL_ACTIVE",
+        "tube_bulk_K": 299.70,
+        "shell_bulk_K": 298.70,
+        "s_ts": 1,
+        "pressure_Pa": 100000,
+        "reynolds": 12000,
+        "total_resistance_base_K_W": 0.060,
+        "resistance_fractions": {"tube_film": 0.70, "wall": 0.20, "shell_film": 0.10}
+      },
+      {
+        "case_id": "H02",
+        "type": "DUAL_ACTIVE",
+        "tube_bulk_K": 298.70,
+        "shell_bulk_K": 299.70,
+        "s_ts": -1,
+        "pressure_Pa": 101325,
+        "reynolds": 75000,
+        "total_resistance_base_K_W": 0.045,
+        "resistance_fractions": {"tube_film": 0.10, "wall": 0.20, "shell_film": 0.70}
+      },
+      {
+        "case_id": "H03",
+        "type": "DUAL_ACTIVE",
+        "tube_bulk_K": 299.5002,
+        "shell_bulk_K": 299.5000,
+        "s_ts": 1,
+        "pressure_Pa": 100000,
+        "reynolds": 25000,
+        "total_resistance_base_K_W": 0.080,
+        "resistance_fractions": {"tube_film": 0.20, "wall": 0.60, "shell_film": 0.20}
+      },
+      {
+        "case_id": "H04",
+        "type": "DUAL_ACTIVE_NEGATIVE_Q",
+        "tube_bulk_K": 298.75,
+        "shell_bulk_K": 299.65,
+        "s_ts": 1,
+        "pressure_Pa": 101325,
+        "reynolds": 300000,
+        "total_resistance_base_K_W": 0.055,
+        "resistance_fractions": {"tube_film": 0.55, "wall": 0.30, "shell_film": 0.15}
+      },
+      {
+        "case_id": "H05",
+        "type": "TUBE_C3_ONLY",
+        "tube_bulk_K": 299.65,
+        "shell_bulk_K": 298.85,
+        "s_ts": 1,
+        "pressure_Pa": 100000,
+        "reynolds": 6000,
+        "total_resistance_base_K_W": 0.050,
+        "resistance_fractions": {"tube_film": 0.15, "wall": 0.25, "shell_film": 0.60}
+      },
+      {
+        "case_id": "H06",
+        "type": "TUBE_C3_ONLY",
+        "tube_bulk_K": 298.85,
+        "shell_bulk_K": 299.65,
+        "s_ts": -1,
+        "pressure_Pa": 101325,
+        "reynolds": 450000,
+        "total_resistance_base_K_W": 0.070,
+        "resistance_fractions": {"tube_film": 0.60, "wall": 0.25, "shell_film": 0.15}
+      },
+      {
+        "case_id": "H07",
+        "type": "DUAL_ACTIVE",
+        "tube_bulk_K": 299.80,
+        "shell_bulk_K": 298.50,
+        "s_ts": 1,
+        "pressure_Pa": 100000,
+        "reynolds": 1500000,
+        "total_resistance_base_K_W": 0.035,
+        "resistance_fractions": {"tube_film": 0.25, "wall": 0.15, "shell_film": 0.60}
+      },
+      {
+        "case_id": "H08",
+        "type": "DUAL_ACTIVE",
+        "tube_bulk_K": 298.50,
+        "shell_bulk_K": 299.80,
+        "s_ts": -1,
+        "pressure_Pa": 101325,
+        "reynolds": 3500,
+        "total_resistance_base_K_W": 0.090,
+        "resistance_fractions": {"tube_film": 0.60, "wall": 0.15, "shell_film": 0.25}
+      }
+    ]
+  },
+  "frozen_profile": {
+    "method": "trf",
+    "loss": "linear",
+    "ftol": 0.000001,
+    "xtol": 1e-12,
+    "gtol": 1e-12,
+    "jacobian": "2-point",
+    "diff_step": 0.00001,
+    "x_scale": "INITIALIZATION_DERIVED",
+    "residual_scale": "abs(q_ts_seed)",
+    "max_nfev": 6,
+    "residual_callback_cap": 24,
+    "tr_solver": "exact",
+    "tr_options": {},
+    "f_scale": 1.0,
+    "jac_sparsity": null,
+    "c_round": 0.5
+  },
+  "pre_execution_and_review_binding": {"pre_execution_binding":{"input_file_sha256":"23f707ba9eb21a34a01a7da454c7a34a6923f8e9e03a6a80bd812d55eb81b5c1","input_canonical_hash":"205268c463409502dbedf04ca97121a4364f301718fe3f1c24b5ef29df6873cf","holdout_matrix_canonical_hash":"a82da762b4c70ac2c7adf412d417a5e979603b37074c5cf246cce4e3c85c99f2","frozen_profile_canonical_hash":"654dc963b6ca5a8fb934d9b2224c551c4e4329a4d8b7a5ce436c0e2488f4f4a4","matrix_and_profile_unchanged_after_freeze":true,"hash_verified_before_first_numerical_solve":true},"review_replay":{"runner_path":"docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-runner-r1.py","r92_full_numeric_result_matrix_canonical_hash":"44747246ee473f87024cf9b24cb90347b2b4342659e4ea1a6ad7eff28208e265","r92_shell_jmu_subset_canonical_hash":"f443200b30b53fde988f63c7ffd3f65ca79dbf70492724c84717533fc86fb5c5","r92a_numeric_result_matrix_canonical_hash":"9190c9622c1e298c18f7e8243500e3978bebab9995a85b52b9628e07c9d13be1","holdout_numeric_result_matrix_canonical_hash":"915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99","frozen_profile_replayed_unchanged":true,"holdout_summary":{"accepted_count":8,"all_pass":true,"fixture_count":8,"max_callback_count":16,"max_nfev":4,"max_q_oracle_error_W":2.9345414986892138e-12,"max_twi_oracle_error_K":5.684341886080802e-14,"max_two_oracle_error_K":5.684341886080802e-14,"numeric_result_matrix_canonical_hash":"915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99","oracle_audit_all_pass":true,"p95_nfev":4},"holdout_fixture_results":[{"case_id":"H01","solution":{"T_wall_inner_K":298.9995714057804,"T_wall_outer_K":298.799836111268,"q_hc_W":16.64460787603386,"q_ts_W":16.64460787603386},"physical_residuals_W":[-7.958078640513122e-13,2.2453150450019166e-12,-2.9345414986892138e-12],"candidate_c_bounds_W":[1.3593640872255195e-12,4.743508690420102e-12,9.48530114365206e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":5.684341886080802e-14,"T_wall_outer_K":0,"q_hc_W":2.9345414986892138e-12},"solver_success":true,"solver_status":3,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[298.7994873046875,298.79993896484376],"oracle_monotonicity":"INCREASING"},{"case_id":"H02","solution":{"T_wall_inner_K":298.7998212123162,"T_wall_outer_K":298.99951922748926,"q_hc_W":22.188668352559027,"q_ts_W":-22.188668352559027},"physical_residuals_W":[-5.375255796025158e-12,2.6858515411731787e-12,-9.237055564881302e-14],"candidate_c_bounds_W":[1.2645410202758322e-11,6.323493556129638e-12,1.8108295411202699e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":0,"T_wall_outer_K":0,"q_hc_W":9.237055564881302e-14},"solver_success":true,"solver_status":3,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[298.99912109375,298.99957275390625],"oracle_monotonicity":"INCREASING"},{"case_id":"H03","solution":{"T_wall_inner_K":299.50015999999545,"T_wall_outer_K":299.5000399999951,"q_hc_W":0.002500000007526688,"q_ts_W":0.002500000007526688},"physical_residuals_W":[-1.6189701489144337e-12,8.119646448256912e-13,-8.174489730949919e-13],"candidate_c_bounds_W":[3.5527144873234412e-12,1.184238745342284e-12,3.5527153242702958e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":5.684341886080802e-14,"T_wall_outer_K":0,"q_hc_W":8.174489730949919e-13},"solver_success":true,"solver_status":3,"nfev":2,"callback_count_including_fd":8,"accepted_for_profile_review":true,"oracle_bracket":[299.50001220703126,299.5004638671875],"oracle_monotonicity":"INCREASING"},{"case_id":"H04","solution":{"T_wall_inner_K":299.2446623808039,"T_wall_outer_K":299.51484938688895,"q_hc_W":-16.374970065759346,"q_ts_W":-16.374970065759346},"physical_residuals_W":[-8.562039965909207e-13,1.4068746168049984e-12,-2.277289468111121e-12],"candidate_c_bounds_W":[1.889813716427222e-12,3.452108545189992e-12,6.8960699822353275e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":5.684341886080802e-14,"T_wall_outer_K":0,"q_hc_W":2.277289468111121e-12},"solver_success":true,"solver_status":3,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[299.51446533203125,299.51491699218747],"oracle_monotonicity":"INCREASING"},{"case_id":"H05","solution":{"T_wall_inner_K":299.52996626486765,"T_wall_outer_K":299.32997618696544,"q_hc_W":15.999206232179805,"q_ts_W":15.999206232179805},"physical_residuals_W":[-1.5063505998114124e-12,2.675193400136777e-12,-7.371880883511039e-13],"candidate_c_bounds_W":[7.582870300340492e-12,4.5521363574421354e-12,1.9010347088137935e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":5.684341886080802e-14,"T_wall_outer_K":5.684341886080802e-14,"q_hc_W":1.1581846592889633e-12},"solver_success":true,"solver_status":3,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[299.32973632812497,299.33018798828124],"oracle_monotonicity":"INCREASING"},{"case_id":"H06","solution":{"T_wall_inner_K":299.32974433662486,"T_wall_outer_K":299.5299041262343,"q_hc_W":11.437702263397375,"q_ts_W":-11.437702263397375},"physical_residuals_W":[5.044853423896711e-13,1.0373923942097463e-12,-2.2097879082139116e-12],"candidate_c_bounds_W":[1.360195639688773e-12,3.252034576800468e-12,5.418635823082767e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":5.684341886080802e-14,"T_wall_outer_K":0,"q_hc_W":2.2097879082139116e-12},"solver_success":true,"solver_status":3,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[299.5298217773437,299.5302734375],"oracle_monotonicity":"INCREASING"},{"case_id":"H07","solution":{"T_wall_inner_K":299.47430139208643,"T_wall_outer_K":299.2790573811826,"q_hc_W":37.18933541025248,"q_ts_W":37.18933541025248},"physical_residuals_W":[1.1368683772161603e-12,9.237055564881302e-13,-1.1084466677857563e-12],"candidate_c_bounds_W":[6.509100364991012e-12,1.0841195539404912e-11,2.7315088658184124e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":0,"T_wall_outer_K":0,"q_hc_W":1.1084466677857563e-12},"solver_success":true,"solver_status":1,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[299.27869873046876,299.279150390625],"oracle_monotonicity":"INCREASING"},{"case_id":"H08","solution":{"T_wall_inner_K":299.27912465301915,"T_wall_outer_K":299.47432868233443,"q_hc_W":14.459557727059526,"q_ts_W":-14.459557727059526},"physical_residuals_W":[2.2382096176443156e-13,-1.9184653865522705e-12,1.9539925233402755e-14],"candidate_c_bounds_W":[1.0609584396580678e-12,4.215033293832021e-12,2.5300237252380078e-12],"candidate_c_pass":true,"absolute_oracle_errors":{"T_wall_inner_K":0,"T_wall_outer_K":0,"q_hc_W":1.9539925233402755e-14},"solver_success":true,"solver_status":1,"nfev":4,"callback_count_including_fd":16,"accepted_for_profile_review":true,"oracle_bracket":[299.47426757812497,299.47471923828124],"oracle_monotonicity":"INCREASING"}],"runtime_replays":[{"runtime":"CPython 3.11.15; SciPy 1.17.1; NumPy 2.4.6; CoolProp 8.0.0","numeric_matrix_hashes":{"holdout":"915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99","r92":"44747246ee473f87024cf9b24cb90347b2b4342659e4ea1a6ad7eff28208e265","r92a":"9190c9622c1e298c18f7e8243500e3978bebab9995a85b52b9628e07c9d13be1"},"same_environment_raw_output_sha256_repeat_1":"2cfa1dbc22e619c94269a5a18e497b35ea965ca79362cf0303891acc3cf417f2","same_environment_raw_output_sha256_repeat_2":"2cfa1dbc22e619c94269a5a18e497b35ea965ca79362cf0303891acc3cf417f2","repeat_output_bytes_identical":true},{"runtime":"CPython 3.12.13; SciPy 1.18.0; NumPy 2.5.0; CoolProp 8.0.0","numeric_matrix_hashes":{"holdout":"915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99","r92":"44747246ee473f87024cf9b24cb90347b2b4342659e4ea1a6ad7eff28208e265","r92a":"9190c9622c1e298c18f7e8243500e3978bebab9995a85b52b9628e07c9d13be1"},"same_environment_raw_output_sha256_repeat_1":"aca9fdb6b3123e165729fb695e4be91aa59c4e1355ba23a207f79e2d24887874","same_environment_raw_output_sha256_repeat_2":"aca9fdb6b3123e165729fb695e4be91aa59c4e1355ba23a207f79e2d24887874","repeat_output_bytes_identical":true},{"runtime":"CPython 3.14.5; SciPy 1.18.0; NumPy 2.5.0; CoolProp 8.0.0","numeric_matrix_hashes":{"holdout":"915a713d0775eb9a26d00032b8afab5b997346a991fb6085de6554115238de99","r92":"44747246ee473f87024cf9b24cb90347b2b4342659e4ea1a6ad7eff28208e265","r92a":"9190c9622c1e298c18f7e8243500e3978bebab9995a85b52b9628e07c9d13be1"},"same_environment_raw_output_sha256_repeat_1":"7877b96c6cc51bb4910259c625c6d0a83ccb8bd63c2db1f2211fa804634fbfea","same_environment_raw_output_sha256_repeat_2":"7877b96c6cc51bb4910259c625c6d0a83ccb8bd63c2db1f2211fa804634fbfea","repeat_output_bytes_identical":true}],"all_numeric_matrix_hashes_identical_across_runtimes":true,"cross_runtime_numeric_hash":"c7eb241673520b8954fff78b66c451eaac0be9c418bf28afb9da997f4ea73061"}},
+  "canonical_hash": "0cf13bf360d24937d156b7a7c80849222bccdc3d6fa0c6ee8cfd6d71812ccf5d"
+}
