@@ -1001,22 +1001,22 @@
         "REPO-WALL",
         "REPO-CANONICAL"
       ],
-      "dependent_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
-      "closure_status": "MODEL_LEVEL_CONTRACT_COMPLETE_REVIEW_PENDING",
-      "remaining_blockers": [
-        "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
-        "TUBE-WALL-CORRECTION-AUTHORITY",
-        "SHELL-WALL-CORRECTION-AUTHORITY",
-        "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
-        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
-      "canonical_blocker_removed": false,
-      "effective_lifecycle_status": "PROPOSED_AUTHORITY_INDEPENDENT_REVIEW_PENDING",
+  "dependent_blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+  "closure_status": "MODEL_LEVEL_CONTRACT_COMPLETE_REVIEW_PENDING",
+  "remaining_blockers": [
+    "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "TUBE-WALL-CORRECTION-AUTHORITY",
+    "SHELL-WALL-CORRECTION-AUTHORITY",
+    "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+    "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+    "MESH-CONVERGENCE-QUALIFICATION"
+  ],
+  "canonical_blocker_removed": false,
+  "effective_lifecycle_status": "PROPOSED_AUTHORITY_INDEPENDENT_REVIEW_PENDING",
       "physics_authority": "No new material physics; only exact source-declared fixed-value admission and wall-state domain coverage",
       "project_rules": "Case-level authority is required; no material default, k(T)-to-constant conversion, or numerical tolerance is inferred",
       "implementation_design": "DEFERRED; no property runtime or wall solver authorized",
-      "canonical_hash": "393198e0676bade74d4b4988a7e1ab0d2146757a64e0c1b69dfa2dc659f27964",
+  "canonical_hash": "393198e0676bade74d4b4988a7e1ab0d2146757a64e0c1b69dfa2dc659f27964",
       "constant_k_contract": {
         "schema_version": "task172.constant-k-qualification.v1",
         "qualification_mode": "CASE_LEVEL_AUTHORITY_REQUIRED",
@@ -1219,6 +1219,7 @@
     "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
     "MESH-CONVERGENCE-QUALIFICATION"
   ],
+  "canonical_hash": "8e2369ead8e06a24371237904c9f46c69651472e1723167b74745187979e24d3",
   "r2_extension": {
     "task_id": "TASK172_V0_7_WATER_AND_WALL_SURFACE_QUALIFICATION_R2",
     "previous_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
@@ -2307,14 +2308,7 @@
         "V07-T172-LOCAL-CYLINDRICAL-MAPPING-R2",
         "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1"
       ],
-      "native_upstream_tasks": [
-        "TASK020",
-        "TASK021",
-        "TASK022",
-        "TASK024",
-        "TASK025",
-        "TASK037"
-      ],
+      "native_upstream_tasks": ["TASK020", "TASK021", "TASK022", "TASK024", "TASK025", "TASK037"],
       "producer_fabrication": false,
       "caller_assertion_promoted": false
     },
@@ -5351,9 +5345,7 @@
         "source_id": "HERWIG-1985-CHF-VARIABLE-PROPERTIES",
         "doi": "10.1016/0017-9310(85)90075-4",
         "title": "The effect of variable properties on momentum and heat transfer in a tube with constant heat flux across the wall",
-        "authors": [
-          "H. Herwig"
-        ],
+        "authors": ["H. Herwig"],
         "publication": "International Journal of Heat and Mass Transfer 28(2), 423-431, February 1985",
         "source_class": "PEER_REVIEWED_PRIMARY_JOURNAL_ARTICLE",
         "source_role": "PRIMARY_EXACT_BOUNDARY_SOURCE_TARGET",
@@ -5376,11 +5368,7 @@
         "source_id": "HERWIG-1989-CWT-VARIABLE-PROPERTIES",
         "doi": "10.1016/0017-9310(89)90160-9",
         "title": "The effect of variable properties on momentum and heat transfer in a tube with constant wall temperature",
-        "authors": [
-          "H. Herwig",
-          "M. Voigt",
-          "F.-J. Bauhaus"
-        ],
+        "authors": ["H. Herwig", "M. Voigt", "F.-J. Bauhaus"],
         "publication": "International Journal of Heat and Mass Transfer 32(10), 1907-1915, October 1989",
         "source_class": "PEER_REVIEWED_PRIMARY_JOURNAL_ARTICLE",
         "source_role": "PRIMARY_EXACT_BOUNDARY_SOURCE_TARGET",
@@ -5403,10 +5391,7 @@
         "source_id": "KOPPEL-SMITH-1962-VARIABLE-PROPERTIES",
         "doi": "10.1115/1.3684320",
         "title": "Laminar Flow Heat Transfer for Variable Physical Properties",
-        "authors": [
-          "L. B. Koppel",
-          "J. M. Smith"
-        ],
+        "authors": ["L. B. Koppel", "J. M. Smith"],
         "publication": "Journal of Heat Transfer 84(2), 157-162, May 1962",
         "source_class": "PEER_REVIEWED_PRIMARY_JOURNAL_ARTICLE",
         "source_role": "NARROW_FALLBACK_SOURCE_TARGET",
@@ -5461,11 +5446,7 @@
     "branch_audits": {
       "LAMINAR_CWT": {
         "correlation_id": "tube_laminar_cwt@1.0.0",
-        "source_ids": [
-          "HERWIG-1989-CWT-VARIABLE-PROPERTIES",
-          "KOPPEL-SMITH-1962-VARIABLE-PROPERTIES",
-          "YANG-1962-VARIABLE-VISCOSITY"
-        ],
+        "source_ids": ["HERWIG-1989-CWT-VARIABLE-PROPERTIES", "KOPPEL-SMITH-1962-VARIABLE-PROPERTIES", "YANG-1962-VARIABLE-VISCOSITY"],
         "source_body_complete_for_variable_property": false,
         "correction_equation_bound": false,
         "property_ratio_bound": false,
@@ -5486,11 +5467,7 @@
       },
       "LAMINAR_CHF": {
         "correlation_id": "tube_laminar_chf@1.0.0",
-        "source_ids": [
-          "HERWIG-1985-CHF-VARIABLE-PROPERTIES",
-          "KOPPEL-SMITH-1962-VARIABLE-PROPERTIES",
-          "YANG-1962-VARIABLE-VISCOSITY"
-        ],
+        "source_ids": ["HERWIG-1985-CHF-VARIABLE-PROPERTIES", "KOPPEL-SMITH-1962-VARIABLE-PROPERTIES", "YANG-1962-VARIABLE-VISCOSITY"],
         "source_body_complete_for_variable_property": false,
         "correction_equation_bound": false,
         "property_ratio_bound": false,
@@ -6266,19 +6243,9 @@
       "method": "BELL_DELAWARE",
       "ideal_htc_form": "ji*cp*G*Pr^(-2/3)",
       "corrected_htc_form": "ideal_h*Jc*Jl*Jb*Js*Jr",
-      "correction_factors": [
-        "Jc",
-        "Jl",
-        "Jb",
-        "Js",
-        "Jr"
-      ],
+      "correction_factors": ["Jc", "Jl", "Jb", "Js", "Jr"],
       "re_evaluator_domain": "0<Re_s<=100000",
-      "construction_families": [
-        "FIXED_TUBESHEET",
-        "U_TUBE",
-        "FLOATING_HEAD"
-      ],
+      "construction_families": ["FIXED_TUBESHEET", "U_TUBE", "FLOATING_HEAD"],
       "task172_current_family": "FIXED_TUBESHEET",
       "native_applicability_to_task172_target": "TASK166_BELL_FIXED_GEOMETRY_SHELL_PATH_FOR_FIXED_TUBESHEET_E_SHELL_SINGLE_SEGMENTAL_SINGLE_PHASE_NEWTONIAN_ONE_SHELL_PASS_LAYOUT_30_DEG_OR_45_DEG_OR_90_DEG_0<RE_S<=100000;NO_WALL_CORRECTION_AUTHORITY"
     },
@@ -6776,11 +6743,7 @@
       "source_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
       "fingerprint_sha256": "b6e0b32a794b43d43e6a976e42683f271c2ed25de5c055645b325f9c514bead0",
       "rows": 5,
-      "layouts": [
-        "30_DEG",
-        "45_DEG",
-        "90_DEG"
-      ],
+      "layouts": ["30_DEG", "45_DEG", "90_DEG"],
       "table_to_native_values": "EXACT_MATCH",
       "runtime_selection": "explicit_layout_and_reynolds_row;no_interpolation_or_generation"
     },
@@ -6788,12 +6751,7 @@
       "jamil": {
         "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
         "body_sha256": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
-        "exact_locations": [
-          "§2.2.2 PDF p.11 Eqs.6-9",
-          "Appendix PDF p.57 Table A.1",
-          "Appendix PDF pp.58-59 Table A.2",
-          "References PDF p.50/printed p.51 Ref.[9]"
-        ],
+        "exact_locations": ["§2.2.2 PDF p.11 Eqs.6-9", "Appendix PDF p.57 Table A.1", "Appendix PDF pp.58-59 Table A.2", "References PDF p.50/printed p.51 Ref.[9]"],
         "observed_definition": "hc=ji*cp*G*Pr^(-2/3);Jmu is a separate factor after hc",
         "coefficient_provenance": "BOUND_TO_JAMIL_OPERATIONAL_REPRESENTATION;ANCESTRAL_THOME_BODY_NOT_ACQUIRED",
         "coefficient_match": "EXACT_MATCH"
@@ -6802,9 +6760,7 @@
         "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
         "doi": "10.1002/aic.16602",
         "body_sha256": "fd39834253245f49609b42340e89ca8c652fed83f7cd7803d6c660bddfd6ca54",
-        "exact_locations": [
-          "Eqs.36-43 PDF pp.4-5"
-        ],
+        "exact_locations": ["Eqs.36-43 PDF pp.4-5"],
         "equation_provenance_bound": true,
         "supporting_information_filename": "aic16602-sup-0001-Supinfo.docx",
         "supporting_information_body_acquired": false,
@@ -6814,11 +6770,7 @@
       "bell_1960": {
         "source_target_id": "BELL-1960-DELAWARE-DESIGN",
         "body_sha256": "4657ebfb78bda433528b7f1197fff32e299361d39379bb6839e871f43bc2ed11",
-        "exact_locations": [
-          "C-32-C-33 j normalization",
-          "C-40a reconstruction",
-          "C-40c nomenclature"
-        ],
+        "exact_locations": ["C-32-C-33 j normalization", "C-40a reconstruction", "C-40c nomenclature"],
         "normalized_j_ratio": "(mu_w/mu)^0.14",
         "reconstruction_ratio": "(mu/mu_w)^0.14",
         "coefficient_mapping_to_native_jamil": false,
@@ -11608,11 +11560,7 @@
       "self_approval": false
     },
     "effective_contract_review": {
-      "composition": [
-        "R2",
-        "R2A",
-        "R2B"
-      ],
+      "composition": ["R2", "R2A", "R2B"],
       "l3_state_reconstruction_contract_bound": true,
       "l3_state_reconstruction_operator_bound": false,
       "l3_local_state_producer_class_contract_bound": true,
@@ -11713,31 +11661,31 @@
       "stop": true
     },
     "historical_payloads_immutable": true,
-    "governance": {
-      "documentation_evidence_only": true,
-      "append_only_registry_extension": true,
-      "historical_payloads_rewritten": false,
-      "r2_original_artifacts_changed": false,
-      "r2a_original_artifacts_changed": false,
-      "r2b_original_artifacts_changed": false,
-      "r63_extension_rewritten": false,
-      "r64_extension_rewritten": false,
-      "r65_extension_rewritten": false,
-      "production_code_changed": false,
-      "engineering_calculation_changed": false,
-      "dependency_changed": false,
-      "task171_changed": false,
-      "task166_changed": false,
-      "task172_implementation_started": false,
-      "numerical_experiment_performed": false,
-      "mesh_study_performed": false,
-      "property_backend_called": false,
-      "reconstruction_performed": false,
-      "real_state_instance_created": false,
-      "ready_authorized": false,
-      "merge_authorized": false,
-      "no_step_implies_the_next": true
-    },
+  "governance": {
+    "documentation_evidence_only": true,
+    "append_only_registry_extension": true,
+    "historical_payloads_rewritten": false,
+    "r2_original_artifacts_changed": false,
+    "r2a_original_artifacts_changed": false,
+    "r2b_original_artifacts_changed": false,
+    "r63_extension_rewritten": false,
+    "r64_extension_rewritten": false,
+    "r65_extension_rewritten": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task171_changed": false,
+    "task166_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "property_backend_called": false,
+    "reconstruction_performed": false,
+    "real_state_instance_created": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
     "canonical_hash": "1176f6dc1acd6074f889dc599b07a80fdaedcde57772480a22b9fdf71b4ff949"
   },
   "r67_extension": {
@@ -12804,10 +12752,7 @@
         "predicate": "SOURCE_MEAN_BULK_TEMPERATURE_OPERATOR_CONTRACT_BOUND",
         "current_status": "BOUND_BY_REVIEWED_R71_SOURCE_ADJUDICATION",
         "satisfied": true,
-        "evidence_extensions": [
-          "r71_extension",
-          "r72_extension"
-        ],
+        "evidence_extensions": ["r71_extension", "r72_extension"],
         "evidence_canonical_hashes": [
           "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
           "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638",
@@ -12819,10 +12764,7 @@
         "predicate": "JMU_BULK_PRESSURE_RULE_BOUND",
         "current_status": "UNBOUND",
         "satisfied": false,
-        "evidence_extensions": [
-          "r71_extension",
-          "r72_extension"
-        ],
+        "evidence_extensions": ["r71_extension", "r72_extension"],
         "evidence_canonical_hashes": [
           "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008",
           "7de8acc0bf4dabc0ab01056fe696aa2dff30dae4e66fbf12831c5fcb3400f638",
@@ -12834,10 +12776,7 @@
         "predicate": "PAIR_TRANSFER_CONTRACT_STATUS",
         "current_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
         "satisfied": true,
-        "evidence_extensions": [
-          "r58_extension",
-          "r59_extension"
-        ],
+        "evidence_extensions": ["r58_extension", "r59_extension"],
         "evidence_canonical_hashes": [
           "8dbd14422d496be610ec518d011799e0aa9fa6986af4afce7f58dc4049e6db74",
           "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b",
@@ -12849,12 +12788,7 @@
         "predicate": "JMU_BULK_PROPERTY_AUTHORITY_CONTRACT_VALID",
         "current_status": "REVIEWED_NARROW_SCOPE_AUTHORITY_REFERENCE_VALID",
         "satisfied": true,
-        "evidence_extensions": [
-          "r2_extension",
-          "r3_extension",
-          "r59_extension",
-          "r71_extension"
-        ],
+        "evidence_extensions": ["r2_extension", "r3_extension", "r59_extension", "r71_extension"],
         "evidence_canonical_hashes": [
           "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
           "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
@@ -12869,11 +12803,7 @@
         "predicate": "SOURCE_MEAN_IDENTITY_AND_PROVENANCE_SCHEMA_BOUND",
         "current_status": "BOUND_AS_MODEL_LEVEL_REQUIRED_FIELD_SCHEMA_ONLY",
         "satisfied": true,
-        "evidence_extensions": [
-          "r57_extension",
-          "r71_extension",
-          "r72_extension"
-        ],
+        "evidence_extensions": ["r57_extension", "r71_extension", "r72_extension"],
         "evidence_canonical_hashes": [
           "2d91fb0aa77ef7b79d2b1e22f5c3dce06e06b6f033cdc0a2c378cb0da27e39f6",
           "88761027997bd7ad06395b882fcf9b2ef9eb4c09352db37a5b20074d755fbe9b",
@@ -12902,12 +12832,7 @@
         "predicate": "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND",
         "current_status": "UNDETERMINED_SOURCE_MEAN_COVERAGE",
         "satisfied": "undetermined",
-        "evidence_extensions": [
-          "r57_extension",
-          "r59_extension",
-          "r71_extension",
-          "r72_extension"
-        ],
+        "evidence_extensions": ["r57_extension", "r59_extension", "r71_extension", "r72_extension"],
         "evidence_canonical_hashes": [
           "88761027997bd7ad06395b882fcf9b2ef9eb4c09352db37a5b20074d755fbe9b",
           "84f31d5f52d598230eb422f0fd0748c64c411bb263a04da10e192ad312823b4b",
@@ -13177,10 +13102,7 @@
       "rejection_matrix_non_reject_decision_count": 0,
       "rejection_matrix_required_coverage_complete": false,
       "rejection_matrix_contradiction_count": 0,
-      "missing_matrix_conditions": [
-        "HIDDEN_OR_DEFAULT_STATE",
-        "LEGACY_RESULT_RELABELING"
-      ],
+      "missing_matrix_conditions": ["HIDDEN_OR_DEFAULT_STATE", "LEGACY_RESULT_RELABELING"],
       "defects": [
         {
           "defect_id": "R74-MATRIX-001",
@@ -13208,10 +13130,7 @@
       "source_mean_identity_provenance_predicate_satisfied": true,
       "source_mean_fail_closed_predicate_satisfied": "undetermined",
       "source_mean_model_level_predicate_status_bound": false,
-      "source_mean_model_level_unsatisfied_or_undetermined_predicates": [
-        "JMU_BULK_PRESSURE_RULE_BOUND",
-        "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND"
-      ],
+      "source_mean_model_level_unsatisfied_or_undetermined_predicates": ["JMU_BULK_PRESSURE_RULE_BOUND", "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND"],
       "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 2,
       "source_mean_model_level_sole_blocker": "NOT_PROVEN",
       "pressure_is_proven_sole_model_level_blocker": false
@@ -13314,10 +13233,7 @@
       "historical_payloads_immutable": true
     },
     "correction_scope": {
-      "r75_defects_addressed": [
-        "R74-MATRIX-001",
-        "R74-MATRIX-002"
-      ],
+      "r75_defects_addressed": ["R74-MATRIX-001", "R74-MATRIX-002"],
       "new_effective_matrix_rows": [
         {
           "rule_id": "SMFC-ID-015",
@@ -13901,9 +13817,7 @@
       "citation_chain_lead_count": 1,
       "citation_chain_body_acquired_count": 0,
       "unresolved_lineage_target_count": 1,
-      "unresolved_lineage_targets": [
-        "BELL-1963-DELAWARE-FINAL-REPORT"
-      ],
+      "unresolved_lineage_targets": ["BELL-1963-DELAWARE-FINAL-REPORT"],
       "bell_1963_body_acquired": false,
       "taborek_hedh_body_acquired": true,
       "asme_official_body_acquired": false,
@@ -14001,9 +13915,7 @@
       "source_mean_property_authority_predicate_satisfied": true,
       "source_mean_identity_provenance_predicate_satisfied": true,
       "source_mean_fail_closed_predicate_satisfied": true,
-      "source_mean_model_level_unsatisfied_or_undetermined_predicates": [
-        "JMU_BULK_PRESSURE_RULE_BOUND"
-      ],
+      "source_mean_model_level_unsatisfied_or_undetermined_predicates": ["JMU_BULK_PRESSURE_RULE_BOUND"],
       "source_mean_model_level_unsatisfied_or_undetermined_predicate_count": 1,
       "source_mean_model_level_sole_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
       "pressure_is_proven_sole_model_level_blocker": true,
@@ -14137,9 +14049,7 @@
       "missing_lineage_body_gap_closed": false,
       "source_bodies_vendored": false,
       "access_control_bypassed": false,
-      "unresolved_source_targets": [
-        "BELL-1963-DELAWARE-FINAL-REPORT"
-      ]
+      "unresolved_source_targets": ["BELL-1963-DELAWARE-FINAL-REPORT"]
     },
     "source_record": {
       "source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
@@ -14404,7 +14314,7 @@
       "merge_authorized": false,
       "no_step_implies_the_next": true
     },
-    "canonical_hash": "f3d93fda81e329300130c128a5773d763d5b766c7cadc0277de95f478cc38c84"
+      "canonical_hash": "f3d93fda81e329300130c128a5773d763d5b766c7cadc0277de95f478cc38c84"
   },
   "r82_extension": {
     "task_id": "TASK172_V0_7_JMU_BULK_PRESSURE_RULE_AUTHORITY_RESOLUTION_R1",
@@ -14919,10 +14829,7 @@
       "q_hc_positive_means_hot_to_cold": true,
       "s_ts_is_known_input": true,
       "s_ts_is_unknown": false,
-      "s_ts_allowed_values": [
-        1,
-        -1
-      ],
+      "s_ts_allowed_values": [1, -1],
       "tube_hot_s_ts": 1,
       "shell_hot_s_ts": -1,
       "q_ts_relation": "q_ts=s_ts*q_hc",
@@ -15117,10 +15024,7 @@
       "hot_cold_role_inference_from_array_index": false,
       "hot_cold_role_reassignment_during_local_iteration": false,
       "temperature_crossover_mutates_identity": false,
-      "s_ts_allowed_values": [
-        1,
-        -1
-      ],
+      "s_ts_allowed_values": [1, -1],
       "s_ts_is_known_input": true,
       "s_ts_is_unknown": false,
       "q_ts_relation": "q_ts=s_ts*q_hc",
@@ -15218,49 +15122,31 @@
         "repository": "IDAES/idaes-pse",
         "commit": "84532d7f99a9f976b05170948147afdd69cfa5f6",
         "license": "BSD_LICENSE_TEXT",
-        "source_roles": [
-          "ARCHITECTURE_REFERENCE",
-          "IMPLEMENTATION_PATTERN_REFERENCE",
-          "TEST_PATTERN_REFERENCE"
-        ]
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
       },
       {
         "repository": "CalebBell/ht",
         "commit": "85e0ee686ec91b35919925fd31d73d140a9de135",
         "license": "MIT",
-        "source_roles": [
-          "IMPLEMENTATION_PATTERN_REFERENCE",
-          "NUMERIC_CROSSCHECK_REFERENCE",
-          "TEST_PATTERN_REFERENCE"
-        ]
+        "source_roles": ["IMPLEMENTATION_PATTERN_REFERENCE", "NUMERIC_CROSSCHECK_REFERENCE", "TEST_PATTERN_REFERENCE"]
       },
       {
         "repository": "oemof/tespy",
         "commit": "18dc773f6ebbfedfc262df7087c768b1c74d2081",
         "license": "MIT",
-        "source_roles": [
-          "ARCHITECTURE_REFERENCE",
-          "IMPLEMENTATION_PATTERN_REFERENCE",
-          "TEST_PATTERN_REFERENCE"
-        ]
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
       },
       {
         "repository": "lbl-srg/modelica-buildings",
         "commit": "a3cfdde4e2fa1605f351875c2199b6aafaee7fe0",
         "license": "REVISED_THREE_CLAUSE_BSD_WITH_ADDITIONAL_IMPROVEMENTS_TERM",
-        "source_roles": [
-          "ARCHITECTURE_REFERENCE",
-          "IMPLEMENTATION_PATTERN_REFERENCE"
-        ]
+        "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"]
       },
       {
         "repository": "jjgomera/pychemqt",
         "commit": "d34339ea62b719185baffd3cbf8b47b5cfd931a6",
         "license": "GPL-3.0",
-        "source_roles": [
-          "NUMERIC_CROSSCHECK_REFERENCE",
-          "IMPLEMENTATION_PATTERN_REFERENCE"
-        ],
+        "source_roles": ["NUMERIC_CROSSCHECK_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
         "code_reuse": "FORBIDDEN"
       }
     ],
@@ -15369,12 +15255,8 @@
     },
     "initialization": {
       "initialization_architecture_bound": true,
-      "stages": [
-        "I0_INPUT_AND_DOMAIN_ADMISSION",
-        "I1_NEUTRAL_BASE_FILM_INITIALIZATION",
-        "I2_FULL_EQUATION_RESTORE"
-      ],
-      "jmu_neutral_initialization_candidate_value": 1,
+      "stages": ["I0_INPUT_AND_DOMAIN_ADMISSION", "I1_NEUTRAL_BASE_FILM_INITIALIZATION", "I2_FULL_EQUATION_RESTORE"],
+      "jmu_neutral_initialization_candidate_value": 1.0,
       "jmu_zero_initialization_forbidden": true,
       "jmu_neutral_initialization_is_production_physics": false,
       "final_accepted_result_must_use_full_active_jmu": true,
@@ -16097,20 +15979,16 @@
       "method": "trf",
       "loss": "linear",
       "settings": {
-        "ftol": 0.000001,
+        "ftol": 1e-6,
         "xtol": 1e-12,
         "gtol": 1e-12,
         "jacobian": "2-point",
-        "diff_step": 0.00001,
-        "x_scale": [
-          "abs(q_hc_seed)",
-          "abs(T_tube_bulk-T_shell_bulk)",
-          "abs(T_tube_bulk-T_shell_bulk)"
-        ],
+        "diff_step": 1e-5,
+        "x_scale": ["abs(q_hc_seed)", "abs(T_tube_bulk-T_shell_bulk)", "abs(T_tube_bulk-T_shell_bulk)"],
         "max_nfev": 6,
         "tr_solver": "exact",
         "tr_options": {},
-        "f_scale": 1,
+        "f_scale": 1.0,
         "jac_sparsity": null,
         "residual_callback_cap": 24
       },
@@ -16139,10 +16017,7 @@
       "numeric_output_matrix_canonical_hash": "8a101ba44eec053d2e0ed6050867bd2cbe65022b0f5a8b23d7c3affb3fc3a87a"
     },
     "numerical_error_budget": {
-      "components": [
-        "ITERATION_ROOT_ERROR",
-        "SERIALIZATION_QUANTIZATION_ERROR"
-      ],
+      "components": ["ITERATION_ROOT_ERROR", "SERIALIZATION_QUANTIZATION_ERROR"],
       "combination_rule": "COMPONENTWISE_LINEAR_SUM",
       "observed_q_hc_envelope_W": 8.423539643587219e-13,
       "observed_wall_temperature_envelope_K": 5.684341886080802e-14,
@@ -16160,10 +16035,7 @@
       "same_input_same_result_hash_each_runtime": true
     },
     "blocker_state": {
-      "remaining": [
-        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW", "MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 2,
       "task172_entry_authority_complete": false,
       "numerical_error_budget_and_stopping_canonical_blocker_removed": false
@@ -16205,265 +16077,266 @@
     "canonical_hash": "10ac107e91490158dc1a268651243af8115b6f1407a93cbc67002c7298ebbf7f"
   },
   "r93_extension": {
-    "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_COVERAGE_AND_ROUNDOFF_ROBUSTNESS_R92A",
-    "mode": "TARGETED_R92_NONLINEAR_COVERAGE_AND_RESIDUAL_ACCEPTANCE_REQUALIFICATION",
-    "previous_head": "393ff58a699e1baec9e4fed83fa91aa7a09e9949",
-    "historical_registry_root_canonical_hash": "d540521bd29490c78eda9b098a836a6121b5f09259f71f34e523a81aad658cdf",
-    "historical_boundary": {
-      "r1_r92_payloads_immutable": true,
-      "r92_document_rewritten": false,
-      "r92_evidence_rewritten": false,
-      "r92_runner_rewritten": false,
-      "r92_results_rewritten": false,
-      "r92_profile_settings_replayed_unchanged": true,
-      "historical_registry_root_canonical_hash": "d540521bd29490c78eda9b098a836a6121b5f09259f71f34e523a81aad658cdf"
-    },
-    "artifacts": {
-      "document_path": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.md",
-      "document_sha256": "df60a1884f7bec47f92748c8581e1a1a2e011a657be2f00398d26ca8f476866b",
-      "evidence_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.json",
-      "evidence_file_sha256": "dadd98da7591e843bcc20c243df01bee5b446cfee4b6530e5597b379ad012054",
-      "evidence_canonical_hash": "cb7ee75488d4a11e4c7898f9a20607cd74409a209ba40862ca2b3512b24f471c",
-      "results_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-results-r92a.json",
-      "results_file_sha256": "664c73b18b7f1fef29cb0996f3749ba24c551002f367718c4bd84c0f4f71aeac",
-      "results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae776c3f5f99b84d4077523cfea0c",
-      "runner_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-runner-r92a.py",
-      "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
-      "registry_extension_key": "r93_extension",
-      "registry_extension_canonical_hash": "BOUND_BY_EXTENSION_SELF_HASH",
-      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
-      "final_head_sha": "RECORDED_IN_FINAL_RECEIPT",
-      "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
-    },
-    "coverage": {
-      "total_nonlinear_fixtures": 16,
-      "tube_c3_only_fixture_count": 8,
-      "dual_active_tube_c3_and_shell_jmu_fixture_count": 8,
-      "dynamic_range_stress_fixture_count": 8,
-      "resistance_ratio_classes": [
-        "TUBE_FILM_DOMINANT",
-        "WALL_DOMINANT",
-        "SHELL_FILM_DOMINANT",
-        "BALANCED"
-      ],
-      "dominant_resistance_partition": "0.90/0.05/0.05 (18:1 against either other component)",
-      "balanced_resistance_partition": "1/3 per component",
-      "fixed_topology": true,
-      "synthetic_parameters_only": [
-        "A_i",
-        "A_o",
-        "h_i_base",
-        "h_o_base",
-        "R_wall"
-      ],
-      "tube_hot_shell_hot_near_zero_negative_q_covered_in_core_fixtures": true,
-      "property_domain_all_selected_wall_states_valid": true
-    },
-    "oracle_audit": {
-      "validation_only_method": "BRENTQ_VALIDATION_ORACLE_ONLY",
-      "production_scalar_reduction_selected": false,
-      "deterministic_grid_point_count_per_fixture": 4097,
-      "strict_sign_change_verified_for_all": true,
-      "strict_monotonicity_verified_for_all": true,
-      "valid_domain_contiguous_for_all": true,
-      "all_oracle_solves_converged": true,
-      "selected_profile_acceptance_count": 16,
-      "selected_profile_fixture_count": 16,
-      "max_q_hc_absolute_error_W": 3.852473895449293e-13,
-      "max_wall_temperature_absolute_error_K": 3.410605131648481e-13,
-      "max_scaled_residual_infinity_norm": 1.2049450253531765e-9,
-      "error_envelope_is_universal": false
-    },
-    "residual_acceptance": {
-      "R92_ROUNDOFF_RULE_FIXTURE_VALIDATED": true,
-      "R92_ROUNDOFF_RULE_UNIVERSAL_BOUND_PROVEN": false,
-      "selected_candidate": "C_RESIDUAL_SPECIFIC_METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
-      "authority_class": "METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
-      "C_round": 0.5,
-      "C_round_selection": "smallest tested multiplier passing all 16 fixed fixtures",
-      "candidate_c_rule_shape": {
-        "gamma_n": "n*machine_epsilon/(1-n*machine_epsilon)",
-        "inner": "C_round*[ulp(q_ts)+ulp(q_i)+G_i*(ulp(T_tube_bulk)+ulp(T_wall_inner)+ulp(T_tube_bulk-T_wall_inner))+gamma_2*abs(q_i)]",
-        "wall": "C_round*[ulp(q_ts)+ulp(q_wall)+G_wall*(ulp(T_wall_inner)+ulp(T_wall_outer)+ulp(T_wall_inner-T_wall_outer))+gamma_1*abs(q_wall)]",
-        "outer": "C_round*[ulp(q_ts)+ulp(q_o)+G_o*(ulp(T_wall_outer)+ulp(T_shell_bulk)+ulp(T_wall_outer-T_shell_bulk))+gamma_2*abs(q_o)]",
-        "accept": "each abs(r_j) <= its corresponding residual-specific bound in W"
+      "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_COVERAGE_AND_ROUNDOFF_ROBUSTNESS_R92A",
+      "mode": "TARGETED_R92_NONLINEAR_COVERAGE_AND_RESIDUAL_ACCEPTANCE_REQUALIFICATION",
+      "previous_head": "393ff58a699e1baec9e4fed83fa91aa7a09e9949",
+      "historical_registry_root_canonical_hash": "d540521bd29490c78eda9b098a836a6121b5f09259f71f34e523a81aad658cdf",
+      "historical_boundary": {
+        "r1_r92_payloads_immutable": true,
+        "r92_document_rewritten": false,
+        "r92_evidence_rewritten": false,
+        "r92_runner_rewritten": false,
+        "r92_results_rewritten": false,
+        "r92_profile_settings_replayed_unchanged": true,
+        "historical_registry_root_canonical_hash": "d540521bd29490c78eda9b098a836a6121b5f09259f71f34e523a81aad658cdf"
       },
-      "candidate_comparison_at_C_round_0_5": {
-        "candidate_a_r92_legacy_pass_count": 13,
-        "candidate_b_active_conductance_pass_count": 13,
-        "candidate_c_residual_specific_pass_count": 16,
-        "fixture_count": 16
+      "artifacts": {
+        "document_path": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.md",
+        "document_sha256": "df60a1884f7bec47f92748c8581e1a1a2e011a657be2f00398d26ca8f476866b",
+        "evidence_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.json",
+        "evidence_file_sha256": "dadd98da7591e843bcc20c243df01bee5b446cfee4b6530e5597b379ad012054",
+        "evidence_canonical_hash": "cb7ee75488d4a11e4c7898f9a20607cd74409a209ba40862ca2b3512b24f471c",
+        "results_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-results-r92a.json",
+        "results_file_sha256": "664c73b18b7f1fef29cb0996f3749ba24c551002f367718c4bd84c0f4f71aeac",
+        "results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae776c3f5f99b84d4077523cfea0c",
+        "runner_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-runner-r92a.py",
+        "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
+        "registry_extension_key": "r93_extension",
+        "registry_extension_canonical_hash": "BOUND_BY_EXTENSION_SELF_HASH",
+        "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+        "final_head_sha": "RECORDED_IN_FINAL_RECEIPT",
+        "exact_final_head_ci_run": "PENDING_FINAL_HEAD_CI"
       },
-      "candidate_comparison_at_C_round_1": {
-        "candidate_a_r92_legacy_pass_count": 16,
-        "candidate_b_active_conductance_pass_count": 16,
-        "candidate_c_residual_specific_pass_count": 16,
-        "fixture_count": 16
+      "coverage": {
+        "total_nonlinear_fixtures": 16,
+        "tube_c3_only_fixture_count": 8,
+        "dual_active_tube_c3_and_shell_jmu_fixture_count": 8,
+        "dynamic_range_stress_fixture_count": 8,
+        "resistance_ratio_classes": [
+          "TUBE_FILM_DOMINANT",
+          "WALL_DOMINANT",
+          "SHELL_FILM_DOMINANT",
+          "BALANCED"
+        ],
+        "dominant_resistance_partition": "0.90/0.05/0.05 (18:1 against either other component)",
+        "balanced_resistance_partition": "1/3 per component",
+        "fixed_topology": true,
+        "synthetic_parameters_only": [
+          "A_i",
+          "A_o",
+          "h_i_base",
+          "h_o_base",
+          "R_wall"
+        ],
+        "tube_hot_shell_hot_near_zero_negative_q_covered_in_core_fixtures": true,
+        "property_domain_all_selected_wall_states_valid": true
       },
-      "active_conductance_terms_replayed": [
-        "h_i(T_wall_inner)*A_i",
-        "1/R_wall",
-        "h_o(T_wall_outer)*A_o"
-      ],
-      "formal_floating_point_theorem_claimed": false,
-      "promotion_to_reviewed_authority": false
-    },
-    "profile_candidate": {
-      "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
-      "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
-      "method": "trf",
-      "loss": "linear",
-      "ftol": 0.000001,
-      "xtol": 1e-12,
-      "gtol": 1e-12,
-      "jacobian": "2-point",
-      "diff_step": 0.00001,
-      "x_scale": [
-        "abs(q_hc_seed)",
-        "abs(T_tube_bulk-T_shell_bulk)",
-        "abs(T_tube_bulk-T_shell_bulk)"
-      ],
-      "residual_scale": "abs(q_ts_seed); exact-zero branch is separate",
-      "max_nfev": 6,
-      "residual_callback_cap": 24,
-      "tr_solver": "exact",
-      "tr_options": {},
-      "f_scale": 1,
-      "jac_sparsity": null,
-      "R92_PROFILE_SETTINGS_PRESERVED": true,
-      "R92A_SUPERSEDING_PROFILE_CREATED": false,
-      "residual_acceptance_rule_requalified_separately": true,
-      "max_nfev_is_convergence_proof": false
-    },
-    "profile_sensitivity": {
-      "axes_tested": [
-        "ftol",
-        "xtol",
-        "gtol",
-        "jacobian",
-        "diff_step",
-        "x_scale",
-        "residual_scaling",
-        "joint_tolerance_sweep",
-        "max_nfev"
-      ],
-      "direct_seed_all_pass": true,
-      "max_nfev_candidates_tested": [
-        6,
-        8,
-        12,
-        16
-      ],
-      "smallest_candidate_with_declared_headroom": 6,
-      "selected_max_nfev": 6,
-      "observed_worst_nfev": 4,
-      "observed_p95_nfev": 4,
-      "observed_worst_callback_count": 16,
-      "max_nfev_callback_cap": 24,
-      "evaluation_headroom": 2,
-      "callback_headroom": 8,
-      "perturbed_seed_is_production_requirement": false
-    },
-    "reproducibility": {
-      "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
-      "input_matrix_canonical_hash": "1fdd0ce8ab9d4071a068042f90f5d9178da27e3b4f9beb3149455e3a975117b4",
-      "selected_numeric_output_matrix_canonical_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
-      "same_input_same_result_bytes_each_runtime": true,
-      "same_input_same_result_hash_each_runtime": true,
-      "cross_runtime_numeric_output_hashes_equal": true,
-      "runtimes": [
-        {
-          "python": "CPython 3.11.15",
-          "scipy": "1.17.1",
-          "numpy": "2.4.6",
-          "coolprop": "8.0.0",
-          "platform": "macOS-27.2-arm64-arm-64bit",
-          "runtime_summary_canonical_hash": "8dc610890e436da6a66e6473eb8f171c1f9ba76824407eeb2163f175a457a149",
-          "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
-          "deterministic_replay": true
+      "oracle_audit": {
+        "validation_only_method": "BRENTQ_VALIDATION_ORACLE_ONLY",
+        "production_scalar_reduction_selected": false,
+        "deterministic_grid_point_count_per_fixture": 4097,
+        "strict_sign_change_verified_for_all": true,
+        "strict_monotonicity_verified_for_all": true,
+        "valid_domain_contiguous_for_all": true,
+        "all_oracle_solves_converged": true,
+        "selected_profile_acceptance_count": 16,
+        "selected_profile_fixture_count": 16,
+        "max_q_hc_absolute_error_W": 3.852473895449293e-13,
+        "max_wall_temperature_absolute_error_K": 3.410605131648481e-13,
+        "max_scaled_residual_infinity_norm": 1.2049450253531765e-9,
+        "error_envelope_is_universal": false
+      },
+      "residual_acceptance": {
+        "R92_ROUNDOFF_RULE_FIXTURE_VALIDATED": true,
+        "R92_ROUNDOFF_RULE_UNIVERSAL_BOUND_PROVEN": false,
+        "selected_candidate": "C_RESIDUAL_SPECIFIC_METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
+        "C_round": 0.5,
+        "C_round_selection": "smallest tested multiplier passing all 16 fixed fixtures",
+        "candidate_c_rule_shape": {
+          "gamma_n": "n*machine_epsilon/(1-n*machine_epsilon)",
+          "inner": "C_round*[ulp(q_ts)+ulp(q_i)+G_i*(ulp(T_tube_bulk)+ulp(T_wall_inner)+ulp(T_tube_bulk-T_wall_inner))+gamma_2*abs(q_i)]",
+          "wall": "C_round*[ulp(q_ts)+ulp(q_wall)+G_wall*(ulp(T_wall_inner)+ulp(T_wall_outer)+ulp(T_wall_inner-T_wall_outer))+gamma_1*abs(q_wall)]",
+          "outer": "C_round*[ulp(q_ts)+ulp(q_o)+G_o*(ulp(T_wall_outer)+ulp(T_shell_bulk)+ulp(T_wall_outer-T_shell_bulk))+gamma_2*abs(q_o)]",
+          "accept": "each abs(r_j) <= its corresponding residual-specific bound in W"
         },
-        {
-          "python": "CPython 3.12.13",
-          "scipy": "1.18.0",
-          "numpy": "2.5.0",
-          "coolprop": "8.0.0",
-          "platform": "macOS-27.2-arm-64bit",
-          "runtime_summary_canonical_hash": "62ad3bf1c16e9f21febe59bad4870700a806a6d7b9498936bd41fec68aba8f89",
-          "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
-          "deterministic_replay": true
+        "candidate_comparison_at_C_round_0_5": {
+          "candidate_a_r92_legacy_pass_count": 13,
+          "candidate_b_active_conductance_pass_count": 13,
+          "candidate_c_residual_specific_pass_count": 16,
+          "fixture_count": 16
         },
-        {
-          "python": "CPython 3.14.5",
-          "scipy": "1.18.0",
-          "numpy": "2.5.0",
-          "coolprop": "8.0.0",
-          "platform": "macOS-27.2-arm-64bit-Mach-O",
-          "full_results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae776c3f5f99b84d4077523cfea0c",
-          "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
-          "deterministic_replay": true
-        }
-      ]
-    },
-    "observed_envelope": {
-      "validation_only_method": "BRENTQ_VALIDATION_ORACLE_ONLY",
-      "production_scalar_reduction_selected": false,
-      "deterministic_grid_point_count_per_fixture": 4097,
-      "strict_sign_change_verified_for_all": true,
-      "strict_monotonicity_verified_for_all": true,
-      "valid_domain_contiguous_for_all": true,
-      "all_oracle_solves_converged": true,
-      "selected_profile_acceptance_count": 16,
-      "selected_profile_fixture_count": 16,
-      "max_q_hc_absolute_error_W": 3.852473895449293e-13,
-      "max_wall_temperature_absolute_error_K": 3.410605131648481e-13,
-      "max_scaled_residual_infinity_norm": 1.2049450253531765e-9,
-      "error_envelope_is_universal": false
-    },
-    "blocker_state": {
-      "remaining": [
-        "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
-      "effective_remaining_task172_entry_blocker_count": 2,
-      "numerical_error_budget_and_stopping_canonical_blocker_removed": false,
-      "task172_entry_authority_complete": false,
-      "mesh_study_performed": false,
-      "discretization_error_delegated_to_mesh_qualification": true
-    },
-    "governance": {
-      "production_code_changed": false,
-      "engineering_calculation_production_path_changed": false,
-      "dependency_changed": false,
-      "lockfile_changed": false,
-      "task172_implementation_started": false,
-      "numerical_experiment_performed": true,
-      "numerical_experiment_is_production_solve": false,
-      "mesh_study_performed": false,
-      "production_solver_execution_authorized": false,
-      "new_authority_self_approval": false,
-      "ready_authorized": false,
-      "merge_authorized": false,
-      "no_step_implies_the_next": true,
-      "stop": true,
-      "full_pytest": "NOT_RUN_CONTROLLED_NUMERICAL_EXPERIMENT_AND_EVIDENCE_ONLY"
-    },
-    "validation": {
-      "predecessor_head": "PASS",
-      "R92_artifact_and_profile_replay": "PASS",
-      "tube_c3_and_shell_jmu_authority_replay": "PASS",
-      "active_tube_and_dual_active_fixture_matrix": "PASS",
-      "independent_oracle_and_resistance_stress": "PASS",
-      "residual_acceptance_and_profile_sensitivity": "PASS",
-      "cross_runtime_replay": "PASS",
-      "historical_immutability": "PASS",
-      "artifact_linkage": "PASS",
-      "local_static_validation": "PASS",
-      "exact_final_head_ci": "PENDING_FINAL_HEAD_CI",
-      "full_pytest": "NOT_RUN_CONTROLLED_NUMERICAL_EXPERIMENT_AND_EVIDENCE_ONLY"
-    },
-    "next_gate": "AUTHORIZE_TASK172_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1_ONLY",
-    "canonical_hash": "1d363476516bbef0706fcece75c03b2176c1b34443e067df39067c0b0d1f7773"
+        "candidate_comparison_at_C_round_1": {
+          "candidate_a_r92_legacy_pass_count": 16,
+          "candidate_b_active_conductance_pass_count": 16,
+          "candidate_c_residual_specific_pass_count": 16,
+          "fixture_count": 16
+        },
+        "active_conductance_terms_replayed": [
+          "h_i(T_wall_inner)*A_i",
+          "1/R_wall",
+          "h_o(T_wall_outer)*A_o"
+        ],
+        "formal_floating_point_theorem_claimed": false,
+        "promotion_to_reviewed_authority": false
+      },
+      "profile_candidate": {
+        "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+        "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+        "method": "trf",
+        "loss": "linear",
+        "ftol": 0.000001,
+        "xtol": 1e-12,
+        "gtol": 1e-12,
+        "jacobian": "2-point",
+        "diff_step": 0.00001,
+        "x_scale": [
+          "abs(q_hc_seed)",
+          "abs(T_tube_bulk-T_shell_bulk)",
+          "abs(T_tube_bulk-T_shell_bulk)"
+        ],
+        "residual_scale": "abs(q_ts_seed); exact-zero branch is separate",
+        "max_nfev": 6,
+        "residual_callback_cap": 24,
+        "tr_solver": "exact",
+        "tr_options": {},
+        "f_scale": 1,
+        "jac_sparsity": null,
+        "R92_PROFILE_SETTINGS_PRESERVED": true,
+        "R92A_SUPERSEDING_PROFILE_CREATED": false,
+        "residual_acceptance_rule_requalified_separately": true,
+        "max_nfev_is_convergence_proof": false
+      },
+      "profile_sensitivity": {
+        "axes_tested": [
+          "ftol",
+          "xtol",
+          "gtol",
+          "jacobian",
+          "diff_step",
+          "x_scale",
+          "residual_scaling",
+          "joint_tolerance_sweep",
+          "max_nfev"
+        ],
+        "direct_seed_all_pass": true,
+        "max_nfev_candidates_tested": [
+          6,
+          8,
+          12,
+          16
+        ],
+        "smallest_candidate_with_declared_headroom": 6,
+        "selected_max_nfev": 6,
+        "observed_worst_nfev": 4,
+        "observed_p95_nfev": 4,
+        "observed_worst_callback_count": 16,
+        "max_nfev_callback_cap": 24,
+        "evaluation_headroom": 2,
+        "callback_headroom": 8,
+        "perturbed_seed_is_production_requirement": false
+      },
+      "reproducibility": {
+        "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
+        "input_matrix_canonical_hash": "1fdd0ce8ab9d4071a068042f90f5d9178da27e3b4f9beb3149455e3a975117b4",
+        "selected_numeric_output_matrix_canonical_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+        "same_input_same_result_bytes_each_runtime": true,
+        "same_input_same_result_hash_each_runtime": true,
+        "cross_runtime_numeric_output_hashes_equal": true,
+        "runtimes": [
+          {
+            "python": "CPython 3.11.15",
+            "scipy": "1.17.1",
+            "numpy": "2.4.6",
+            "coolprop": "8.0.0",
+            "platform": "macOS-27.2-arm64-arm-64bit",
+            "runtime_summary_canonical_hash": "8dc610890e436da6a66e6473eb8f171c1f9ba76824407eeb2163f175a457a149",
+            "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+            "deterministic_replay": true
+          },
+          {
+            "python": "CPython 3.12.13",
+            "scipy": "1.18.0",
+            "numpy": "2.5.0",
+            "coolprop": "8.0.0",
+            "platform": "macOS-27.2-arm-64bit",
+            "runtime_summary_canonical_hash": "62ad3bf1c16e9f21febe59bad4870700a806a6d7b9498936bd41fec68aba8f89",
+            "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+            "deterministic_replay": true
+          },
+          {
+            "python": "CPython 3.14.5",
+            "scipy": "1.18.0",
+            "numpy": "2.5.0",
+            "coolprop": "8.0.0",
+            "platform": "macOS-27.2-arm-64bit-Mach-O",
+            "full_results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae776c3f5f99b84d4077523cfea0c",
+            "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+            "deterministic_replay": true
+          }
+        ]
+      },
+      "observed_envelope": {
+        "validation_only_method": "BRENTQ_VALIDATION_ORACLE_ONLY",
+        "production_scalar_reduction_selected": false,
+        "deterministic_grid_point_count_per_fixture": 4097,
+        "strict_sign_change_verified_for_all": true,
+        "strict_monotonicity_verified_for_all": true,
+        "valid_domain_contiguous_for_all": true,
+        "all_oracle_solves_converged": true,
+        "selected_profile_acceptance_count": 16,
+        "selected_profile_fixture_count": 16,
+        "max_q_hc_absolute_error_W": 3.852473895449293e-13,
+        "max_wall_temperature_absolute_error_K": 3.410605131648481e-13,
+        "max_scaled_residual_infinity_norm": 1.2049450253531765e-9,
+        "error_envelope_is_universal": false
+      },
+      "blocker_state": {
+        "remaining": [
+          "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+          "MESH-CONVERGENCE-QUALIFICATION"
+        ],
+        "effective_remaining_task172_entry_blocker_count": 2,
+        "numerical_error_budget_and_stopping_canonical_blocker_removed": false,
+        "task172_entry_authority_complete": false,
+        "mesh_study_performed": false,
+        "discretization_error_delegated_to_mesh_qualification": true
+      },
+      "governance": {
+        "production_code_changed": false,
+        "engineering_calculation_production_path_changed": false,
+        "dependency_changed": false,
+        "lockfile_changed": false,
+        "task172_implementation_started": false,
+        "numerical_experiment_performed": true,
+        "numerical_experiment_is_production_solve": false,
+        "mesh_study_performed": false,
+        "production_solver_execution_authorized": false,
+        "new_authority_self_approval": false,
+        "ready_authorized": false,
+        "merge_authorized": false,
+        "no_step_implies_the_next": true,
+        "stop": true,
+        "full_pytest": "NOT_RUN_CONTROLLED_NUMERICAL_EXPERIMENT_AND_EVIDENCE_ONLY"
+      },
+      "validation": {
+        "predecessor_head": "PASS",
+        "R92_artifact_and_profile_replay": "PASS",
+        "tube_c3_and_shell_jmu_authority_replay": "PASS",
+        "active_tube_and_dual_active_fixture_matrix": "PASS",
+        "independent_oracle_and_resistance_stress": "PASS",
+        "residual_acceptance_and_profile_sensitivity": "PASS",
+        "cross_runtime_replay": "PASS",
+        "historical_immutability": "PASS",
+        "artifact_linkage": "PASS",
+        "local_static_validation": "PASS",
+        "exact_final_head_ci": "PENDING_FINAL_HEAD_CI",
+        "full_pytest": "NOT_RUN_CONTROLLED_NUMERICAL_EXPERIMENT_AND_EVIDENCE_ONLY"
+      },
+      "next_gate": "AUTHORIZE_TASK172_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1_ONLY",
+      "canonical_hash": "1d363476516bbef0706fcece75c03b2176c1b34443e067df39067c0b0d1f7773"
   },
+  "canonical_hash": "72b1e6519fca031b54ec21169bb71de5f6bacea4658ef1de348bd9e89a3b6057",
   "r94_extension": {
     "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1",
     "mode": "INDEPENDENT_R92_R92A_REPLAY_AND_FROZEN_HOLDOUT_REVIEW",
@@ -16478,13 +16351,13 @@
       "document_path": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-independent-review-and-blocker-closure-r1.md",
       "document_sha256": "c2c2a11b9bd9072d90571b9abc3568f20583e2c68928e6995dc301851672680a",
       "evidence_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-and-blocker-closure-r1.json",
-      "evidence_file_sha256": "24ecc22557715b7ef326337b28b92d97042a1bb0257b5ec0646076da5b8b2be9",
-      "evidence_canonical_hash": "78dcd5dad1c5207e12a5732ad67c5d5a74140c53c1c504ab9eae0ed8728bf1d7",
+    "evidence_file_sha256": "24ecc22557715b7ef326337b28b92d97042a1bb0257b5ec0646076da5b8b2be9",
+    "evidence_canonical_hash": "78dcd5dad1c5207e12a5732ad67c5d5a74140c53c1c504ab9eae0ed8728bf1d7",
       "holdout_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-holdout-r1.json",
-      "holdout_file_sha256": "50c0733aba84a3a1d375a0c15e690d342e6c4c7c75589d7d33246e81d0500511",
-      "holdout_canonical_hash": "0cf13bf360d24937d156b7a7c80849222bccdc3d6fa0c6ee8cfd6d71812ccf5d",
+    "holdout_file_sha256": "50c0733aba84a3a1d375a0c15e690d342e6c4c7c75589d7d33246e81d0500511",
+    "holdout_canonical_hash": "0cf13bf360d24937d156b7a7c80849222bccdc3d6fa0c6ee8cfd6d71812ccf5d",
       "runner_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-independent-review-runner-r1.py",
-      "runner_sha256": "7e342f6cad0589616a3efdcf4b053d7b8d608c05be4f0c591c11d332025274f1",
+    "runner_sha256": "7e342f6cad0589616a3efdcf4b053d7b8d608c05be4f0c591c11d332025274f1",
       "registry_extension_key": "r94_extension",
       "registry_extension_canonical_hash": "COMPUTED_AFTER_EXTENSION_FINALIZATION",
       "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
@@ -16612,24 +16485,8 @@
     "outcome": {
       "input_matrix_canonical_hash": "b13d4306f3a2a60f248fbd1b222a6069599ec08a3c094996b17019ac315ae2d8",
       "fixture_count": 6,
-      "primary_sequence": [
-        1,
-        2,
-        4,
-        8,
-        16,
-        32,
-        64,
-        128
-      ],
-      "secondary_alignment_sequence": [
-        3,
-        6,
-        12,
-        24,
-        48,
-        96
-      ],
+      "primary_sequence": [1, 2, 4, 8, 16, 32, 64, 128],
+      "secondary_alignment_sequence": [3, 6, 12, 24, 48, 96],
       "structural_geometry_audits": "PASS_12_CASE_SEQUENCE_COMBINATIONS",
       "first_blocking_cell": "SYNTHETIC-MESH-SUPPORT-M01:xi[1/4,3/8]",
       "blocking_predicate": "FROZEN_R94_LOCAL_RESIDUAL_ACCEPTANCE_PASS_FOR_EACH_MESH_CELL=false",
@@ -16657,9 +16514,7 @@
       "historical_registry_root_verified": true
     },
     "blocker_ledger": {
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false
     },
@@ -16740,10 +16595,7 @@
       "fixture_id": "M01",
       "sequence": "PRIMARY",
       "cell_count": 8,
-      "cell_interval_exact": [
-        "1/4",
-        "3/8"
-      ],
+      "cell_interval_exact": ["1/4", "3/8"],
       "cell_fraction_exact": "1/8",
       "solver_success": true,
       "solver_status": 3,
@@ -16781,7 +16633,7 @@
           "known_r95_diagnostic_pass": false
         },
         "P1_ACCEPTANCE_EXTENSION": {
-          "c_round": 1,
+          "c_round": 1.0,
           "xtol": 1e-12,
           "accepted_count": 72,
           "case_count": 72,
@@ -16837,14 +16689,7 @@
     "holdout": {
       "path": "docs/tasks/evidence/TASK-172-mesh-cell-scale-numerical-acceptance-holdout-input-r1.json",
       "case_count": 30,
-      "scale_fractions_exact": [
-        "1/3",
-        "1/6",
-        "1/12",
-        "1/24",
-        "1/48",
-        "1/96"
-      ],
+      "scale_fractions_exact": ["1/3", "1/6", "1/12", "1/24", "1/48", "1/96"],
       "canonical_hash": "9c0d41a78836a24b55d21ff76ccb88b1c83d3df291f310cb106e9c653463f60a",
       "selected_profile_canonical_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
       "frozen": true,
@@ -16876,9 +16721,7 @@
       "mesh_termination_threshold_bound": false,
       "discretization_error_estimator_bound": false,
       "mesh_convergence_canonical_blocker_removed": false,
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false,
       "r95_mesh_qualification_resume_authorized": false
@@ -16989,10 +16832,7 @@
       "canonical_hash": "9c0d41a78836a24b55d21ff76ccb88b1c83d3df291f310cb106e9c653463f60a",
       "independence_valid": false,
       "must_not_be_executed": true,
-      "exact_duplicates": [
-        "K04=R94:H05",
-        "K05=R94:H04"
-      ],
+      "exact_duplicates": ["K04=R94:H05", "K05=R94:H04"],
       "historical_artifact_rewritten": false
     },
     "corrected_holdout": {
@@ -17024,9 +16864,7 @@
       "new_authority_self_approval": false,
       "numerical_error_budget_and_stopping_canonical_blocker_removed": true,
       "mesh_convergence_canonical_blocker_removed": false,
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false,
       "r95_mesh_qualification_resume_authorized": false
@@ -17131,14 +16969,7 @@
       "base_case_count": 5,
       "scale_count": 6,
       "unique_holdout_case_count": 30,
-      "scale_fractions_exact": [
-        "1/3",
-        "1/6",
-        "1/12",
-        "1/24",
-        "1/48",
-        "1/96"
-      ],
+      "scale_fractions_exact": ["1/3", "1/6", "1/12", "1/24", "1/48", "1/96"],
       "runtime_count": 2,
       "same_runtime_repeats": 2,
       "accepted_executions": 60,
@@ -17188,13 +17019,11 @@
     "effective_overlay": {
       "review_result": "PASS",
       "status": "REVIEWED_AUTHORITY",
-      "effective_mesh_cell_scale_c_round": 1,
+      "effective_mesh_cell_scale_c_round": 1.0,
       "r96_p1_effective_overlay_reviewed": true,
       "r94_base_numerical_profile_rewritten": false,
       "mesh_convergence_canonical_blocker_removed": false,
-      "remaining_parent_blockers": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining_parent_blockers": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false,
       "r95_mesh_qualification_resume_authorized": true,
@@ -17287,7 +17116,7 @@
       "r95_mesh_sequence_changed": false,
       "r95_threshold_grid_changed": false,
       "r98_overlay_consumed": true,
-      "effective_c_round": 1,
+      "effective_c_round": 1.0,
       "r94_base_c_round": 0.5,
       "other_solver_settings_changed": false
     },
@@ -17295,10 +17124,7 @@
       "fixture": "M01",
       "sequence": "PRIMARY",
       "N": 8,
-      "cell_interval_exact": [
-        "1/4",
-        "3/8"
-      ],
+      "cell_interval_exact": ["1/4", "3/8"],
       "residual_acceptance_pass": true,
       "r_i_W": 2.0605739337042905e-13,
       "r_i_bound_W": 3.398902209176952e-13,
@@ -17320,12 +17146,7 @@
     },
     "matrix_status": {
       "complete_mesh_result_matrix_available": false,
-      "completed_fixtures_before_blocker": [
-        "M01",
-        "M02",
-        "M03",
-        "M04"
-      ],
+      "completed_fixtures_before_blocker": ["M01", "M02", "M03", "M04"],
       "accepted_local_cell_solves_before_blocker": 1776,
       "M05_mesh_cells_started": false,
       "M06_reached": false,
@@ -17338,9 +17159,7 @@
       "mesh_convergence_canonical_blocker_removed": false
     },
     "blocker_ledger": {
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false
     },
@@ -17424,19 +17243,9 @@
       "reference_uncertainty_propagation_required": true
     },
     "qualification_summary": {
-      "fixture_ids": [
-        "M01",
-        "M02",
-        "M03",
-        "M04",
-        "M05",
-        "M06"
-      ],
+      "fixture_ids": ["M01", "M02", "M03", "M04", "M05", "M06"],
       "all_fixtures_pass_both_runtimes": true,
-      "independent_quadrature_families": [
-        "GAUSS_LEGENDRE",
-        "COMPOSITE_SIMPSON"
-      ],
+      "independent_quadrature_families": ["GAUSS_LEGENDRE", "COMPOSITE_SIMPSON"],
       "historical_M05_128_256_512_values_reproduced": true,
       "historical_64_ulp_rule_superseded_in_effective_policy": true,
       "brent_vs_TOMS748_validation_only": true,
@@ -17471,9 +17280,7 @@
       "mesh_convergence_canonical_blocker_removed": false
     },
     "blocker_ledger": {
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false
     },
@@ -17552,12 +17359,7 @@
       "gauss1024_accepted_with_independent_crosscheck": true,
       "canonical_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
       "canonical_reference_producer_authority_accepted": true,
-      "crosscheck_pass_by_order": {
-        "128": true,
-        "256": true,
-        "512": true,
-        "1024": true
-      },
+      "crosscheck_pass_by_order": {"128": true, "256": true, "512": true, "1024": true},
       "uncertainty_classification": "MEASURED_EMPIRICAL_NUMERICAL_REFERENCE_UNCERTAINTY_ENVELOPE",
       "formal_true_error_bound": false,
       "conservative_wording_accepted": false,
@@ -17572,9 +17374,7 @@
       "self_approval": false
     },
     "blocker_ledger": {
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "mesh_convergence_canonical_blocker_removed": false,
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false
@@ -17668,9 +17468,7 @@
       "continuous_reference_oracle_precision_lifecycle": "REVIEWED_AUTHORITY",
       "R101_reviewed_authority_preserved": true,
       "mesh_convergence_canonical_blocker_removed": false,
-      "remaining": [
-        "MESH-CONVERGENCE-QUALIFICATION"
-      ],
+      "remaining": ["MESH-CONVERGENCE-QUALIFICATION"],
       "effective_remaining_task172_entry_blocker_count": 1,
       "task172_entry_authority_complete": false
     },
@@ -17736,38 +17534,12 @@
     },
     "frozen_authority": {
       "R95_input_matrix_canonical_hash": "b13d4306f3a2a60f248fbd1b222a6069599ec08a3c094996b17019ac315ae2d8",
-      "primary_sequence_cells": [
-        1,
-        2,
-        4,
-        8,
-        16,
-        32,
-        64,
-        128
-      ],
-      "secondary_alignment_sequence_cells": [
-        3,
-        6,
-        12,
-        24,
-        48,
-        96
-      ],
-      "threshold_grid_each_axis": [
-        "1e-2",
-        "1e-3",
-        "1e-4",
-        "1e-5"
-      ],
+      "primary_sequence_cells": [1, 2, 4, 8, 16, 32, 64, 128],
+      "secondary_alignment_sequence_cells": [3, 6, 12, 24, 48, 96],
+      "threshold_grid_each_axis": ["1e-2", "1e-3", "1e-4", "1e-5"],
       "threshold_tuple_count": 64,
-      "resource_cap_grid_cells": [
-        32,
-        64,
-        128,
-        256
-      ],
-      "C_round_effective": 1,
+      "resource_cap_grid_cells": [32, 64, 128, 256],
+      "C_round_effective": 1.0,
       "R98_profile_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
       "R102_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
       "uncertainty_classification": "MEASURED_EMPIRICAL_NUMERICAL_REFERENCE_UNCERTAINTY_ENVELOPE",
@@ -17781,14 +17553,7 @@
     "qualification": {
       "full_mesh_matrix_rerun": true,
       "mesh_threshold_sensitivity_performed": true,
-      "fixtures": [
-        "M01",
-        "M02",
-        "M03",
-        "M04",
-        "M05",
-        "M06"
-      ],
+      "fixtures": ["M01", "M02", "M03", "M04", "M05", "M06"],
       "mesh_levels_per_runtime": 84,
       "local_cell_solves_per_matrix_per_runtime": 2664,
       "deterministic_replay_per_runtime": true,
