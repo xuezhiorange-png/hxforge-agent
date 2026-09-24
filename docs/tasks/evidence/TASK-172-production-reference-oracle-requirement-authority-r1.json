@@ -1,0 +1,146 @@
+{
+  "schema_version": "hxforge.task172.production-reference-oracle-requirement-authority.r1",
+  "task_id": "TASK172_V0_7_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_R1",
+  "authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pull_request": {
+    "number": 279,
+    "state": "OPEN_DRAFT",
+    "base_main_sha": "fbff0ec3db398e61fbe332bc0850f3e34dc4e4fa"
+  },
+  "mode": "PROPOSED_BOOLEAN_REQUIREMENT_AUTHORITY_CANDIDATE",
+  "result": "PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_CANDIDATE_COMPLETED",
+  "lifecycle": {
+    "status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review_required": true,
+    "independent_review_complete": false,
+    "codex_self_approval_claimed": false,
+    "lifecycle_promotion_performed": false
+  },
+  "decision": {
+    "target_field": "production_reference_oracle_required",
+    "candidate_value": false,
+    "decision_origin": "USER_SUPPLIED_ARCHITECTURE_DECISION",
+    "semantic_meaning": "ONLINE_CONTINUOUS_REFERENCE_ORACLE_NOT_MANDATORY_FOR_TASK172_REAL_CASE_MESH_ADMISSION",
+    "all_reference_comparison_not_applicable": false,
+    "reference_comparison_forbidden": false,
+    "case_specific_reference_authority_forbidden": false,
+    "offline_qualification_reference_forbidden": false,
+    "periodic_validation_reference_forbidden": false
+  },
+  "authority_basis": {
+    "sources_are_compatibility_and_applicability_evidence_not_prior_boolean_selection": true,
+    "task170_freeze": {
+      "document_path": "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md",
+      "document_sha256": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0",
+      "online_oracle_mandate_bound": false
+    },
+    "r102": {
+      "reference_id": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
+      "correction_document_sha256": "300eee99502beb815bf72a64b57d2c66a771c8d2cf795e5fa8148ac875c5e5d8",
+      "scope": "SYNTHETIC_QUALIFICATION_REFERENCE",
+      "online_production_oracle_mandate": false
+    },
+    "r103": {
+      "document_sha256": "4ab8c5c6ae1a7f499feaa2411c701d57c0b75b5aef4533e27991c187d019d431",
+      "extension_canonical_hash": "331bb73c09f0b2ec00260886abb1ceec65b3a2996dcb02a17d144e252ef51ac9",
+      "scope": "SIX_FROZEN_SYNTHETIC_FIXTURES_AND_APPROVED_QUALIFICATION_PROFILE_ONLY",
+      "real_case_generalization_bound": false
+    },
+    "r104": {
+      "document_sha256": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+      "production_reference_oracle_required_at_source": "UNBOUND",
+      "real_case_reference_policy_bound": false,
+      "r102_online_real_case_oracle_required_or_selected": false
+    },
+    "r106": {
+      "document_sha256": "81763418d1ba280fae30da440f31831e538b169a1fff083b99516bb16ec26e07",
+      "evidence_canonical_hash": "b101a63e74e6dcc4005d6023253472f6f66ef458d4ef21152ae11bc29954bbe3",
+      "reference_policy_not_applicable_does_not_resolve_oracle_requirement": true
+    },
+    "r107_r108": {
+      "r107_evidence_canonical_hash": "cc0b6a4b28168a15040f909249c101a0ff5edd163db269a20e0cfe9a9edd7169",
+      "r108_evidence_canonical_hash": "f539e7eb518d8017ed7a732c8bbd69795af0009de8a666cfc4d6b954cae60696",
+      "reviewed_fail_closed_resolution_gate": true
+    }
+  },
+  "exact_profile_scope": {
+    "profile_scope_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-SCOPE-R1",
+    "exact_profile_scope_bound": true,
+    "admitted_profile": [
+      "FIXED_TUBESHEET",
+      "E_SHELL",
+      "ONE_SHELL_PASS",
+      "ONE_DECLARED_STRAIGHT_THROUGH_TUBE_PASS",
+      "EXPLICIT_COUNTERCURRENT_HOT_AND_COLD_PATHS",
+      "NATIVE_TASK020_024_ACCEPTED_GEOMETRY",
+      "EXISTING_SINGLE_SEGMENTAL_BAFFLE_AND_BELL_COMPATIBILITY_GATES",
+      "STEADY_SINGLE_PHASE_NEWTONIAN_SERVICE"
+    ],
+    "unsupported_or_scope_mismatched_case_resolution_valid": false
+  },
+  "case_binding_contract": {
+    "case_binding_required": true,
+    "current_real_case_binding_present": false,
+    "required_fields": [
+      "CASE_ID",
+      "CONFIGURATION_ID",
+      "GEOMETRY_ID",
+      "TOPOLOGY_AUTHORITY_ID",
+      "FLOW_PATH_MAPPING_ID",
+      "PRODUCTION_MESH_PROFILE_AUTHORITY_ID",
+      "PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_ID",
+      "PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_CANONICAL_HASH",
+      "PROFILE_SCOPE_ID",
+      "APPLICABILITY_EVIDENCE_ID_OR_HASH"
+    ],
+    "caller_boolean_assertion_is_authority": false,
+    "profile_name_without_canonical_identity_is_authority": false
+  },
+  "current_effective_state": {
+    "production_reference_oracle_required_candidate": false,
+    "production_reference_oracle_required_effective": "UNBOUND",
+    "effective_reviewed_binding": "UNBOUND",
+    "production_reference_oracle_requirement_resolution_valid": false,
+    "reference_policy_resolution_valid": false,
+    "real_case_mesh_admissible": false,
+    "production_mesh_admission_enabled": false
+  },
+  "non_creation_boundary": {
+    "reference_policy_created": false,
+    "online_oracle_implemented": false,
+    "online_oracle_execution_authorized": false,
+    "initial_mesh_policy_created": false,
+    "refinement_policy_created": false,
+    "convergence_threshold_created": false,
+    "headroom_policy_created": false,
+    "resource_policy_created": false,
+    "wall_acceptance_policy_created": false,
+    "R98_C_round_real_case_transfer_authorized": false,
+    "normalized_mesh_descriptor_created": false,
+    "other_quantitative_mesh_policy_created": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false
+  },
+  "governance": {
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-production-reference-oracle-requirement-authority-r1.md",
+    "document_sha256": "9438bdeeda476b9d691a7d44ebc6ce5ba3a3898eaaa4c5213a321d76e9f92a71",
+    "evidence_path": "docs/tasks/evidence/TASK-172-production-reference-oracle-requirement-authority-r1.json",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r109_extension",
+    "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+  },
+  "canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7"
+}

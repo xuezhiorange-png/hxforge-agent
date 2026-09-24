@@ -18088,5 +18088,182 @@
     },
     "canonical_hash": "fe682073d68de44cb16b09f1a91e109f6bdd5461ba9cfb07ee9cdabc8e53e144"
   },
-  "canonical_hash": "08b9b8cb2c827493bc64853cc4491d59a8823b7cd6fec097dc9ec84985487a1d"
+  "r109_extension": {
+    "task_id": "TASK172_V0_7_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_R1",
+    "authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+    "mode": "APPEND_ONLY_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_CANDIDATE",
+    "result": "PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_CANDIDATE_COMPLETED",
+    "previous_main_head": "fbff0ec3db398e61fbe332bc0850f3e34dc4e4fa",
+    "pr_number": 279,
+    "pr_state": "OPEN_DRAFT",
+    "lifecycle": {
+      "status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "independent_review_required": true,
+      "independent_review_complete": false,
+      "codex_self_approval_claimed": false,
+      "lifecycle_promotion_performed": false
+    },
+    "decision": {
+      "target_field": "production_reference_oracle_required",
+      "candidate_value": false,
+      "decision_origin": "USER_SUPPLIED_ARCHITECTURE_DECISION",
+      "semantic_meaning": "ONLINE_CONTINUOUS_REFERENCE_ORACLE_NOT_MANDATORY_FOR_TASK172_REAL_CASE_MESH_ADMISSION",
+      "all_reference_comparison_not_applicable": false
+    },
+    "scope_and_binding": {
+      "profile_scope_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-SCOPE-R1",
+      "exact_profile_scope_bound": true,
+      "case_binding_required": true,
+      "current_real_case_binding_present": false,
+      "applicability_evidence_bound": true,
+      "unsupported_or_scope_mismatch_is_invalid": true
+    },
+    "current_effective_state": {
+      "production_reference_oracle_required_effective": "UNBOUND",
+      "effective_reviewed_binding": "UNBOUND",
+      "production_reference_oracle_requirement_resolution_valid": false,
+      "reference_policy_resolution_valid": false,
+      "real_case_mesh_admissible": false,
+      "production_mesh_admission_enabled": false
+    },
+    "no_policy_creation": {
+      "reference_policy_created": false,
+      "online_oracle_implemented": false,
+      "online_oracle_execution_authorized": false,
+      "quantitative_mesh_policy_created": false,
+      "production_code_changed": false,
+      "task172_implementation_started": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-production-reference-oracle-requirement-authority-r1.md",
+      "document_file_sha256": "9438bdeeda476b9d691a7d44ebc6ce5ba3a3898eaaa4c5213a321d76e9f92a71",
+      "evidence_path": "docs/tasks/evidence/TASK-172-production-reference-oracle-requirement-authority-r1.json",
+      "evidence_file_sha256": "65807e42602b3f195d6257ac31dfd9d6c4b90f81c4ccdb8173720b1b6c23179e",
+      "evidence_canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7",
+      "registry_extension_key": "r109_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "governance": {
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "AUTHORIZE_TASK172_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "canonical_hash": "537e6dae5c44e423a3363e673e47f80e8c3f1e4c72312b665014a20ec584641a"
+  },
+  "r110_extension": {
+    "task_id": "TASK172_V0_7_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY_INDEPENDENT_REVIEW_RECEIPT_R1",
+    "authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+    "mode": "EXTERNAL_INDEPENDENT_REVIEW_RECEIPT_AND_LIFECYCLE_OVERLAY_ONLY",
+    "result": "REVIEWED_PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_AUTHORITY",
+    "previous_head": "64909bfea310f40ab119748273d54fcc5e42088e",
+    "pr_number": 279,
+    "pr_state": "OPEN_DRAFT",
+    "review_source": {
+      "source_type": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+      "decision": "PASS",
+      "recommendation": "ACCEPT_R109A_AUTHORITY_IN_EXACT_DECLARED_SCOPE",
+      "self_approval": false,
+      "codex_self_approval_claimed": false
+    },
+    "reviewed_r109_identity": {
+      "final_head": "64909bfea310f40ab119748273d54fcc5e42088e",
+      "document_sha256": "9438bdeeda476b9d691a7d44ebc6ce5ba3a3898eaaa4c5213a321d76e9f92a71",
+      "evidence_file_sha256": "65807e42602b3f195d6257ac31dfd9d6c4b90f81c4ccdb8173720b1b6c23179e",
+      "evidence_canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7",
+      "extension_canonical_hash": "537e6dae5c44e423a3363e673e47f80e8c3f1e4c72312b665014a20ec584641a",
+      "registry_root_canonical_hash": "e314804319f63a41e85a92c153ae3afd0b157ebb1b168ca0d7500eb4c8234306",
+      "identity_replay_pass": true,
+      "exact_head_ci_run": 35959585753,
+      "exact_head_ci_status": "completed",
+      "exact_head_ci_conclusion": "success"
+    },
+    "decision_adjudication": {
+      "target_field": "production_reference_oracle_required",
+      "candidate_value": false,
+      "reviewed_boolean_value": false,
+      "decision_origin": "USER_SUPPLIED_ARCHITECTURE_DECISION",
+      "accepted_semantics": "ONLINE_CONTINUOUS_REFERENCE_ORACLE_IS_NOT_A_MANDATORY_ADMISSION_PREREQUISITE",
+      "all_reference_comparison_not_applicable": false,
+      "reference_comparison_forbidden": false,
+      "reference_policy_resolved": false
+    },
+    "accepted_scope": {
+      "profile_scope_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-SCOPE-R1",
+      "exact_profile_scope_bound": true,
+      "arbitrary_topology_generalization": false,
+      "unsupported_or_unreviewed_profile_applicable": false
+    },
+    "case_binding": {
+      "case_binding_required": true,
+      "current_real_case_binding_present": false,
+      "actual_real_case_id_bound": false
+    },
+    "lifecycle_promotion": {
+      "independent_review_complete": true,
+      "independent_review_result": "PASS",
+      "effective_authority_status": "REVIEWED_AUTHORITY",
+      "promotion_scope": "PRODUCTION_REFERENCE_ORACLE_REQUIREMENT_BOOLEAN_AUTHORITY_DEFINITION_AND_DECLARED_PROFILE_SCOPE_ONLY",
+      "lifecycle_promotion_performed": true,
+      "r109_historical_payload_rewritten": false
+    },
+    "effective_case_state": {
+      "effective_reviewed_binding": "UNBOUND",
+      "production_reference_oracle_requirement_resolution_valid": false,
+      "reference_policy_resolution_valid": false,
+      "real_case_mesh_admissible": false,
+      "production_mesh_admission_enabled": false
+    },
+    "no_policy_creation": {
+      "reference_policy_created": false,
+      "online_oracle_implemented": false,
+      "online_oracle_execution_authorized": false,
+      "initial_mesh_policy_created": false,
+      "refinement_policy_created": false,
+      "convergence_threshold_created": false,
+      "headroom_policy_created": false,
+      "resource_policy_created": false,
+      "wall_acceptance_policy_created": false,
+      "R98_C_round_real_case_transfer_authorized": false,
+      "normalized_mesh_descriptor_created": false,
+      "other_quantitative_mesh_policy_created": false,
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false
+    },
+    "validation_caveat": {
+      "r109_local_full_pytest_clean_pass": false,
+      "r109_local_full_pytest_result": "NOT_CLEAN",
+      "r109_exact_head_github_ci_pass": true
+    },
+    "historical_boundary": {
+      "r1_r109_historical_payloads_immutable": true,
+      "r1_r109_registry_extensions_rewritten": false,
+      "R104_historical_canonical_remediation_authorized": false,
+      "historical_registry_repair_authorized": false,
+      "append_only_overlay": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-production-reference-oracle-requirement-authority-independent-review-receipt-r1.md",
+      "document_sha256": "84c099ff3318eccb647877d40ba483e6485c4ca2ce864a94e9dd4a05bfc5df4a",
+      "evidence_path": "docs/tasks/evidence/TASK-172-production-reference-oracle-requirement-authority-independent-review-receipt-r1.json",
+      "evidence_file_sha256": "7d237d5b33fe7d8bf5ebbf2d9363df1ae4f44b429efe6c81437c123887f76f3b",
+      "evidence_canonical_hash": "d6f71b0abcfdefed9f5892c91011d6066d52500522b5fc9c3faa0581c35205e3",
+      "registry_extension_key": "r110_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "governance": {
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "next_gate": "REAL_CASE_REFERENCE_ORACLE_REQUIREMENT_BINDING_OR_SEPARATELY_AUTHORIZED_REFERENCE_POLICY_WORK",
+      "stop": true
+    },
+    "canonical_hash": "2f80e41406be2ee3bec40de448af115ac9458c61845ac27cba6e2056b8e69058"
+  },
+  "canonical_hash": "1c97cf0a5db3f6cb2095baeb70d81ba24c17624b717c21755f2987ae209b1ffb"
 }
