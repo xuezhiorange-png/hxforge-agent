@@ -1,0 +1,191 @@
+{
+  "schema_version": "task172.tube-laminar-wall-correction-or-omission-adjudication.r1",
+  "task_id": "TASK172_V0_7_TUBE_LAMINAR_WALL_CORRECTION_OR_OMISSION_AUTHORITY_ADJUDICATION_R1",
+  "pr_number": 277,
+  "expected_start_head": "af13e174376f47981764eb8ca4654778bab4c685",
+  "mode": "LAMINAR_BRANCH_AUTHORITY_SEMANTIC_ADJUDICATION_ONLY",
+  "parent_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "result": "PASS_WITH_BLOCKER_RETAINED",
+  "adjudication": {
+    "outcome": "LAMINAR_DISPOSITION_SOURCE_EVIDENCE_INSUFFICIENT",
+    "canonical_blocker_closure_eligible": false,
+    "canonical_blocker_removed": false,
+    "all_admitted_tube_branches_authority_covered": false,
+    "decision_rule": "Each admitted native TASK026 branch requires either a compatible reviewed active wall-property correction or a branch-specific reviewed explicit omission authority before whole-model tube correction coverage can close.",
+    "native_requires_wall_viscosity_is_sufficient_omission_authority": false,
+    "c3_authority_reused_for_laminar": false,
+    "neutral_factor_or_silent_omission_used": false,
+    "source_acquisition_performed": false
+  },
+  "native_task026_branches": [
+    {
+      "branch": "LAMINAR_CWT",
+      "correlation_id": "tube_laminar_cwt@1.0.0",
+      "native_requires_wall_viscosity": false,
+      "native_boundary_condition": "constant_wall_temperature",
+      "native_equation": "Nu_D = 3.66",
+      "native_domain": "Re < 2300; Pr > 0.6; fully developed circular tube; inside-diameter basis",
+      "native_source_reference": "Incropera et al., Fundamentals of Heat and Mass Transfer, 7th ed., Table 8.1 as carried by the reviewed TASK026 repository authority",
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_authority_basis": "NO_REVIEWED_SOURCE_AUTHORITY_IDENTIFIED;NATIVE_REQUIRES_WALL_VISCOSITY_FALSE_IS_INSUFFICIENT",
+      "boundary_condition_complete": "PARTIAL_NATIVE_DEFINITION_ONLY",
+      "disposition": "UNRESOLVED_SOURCE_EVIDENCE_INSUFFICIENT",
+      "omission_authority_candidate_complete": false,
+      "reviewed_correction_or_omission_authority": false
+    },
+    {
+      "branch": "LAMINAR_CHF",
+      "correlation_id": "tube_laminar_chf@1.0.0",
+      "native_requires_wall_viscosity": false,
+      "native_boundary_condition": "constant_heat_flux",
+      "native_equation": "Nu_D = 4.36",
+      "native_domain": "Re < 2300; Pr > 0.6; fully developed circular tube; inside-diameter basis",
+      "native_source_reference": "Incropera et al., Fundamentals of Heat and Mass Transfer, 7th ed., Table 8.1 as carried by the reviewed TASK026 repository authority",
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_authority_basis": "NO_REVIEWED_SOURCE_AUTHORITY_IDENTIFIED;NATIVE_REQUIRES_WALL_VISCOSITY_FALSE_IS_INSUFFICIENT",
+      "boundary_condition_complete": "PARTIAL_NATIVE_DEFINITION_ONLY",
+      "disposition": "UNRESOLVED_SOURCE_EVIDENCE_INSUFFICIENT",
+      "omission_authority_candidate_complete": false,
+      "reviewed_correction_or_omission_authority": false
+    },
+    {
+      "branch": "TURBULENT_C3_INHERITED",
+      "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+      "native_requires_wall_viscosity": false,
+      "reviewed_authority": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "reviewed_scope": "TURBULENT_C3_ONLY",
+      "changed_by_this_task": false
+    }
+  ],
+  "repository_evidence": {
+    "native_source_locations": [
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "locations": ["19-47", "50-79"],
+        "evidence": "CWT and CHF identities, constants, boundary conditions, domains and requires_wall_viscosity=false"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "locations": ["62-108", "140-149"],
+        "evidence": "Laminar dispatch and CWT/CHF branch selection"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "locations": ["17-32", "86-99"],
+        "evidence": "Native C1/C2 equation and validity summary"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "locations": ["49-81", "147-179"],
+        "evidence": "Reviewed native correlation contract and current wall-property boundary"
+      }
+    ],
+    "native_source_artifacts": [
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "sha256": "e9cd8d26d47821f81810ff8382547d1c907d1ed0182ceabe2d1bcdb1a0ffb526"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "sha256": "e137959f5bf04784f78383db27a13736098ea47f926b323510d80dbe23f6fe9e"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb"
+      }
+    ],
+    "historical_audit": [
+      {
+        "path": "TASK-172-v0.7-tube-wall-correction-authority-resolution-r1.md",
+        "sha256": "6480959ac6c8d48bf342ec208be7e4a8bf2398db5c720bb92b8264cdb165fcb1",
+        "conclusion": "C1/C2/C3 native branches identified; exact correction/base/domain/state/combination authority incomplete"
+      },
+      {
+        "path": "TASK-172-v0.7-material-active-wall-review-r4.md",
+        "sha256": "730bebfb09a2fdf6939152f3b8aab70f196eb4a8afa21d6f49667d6ced9d52c8",
+        "conclusion": "Laminar and turbulent paths remain separate; unqualified omission and neutral factor are not allowed"
+      },
+      {
+        "path": "TASK-172-v0.7-physical-authority-semantic-source-r5.md",
+        "sha256": "9d01a10b043a9b585405dc6611bbe9109efeb0b1a2afa627568f0e7d934b3683",
+        "registry_overlay_hash": "ad4bd1d8684e1eabcf6dd3c0fe3a65da473bbf1b76c1fc7e1f20438c96a941bb",
+        "conclusion": "Exact C1/C2/C3 branch and version binding is required"
+      },
+      {
+        "path": "TASK-172-v0.7-tube-wall-correction-primary-transfer-acquisition-r2.md",
+        "sha256": "f2051a46b4fc6b6099ef2718e1f83c73d54318d13658052059e60f2c469de083",
+        "conclusion": "Acquired transfer package is exact C3 scope and does not cover laminar branches"
+      },
+      {
+        "path": "TASK-172-v0.7-tube-wall-correction-authority-independent-review-r1.md",
+        "sha256": "eef5302d59439c32bd3aa3b669c196a253bf043adc8be2b78edee270f6dc7eb2",
+        "registry_overlay_hash": "3d93103483b3024d748470a6e4a19f1a6ce6788732e72993ad24a15e5da93174",
+        "conclusion": "Independent acceptance is turbulent-only; laminar transfer is false"
+      },
+      {
+        "path": "TASK-172-v0.7-tube-wall-correction-external-scoped-approval-record-r1.md",
+        "sha256": "41dcc7abe70ad3171cad8f9f873d57a45ab4f4885543d1049e89f98157b70bd2",
+        "registry_overlay_hash": "acd10f93c02c7feed8c65d55d36eaf0ab19895b3aafdbc887aacde5ef72e7b15",
+        "conclusion": "External scoped acceptance promotes only turbulent C3"
+      },
+      {
+        "path": "TASK-172-v0.7-tube-wall-correction-canonical-blocker-closure-adjudication-r1.md",
+        "sha256": "2845f8a15578e8ac41e597b40a3f313eb543d291302c9deb81b8b70979ac66e3",
+        "registry_overlay_hash": "8f00bfb5b8bba8e8a29b8d6bffbe2fe1ff193eaf7570063c5b32b1467c5fd61d",
+        "conclusion": "Whole model closure requires every admitted branch to have correction or reviewed omission disposition"
+      }
+    ]
+  },
+  "case_level_gate": {
+    "authority_required": true,
+    "authority_present": false,
+    "gate_id": "TASK172-CASE-LEVEL-TUBE-WALL-CORRECTION-ADMISSION",
+    "gate_status": "DEFINED_ACTIVE_FAIL_CLOSED_IMPLEMENTATION_PENDING",
+    "runtime_implemented": false,
+    "production_without_required_case_level_authority": "BLOCKED",
+    "laminar_branch_missing_disposition": "BLOCKED"
+  },
+  "effective_state": {
+    "tube_wall_correction_status": "REVIEWED_AUTHORITY",
+    "tube_wall_correction_independent_review": "ACCEPTED",
+    "tube_wall_correction_canonical_blocker_closure_eligible": false,
+    "tube_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "turbulent_c3_authority_changed": false,
+    "task026_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AUTHORIZE_TASK172_TUBE_LAMINAR_PRIMARY_SOURCE_ACQUISITION_R1_ONLY",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "TASK-172-v0.7-tube-laminar-wall-correction-or-omission-authority-adjudication-r1.md",
+    "sha256": "d3515473f8267aa12511b22af8f1d2087516da61e67940c89f16abe6d8cb9311"
+  },
+  "canonical_hash": "230314b3fdc8e8159cef7240ed7fa571a645d7ac245d815584aa2152a7915673"
+}

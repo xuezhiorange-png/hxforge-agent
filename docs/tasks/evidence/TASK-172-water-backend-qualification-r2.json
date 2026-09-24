@@ -1,0 +1,1345 @@
+{
+  "schema_version": "task172.water-backend-qualification.r2",
+  "authority_id": "V07-T172-WATER-BACKEND-QUALIFICATION-R2",
+  "review_status": "PROPOSED_AUTHORITY",
+  "approved_by": null,
+  "approval_evidence": [],
+  "date": "2026-09-12",
+  "production_runtime_implemented": false,
+  "qualified_source_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
+  "runner_source": "\"\"\"One-off documentation evidence, NOT a production adapter or solver.\n\nExpected values are literal IAPWS program checks, not fitted backend outputs.\nRun separately with the two pinned interpreters from the repository root.\n\"\"\"\nimport hashlib\nimport json\nimport math\nimport platform\nimport subprocess\nimport sys\nfrom decimal import Decimal, ROUND_HALF_EVEN\nfrom pathlib import Path\n\nimport CoolProp.CoolProp as CP\nfrom hexagent.canonical_json import canonical_sha256\nfrom hexagent.properties.coolprop_provider import (\n    _coolprop_configuration_fingerprint,\n    _REF_VERIFY_STATE_POINTS,\n)\n\nREV = \"ae81610e7d23efc57f9d051c8e70a4d66e87537f\"\nPROFILE = \"V07-T172-WATER-PROPERTY-PROFILE-R2\"\n\n\ndef sha(path):\n    return hashlib.sha256(Path(path).read_bytes()).hexdigest()\n\n\ndef printed(check_id, source, location, inputs, key, scale, expected):\n    value = CP.PropsSI(key, *inputs, \"HEOS::Water\") * scale\n    target = Decimal(expected)\n    quantum = Decimal(1).scaleb(target.as_tuple().exponent)\n    rounded = Decimal.from_float(value).quantize(quantum, rounding=ROUND_HALF_EVEN)\n    return {\n        \"checkpoint_id\": check_id, \"source_id\": source, \"exact_location\": location,\n        \"inputs\": list(inputs), \"output_key\": key, \"SI_to_published_unit_scale\": scale,\n        \"expected_published_decimal\": expected, \"observed_published_unit\": repr(value),\n        \"rounding_rule\": \"NEAREST_PUBLISHED_DECIMAL_HALF_EVEN\",\n        \"rounding_interval_lower\": str(target - quantum / 2),\n        \"rounding_interval_upper\": str(target + quantum / 2),\n        \"rounded_observation\": str(rounded), \"pass\": rounded == target,\n        \"role\": \"FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY\",\n    }\n\n\ndef admitted(record, observed_fingerprint, baseline):\n    # Proposal predicate only. No property call or phase classifier inside it.\n    required = {\n        \"profile_id\": PROFILE, \"fluid\": \"Water\", \"composition\": \"PURE_ORDINARY_WATER\",\n        \"backend\": \"HEOS\", \"version\": \"8.0.0\", \"revision\": REV,\n        \"reference\": \"DEF\", \"phase_request\": \"STABLE_SINGLE_PHASE_LIQUID\",\n    }\n    return (\n        all(record.get(k) == v for k, v in required.items())\n        and observed_fingerprint == baseline\n        and all(math.isfinite(record[k]) for k in (\"T_K\", \"P_Pa\"))\n        and 298.15 <= record[\"T_K\"] <= 300.0\n        and 100000.0 <= record[\"P_Pa\"] <= 101325.0\n    )\n\n\nassert CP.get_global_param_string(\"version\") == \"8.0.0\"\nassert CP.get_global_param_string(\"gitrevision\") == REV\nassert sys.version_info[:2] in ((3, 11), (3, 12))\nfor fluid in _REF_VERIFY_STATE_POINTS:\n    CP.set_reference_state(fluid, \"DEF\")  # Isolated qualification initialization, legacy policy.\nbaseline = _coolprop_configuration_fingerprint()\nchecks = [\n    printed(\"WATER-EOS-T300-RHO996556\", \"IAPWS95\", \"Table7 p15 first row\", (\"T\", 300, \"Dmass\", 996.556), \"P\", 1e-6, \"0.0992418352\"),\n    printed(\"WATER-MU-T298-RHO998\", \"IAPWS-MU\", \"section4 Table4 p8\", (\"T\", 298.15, \"Dmass\", 998), \"V\", 1e6, \"889.735100\"),\n    printed(\"WATER-K-T298-RHO998\", \"IAPWS-K\", \"section2.8 Table4 p10\", (\"T\", 298.15, \"Dmass\", 998), \"L\", 1e3, \"607.712868\"),\n    printed(\"WATER-REFERENCE-DEF\", \"IAPWS95\", \"section3 Eq8 p4\", (\"T\", 273.16, \"Q\", 0), \"Hmass\", 1, \"0.611782\"),\n]\n# Checkpoints at prescribed density and at triple point are formulation tests,\n# not production admission points; no critical term is disabled to pass them.\ncross = []\nfor key, scale, expected in [(\"Dmass\", 1, \"997.047013\"), (\"Cpmass\", 1, \"4181.44618\"), (\"V\", 1e6, \"889.996774\"), (\"L\", 1, \"0.606502308\")]:\n    x = CP.PropsSI(key, \"T\", 298.15, \"P\", 100000, \"HEOS::Water\") * scale\n    cross.append({\"property\": key, \"expected_SR6_decimal\": expected, \"observed_HEOS\": repr(x), \"difference\": repr(x-float(expected)), \"relative_difference\": repr((x-float(expected))/float(expected))})\n# h=g+T*s is an independent SR6 relation, but no HEOS printed-digit acceptance.\nh_sr6 = Decimal(\"-4561.7537\") + Decimal(\"298.15\") * Decimal(\"367.20145\")\ncross.append({\"property\": \"Hmass\", \"expected_SR6_from_Table3_and_Table8\": str(h_sr6), \"observed_HEOS\": repr(CP.PropsSI(\"Hmass\", \"T\", 298.15, \"P\", 100000, \"HEOS::Water\"))})\nbase = dict(profile_id=PROFILE, fluid=\"Water\", composition=\"PURE_ORDINARY_WATER\", backend=\"HEOS\", version=\"8.0.0\", revision=REV, reference=\"DEF\", phase_request=\"STABLE_SINGLE_PHASE_LIQUID\", T_K=298.15, P_Pa=100000.0)\npositives = []\nfor t in [298.15, (298.15+300)/2, 300.0]:\n    for p in [100000.0, (100000+101325)/2, 101325.0]:\n        state = {k: CP.PropsSI(k, \"T\", t, \"P\", p, \"HEOS::Water\") for k in [\"Dmass\", \"Cpmass\", \"Hmass\", \"V\", \"L\"]}\n        positives.append({\"T_K\": t, \"P_Pa\": p, \"admitted_by_proposal\": admitted(dict(base, T_K=t, P_Pa=p), baseline, baseline), \"properties\": state, \"derived_Pr\": state[\"Cpmass\"]*state[\"V\"]/state[\"L\"], \"role\": \"FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE\"})\nnegative_inputs = [\n    (\"BELOW_T\", {\"T_K\": math.nextafter(298.15, -math.inf)}),\n    (\"ABOVE_T\", {\"T_K\": math.nextafter(300.0, math.inf)}),\n    (\"BELOW_P\", {\"P_Pa\": math.nextafter(100000.0, -math.inf)}),\n    (\"ABOVE_P\", {\"P_Pa\": math.nextafter(101325.0, math.inf)}),\n    (\"SATURATION\", {\"T_K\": 373.1243, \"P_Pa\": 101325.0, \"phase_request\": \"SATURATED\"}),\n    (\"WRONG_COMPOSITION\", {\"composition\": \"WATER_GLYCOL\"}),\n    (\"WRONG_FLUID\", {\"fluid\": \"R134a\"}),\n    (\"WRONG_BACKEND\", {\"backend\": \"IF97\"}),\n    (\"WRONG_VERSION\", {\"version\": \"7.2.0\"}),\n    (\"WRONG_REVISION\", {\"revision\": \"unqualified\"}),\n    (\"WRONG_PROFILE\", {\"profile_id\": \"V07-T172-WATER-PROPERTY-PROFILE-R1\"}),\n    (\"WRONG_REFERENCE\", {\"reference\": \"NBP\"}),\n    (\"METASTABLE\", {\"T_K\": 260.0, \"phase_request\": \"METASTABLE_LIQUID\"}),\n    (\"TWO_PHASE\", {\"phase_request\": \"TWO_PHASE\"}),\n    (\"VAPOR\", {\"phase_request\": \"VAPOR\"}),\n    (\"SOLID\", {\"phase_request\": \"SOLID\"}),\n    (\"SUPERCRITICAL\", {\"T_K\": 647.096, \"P_Pa\": 22064000.0, \"phase_request\": \"SUPERCRITICAL\"}),\n]\nnegative = [{\"case_id\": n, \"input\": dict(base, **change), \"rejected\": not admitted(dict(base, **change), baseline, baseline)} for n, change in negative_inputs]\nbefore_mutation = _coolprop_configuration_fingerprint()\nCP.set_reference_state(\"Water\", \"NBP\")  # Deliberate negative case only in this child process.\nmutated = _coolprop_configuration_fingerprint()\nnegative.append({\"case_id\": \"REFERENCE_FINGERPRINT_MUTATION\", \"baseline\": baseline, \"mutated\": mutated, \"rejected\": not admitted(base, mutated, baseline)})\nCP.set_reference_state(\"Water\", \"DEF\")\nrestored = _coolprop_configuration_fingerprint()\nprobe_values = {f: repr(CP.PropsSI(\"Hmass\", \"T\", t, \"P\", p, f)) for f, (t, p) in _REF_VERIFY_STATE_POINTS.items()}\nsemantic = {\n    \"profile_id\": PROFILE, \"checks\": checks,\n    \"crosscheck\": {\"checkpoint_id\": \"WATER-LIQUID-T298-P01\", \"source_id\": \"IAPWS-LIQUID\", \"exact_location\": \"Table8 p11 and Table3 p6\", \"status\": \"EXECUTED_CROSSCHECK_NOT_HEOS_EXACT_ORACLE\", \"values\": cross, \"numerical_acceptance_tolerance\": None},\n    \"profile_points\": positives,\n    \"negative_admission\": {\"checkpoint_id\": \"WATER-DOMAIN-NEGATIVE\", \"cases\": negative, \"pass\": all(x[\"rejected\"] for x in negative)},\n    \"reference\": {\"policy\": \"DEF\", \"native_fingerprint\": baseline, \"probe_Hmass_J_kg\": probe_values, \"unchanged_before_negative\": baseline == before_mutation, \"mutation_detected\": baseline != mutated, \"restored_after_isolated_negative\": baseline == restored},\n}\npassed = all(c[\"pass\"] for c in checks) and semantic[\"negative_admission\"][\"pass\"] and baseline == before_mutation == restored and baseline != mutated and all(p[\"admitted_by_proposal\"] and all(math.isfinite(v) for v in p[\"properties\"].values()) for p in positives)\nruntime = {\n    \"python_version\": platform.python_version(), \"implementation\": platform.python_implementation(),\n    \"executable\": str(Path(sys.executable).resolve()), \"executable_sha256\": sha(Path(sys.executable).resolve()),\n    \"platform\": platform.platform(), \"machine\": platform.machine(),\n    \"coolprop_version\": CP.get_global_param_string(\"version\"), \"coolprop_git_revision\": CP.get_global_param_string(\"gitrevision\"),\n    \"extension_path\": CP.__file__, \"extension_sha256\": sha(CP.__file__),\n    \"qualification_script_sha256\": sha(__file__),\n    \"repository_head\": subprocess.check_output([\"git\", \"rev-parse\", \"HEAD\"], text=True).strip(),\n    \"repository_tree\": subprocess.check_output([\"git\", \"rev-parse\", \"HEAD^{tree}\"], text=True).strip(),\n    \"native_provider_sha256\": sha(\"src/hexagent/properties/coolprop_provider.py\"),\n    \"semantic_sha256\": canonical_sha256(semantic),\n}\nprint(json.dumps({\"schema_version\": \"task172.water.qualification-runtime.r2\", \"runtime\": runtime, \"semantic\": semantic, \"qualification_checks_pass\": passed}, indent=2, allow_nan=False))\nassert passed\n",
+  "runner_source_sha256": "ca6579b4ad582aacb2cf9bb14ed9122e8e5f85aaa10be4c3252a16561f9f2dae",
+  "source_bindings": [
+    {
+      "source_id": "IAPWS95",
+      "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+      "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4",
+      "access_path": "https://iapws.org/technical-guidance/release/IAPWS-95.download"
+    },
+    {
+      "source_id": "IAPWS-MU",
+      "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+      "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4",
+      "access_path": "https://iapws.org/technical-guidance/release/viscosity.download"
+    },
+    {
+      "source_id": "IAPWS-K",
+      "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+      "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4",
+      "access_path": "https://iapws.org/technical-guidance/release/ThCond.download"
+    },
+    {
+      "source_id": "IAPWS-LIQUID",
+      "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+      "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11",
+      "access_path": "https://iapws.org/technical-guidance/release/LiquidWater.download"
+    },
+    {
+      "source_id": "IAPWS-H",
+      "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+      "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3",
+      "access_path": "https://iapws.org/public/documents/x2LDq/Advise1.pdf"
+    },
+    {
+      "source_id": "CP-WATER",
+      "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+      "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/dev/fluids/Water.json"
+    },
+    {
+      "source_id": "CP-TRANSPORT",
+      "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+      "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/src/Backends/Helmholtz/TransportRoutines.cpp"
+    },
+    {
+      "source_id": "CP-LICENSE",
+      "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+      "exact_location": "LICENSE at pinned commit",
+      "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/LICENSE"
+    },
+    {
+      "source_id": "IAPWS-MELT-R2",
+      "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+      "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+      "access_path": "https://iapws.org/documents/release/MeltSub.download"
+    },
+    {
+      "source_id": "IAPWS-SAT-R2",
+      "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+      "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+      "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download"
+    },
+    {
+      "source_id": "DOE-WALL-R2",
+      "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+      "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+      "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+    }
+  ],
+  "domain_proof": {
+    "authority_id": "V07-T172-WATER-DOMAIN-PROOF-R2",
+    "profile_bounds": {
+      "T_min_K": "298.15",
+      "T_max_K": "300",
+      "P_min_Pa": "100000",
+      "P_max_Pa": "101325"
+    },
+    "selection": "PROJECT_PROPOSAL: minimal rectangle spanning SR6 Table8 stable liquid check and pinned native Water DEF probe; not general industrial range",
+    "source_bindings": [
+      {
+        "source_id": "IAPWS95",
+        "hash_or_revision": "512879217b94f4d0741c88cab743d41098268914d538d73e680a736cb1c3aad7",
+        "exact_location": "R6-95(2018), sections 3-7; Tables 3,7,8; Figures 1-4",
+        "access_path": "https://iapws.org/technical-guidance/release/IAPWS-95.download"
+      },
+      {
+        "source_id": "IAPWS-MU",
+        "hash_or_revision": "6e89cafb61618f38aeca88a5740181948db7300d2b4beafbb4228bb164657bef",
+        "exact_location": "R12-08 section 2.4 Eq9; section 2.5 Fig1; Eq10; section 4 Table4",
+        "access_path": "https://iapws.org/technical-guidance/release/viscosity.download"
+      },
+      {
+        "source_id": "IAPWS-K",
+        "hash_or_revision": "08e0e6114fa2a4d66dd642b3c127acea541c5b09d73abc4a8c5260c2bbeb2f78",
+        "exact_location": "R15-11 sections 2.4-2.8; Eq14/15; Fig1; Table4",
+        "access_path": "https://iapws.org/technical-guidance/release/ThCond.download"
+      },
+      {
+        "source_id": "IAPWS-LIQUID",
+        "hash_or_revision": "fda79dde9f441a90da755477c6533e23065e4f90c7f59a505f64c394d775bd45",
+        "exact_location": "SR6-08(2011), section 2.3; Table3 h relation; sections 3.3/4.3; section 7/Table8 p11",
+        "access_path": "https://iapws.org/technical-guidance/release/LiquidWater.download"
+      },
+      {
+        "source_id": "IAPWS-H",
+        "hash_or_revision": "1a4d4b075cd8f2552f47e1fc05d83dc37e432f57f286158ecfdb4347820bcf59",
+        "exact_location": "AN1-03 sections 2.2.1-2.2.4 pp3-7; Figures1-3",
+        "access_path": "https://iapws.org/public/documents/x2LDq/Advise1.pdf"
+      },
+      {
+        "source_id": "CP-WATER",
+        "hash_or_revision": "85021d3803d2b02edb1d3e90bd60f4eee4a70380e06ed6b7b44e57716b4c2266",
+        "exact_location": "v8.0.0 dev/fluids/Water.json: EOS[0], TRANSPORT, STATES",
+        "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/dev/fluids/Water.json"
+      },
+      {
+        "source_id": "CP-TRANSPORT",
+        "hash_or_revision": "76118d1b1f50929cb0e3193941fc37af2b0115a8b2bebb0e6864b25d81b6cf12",
+        "exact_location": "v8.0.0 viscosity_water_hardcoded and conductivity_hardcoded_water",
+        "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/src/Backends/Helmholtz/TransportRoutines.cpp"
+      },
+      {
+        "source_id": "CP-LICENSE",
+        "hash_or_revision": "9bf835333ef602af4cb19338b9f9d43671e174fa029b00280e9bdba6ea4719b2",
+        "exact_location": "LICENSE at pinned commit",
+        "access_path": "https://raw.githubusercontent.com/CoolProp/CoolProp/ae81610e7d23efc57f9d051c8e70a4d66e87537f/LICENSE"
+      },
+      {
+        "source_id": "IAPWS-MELT-R2",
+        "hash_or_revision": "706b17a9c646979aa77c589db145a6a707e7b19527aefbdb70dc230898cfc839",
+        "exact_location": "sections3.1-3.2 Eq1; Tables1/2; section5",
+        "access_path": "https://iapws.org/documents/release/MeltSub.download"
+      },
+      {
+        "source_id": "IAPWS-SAT-R2",
+        "hash_or_revision": "a10d38d73339b0713c86cfac88f9adcba137202167ccdfa1cd58238c438361d7",
+        "exact_location": "section3 Eq1 p3; sections6-8 p6; Table1 p7",
+        "access_path": "https://iapws.org/technical-guidance/release/Supp-sat.download"
+      },
+      {
+        "source_id": "DOE-WALL-R2",
+        "hash_or_revision": "1261936f3985477e85c694f27dd8ffd56ca95130e44f3f1bbc64d30de540e2b2",
+        "exact_location": "HT-02 Eqs2-7/2-8 pp12-13; Eq2-10 p22 (PDF34/35/44)",
+        "access_path": "https://www.energy.gov/sites/default/files/2026-04/DOE-HDBK-1012-92_VOL2.pdf"
+      }
+    ],
+    "saturation_bound": {
+      "program": "from decimal import Decimal as D, localcontext, ROUND_CEILING\ndef bound(precision):\n    with localcontext() as c:\n        c.prec=precision\n        tc=D(\"647.096\"); low=1-D(\"300\")/tc; high=1-D(\"298.15\")/tc\n        a=[D(x) for x in [\"-7.85951783\",\"1.84408259\",\"-11.7866497\",\"22.6807411\",\"-15.9618719\",\"1.80122502\"]]\n        b=[D(x) for x in [\"1\",\"1.5\",\"3\",\"3.5\",\"4\",\"7.5\"]]\n        fu=sum(x*(high if x>0 else low)**y for x,y in zip(a,b))\n        assert fu < 0\n        pressure=D(\"22064000\")*((tc/D(\"300\"))*fu).exp()\n        return str(pressure), str(pressure.to_integral_value(rounding=ROUND_CEILING))\nprint(bound(40)); print(bound(60))\n",
+      "program_sha256": "48c14d7ac6d4bf2c63e993c37397a085e642e377a37d046f8bd7873064cf1828",
+      "calculation_precision40": "3978.991047455740190100262642484593474785",
+      "calculation_precision60": "3978.99104745574019010026264248459347476940040722739587154941",
+      "upper_bound_outward_report_Pa": "3979",
+      "pressure_clearance_lower_bound_Pa": "96021",
+      "interpretation": "Source formulation inequality; not stochastic uncertainty bound or backend oracle"
+    },
+    "melting_clearance_lower_bound_K": "24.99",
+    "critical_temperature_distance_K": "347.096",
+    "critical_pressure_distance_Pa": "21962675",
+    "review_status": "PROPOSED_AUTHORITY",
+    "approved_by": null,
+    "approval_evidence": [],
+    "canonical_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53"
+  },
+  "observations": [
+    {
+      "schema_version": "task172.water.qualification-runtime.r2",
+      "runtime": {
+        "python_version": "3.11.15",
+        "implementation": "CPython",
+        "executable": "/Users/charles/.local/share/uv/python/cpython-3.11.15-macos-aarch64-none/bin/python3.11",
+        "executable_sha256": "68100c5188b837802c7ae52398389d121b1c063ed244dec11649775b539c3a30",
+        "platform": "macOS-27.0-arm64-arm-64bit",
+        "machine": "arm64",
+        "coolprop_version": "8.0.0",
+        "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "extension_path": "/Users/charles/hxforge-task172-validation.Ud9RdV/.runtime311/lib/python3.11/site-packages/CoolProp/CoolProp.cpython-311-darwin.so",
+        "extension_sha256": "6b35e8440ebc285e05826cce8bcac454cea96649054d158747846b1215a52e16",
+        "qualification_script_sha256": "ca6579b4ad582aacb2cf9bb14ed9122e8e5f85aaa10be4c3252a16561f9f2dae",
+        "repository_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
+        "repository_tree": "5b4d28c9c887994badaada3724d9cfdbf8dd3314",
+        "native_provider_sha256": "29f7c4b42e71a1eb7b351c4c8cf9e7abca4781451b397bc417408bdec8d690b5",
+        "semantic_sha256": "59e659da63e58013c466836e04810b4c484fc7a3c3784bb17128996b2eff170b"
+      },
+      "semantic": {
+        "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "checks": [
+          {
+            "checkpoint_id": "WATER-EOS-T300-RHO996556",
+            "source_id": "IAPWS95",
+            "exact_location": "Table7 p15 first row",
+            "inputs": [
+              "T",
+              300,
+              "Dmass",
+              996.556
+            ],
+            "output_key": "P",
+            "SI_to_published_unit_scale": 1e-06,
+            "expected_published_decimal": "0.0992418352",
+            "observed_published_unit": "0.09924183518087218",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "0.09924183515",
+            "rounding_interval_upper": "0.09924183525",
+            "rounded_observation": "0.0992418352",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-MU-T298-RHO998",
+            "source_id": "IAPWS-MU",
+            "exact_location": "section4 Table4 p8",
+            "inputs": [
+              "T",
+              298.15,
+              "Dmass",
+              998
+            ],
+            "output_key": "V",
+            "SI_to_published_unit_scale": 1000000.0,
+            "expected_published_decimal": "889.735100",
+            "observed_published_unit": "889.7351001498093",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "889.7350995",
+            "rounding_interval_upper": "889.7351005",
+            "rounded_observation": "889.735100",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-K-T298-RHO998",
+            "source_id": "IAPWS-K",
+            "exact_location": "section2.8 Table4 p10",
+            "inputs": [
+              "T",
+              298.15,
+              "Dmass",
+              998
+            ],
+            "output_key": "L",
+            "SI_to_published_unit_scale": 1000.0,
+            "expected_published_decimal": "607.712868",
+            "observed_published_unit": "607.71286758806",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "607.7128675",
+            "rounding_interval_upper": "607.7128685",
+            "rounded_observation": "607.712868",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-REFERENCE-DEF",
+            "source_id": "IAPWS95",
+            "exact_location": "section3 Eq8 p4",
+            "inputs": [
+              "T",
+              273.16,
+              "Q",
+              0
+            ],
+            "output_key": "Hmass",
+            "SI_to_published_unit_scale": 1,
+            "expected_published_decimal": "0.611782",
+            "observed_published_unit": "0.6117816877430743",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "0.6117815",
+            "rounding_interval_upper": "0.6117825",
+            "rounded_observation": "0.611782",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          }
+        ],
+        "crosscheck": {
+          "checkpoint_id": "WATER-LIQUID-T298-P01",
+          "source_id": "IAPWS-LIQUID",
+          "exact_location": "Table8 p11 and Table3 p6",
+          "status": "EXECUTED_CROSSCHECK_NOT_HEOS_EXACT_ORACLE",
+          "values": [
+            {
+              "property": "Dmass",
+              "expected_SR6_decimal": "997.047013",
+              "observed_HEOS": "997.0470390177117",
+              "difference": "2.6017711661552312e-05",
+              "relative_difference": "2.6094769175696142e-08"
+            },
+            {
+              "property": "Cpmass",
+              "expected_SR6_decimal": "4181.44618",
+              "observed_HEOS": "4181.318830957573",
+              "difference": "-0.12734904242734046",
+              "relative_difference": "-3.0455741134838778e-05"
+            },
+            {
+              "property": "V",
+              "expected_SR6_decimal": "889.996774",
+              "observed_HEOS": "890.0226737731598",
+              "difference": "0.025899773159835604",
+              "relative_difference": "2.910097420177346e-05"
+            },
+            {
+              "property": "L",
+              "expected_SR6_decimal": "0.606502308",
+              "observed_HEOS": "0.6065153281526888",
+              "difference": "1.3020152688780762e-05",
+              "relative_difference": "2.146760616907786e-05"
+            },
+            {
+              "property": "Hmass",
+              "expected_SR6_from_Table3_and_Table8": "104919.3586175",
+              "observed_HEOS": "104918.89282785416"
+            }
+          ],
+          "numerical_acceptance_tolerance": null
+        },
+        "profile_points": [
+          {
+            "T_K": 298.15,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.0470390177117,
+              "Cpmass": 4181.318830957573,
+              "Hmass": 104918.89282785416,
+              "V": 0.0008900226737731598,
+              "L": 0.6065153281526888
+            },
+            "derived_Pr": 6.13581948070742,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 298.15,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.047337889216,
+              "Cpmass": 4181.316910860631,
+              "Hmass": 104919.5063186828,
+              "V": 0.0008900225814246936,
+              "L": 0.6065157041866177
+            },
+            "derived_Pr": 6.135812222289719,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 298.15,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.047636760353,
+              "Cpmass": 4181.31499077066,
+              "Hmass": 104920.11980926784,
+              "V": 0.0008900224890776955,
+              "L": 0.6065160802198025
+            },
+            "derived_Pr": 6.13580496390948,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8056969879248,
+              "Cpmass": 4180.959218907962,
+              "Hmass": 108786.44326518766,
+              "V": 0.0008715779195240792,
+              "L": 0.6080177256579152
+            },
+            "derived_Pr": 5.993298523801651,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8059951254812,
+              "Cpmass": 4180.9573230090855,
+              "Hmass": 108787.05499125365,
+              "V": 0.0008715778438753712,
+              "L": 0.6080180994624396
+            },
+            "derived_Pr": 5.993291601261474,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8062932626253,
+              "Cpmass": 4180.955427118845,
+              "Hmass": 108787.66671700282,
+              "V": 0.0008715777682280554,
+              "L": 0.6080184732661732
+            },
+            "derived_Pr": 5.993284678760028,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.5563403888945,
+              "Cpmass": 4180.63952202256,
+              "Hmass": 112653.67968857854,
+              "V": 0.0008537426062537251,
+              "L": 0.6094991151038326
+            },
+            "derived_Pr": 5.855939726394567,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.556637827273,
+              "Cpmass": 4180.637649284224,
+              "Hmass": 112654.2896717464,
+              "V": 0.0008537425462691775,
+              "L": 0.6094994867951465
+            },
+            "derived_Pr": 5.855933120626744,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.556935265198,
+              "Cpmass": 4180.635776556238,
+              "Hmass": 112654.89965462626,
+              "V": 0.0008537424862859429,
+              "L": 0.6094998584856292
+            },
+            "derived_Pr": 5.855926514898839,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          }
+        ],
+        "negative_admission": {
+          "checkpoint_id": "WATER-DOMAIN-NEGATIVE",
+          "cases": [
+            {
+              "case_id": "BELOW_T",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.1499999999999,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "ABOVE_T",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 300.00000000000006,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "BELOW_P",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 99999.99999999999
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "ABOVE_P",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 101325.00000000001
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SATURATION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SATURATED",
+                "T_K": 373.1243,
+                "P_Pa": 101325.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_COMPOSITION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "WATER_GLYCOL",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_FLUID",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "R134a",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_BACKEND",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "IF97",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_VERSION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "7.2.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_REVISION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "unqualified",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_PROFILE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R1",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_REFERENCE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "NBP",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "METASTABLE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "METASTABLE_LIQUID",
+                "T_K": 260.0,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "TWO_PHASE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "TWO_PHASE",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "VAPOR",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "VAPOR",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SOLID",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SOLID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SUPERCRITICAL",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SUPERCRITICAL",
+                "T_K": 647.096,
+                "P_Pa": 22064000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "REFERENCE_FINGERPRINT_MUTATION",
+              "baseline": "8d37dea32044ee8d",
+              "mutated": "b9ea8e2107f782b6",
+              "rejected": true
+            }
+          ],
+          "pass": true
+        },
+        "reference": {
+          "policy": "DEF",
+          "native_fingerprint": "8d37dea32044ee8d",
+          "probe_Hmass_J_kg": {
+            "Water": "112654.89965462626",
+            "R134a": "237224.69930391829",
+            "R717": "472416.67285673606"
+          },
+          "unchanged_before_negative": true,
+          "mutation_detected": true,
+          "restored_after_isolated_negative": true
+        }
+      },
+      "qualification_checks_pass": true
+    },
+    {
+      "schema_version": "task172.water.qualification-runtime.r2",
+      "runtime": {
+        "python_version": "3.12.13",
+        "implementation": "CPython",
+        "executable": "/Users/charles/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12",
+        "executable_sha256": "a395f264e5612a2819662ed3e37fd30d39ed61179b98e5f86c3c783a008d8623",
+        "platform": "macOS-27.0-arm64-arm-64bit",
+        "machine": "arm64",
+        "coolprop_version": "8.0.0",
+        "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "extension_path": "/Users/charles/hxforge-task172-validation.Ud9RdV/.venv/lib/python3.12/site-packages/CoolProp/CoolProp.abi3.so",
+        "extension_sha256": "1769af71ee559ad3040f286d991617713e4442d272c56adc2e2a69fd4d33dd8f",
+        "qualification_script_sha256": "ca6579b4ad582aacb2cf9bb14ed9122e8e5f85aaa10be4c3252a16561f9f2dae",
+        "repository_head": "6ca1e2df3114937db149fa8ee1ce2d033cac8da7",
+        "repository_tree": "5b4d28c9c887994badaada3724d9cfdbf8dd3314",
+        "native_provider_sha256": "29f7c4b42e71a1eb7b351c4c8cf9e7abca4781451b397bc417408bdec8d690b5",
+        "semantic_sha256": "59e659da63e58013c466836e04810b4c484fc7a3c3784bb17128996b2eff170b"
+      },
+      "semantic": {
+        "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "checks": [
+          {
+            "checkpoint_id": "WATER-EOS-T300-RHO996556",
+            "source_id": "IAPWS95",
+            "exact_location": "Table7 p15 first row",
+            "inputs": [
+              "T",
+              300,
+              "Dmass",
+              996.556
+            ],
+            "output_key": "P",
+            "SI_to_published_unit_scale": 1e-06,
+            "expected_published_decimal": "0.0992418352",
+            "observed_published_unit": "0.09924183518087218",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "0.09924183515",
+            "rounding_interval_upper": "0.09924183525",
+            "rounded_observation": "0.0992418352",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-MU-T298-RHO998",
+            "source_id": "IAPWS-MU",
+            "exact_location": "section4 Table4 p8",
+            "inputs": [
+              "T",
+              298.15,
+              "Dmass",
+              998
+            ],
+            "output_key": "V",
+            "SI_to_published_unit_scale": 1000000.0,
+            "expected_published_decimal": "889.735100",
+            "observed_published_unit": "889.7351001498093",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "889.7350995",
+            "rounding_interval_upper": "889.7351005",
+            "rounded_observation": "889.735100",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-K-T298-RHO998",
+            "source_id": "IAPWS-K",
+            "exact_location": "section2.8 Table4 p10",
+            "inputs": [
+              "T",
+              298.15,
+              "Dmass",
+              998
+            ],
+            "output_key": "L",
+            "SI_to_published_unit_scale": 1000.0,
+            "expected_published_decimal": "607.712868",
+            "observed_published_unit": "607.71286758806",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "607.7128675",
+            "rounding_interval_upper": "607.7128685",
+            "rounded_observation": "607.712868",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          },
+          {
+            "checkpoint_id": "WATER-REFERENCE-DEF",
+            "source_id": "IAPWS95",
+            "exact_location": "section3 Eq8 p4",
+            "inputs": [
+              "T",
+              273.16,
+              "Q",
+              0
+            ],
+            "output_key": "Hmass",
+            "SI_to_published_unit_scale": 1,
+            "expected_published_decimal": "0.611782",
+            "observed_published_unit": "0.6117816877430743",
+            "rounding_rule": "NEAREST_PUBLISHED_DECIMAL_HALF_EVEN",
+            "rounding_interval_lower": "0.6117815",
+            "rounding_interval_upper": "0.6117825",
+            "rounded_observation": "0.611782",
+            "pass": true,
+            "role": "FORMULATION_REPRODUCTION_NOT_PHYSICAL_UNCERTAINTY"
+          }
+        ],
+        "crosscheck": {
+          "checkpoint_id": "WATER-LIQUID-T298-P01",
+          "source_id": "IAPWS-LIQUID",
+          "exact_location": "Table8 p11 and Table3 p6",
+          "status": "EXECUTED_CROSSCHECK_NOT_HEOS_EXACT_ORACLE",
+          "values": [
+            {
+              "property": "Dmass",
+              "expected_SR6_decimal": "997.047013",
+              "observed_HEOS": "997.0470390177117",
+              "difference": "2.6017711661552312e-05",
+              "relative_difference": "2.6094769175696142e-08"
+            },
+            {
+              "property": "Cpmass",
+              "expected_SR6_decimal": "4181.44618",
+              "observed_HEOS": "4181.318830957573",
+              "difference": "-0.12734904242734046",
+              "relative_difference": "-3.0455741134838778e-05"
+            },
+            {
+              "property": "V",
+              "expected_SR6_decimal": "889.996774",
+              "observed_HEOS": "890.0226737731598",
+              "difference": "0.025899773159835604",
+              "relative_difference": "2.910097420177346e-05"
+            },
+            {
+              "property": "L",
+              "expected_SR6_decimal": "0.606502308",
+              "observed_HEOS": "0.6065153281526888",
+              "difference": "1.3020152688780762e-05",
+              "relative_difference": "2.146760616907786e-05"
+            },
+            {
+              "property": "Hmass",
+              "expected_SR6_from_Table3_and_Table8": "104919.3586175",
+              "observed_HEOS": "104918.89282785416"
+            }
+          ],
+          "numerical_acceptance_tolerance": null
+        },
+        "profile_points": [
+          {
+            "T_K": 298.15,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.0470390177117,
+              "Cpmass": 4181.318830957573,
+              "Hmass": 104918.89282785416,
+              "V": 0.0008900226737731598,
+              "L": 0.6065153281526888
+            },
+            "derived_Pr": 6.13581948070742,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 298.15,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.047337889216,
+              "Cpmass": 4181.316910860631,
+              "Hmass": 104919.5063186828,
+              "V": 0.0008900225814246936,
+              "L": 0.6065157041866177
+            },
+            "derived_Pr": 6.135812222289719,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 298.15,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 997.047636760353,
+              "Cpmass": 4181.31499077066,
+              "Hmass": 104920.11980926784,
+              "V": 0.0008900224890776955,
+              "L": 0.6065160802198025
+            },
+            "derived_Pr": 6.13580496390948,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8056969879248,
+              "Cpmass": 4180.959218907962,
+              "Hmass": 108786.44326518766,
+              "V": 0.0008715779195240792,
+              "L": 0.6080177256579152
+            },
+            "derived_Pr": 5.993298523801651,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8059951254812,
+              "Cpmass": 4180.9573230090855,
+              "Hmass": 108787.05499125365,
+              "V": 0.0008715778438753712,
+              "L": 0.6080180994624396
+            },
+            "derived_Pr": 5.993291601261474,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 299.075,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.8062932626253,
+              "Cpmass": 4180.955427118845,
+              "Hmass": 108787.66671700282,
+              "V": 0.0008715777682280554,
+              "L": 0.6080184732661732
+            },
+            "derived_Pr": 5.993284678760028,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 100000.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.5563403888945,
+              "Cpmass": 4180.63952202256,
+              "Hmass": 112653.67968857854,
+              "V": 0.0008537426062537251,
+              "L": 0.6094991151038326
+            },
+            "derived_Pr": 5.855939726394567,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 100662.5,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.556637827273,
+              "Cpmass": 4180.637649284224,
+              "Hmass": 112654.2896717464,
+              "V": 0.0008537425462691775,
+              "L": 0.6094994867951465
+            },
+            "derived_Pr": 5.855933120626744,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          },
+          {
+            "T_K": 300.0,
+            "P_Pa": 101325.0,
+            "admitted_by_proposal": true,
+            "properties": {
+              "Dmass": 996.556935265198,
+              "Cpmass": 4180.635776556238,
+              "Hmass": 112654.89965462626,
+              "V": 0.0008537424862859429,
+              "L": 0.6094998584856292
+            },
+            "derived_Pr": 5.855926514898839,
+            "role": "FINITE_CONSISTENT_SNAPSHOT_NOT_INDEPENDENT_ACCURACY_ORACLE"
+          }
+        ],
+        "negative_admission": {
+          "checkpoint_id": "WATER-DOMAIN-NEGATIVE",
+          "cases": [
+            {
+              "case_id": "BELOW_T",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.1499999999999,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "ABOVE_T",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 300.00000000000006,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "BELOW_P",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 99999.99999999999
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "ABOVE_P",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 101325.00000000001
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SATURATION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SATURATED",
+                "T_K": 373.1243,
+                "P_Pa": 101325.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_COMPOSITION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "WATER_GLYCOL",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_FLUID",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "R134a",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_BACKEND",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "IF97",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_VERSION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "7.2.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_REVISION",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "unqualified",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_PROFILE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R1",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "WRONG_REFERENCE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "NBP",
+                "phase_request": "STABLE_SINGLE_PHASE_LIQUID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "METASTABLE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "METASTABLE_LIQUID",
+                "T_K": 260.0,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "TWO_PHASE",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "TWO_PHASE",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "VAPOR",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "VAPOR",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SOLID",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SOLID",
+                "T_K": 298.15,
+                "P_Pa": 100000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "SUPERCRITICAL",
+              "input": {
+                "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+                "fluid": "Water",
+                "composition": "PURE_ORDINARY_WATER",
+                "backend": "HEOS",
+                "version": "8.0.0",
+                "revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                "reference": "DEF",
+                "phase_request": "SUPERCRITICAL",
+                "T_K": 647.096,
+                "P_Pa": 22064000.0
+              },
+              "rejected": true
+            },
+            {
+              "case_id": "REFERENCE_FINGERPRINT_MUTATION",
+              "baseline": "8d37dea32044ee8d",
+              "mutated": "b9ea8e2107f782b6",
+              "rejected": true
+            }
+          ],
+          "pass": true
+        },
+        "reference": {
+          "policy": "DEF",
+          "native_fingerprint": "8d37dea32044ee8d",
+          "probe_Hmass_J_kg": {
+            "Water": "112654.89965462626",
+            "R134a": "237224.69930391829",
+            "R717": "472416.67285673606"
+          },
+          "unchanged_before_negative": true,
+          "mutation_detected": true,
+          "restored_after_isolated_negative": true
+        }
+      },
+      "qualification_checks_pass": true
+    }
+  ],
+  "cross_runtime_semantics_exact": true,
+  "scope_note": "Only these actual macOS arm64 builds; final documentation CI does not qualify other binaries. SR6 is executed diagnostic crosscheck, not exact HEOS oracle.",
+  "wall_derivation_audit": {
+    "unit_film_K_per_W": true,
+    "unit_cylinder_K_per_W": true,
+    "parallel_area_fractions": [
+      "1/3",
+      "1/4",
+      "5/12"
+    ],
+    "fraction_sum": "1",
+    "physical_coefficients_added": false,
+    "sign_audit": "Q_ts=s*q; s=+1 tube hot, -1 shell hot; same Q in all three branches; reverse all ordered drops when sign changes",
+    "zero_duty": "For positive finite resistances, Q=0 implies equal bulk/surface states",
+    "constant_k_domain_qualified": false
+  },
+  "canonical_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884"
+}

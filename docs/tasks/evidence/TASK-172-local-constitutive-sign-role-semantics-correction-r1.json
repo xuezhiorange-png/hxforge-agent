@@ -1,0 +1,323 @@
+{
+  "schema_version": "task172.local-constitutive-sign-role-semantics-correction.r1",
+  "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS_CORRECTION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "2f66a000cf079b5d11c317466113cf2fff894766",
+  "mode": "MODEL_LEVEL_SIGN_ROLE_SEMANTICS_CORRECTION_ONLY",
+  "head_precondition": {
+    "expected_head_sha": "2f66a000cf079b5d11c317466113cf2fff894766",
+    "verified_head_sha": "2f66a000cf079b5d11c317466113cf2fff894766",
+    "verified": true,
+    "pr_state": "OPEN_DRAFT",
+    "rebase_performed": false,
+    "reset_performed": false,
+    "force_push_performed": false
+  },
+  "scope": {
+    "r84_architecture_reused": true,
+    "sign_role_semantics_corrected": true,
+    "historical_source_research_reopened": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "real_case_created": false,
+    "real_endpoint_created": false,
+    "external_q_used": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "production_implementation_performed": false
+  },
+  "historical_immutability": {
+    "r1_through_r84_documents_unchanged": true,
+    "r1_through_r84_evidence_unchanged": true,
+    "r1_through_r84_extensions_rewritten": false,
+    "r84_original_document_changed": false,
+    "r84_original_evidence_changed": false,
+    "r84_extension_rewritten": false,
+    "historical_payloads_immutable": true
+  },
+  "authority_replay": {
+    "task170_task172_owner_replay": "PASS",
+    "task171_positive_q_semantics": "HOT_TO_COLD",
+    "task171_tube_hot_and_shell_hot_supported": true,
+    "task171_interface_replay": "PASS",
+    "r84_architecture_replay": "PASS",
+    "evidence": [
+      {
+        "authority": "TASK170_V07_SCOPE_SOURCE_GOLDEN_FREEZE",
+        "path": "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md",
+        "document_sha256": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0",
+        "exact_location": "TASK172 ownership and TASK173 full rating/sizing boundary sections",
+        "observed": "TASK172 owns local property/wall/convergence closure; TASK173 owns exchanger-level boundary closure"
+      },
+      {
+        "authority": "TASK171_SEGMENTED_THERMAL_STATE_TOPOLOGY_ENGINE",
+        "path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+        "document_sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+        "exact_location": "Authority and scope; Conservation and identity",
+        "observed": "Both tube-hot and shell-hot assignments are supported; positive signed wall heat rate means HOT to COLD"
+      },
+      {
+        "authority": "TASK172_WALL_TEMPERATURE_STATE_AUTHORITY_DEFINITION_R1",
+        "path": "docs/tasks/TASK-172-v0.7-wall-temperature-state-authority-definition-r1.md",
+        "document_sha256": "1ab84d797a53e7171714b79305087c6dfe4965a578d4d1e5825b8a491bea2cf9",
+        "exact_location": "sections 4-7; signed radial state relation",
+        "observed": "TUBE/SHELL identities are independent of HOT/COLD; Q_ts is positive for tube-hot and negative for shell-hot"
+      },
+      {
+        "authority": "TASK172_JMU_WALL_PRODUCER_AND_STATE_MAPPING_AUTHORITY_R1",
+        "path": "docs/tasks/TASK-172-v0.7-shell-wall-correction-jmu-wall-producer-and-state-mapping-authority-r1.md",
+        "document_sha256": "2cacb821e92ad38db9f6721d784b65c255c0e895525bdad519c2aa4a41b5c73b",
+        "exact_location": "sections 7, 9-11",
+        "observed": "The same signed rate is used across inner film, wall and outer film; J_mu remains on the shell-side wall-property branch"
+      },
+      {
+        "authority": "R84_LOCAL_CONSTITUTIVE_ARCHITECTURE_CORRECTION",
+        "path": "docs/tasks/TASK-172-v0.7-local-constitutive-closure-architecture-correction-r1.md",
+        "document_sha256": "bb53aa76f57fb18e3fc867c9652462d15d22c3ffb7242829bb86c32037cfbf3d",
+        "evidence_canonical_hash": "1f4668d99ba6c8b92ff1b74be941403e031d96624fb58099b9bb8f085107577c",
+        "exact_location": "sections 2-8",
+        "observed": "Native local closure has three primary unknowns and three residuals; external Q, real case and whole-exchanger mean pressure are not native prerequisites"
+      }
+    ]
+  },
+  "sign_role_contract": {
+    "task171_positive_q_semantics": "HOT_TO_COLD",
+    "tube_hot_and_shell_hot_supported": true,
+    "q_hc_is_primary_unknown": true,
+    "q_hc_sign_semantics": "HOT_TO_COLD_ORIENTATION",
+    "q_hc_positive_means_hot_to_cold": true,
+    "s_ts_is_known_orientation": true,
+    "s_ts_is_unknown": false,
+    "s_ts_allowed_values": [1, -1],
+    "s_ts_definition": {
+      "tube_hot_shell_cold": 1,
+      "shell_hot_tube_cold": -1
+    },
+    "q_ts_is_derived": true,
+    "q_ts_relation": "q_ts=s_ts*q_hc",
+    "tube_hot_s_ts": 1,
+    "shell_hot_s_ts": -1,
+    "role_inference_from_equipment_side": false,
+    "role_inference_from_array_index": false,
+    "absolute_heat_rate_substitution_forbidden": true,
+    "reject_if_orientation_missing": true,
+    "reject_if_orientation_invalid": true,
+    "reject_if_hot_cold_role_unbound": true,
+    "reject_if_equipment_side_used_as_hot_cold_authority": true
+  },
+  "corrected_local_constitutive_system": {
+    "runtime_granularity": "SEGMENT_LOCAL_CONSTITUTIVE_EVALUATION_STATE",
+    "unknown_set": [
+      "q_hc",
+      "T_wall_inner",
+      "T_wall_outer"
+    ],
+    "unknown_set_bound": true,
+    "derived_set": [
+      "q_ts"
+    ],
+    "derived_relation": "q_ts=s_ts*q_hc",
+    "residual_set": [
+      {
+        "id": "r_i",
+        "definition": "q_ts - h_i(T_wall_inner, located_tube_state, admitted_tube_profile) * A_i * (T_tube_bulk - T_wall_inner)",
+        "unit": "W",
+        "role": "INNER_FILM_HEAT_TRANSFER"
+      },
+      {
+        "id": "r_w",
+        "definition": "q_ts - (T_wall_inner - T_wall_outer) / R_wall",
+        "unit": "W",
+        "role": "WALL_CONDUCTION_AND_FOULING_NETWORK"
+      },
+      {
+        "id": "r_o",
+        "definition": "q_ts - h_o(T_wall_outer, located_shell_state, admitted_shell_profile) * A_o * (T_wall_outer - T_shell_bulk)",
+        "unit": "W",
+        "role": "OUTER_FILM_HEAT_TRANSFER"
+      }
+    ],
+    "residual_set_bound": true,
+    "equation_count": 3,
+    "unknown_count": 3,
+    "degrees_of_freedom_status": "CLOSED_MODEL_LEVEL_THREE_PRIMARY_UNKNOWNS_THREE_PRIMARY_RESIDUALS",
+    "hot_cold_role_assumption": false,
+    "scalar_reduction_bound": false,
+    "vector_method_review_required": true,
+    "method_status": "METHOD_UNBOUND",
+    "solver_selected": false,
+    "tolerances_selected": false,
+    "max_iter_selected": false,
+    "relaxation_factor_selected": false
+  },
+  "orientation_audit": {
+    "tube_hot_residual_orientation_consistent": true,
+    "shell_hot_residual_orientation_consistent": true,
+    "temperature_difference_role_transform_explicit": true,
+    "tube_hot_case": {
+      "s_ts": 1,
+      "q_ts": "q_hc",
+      "direction": "TUBE_TO_SHELL"
+    },
+    "shell_hot_case": {
+      "s_ts": -1,
+      "q_ts": "-q_hc",
+      "direction": "SHELL_TO_TUBE"
+    },
+    "same_surface_identity_across_role_swap": true,
+    "same_residual_family_across_role_swap": true,
+    "hard_coded_tube_hot_assumption": false,
+    "hard_coded_shell_cold_assumption": false,
+    "numerical_execution_performed": false
+  },
+  "jmu_ownership": {
+    "jmu_shell_side_interface_owned": true,
+    "mu_bulk_source": "LOCATED_LOCAL_SHELL_BULK_PROPERTY_STATE",
+    "mu_wall_source": "LOCATED_LOCAL_SHELL_FLUID_WALL_INTERFACE_PROPERTY_STATE",
+    "jmu_sign_orientation_factor": false,
+    "physical_form_observed": "J_mu=(mu_bulk/mu_wall)^m",
+    "jmu_physical_transfer_bound": false,
+    "jmu_executable_authority_bound": false,
+    "physical_authority_gaps_remaining": [
+      "JMU_EQUATION_TRANSFER",
+      "JMU_EXPONENT_AND_APPLICABILITY_TRANSFER",
+      "JMU_FLUID_AND_PROPERTY_DOMAIN_TRANSFER",
+      "WALL_INTERFACE_STATE_MAPPING",
+      "K_WALL_AUTHORITY",
+      "BASE_SHELL_FILM_AUTHORITY"
+    ]
+  },
+  "preserved_r84_architecture": {
+    "external_q_required_for_native_local_wall_closure": false,
+    "local_constitutive_q_is_unknown_or_derived_output": true,
+    "real_case_required_for_model_level_task172_closure": false,
+    "real_case_required_for_production_replay_or_validation": true,
+    "real_case_required_for_task175_golden_release": true,
+    "whole_exchanger_source_mean_path_selected_for_task172_runtime": false,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+    "mean_pressure_rule_required_for_local_runtime": false,
+    "task172_generates_hydraulic_pressure_field": false,
+    "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+    "jmu_neutral_initialization_allowed": true,
+    "jmu_neutral_initialization_execution_authorized": false,
+    "jmu_equals_one_is_physical_production_correction": false,
+    "final_active_jmu_required": true,
+    "r84_architecture_preserved": true
+  },
+  "preserved_state": {
+    "source_mean_temperature_predicate_satisfied": true,
+    "source_mean_pressure_predicate_satisfied": false,
+    "source_mean_endpoint_pair_predicate_satisfied": true,
+    "source_mean_property_authority_predicate_satisfied": true,
+    "source_mean_identity_provenance_predicate_satisfied": true,
+    "source_mean_fail_closed_predicate_satisfied": true,
+    "jmu_bulk_pressure_rule_authority_found": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "qualified_q_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "local_residual_and_method_qualification": "OPEN",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN",
+    "production_numerical_method_authorized": false,
+    "task172_numerical_execution_authorized": false
+  },
+  "entry_blocker_state": {
+    "recomputed_from_ownership_and_required_authority": false,
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ]
+  },
+  "real_instance_guards": {
+    "real_task172_case_created": false,
+    "real_external_q_receipt_created": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false,
+    "source_mean_bulk_state_authority_candidate_created": false
+  },
+  "decision": {
+    "result": "CORRECTED_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS",
+    "r84_architecture_preserved": true,
+    "sign_role_semantics_corrected": true,
+    "pressure_rule_selected": false,
+    "source_mean_path_selected_for_task172_runtime": false,
+    "candidate_created": false,
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+    "stop": true
+  },
+  "validation": {
+    "task170_frozen_ownership_replay": "PASS",
+    "task171_interface_replay": "PASS",
+    "r1_r84_immutability": "PASS",
+    "q_direction_classification": "PASS",
+    "sign_role_orientation_audit": "PASS",
+    "r84_architecture_preservation": "PASS",
+    "local_vs_source_mean_state_classification": "PASS",
+    "jmu_shell_interface_ownership": "PASS",
+    "unknown_residual_dof_audit": "PASS",
+    "cross_task_owner_leakage": "PASS",
+    "json_parse": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci": "PENDING"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-sign-role-semantics-correction-r1.md",
+    "document_sha256": "ba4d5538bc8134023fcf058d2ceec81ecab3ff32b47c16f685c4309db60d0f14",
+    "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-sign-role-semantics-correction-r1.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r85_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "task026_changed": false,
+    "pressure_source_researched": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "real_case_created": false,
+    "external_q_receipt_created": false,
+    "property_snapshot_created": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "b3be3bd297c1d3cfea94df93e7ef0b6274ddc225edfe4a0c13d54aa9167c1214"
+}

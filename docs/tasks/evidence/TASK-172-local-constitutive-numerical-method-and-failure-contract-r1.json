@@ -1,0 +1,403 @@
+{
+  "schema_version": "task172.local-constitutive-numerical-method-and-failure-contract.r1",
+  "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "mode": "MODEL_LEVEL_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_ONLY",
+  "access_date": "2026-09-22",
+  "previous_head_sha": "c9a9f6a664dd6f15f128f08a6e2b1325d2505088",
+  "head_precondition": {
+    "authorized_predecessor_head": "c9a9f6a664dd6f15f128f08a6e2b1325d2505088",
+    "expected_predecessor_head": "c9a9f6a664dd6f15f128f08a6e2b1325d2505088",
+    "verified_head_sha": "c9a9f6a664dd6f15f128f08a6e2b1325d2505088",
+    "verified": true,
+    "pr_state_verified": "OPEN_DRAFT",
+    "rebase_performed": false,
+    "reset_performed": false,
+    "force_push_performed": false
+  },
+  "historical_binding": {
+    "r1_through_r87_documents_unchanged": true,
+    "r1_through_r87_evidence_unchanged": true,
+    "r1_through_r87_extensions_rewritten": false,
+    "r84_extension_canonical_hash": "d1a949e76e45d6cdcef367acf09d65359956badd0639edaebb9e86eeb51c62e5",
+    "r85_extension_canonical_hash": "6b89349c35b2b2d651e4fca87f9bf45e919768a94db7a04d7b93759ea593f278",
+    "r86_extension_canonical_hash": "c59d57851d278386a7b27d921720981a12fef0e214b09996ed1a6039d46d0678",
+    "r87_extension_canonical_hash": "b6ba916042c7100be42ffb48bf6812185e237cfd23377bee86aae6c3d8003d19",
+    "predecessor_registry_root_canonical_hash": "280ea72505e43b0bb2c81dbbbf7cdd657f2870425071d5f91e528a9d1f95f658",
+    "historical_payloads_immutable": true
+  },
+  "evidence_authorities": [
+    {
+      "authority": "R84_LOCAL_CONSTITUTIVE_ARCHITECTURE",
+      "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-closure-architecture-correction-r1.md",
+      "document_sha256": "bb53aa76f57fb18e3fc867c9652462d15d22c3ffb7242829bb86c32037cfbf3d",
+      "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-closure-architecture-correction-r1.json",
+      "evidence_canonical_hash": "1f4668d99ba6c8b92ff1b74be941403e031d96624fb58099b9bb8f085107577c",
+      "registry_extension": "r84_extension"
+    },
+    {
+      "authority": "R85_R85A_SIGN_ROLE_SEMANTICS",
+      "document_paths": [
+        "docs/tasks/TASK-172-v0.7-local-constitutive-sign-role-semantics-correction-r1.md",
+        "docs/tasks/TASK-172-v0.7-local-constitutive-sign-role-semantics-completeness-correction-r85a.md"
+      ],
+      "evidence_canonical_hashes": [
+        "b3be3bd297c1d3cfea94df93e7ef0b6274ddc225edfe4a0c13d54aa9167c1214",
+        "487ca8e4056cc5425c4b773db3250db0ebc5a207dcebf3976e87f2b79efa73b8"
+      ],
+      "registry_extensions": ["r85_extension", "r86_extension"]
+    },
+    {
+      "authority": "R87_OPEN_SOURCE_ARCHITECTURE_AUDIT",
+      "document_path": "docs/tasks/TASK-172-v0.7-open-source-reference-architecture-audit-r1.md",
+      "document_sha256": "3e0eaf908a2fa3efc4c5c6a5a5743c474cb9d8ce76813d32761f2b4e71c59bdd",
+      "evidence_path": "docs/tasks/evidence/TASK-172-open-source-reference-architecture-audit-r1.json",
+      "evidence_canonical_hash": "7613b2a5622d117222f46124c9d7afcc63e313bb259d8956f7871c9badabda5f",
+      "registry_extension": "r87_extension",
+      "use_scope": "ARCHITECTURE_REFERENCE_ONLY"
+    },
+    {
+      "authority": "PROJECT_SCIPY_DEPENDENCY_DECLARATION",
+      "repository_path": "pyproject.toml:16",
+      "observed_declaration": "scipy>=1.14",
+      "use_scope": "IMPLEMENTATION_CANDIDATE_AVAILABILITY_ONLY",
+      "dependency_changed": false
+    }
+  ],
+  "frozen_local_system": {
+    "unknown_set": ["q_hc", "T_wall_inner", "T_wall_outer"],
+    "unknown_count": 3,
+    "orientation_input": "s_ts",
+    "orientation_allowed_values": [1, -1],
+    "orientation_is_known_input": true,
+    "q_ts_relation": "q_ts=s_ts*q_hc",
+    "residual_set": ["r_i", "r_w", "r_o"],
+    "equation_count": 3,
+    "degrees_of_freedom": 0,
+    "residual_equations_changed": false,
+    "residuals": {
+      "r_i": "q_ts-h_i(T_wall_inner,located_tube_state,admitted_tube_profile)*A_i*(T_tube_bulk-T_wall_inner)",
+      "r_w": "q_ts-(T_wall_inner-T_wall_outer)/R_wall",
+      "r_o": "q_ts-h_o(T_wall_outer,located_shell_state,admitted_shell_profile)*A_o*(T_wall_outer-T_shell_bulk)"
+    },
+    "local_residual_structure_bound": true,
+    "equation_set_rewritten": false
+  },
+  "preserved_semantics": {
+    "local_q_is_constitutive_unknown_or_output": true,
+    "external_q_required_for_native_local_wall_closure": false,
+    "real_case_required_for_model_level_task172_closure": false,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+    "jmu_shell_side_interface_ownership_preserved": true,
+    "q_hc_is_signed_unknown": true,
+    "q_hc_positive_means_hot_to_cold": true,
+    "q_hc_zero_meaning": "ZERO_LOCAL_HEAT_TRANSFER",
+    "q_hc_negative_allowed_at_model_level": true,
+    "q_hc_negative_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY",
+    "absolute_heat_rate_substitution_forbidden": true,
+    "q_hc_nonnegative_clamp_forbidden": true,
+    "hot_cold_role_is_explicit_task171_identity": true,
+    "hot_cold_role_reassignment_during_local_iteration": false,
+    "s_ts_allowed_values": [1, -1],
+    "q_ts_relation": "q_ts=s_ts*q_hc",
+    "r84_architecture_preserved": true,
+    "r85_r85a_semantics_preserved": true
+  },
+  "method_adjudication": {
+    "selected_model_level_method_family": "BOUND_AWARE_TRUST_REGION_VECTOR_NONLINEAR_LEAST_SQUARES",
+    "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+    "method_family_bound": true,
+    "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+    "scipy_method": "trf",
+    "loss": "linear",
+    "scipy_dependency_existing": true,
+    "production_solver_execution_authorized": false,
+    "candidates": [
+      {
+        "candidate": "BOUND_AWARE_TRUST_REGION_VECTOR_NONLINEAR_LEAST_SQUARES",
+        "decision": "SELECTED_MODEL_LEVEL_METHOD_FAMILY",
+        "native_vector_residual": true,
+        "explicit_bounds_supported": true,
+        "deterministic_single_seed_path_supported": true,
+        "termination_diagnostics_supported": true,
+        "nonzero_residual_minimum_requires_rejection": true,
+        "invalid_trial_requires_typed_abort_adapter": true
+      },
+      {
+        "candidate": "GENERIC_ROOT_OR_NEWTON",
+        "decision": "NOT_SELECTED",
+        "reason": "Bound, invalid-trial, branch-boundary and derivative requirements remain less explicit for the current contract."
+      },
+      {
+        "candidate": "FIXED_POINT_ITERATION",
+        "decision": "NOT_SELECTED_AS_PRIMARY",
+        "reason": "Does not by itself bind simultaneous satisfaction of all three residuals or failure semantics."
+      },
+      {
+        "candidate": "SCALAR_REDUCTION",
+        "decision": "NOT_SELECTED",
+        "reason": "Restricted algebraic elimination does not prove a globally valid continuous scalar residual across callbacks and domains."
+      }
+    ]
+  },
+  "scalar_reduction_adjudication": {
+    "mathematically_possible": true,
+    "basis": "The wall equation can eliminate q_ts on a fixed smooth branch, but h_i, h_o, J_mu and property/domain callbacks may depend on both wall states and may branch or fail.",
+    "continuous_scalar_residual_proof": false,
+    "robustly_authorized": false,
+    "selected_for_task172": false,
+    "brent_or_other_scalar_solver_selected": false
+  },
+  "initialization_contract": {
+    "architecture_bound": true,
+    "stages": [
+      "I0_INPUT_AND_DOMAIN_ADMISSION",
+      "I1_NEUTRAL_BASE_FILM_INITIALIZATION",
+      "I2_FULL_EQUATION_RESTORE"
+    ],
+    "initialization_not_started_on_missing_authority": true,
+    "jmu_neutral_initialization_candidate_value": 1.0,
+    "jmu_neutral_initialization_is_production_physics": false,
+    "jmu_neutral_initialization_is_initialization_only": true,
+    "jmu_zero_initialization_term_forbidden": true,
+    "jmu_zero_initialization_value_forbidden": true,
+    "final_accepted_result_must_use_full_active_jmu": true,
+    "temporary_simplification_present_in_final_residual": false,
+    "base_film_required_for_direct_seed": true,
+    "base_film_unavailable_status": "INITIALIZATION_BASE_FILM_UNAVAILABLE",
+    "direct_seed_formula": {
+      "R_i_0": "1/(h_i_0*A_i)",
+      "R_o_0": "1/(h_o_0*A_o)",
+      "q_ts_0": "(T_tube_bulk-T_shell_bulk)/(R_i_0+R_wall+R_o_0)",
+      "T_wall_inner_0": "T_tube_bulk-q_ts_0*R_i_0",
+      "T_wall_outer_0": "T_shell_bulk+q_ts_0*R_o_0",
+      "q_hc_0": "s_ts*q_ts_0",
+      "abs_or_nonnegative_clamp": false,
+      "role_swap": false,
+      "temperature_role_reassignment": false
+    },
+    "seed_is_accepted_result": false,
+    "random_multistart_authorized": false
+  },
+  "domain_policy": {
+    "bound": true,
+    "q_hc_domain": "SIGNED",
+    "q_hc_nonnegative_bound": false,
+    "q_hc_numeric_lower_bound": "UNBOUND",
+    "q_hc_numeric_upper_bound": "UNBOUND",
+    "wall_temperature_bounds": "INTERSECTION_OF_PROPERTY_MATERIAL_CORRELATION_INTERFACE_AND_STABLE_PHASE_DOMAINS",
+    "automatic_bulk_temperature_min_max_wall_clamp": false,
+    "nearest_bound_clipping": false,
+    "property_extrapolation": false,
+    "silent_pressure_substitution": false,
+    "default_material": false,
+    "default_film_coefficient": false,
+    "empty_trial_domain": "NO_VALID_TRIAL_DOMAIN",
+    "finite_check_required": true,
+    "property_domain_check_required": true,
+    "correlation_domain_check_required": true,
+    "material_domain_check_required": true,
+    "wall_interface_identity_check_required": true
+  },
+  "full_equation_restore": {
+    "required": true,
+    "final_active_jmu_required": true,
+    "final_residual_family": ["r_i", "r_w", "r_o"],
+    "initialization_equation_as_final_forbidden": true,
+    "physical_jmu_authority_missing_blocks_execution": true
+  },
+  "trial_state_policy": {
+    "invalid_trial_typed_failure_path": true,
+    "fake_penalty_residual_allowed": false,
+    "huge_sentinel_residual_allowed": false,
+    "nan_as_success_allowed": false,
+    "invalid_trial_reported_as_normal_residual": false,
+    "solver_adapter_must_abort_or_return_typed_failure": true,
+    "last_iterate_authoritative": false,
+    "last_iterate_diagnostic_only": true
+  },
+  "acceptance_separation": {
+    "solver_termination_status": "SEPARATE",
+    "residual_acceptance_status": "SEPARATE",
+    "physical_applicability_status": "SEPARATE",
+    "authority_admission_status": "SEPARATE",
+    "solver_success_is_engineering_acceptance": false,
+    "residual_acceptance_separate": true,
+    "future_acceptance_requires": [
+      "ADMISSIBLE_SOLVER_TERMINATION",
+      "ALL_PHYSICAL_RESIDUAL_CRITERIA_SATISFIED",
+      "FINITE_AUTHORITY_VALID_FINAL_AND_TRIAL_STATES",
+      "PHYSICAL_APPLICABILITY_ACCEPTED",
+      "ALL_ACTIVE_CORRELATIONS_AND_JMU_EVALUATED",
+      "NO_FAILURE_CLASS_ACTIVE"
+    ]
+  },
+  "numerical_profile": {
+    "executable_numerical_profile_bound": false,
+    "residual_absolute_tolerance": "UNBOUND",
+    "residual_relative_tolerance": "UNBOUND",
+    "xtol": "UNBOUND",
+    "ftol": "UNBOUND",
+    "gtol": "UNBOUND",
+    "max_nfev": "UNBOUND",
+    "diff_step": "UNBOUND",
+    "x_scale": "UNBOUND",
+    "jacobian_strategy": "UNBOUND_PENDING_NUMERICAL_PROFILE",
+    "stagnation_window": "UNBOUND",
+    "stagnation_progress_threshold": "UNBOUND",
+    "oscillation_window": "UNBOUND",
+    "oscillation_threshold": "UNBOUND",
+    "resource_cap": "UNBOUND",
+    "scipy_defaults_promoted": false
+  },
+  "residual_scaling": {
+    "required_for_review": true,
+    "physical_residual_representation": "PHYSICAL_UNSCALED_RESIDUALS",
+    "numerical_scaled_residual_representation": "DIMENSIONLESS_OR_AUTHORITY_NORMALIZED",
+    "scaling_changes_physical_equations": false,
+    "policy_status": "CONTRACT_SHAPE_BOUND_QUANTITATIVE_SCALE_UNBOUND"
+  },
+  "failure_taxonomy": {
+    "bound": true,
+    "failure_may_return_authoritative_partial_result": false,
+    "classes": [
+      "INPUT_AUTHORITY_MISSING",
+      "ROLE_ORIENTATION_UNBOUND",
+      "NO_VALID_TRIAL_DOMAIN",
+      "INITIALIZATION_BASE_FILM_UNAVAILABLE",
+      "INITIALIZATION_STATE_OUT_OF_DOMAIN",
+      "INITIALIZATION_FAILURE",
+      "PROPERTY_EVALUATION_FAILURE",
+      "CORRELATION_EVALUATION_FAILURE",
+      "MATERIAL_EVALUATION_FAILURE",
+      "NONFINITE_TRIAL",
+      "TRIAL_DOMAIN_EXCURSION",
+      "SINGULAR_OR_INVALID_RESISTANCE",
+      "SOLVER_NUMERICAL_FAILURE",
+      "SOLVER_RESOURCE_EXHAUSTION",
+      "SOLVER_TERMINATED_RESIDUAL_UNACCEPTED",
+      "FINAL_ACTIVE_JMU_UNAVAILABLE",
+      "FINAL_STATE_DOMAIN_INVALID",
+      "NEGATIVE_Q_APPLICABILITY_UNBOUND",
+      "NOT_CONVERGED"
+    ],
+    "stagnation_state_name_bound": true,
+    "oscillation_state_name_bound": true,
+    "resource_exhausted_state_name_bound": true,
+    "stagnation_numeric_policy": "UNBOUND",
+    "oscillation_numeric_policy": "UNBOUND",
+    "resource_cap_numeric_policy": "UNBOUND"
+  },
+  "negative_heat_policy": {
+    "q_hc_negative_allowed_at_model_level": true,
+    "negative_q_numerically_allowed": true,
+    "negative_q_is_numerical_failure": false,
+    "negative_q_applicability_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY",
+    "numerical_method_does_not_decide_applicability": true
+  },
+  "method_blocker_adjudication": {
+    "local_residual_structure_bound": true,
+    "method_family_bound": true,
+    "initialization_architecture_bound": true,
+    "domain_policy_bound": true,
+    "failure_taxonomy_bound": true,
+    "local_residual_and_method_model_level_complete": true,
+    "executable_numerical_profile_bound": false,
+    "local_residual_and_method_qualification": "RESOLVED_MODEL_LEVEL_EXECUTABLE_PROFILE_UNBOUND"
+  },
+  "blocker_recomputation": {
+    "previous_count": 4,
+    "current_count": 3,
+    "removed_blocker": "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+    "remaining_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "task172_entry_authority_complete": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN"
+  },
+  "open_source_boundary": {
+    "r87_used_as_architecture_reference": true,
+    "open_source_physical_authority_promoted": false,
+    "open_source_solver_defaults_promoted": false,
+    "open_source_tolerances_promoted": false,
+    "direct_code_import_authorized": false,
+    "external_code_vendored": false
+  },
+  "validation": {
+    "predecessor_head": "PASS",
+    "r85a_equation_replay": "PASS",
+    "r87_reference_architecture_replay": "PASS",
+    "scalar_reduction_adjudication": "PASS",
+    "vector_method_adjudication": "PASS",
+    "initialization_seed_algebra": "PASS",
+    "tube_hot_initialization_sign": "PASS",
+    "shell_hot_initialization_sign": "PASS",
+    "zero_q_initialization": "PASS",
+    "negative_q_no_clamp": "PASS",
+    "full_equation_restore": "PASS",
+    "no_initialization_equation_as_final": "PASS",
+    "domain_intersection_policy": "PASS",
+    "invalid_trial_fail_closed": "PASS",
+    "no_fake_penalty_residual": "PASS",
+    "solver_status_vs_residual_acceptance_separation": "PASS",
+    "failure_taxonomy": "PASS",
+    "no_scipy_default_tolerance_promotion": "PASS",
+    "no_hidden_max_iter": "PASS",
+    "no_hidden_diff_step": "PASS",
+    "jmu_neutral_one_not_zero": "PASS",
+    "r1_r87_immutability": "PASS",
+    "json_parse": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "production_solver_execution_authorized": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-numerical-method-and-failure-contract-r1.md",
+    "document_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-numerical-method-and-failure-contract-r1.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r88_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "decision": {
+    "result": "RESOLVED_LOCAL_CONSTITUTIVE_METHOD_CONTRACT",
+    "local_residual_and_method_model_level_complete": true,
+    "executable_numerical_profile_bound": false,
+    "effective_remaining_task172_entry_blocker_count": 3,
+    "next_minimal_gate": "AUTHORIZE_TASK172_NUMERICAL_ERROR_BUDGET_STOPPING_QUANTITATIVE_ALLOCATION_AND_METHOD_SENSITIVITY_R1_ONLY",
+    "stop": true
+  },
+  "canonical_hash": ""
+}

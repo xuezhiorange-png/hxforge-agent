@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0",
+  "task_id": "TASK172_V0_7_MESH_CONVERGENCE_QUALIFICATION_FINAL_R1",
+  "result": "PASS_MESH_CONVERGENCE_QUALIFICATION",
+  "authorization": {
+    "repository": "xuezhiorange-png/hxforge-agent",
+    "pr_number": 277,
+    "expected_pr_state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "a651c9ad92e391f203f79440b1855405a0d2a46f",
+    "predecessor_verified": true,
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "historical_replay": {
+    "R1_R102_payloads_immutable": true,
+    "R1_R102_registry_extensions_rewritten": false,
+    "R95_R102_registry_root_before_append": "34b613b6e6aff581b48adb7245e9541f4c1b7d2367bb21c8f9bd7d992923f25f",
+    "R95_input_matrix_canonical_hash": "b13d4306f3a2a60f248fbd1b222a6069599ec08a3c094996b17019ac315ae2d8",
+    "historical_artifact_hash_count_verified": 33,
+    "R99_result_preserved": "BLOCKED_MESH_CONVERGENCE_QUALIFICATION_R2",
+    "R99_historical_blocker_reproduced": true,
+    "R99_M05_GL128_W": 0.2222234220550436,
+    "R99_M05_GL256_W": 0.22222342205515927,
+    "R99_M05_GL512_W": 0.22222342205526033,
+    "R99_historical_64_ULP_gate": "STILL_FAILS"
+  },
+  "frozen_mesh_authority": {
+    "fixtures": ["M01", "M02", "M03", "M04", "M05", "M06"],
+    "primary_sequence_cells": [1, 2, 4, 8, 16, 32, 64, 128],
+    "secondary_alignment_sequence_cells": [3, 6, 12, 24, 48, 96],
+    "threshold_grid_each_axis": ["1e-2", "1e-3", "1e-4", "1e-5"],
+    "threshold_tuple_count": 64,
+    "resource_cap_grid_cells": [32, 64, 128, 256],
+    "mesh_policy_retuned": false,
+    "precision_policy_retuned": false,
+    "reference_oracle_redefined": false
+  },
+  "reference_authority": {
+    "canonical_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
+    "numpy_leggauss_role": "HISTORICAL_AND_INDEPENDENT_CROSSCHECK_ONLY",
+    "uncertainty_classification": "MEASURED_EMPIRICAL_NUMERICAL_REFERENCE_UNCERTAINTY_ENVELOPE",
+    "formal_true_error_bound": false,
+    "proven_global_upper_bound": false,
+    "conservative_wording_accepted": false,
+    "reference_uncertainty_propagation_required": true,
+    "reference_uncertainty_propagated": true,
+    "R102_canonical_results_file_sha256": "1515994982ac948fd79b687fec989ee39e8639aa5416fa6db789d039f21a0222",
+    "R102_canonical_results_hash": "8ff57c42b8a78afad395ca6f560886ec1d3f915fda6f2d65bf6d3b3c16cf53ae",
+    "runtime_fixture_reference_rows": [
+      {"fixture_id": "M01", "Q_ref_W": 17.051453586322395, "U_Q_py311_W": 2.2669865984425996e-11, "U_Q_py312_W": 2.2648549702353193e-11},
+      {"fixture_id": "M02", "Q_ref_W": 18.597879246107482, "U_Q_py311_W": 8.054001909840736e-12, "U_Q_py312_W": 8.029132914089132e-12},
+      {"fixture_id": "M03", "Q_ref_W": 13.187854026392497, "U_Q_py311_W": 5.801581437481218e-12, "U_Q_py312_W": 5.785594225926616e-12},
+      {"fixture_id": "M04", "Q_ref_W": 16.94171992110042, "U_Q_py311_W": 9.64561763794336e-12, "U_Q_py312_W": 9.620748642191757e-12},
+      {"fixture_id": "M05", "Q_ref_W": 0.22222342205523007, "U_Q_py311_W": 7.722877892746283e-12, "U_Q_py312_W": 7.722378292385201e-12},
+      {"fixture_id": "M06", "Q_ref_W": 13.526962848693817, "U_Q_py311_W": 4.870770453635487e-12, "U_Q_py312_W": 4.844125101044483e-12}
+    ]
+  },
+  "R98_roundoff_overlay": {
+    "C_round_effective": 1.0,
+    "profile_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
+    "overlay_consumed_by_final_mesh_decision": true,
+    "frozen_expression": "effective_bound_j = R94_candidate_bound_j * (C_round_effective / R94_C_ROUND); R94_C_ROUND=0.5, C_round_effective=1.0"
+  },
+  "execution": {
+    "full_mesh_matrix_rerun": true,
+    "mesh_threshold_sensitivity_performed": true,
+    "mesh_study_performed": true,
+    "python311": {
+      "version": "3.11.15",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "platform": "macOS-27.2-arm64-arm-64bit",
+      "mesh_levels": 84,
+      "accepted_cell_solves_per_matrix": 2664,
+      "deterministic_replay_cell_solves": 2664,
+      "replay_projection_canonical_hash": "02cab25b9ac3a3c63f0a3a0c88a48788f8086a70e45d71e7f38ca264e76fa36e",
+      "same_input_same_result_bytes": true,
+      "same_input_same_result_hash": true,
+      "all_failure_fixtures_pass": true
+    },
+    "python312": {
+      "version": "3.12.13",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "platform": "macOS-27.2-arm64-arm-64bit",
+      "mesh_levels": 84,
+      "accepted_cell_solves_per_matrix": 2664,
+      "deterministic_replay_cell_solves": 2664,
+      "replay_projection_canonical_hash": "02cab25b9ac3a3c63f0a3a0c88a48788f8086a70e45d71e7f38ca264e76fa36e",
+      "same_input_same_result_bytes": true,
+      "same_input_same_result_hash": true,
+      "all_failure_fixtures_pass": true
+    },
+    "same_classification_across_runtimes": true
+  },
+  "threshold_sensitivity": {
+    "candidate_tuple_count": 64,
+    "feasible_tuple_count": 12,
+    "unique_componentwise_loosest_feasible_tuple": true,
+    "componentwise_looser_feasibility_monotonicity_pass": true,
+    "selected_duty_relative_threshold": 0.01,
+    "selected_near_zero_duty_absolute_threshold_W": 0.01,
+    "selected_wall_extrema_absolute_threshold_K": 0.01,
+    "selected_minimum_resource_cap_cells": 128,
+    "resource_cap_is_convergence_proof": false,
+    "selection_status": "PASS_UNIQUE_LOOSEST_FEASIBLE_TUPLE"
+  },
+  "fixture_outcomes": [
+    {"fixture_id": "M01", "pass": true, "primary_first_converged_cells": 64, "primary_headroom_cells": 128, "secondary_first_converged_cells": 48, "secondary_headroom_cells": 96, "sequence_Q_disagreement_W": 3.300862833199858e-5, "sequence_wall_extrema_disagreement_K": 8.876109067159632e-4, "sequence_threshold_classification_disagreement": false},
+    {"fixture_id": "M02", "pass": true, "primary_first_converged_cells": 64, "primary_headroom_cells": 128, "secondary_first_converged_cells": 48, "secondary_headroom_cells": 96, "sequence_Q_disagreement_W": 3.598802979779603e-5, "sequence_wall_extrema_disagreement_K": 8.876474816474911e-4, "sequence_threshold_classification_disagreement": false},
+    {"fixture_id": "M03", "pass": true, "primary_first_converged_cells": 32, "primary_headroom_cells": 64, "secondary_first_converged_cells": 24, "secondary_headroom_cells": 48, "sequence_Q_disagreement_W": 2.024400203026744e-9, "sequence_wall_extrema_disagreement_K": 1.7843208798353771e-3, "sequence_threshold_classification_disagreement": false},
+    {"fixture_id": "M04", "pass": true, "primary_first_converged_cells": 16, "primary_headroom_cells": 32, "secondary_first_converged_cells": 12, "secondary_headroom_cells": 24, "sequence_Q_disagreement_W": 3.18941374743531e-4, "sequence_wall_extrema_disagreement_K": 1.1209873500206413e-3, "sequence_threshold_classification_disagreement": false},
+    {"fixture_id": "M05", "pass": true, "primary_first_converged_cells": 32, "primary_headroom_cells": 64, "secondary_first_converged_cells": 24, "secondary_headroom_cells": 48, "sequence_Q_disagreement_W": 1.4155343563970746e-13, "sequence_wall_extrema_disagreement_K": 8.424355025908881e-4, "sequence_threshold_classification_disagreement": false},
+    {"fixture_id": "M06", "pass": true, "primary_first_converged_cells": 16, "primary_headroom_cells": 32, "secondary_first_converged_cells": 12, "secondary_headroom_cells": 24, "sequence_Q_disagreement_W": 3.431174951984417e-4, "sequence_wall_extrema_disagreement_K": 4.320974164784275e-4, "sequence_threshold_classification_disagreement": false}
+  ],
+  "diagnostics": {
+    "nonmonotonicity_is_frozen_acceptance_requirement": false,
+    "M03_primary_successive_delta_non_decrease_at_cell_count": [16],
+    "M03_primary_16_cell_candidate_rejected": true,
+    "M03_secondary_reference_error_reversal_at_cell_count": [6],
+    "diagnostics_retained_and_not_suppressed": true
+  },
+  "lifecycle_and_blockers": {
+    "mesh_convergence_status": "REVIEWED_AUTHORITY",
+    "mesh_convergence_canonical_blocker_removed": true,
+    "remaining_task172_entry_blockers": [],
+    "effective_remaining_task172_entry_blocker_count": 0,
+    "task172_entry_authority_complete": true,
+    "next_gate": "AUTHORIZE_TASK172_IMPLEMENTATION_START_ONLY"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "engineering_calculation_production_path_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-mesh-convergence-final-qualification-r1.md",
+    "evidence_path": "docs/tasks/evidence/TASK-172-mesh-convergence-final-qualification-r1.json",
+    "results_path": "docs/tasks/evidence/TASK-172-mesh-convergence-final-qualification-results-r1.json",
+    "runner_path": "docs/tasks/evidence/TASK-172-mesh-convergence-final-qualification-runner-r1.py",
+    "results_sha256": "1a759a9f7b83c8ec5033dd3e234be11ee9ee4b36d65739246c466213536876a8",
+    "results_canonical_hash": "a74bbe6126a66348ba4a2c54c42cb7d66840e36924ff9bf0b59e431a0a372f63",
+    "runner_sha256": "e0f9b55c3938821fb9eedc25d5bffe317e357fa1c04bdbdbaa2f11c0dea4eae8",
+    "registry_extension_key": "r103_extension",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+    "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "validation": {
+    "predecessor_head_and_PR_state": "PASS",
+    "R95_R102_history_and_frozen_authority_replay": "PASS",
+    "R99_historical_failure_preserved_and_reproduced": "PASS",
+    "full_mesh_matrix_and_64_tuple_threshold_matrix_both_runtimes": "PASS",
+    "primary_secondary_sequence_and_wall_extrema_adjudication": "PASS",
+    "R102_reference_uncertainty_propagation": "PASS",
+    "R98_C_round_overlay_consumed": "PASS",
+    "cross_runtime_classification_and_deterministic_replay": "PASS",
+    "ruff_check": "PASS",
+    "ruff_format": "PASS",
+    "mypy_438_sources": "PASS",
+    "manifest_256_tests": "PASS",
+    "JSON_parse_and_canonical_hash": "PASS",
+    "artifact_hash_linkage": "PASS",
+    "historical_payload_immutability": "PASS",
+    "registry_extension_uniqueness_and_append_only": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "local_full_pytest": {
+      "status": "FAIL",
+      "summary": "6 failed, 6774 passed, 9 skipped, 70 errors in 162.48s",
+      "failed_test_classes": [
+        "five tests/ci/test_outcome_plugin.py::test_p04_* node-id expectation failures",
+        "tests/exchangers/shell_tube/tube_side/test_a01_upstream_closure.py::test_a01_no_upstream_repo_external_import rejected /private/tmp checkout path"
+      ],
+      "release_demo_setup_errors": "70 TASK164 tests observed dual-runtime parity status BLOCKED in the uncommitted local worktree",
+      "production_or_test_code_changed_to_mask_failures": false
+    },
+    "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "73eef68f871a2c4dab5fac036210af1d9c4be6ec503349ba40f40bc491f40c79"
+}

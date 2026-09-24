@@ -1,0 +1,188 @@
+{
+  "schema_version": "task172.local-constitutive-sign-role-semantics-completeness-correction.r85a",
+  "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_SIGN_ROLE_SEMANTICS_COMPLETENESS_CORRECTION_R85A",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "26214787d2b521182d28c6f00ba7bd70efc32a89",
+  "mode": "R85_SIGN_SEMANTICS_COMPLETENESS_ONLY",
+  "head_precondition": {
+    "expected_head_sha": "26214787d2b521182d28c6f00ba7bd70efc32a89",
+    "verified_head_sha": "26214787d2b521182d28c6f00ba7bd70efc32a89",
+    "verified": true,
+    "pr_state": "OPEN_DRAFT",
+    "rebase_performed": false,
+    "reset_performed": false,
+    "force_push_performed": false
+  },
+  "correction_scope": {
+    "r84_architecture_direction_valid": true,
+    "r84_sign_role_contradiction_found": true,
+    "r84_sign_role_contradiction_corrected": true,
+    "r85_rules_modified": false,
+    "r85_equations_modified": false,
+    "s_ts_modified": false,
+    "unknown_count_modified": false,
+    "residual_count_modified": false,
+    "r84_architecture_reopened": false,
+    "negative_q_policy_decided": false,
+    "production_implementation_performed": false
+  },
+  "historical_immutability": {
+    "r1_through_r85_documents_unchanged": true,
+    "r1_through_r85_evidence_unchanged": true,
+    "r1_through_r85_extensions_rewritten": false,
+    "r85_original_document_changed": false,
+    "r85_original_evidence_changed": false,
+    "r85_extension_rewritten": false,
+    "historical_payloads_immutable": true
+  },
+  "historical_r85_binding": {
+    "r85_document_sha256": "ba4d5538bc8134023fcf058d2ceec81ecab3ff32b47c16f685c4309db60d0f14",
+    "r85_evidence_canonical_hash": "b3be3bd297c1d3cfea94df93e7ef0b6274ddc225edfe4a0c13d54aa9167c1214",
+    "r85_evidence_file_sha256": "0e804c8c8caa94ee6e3ef0af93682b3c613802f605e3bad82556f75e18f2679d",
+    "r85_extension_canonical_hash": "6b89349c35b2b2d651e4fca87f9bf45e919768a94db7a04d7b93759ea593f278",
+    "predecessor_registry_root_canonical_hash": "6c61d2739fff3475e5ff225eec442b69d351a2928e0d5a0226fe535236b7a847"
+  },
+  "signed_q_contract": {
+    "q_hc_is_signed_unknown": true,
+    "q_hc_positive_means_hot_to_cold": true,
+    "q_hc_zero_meaning": "ZERO_LOCAL_HEAT_TRANSFER",
+    "q_hc_negative_allowed_at_model_level": true,
+    "q_hc_negative_meaning": "LOCAL_HEAT_FLOW_OPPOSITE_TO_ASSIGNED_HOT_TO_COLD_ORIENTATION",
+    "q_hc_negative_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY",
+    "absolute_heat_rate_substitution_forbidden": true,
+    "q_hc_nonnegative_clamp_forbidden": true,
+    "negative_q_policy_selected": false,
+    "negative_q_threshold_selected": false,
+    "negative_q_numerical_experiment_performed": false
+  },
+  "role_identity_contract": {
+    "hot_cold_role_is_explicit_task171_identity": true,
+    "hot_cold_role_inference_from_temperature_magnitude": false,
+    "hot_cold_role_inference_from_equipment_side": false,
+    "hot_cold_role_inference_from_array_index": false,
+    "hot_cold_role_reassignment_during_local_iteration": false,
+    "temperature_crossover_mutates_identity": false,
+    "s_ts_allowed_values": [1, -1],
+    "s_ts_is_known_input": true,
+    "s_ts_is_unknown": false,
+    "q_ts_relation": "q_ts=s_ts*q_hc",
+    "tube_hot_s_ts": 1,
+    "shell_hot_s_ts": -1
+  },
+  "preserved_local_system": {
+    "unknown_set": [
+      "q_hc",
+      "T_wall_inner",
+      "T_wall_outer"
+    ],
+    "unknown_set_bound": true,
+    "unknown_count": 3,
+    "residual_set": [
+      "r_i",
+      "r_w",
+      "r_o"
+    ],
+    "residual_set_bound": true,
+    "equation_count": 3,
+    "residual_equations_changed": false,
+    "s_ts_relation_changed": false,
+    "unknown_count_changed": false,
+    "residual_count_changed": false,
+    "tube_hot_residual_orientation_pass": true,
+    "shell_hot_residual_orientation_pass": true,
+    "degrees_of_freedom_status": "CLOSED_MODEL_LEVEL_THREE_PRIMARY_UNKNOWNS_THREE_PRIMARY_RESIDUALS"
+  },
+  "preserved_architecture_and_ownership": {
+    "jmu_shell_side_interface_ownership_preserved": true,
+    "external_q_required_for_native_local_wall_closure": false,
+    "real_case_required_for_model_level_task172_closure": false,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+    "whole_exchanger_source_mean_path_selected_for_task172_runtime": false,
+    "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+    "final_active_jmu_required": true,
+    "r84_architecture_preserved": true
+  },
+  "entry_blocker_state": {
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ]
+  },
+  "real_instance_guards": {
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false,
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "wall_state_solved": false
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "pressure_rule_selected": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "decision": {
+    "result": "CORRECTED_SIGN_ROLE_SEMANTICS_COMPLETENESS",
+    "r85_modified": false,
+    "signed_q_completeness_overlay_recorded": true,
+    "negative_q_policy_promoted": false,
+    "candidate_created": false,
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+    "stop": true
+  },
+  "validation": {
+    "signed_q_unknown": "PASS",
+    "positive_q_semantics": "PASS",
+    "zero_q_semantics": "PASS",
+    "negative_q_semantics": "PASS",
+    "no_abs_q": "PASS",
+    "no_q_nonnegative_clamp": "PASS",
+    "no_temperature_role_inference": "PASS",
+    "no_equipment_side_role_inference": "PASS",
+    "no_array_role_inference": "PASS",
+    "no_iterative_role_reassignment": "PASS",
+    "tube_hot_residual": "PASS",
+    "shell_hot_residual": "PASS",
+    "dof_unchanged": "PASS",
+    "r1_r85_immutability": "PASS",
+    "json_parse": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-sign-role-semantics-completeness-correction-r85a.md",
+    "document_sha256": "128bfcfe530ba130b0fc02a2e07eafb37433910aa394d01901353152c0407696",
+    "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-sign-role-semantics-completeness-correction-r85a.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r86_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "487ca8e4056cc5425c4b773db3250db0ebc5a207dcebf3976e87f2b79efa73b8"
+}

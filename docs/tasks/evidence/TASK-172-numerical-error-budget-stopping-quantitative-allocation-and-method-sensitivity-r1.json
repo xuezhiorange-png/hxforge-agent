@@ -1,0 +1,526 @@
+{
+  "schema_version": "task172.numerical-error-budget-stopping-quantitative-allocation-evidence.r1",
+  "task_id": "TASK172_V0_7_NUMERICAL_ERROR_BUDGET_STOPPING_QUANTITATIVE_ALLOCATION_AND_METHOD_SENSITIVITY_R1",
+  "mode": "CONTROLLED_TEST_FIXTURE_NUMERICAL_EXPERIMENT_AND_PROPOSED_PROFILE_ONLY",
+  "result": "QUANTITATIVE_NUMERICAL_PROFILE_CANDIDATE_COMPLETED",
+  "lifecycle": {
+    "candidate_created": true,
+    "candidate_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review": "PENDING",
+    "canonical_blocker_removed": false,
+    "new_authority_self_approval": false
+  },
+  "predecessor": {
+    "pr_number": 277,
+    "required_pr_state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "dbba1624415f0ca845af46260bca08260e7b1936",
+    "head_precondition_verified": true
+  },
+  "historical_boundary": {
+    "R1_R91_payloads_immutable": true,
+    "R88_method_contract_rewritten": false,
+    "R91_JMU_authority_reopened": false
+  },
+  "frozen_replay": {
+    "R88": {
+      "unknowns": [
+        "q_hc",
+        "T_wall_inner",
+        "T_wall_outer"
+      ],
+      "unknown_count": 3,
+      "residuals": [
+        "r_i",
+        "r_w",
+        "r_o"
+      ],
+      "equation_count": 3,
+      "dof": 0,
+      "q_ts": "s_ts*q_hc",
+      "physical_residuals_changed": false,
+      "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+      "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+      "method": "trf",
+      "loss": "linear",
+      "model_level_complete": true
+    },
+    "R91": {
+      "JMU_PHYSICAL_AUTHORITY_REVIEWED": true,
+      "jmu_relation": "J_mu,k=(mu_bulk,k/mu_wall,k)^0.14",
+      "wall_mapping_scope": "CLEAN_SURFACE_ONLY",
+      "nonzero_fouling_supported": false,
+      "fouled_shell_wall_correction_authority_bound": false
+    }
+  },
+  "experiment_design": {
+    "deterministic": true,
+    "randomness_used": false,
+    "network_calls": false,
+    "production_import_side_effects": false,
+    "fixture_counts": {
+      "analytic_oracle": 10,
+      "nonlinear_jmu": 4,
+      "failure_policy": 9,
+      "total": 23,
+      "nonzero_solver": 13
+    },
+    "analytic_oracle": "Closed-form three-resistance network.",
+    "nonlinear_oracle": {
+      "method": "Independent scalar residual with sign-changing physical bracket and 257-point monotonicity check; brentq.",
+      "scope": "NUMERICAL_ORACLE_ONLY",
+      "production_scalar_reduction_selected": false
+    },
+    "synthetic_values": "Areas, h_i, h_o_base, and R_wall are numerical-method fixture parameters only, not engineering authority.",
+    "property_scope": {
+      "authority_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "fluid": "PURE_ORDINARY_WATER",
+      "backend": "HEOS",
+      "reference_state": "DEF",
+      "phase": "STABLE_SINGLE_PHASE_LIQUID",
+      "temperature_K": [
+        298.15,
+        300
+      ],
+      "pressure_Pa": [
+        100000,
+        101325
+      ],
+      "fixture_pressure_Pa": 101325,
+      "fixture_pressure_is_pressure_rule": false
+    }
+  },
+  "numerical_profile": {
+    "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+    "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+    "method": "trf",
+    "loss": "linear",
+    "settings": [
+      {
+        "name": "ftol",
+        "value": 0.000001,
+        "basis": "dimensionless solver control",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-JOINT-TOL-01",
+          "R92-OAT-01",
+          "R92-OAT-02",
+          "R92-OAT-03"
+        ],
+        "rationale": "Loosest tested one-axis ftol with selected tight xtol/gtol; identical selected-matrix acceptance/output."
+      },
+      {
+        "name": "xtol",
+        "value": 1e-12,
+        "basis": "dimensionless solver control",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-JOINT-TOL-04",
+          "R92-JOINT-TOL-05",
+          "R92-OAT-07",
+          "R92-OAT-08",
+          "R92-OAT-09"
+        ],
+        "rationale": "First all-accepted joint anchor; 1e-6 failed physical residual acceptance, 1e-8 passed but did not match selected oracle envelope."
+      },
+      {
+        "name": "gtol",
+        "value": 1e-12,
+        "basis": "dimensionless solver control",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-JOINT-TOL-04",
+          "R92-OAT-13",
+          "R92-OAT-14",
+          "R92-OAT-15",
+          "R92-OAT-16"
+        ],
+        "rationale": "First tested one-axis value in all-accepted region; 1e-10 and looser failed at least two fixtures."
+      },
+      {
+        "name": "jacobian",
+        "value": "2-point real finite difference",
+        "basis": "scheme",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-OAT-16",
+          "R92-OAT-20"
+        ],
+        "rationale": "Both schemes accepted 13/13; 2-point max 16 callbacks vs 28 for 3-point, with lower observed q error. Complex step excluded for real callbacks."
+      },
+      {
+        "name": "diff_step",
+        "value": 0.00001,
+        "basis": "relative perturbation",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-OAT-21",
+          "R92-OAT-22",
+          "R92-OAT-23",
+          "R92-OAT-24",
+          "R92-OAT-25",
+          "R92-OAT-26",
+          "R92-OAT-27"
+        ],
+        "rationale": "Best observed oracle envelope among steps tied at the minimum callback count; 1e-4 increased callback/nfev, 1e-3 increased q error, smaller tested steps did not improve envelope."
+      },
+      {
+        "name": "x_scale",
+        "value": [
+          "abs(q_hc_seed)",
+          "abs(T_tube_bulk-T_shell_bulk)",
+          "abs(T_tube_bulk-T_shell_bulk)"
+        ],
+        "basis": [
+          "W",
+          "K",
+          "K"
+        ],
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-OAT-28",
+          "R92-OAT-29",
+          "R92-OAT-30"
+        ],
+        "rationale": "ONE, JACOBIAN and derived scale outputs matched; choose derived scale to respect variable units without arbitrary constants."
+      },
+      {
+        "name": "max_nfev",
+        "value": 6,
+        "basis": "function evaluations per local solve",
+        "authority_class": "PROJECT_RESOURCE_POLICY",
+        "experiments": [
+          "R92-OAT-31",
+          "R92-OAT-10",
+          "R92-OAT-33",
+          "R92-OAT-34",
+          "R92-OAT-35",
+          "R92-OAT-36",
+          "R92-OAT-40"
+        ],
+        "rationale": "ceil(1.5*4)=6 from selected profile worst/p95 nfev=4, two evaluations headroom. Candidate requires admitted direct algebraic seed; perturbed-seed exhaustion is a typed failure."
+      },
+      {
+        "name": "residual_callback_cap",
+        "value": 24,
+        "basis": "residual callback evaluations",
+        "authority_class": "PROJECT_RESOURCE_POLICY",
+        "experiments": [
+          "R92-OAT-10",
+          "R92-OAT-20",
+          "R92-OAT-40"
+        ],
+        "rationale": "6*(1+3) for three unknowns and 2-point finite differences; max observed callbacks=16."
+      },
+      {
+        "name": "tr_solver",
+        "value": "exact",
+        "basis": "TRF subproblem",
+        "authority_class": "METHOD_SENSITIVITY_DERIVED",
+        "experiments": [
+          "R92-JOINT-TOL-04",
+          "R92-OAT-16"
+        ],
+        "rationale": "Explicit dense subproblem setting held constant for the three-variable experiment; not a general solver-family comparison."
+      },
+      {
+        "name": "tr_options",
+        "value": {},
+        "basis": "options",
+        "authority_class": "NOT_APPLICABLE",
+        "experiments": [
+          "R92-JOINT-TOL-04"
+        ],
+        "rationale": "Explicit empty mapping."
+      },
+      {
+        "name": "f_scale",
+        "value": 1,
+        "basis": "loss scale",
+        "authority_class": "NOT_APPLICABLE",
+        "experiments": [
+          "R92-JOINT-TOL-04"
+        ],
+        "rationale": "Explicit for reproducibility; linear loss."
+      },
+      {
+        "name": "jac_sparsity",
+        "value": null,
+        "basis": "sparsity pattern",
+        "authority_class": "NOT_APPLICABLE",
+        "experiments": [
+          "R92-JOINT-TOL-04"
+        ],
+        "rationale": "Dense three-equation residual; no sparsity pattern."
+      }
+    ],
+    "residual_scaling": {
+      "physical_residual_units": "W",
+      "policy": "r_hat_j=r_j/Q_scale",
+      "Q_scale": "abs(q_ts_seed)",
+      "authority_class": "METHOD_SENSITIVITY_DERIVED",
+      "experiments": [
+        "R92-OAT-37",
+        "R92-OAT-38",
+        "R92-OAT-39"
+      ],
+      "zero_policy": "Exact zero-duty branch bypasses scaling; no epsilon or fixed 1 W denominator."
+    },
+  "residual_acceptance": {
+      "bound": true,
+      "type": "ABSOLUTE_MACHINE_ROUNDOFF_DERIVED",
+      "rule": "max(abs(r_i,r_w,r_o)) <= G_ref*ulp(T_ref)+ulp(Q_scale)",
+      "units": "W",
+    "G_ref": "max(h_i,0*A_i; 1/R_wall; h_o,base*A_o)",
+      "T_ref": "max(abs(T_tube_bulk),abs(T_shell_bulk))",
+      "Q_scale": "abs(q_ts_seed)",
+      "relative_tolerance": "NOT_USED",
+      "authority_class": "MACHINE_PRECISION_DERIVED",
+      "experiments": [
+        "R92-JOINT-TOL-04",
+        "R92-OAT-10"
+      ],
+      "multiplier_sensitivity": [
+        {
+          "multiplier": 0.5,
+          "accepted": 6,
+          "total": 13
+        },
+        {
+          "multiplier": 1,
+          "accepted": 13,
+          "total": 13
+        },
+        {
+          "multiplier": 2,
+          "accepted": 13,
+          "total": 13
+        }
+      ],
+      "scope": "Candidate evidenced on fixed fixtures only; not a universal production guarantee."
+    },
+    "zero_duty": {
+      "exact_branch_selected": true,
+      "nonlinear_solver_required": false,
+      "branch": "equal bulk temperatures on admitted passive clean network: q_hc=q_ts=0 and both wall temperatures equal the common bulk temperature",
+      "epsilon_or_deadband": false,
+      "near_zero_nonzero_remains_distinct": true,
+      "authority_class": "ANALYTIC_ORACLE_DERIVED",
+      "experiments": [
+        "A04_ZERO_DUTY_EXACT",
+        "A05_NEAR_ZERO_DRIVING_FORCE"
+      ]
+    },
+    "selected_observations": {
+      "fixture_count": 13,
+      "solver_success_count": 13,
+      "residual_accepted_count": 13,
+      "max_nfev": 4,
+      "p95_nfev": 4,
+      "max_callbacks": 16,
+      "max_scaled_residual_inf_norm": 2.335634741170615e-11,
+      "max_abs_q_oracle_error_W": 8.423539643587219e-13,
+      "max_abs_wall_error_K": 5.684341886080802e-14,
+      "near_zero_relative_q_error": "NOT_USED; absolute error reported"
+    },
+    "stopping": {
+      "wall_temperature_iteration_tolerance_applicable": false,
+      "property_coupling_tolerance_applicable": false,
+      "root_interval_tolerance_applicable": false,
+      "custom_stagnation_detector_enabled": false,
+      "custom_oscillation_detector_enabled": false,
+      "max_nfev_is_convergence_proof": false,
+      "solver_success_is_engineering_acceptance": false
+    },
+    "acceptance_conjunction": [
+      "solver termination admissible",
+      "physical residual acceptance satisfied",
+      "all final states authority/domain-valid",
+      "all active correlations evaluated",
+      "no active failure class"
+    ],
+    "scalar_production_method_selected": false
+  },
+  "numerical_error_budget": {
+    "bound": true,
+    "components": [
+      "ITERATION_ROOT_ERROR",
+      "SERIALIZATION_QUANTIZATION_ERROR"
+    ],
+    "combination_rule": "COMPONENTWISE_LINEAR_SUM",
+    "iteration_root_error": {
+      "q_hc_observed_envelope_W": 8.423539643587219e-13,
+      "T_wall_inner_observed_envelope_K": 5.684341886080802e-14,
+      "T_wall_outer_observed_envelope_K": 5.684341886080802e-14,
+      "basis": "independent analytic and validation-only nonlinear oracle over 13 fixed nonzero fixtures",
+      "authority_class": "INDEPENDENT_NUMERICAL_ORACLE_DERIVED",
+      "universal_production_bound": false
+    },
+    "serialization_error": {
+      "q_and_residual_W": 0,
+      "wall_temperature_K": 0,
+      "method": "canonical JSON float serialization and parse; binary equality",
+      "authority_class": "ANALYTIC_ORACLE_DERIVED",
+      "tested_values": 7
+    },
+    "combined_observed_envelope": {
+      "q_hc_W": 8.423539643587219e-13,
+      "T_wall_inner_K": 5.684341886080802e-14,
+      "T_wall_outer_K": 5.684341886080802e-14
+    },
+    "excluded": [
+      "PROPERTY_FORMULATION_ERROR",
+      "CORRELATION_MODEL_FORM_ERROR",
+      "DISCRETIZATION_ERROR",
+      "REFERENCE_DATA_ERROR",
+      "EXPERIMENTAL_UNCERTAINTY"
+    ]
+  },
+  "failure_policy": {
+    "failure_fixtures_pass": true,
+    "typed_classes": [
+      "INPUT_AUTHORITY_MISSING",
+      "SUPPORT_IDENTITY_MISMATCH",
+      "TRIAL_DOMAIN_EXCURSION",
+      "NONFINITE_TRIAL",
+      "SINGULAR_OR_INVALID_RESISTANCE",
+      "SOLVER_TERMINATED_RESIDUAL_UNACCEPTED",
+      "SOLVER_RESOURCE_EXHAUSTION"
+    ],
+    "negative_q_numerically_allowed": true,
+    "negative_q_applicability": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY",
+    "penalty_residual_used": false,
+    "nan_as_success": false,
+    "partial_result_authoritative": false
+  },
+  "serialization": {
+    "roundtrip": "PASS_BITWISE_FLOAT_ROUNDTRIP",
+    "max_quantization_error_W": 0,
+    "max_quantization_error_K": 0,
+    "display_rounding_included": false
+  },
+  "reproducibility": {
+    "primary": {
+      "python": "3.14.5",
+      "scipy": "1.18.0",
+      "numpy": "2.5.0",
+      "coolprop": "8.0.0",
+      "platform": "macOS-27.2-arm64",
+      "runner_sha256": "fcae918100081984844207ced8e34cd2aa8fc6b1220013e583c4d400c56da649",
+      "input_matrix_canonical_hash": "2654b9c558cbb81febd58b076826acf89867cd59c5b19dc05f2cfa68c2351f0d",
+      "result_matrix_canonical_hash": "8f02747f531e37a45c59acb4a7a2b89973ec33784d0abb5863276437dd12f2e6",
+      "numeric_output_matrix_canonical_hash": "8a101ba44eec053d2e0ed6050867bd2cbe65022b0f5a8b23d7c3affb3fc3a87a",
+      "same_input_same_result_bytes": true,
+      "same_input_same_result_hash": true,
+      "selected_result_bytes_sha256": "5c0902de24c28af821632024887ff5db511d3fa5d58a832bd8eac3a8f83be6c8"
+    },
+    "python311": {
+      "python": "3.11.15",
+      "scipy": "1.17.1",
+      "numpy": "2.4.6",
+      "coolprop": "8.0.0",
+      "same_input_same_result_bytes": true,
+      "same_input_same_result_hash": true,
+      "result_matrix_canonical_hash": "8f02747f531e37a45c59acb4a7a2b89973ec33784d0abb5863276437dd12f2e6",
+      "numeric_output_matrix_canonical_hash": "8a101ba44eec053d2e0ed6050867bd2cbe65022b0f5a8b23d7c3affb3fc3a87a"
+    },
+    "python312": {
+      "python": "3.12.13",
+      "scipy": "1.18.0",
+      "numpy": "2.5.0",
+      "coolprop": "8.0.0",
+      "same_input_same_result_bytes": true,
+      "same_input_same_result_hash": true,
+      "result_matrix_canonical_hash": "8f02747f531e37a45c59acb4a7a2b89973ec33784d0abb5863276437dd12f2e6",
+      "numeric_output_matrix_canonical_hash": "8a101ba44eec053d2e0ed6050867bd2cbe65022b0f5a8b23d7c3affb3fc3a87a"
+    },
+    "source_runner_full_result_canonical_hash": "a2061b1500473ec3a3ec5110ccc52efe8acdf17ba5fcec53967f8ab1b9855acd"
+  },
+  "ownership": {
+    "numerical_experiment_performed": true,
+    "numerical_experiment_is_production_solve": false,
+    "production_solver_execution_authorized": false,
+    "production_code_changed": false,
+    "engineering_calculation_production_path_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "property_backend_used_for": "reviewed-scope controlled method fixtures only",
+    "real_case_required": false,
+    "external_Q_required": false,
+    "whole_exchanger_mean_pressure_researched": false,
+    "mesh_study_performed": false,
+    "discretization_error_delegated_to_mesh_qualification": true,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "blocker_ledger": {
+    "remaining": [
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 2,
+    "task172_entry_authority_complete": false,
+    "numerical_error_budget_and_stopping_canonical_blocker_removed": false
+  },
+  "next_gate": "AUTHORIZE_TASK172_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1_ONLY",
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-numerical-error-budget-stopping-quantitative-allocation-and-method-sensitivity-r1.md",
+    "document_sha256": "8bb263780ab1a4e6306eb559175a72fd42fcf25ec1cf094c9415946268230be3",
+    "results_path": "docs/tasks/evidence/TASK-172-numerical-error-budget-stopping-method-sensitivity-results-r1.json",
+    "results_file_sha256": "65f0f9d0ef51d1d51865864d39a8836f43e65e0f6f13fb27601c102b5d965b7f",
+    "results_canonical_hash": "f86ba9b324323dc15bcd3c15c624b5235ae52fd8955b48990095279684818e65",
+    "runner_path": "docs/tasks/evidence/TASK-172-numerical-error-budget-stopping-method-sensitivity-runner-r1.py",
+    "runner_sha256": "fcae918100081984844207ced8e34cd2aa8fc6b1220013e583c4d400c56da649",
+    "registry_extension_key": "r92_extension",
+    "registry_extension_canonical_hash": "BOUND_BY_REGISTRY; OMITTED_HERE_TO_AVOID_HASH_CYCLE",
+    "registry_root_canonical_hash": "BOUND_BY_REGISTRY_ROOT; OMITTED_HERE_TO_AVOID_HASH_CYCLE"
+  },
+  "validation": {
+    "PREDECESSOR_HEAD_PASS": "PASS",
+    "R88_METHOD_CONTRACT_REPLAY_PASS": "PASS",
+    "R91_JMU_AUTHORITY_REPLAY_PASS": "PASS",
+    "ANALYTIC_ORACLE_FIXTURE_PASS": "PASS",
+    "TUBE_HOT_ORACLE_PASS": "PASS",
+    "SHELL_HOT_ORACLE_PASS": "PASS",
+    "ZERO_DUTY_EXACT_PASS": "PASS",
+    "NEGATIVE_Q_NO_CLAMP_PASS": "PASS",
+    "NEAR_ZERO_CASE_PASS": "PASS",
+    "NONLINEAR_JMU_FIXTURE_PASS": "PASS",
+    "INDEPENDENT_NONLINEAR_ORACLE_PASS": "PASS",
+    "RESIDUAL_SCALING_SENSITIVITY_PASS": "PASS",
+    "VARIABLE_SCALING_SENSITIVITY_PASS": "PASS",
+    "FTOL_SENSITIVITY_PASS": "PASS",
+    "XTOL_SENSITIVITY_PASS": "PASS",
+    "GTOL_SENSITIVITY_PASS": "PASS",
+    "JACOBIAN_SCHEME_SENSITIVITY_PASS": "PASS",
+    "DIFF_STEP_SENSITIVITY_PASS": "PASS",
+    "MAX_NFEV_SENSITIVITY_PASS": "PASS",
+    "SOLVER_SUCCESS_VS_RESIDUAL_ACCEPTANCE_PASS": "PASS",
+    "ZERO_DUTY_POLICY_PASS": "PASS",
+    "RESOURCE_CAP_POLICY_PASS": "PASS",
+    "SERIALIZATION_ROUNDTRIP_PASS": "PASS",
+    "NO_SCIPY_DEFAULT_PROMOTION_PASS": "PASS",
+    "NO_LEGACY_TOLERANCE_BLIND_REUSE_PASS": "PASS",
+    "NO_HIDDEN_MAX_ITER_PASS": "PASS",
+    "NO_HIDDEN_DIFF_STEP_PASS": "PASS",
+    "JMU_NEUTRAL_ONE_NOT_ZERO_PASS": "PASS",
+    "NO_MESH_EXPERIMENT_PASS": "PASS",
+    "DETERMINISTIC_REPLAY_PASS": "PASS",
+    "R1_R91_IMMUTABILITY_PASS": "PASS",
+    "EVIDENCE_CANONICAL_HASH_NONEMPTY_PASS": "PASS",
+    "JSON_PASS": "PASS",
+    "CANONICAL_HASH_PASS": "PASS",
+    "ARTIFACT_LINKAGE_PASS": "PASS",
+    "DIFF_ALLOWLIST_PASS": "PASS",
+    "GIT_DIFF_CHECK_PASS": "PASS",
+    "RUFF_PASS": "PASS",
+    "RUFF_FORMAT_PASS": "PASS",
+    "MYPY_PASS": "PASS",
+    "MANIFEST_PASS": "PASS",
+    "FULL_PYTEST": "NOT_RUN_CONTROLLED_NUMERICAL_FIXTURES_AND_EVIDENCE_ONLY",
+    "EXACT_FINAL_HEAD_CI_RUN": "PENDING_FINAL_HEAD_CI",
+    "EXACT_FINAL_HEAD_CI": "PENDING_FINAL_HEAD_CI"
+  },
+  "canonical_hash": "d50ebbbaa4d851376068e0a7efe8e53b6da1ecd095698e480bb8d88621352f1e"
+}

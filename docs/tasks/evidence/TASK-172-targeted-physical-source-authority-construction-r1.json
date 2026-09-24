@@ -1,0 +1,175 @@
+{
+  "schema_version": "task172.targeted-physical-source-authority-construction.r1",
+  "task_id": "TASK172_V0_7_TARGETED_PHYSICAL_SOURCE_AUTHORITY_CONSTRUCTION_R1",
+  "pr_number": 277,
+  "previous_head_sha": "5a5c8954a0ddd509f489b6bc6d2c35e86f2bb4f0",
+  "mode": "CONTROLLED_ENGINEERING_SOURCE_AUTHORITY_CONSTRUCTION_ONLY",
+  "scope": [
+    "MATERIAL_IDENTITY",
+    "MATERIAL_K",
+    "TUBE_ACTIVE_WALL_CORRECTION",
+    "SHELL_ACTIVE_WALL_CORRECTION",
+    "CROSS_BINDING"
+  ],
+  "source_conflict_policy": "FAIL_CLOSED",
+  "source_research": {
+    "new_external_source_bytes_added": false,
+    "new_external_source_authority_promoted": false,
+    "search_snippet_used_as_authority": false,
+    "secondary_source_used_as_primary": false,
+    "license_assumption_added": false,
+    "source_research_stop_phase": "MATERIAL_IDENTITY",
+    "stop_reason": "MATERIAL_IDENTITY_INPUT_CONTRACT_MISSING"
+  },
+  "historical_anomaly": {
+    "legacy_tube_thermal_conductivity_field_found": true,
+    "legacy_field_current_main_present": true,
+    "current_main_occurrence_type": "TASK026_FORBIDDEN_FIELDS_TOKEN_NOT_REQUEST_OR_RESULT_FIELD",
+    "current_main_path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py",
+    "current_main_symbol": "TASK026_T025_FORBIDDEN_FIELDS",
+    "introduced_by_commit": "37f39d902143e4938f83cd7edb48231d5fabf937",
+    "upstream_read_set_contains_field": false,
+    "legacy_field_frozen_authority": false,
+    "legacy_field_source_provenance_complete": false,
+    "legacy_field_reusable_for_task172": false,
+    "legacy_field_disposition": "RETAIN_FORBIDDEN_FIELD_TOKEN_AS_TASK026_T025_BOUNDARY_METADATA;DO_NOT_TREAT_AS_MATERIAL_AUTHORITY;NO_REUSE",
+    "reachable_task026_design_authority_found": false,
+    "unimmutable_external_draft_is_authority": false
+  },
+  "material_identity_contract": {
+    "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+    "authority_version": "r1",
+    "status": "PROPOSED_AUTHORITY",
+    "component_role": "TUBE_WALL_METAL",
+    "required_fields": [
+      "component_role",
+      "material_id",
+      "material_grade_or_specification",
+      "material_standard",
+      "product_form",
+      "source_id",
+      "source_version",
+      "source_location",
+      "source_class",
+      "permission_status",
+      "evidence_refs",
+      "approval_status",
+      "canonical_hash",
+      "upstream_configuration_identity_binding"
+    ],
+    "material_identity_bound": false,
+    "input_contract_missing": true,
+    "material_profile_id": null,
+    "default_forbidden": true,
+    "selection_by_conductivity_forbidden": true,
+    "selection_by_geometry_forbidden": true,
+    "selection_by_common_practice_forbidden": true,
+    "source_bindings": [
+      {
+        "source_id": "SRC-T172-REPO-WALL",
+        "exact_location": "src/hexagent/exchangers/shell_tube/overall_heat_transfer_resistance/models.py; authority.py; validation.py",
+        "role": "INHERITED_TYPED_CARRIER_AND_CYLINDRICAL_EQUATION_ONLY"
+      },
+      {
+        "source_id": "SRC-T172-REPO-TUBE",
+        "exact_location": "src/hexagent/exchangers/shell_tube/tube_side_thermal/stage_pipeline.py",
+        "role": "TASK026_READ_SET_AND_FORBIDDEN_FIELD_BOUNDARY"
+      }
+    ],
+    "physics_introduced": false,
+    "production_enabled": false,
+    "canonical_hash": null
+  },
+  "material_conductivity": {
+    "physical_quantity": "solid_tube_wall_thermal_conductivity_w_m_k",
+    "equation_inherited": "R_w,j=d_i*ln(d_o/d_i)/(2*k_wall*A_i,j)",
+    "material_profile_id": null,
+    "source_authority_status": "BLOCKED",
+    "constant_k_status": "OPEN",
+    "temperature_domain_bound": false,
+    "component_mapping_complete": false,
+    "blocker": "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+    "blocking_prerequisite": "MATERIAL_IDENTITY_INPUT_CONTRACT_MISSING",
+    "selected_material_or_value": null,
+    "authority_id": null,
+    "new_equation": false
+  },
+  "tube_wall_correction": {
+    "correction_id": null,
+    "status": "BLOCKED",
+    "base_authority": "SRC-T172-REPO-TUBE",
+    "physical_type": "WALL_VISCOSITY_CORRECTION",
+    "source_bound": false,
+    "base_compatibility_bound": false,
+    "applicability_bound": false,
+    "material_profile_bound": false,
+    "wall_temperature_state_bound": false,
+    "sieder_tate_transfer_authority": "UNAVAILABLE",
+    "disposition": "DISPOSITION_BLOCKED_UPSTREAM_MATERIAL_IDENTITY_AND_WALL_STATE_PREREQUISITE_MISSING;NO_TRANSFER_ATTEMPTED",
+    "new_equation": false
+  },
+  "shell_wall_correction": {
+    "correction_id": null,
+    "status": "BLOCKED",
+    "base_authority": "SRC-T172-REPO-BELL",
+    "physical_type": "WALL_VISCOSITY_CORRECTION",
+    "source_bound": false,
+    "base_compatibility_bound": false,
+    "applicability_bound": false,
+    "material_profile_bound": false,
+    "wall_temperature_state_bound": false,
+    "task034_wall_authority_reuse": "NO",
+    "task034_reuse_reason": "TASK034_BAYRAM_SEVILGEN_WALL_TERM_IS_SHELL_PRESSURE_DROP_PHI_S_NOT_TASK166_BELL_HEAT_TRANSFER_CORRECTION",
+    "disposition": "DISPOSITION_BLOCKED_UPSTREAM_MATERIAL_IDENTITY_AND_WALL_STATE_PREREQUISITE_MISSING;NO_TRANSFER_ATTEMPTED",
+    "new_equation": false
+  },
+  "cross_binding": {
+    "status": "NOT_READY",
+    "wall_temperature_state_required": true,
+    "wall_temperature_state_authority_bound": false,
+    "material_source_domain_surface_geometry_unit_correlation_checks_defined": true,
+    "actual_material_profile_available": false,
+    "actual_correction_available": false
+  },
+  "numerical_boundary": {
+    "local_residual_and_method_qualification": "OPEN",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN",
+    "numerical_profile_status": "PARTIALLY_CLOSED",
+    "numerical_tolerances_bound": false,
+    "mesh_convergence_rule_bound": false
+  },
+  "review_status": {
+    "water_profile_r2": "REVIEWED_AUTHORITY",
+    "water_profile_independent_review": "CLOSED_FOR_TASK172_ENTRY",
+    "clean_wall_network_r2": "REVIEWED_AUTHORITY",
+    "local_cylindrical_mapping_r2": "REVIEWED_AUTHORITY",
+    "wall_surface_network_independent_review": "CLOSED_FOR_TASK172_ENTRY",
+    "new_authority_self_approval": false,
+    "entry_review_pending": true
+  },
+  "final_decision": {
+    "result": "BLOCKED",
+    "block_reason": "MATERIAL_IDENTITY_INPUT_CONTRACT_MISSING",
+    "physical_authority_portion_closed": false,
+    "task172_entry_authority_complete": false,
+    "remaining_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "next_gate": "AUTHORIZE_TASK172_MATERIAL_IDENTITY_AUTHORITY_INPUT_CONTRACT_R1_ONLY"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "32cf979e002eaeebbaaca586d6212751a6ec286d410436e34788f6258aef48a2"
+}

@@ -1,0 +1,199 @@
+{
+  "schema_version": "task172.material-identity-independent-review-evidence.r1",
+  "task_id": "TASK172_V0_7_MATERIAL_IDENTITY_INPUT_CONTRACT_INDEPENDENT_REVIEW_R1",
+  "pr_number": 277,
+  "previous_head_sha": "f1a7a7e9722657e7a0004468c8d43df3578d34ec",
+  "subject_authority": {
+    "authority_id": "V07-T172-MATERIAL-IDENTITY-INPUT-CONTRACT-R1",
+    "authority_version": "r1",
+    "status": "PROPOSED_AUTHORITY",
+    "independent_review": "PENDING",
+    "contract_definition_complete": true,
+    "lifecycle_promotion_performed": false,
+    "new_authority_self_approval": false,
+    "actual_material_instance_bound": false,
+    "material_profile_id": null
+  },
+  "independent_scope_audit": {
+    "mode": "INDEPENDENT_SCOPE_AUDIT_ONLY",
+    "result": "PASS_FOR_SCOPED_MODEL_LEVEL_LAYER_A_CONTRACT",
+    "scope": "MODEL_LEVEL_MATERIAL_IDENTITY_INPUT_CONTRACT_ONLY",
+    "review_evidence_bound": true,
+    "review_evidence_is_lifecycle_approval": false,
+    "external_independent_confirmation_pending": true,
+    "self_approval": false,
+    "downstream_work_performed": false
+  },
+  "review_checks": {
+    "ownership_task172_case_input_boundary": "PASS",
+    "component_role_exact_tube_wall_metal": "PASS",
+    "identity_property_separation": "PASS",
+    "identity_disambiguation_fields": "PASS",
+    "source_revision_location_class_permission_evidence_required": "PASS",
+    "caller_transport_not_approval": "PASS",
+    "bare_grade_name_assertion_rejected": "PASS",
+    "hidden_default_forbidden": "PASS",
+    "runtime_material_database_lookup_forbidden": "PASS",
+    "legacy_tube_thermal_conductivity_not_authority": "PASS",
+    "case_configuration_identity_and_hash_binding": "PASS",
+    "geometry_component_physical_support_binding": "PASS",
+    "name_only_binding_rejected": "PASS",
+    "canonical_preimage_complete": "PASS",
+    "source_condition_case_geometry_rebinding_new_identity": "PASS",
+    "proposed_authority_blocks_production": "PASS",
+    "independent_review_required_for_promotion": "PASS",
+    "layer_a_excludes_property_and_wall_values": "PASS",
+    "scoped_acceptance_is_shape_only": "PASS",
+    "layer_b_layer_c_and_canonical_blocker_unchanged": "PASS"
+  },
+  "scope_boundary": {
+    "owner": "TASK172_CASE_INPUT_AUTHORITY_BOUNDARY",
+    "component_role": "TUBE_WALL_METAL",
+    "upstream_task020_task021_task025_semantics_changed": false,
+    "shell_wall_material_contract_created": false,
+    "layer_a_contract_shape_accepted": true,
+    "actual_material_instance_approved": false,
+    "material_property_value_included": false,
+    "wall_temperature_included": false,
+    "htc_u_correction_or_fouling_included": false,
+    "production_admission": "FAIL_CLOSED_UNTIL_REVIEWED_CASE_BOUND_INSTANCE"
+  },
+  "required_identity_fields": [
+    "schema_version",
+    "authority_id",
+    "authority_version",
+    "component_role",
+    "material_identity_id",
+    "material_standard_system",
+    "material_specification_or_designation",
+    "material_grade_or_alloy",
+    "material_condition_or_temper_if_applicable",
+    "product_form_if_material_identity_requires_it",
+    "source_id",
+    "source_version_or_revision",
+    "source_location",
+    "source_class",
+    "permission_status",
+    "evidence_refs",
+    "approval_status",
+    "case_or_configuration_binding",
+    "geometry_binding",
+    "authority_hash"
+  ],
+  "forbidden_layer_a_fields": [
+    "thermal_conductivity_w_m_k",
+    "constant_k",
+    "k_at_temperature",
+    "wall_temperature",
+    "tube_wall_resistance",
+    "correction_factor",
+    "HTC",
+    "U",
+    "fouling"
+  ],
+  "binding_rules": {
+    "case_binding_required": true,
+    "case_binding_fields": [
+      "task172_case_id",
+      "task172_request_id",
+      "task172_request_hash",
+      "configuration_authority_id",
+      "configuration_authority_hash",
+      "upstream_identity_refs",
+      "binding_rule_revision"
+    ],
+    "geometry_binding_required": true,
+    "geometry_binding_fields": [
+      "component_role",
+      "geometry_authority_id",
+      "geometry_authority_hash",
+      "physical_support_id",
+      "physical_support_hash",
+      "upstream_geometry_identity_refs"
+    ],
+    "component_role_exact": "TUBE_WALL_METAL",
+    "caller_assertion_sufficient": false,
+    "global_material_default_allowed": false,
+    "runtime_database_lookup_allowed": false,
+    "legacy_tube_thermal_conductivity_reuse": "FORBIDDEN"
+  },
+  "canonical_identity": {
+    "serializer": "hexagent.canonical_json.canonical_sha256",
+    "authority_hash_excluded_from_own_preimage": true,
+    "preimage_semantics": [
+      "schema_and_authority_version",
+      "component_scope_and_role",
+      "material_identity_fields",
+      "source_identity_revision_location_rights_and_evidence",
+      "case_configuration_binding",
+      "geometry_component_and_physical_support_binding",
+      "approval_lifecycle_status"
+    ],
+    "source_revision_changes_identity": true,
+    "material_condition_changes_identity": true,
+    "case_rebinding_changes_identity": true,
+    "geometry_rebinding_changes_identity": true,
+    "same_hash_different_body": "BLOCKED"
+  },
+  "upstream_layers": {
+    "layer_b_material_thermal_property": {
+      "authority_id": "V07-T172-MATERIAL-THERMAL-PROPERTY-AUTHORITY-CONTRACT-R1",
+      "status": "PROPOSED_AUTHORITY",
+      "independent_review": "PENDING",
+      "unchanged": true
+    },
+    "layer_c_constant_k": {
+      "authority_id": "V07-T172-CONSTANT-K-QUALIFICATION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "unchanged": true,
+      "promotion_scope": "MODEL_LEVEL_CONSTANT_K_QUALIFICATION_CONTRACT_ONLY"
+    }
+  },
+  "effective_state": {
+    "material_identity_actual_value_bound": false,
+    "material_profile_id": null,
+    "material_constant_k_status": "OPEN",
+    "material_k_temperature_domain_bound": false,
+    "material_constant_k_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "MATERIAL-CONSTANT-K-TEMPERATURE-DOMAIN",
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 6,
+    "task172_entry_authority_complete": false,
+    "task172_entry_review_pending": true
+  },
+  "provenance": {
+    "acyclic": true,
+    "source_type": "REPOSITORY_PROPOSAL_AND_SCOPED_AUDIT_RECEIPT",
+    "historical_proposal_document": "TASK-172-v0.7-material-identity-authority-input-contract-r1.md",
+    "historical_proposal_document_sha256": "1cffabd1aa25ade7cf67f224150b8e455c130f7eb6a4899b94f88803a18e4856",
+    "historical_proposal_evidence": "evidence/TASK-172-material-identity-authority-input-contract-r1.json",
+    "historical_proposal_evidence_canonical_hash": "3414779c84cd526cc3f1068e559035205711c025f7fa781904138b52f1fddf97",
+    "historical_registry_root_hash": "7ba0674e734f111d272538410843b0ea6b03659e3aec7cf701cd7a97f15a5d71",
+    "historical_r13_extension_hash": "99cb9d8473d26aea36c10ab81849c95e25c057c57b7f2cb8e25660ab1323b114",
+    "caller_assertion_promoted": false,
+    "material_instance_fabricated": false,
+    "reviewer_identity_fabricated": false
+  },
+  "governance": {
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "layer_b_reviewed_or_promoted": false,
+    "layer_c_reviewed_or_promoted_by_this_receipt": false,
+    "material_profile_created": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "EXTERNAL_INDEPENDENT_REVIEWER_CONFIRM_OR_REJECT_SCOPED_MODEL_LEVEL_LAYER_A_ACCEPTANCE",
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "2072919bf73a68388de41c931958b8597333c78e0494aeab885758680cd29bb5"
+}

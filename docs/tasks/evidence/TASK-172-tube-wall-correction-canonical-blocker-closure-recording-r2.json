@@ -1,0 +1,148 @@
+{
+  "schema_version": "task172.tube-wall-correction-canonical-blocker-closure-recording.r2",
+  "task_id": "TASK172_V0_7_TUBE_WALL_CORRECTION_CANONICAL_BLOCKER_CLOSURE_RECORDING_R2",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "expected_start_head": "43f71f4c7df6aa7a21112b3aba7d53bdc22384b3",
+  "previous_head_sha": "43f71f4c7df6aa7a21112b3aba7d53bdc22384b3",
+  "mode": "CANONICAL_BLOCKER_CLOSURE_RECORDING_ONLY",
+  "subject_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "closure_basis": {
+    "closure_adjudication_task": "TASK172_V0_7_TUBE_WALL_CORRECTION_COMPLETE_BRANCH_COVERAGE_CLOSURE_ADJUDICATION_R2",
+    "closure_adjudication_result": "PASS",
+    "canonical_blocker_semantics": "MODEL_LEVEL_COMPLETE_TUBE_BRANCH_COVERAGE_AUTHORITY",
+    "adjudication_outcome": "COMPLETE_MODEL_LEVEL_TUBE_BRANCH_COVERAGE_ESTABLISHED",
+    "all_task026_selector_paths_explicitly_disposed": true,
+    "all_admitted_tube_branches_authority_covered": true,
+    "closure_eligible": true
+  },
+  "inherited_authorities": {
+    "cwt": {
+      "authority_id": "V07-T172-TUBE-LAMINAR-CWT-PROPERTY-SCOPE-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "native_correlation_id": "tube_laminar_cwt@1.0.0",
+      "source_domain": "Re<2300; Pr>0.6; fully developed circular tube; constant wall temperature",
+      "constant_property_use": "AUTHORIZED_WITHIN_NATIVE_SOURCE_SCOPE",
+      "variable_property_use": "BLOCKED_WITHOUT_SEPARATE_EXTENSION_AUTHORITY",
+      "no_active_wall_correction_required": "NOT_CLAIMED",
+      "active_correction_authority": "NONE",
+      "explicit_reviewed_disposition_complete": true
+    },
+    "chf": {
+      "authority_id": "V07-T172-TUBE-LAMINAR-CHF-PROPERTY-SCOPE-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "native_correlation_id": "tube_laminar_chf@1.0.0",
+      "source_domain": "Re<2300; Pr>0.6; fully developed circular tube; constant heat flux",
+      "constant_property_use": "AUTHORIZED_WITHIN_NATIVE_SOURCE_SCOPE",
+      "variable_property_use": "BLOCKED_WITHOUT_SEPARATE_EXTENSION_AUTHORITY",
+      "no_active_wall_correction_required": "NOT_CLAIMED",
+      "active_correction_authority": "NONE",
+      "explicit_reviewed_disposition_complete": true
+    },
+    "turbulent_c3": {
+      "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+      "status": "REVIEWED_AUTHORITY",
+      "independent_review": "ACCEPTED",
+      "native_correlation_id": "tube_turbulent_gnielinski@1.0.0",
+      "transfer_re_domain": "3000<Re<5000000",
+      "property_ratio_domain": "0.05<=Pr_liq/Pr_w<=20",
+      "property_ratio_exponent": "0.11",
+      "target_pr_domain": "0.5<=Pr<=2000",
+      "explicit_reviewed_disposition_complete": true
+    }
+  },
+  "boundary_dispositions": {
+    "re_3000_correction_authorized": false,
+    "re_3000_disposition": "EXPLICIT_FAIL_CLOSED_OUTSIDE_REVIEWED_TRANSFER_DOMAIN",
+    "re_5000000_correction_authorized": false,
+    "re_at_or_above_5000000_disposition": "EXPLICIT_FAIL_CLOSED_AT_AND_ABOVE_RE_5000000",
+    "transition_band_disposition": "EXPLICIT_SELECTOR_LEVEL_NO_CORRELATION_BLOCKED",
+    "transition_disposition_complete": true,
+    "laminar_variable_property_disposition": "BLOCKED_MISSING_LAMINAR_VARIABLE_PROPERTY_EXTENSION_AUTHORITY",
+    "extrapolation": "FORBIDDEN"
+  },
+  "laminar_snapshot_contract": {
+    "frozen_property_snapshot_required": true,
+    "per_segment_distinct_snapshot_without_extension": "FORBIDDEN",
+    "temperature_driven_property_refresh": "BLOCKED",
+    "wall_bulk_or_film_property_reevaluation": "BLOCKED",
+    "silent_fallback_to_native_laminar_constants": "BLOCKED"
+  },
+  "case_level_fail_closed": {
+    "case_level_tube_correction_gate_runtime_implemented": false,
+    "case_level_reference_state_authority_present": false,
+    "case_level_property_snapshot_present": false,
+    "case_level_material_property_authority_present": false,
+    "case_level_execution_authorized": false,
+    "production_without_required_case_level_tube_correction_authority": "BLOCKED",
+    "required_conditions": [
+      "exact_native_base_identity_and_version",
+      "located_bulk_and_wall_states",
+      "source_and_domain_bindings",
+      "case_configuration_geometry_and_support_bindings",
+      "matching_hashes",
+      "case_level_reference_state_authority",
+      "reviewed_material_and_property_authority",
+      "no_hidden_default_or_unbound_database_authority",
+      "no_extrapolation_or_out_of_domain_use"
+    ]
+  },
+  "effective_state": {
+    "model_level_tube_wall_correction_entry_authority_status": "CLOSED",
+    "tube_wall_correction_canonical_blocker_removed": true,
+    "remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1_ONLY"
+  },
+  "governance": {
+    "closure_recording_only": true,
+    "lifecycle_promotion_performed": false,
+    "historical_records_rewritten": false,
+    "task026_changed": false,
+    "task026_equations_changed": false,
+    "task026_constants_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "new_authority_self_approval": false,
+    "no_step_implies_the_next": true
+  },
+  "source_artifacts": {
+    "prior_adjudication_document": {
+      "path": "docs/tasks/TASK-172-v0.7-tube-wall-correction-complete-branch-coverage-closure-adjudication-r2.md",
+      "sha256": "e0dc12615cdd9ea46c6fef07e001ccbc2486f8d59215511ba1604e81f3246d30"
+    },
+    "prior_adjudication_evidence": {
+      "path": "docs/tasks/evidence/TASK-172-tube-wall-correction-complete-branch-coverage-closure-adjudication-r2.json",
+      "sha256": "f60b4c27df7c6415279e0efb4769b9a6bc20e6b24897ebb0e702d4ecedee4554",
+      "canonical_hash": "a0199e965a14d320ab1dc12fd01db691e865df69f5cfe48b701eb07fae58141b"
+    },
+    "historical_registry": {
+      "path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+      "r35_extension_hash": "609f72914a9a75e61b5649ca85b10ce3b5394a296616cea4862a88c3e53ca5e3",
+      "root_hash": "65f69aabb0e3c44c05b010806533e8fbb372f855f3bc7c75cd21cf4072a24861"
+    }
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-tube-wall-correction-canonical-blocker-closure-recording-r2.md",
+    "document_sha256": "fe65cfb2f5ecaa6c4fba91928ff7283bb6134310604694c957e0d24f57739323",
+    "evidence_path": "docs/tasks/evidence/TASK-172-tube-wall-correction-canonical-blocker-closure-recording-r2.json"
+  },
+  "next_gate": "AUTHORIZE_TASK172_SHELL_WALL_CORRECTION_AUTHORITY_RESOLUTION_R1_ONLY",
+  "canonical_hash": "02c1f21d91da1dce95cd6656ac057de815c3c22215ac53d93b91c371e63c6977"
+}

@@ -1,0 +1,154 @@
+{
+  "schema_version": "1.0",
+  "task_id": "TASK172_CONTINUOUS_REFERENCE_ORACLE_SCIPY_CANONICAL_ENVELOPE_BINDING_CORRECTION_R1",
+  "result": "PASS_SCIPY_CANONICAL_ENVELOPE_BINDING_CORRECTION",
+  "authorization": {
+    "repository": "xuezhiorange-png/hxforge-agent",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "566d85d88bdc44c2cc7cb67789690878c669ef0f",
+    "predecessor_head_verified": true
+  },
+  "reviewed_authority_preserved": {
+    "R101_review_result": "PASS_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW",
+    "R101_lifecycle": "REVIEWED_AUTHORITY",
+    "R101_canonical_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
+    "new_self_approved_authority_created": false
+  },
+  "historical_bindings": {
+    "R100_document_sha256": "c7a5415006e319a6f999937d883bb0d520eee6f84d4e05ee4ef752df1448d118",
+    "R100_evidence_file_sha256": "0d719a48ef4ccee07c5f0b161e844f635e0c97ed101964825880b744e1fdd0c5",
+    "R100_evidence_canonical_hash": "d4be20147aa641c189bef443fd497987230fe6bd1d7b4edf4f2171af3ca356bb",
+    "R100_results_file_sha256": "b7844e566faab902fef1bc90eda3c991f3e1271da96effe78c693efe4fac6b43",
+    "R100_results_canonical_hash": "17799de16c5b4a7362bda4595d4d5af9e46ee1633d89e852e51cc58419caf5d0",
+    "R100_runner_sha256": "a6ea1850bca18bed700f8313ffd208d4a27fa8750604a1529fad9a4a4a2084ba",
+    "R100_extension_canonical_hash": "9e1210f35c3e52f83cdffde3b23f0fc78f8b8b75e1fbbd2e35c07039095b6701",
+    "R101_document_sha256": "2a026ed5f99b3b8efd88dd076ab14df88a28a462fcb7cbe49444a9df304ca192",
+    "R101_evidence_file_sha256": "da5165ad2010d073cbda92b57034890b4d299a31933ea3e08bebd3aea162bcff",
+    "R101_evidence_canonical_hash": "e7e62f8137ac78bf3b2ddb74fdd13889e3f9040ca58516b2d5403fc3fed4b18a",
+    "R101_results_file_sha256": "fa992216fbc15cccc84c93b59a39a5ff70c64543b7828a679d7ca2d231f404b0",
+    "R101_results_canonical_hash": "94ff0a74b53e6c57c0f08a16625f59cea5c8246c9825ed734e7be352173dd032",
+    "R101_runner_sha256": "2ac6dea8e6fa619d524de7b507b184196e4a29cb82020e65b4678eb978f2648c",
+    "R101_extension_canonical_hash": "fc4265c2f2db3bcda49dc032a5d5cd6065a79a1e26f31f2ea40cbaed0fde0b3c",
+    "R101_predecessor_registry_root_canonical_hash": "e3ff00e9aae448bdc4a8b43273aeb62dc8a84633ee997682cad59799a411798f",
+    "R1_R101_historical_payloads_immutable": true,
+    "R1_R101_registry_extensions_rewritten": false
+  },
+  "canonical_roles": {
+    "canonical_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
+    "scipy_roots_legendre_role": "CANONICAL_REFERENCE_PRODUCER",
+    "numpy_leggauss_role": "HISTORICAL_AND_INDEPENDENT_CROSSCHECK_ONLY",
+    "numpy_effective_canonical_Q_ref": false,
+    "numpy_effective_canonical_U_GL": false,
+    "numpy_effective_canonical_U_CROSS": false,
+    "numpy_effective_canonical_U_REDUCTION": false,
+    "numpy_effective_canonical_U_Q": false
+  },
+  "canonical_envelope_definition": {
+    "Q_REF_CANONICAL_W": "Q_SCIPY_GL1024_W",
+    "U_GL_CANONICAL_W": "max(abs(Q_SCIPY_GL256-Q_SCIPY_GL512),abs(Q_SCIPY_GL512-Q_SCIPY_GL1024))",
+    "U_SIMPSON_W": "max(abs(Q_SIMPSON512-Q_SIMPSON1024),abs(Q_SIMPSON1024-Q_SIMPSON2048))",
+    "U_CROSS_CANONICAL_W": "abs(Q_SCIPY_GL1024-Q_SIMPSON2048)",
+    "U_ROOT_INTEGRATED_EMPIRICAL_W": "257 fixed support coordinates: max absolute Brent/TOMS748 q_hc discrepancy times normalized support length 1",
+    "U_REDUCTION_CANONICAL_W": "maximum fsum-versus-ordinary-sum and original-fsum-versus-canonical-roundtrip-fsum discrepancy over SciPy GL128/256/512/1024 and Simpson512/1024/2048 contribution vectors",
+    "U_Q_CANONICAL_W": "U_GL_CANONICAL+U_SIMPSON+U_CROSS_CANONICAL+U_ROOT_INTEGRATED_EMPIRICAL+U_REDUCTION_CANONICAL",
+    "root_component_classification": "FINITE_SAMPLE_EMPIRICAL_DISCREPANCY",
+    "formal_true_error_bound": false,
+    "proven_global_integral_bound": false,
+    "uncertainty_classification": "MEASURED_EMPIRICAL_NUMERICAL_REFERENCE_UNCERTAINTY_ENVELOPE",
+    "conservative_wording_accepted": false,
+    "reference_uncertainty_propagation_required": true,
+    "canonical_wording": "Measured empirical numerical-reference uncertainty envelope from the stated quadrature, sampled root-method, and floating-point reduction comparisons; not a formal true-error bound or a proven global upper bound."
+  },
+  "precision_policy": {
+    "oracle_to_mesh_threshold_separation_factor": 0.001,
+    "non_near_zero_reference_relative_limit": 1e-8,
+    "M05_reference_absolute_limit_W": 1e-8,
+    "wall_reference_stability_criterion_K": 1e-8,
+    "retuned": false,
+    "pre_run_policy_freeze_author_asserted": true,
+    "pre_run_policy_freeze_independently_proven": false
+  },
+  "runtime_replay": {
+    "orders": [128, 256, 512, 1024],
+    "simpson_subinterval_counts": [512, 1024, 2048],
+    "fixture_ids": ["M01", "M02", "M03", "M04", "M05", "M06"],
+    "Python_3_11": {
+      "version": "3.11.15",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "worker_sha256": "1dde2f6563a7e2fdd29660207136ce5033d85c48321a11f83e9057810bd9ce45"
+    },
+    "Python_3_12": {
+      "version": "3.12.13",
+      "numpy": "2.5.0",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "worker_sha256": "5465ac3a582fefde363135e64e4e105434ee4fce05c87a67c96d722520b6b0b0"
+    },
+    "all_six_fixtures_pass_both_runtimes": true,
+    "R100_Simpson_values_replayed_exactly": true,
+    "R101_SciPy_GL_sequences_replayed_exactly": true,
+    "R101_root_empirical_components_replayed_exactly": true
+  },
+  "R99_historical_replay": {
+    "result": "BLOCKED_MESH_CONVERGENCE_QUALIFICATION_R2",
+    "M05_GL128_W": 0.2222234220550436,
+    "M05_GL256_W": 0.22222342205515927,
+    "M05_GL512_W": 0.22222342205526033,
+    "historical_64_ulp_gate_still_fails": true,
+    "R100_GL1024_historical_crosscheck_W": 0.22222342205523007
+  },
+  "effective_status": {
+    "SCIPY_CANONICAL_QREF_BOUND": true,
+    "SCIPY_CANONICAL_UNCERTAINTY_COMPONENTS_BOUND": true,
+    "SCIPY_CANONICAL_UQ_ENVELOPE_BOUND": true,
+    "continuous_reference_oracle_precision_lifecycle": "REVIEWED_AUTHORITY",
+    "R101_reviewed_authority_preserved": true,
+    "mesh_convergence_canonical_blocker_removed": false,
+    "remaining_blockers": ["MESH-CONVERGENCE-QUALIFICATION"],
+    "effective_remaining_task172_entry_blocker_count": 1,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "mesh_study_performed": false,
+    "mesh_threshold_sensitivity_performed": false,
+    "full_mesh_matrix_rerun": false,
+    "mesh_threshold_changed": false,
+    "mesh_convergence_adjudicated": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-continuous-reference-oracle-scipy-canonical-envelope-binding-correction-r1.md",
+    "document_sha256": "300eee99502beb815bf72a64b57d2c66a771c8d2cf795e5fa8148ac875c5e5d8",
+    "evidence_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-scipy-canonical-envelope-binding-correction-r1.json",
+    "results_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-scipy-canonical-envelope-binding-results-r1.json",
+    "results_file_sha256": "1515994982ac948fd79b687fec989ee39e8639aa5416fa6db789d039f21a0222",
+    "results_canonical_hash": "8ff57c42b8a78afad395ca6f560886ec1d3f915fda6f2d65bf6d3b3c16cf53ae",
+    "runner_path": "docs/tasks/evidence/TASK-172-continuous-reference-oracle-scipy-canonical-envelope-binding-runner-r1.py",
+    "runner_sha256": "5b3e9a612bee1b7726575ca1f63d0488b5ce0a36f206b4e5b96cff39bfdedc60",
+    "registry_extension_key": "r102_extension",
+    "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "validation": {
+    "predecessor_head_and_PR_state": "PASS",
+    "R100_R101_artifacts_and_extensions_immutable": "PASS",
+    "R99_historical_values_and_64_ULP_failure": "PASS",
+    "SciPy_Gauss_and_frozen_Simpson_replay": "PASS",
+    "root_empirical_component_match": "PASS",
+    "canonical_reduction_and_serialization_audit": "PASS",
+    "six_fixture_dual_runtime_precision_policy": "PASS",
+    "uncertainty_semantics_and_precision_policy_preserved": "PASS",
+    "append_only_registry_and_artifact_linkage": "PASS",
+    "diff_allowlist_and_static_validation": "PASS",
+    "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "a13bad10d1537914e226f794d1493380158913f4ebaa30b45c9af4c68629c216"
+}

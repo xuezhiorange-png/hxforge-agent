@@ -1,0 +1,299 @@
+{
+  "schema_version": "task172.quantitative-numerical-profile-coverage-evidence.r92a",
+  "task_id": "TASK172_V0_7_QUANTITATIVE_NUMERICAL_PROFILE_COVERAGE_AND_ROUNDOFF_ROBUSTNESS_R92A",
+  "mode": "TARGETED_R92_NONLINEAR_COVERAGE_AND_RESIDUAL_ACCEPTANCE_REQUALIFICATION",
+  "predecessor_head": "393ff58a699e1baec9e4fed83fa91aa7a09e9949",
+  "result": "QUANTITATIVE_NUMERICAL_PROFILE_COVERAGE_COMPLETED",
+  "historical_boundary": {
+    "r1_r92_payloads_immutable": true,
+    "r92_document_rewritten": false,
+    "r92_evidence_rewritten": false,
+    "r92_runner_rewritten": false,
+    "r92_results_rewritten": false,
+    "r92_profile_settings_replayed_unchanged": true,
+    "historical_registry_root_canonical_hash": "d540521bd29490c78eda9b098a836a6121b5f09259f71f34e523a81aad658cdf"
+  },
+  "authority_replay": {
+    "r88_unknowns_and_residuals_rewritten": false,
+    "unknowns": [
+      "q_hc",
+      "T_wall_inner",
+      "T_wall_outer"
+    ],
+    "residuals": [
+      "r_i",
+      "r_w",
+      "r_o"
+    ],
+    "r91_shell_jmu_reopened": false,
+    "tube_c3_authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+    "tube_c3_factor": "(Pr_bulk/Pr_wall)^0.11",
+    "tube_c3_domain": {
+      "reynolds": "3000 < Re < 5000000",
+      "pr_bulk_and_wall": "0.5 <= Pr <= 2000",
+      "pr_ratio": "0.05 <= Pr_bulk/Pr_wall <= 20"
+    },
+    "shell_jmu_authority": "R89_R90_REVIEWED_AUTHORITY",
+    "shell_jmu_factor": "(mu_bulk/mu_wall)^0.14",
+    "property_profile": "PURE_ORDINARY_WATER;HEOS;DEF;STABLE_SINGLE_PHASE_LIQUID;T=298.15..300 K;P=100000..101325 Pa",
+    "fixture_pressure_is_located_state_input_not_rule": true,
+    "wall_profile": "CLEAN_SURFACE_ONLY",
+    "authorities_reopened": false
+  },
+  "fixture_coverage": {
+    "total_nonlinear_fixtures": 16,
+    "tube_c3_only_fixture_count": 8,
+    "dual_active_tube_c3_and_shell_jmu_fixture_count": 8,
+    "dynamic_range_stress_fixture_count": 8,
+    "resistance_ratio_classes": [
+      "TUBE_FILM_DOMINANT",
+      "WALL_DOMINANT",
+      "SHELL_FILM_DOMINANT",
+      "BALANCED"
+    ],
+    "dominant_resistance_partition": "0.90/0.05/0.05 (18:1 against either other component)",
+    "balanced_resistance_partition": "1/3 per component",
+    "fixed_topology": true,
+    "synthetic_parameters_only": [
+      "A_i",
+      "A_o",
+      "h_i_base",
+      "h_o_base",
+      "R_wall"
+    ],
+    "tube_hot_shell_hot_near_zero_negative_q_covered_in_core_fixtures": true,
+    "property_domain_all_selected_wall_states_valid": true
+  },
+  "independent_oracle_audit": {
+    "validation_only_method": "BRENTQ_VALIDATION_ORACLE_ONLY",
+    "production_scalar_reduction_selected": false,
+    "deterministic_grid_point_count_per_fixture": 4097,
+    "strict_sign_change_verified_for_all": true,
+    "strict_monotonicity_verified_for_all": true,
+    "valid_domain_contiguous_for_all": true,
+    "all_oracle_solves_converged": true,
+    "selected_profile_acceptance_count": 16,
+    "selected_profile_fixture_count": 16,
+    "max_q_hc_absolute_error_W": 3.852473895449293e-13,
+    "max_wall_temperature_absolute_error_K": 3.410605131648481e-13,
+    "max_scaled_residual_infinity_norm": 1.2049450253531765e-9,
+    "error_envelope_is_universal": false
+  },
+  "residual_acceptance_requalification": {
+    "R92_ROUNDOFF_RULE_FIXTURE_VALIDATED": true,
+    "R92_ROUNDOFF_RULE_UNIVERSAL_BOUND_PROVEN": false,
+    "selected_candidate": "C_RESIDUAL_SPECIFIC_METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
+    "authority_class": "METHOD_SENSITIVITY_DERIVED_PROJECT_ACCEPTANCE_RULE",
+    "C_round": 0.5,
+    "C_round_selection": "smallest tested multiplier passing all 16 fixed fixtures",
+    "candidate_c_rule_shape": {
+      "gamma_n": "n*machine_epsilon/(1-n*machine_epsilon)",
+      "inner": "C_round*[ulp(q_ts)+ulp(q_i)+G_i*(ulp(T_tube_bulk)+ulp(T_wall_inner)+ulp(T_tube_bulk-T_wall_inner))+gamma_2*abs(q_i)]",
+      "wall": "C_round*[ulp(q_ts)+ulp(q_wall)+G_wall*(ulp(T_wall_inner)+ulp(T_wall_outer)+ulp(T_wall_inner-T_wall_outer))+gamma_1*abs(q_wall)]",
+      "outer": "C_round*[ulp(q_ts)+ulp(q_o)+G_o*(ulp(T_wall_outer)+ulp(T_shell_bulk)+ulp(T_wall_outer-T_shell_bulk))+gamma_2*abs(q_o)]",
+      "accept": "each abs(r_j) <= its corresponding residual-specific bound in W"
+    },
+    "candidate_comparison_at_C_round_0_5": {
+      "candidate_a_r92_legacy_pass_count": 13,
+      "candidate_b_active_conductance_pass_count": 13,
+      "candidate_c_residual_specific_pass_count": 16,
+      "fixture_count": 16
+    },
+    "candidate_comparison_at_C_round_1": {
+      "candidate_a_r92_legacy_pass_count": 16,
+      "candidate_b_active_conductance_pass_count": 16,
+      "candidate_c_residual_specific_pass_count": 16,
+      "fixture_count": 16
+    },
+    "active_conductance_terms_replayed": [
+      "h_i(T_wall_inner)*A_i",
+      "1/R_wall",
+      "h_o(T_wall_outer)*A_o"
+    ],
+    "formal_floating_point_theorem_claimed": false,
+    "promotion_to_reviewed_authority": false
+  },
+  "selected_profile": {
+    "method_class": "BOUND_AWARE_VECTOR_NONLINEAR_RESIDUAL_SOLVE",
+    "implementation_candidate": "SCIPY_OPTIMIZE_LEAST_SQUARES",
+    "method": "trf",
+    "loss": "linear",
+    "ftol": 0.000001,
+    "xtol": 1e-12,
+    "gtol": 1e-12,
+    "jacobian": "2-point",
+    "diff_step": 0.00001,
+    "x_scale": [
+      "abs(q_hc_seed)",
+      "abs(T_tube_bulk-T_shell_bulk)",
+      "abs(T_tube_bulk-T_shell_bulk)"
+    ],
+    "residual_scale": "abs(q_ts_seed); exact-zero branch is separate",
+    "max_nfev": 6,
+    "residual_callback_cap": 24,
+    "tr_solver": "exact",
+    "tr_options": {},
+    "f_scale": 1,
+    "jac_sparsity": null,
+    "R92_PROFILE_SETTINGS_PRESERVED": true,
+    "R92A_SUPERSEDING_PROFILE_CREATED": false,
+    "residual_acceptance_rule_requalified_separately": true,
+    "max_nfev_is_convergence_proof": false
+  },
+  "profile_sensitivity": {
+    "axes_tested": [
+      "ftol",
+      "xtol",
+      "gtol",
+      "jacobian",
+      "diff_step",
+      "x_scale",
+      "residual_scaling",
+      "joint_tolerance_sweep",
+      "max_nfev"
+    ],
+    "direct_seed_all_pass": true,
+    "max_nfev_candidates_tested": [
+      6,
+      8,
+      12,
+      16
+    ],
+    "smallest_candidate_with_declared_headroom": 6,
+    "selected_max_nfev": 6,
+    "observed_worst_nfev": 4,
+    "observed_p95_nfev": 4,
+    "observed_worst_callback_count": 16,
+    "max_nfev_callback_cap": 24,
+    "evaluation_headroom": 2,
+    "callback_headroom": 8,
+    "perturbed_seed_is_production_requirement": false
+  },
+  "reproducibility": {
+    "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
+    "input_matrix_canonical_hash": "1fdd0ce8ab9d4071a068042f90f5d9178da27e3b4f9beb3149455e3a975117b4",
+    "selected_numeric_output_matrix_canonical_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+    "same_input_same_result_bytes_each_runtime": true,
+    "same_input_same_result_hash_each_runtime": true,
+    "cross_runtime_numeric_output_hashes_equal": true,
+    "runtimes": [
+      {
+        "python": "CPython 3.11.15",
+        "scipy": "1.17.1",
+        "numpy": "2.4.6",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "runtime_summary_canonical_hash": "8dc610890e436da6a66e6473eb8f171c1f9ba76824407eeb2163f175a457a149",
+        "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+        "deterministic_replay": true
+      },
+      {
+        "python": "CPython 3.12.13",
+        "scipy": "1.18.0",
+        "numpy": "2.5.0",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm-64bit",
+        "runtime_summary_canonical_hash": "62ad3bf1c16e9f21febe59bad4870700a806a6d7b9498936bd41fec68aba8f89",
+        "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+        "deterministic_replay": true
+      },
+      {
+        "python": "CPython 3.14.5",
+        "scipy": "1.18.0",
+        "numpy": "2.5.0",
+        "coolprop": "8.0.0",
+        "platform": "macOS-27.2-arm-64bit-Mach-O",
+        "full_results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae7763c5f99b84d4077523cfea0c",
+        "selected_numeric_output_hash": "d63b223e6c582a9aafd5aae483db7f48b8b147512407089a2cca1794f95c35b8",
+        "deterministic_replay": true
+      }
+    ]
+  },
+  "numerical_authority_state": {
+    "candidate_created": true,
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review": "PENDING",
+    "executable_numerical_profile_bound": false,
+    "local_residual_acceptance_candidate_bound": true,
+    "numerical_error_budget_candidate_bound": true,
+    "self_approval": false
+  },
+  "blocker_state": {
+    "remaining": [
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 2,
+    "numerical_error_budget_and_stopping_canonical_blocker_removed": false,
+    "task172_entry_authority_complete": false,
+    "mesh_study_performed": false,
+    "discretization_error_delegated_to_mesh_qualification": true
+  },
+  "governance": {
+    "production_code_changed": false,
+    "engineering_calculation_production_path_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": true,
+    "numerical_experiment_is_production_solve": false,
+    "mesh_study_performed": false,
+    "production_solver_execution_authorized": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true,
+    "full_pytest": "NOT_RUN_CONTROLLED_NUMERICAL_EXPERIMENT_AND_EVIDENCE_ONLY"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.md",
+    "document_sha256": "df60a1884f7bec47f92748c8581e1a1a2e011a657be2f00398d26ca8f476866b",
+    "evidence_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.json",
+    "results_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-results-r92a.json",
+    "results_file_sha256": "664c73b18b7f1fef29cb0996f3749ba24c551002f367718c4bd84c0f4f71aeac",
+    "results_canonical_hash": "0ea7a85e71ef458c4f47828772c88087af2ae7763c5f99b84d4077523cfea0c",
+    "runner_path": "docs/tasks/evidence/TASK-172-quantitative-numerical-profile-coverage-runner-r92a.py",
+    "runner_sha256": "f68377fadb6a788340970a93b3fefe826fd5934c8b5c363b19e43ad498a867b2",
+    "registry_extension_key": "r93_extension"
+  },
+  "validation": {
+    "PREDECESSOR_HEAD_PASS": "PASS",
+    "R92_ARTIFACT_REPLAY_PASS": "PASS",
+    "R92_PROFILE_REPLAY_PASS": "PASS",
+    "TUBE_C3_AUTHORITY_REPLAY_PASS": "PASS",
+    "SHELL_JMU_AUTHORITY_REPLAY_PASS": "PASS",
+    "TUBE_C3_NONLINEAR_FIXTURE_PASS": "PASS",
+    "DUAL_ACTIVE_NONLINEAR_FIXTURE_PASS": "PASS",
+    "DUAL_ACTIVE_INDEPENDENT_ORACLE_PASS": "PASS",
+    "RESISTANCE_RATIO_STRESS_PASS": "PASS",
+    "ACTIVE_HI_RESIDUAL_SCALE_PASS": "PASS",
+    "ACTIVE_HO_RESIDUAL_SCALE_PASS": "PASS",
+    "ROUNDOFF_RULE_CLASSIFICATION_PASS": "PASS",
+    "RESIDUAL_ACCEPTANCE_SENSITIVITY_PASS": "PASS",
+    "FTOL_REPLAY_PASS": "PASS",
+    "XTOL_REPLAY_PASS": "PASS",
+    "GTOL_REPLAY_PASS": "PASS",
+    "JACOBIAN_REPLAY_PASS": "PASS",
+    "DIFF_STEP_REPLAY_PASS": "PASS",
+    "X_SCALE_REPLAY_PASS": "PASS",
+    "MAX_NFEV_REQUALIFICATION_PASS": "PASS",
+    "NO_MESH_EXPERIMENT_PASS": "PASS",
+    "DETERMINISTIC_REPLAY_PASS": "PASS",
+    "R1_R92_IMMUTABILITY_PASS": "PASS",
+    "EVIDENCE_CANONICAL_HASH_NONEMPTY_PASS": "PASS",
+    "JSON_PASS": "PASS",
+    "CANONICAL_HASH_PASS": "PASS",
+    "ARTIFACT_LINKAGE_PASS": "PASS",
+    "DIFF_ALLOWLIST_PASS": "PASS",
+    "GIT_DIFF_CHECK_PASS": "PASS",
+    "RUFF_PASS": "PASS",
+    "RUFF_FORMAT_PASS": "PASS",
+    "MYPY_PASS": "PASS",
+    "MANIFEST_PASS": "PASS",
+    "EXACT_FINAL_HEAD_CI_RUN": "PENDING_FINAL_HEAD_CI",
+    "EXACT_FINAL_HEAD_CI": "PENDING_FINAL_HEAD_CI"
+  },
+  "next_gate": "AUTHORIZE_TASK172_QUANTITATIVE_NUMERICAL_PROFILE_INDEPENDENT_REVIEW_AND_BLOCKER_CLOSURE_R1_ONLY",
+  "canonical_hash": "cb7ee75488d4a11e4c7898f9a20607cd74409a209ba40862ca2b3512b24f471c"
+}

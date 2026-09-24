@@ -1,0 +1,268 @@
+{
+  "schema_version": "task172.jmu.bulk-pressure.bell-1963-exact-body-acquisition.r3",
+  "task_id": "TASK172_V0_7_JMU_BULK_PRESSURE_BELL_1963_EXACT_BODY_ACQUISITION_R3",
+  "mode": "TARGETED_BELL_1963_EXACT_BODY_ACQUISITION_AND_PRESSURE_TEXT_INSPECTION_ONLY",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "7dcb3c078d5cca640681c5bf5e2a7d8c57fcbfed",
+  "head_precondition": {
+    "expected_head_sha": "7dcb3c078d5cca640681c5bf5e2a7d8c57fcbfed",
+    "verified_head_sha": "7dcb3c078d5cca640681c5bf5e2a7d8c57fcbfed",
+    "pr_state": "OPEN_DRAFT",
+    "verified": true
+  },
+  "target_source": {
+    "source_target_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+    "title": "Final Report of the Cooperative Research Program on Shell and Tube Heat Exchangers",
+    "author": "Kenneth J. Bell",
+    "publisher_or_institution": "University of Delaware Engineering Experimental Station",
+    "year": "1963",
+    "edition_or_revision": "Bulletin No. 5",
+    "source_role": "HISTORICAL_METHOD_ORIGIN_TARGET",
+    "primary_or_secondary": "HISTORICAL_PRIMARY_ORIGIN_TARGET",
+    "worldcat_identity_url": "https://search.worldcat.org/title/Final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers/oclc/16107403",
+    "hedh_citation_chain_lead": "HEDH-3.3.3-REF-BELL-1963",
+    "bibliographic_identity_verified": true,
+    "body_identity_verified": false,
+    "body_acquired": false,
+    "body_sha256": "NONE",
+    "body_page_count": "NONE",
+    "body_complete_for_pressure_question": false,
+    "rights_status": "NO_BODY_ACQUIRED;TITLE_MATCH_CANDIDATES_REJECTED_OR_NON_BODY",
+    "review_permission_status": "NO_EXACT_BODY_REVIEW_PERMISSION_OR_BODY_AVAILABLE"
+  },
+  "acquisition_attempts": [
+    {
+      "attempt_id": "BELL-WORLDCAT-IDENTITY",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "WorldCat exact bibliographic record",
+      "url": "https://search.worldcat.org/title/Final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers/oclc/16107403",
+      "result": "BIBLIOGRAPHIC_IDENTITY_ONLY_NO_BODY",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-UDEL-CATALOGUE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "University of Delaware catalogue/digital-collection route",
+      "url": "https://delcat.udel.edu/discovery/search",
+      "result": "NO_EXACT_PUBLIC_BODY_LOCATED",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-INTERNET-ARCHIVE-EXACT-METADATA",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Internet Archive exact-title/creator metadata query",
+      "url": "https://archive.org/advancedsearch.php?q=title%3A%22Final%20report%20of%20the%20cooperative%20research%20program%20on%20shell%20and%20tube%20heat%20exchangers%22%20AND%20creator%3ABell",
+      "result": "ZERO_MATCHING_ITEMS_NO_BODY",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-HATHITRUST-CATALOGUE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "HathiTrust exact-title catalogue route",
+      "url": "https://catalog.hathitrust.org/Search/Home?lookfor=Final+report+of+the+cooperative+research+program+on+shell+and+tube+heat+exchangers&type=all",
+      "result": "ACCESS_CHALLENGE_NO_BODY_NO_BYPASS",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-GOOGLE-BOOKS-METADATA",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Google Books exact-title/author metadata route",
+      "url": "https://books.google.com/",
+      "result": "NO_BODY_PUBLIC_API_QUOTA_RESPONSE",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-SCRIBD-CANDIDATE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Public title-matching Scribd page",
+      "url": "https://de.scribd.com/document/443127855/149314721-Final-Report-of-the-Cooperative-Research-Program-on-Shell-And-Tube-Heat-Exchangers-pdf",
+      "result": "REJECTED_UNRELATED_1995_ELSEVIER_PAPER_NOT_BELL_1963",
+      "visible_identity_mismatch": "1995 Elsevier article metadata; not Kenneth J. Bell, 1963, Bulletin No. 5",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-PDFCOFFEE-CANDIDATE",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Public title-matching PDFCoffee page",
+      "url": "https://pdfcoffee.com/final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers-pdf-free.html",
+      "result": "REJECTED_UNRELATED_1995_ELSEVIER_PAPER_NOT_BELL_1963",
+      "visible_identity_mismatch": "1995 Elsevier article metadata; not Kenneth J. Bell, 1963, Bulletin No. 5",
+      "access_control_bypassed": false
+    },
+    {
+      "attempt_id": "BELL-CITATION-CHAIN-CHECK",
+      "target_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "path": "Existing HEDH and recognized citation-chain records",
+      "url": "https://e-jamet.org/_common/do.php?a=full&aidx=14595&b=52&bidx=1126",
+      "result": "CITATION_ONLY_NO_BELL_BODY",
+      "access_control_bypassed": false
+    }
+  ],
+  "candidate_bodies": [
+    {
+      "candidate_id": "BELL-TITLE-MATCH-SCRIBD-1995",
+      "source_url": "https://de.scribd.com/document/443127855/149314721-Final-Report-of-the-Cooperative-Research-Program-on-Shell-And-Tube-Heat-Exchangers-pdf",
+      "title_match": true,
+      "author_match": false,
+      "institution_match": false,
+      "year_match": false,
+      "bulletin_no_5_match": false,
+      "body_identity_verified": false,
+      "accepted": false,
+      "rejection_reason": "Visible content is an unrelated 1995 Elsevier paper; title match alone is insufficient"
+    },
+    {
+      "candidate_id": "BELL-TITLE-MATCH-PDFCOFFEE-1995",
+      "source_url": "https://pdfcoffee.com/final-report-of-the-cooperative-research-program-on-shell-and-tube-heat-exchangers-pdf-free.html",
+      "title_match": true,
+      "author_match": false,
+      "institution_match": false,
+      "year_match": false,
+      "bulletin_no_5_match": false,
+      "body_identity_verified": false,
+      "accepted": false,
+      "rejection_reason": "Visible content is an unrelated 1995 Elsevier paper; no Delaware Bulletin No. 5 body identity"
+    }
+  ],
+  "accepted_body": {
+    "accepted": false,
+    "source_id": "NONE",
+    "body_sha256": "NONE",
+    "page_count": "NONE",
+    "temporary_review_bytes_saved": false,
+    "vendored_to_repository": false
+  },
+  "rejected_candidate_bodies": [
+    "BELL-TITLE-MATCH-SCRIBD-1995",
+    "BELL-TITLE-MATCH-PDFCOFFEE-1995"
+  ],
+  "pressure_text_inspection": {
+    "body_available_for_inspection": false,
+    "body_complete_for_pressure_question": false,
+    "terms_inspected_in_bell_body": [],
+    "target_context_inspected": false,
+    "pressure_rule_text_observed": "undetermined",
+    "pressure_rule_exact_location": "NONE",
+    "pressure_rule_semantics": "UNDETERMINED_EXACT_BODY_UNAVAILABLE",
+    "unrelated_pressure_excluded": true,
+    "negative_result_permitted": false
+  },
+  "direct_citation_leads": [],
+  "citation_chain_context": [
+    {
+      "lead_id": "HEDH-3.3.3-REF-BELL-1963",
+      "from_source_id": "TABOREK-HEDH-SHELL-TUBE-SINGLE-PHASE",
+      "cited_source_id": "BELL-1963-DELAWARE-FINAL-REPORT",
+      "body_acquired": false,
+      "pressure_rule_relevant": true,
+      "direct_pressure_rule_lead_from_bell_body": false,
+      "reason": "HEDH citation identifies the missing Delaware lineage body; Bell body was not available to inspect for a further citation"
+    }
+  ],
+  "preserved_predicate_state": {
+    "source_mean_temperature_predicate_satisfied": true,
+    "source_mean_pressure_predicate_satisfied": false,
+    "source_mean_endpoint_pair_predicate_satisfied": true,
+    "source_mean_property_authority_predicate_satisfied": true,
+    "source_mean_identity_provenance_predicate_satisfied": true,
+    "source_mean_fail_closed_predicate_satisfied": true,
+    "source_mean_model_level_sole_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+    "pressure_is_proven_sole_model_level_blocker": true,
+    "source_mean_model_level_authority_candidate_eligible": false,
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "jmu_bulk_pressure_rule_authority_found": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false
+  },
+  "real_instance_guards": {
+    "source_mean_model_level_authority_candidate_eligible": false,
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "real_reviewed_shell_inlet_producer_found": false,
+    "real_reviewed_shell_outlet_producer_found": false,
+    "real_reviewed_shell_endpoint_pair_producer_found": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false
+  },
+  "preserved_downstream_guards": {
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false,
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "preserved_source_branch_state": {
+    "hedh_research_reopened": false,
+    "asme_research_reopened": false,
+    "thome_research_reopened": false,
+    "jamil_research_reopened": false
+  },
+  "historical_immutability": {
+    "r71_extension_rewritten": false,
+    "r72_extension_rewritten": false,
+    "r73_extension_rewritten": false,
+    "r74_extension_rewritten": false,
+    "r75_extension_rewritten": false,
+    "r76_extension_rewritten": false,
+    "r77_extension_rewritten": false,
+    "r78_extension_rewritten": false,
+    "r79_extension_rewritten": false,
+    "historical_payloads_immutable": true
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "source_bodies_vendored": false,
+    "pressure_rule_researched": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "endpoint_producer_created": false,
+    "endpoint_state_created": false,
+    "source_mean_state_created": false,
+    "property_snapshot_created": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "workflow_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "decision": {
+    "result": "BLOCKED_BELL_1963_EXACT_BODY_UNAVAILABLE",
+    "outcome": "BELL_1963_EXACT_BODY_UNAVAILABLE",
+    "missing_lineage_body_gap_closed": false,
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-bulk-pressure-bell-1963-exact-body-acquisition-r3.md",
+    "document_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-bulk-pressure-bell-1963-exact-body-acquisition-r3.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r80_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "c21319c678ceb864622979b6fd8518f018ff9755b0140ecb3dafb3b92548b708"
+}

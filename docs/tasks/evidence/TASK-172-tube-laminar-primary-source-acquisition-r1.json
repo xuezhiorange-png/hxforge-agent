@@ -1,0 +1,224 @@
+{
+  "schema_version": "task172.tube-laminar-primary-source-acquisition.r1",
+  "task_id": "TASK172_V0_7_TUBE_LAMINAR_PRIMARY_SOURCE_ACQUISITION_R1",
+  "pr_number": 277,
+  "expected_start_head": "043b9eef76d12f1469ab52a5b5f393192b098bfa",
+  "previous_head_sha": "043b9eef76d12f1469ab52a5b5f393192b098bfa",
+  "mode": "TARGETED_LAMINAR_PRIMARY_SOURCE_ACQUISITION_ONLY",
+  "parent_blocker": "TUBE-WALL-CORRECTION-AUTHORITY",
+  "result": "PASS_WITH_BLOCKER_RETAINED",
+  "source_acquisition": {
+    "status": "COMPLETE_SOURCE_BODY_CONSTANT_PROPERTY_ONLY",
+    "source_id": "NASA-CR-189922",
+    "source_revision": "NASA-CR-189922; NAS 1.26:189922; December 1991",
+    "title": "Elements of radiative interactions in gaseous systems",
+    "author": "Surendra N. Tiwari",
+    "issuer": "Old Dominion University for NASA Langley Research Center",
+    "source_class": "OFFICIAL_GOVERNMENT_TECHNICAL_REPORT",
+    "source_role": "AUTHORITATIVE_DERIVATION_CANDIDATE",
+    "ntrs_record": "https://ntrs.nasa.gov/citations/19920012099",
+    "pdf_access_path": "https://ntrs.nasa.gov/api/citations/19920012099/downloads/19920012099.pdf",
+    "retrieved_on": "2026-09-15",
+    "source_bytes_sha256": "46c1af47bf173cd0a33f7b491d73e635e3335ce67277df50f4f8df2840e5cd5e",
+    "source_pdf_page_count": 198,
+    "body_acquired": true,
+    "body_review_method": "RENDERED_PAGE_INSPECTION_OF_REPORT_PP14_20_PDF_PP28_34",
+    "rights_status": "US_GOVERNMENT_WORK_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+    "source_pdf_vendored": false,
+    "source_status": "VERIFIED_SOURCE",
+    "reviewed_task172_authority": false,
+    "limitations": [
+      "The report is an official derivation source, not the original publication of the Incropera table carried by TASK026.",
+      "The reviewed derivations explicitly use constant material properties.",
+      "No TASK172 variable-property wall/bulk correction or explicit omission rule is supplied for either native branch.",
+      "No broader production fluid, geometry, entrance-region, or heating/cooling transfer is authorized by this acquisition."
+    ]
+  },
+  "native_task026_bindings": {
+    "selector_artifacts": [
+      {
+        "path": "src/hexagent/correlations/tube.py",
+        "sha256": "e9cd8d26d47821f81810ff8382547d1c907d1ed0182ceabe2d1bcdb1a0ffb526"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_side_thermal/nusselt_selector.py",
+        "sha256": "d2059a83624308b5cdb808e1e314c1b7514e31eaca31899570cde343d3ea2109"
+      },
+      {
+        "path": "docs/CORRELATIONS.md",
+        "sha256": "e137959f5bf04784f78383db27a13736098ea47f926b323510d80dbe23f6fe9e"
+      },
+      {
+        "path": "docs/tasks/TASK-007-tube-annulus-correlations.md",
+        "sha256": "c650cc275d05972afd0f86eb80d1c5eaf303a91cfa305b771314f731bd4130cb"
+      }
+    ],
+    "branches": [
+      {
+        "branch": "LAMINAR_CWT",
+        "correlation_id": "tube_laminar_cwt@1.0.0",
+        "native_boundary_condition": "CONSTANT_WALL_TEMPERATURE",
+        "native_equation": "Nu_D = 3.66",
+        "native_domain": "Re < 2300; Pr > 0.6; fully developed circular tube; inside-diameter basis",
+        "native_requires_wall_viscosity": false,
+        "task026_changed": false
+      },
+      {
+        "branch": "LAMINAR_CHF",
+        "correlation_id": "tube_laminar_chf@1.0.0",
+        "native_boundary_condition": "CONSTANT_HEAT_FLUX",
+        "native_equation": "Nu_D = 4.36",
+        "native_domain": "Re < 2300; Pr > 0.6; fully developed circular tube; inside-diameter basis",
+        "native_requires_wall_viscosity": false,
+        "task026_changed": false
+      },
+      {
+        "branch": "TURBULENT_C3_INHERITED",
+        "correlation_id": "tube_turbulent_gnielinski@1.0.0",
+        "authority_id": "V07-T172-TUBE-WALL-CORRECTION-R1",
+        "status": "REVIEWED_AUTHORITY",
+        "scope": "TURBULENT_C3_ONLY",
+        "changed_by_this_task": false
+      }
+    ]
+  },
+  "branch_audits": {
+    "LAMINAR_CWT": {
+      "source_id": "SRC-T172-NASA-CR-189922-CWT-R1",
+      "source_class": "OFFICIAL_GOVERNMENT_TECHNICAL_REPORT",
+      "source_revision": "NASA-CR-189922; NAS 1.26:189922; December 1991",
+      "source_location": "Chapter 3 §3.3.3; report pp.14-16 and 19-20; Eqs.3.20a,3.28,3.47-3.51; PDF pp.28-34 (1-indexed)",
+      "source_rights": "US_GOVERNMENT_WORK_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+      "source_bytes_sha256": "46c1af47bf173cd0a33f7b491d73e635e3335ce67277df50f4f8df2840e5cd5e",
+      "source_body_acquired": true,
+      "equation_bound": true,
+      "equation": "Nu_D = 3.658, source Eq.3.51; native TASK026 rounded value remains Nu_D = 3.66",
+      "boundary_condition_bound": true,
+      "boundary_condition": "Uniform wall temperature; circular-tube centerline symmetry; fully developed analytical solution",
+      "property_evaluation_basis_bound": true,
+      "property_state_definition": "CONSTANT_NOMINAL_PROPERTIES_IN_ANALYTICAL_MODEL",
+      "constant_property_assumption_bound": true,
+      "wall_property_state_defined": false,
+      "wall_property_correction_rule_bound": false,
+      "omission_semantics_bound": false,
+      "variable_property_extension_defined": false,
+      "task172_variable_property_use_authorized": false,
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "source_finding": "CONSTANT_PROPERTY_MODEL_ONLY",
+      "authority_candidate_status": "NOT_CREATED",
+      "assumptions": {
+        "geometry": "circular tube",
+        "flow": "laminar and fully developed",
+        "thermal_development": "fully developed analytical solution",
+        "entrance_effects": "not supplied",
+        "axial_conduction": "not represented in the reduced relation",
+        "viscous_heating": "classical result does not authorize a wall-property correction; separate source variant not transferred",
+        "heating_cooling_rule": "UNBOUND_FOR_VARIABLE_PROPERTY_EXTENSION"
+      }
+    },
+    "LAMINAR_CHF": {
+      "source_id": "SRC-T172-NASA-CR-189922-CHF-R1",
+      "source_class": "OFFICIAL_GOVERNMENT_TECHNICAL_REPORT",
+      "source_revision": "NASA-CR-189922; NAS 1.26:189922; December 1991",
+      "source_location": "Chapter 3 §3.3.2; report pp.14-19; Eqs.3.20a,3.28,3.39-3.46; PDF pp.28-33 (1-indexed)",
+      "source_rights": "US_GOVERNMENT_WORK_PUBLIC_USE_PERMITTED_PER_NTRS_METADATA",
+      "source_bytes_sha256": "46c1af47bf173cd0a33f7b491d73e635e3335ce67277df50f4f8df2840e5cd5e",
+      "source_body_acquired": true,
+      "equation_bound": true,
+      "equation": "Nu_D = 4.364, source Eq.3.46; native TASK026 rounded value remains Nu_D = 4.36",
+      "boundary_condition_bound": true,
+      "boundary_condition": "Uniform wall heat flux; circular-tube centerline symmetry; fully developed laminar flow; negligible frictional heating",
+      "property_evaluation_basis_bound": true,
+      "property_state_definition": "CONSTANT_NOMINAL_PROPERTIES_IN_ANALYTICAL_MODEL",
+      "constant_property_assumption_bound": true,
+      "wall_property_state_defined": false,
+      "wall_property_correction_rule_bound": false,
+      "omission_semantics_bound": false,
+      "variable_property_extension_defined": false,
+      "task172_variable_property_use_authorized": false,
+      "active_correction_required": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "omission_allowed": "UNRESOLVED_BY_REVIEWED_AUTHORITY",
+      "source_finding": "CONSTANT_PROPERTY_MODEL_ONLY",
+      "authority_candidate_status": "NOT_CREATED",
+      "assumptions": {
+        "geometry": "circular tube",
+        "flow": "laminar and fully developed",
+        "thermal_development": "fully developed analytical solution",
+        "entrance_effects": "not supplied",
+        "axial_conduction": "not represented in the reduced relation",
+        "viscous_heating": "negligible frictional heating",
+        "heating_cooling_rule": "UNBOUND_FOR_VARIABLE_PROPERTY_EXTENSION"
+      }
+    }
+  },
+  "source_finding_decision": {
+    "cwt": "CONSTANT_PROPERTY_MODEL_ONLY",
+    "chf": "CONSTANT_PROPERTY_MODEL_ONLY",
+    "native_requires_wall_viscosity_is_sufficient_omission_authority": false,
+    "turbulent_c3_transferred": false,
+    "neutral_factor_or_silent_omission_used": false,
+    "task172_variable_property_use_authorized": false,
+    "all_admitted_tube_branches_authority_covered": false,
+    "complete_omission_candidates_created": false,
+    "active_correction_candidates_created": false,
+    "reason": "The acquired report gives complete constant-property CWT and CHF derivations but no source-qualified variable-property wall correction or explicit TASK172 omission rule for either exact native branch."
+  },
+  "rejected_or_limited_evidence": [
+    {
+      "source_id": "TASK026-INCROPERA-TABLE-8.1",
+      "status": "INHERITED_NATIVE_BASE_ONLY",
+      "reason": "Repository carries the table citation and branch constants, but the full copyrighted source semantics are not acquired in this receipt."
+    },
+    {
+      "source_id": "ASHRAE-HANDBOOK-CH04",
+      "status": "AUTHORITATIVE_CROSS_CHECK_ONLY",
+      "reason": "Official public chapter confirms fully developed laminar internal-tube rows and boundary-condition distinctions, but does not by itself provide the exact TASK172 variable-property wall disposition."
+    },
+    {
+      "source_id": "NASA-TM-X-54568",
+      "status": "CONSTANT_PROPERTY_CROSS_CHECK_ONLY",
+      "reason": "Public NASA report concerns laminar heat transfer with constant material properties; it was not used as the exact CWT/CHF equation package for this acquisition."
+    },
+    {
+      "source_id": "SIEDER-TATE-1936",
+      "status": "NOT_ACQUIRED_AS_TRANSFER_AUTHORITY",
+      "reason": "No rights-cleared complete equation/domain package was acquired; no remembered exponent is used."
+    }
+  ],
+  "effective_state": {
+    "tube_wall_correction_canonical_blocker_closure_eligible": false,
+    "tube_wall_correction_canonical_blocker_removed": false,
+    "remaining_task172_entry_blockers": [
+      "TUBE-WALL-CORRECTION-AUTHORITY",
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "remaining_task172_entry_blocker_count": 5,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "historical_records_rewritten": false,
+    "task026_changed": false,
+    "engineering_rules_changed": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "turbulent_c3_changed": false,
+    "shell_wall_correction_started": false,
+    "numerical_work_started": false,
+    "golden_approved": false,
+    "new_authority_self_approval": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "AWAIT_COMPLETE_LAMINAR_PRIMARY_SOURCE_AUTHORITY",
+    "no_step_implies_the_next": true
+  },
+  "document": {
+    "path": "TASK-172-v0.7-tube-laminar-primary-source-acquisition-r1.md",
+    "sha256": "7ed891921a49c2eee8a6541ad782cb0bc7ef483cee3c4386b5e815cc2bed80c2"
+  },
+  "canonical_hash": "cb6ceda7e67c5386d9823418443e5471ea0641cfcbcc857da16b08ea6efe8bfb"
+}

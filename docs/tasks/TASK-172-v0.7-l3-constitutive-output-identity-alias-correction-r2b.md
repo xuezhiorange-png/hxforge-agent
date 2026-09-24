@@ -1,0 +1,196 @@
+# TASK172 v0.7 — L3 Constitutive-Output Identity Alias Correction R2B
+
+This documentation-only correction resolves the remaining output-identity
+ambiguity in the effective R2 and R2A model-level L3 contract.  R2A correctly
+separated direct and reconstructed producer prerequisites, but its reconstructed
+variant still listed both `LOCAL_STATE_ID/HASH` and
+`CONSTITUTIVE_EVALUATION_STATE_ID/HASH` without defining their identity
+relation.
+
+R2B defines `LOCAL_STATE_ID/HASH` as the single canonical identity of the
+admitted `L3_CONSTITUTIVE_EVALUATION_STATE` for both producer classes.  The
+historical constitutive-evaluation field names are compatibility aliases only;
+they are not a second state object, lifecycle, or canonical identity.
+
+## Receipt identity and scope
+
+```ini
+TASK_ID=TASK172_V0_7_L3_CONSTITUTIVE_OUTPUT_IDENTITY_ALIAS_CORRECTION_R2B
+PR_NUMBER=277
+PR_STATE=OPEN_DRAFT
+AUTHORIZED_PREDECESSOR_HEAD=82e1b13b060eac34377682c8b2d48b48371992ba
+MODE=MODEL_LEVEL_CONSTITUTIVE_OUTPUT_IDENTITY_ALIAS_CORRECTION_ONLY
+R2_AUTHORITY_ID=V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2
+R2_ORIGINAL_ARTIFACTS_CHANGED=false
+R2A_ORIGINAL_ARTIFACTS_CHANGED=false
+R63_EXTENSION_REWRITTEN=false
+R64_EXTENSION_REWRITTEN=false
+HISTORICAL_PAYLOADS_IMMUTABLE=true
+PRODUCTION_CODE_CHANGED=false
+ENGINEERING_CALCULATION_CHANGED=false
+DEPENDENCY_CHANGED=false
+TASK171_CHANGED=false
+TASK166_CHANGED=false
+TASK172_IMPLEMENTATION_STARTED=false
+NUMERICAL_EXPERIMENT_PERFORMED=false
+MESH_STUDY_PERFORMED=false
+READY_AUTHORIZED=false
+MERGE_AUTHORIZED=false
+NO_STEP_IMPLIES_THE_NEXT=true
+```
+
+R2, R2A, r63, and r64 artifacts are not rewritten.  R2B is a new append-only
+overlay.
+
+## Single canonical constitutive-output identity
+
+The effective contract has one admitted output state.  Its canonical identity
+is always `LOCAL_STATE_ID/HASH`:
+
+```ini
+L3_CONSTITUTIVE_OUTPUT_SINGLE_CANONICAL_STATE_IDENTITY_BOUND=true
+L3_LOCAL_STATE_ID_IS_CONSTITUTIVE_EVALUATION_STATE_ID=true
+L3_LOCAL_STATE_HASH_IS_CONSTITUTIVE_EVALUATION_STATE_HASH=true
+L3_CONSTITUTIVE_OUTPUT_ALIAS_MISMATCH=BLOCKED
+```
+
+`LOCAL_STATE_ID/HASH` identifies the exact state consumed by the L3 constitutive
+evaluation.  The consumer must not receive two independent output identities for
+one receipt.
+
+## Direct and reconstructed variants
+
+For `DIRECT_LOCAL_STATE_PRODUCER`, the directly supplied `LOCAL_STATE_ID/HASH`
+is the constitutive-evaluation state identity.  No second output identity or
+reconstruction operator is required:
+
+```ini
+L3_EFFECTIVE_DIRECT_RECEIPT_SCHEMA_BOUND=true
+L3_RECONSTRUCTION_OPERATOR_AUTHORITY_REQUIRED_FOR_DIRECT_CLASS=false
+UPSTREAM_FACE_RECONSTRUCTION_INPUT_REQUIRED_FOR_DIRECT_CLASS=false
+DOWNSTREAM_FACE_RECONSTRUCTION_INPUT_REQUIRED_FOR_DIRECT_CLASS=false
+```
+
+For `RECONSTRUCTED_LOCAL_STATE_PRODUCER`, the bound face states and operator
+produce `LOCAL_STATE_ID/HASH`, which is the same constitutive-evaluation state
+identity:
+
+```ini
+L3_EFFECTIVE_RECONSTRUCTED_RECEIPT_SCHEMA_BOUND=true
+L3_RECONSTRUCTED_OPERATOR_OUTPUT_IS_LOCAL_STATE_IDENTITY=true
+L3_RECONSTRUCTION_OPERATOR_AUTHORITY_REQUIRED_FOR_RECONSTRUCTED_CLASS=true
+```
+
+The effective reconstructed receipt requires the local-state identity, case,
+topology, path, stream, side, physical interval/support/cell, both face-state
+identities, property authority/snapshot, producer authority, reconstruction
+operator authority/lifecycle, provenance, and one canonical hash.  It does not
+independently require `CONSTITUTIVE_EVALUATION_STATE_ID/HASH`.
+
+## Historical alias rule
+
+The historical field names remain present in immutable R2/R2A artifacts for
+historical fidelity.  A future compatibility representation may carry them,
+but only as derived aliases:
+
+```ini
+L3_CONSTITUTIVE_EVALUATION_STATE_LEGACY_ALIAS_BOUND=true
+LEGACY_CONSTITUTIVE_EVALUATION_STATE_ID_MUST_EQUAL_LOCAL_STATE_ID=true
+LEGACY_CONSTITUTIVE_EVALUATION_STATE_HASH_MUST_EQUAL_LOCAL_STATE_HASH=true
+LEGACY_ALIAS_HAS_INDEPENDENT_LIFECYCLE=false
+LEGACY_ALIAS_HAS_INDEPENDENT_CANONICAL_IDENTITY=false
+```
+
+Any mismatch is fail-closed as `L3_CONSTITUTIVE_OUTPUT_ALIAS_MISMATCH=BLOCKED`.
+Numerical equality, semantic similarity, or same support does not satisfy the
+alias rule; exact canonical identity equality is required.
+
+## Canonical preimage and variant convergence
+
+The canonical preimage for both variants includes:
+
+```ini
+L3_CONSTITUTIVE_OUTPUT_CANONICAL_PREIMAGE_RULE_BOUND=true
+CANONICAL_ALWAYS_INCLUDES=LOCAL_STATE_ID;LOCAL_STATE_HASH;LOCAL_STATE_PRODUCER_CLASS;LOCAL_STATE_PRODUCER_AUTHORITY_ID;LOCAL_STATE_PRODUCER_AUTHORITY_HASH;LOCAL_STATE_PRODUCER_LIFECYCLE_STATUS
+CANONICAL_RECONSTRUCTED_ADDITIONAL=UPSTREAM_FACE_STATE_ID;UPSTREAM_FACE_STATE_HASH;DOWNSTREAM_FACE_STATE_ID;DOWNSTREAM_FACE_STATE_HASH;RECONSTRUCTION_OPERATOR_AUTHORITY_ID;RECONSTRUCTION_OPERATOR_AUTHORITY_HASH;RECONSTRUCTION_OPERATOR_LIFECYCLE_STATUS
+LEGACY_ALIAS_FIELDS_ARE_INDEPENDENT_CANONICAL_INPUTS=false
+```
+
+The variants differ only in producer prerequisites and share one output
+identity model:
+
+```ini
+L3_DIRECT_AND_RECONSTRUCTED_VARIANTS_SHARE_OUTPUT_STATE_SEMANTICS=true
+L3_DIRECT_AND_RECONSTRUCTED_VARIANTS_SHARE_OUTPUT_IDENTITY_SCHEMA=true
+L3_CONSTITUTIVE_OUTPUT_SEMANTIC_OBJECT=L3_CONSTITUTIVE_EVALUATION_STATE
+```
+
+This does not turn `CELL_MEAN` into the constitutive state and does not authorize
+any averaging, interpolation, enthalpy inversion, or constitutive mixing.
+
+## Operator, instance, and method guards
+
+The correction preserves the absence of a reviewed reconstruction operator:
+
+```ini
+L3_EXISTING_RECONSTRUCTION_OPERATOR_AUTHORITY_FOUND=false
+L3_RECONSTRUCTION_OPERATOR_AUTHORITY_ID=NONE
+L3_STATE_RECONSTRUCTION_OPERATOR_BOUND=false
+L3_ARITHMETIC_FACE_TEMPERATURE_MEAN_AUTHORIZED=false
+L3_ARITHMETIC_FACE_PRESSURE_MEAN_AUTHORIZED=false
+L3_PROPERTY_VALUE_AVERAGING_AUTHORIZED=false
+L3_ENTHALPY_TO_TEMPERATURE_INVERSION_AUTHORIZED=false
+L3_MIDPOINT_OPERATOR_AUTHORIZED=false
+L3_MASS_WEIGHTED_OPERATOR_AUTHORIZED=false
+L3_ENTHALPY_EQUIVALENT_OPERATOR_AUTHORIZED=false
+L3_CONSTITUTIVE_MIXING_OPERATOR_AUTHORIZED=false
+```
+
+No direct state, reconstructed state, face state, property snapshot, or receipt
+instance is created:
+
+```ini
+REAL_L3_DIRECT_LOCAL_STATE_INSTANCE_PRESENT=false
+REAL_L3_RECONSTRUCTED_LOCAL_STATE_INSTANCE_PRESENT=false
+REAL_L3_UPSTREAM_FACE_STATE_PRESENT=false
+REAL_L3_DOWNSTREAM_FACE_STATE_PRESENT=false
+REAL_L3_CONSTITUTIVE_EVALUATION_STATE_PRESENT=false
+REAL_L3_STATE_RECONSTRUCTION_RECEIPT_PRESENT=false
+REAL_L3_LOCAL_PROPERTY_SNAPSHOT_PRESENT=false
+REAL_L3_LOCAL_CONSTITUTIVE_INSTANCE_PRESENT=false
+```
+
+The same proposed candidate remains pending external independent review:
+
+```ini
+L3_LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID=V07-T172-L3-LOCAL-STATE-RECONSTRUCTION-CONTRACT-R2
+L3_LOCAL_STATE_RECONSTRUCTION_AUTHORITY_LIFECYCLE=PROPOSED_AUTHORITY
+L3_LOCAL_STATE_RECONSTRUCTION_INDEPENDENT_REVIEW=PENDING
+NEW_AUTHORITY_SELF_APPROVAL=false
+```
+
+`L3_UNKNOWN_SET_BOUND=false`, `L3_METHOD_STATUS=METHOD_UNBOUND`, and all L2b,
+physical, numerical, and four-entry-blocker guards remain unchanged.
+
+## Outcome and next gate
+
+```ini
+RESULT=CORRECTED
+L3_STATE_RECONSTRUCTION_CONTRACT_BOUND=true
+L3_STATE_RECONSTRUCTION_OPERATOR_BOUND=false
+L3_CONSTITUTIVE_OUTPUT_SINGLE_CANONICAL_STATE_IDENTITY_BOUND=true
+L3_CONSTITUTIVE_EVALUATION_STATE_LEGACY_ALIAS_BOUND=true
+L3_EFFECTIVE_DIRECT_RECEIPT_SCHEMA_BOUND=true
+L3_EFFECTIVE_RECONSTRUCTED_RECEIPT_SCHEMA_BOUND=true
+L3_CONSTITUTIVE_OUTPUT_CANONICAL_PREIMAGE_RULE_BOUND=true
+L3_DIRECT_AND_RECONSTRUCTED_VARIANTS_SHARE_OUTPUT_STATE_SEMANTICS=true
+L3_DIRECT_AND_RECONSTRUCTED_VARIANTS_SHARE_OUTPUT_IDENTITY_SCHEMA=true
+LOCAL_RESIDUAL_AND_METHOD_CANONICAL_BLOCKER_REMOVED=false
+EFFECTIVE_REMAINING_TASK172_ENTRY_BLOCKER_COUNT=4
+TASK172_ENTRY_AUTHORITY_COMPLETE=false
+NEXT_GATE=AUTHORIZE_TASK172_L3_LOCAL_STATE_RECONSTRUCTION_CONTRACT_R2_INDEPENDENT_REVIEW_ONLY
+NO_STEP_IMPLIES_THE_NEXT=true
+STOP=true
+```
+
+This correction does not perform the independent review automatically.

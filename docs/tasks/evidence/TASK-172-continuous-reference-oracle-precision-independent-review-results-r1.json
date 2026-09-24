@@ -1,0 +1,4405 @@
+{
+  "R100_candidate_reproduced": true,
+  "R100_first_appearance_commit_by_artifact": {
+    "document": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+    "evidence": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+    "results": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+    "runner": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075"
+  },
+  "R100_original_dual_runtime_byte_replay_verified_from_worker_files": {
+    "python311_equal": true,
+    "python311_sha256": "68316f95b2041b5c761cb71b0801d4194069364bc8e822e589f736c486a887c2",
+    "python312_equal": true,
+    "python312_sha256": "b03aa9d7cd355d41e8157f02050c4d4be9704880b58d57053f4ea83f4c2d36d7"
+  },
+  "R100_reference_policy": {
+    "classification": "PROJECT_REFERENCE_PRECISION_POLICY",
+    "composite_simpson_subintervals": [
+      512,
+      1024,
+      2048
+    ],
+    "continuous_duty_reference_producer": "GAUSS_LEGENDRE_ORDER_1024",
+    "gauss_orders": [
+      128,
+      256,
+      512,
+      1024
+    ],
+    "independent_quadrature_family_count": 2,
+    "local_root_validation_method": "TOMS748",
+    "near_zero_absolute_limit_W": 1e-08,
+    "non_near_zero_relative_limit": 1e-08,
+    "oracle_to_mesh_threshold_separation_factor": 0.001,
+    "oracle_uncertainty_is_formal_true_error_bound": false,
+    "production_scalar_reduction_selected": false,
+    "reference_uncertainty_propagation_required": true,
+    "uncertainty_classification": "MEASURED_CONSERVATIVE_NUMERICAL_REFERENCE_UNCERTAINTY",
+    "uncertainty_definition": "U_Q=U_GL+U_SIMPSON+U_CROSS+U_ROOT_INTEGRATED+U_REDUCTION",
+    "wall_reference_stability_criterion_K": 1e-08
+  },
+  "R99_M05_64_ulp_gate": {
+    "256_512_difference_W": 1.0105805081650487e-13,
+    "64_ulp_criterion_W": 1.7763568394002505e-15,
+    "expected_128_256_512_W": {
+      "128": 0.2222234220550436,
+      "256": 0.22222342205515927,
+      "512": 0.22222342205526033
+    },
+    "historical_128_256_512_exactly_preserved": true,
+    "historical_gate_still_fails": true,
+    "observed_numpy_128_256_512_1024_W": {
+      "1024": 0.22222342205523007,
+      "128": 0.2222234220550436,
+      "256": 0.22222342205515927,
+      "512": 0.22222342205526033
+    }
+  },
+  "R99_historical_result_preserved": true,
+  "all_six_precision_policy_results_pass_both_runtimes": true,
+  "authorized_predecessor_head": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+  "canonical_hash": "94ff0a74b53e6c57c0f08a16625f59cea5c8246c9825ed734e7be352173dd032",
+  "crosscheck_pass_by_order": {
+    "1024": true,
+    "128": true,
+    "256": true,
+    "512": true
+  },
+  "fixtures": [
+    {
+      "U_Q_W": {
+        "python311": 2.2662760557068395e-11,
+        "python312": 2.262723342028039e-11
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M01",
+      "maximum_cross_runtime_UQ_difference_W": 3.552713678800501e-14,
+      "numpy_gl1024_Q_W": {
+        "python311": 17.05145358632239,
+        "python312": 17.05145358632239
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 7.105427357601002e-15,
+          "128": 0.0,
+          "256": 1.4210854715202004e-14,
+          "512": 7.105427357601002e-15
+        },
+        "python312": {
+          "1024": 7.105427357601002e-15,
+          "128": 0.0,
+          "256": 1.4210854715202004e-14,
+          "512": 7.105427357601002e-15
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 17.051453586322395,
+        "python312": 17.051453586322395
+      }
+    },
+    {
+      "U_Q_W": {
+        "python311": 8.039791055125534e-12,
+        "python312": 8.004263918337529e-12
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M02",
+      "maximum_cross_runtime_UQ_difference_W": 3.552713678800501e-14,
+      "numpy_gl1024_Q_W": {
+        "python311": 18.597879246107475,
+        "python312": 18.597879246107475
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 7.105427357601002e-15,
+          "128": 0.0,
+          "256": 1.7763568394002505e-14,
+          "512": 1.0658141036401503e-14
+        },
+        "python312": {
+          "1024": 7.105427357601002e-15,
+          "128": 0.0,
+          "256": 1.7763568394002505e-14,
+          "512": 1.0658141036401503e-14
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 18.597879246107482,
+        "python312": 18.597879246107482
+      }
+    },
+    {
+      "U_Q_W": {
+        "python311": 5.7909232964448165e-12,
+        "python312": 5.778488798569015e-12
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M03",
+      "maximum_cross_runtime_UQ_difference_W": 1.2434497875801753e-14,
+      "numpy_gl1024_Q_W": {
+        "python311": 13.187854026392502,
+        "python312": 13.187854026392502
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 5.329070518200751e-15,
+          "128": 3.552713678800501e-15,
+          "256": 5.329070518200751e-15,
+          "512": 3.552713678800501e-15
+        },
+        "python312": {
+          "1024": 5.329070518200751e-15,
+          "128": 3.552713678800501e-15,
+          "256": 5.329070518200751e-15,
+          "512": 3.552713678800501e-15
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 13.187854026392497,
+        "python312": 13.187854026392497
+      }
+    },
+    {
+      "U_Q_W": {
+        "python311": 9.64206492426456e-12,
+        "python312": 9.620748642191757e-12
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M04",
+      "maximum_cross_runtime_UQ_difference_W": 2.1316282072803006e-14,
+      "numpy_gl1024_Q_W": {
+        "python311": 16.941719921100418,
+        "python312": 16.941719921100418
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 3.552713678800501e-15,
+          "128": 0.0,
+          "256": 7.105427357601002e-15,
+          "512": 7.105427357601002e-15
+        },
+        "python312": {
+          "1024": 3.552713678800501e-15,
+          "128": 0.0,
+          "256": 7.105427357601002e-15,
+          "512": 7.105427357601002e-15
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 16.94171992110042,
+        "python312": 16.94171992110042
+      }
+    },
+    {
+      "U_Q_W": {
+        "python311": 7.722877892746283e-12,
+        "python312": 7.722378292385201e-12
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M05",
+      "maximum_cross_runtime_UQ_difference_W": 4.996003610813204e-16,
+      "numpy_gl1024_Q_W": {
+        "python311": 0.22222342205523007,
+        "python312": 0.22222342205523007
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 0.0,
+          "128": 2.7755575615628914e-17,
+          "256": 0.0,
+          "512": 0.0
+        },
+        "python312": {
+          "1024": 0.0,
+          "128": 2.7755575615628914e-17,
+          "256": 0.0,
+          "512": 0.0
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 0.22222342205523007,
+        "python312": 0.22222342205523007
+      }
+    },
+    {
+      "U_Q_W": {
+        "python311": 4.8618886694384855e-12,
+        "python312": 4.835243316847482e-12
+      },
+      "all_order_1024_node_weight_checks_pass": true,
+      "fixture_id": "M06",
+      "maximum_cross_runtime_UQ_difference_W": 2.6645352591003757e-14,
+      "numpy_gl1024_Q_W": {
+        "python311": 13.526962848693813,
+        "python312": 13.526962848693813
+      },
+      "numpy_scipy_abs_differences_by_order_W": {
+        "python311": {
+          "1024": 3.552713678800501e-15,
+          "128": 0.0,
+          "256": 1.0658141036401503e-14,
+          "512": 5.329070518200751e-15
+        },
+        "python312": {
+          "1024": 3.552713678800501e-15,
+          "128": 0.0,
+          "256": 1.0658141036401503e-14,
+          "512": 5.329070518200751e-15
+        }
+      },
+      "precision_policy_pass_both_runtimes": true,
+      "r100_exact_reproduced_both_runtimes": true,
+      "scipy_gl1024_Q_W": {
+        "python311": 13.526962848693817,
+        "python312": 13.526962848693817
+      }
+    }
+  ],
+  "independent_workers": {
+    "python311": {
+      "runtime": {
+        "coolprop": "8.0.0",
+        "numpy": "2.4.6",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "python": "3.11.15",
+        "scipy": "1.17.1"
+      },
+      "worker_canonical_hash": "019b23de4f1b76d6fa13de04ed39f4cb108300d9a556b49516f6da47f8f2ff9c",
+      "worker_file_sha256": "a6bb16da0aaf4204c7eb51f1e7412adaf5f218a2f18d194fc60cc01c4cd10e93"
+    },
+    "python312": {
+      "runtime": {
+        "coolprop": "8.0.0",
+        "numpy": "2.5.0",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "python": "3.12.13",
+        "scipy": "1.18.0"
+      },
+      "worker_canonical_hash": "82e7f487fdfa7b97262fa99d9a6bcb5d9733e1b1e2c4c94b99a6b2001abfafbc",
+      "worker_file_sha256": "38326f1ae3056d934972403f5d225457c57d752422aaf81bfd3ebdefc5cdbf30"
+    }
+  },
+  "maximum_cross_runtime_UQ_difference_W": 3.552713678800501e-14,
+  "maximum_numpy_scipy_Q_difference_by_order_W": {
+    "1024": 7.105427357601002e-15,
+    "128": 3.552713678800501e-15,
+    "256": 1.7763568394002505e-14,
+    "512": 1.0658141036401503e-14
+  },
+  "non_mesh_scope": {
+    "full_mesh_matrix_rerun": false,
+    "mesh_study_performed": false,
+    "mesh_threshold_changed": false,
+    "mesh_threshold_sensitivity_performed": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false
+  },
+  "policy_freeze_author_asserted_in_R100_document": true,
+  "policy_preregistration_independently_proven_in_repository": false,
+  "quadrature_implementation_adjudication": {
+    "basis": "Separate NumPy and SciPy node/weight generation, all six fixtures, four orders, both locked runtime pairs, finite/symmetry/weight-sum checks, and Q differences within each fixture's R100 empirical U_Q envelope.",
+    "canonical_reference_producer": "SCIPY_SPECIAL_ROOTS_LEGENDRE_ORDER_1024",
+    "canonical_reference_producer_authority_accepted": true,
+    "decision": "ACCEPT_GAUSS1024_BUT_CANONICAL_PRODUCER_SHOULD_USE_SCIPY_ROOTS_LEGENDRE",
+    "gauss1024_candidate_accepted_with_independent_crosscheck": true,
+    "numpy_leggauss_1024_acceptable_as_canonical_reference_producer": false,
+    "numpy_official_high_order_note": "NumPy 2.4 documentation says results have only been tested through degree 100 and higher degrees may be problematic.",
+    "scipy_official_method_note": "SciPy roots_legendre documents nth-degree Legendre roots and polynomial exactness through degree 2n-1."
+  },
+  "review_runner_sha256": "2ac6dea8e6fa619d524de7b507b184196e4a29cb82020e65b4678eb978f2648c",
+  "schema_version": "1.0",
+  "task_id": "TASK172_V0_7_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW_R1",
+  "uncertainty_review": {
+    "U_ROOT_INTEGRATED_is_finite_sample_max_times_unit_length": true,
+    "U_ROOT_INTEGRATED_is_strict_global_integral_upper_bound": false,
+    "classification": "MEASURED_EMPIRICAL_NUMERICAL_REFERENCE_UNCERTAINTY_ENVELOPE",
+    "conservative_wording_accepted": false,
+    "formal_true_error_bound": false,
+    "recommended_canonical_wording": "Measured empirical numerical-reference uncertainty envelope from the stated quadrature, sampled root-method, and floating-point reduction comparisons; not a formal true-error bound or a proven global upper bound.",
+    "reference_uncertainty_propagation_required": true
+  },
+  "workers": {
+    "python311": {
+      "R99_M05_replay": {
+        "256_512_difference_W": 1.0105805081650487e-13,
+        "64_ulp_criterion_W": 1.7763568394002505e-15,
+        "expected_128_256_512_W": {
+          "128": 0.2222234220550436,
+          "256": 0.22222342205515927,
+          "512": 0.22222342205526033
+        },
+        "historical_128_256_512_exactly_preserved": true,
+        "historical_gate_still_fails": true,
+        "observed_numpy_128_256_512_1024_W": {
+          "1024": 0.22222342205523007,
+          "128": 0.2222234220550436,
+          "256": 0.22222342205515927,
+          "512": 0.22222342205526033
+        }
+      },
+      "authorized_predecessor_head": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+      "baseline_and_target": {
+        "R100_candidate_status_replayed": true,
+        "R100_document_sha256": "c7a5415006e319a6f999937d883bb0d520eee6f84d4e05ee4ef752df1448d118",
+        "R100_evidence_canonical_hash": "d4be20147aa641c189bef443fd497987230fe6bd1d7b4edf4f2171af3ca356bb",
+        "R100_evidence_sha256": "0d719a48ef4ccee07c5f0b161e844f635e0c97ed101964825880b744e1fdd0c5",
+        "R100_results_canonical_hash": "17799de16c5b4a7362bda4595d4d5af9e46ee1633d89e852e51cc58419caf5d0",
+        "R100_results_sha256": "b7844e566faab902fef1bc90eda3c991f3e1271da96effe78c693efe4fac6b43",
+        "R100_runner_sha256": "a6ea1850bca18bed700f8313ffd208d4a27fa8750604a1529fad9a4a4a2084ba",
+        "head": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+        "registry_extension_canonical_hash": "9e1210f35c3e52f83cdffde3b23f0fc78f8b8b75e1fbbd2e35c07039095b6701"
+      },
+      "canonical_hash": "019b23de4f1b76d6fa13de04ed39f4cb108300d9a556b49516f6da47f8f2ff9c",
+      "fixture_results": [
+        {
+          "Q_ref_numpy_gl1024_W": 17.05145358632239,
+          "Q_ref_scipy_gl1024_W": 17.051453586322395,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M01",
+          "fixture_scoped_exact_coordinate_cache_size": 4384,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 17.05145358632239,
+              "Q_scipy_W": 17.051453586322395,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.1670508157149323e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 17.05145358632164,
+              "Q_scipy_W": 17.05145358632164,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 17.051453586321937,
+              "Q_scipy_W": 17.051453586321923,
+              "abs_difference_W": 1.4210854715202004e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 8.334101631430085e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 17.051453586321887,
+              "Q_scipy_W": 17.05145358632188,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.167050815715055e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 17.05145358632239,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632239,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632239,
+                "ordinary_sum_W": 17.051453586322353,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 17.05145358632164,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632164,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632164,
+                "ordinary_sum_W": 17.051453586321635,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 17.051453586321937,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321937,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321937,
+                "ordinary_sum_W": 17.05145358632193,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 17.051453586321887,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321887,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321887,
+                "ordinary_sum_W": 17.05145358632189,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 7.105427357601002e-15,
+            "U_GL": 5.009326287108706e-13,
+            "U_Q": 2.2662760557068395e-11,
+            "U_REDUCTION": 3.552713678800501e-14,
+            "U_ROOT_INTEGRATED_OBSERVED": 1.901057089526148e-11,
+            "U_SIMPSON": 3.1086244689504383e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 1.901057089526148e-11,
+            "U_ROOT_POINTWISE_OBSERVED_W": 1.901057089526148e-11,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 3.410605131648481e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 1.901057089526148e-11
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.09765625,
+              "T_wall_outer_K": 0.09765625,
+              "q_hc_W": 0.1015625
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 17.051453586322395,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586322395,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586322395,
+                "ordinary_sum_W": 17.051453586322392,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 17.05145358632164,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632164,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632164,
+                "ordinary_sum_W": 17.051453586321653,
+                "ordinary_sum_abs_difference_W": 1.4210854715202004e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 17.051453586321923,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321923,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321923,
+                "ordinary_sum_W": 17.05145358632193,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 17.05145358632188,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632188,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632188,
+                "ordinary_sum_W": 17.0514535863219,
+                "ordinary_sum_abs_difference_W": 2.1316282072803006e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 17.0514535863222,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.0514535863222,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.0514535863222,
+                "ordinary_sum_W": 17.051453586322197,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 17.05145358632238,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632238,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632238,
+                "ordinary_sum_W": 17.051453586322392,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 17.05145358631909,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358631909,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358631909,
+                "ordinary_sum_W": 17.051453586319106,
+                "ordinary_sum_abs_difference_W": 1.4210854715202004e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 298.9247583766599,
+                "Twi_min": 298.8542184860596,
+                "Two_max": 298.7749076216806,
+                "Two_min": 298.58470109721145
+              },
+              "513": {
+                "Twi_max": 298.9247583766599,
+                "Twi_min": 298.8542184860596,
+                "Two_max": 298.7749076216806,
+                "Two_min": 298.58470109721145
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 18.597879246107475,
+          "Q_ref_scipy_gl1024_W": 18.597879246107482,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M02",
+          "fixture_scoped_exact_coordinate_cache_size": 4385,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 18.597879246107475,
+              "Q_scipy_W": 18.597879246107482,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 3.8205578515562003e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 18.597879246107187,
+              "Q_scipy_W": 18.597879246107187,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 18.597879246107425,
+              "Q_scipy_W": 18.597879246107407,
+              "abs_difference_W": 1.7763568394002505e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 9.551394628890527e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 18.597879246107365,
+              "Q_scipy_W": 18.597879246107354,
+              "abs_difference_W": 1.0658141036401503e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 5.730836777334335e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 18.597879246107475,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107475,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107475,
+                "ordinary_sum_W": 18.59787924610751,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 18.597879246107187,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107187,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107187,
+                "ordinary_sum_W": 18.597879246107183,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 18.597879246107425,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107425,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107425,
+                "ordinary_sum_W": 18.597879246107436,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 18.597879246107365,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107365,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107365,
+                "ordinary_sum_W": 18.597879246107375,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 9.947598300641403e-14,
+            "U_GL": 1.1013412404281553e-13,
+            "U_Q": 8.039791055125534e-12,
+            "U_REDUCTION": 3.552713678800501e-14,
+            "U_ROOT_INTEGRATED_OBSERVED": 4.423128530106624e-12,
+            "U_SIMPSON": 3.3715252811816754e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 4.423128530106624e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 4.423128530106624e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.2737367544323206e-13,
+              "T_wall_outer_K": 1.7053025658242404e-13,
+              "q_hc_W": 4.423128530106624e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.52734375,
+              "T_wall_outer_K": 0.52734375,
+              "q_hc_W": 0.87890625
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 18.597879246107482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107482,
+                "ordinary_sum_W": 18.597879246107475,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 18.597879246107187,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107187,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107187,
+                "ordinary_sum_W": 18.597879246107176,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 18.597879246107407,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107407,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107407,
+                "ordinary_sum_W": 18.597879246107404,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 18.597879246107354,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107354,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107354,
+                "ordinary_sum_W": 18.59787924610733,
+                "ordinary_sum_abs_difference_W": 2.4868995751603507e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 18.597879246107155,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107155,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107155,
+                "ordinary_sum_W": 18.597879246107155,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 18.597879246107375,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107375,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107375,
+                "ordinary_sum_W": 18.5978792461074,
+                "ordinary_sum_abs_difference_W": 2.4868995751603507e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 18.597879246103783,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246103783,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246103783,
+                "ordinary_sum_W": 18.597879246103794,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 298.7748992293558,
+                "Twi_min": 298.5846739413541,
+                "Two_max": 298.9247289903079,
+                "Two_min": 298.8541233629825
+              },
+              "513": {
+                "Twi_max": 298.7748992293558,
+                "Twi_min": 298.5846739413541,
+                "Two_max": 298.9247289903079,
+                "Two_min": 298.8541233629825
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 13.187854026392502,
+          "Q_ref_scipy_gl1024_W": 13.187854026392497,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M03",
+          "fixture_scoped_exact_coordinate_cache_size": 4536,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 13.187854026392502,
+              "Q_scipy_W": 13.187854026392497,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.0408928606093337e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 13.187854026392563,
+              "Q_scipy_W": 13.187854026392566,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6939285737395433e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 13.187854026392515,
+              "Q_scipy_W": 13.18785402639252,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.0408928606093297e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 13.187854026392479,
+              "Q_scipy_W": 13.187854026392483,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6939285737395605e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 13.187854026392502,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392502,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392502,
+                "ordinary_sum_W": 13.187854026392515,
+                "ordinary_sum_abs_difference_W": 1.2434497875801753e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 13.187854026392563,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392563,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392563,
+                "ordinary_sum_W": 13.187854026392563,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 13.187854026392515,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392515,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392515,
+                "ordinary_sum_W": 13.187854026392516,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 13.187854026392479,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392479,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392479,
+                "ordinary_sum_W": 13.187854026392467,
+                "ordinary_sum_abs_difference_W": 1.2434497875801753e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.2434497875801753e-14,
+            "U_GL": 3.552713678800501e-14,
+            "U_Q": 5.7909232964448165e-12,
+            "U_REDUCTION": 1.2434497875801753e-14,
+            "U_ROOT_INTEGRATED_OBSERVED": 5.7198690228688065e-12,
+            "U_SIMPSON": 1.0658141036401503e-14
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 5.7198690228688065e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 5.7198690228688065e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 3.410605131648481e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 5.7198690228688065e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.0,
+              "T_wall_outer_K": 0.0,
+              "q_hc_W": 0.078125
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 13.187854026392497,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392497,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392497,
+                "ordinary_sum_W": 13.18785402639251,
+                "ordinary_sum_abs_difference_W": 1.2434497875801753e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 13.187854026392566,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392566,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392566,
+                "ordinary_sum_W": 13.187854026392563,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 13.18785402639252,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.18785402639252,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.18785402639252,
+                "ordinary_sum_W": 13.187854026392523,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 13.187854026392483,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392483,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392483,
+                "ordinary_sum_W": 13.187854026392467,
+                "ordinary_sum_abs_difference_W": 1.5987211554602254e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 13.187854026392525,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392525,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392525,
+                "ordinary_sum_W": 13.187854026392523,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 13.187854026392515,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392515,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392515,
+                "ordinary_sum_W": 13.187854026392525,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 13.187854026392527,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392527,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392527,
+                "ordinary_sum_W": 13.18785402639252,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 5.684341886080802e-14,
+              "Two_max": 0.0,
+              "Two_min": 5.684341886080802e-14
+            },
+            "maximum_absolute_difference_K": 5.684341886080802e-14,
+            "values": {
+              "257": {
+                "Twi_max": 299.47425146645634,
+                "Twi_min": 299.2905125872807,
+                "Two_max": 298.8970355671101,
+                "Two_min": 298.81961458309263
+              },
+              "513": {
+                "Twi_max": 299.47425146645634,
+                "Twi_min": 299.2905125872808,
+                "Two_max": 298.8970355671101,
+                "Two_min": 298.8196145830927
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 16.941719921100418,
+          "Q_ref_scipy_gl1024_W": 16.94171992110042,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M04",
+          "fixture_scoped_exact_coordinate_cache_size": 4407,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 16.941719921100418,
+              "Q_scipy_W": 16.94171992110042,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.0970206657564322e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 16.941719921100482,
+              "Q_scipy_W": 16.941719921100482,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 16.941719921100365,
+              "Q_scipy_W": 16.941719921100358,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.1940413315128777e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 16.94171992110031,
+              "Q_scipy_W": 16.94171992110032,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.194041331512891e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 16.941719921100418,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100418,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100418,
+                "ordinary_sum_W": 16.94171992110042,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 16.941719921100482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100482,
+                "ordinary_sum_W": 16.941719921100486,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 16.941719921100365,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100365,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100365,
+                "ordinary_sum_W": 16.941719921100358,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 16.94171992110031,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110031,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110031,
+                "ordinary_sum_W": 16.941719921100297,
+                "ordinary_sum_abs_difference_W": 1.4210854715202004e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.4210854715202004e-14,
+            "U_GL": 1.0658141036401503e-13,
+            "U_Q": 9.64206492426456e-12,
+            "U_REDUCTION": 2.1316282072803006e-14,
+            "U_ROOT_INTEGRATED_OBSERVED": 7.581490990560269e-12,
+            "U_SIMPSON": 1.9184653865522705e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 7.581490990560269e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 7.581490990560269e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.8421709430404007e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 7.581490990560269e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.0546875,
+              "T_wall_outer_K": 0.0546875,
+              "q_hc_W": 0.078125
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 16.94171992110042,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110042,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110042,
+                "ordinary_sum_W": 16.941719921100397,
+                "ordinary_sum_abs_difference_W": 2.4868995751603507e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 16.941719921100482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100482,
+                "ordinary_sum_W": 16.941719921100486,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 16.941719921100358,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100358,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100358,
+                "ordinary_sum_W": 16.94171992110034,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 16.94171992110032,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110032,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110032,
+                "ordinary_sum_W": 16.94171992110032,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 16.941719921100265,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100265,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100265,
+                "ordinary_sum_W": 16.941719921100244,
+                "ordinary_sum_abs_difference_W": 2.1316282072803006e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 16.941719921100404,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100404,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100404,
+                "ordinary_sum_W": 16.941719921100407,
+                "ordinary_sum_abs_difference_W": 3.552713678800501e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 16.941719921098347,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921098347,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921098347,
+                "ordinary_sum_W": 16.94171992109833,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.3713217627328,
+                "Twi_min": 299.25291703989785,
+                "Two_max": 298.9839306885739,
+                "Two_min": 298.95892094871834
+              },
+              "513": {
+                "Twi_max": 299.3713217627328,
+                "Twi_min": 299.25291703989785,
+                "Two_max": 298.9839306885739,
+                "Two_min": 298.95892094871834
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 0.22222342205523007,
+          "Q_ref_scipy_gl1024_W": 0.22222342205523007,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M05",
+          "fixture_scoped_exact_coordinate_cache_size": 4334,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 0.22222342205523007,
+              "Q_scipy_W": 0.22222342205523007,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 0.2222234220550436,
+              "Q_scipy_W": 0.22222342205504364,
+              "abs_difference_W": 2.7755575615628914e-17,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 1.2489941590744652e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 0.22222342205515927,
+              "Q_scipy_W": 0.22222342205515927,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 0.22222342205526033,
+              "Q_scipy_W": 0.22222342205526033,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 0.22222342205523007,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205523007,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205523007,
+                "ordinary_sum_W": 0.22222342205523005,
+                "ordinary_sum_abs_difference_W": 2.7755575615628914e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 0.2222234220550436,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.2222234220550436,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.2222234220550436,
+                "ordinary_sum_W": 0.22222342205504364,
+                "ordinary_sum_abs_difference_W": 2.7755575615628914e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 0.22222342205515927,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205515927,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205515927,
+                "ordinary_sum_W": 0.22222342205515913,
+                "ordinary_sum_abs_difference_W": 1.3877787807814457e-16,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 0.22222342205526033,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205526033,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205526033,
+                "ordinary_sum_W": 0.22222342205526022,
+                "ordinary_sum_abs_difference_W": 1.1102230246251565e-16,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.1407541578023483e-14,
+            "U_GL": 1.0105805081650487e-13,
+            "U_Q": 7.722877892746283e-12,
+            "U_REDUCTION": 4.996003610813204e-16,
+            "U_ROOT_INTEGRATED_OBSERVED": 7.579464833540328e-12,
+            "U_SIMPSON": 3.044786645034492e-14
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 7.579464833540328e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 7.579464833540328e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.2737367544323206e-13,
+              "T_wall_outer_K": 1.7053025658242404e-13,
+              "q_hc_W": 7.579464833540328e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.24609375,
+              "T_wall_outer_K": 0.24609375,
+              "q_hc_W": 0.98046875
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 0.22222342205523007,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205523007,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205523007,
+                "ordinary_sum_W": 0.22222342205523002,
+                "ordinary_sum_abs_difference_W": 5.551115123125783e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 0.22222342205504364,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205504364,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205504364,
+                "ordinary_sum_W": 0.22222342205504358,
+                "ordinary_sum_abs_difference_W": 5.551115123125783e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 0.22222342205515927,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205515927,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205515927,
+                "ordinary_sum_W": 0.22222342205515921,
+                "ordinary_sum_abs_difference_W": 5.551115123125783e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 0.22222342205526033,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205526033,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205526033,
+                "ordinary_sum_W": 0.2222234220552603,
+                "ordinary_sum_abs_difference_W": 2.7755575615628914e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 0.2222234220552501,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.2222234220552501,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.2222234220552501,
+                "ordinary_sum_W": 0.2222234220552502,
+                "ordinary_sum_abs_difference_W": 8.326672684688674e-17,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 0.22222342205524148,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205524148,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205524148,
+                "ordinary_sum_W": 0.22222342205524198,
+                "ordinary_sum_abs_difference_W": 4.996003610813204e-16,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 0.22222342205521967,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205521967,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205521967,
+                "ordinary_sum_W": 0.2222234220552195,
+                "ordinary_sum_abs_difference_W": 1.6653345369377348e-16,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.55699995917075,
+                "Twi_min": 299.3969999590785,
+                "Two_max": 299.5549999484895,
+                "Two_min": 299.3949999483744
+              },
+              "513": {
+                "Twi_max": 299.55699995917075,
+                "Twi_min": 299.3969999590785,
+                "Two_max": 299.5549999484895,
+                "Two_min": 299.3949999483744
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 13.526962848693813,
+          "Q_ref_scipy_gl1024_W": 13.526962848693817,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M06",
+          "fixture_scoped_exact_coordinate_cache_size": 4412,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 13.526962848693813,
+              "Q_scipy_W": 13.526962848693817,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6263942013735604e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 13.526962848693865,
+              "Q_scipy_W": 13.526962848693865,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 13.526962848693776,
+              "Q_scipy_W": 13.526962848693765,
+              "abs_difference_W": 1.0658141036401503e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 7.879182604120703e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 13.526962848693827,
+              "Q_scipy_W": 13.526962848693822,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 3.9395913020603366e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 13.526962848693813,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693813,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693813,
+                "ordinary_sum_W": 13.526962848693804,
+                "ordinary_sum_abs_difference_W": 8.881784197001252e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 13.526962848693865,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693865,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693865,
+                "ordinary_sum_W": 13.526962848693866,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 13.526962848693776,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693776,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693776,
+                "ordinary_sum_W": 13.526962848693778,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 13.526962848693827,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693827,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693827,
+                "ordinary_sum_W": 13.526962848693811,
+                "ordinary_sum_abs_difference_W": 1.5987211554602254e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 6.039613253960852e-14,
+            "U_GL": 5.1514348342607263e-14,
+            "U_Q": 4.8618886694384855e-12,
+            "U_REDUCTION": 2.6645352591003757e-14,
+            "U_ROOT_INTEGRATED_OBSERVED": 2.7391422463551862e-12,
+            "U_SIMPSON": 1.9841905896100798e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 2.7391422463551862e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 2.7391422463551862e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 1.7053025658242404e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 2.7391422463551862e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.328125,
+              "T_wall_outer_K": 0.328125,
+              "q_hc_W": 0.38671875
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 13.526962848693817,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693817,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693817,
+                "ordinary_sum_W": 13.526962848693827,
+                "ordinary_sum_abs_difference_W": 1.0658141036401503e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 13.526962848693865,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693865,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693865,
+                "ordinary_sum_W": 13.526962848693866,
+                "ordinary_sum_abs_difference_W": 1.7763568394002505e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 13.526962848693765,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693765,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693765,
+                "ordinary_sum_W": 13.526962848693758,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 13.526962848693822,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693822,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693822,
+                "ordinary_sum_W": 13.526962848693808,
+                "ordinary_sum_abs_difference_W": 1.4210854715202004e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 13.526962848693637,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693637,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693637,
+                "ordinary_sum_W": 13.526962848693632,
+                "ordinary_sum_abs_difference_W": 5.329070518200751e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 13.526962848693753,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693753,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693753,
+                "ordinary_sum_W": 13.526962848693726,
+                "ordinary_sum_abs_difference_W": 2.6645352591003757e-14,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 13.526962848691653,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848691653,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848691653,
+                "ordinary_sum_W": 13.526962848691646,
+                "ordinary_sum_abs_difference_W": 7.105427357601002e-15,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.5696787073716,
+                "Twi_min": 299.3603810684183,
+                "Two_max": 299.27825037666327,
+                "Two_min": 299.177688920948
+              },
+              "513": {
+                "Twi_max": 299.5696787073716,
+                "Twi_min": 299.3603810684183,
+                "Two_max": 299.27825037666327,
+                "Two_min": 299.177688920948
+              }
+            }
+          }
+        }
+      ],
+      "non_mesh_scope": {
+        "full_mesh_matrix_rerun": false,
+        "mesh_study_performed": false,
+        "mesh_threshold_changed": false,
+        "mesh_threshold_sensitivity_performed": false,
+        "task173_solve_performed": false,
+        "task174_solve_performed": false
+      },
+      "quadrature_implementations": {
+        "node_weight_arrays_shared": false,
+        "numpy": "numpy.polynomial.legendre.leggauss; independent call and arrays",
+        "orders": [
+          128,
+          256,
+          512,
+          1024
+        ],
+        "scipy": "scipy.special.roots_legendre; independent call and arrays"
+      },
+      "runtime": {
+        "coolprop": "8.0.0",
+        "numpy": "2.4.6",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "python": "3.11.15",
+        "scipy": "1.17.1"
+      },
+      "schema_version": "1.0",
+      "task_id": "TASK172_V0_7_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW_R1"
+    },
+    "python312": {
+      "R99_M05_replay": {
+        "256_512_difference_W": 1.0105805081650487e-13,
+        "64_ulp_criterion_W": 1.7763568394002505e-15,
+        "expected_128_256_512_W": {
+          "128": 0.2222234220550436,
+          "256": 0.22222342205515927,
+          "512": 0.22222342205526033
+        },
+        "historical_128_256_512_exactly_preserved": true,
+        "historical_gate_still_fails": true,
+        "observed_numpy_128_256_512_1024_W": {
+          "1024": 0.22222342205523007,
+          "128": 0.2222234220550436,
+          "256": 0.22222342205515927,
+          "512": 0.22222342205526033
+        }
+      },
+      "authorized_predecessor_head": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+      "baseline_and_target": {
+        "R100_candidate_status_replayed": true,
+        "R100_document_sha256": "c7a5415006e319a6f999937d883bb0d520eee6f84d4e05ee4ef752df1448d118",
+        "R100_evidence_canonical_hash": "d4be20147aa641c189bef443fd497987230fe6bd1d7b4edf4f2171af3ca356bb",
+        "R100_evidence_sha256": "0d719a48ef4ccee07c5f0b161e844f635e0c97ed101964825880b744e1fdd0c5",
+        "R100_results_canonical_hash": "17799de16c5b4a7362bda4595d4d5af9e46ee1633d89e852e51cc58419caf5d0",
+        "R100_results_sha256": "b7844e566faab902fef1bc90eda3c991f3e1271da96effe78c693efe4fac6b43",
+        "R100_runner_sha256": "a6ea1850bca18bed700f8313ffd208d4a27fa8750604a1529fad9a4a4a2084ba",
+        "head": "0af454f0c9850de22b3d70f2006e5e3c4d1e1075",
+        "registry_extension_canonical_hash": "9e1210f35c3e52f83cdffde3b23f0fc78f8b8b75e1fbbd2e35c07039095b6701"
+      },
+      "canonical_hash": "82e7f487fdfa7b97262fa99d9a6bcb5d9733e1b1e2c4c94b99a6b2001abfafbc",
+      "fixture_results": [
+        {
+          "Q_ref_numpy_gl1024_W": 17.05145358632239,
+          "Q_ref_scipy_gl1024_W": 17.051453586322395,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M01",
+          "fixture_scoped_exact_coordinate_cache_size": 4384,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 17.05145358632239,
+              "Q_scipy_W": 17.051453586322395,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.1670508157149323e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 17.05145358632164,
+              "Q_scipy_W": 17.05145358632164,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 17.051453586321937,
+              "Q_scipy_W": 17.051453586321923,
+              "abs_difference_W": 1.4210854715202004e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 8.334101631430085e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 17.051453586321887,
+              "Q_scipy_W": 17.05145358632188,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.167050815715055e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 17.05145358632239,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632239,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632239,
+                "ordinary_sum_W": 17.05145358632239,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 17.05145358632164,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632164,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632164,
+                "ordinary_sum_W": 17.05145358632164,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 17.051453586321937,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321937,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321937,
+                "ordinary_sum_W": 17.051453586321937,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 17.051453586321887,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321887,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321887,
+                "ordinary_sum_W": 17.051453586321887,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 7.105427357601002e-15,
+            "U_GL": 5.009326287108706e-13,
+            "U_Q": 2.262723342028039e-11,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 1.901057089526148e-11,
+            "U_SIMPSON": 3.1086244689504383e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 1.901057089526148e-11,
+            "U_ROOT_POINTWISE_OBSERVED_W": 1.901057089526148e-11,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 3.410605131648481e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 1.901057089526148e-11
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.09765625,
+              "T_wall_outer_K": 0.09765625,
+              "q_hc_W": 0.1015625
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 17.051453586322395,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586322395,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586322395,
+                "ordinary_sum_W": 17.051453586322395,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 17.05145358632164,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632164,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632164,
+                "ordinary_sum_W": 17.05145358632164,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 17.051453586321923,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.051453586321923,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.051453586321923,
+                "ordinary_sum_W": 17.051453586321923,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 17.05145358632188,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632188,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632188,
+                "ordinary_sum_W": 17.05145358632188,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 17.0514535863222,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.0514535863222,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.0514535863222,
+                "ordinary_sum_W": 17.0514535863222,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 17.05145358632238,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358632238,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358632238,
+                "ordinary_sum_W": 17.05145358632238,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 17.05145358631909,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 17.05145358631909,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 17.05145358631909,
+                "ordinary_sum_W": 17.05145358631909,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 298.9247583766599,
+                "Twi_min": 298.8542184860596,
+                "Two_max": 298.7749076216806,
+                "Two_min": 298.58470109721145
+              },
+              "513": {
+                "Twi_max": 298.9247583766599,
+                "Twi_min": 298.8542184860596,
+                "Two_max": 298.7749076216806,
+                "Two_min": 298.58470109721145
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 18.597879246107475,
+          "Q_ref_scipy_gl1024_W": 18.597879246107482,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M02",
+          "fixture_scoped_exact_coordinate_cache_size": 4385,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 18.597879246107475,
+              "Q_scipy_W": 18.597879246107482,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 3.8205578515562003e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 18.597879246107187,
+              "Q_scipy_W": 18.597879246107187,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 18.597879246107425,
+              "Q_scipy_W": 18.597879246107407,
+              "abs_difference_W": 1.7763568394002505e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 9.551394628890527e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 18.597879246107365,
+              "Q_scipy_W": 18.597879246107354,
+              "abs_difference_W": 1.0658141036401503e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 5.730836777334335e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 18.597879246107475,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107475,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107475,
+                "ordinary_sum_W": 18.597879246107475,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 18.597879246107187,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107187,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107187,
+                "ordinary_sum_W": 18.597879246107187,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 18.597879246107425,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107425,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107425,
+                "ordinary_sum_W": 18.597879246107425,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 18.597879246107365,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107365,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107365,
+                "ordinary_sum_W": 18.597879246107365,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 9.947598300641403e-14,
+            "U_GL": 1.1013412404281553e-13,
+            "U_Q": 8.004263918337529e-12,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 4.423128530106624e-12,
+            "U_SIMPSON": 3.3715252811816754e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 4.423128530106624e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 4.423128530106624e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.2737367544323206e-13,
+              "T_wall_outer_K": 1.7053025658242404e-13,
+              "q_hc_W": 4.423128530106624e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.52734375,
+              "T_wall_outer_K": 0.52734375,
+              "q_hc_W": 0.87890625
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 18.597879246107482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107482,
+                "ordinary_sum_W": 18.597879246107482,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 18.597879246107187,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107187,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107187,
+                "ordinary_sum_W": 18.597879246107187,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 18.597879246107407,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107407,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107407,
+                "ordinary_sum_W": 18.597879246107407,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 18.597879246107354,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107354,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107354,
+                "ordinary_sum_W": 18.597879246107354,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 18.597879246107155,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107155,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107155,
+                "ordinary_sum_W": 18.597879246107155,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 18.597879246107375,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246107375,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246107375,
+                "ordinary_sum_W": 18.597879246107375,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 18.597879246103783,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 18.597879246103783,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 18.597879246103783,
+                "ordinary_sum_W": 18.597879246103783,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 298.7748992293558,
+                "Twi_min": 298.5846739413541,
+                "Two_max": 298.9247289903079,
+                "Two_min": 298.8541233629825
+              },
+              "513": {
+                "Twi_max": 298.7748992293558,
+                "Twi_min": 298.5846739413541,
+                "Two_max": 298.9247289903079,
+                "Two_min": 298.8541233629825
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 13.187854026392502,
+          "Q_ref_scipy_gl1024_W": 13.187854026392497,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M03",
+          "fixture_scoped_exact_coordinate_cache_size": 4536,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 13.187854026392502,
+              "Q_scipy_W": 13.187854026392497,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.0408928606093337e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 13.187854026392563,
+              "Q_scipy_W": 13.187854026392566,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6939285737395433e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 13.187854026392515,
+              "Q_scipy_W": 13.18785402639252,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.0408928606093297e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 13.187854026392479,
+              "Q_scipy_W": 13.187854026392483,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6939285737395605e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 13.187854026392502,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392502,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392502,
+                "ordinary_sum_W": 13.187854026392502,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 13.187854026392563,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392563,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392563,
+                "ordinary_sum_W": 13.187854026392563,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 13.187854026392515,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392515,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392515,
+                "ordinary_sum_W": 13.187854026392515,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 13.187854026392479,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392479,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392479,
+                "ordinary_sum_W": 13.187854026392479,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.2434497875801753e-14,
+            "U_GL": 3.552713678800501e-14,
+            "U_Q": 5.778488798569015e-12,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 5.7198690228688065e-12,
+            "U_SIMPSON": 1.0658141036401503e-14
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 5.7198690228688065e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 5.7198690228688065e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 3.410605131648481e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 5.7198690228688065e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.0,
+              "T_wall_outer_K": 0.0,
+              "q_hc_W": 0.078125
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 13.187854026392497,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392497,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392497,
+                "ordinary_sum_W": 13.187854026392497,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 13.187854026392566,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392566,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392566,
+                "ordinary_sum_W": 13.187854026392566,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 13.18785402639252,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.18785402639252,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.18785402639252,
+                "ordinary_sum_W": 13.18785402639252,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 13.187854026392483,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392483,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392483,
+                "ordinary_sum_W": 13.187854026392483,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 13.187854026392525,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392525,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392525,
+                "ordinary_sum_W": 13.187854026392525,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 13.187854026392515,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392515,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392515,
+                "ordinary_sum_W": 13.187854026392515,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 13.187854026392527,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.187854026392527,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.187854026392527,
+                "ordinary_sum_W": 13.187854026392527,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 5.684341886080802e-14,
+              "Two_max": 0.0,
+              "Two_min": 5.684341886080802e-14
+            },
+            "maximum_absolute_difference_K": 5.684341886080802e-14,
+            "values": {
+              "257": {
+                "Twi_max": 299.47425146645634,
+                "Twi_min": 299.2905125872807,
+                "Two_max": 298.8970355671101,
+                "Two_min": 298.81961458309263
+              },
+              "513": {
+                "Twi_max": 299.47425146645634,
+                "Twi_min": 299.2905125872808,
+                "Two_max": 298.8970355671101,
+                "Two_min": 298.8196145830927
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 16.941719921100418,
+          "Q_ref_scipy_gl1024_W": 16.94171992110042,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M04",
+          "fixture_scoped_exact_coordinate_cache_size": 4407,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 16.941719921100418,
+              "Q_scipy_W": 16.94171992110042,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.0970206657564322e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 16.941719921100482,
+              "Q_scipy_W": 16.941719921100482,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 16.941719921100365,
+              "Q_scipy_W": 16.941719921100358,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.1940413315128777e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 16.94171992110031,
+              "Q_scipy_W": 16.94171992110032,
+              "abs_difference_W": 7.105427357601002e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 4.194041331512891e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 16.941719921100418,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100418,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100418,
+                "ordinary_sum_W": 16.941719921100418,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 16.941719921100482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100482,
+                "ordinary_sum_W": 16.941719921100482,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 16.941719921100365,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100365,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100365,
+                "ordinary_sum_W": 16.941719921100365,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 16.94171992110031,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110031,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110031,
+                "ordinary_sum_W": 16.94171992110031,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.4210854715202004e-14,
+            "U_GL": 1.0658141036401503e-13,
+            "U_Q": 9.620748642191757e-12,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 7.581490990560269e-12,
+            "U_SIMPSON": 1.9184653865522705e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 7.581490990560269e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 7.581490990560269e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.8421709430404007e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 7.581490990560269e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.0546875,
+              "T_wall_outer_K": 0.0546875,
+              "q_hc_W": 0.078125
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 16.94171992110042,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110042,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110042,
+                "ordinary_sum_W": 16.94171992110042,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 16.941719921100482,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100482,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100482,
+                "ordinary_sum_W": 16.941719921100482,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 16.941719921100358,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100358,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100358,
+                "ordinary_sum_W": 16.941719921100358,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 16.94171992110032,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.94171992110032,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.94171992110032,
+                "ordinary_sum_W": 16.94171992110032,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 16.941719921100265,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100265,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100265,
+                "ordinary_sum_W": 16.941719921100265,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 16.941719921100404,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921100404,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921100404,
+                "ordinary_sum_W": 16.941719921100404,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 16.941719921098347,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 16.941719921098347,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 16.941719921098347,
+                "ordinary_sum_W": 16.941719921098347,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.3713217627328,
+                "Twi_min": 299.25291703989785,
+                "Two_max": 298.9839306885739,
+                "Two_min": 298.95892094871834
+              },
+              "513": {
+                "Twi_max": 299.3713217627328,
+                "Twi_min": 299.25291703989785,
+                "Two_max": 298.9839306885739,
+                "Two_min": 298.95892094871834
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 0.22222342205523007,
+          "Q_ref_scipy_gl1024_W": 0.22222342205523007,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M05",
+          "fixture_scoped_exact_coordinate_cache_size": 4334,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 0.22222342205523007,
+              "Q_scipy_W": 0.22222342205523007,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 0.2222234220550436,
+              "Q_scipy_W": 0.22222342205504364,
+              "abs_difference_W": 2.7755575615628914e-17,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 1.2489941590744652e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 0.22222342205515927,
+              "Q_scipy_W": 0.22222342205515927,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 0.22222342205526033,
+              "Q_scipy_W": 0.22222342205526033,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 0.22222342205523007,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205523007,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205523007,
+                "ordinary_sum_W": 0.22222342205523007,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 0.2222234220550436,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.2222234220550436,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.2222234220550436,
+                "ordinary_sum_W": 0.2222234220550436,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 0.22222342205515927,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205515927,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205515927,
+                "ordinary_sum_W": 0.22222342205515927,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 0.22222342205526033,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205526033,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205526033,
+                "ordinary_sum_W": 0.22222342205526033,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 1.1407541578023483e-14,
+            "U_GL": 1.0105805081650487e-13,
+            "U_Q": 7.722378292385201e-12,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 7.579464833540328e-12,
+            "U_SIMPSON": 3.044786645034492e-14
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 7.579464833540328e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 7.579464833540328e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 2.2737367544323206e-13,
+              "T_wall_outer_K": 1.7053025658242404e-13,
+              "q_hc_W": 7.579464833540328e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.24609375,
+              "T_wall_outer_K": 0.24609375,
+              "q_hc_W": 0.98046875
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 0.22222342205523007,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205523007,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205523007,
+                "ordinary_sum_W": 0.22222342205523007,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 0.22222342205504364,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205504364,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205504364,
+                "ordinary_sum_W": 0.22222342205504364,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 0.22222342205515927,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205515927,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205515927,
+                "ordinary_sum_W": 0.22222342205515927,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 0.22222342205526033,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205526033,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205526033,
+                "ordinary_sum_W": 0.22222342205526033,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 0.2222234220552501,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.2222234220552501,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.2222234220552501,
+                "ordinary_sum_W": 0.2222234220552501,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 0.22222342205524148,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205524148,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205524148,
+                "ordinary_sum_W": 0.22222342205524148,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 0.22222342205521967,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 0.22222342205521967,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 0.22222342205521967,
+                "ordinary_sum_W": 0.22222342205521967,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.55699995917075,
+                "Twi_min": 299.3969999590785,
+                "Two_max": 299.5549999484895,
+                "Two_min": 299.3949999483744
+              },
+              "513": {
+                "Twi_max": 299.55699995917075,
+                "Twi_min": 299.3969999590785,
+                "Two_max": 299.5549999484895,
+                "Two_min": 299.3949999483744
+              }
+            }
+          }
+        },
+        {
+          "Q_ref_numpy_gl1024_W": 13.526962848693813,
+          "Q_ref_scipy_gl1024_W": 13.526962848693817,
+          "R100_numeric_values_exactly_reproduced": true,
+          "fixture_id": "M06",
+          "fixture_scoped_exact_coordinate_cache_size": 4412,
+          "independent_crosscheck_by_order": {
+            "1024": {
+              "Q_numpy_W": 13.526962848693813,
+              "Q_scipy_W": 13.526962848693817,
+              "abs_difference_W": 3.552713678800501e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 6.391392135592783e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 2.6263942013735604e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "128": {
+              "Q_numpy_W": 13.526962848693865,
+              "Q_scipy_W": 13.526962848693865,
+              "abs_difference_W": 0.0,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.078266808120844e-15,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 4.440892098500626e-16,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 0.0,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "256": {
+              "Q_numpy_W": 13.526962848693776,
+              "Q_scipy_W": 13.526962848693765,
+              "abs_difference_W": 1.0658141036401503e-14,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 2.2076822791747275e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 7.879182604120703e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 2.220446049250313e-16,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            },
+            "512": {
+              "Q_numpy_W": 13.526962848693827,
+              "Q_scipy_W": 13.526962848693822,
+              "abs_difference_W": 5.329070518200751e-15,
+              "max_node_absolute_difference": 1.1102230246251565e-16,
+              "max_weight_absolute_difference": 3.9756013151676095e-14,
+              "node_arrays_are_distinct_objects": true,
+              "numpy_finite_checks_pass": true,
+              "numpy_node_symmetry_deviation": 0.0,
+              "numpy_weight_sum_deviation": 0.0,
+              "numpy_weight_symmetry_deviation": 0.0,
+              "relative_difference": 3.9395913020603366e-16,
+              "scipy_finite_checks_pass": true,
+              "scipy_node_symmetry_deviation": 0.0,
+              "scipy_weight_sum_deviation": 0.0,
+              "scipy_weight_symmetry_deviation": 0.0,
+              "weight_arrays_are_distinct_objects": true
+            }
+          },
+          "numpy_gauss_legendre": {
+            "1024": {
+              "Q_W": 13.526962848693813,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693813,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693813,
+                "ordinary_sum_W": 13.526962848693813,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0000000000000004,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "128": {
+              "Q_W": 13.526962848693865,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693865,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693865,
+                "ordinary_sum_W": 13.526962848693865,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 1.9999999999999996,
+              "weight_sum_deviation_from_2": 4.440892098500626e-16
+            },
+            "256": {
+              "Q_W": 13.526962848693776,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693776,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693776,
+                "ordinary_sum_W": 13.526962848693776,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "512": {
+              "Q_W": 13.526962848693827,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "NUMPY_LEGGAUSS",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693827,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693827,
+                "ordinary_sum_W": 13.526962848693827,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "reference_uncertainty_is_formal_true_error_bound": false,
+          "reproduced_R100_U_components_W": {
+            "U_CROSS": 6.039613253960852e-14,
+            "U_GL": 5.1514348342607263e-14,
+            "U_Q": 4.835243316847482e-12,
+            "U_REDUCTION": 0.0,
+            "U_ROOT_INTEGRATED_OBSERVED": 2.7391422463551862e-12,
+            "U_SIMPSON": 1.9841905896100798e-12
+          },
+          "root_crosscheck": {
+            "U_ROOT_INTEGRATED_OBSERVED_W": 2.7391422463551862e-12,
+            "U_ROOT_POINTWISE_OBSERVED_W": 2.7391422463551862e-12,
+            "all_toms748_converged": true,
+            "comparison": "FROZEN_R95_BRENT_VS_INDEPENDENT_SCIPY_TOMS748",
+            "integration_rule_used": "257_POINT_MAX_TIMES_NORMALIZED_LENGTH_1;EMPIRICAL_NOT_GLOBAL_BOUND",
+            "maximum_absolute_differences": {
+              "T_wall_inner_K": 1.7053025658242404e-13,
+              "T_wall_outer_K": 1.1368683772161603e-13,
+              "q_hc_W": 2.7391422463551862e-12
+            },
+            "maximum_difference_locations_xi": {
+              "T_wall_inner_K": 0.328125,
+              "T_wall_outer_K": 0.328125,
+              "q_hc_W": 0.38671875
+            },
+            "maximum_function_calls": 9,
+            "point_count": 257
+          },
+          "scipy_roots_legendre": {
+            "1024": {
+              "Q_W": 13.526962848693817,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 1024,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693817,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693817,
+                "ordinary_sum_W": 13.526962848693817,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1024
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "128": {
+              "Q_W": 13.526962848693865,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 128,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693865,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693865,
+                "ordinary_sum_W": 13.526962848693865,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 128
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            },
+            "256": {
+              "Q_W": 13.526962848693765,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 256,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693765,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693765,
+                "ordinary_sum_W": 13.526962848693765,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 256
+              },
+              "weight_sum": 1.9999999999999998,
+              "weight_sum_deviation_from_2": 2.220446049250313e-16
+            },
+            "512": {
+              "Q_W": 13.526962848693822,
+              "finite_nodes_weights_contributions": true,
+              "implementation": "SCIPY_ROOTS_LEGENDRE",
+              "max_node_symmetry_deviation": 0.0,
+              "max_weight_symmetry_deviation": 0.0,
+              "order": 512,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693822,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693822,
+                "ordinary_sum_W": 13.526962848693822,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 512
+              },
+              "weight_sum": 2.0,
+              "weight_sum_deviation_from_2": 0.0
+            }
+          },
+          "simpson": {
+            "1024": {
+              "Q_W": 13.526962848693637,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693637,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693637,
+                "ordinary_sum_W": 13.526962848693637,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 1025
+              },
+              "subintervals": 1024
+            },
+            "2048": {
+              "Q_W": 13.526962848693753,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848693753,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848693753,
+                "ordinary_sum_W": 13.526962848693753,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 2049
+              },
+              "subintervals": 2048
+            },
+            "512": {
+              "Q_W": 13.526962848691653,
+              "reduction": {
+                "canonical_roundtrip_fsum_W": 13.526962848691653,
+                "canonical_roundtrip_sum_abs_difference_W": 0.0,
+                "math_fsum_W": 13.526962848691653,
+                "ordinary_sum_W": 13.526962848691653,
+                "ordinary_sum_abs_difference_W": 0.0,
+                "serialization_roundtrip_exact": true,
+                "term_count": 513
+              },
+              "subintervals": 512
+            }
+          },
+          "wall_extrema_257_513": {
+            "absolute_differences_K": {
+              "Twi_max": 0.0,
+              "Twi_min": 0.0,
+              "Two_max": 0.0,
+              "Two_min": 0.0
+            },
+            "maximum_absolute_difference_K": 0.0,
+            "values": {
+              "257": {
+                "Twi_max": 299.5696787073716,
+                "Twi_min": 299.3603810684183,
+                "Two_max": 299.27825037666327,
+                "Two_min": 299.177688920948
+              },
+              "513": {
+                "Twi_max": 299.5696787073716,
+                "Twi_min": 299.3603810684183,
+                "Two_max": 299.27825037666327,
+                "Two_min": 299.177688920948
+              }
+            }
+          }
+        }
+      ],
+      "non_mesh_scope": {
+        "full_mesh_matrix_rerun": false,
+        "mesh_study_performed": false,
+        "mesh_threshold_changed": false,
+        "mesh_threshold_sensitivity_performed": false,
+        "task173_solve_performed": false,
+        "task174_solve_performed": false
+      },
+      "quadrature_implementations": {
+        "node_weight_arrays_shared": false,
+        "numpy": "numpy.polynomial.legendre.leggauss; independent call and arrays",
+        "orders": [
+          128,
+          256,
+          512,
+          1024
+        ],
+        "scipy": "scipy.special.roots_legendre; independent call and arrays"
+      },
+      "runtime": {
+        "coolprop": "8.0.0",
+        "numpy": "2.5.0",
+        "platform": "macOS-27.2-arm64-arm-64bit",
+        "python": "3.12.13",
+        "scipy": "1.18.0"
+      },
+      "schema_version": "1.0",
+      "task_id": "TASK172_V0_7_CONTINUOUS_REFERENCE_ORACLE_PRECISION_INDEPENDENT_REVIEW_R1"
+    }
+  }
+}

@@ -1,0 +1,477 @@
+{
+  "schema_version": "task172.open-source-reference-architecture-audit.r1",
+  "task_id": "TASK172_V0_7_OPEN_SOURCE_REFERENCE_ARCHITECTURE_AUDIT_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "mode": "PINNED_PUBLIC_OPEN_SOURCE_ARCHITECTURE_AUDIT_ONLY",
+  "access_date": "2026-09-22",
+  "previous_head_sha": "53d4f3b7617407957b44662df1c3610720c3ca13",
+  "head_precondition": {
+    "authorized_predecessor_head": "53d4f3b7617407957b44662df1c3610720c3ca13",
+    "expected_predecessor_head": "53d4f3b7617407957b44662df1c3610720c3ca13",
+    "verified_head_sha": "53d4f3b7617407957b44662df1c3610720c3ca13",
+    "verified": true,
+    "pr_state_verified": "OPEN_DRAFT",
+    "rebase_performed": false,
+    "reset_performed": false,
+    "force_push_performed": false
+  },
+  "historical_binding": {
+    "r1_through_r86_documents_unchanged": true,
+    "r1_through_r86_evidence_unchanged": true,
+    "r1_through_r86_extensions_rewritten": false,
+    "r85_r85a_semantics_preserved": true,
+    "r86_extension_canonical_hash": "c59d57851d278386a7b27d921720981a12fef0e214b09996ed1a6039d46d0678",
+    "predecessor_registry_root_canonical_hash": "fd6a3d169046a3946614d5fae849a87698abb24262b0fbf4ad7c7df83c17260b",
+    "historical_payloads_immutable": true
+  },
+  "external_repositories": [
+    {
+      "source_id": "IDAES_IDAES_PSE_84532D7",
+      "repository": "IDAES/idaes-pse",
+      "commit": "84532d7f99a9f976b05170948147afdd69cfa5f6",
+      "commit_verified": true,
+      "commit_url": "https://github.com/IDAES/idaes-pse/commit/84532d7f99a9f976b05170948147afdd69cfa5f6",
+      "license_identity": "BSD_LICENSE_TEXT",
+      "license_evidence": ["pyproject.toml:project.license", "LICENSE.md"],
+      "files_reviewed": [
+        {
+          "path": "idaes/models/unit_models/shell_and_tube_1d.py",
+          "sha256": "2ee2f75a4ba5920c7e398a54ae41ad3668c78ed54f45e2cf59ae627c5ca0d88c",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L280-L325", "L355-L422", "L448-L476"]
+        },
+        {
+          "path": "idaes/models/unit_models/heat_exchanger_1D.py",
+          "sha256": "09f51a5b56dbac82dce53a2a86bbce2b6770dae0977cc320e2c34848d538c8b8",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L216-L279", "L516-L644", "L646-L715", "L861-L1000"]
+        },
+        {
+          "path": "idaes/models/unit_models/tests/test_shell_and_tube_1D.py",
+          "sha256": "e2d4bbf46d10ed429c1b69f197d1688b210646d21e1af36efe4450e1c9811446",
+          "source_roles": ["TEST_PATTERN_REFERENCE"],
+          "locations": ["L1640-L1742", "countercurrent test after L1745"]
+        },
+        {
+          "path": "pyproject.toml",
+          "sha256": "11c97153ec611de76d886eb2cae300b3d04dfacda9e8ac9c1d4a2347af8cd628",
+          "source_roles": ["LICENSE_REFERENCE"]
+        },
+        {
+          "path": "LICENSE.md",
+          "sha256": "4fdde00bd663a045a688899c7e6924bd3b747204518e75540273c97f4bc98fa0",
+          "source_roles": ["LICENSE_REFERENCE"]
+        }
+      ],
+      "physical_authority_promotion": false,
+      "direct_code_import_authorized": false
+    },
+    {
+      "source_id": "HT_85E0EE6",
+      "repository": "CalebBell/ht",
+      "commit": "85e0ee686ec91b35919925fd31d73d140a9de135",
+      "commit_verified": true,
+      "commit_url": "https://github.com/CalebBell/ht/commit/85e0ee686ec91b35919925fd31d73d140a9de135",
+      "license_identity": "MIT",
+      "license_evidence": ["pyproject.toml:project.license", "LICENSE.txt"],
+      "files_reviewed": [
+        {
+          "path": "ht/core.py",
+          "sha256": "0917046e990b6714e68532eac9a9ce8ddd876ec4afdd50a826cc0717232250e5",
+          "source_roles": ["IMPLEMENTATION_PATTERN_REFERENCE", "NUMERIC_CROSSCHECK_REFERENCE"],
+          "locations": ["L166-L213", "L273-L400", "L407-L498"]
+        },
+        {
+          "path": "ht/conv_tube_bank.py",
+          "sha256": "dde1bf58bbfa1a60dded296ae3af78985df48c28879a37f31e2d398139a9d672",
+          "source_roles": ["NUMERIC_CROSSCHECK_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L780-L838", "L1119-L1201", "L1227-L1308", "L1340-L1420", "L1423-L1553"]
+        },
+        {
+          "path": "tests/test_core.py",
+          "sha256": "748e5f26a8034f9324461ebc404f506f5d2576506dbf8c559600c188a777e5b1",
+          "source_roles": ["TEST_PATTERN_REFERENCE"],
+          "locations": ["L63-L115"]
+        },
+        {
+          "path": "tests/test_conv_tube_bank.py",
+          "sha256": "e14974bbf6bc67180c401d3e0faa52bdd0e8e07d848599b5a6cc59167e0b61d1",
+          "source_roles": ["TEST_PATTERN_REFERENCE", "NUMERIC_CROSSCHECK_REFERENCE"],
+          "locations": ["Bell correction reference tests around L641, L746, L794, L979-L983"]
+        },
+        {
+          "path": "pyproject.toml",
+          "sha256": "ec3e1af0180d5c10733bf51665ecbbd96ad8ed2683555e65a862fe0a11f339f1",
+          "source_roles": ["LICENSE_REFERENCE"]
+        },
+        {
+          "path": "LICENSE.txt",
+          "sha256": "0066a88479661eb03701a3e1f9c32be428779a5f4ad7b6bbed7d6bc1fa36f7c4",
+          "source_roles": ["LICENSE_REFERENCE"]
+        }
+      ],
+      "physical_authority_promotion": false,
+      "direct_code_import_authorized": false
+    },
+    {
+      "source_id": "TESPY_18DC773",
+      "repository": "oemof/tespy",
+      "commit": "18dc773f6ebbfedfc262df7087c768b1c74d2081",
+      "commit_verified": true,
+      "commit_url": "https://github.com/oemof/tespy/commit/18dc773f6ebbfedfc262df7087c768b1c74d2081",
+      "license_identity": "MIT",
+      "license_evidence": ["LICENSE"],
+      "files_reviewed": [
+        {
+          "path": "src/tespy/components/heat_exchangers/sectioned.py",
+          "sha256": "39da644c53a47c0f8cd109f473dd35c79f68bc04235c0f0a6d25b3403129ac76",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L34-L43", "L221-L305", "L841-L854", "L1034-L1115", "L1352-L1406"]
+        },
+        {
+          "path": "src/tespy/components/heat_exchangers/base.py",
+          "sha256": "59985211da9d425975589d977aa2101cf9fbacd514a355f535f746aeece7720e",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L200-L208", "L211-L232", "L543-L641", "L1326-L1367", "L1437-L1466"]
+        },
+        {
+          "path": "src/tespy/components/heat_exchangers/movingboundary.py",
+          "sha256": "1f3bad62281f004f6c5f9ffde711397a56a79dbabc22077e25c5ee6c5d18acb2",
+          "source_roles": ["ARCHITECTURE_REFERENCE"],
+          "locations": ["L20-L28", "sectioned inheritance and phase-boundary logic"]
+        },
+        {
+          "path": "tests/test_components/test_heat_exchangers.py",
+          "sha256": "408dcbc4e6f109ba7ca91d2ee32a6197d83cc2c502639785f3f4c19928f3caf6",
+          "source_roles": ["TEST_PATTERN_REFERENCE"],
+          "locations": ["L511-L564", "L874-L952", "L954-L966"]
+        },
+        {
+          "path": "tests/test_components/test_sectioned_hx_sc_phases.py",
+          "sha256": "905de3efe8e43cf003a8b22db486570315076362875a446b44c270a624442db6",
+          "source_roles": ["TEST_PATTERN_REFERENCE"]
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "19827950627302a303c2f4b7eb8acef12b04bfc107f25745e50342e52e1723c0",
+          "source_roles": ["LICENSE_REFERENCE"]
+        }
+      ],
+      "physical_authority_promotion": false,
+      "direct_code_import_authorized": false
+    },
+    {
+      "source_id": "MODELICA_BUILDINGS_A3CFDDE",
+      "repository": "lbl-srg/modelica-buildings",
+      "commit": "a3cfdde4e2fa1605f351875c2199b6aafaee7fe0",
+      "commit_verified": true,
+      "commit_url": "https://github.com/lbl-srg/modelica-buildings/commit/a3cfdde4e2fa1605f351875c2199b6aafaee7fe0",
+      "license_identity": "REVISED_THREE_CLAUSE_BSD_WITH_ADDITIONAL_IMPROVEMENTS_TERM",
+      "license_evidence": ["Buildings/UsersGuide/License.mo:L24-L75"],
+      "files_reviewed": [
+        {
+          "path": "Buildings/Fluid/HeatExchangers/DryCoilDiscretized.mo",
+          "sha256": "559534811adbe60239297647055fc8ad8d3d305be294490c1a4336a80a46698b",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L25-L37", "L101-L132", "L264-L302", "L314-L330", "L420-L467", "L550-L561"]
+        },
+        {
+          "path": "Buildings/Fluid/HeatExchangers/BaseClasses/HexElementSensible.mo",
+          "sha256": "425bf5fb12e6703c89f046d43519ec6c1d0fc0b960a86fee9be670ea788c5825",
+          "source_roles": ["ARCHITECTURE_REFERENCE"]
+        },
+        {
+          "path": "Buildings/Fluid/HeatExchangers/BaseClasses/PartialHexElement.mo",
+          "sha256": "2ea59172a6a91693421370f92f9a9b24858c203e4223f063c59098493aeda395",
+          "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L36-L83", "L94-L125", "L143-L169"]
+        },
+        {
+          "path": "Buildings/Fluid/HeatExchangers/BaseClasses/CoilRegister.mo",
+          "sha256": "e9d013518b973e8a499a9bc2877d56585b602ebffec04a8914ea1b9171c43b06",
+          "source_roles": ["ARCHITECTURE_REFERENCE"],
+          "locations": ["L20-L25", "L43-L74", "L77-L116", "L138-L184"]
+        },
+        {
+          "path": "Buildings/UsersGuide/License.mo",
+          "sha256": "2a6390a2c10c9af282832c0853e0fd9f8fa3d476c8ef742eddc834a533345cc3",
+          "source_roles": ["LICENSE_REFERENCE"]
+        }
+      ],
+      "physical_authority_promotion": false,
+      "direct_code_import_authorized": false
+    },
+    {
+      "source_id": "PYCHEMQT_D34339E",
+      "repository": "jjgomera/pychemqt",
+      "commit": "d34339ea62b719185baffd3cbf8b47b5cfd931a6",
+      "commit_verified": true,
+      "commit_url": "https://github.com/jjgomera/pychemqt/commit/d34339ea62b719185baffd3cbf8b47b5cfd931a6",
+      "license_identity": "GPL-3.0",
+      "license_evidence": ["LICENSE", "setup.py:L39-L42"],
+      "files_reviewed": [
+        {
+          "path": "equipment/shellTube.py",
+          "sha256": "a4a3be16ec79e920fd4d2caf7ff72e37782524c9ed58e4299146652a97944df9",
+          "source_roles": ["NUMERIC_CROSSCHECK_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+          "locations": ["L30-L169", "L291-L423", "L658-L889", "L897", "L911-L915"]
+        },
+        {
+          "path": "LICENSE",
+          "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
+          "source_roles": ["LICENSE_REFERENCE"]
+        },
+        {
+          "path": "setup.py",
+          "sha256": "268df286004ed19f1a73c27a44a518afab4547cace39eee21763bb25de5fec1e",
+          "source_roles": ["LICENSE_REFERENCE"]
+        }
+      ],
+      "physical_authority_promotion": false,
+      "direct_code_import_authorized": false,
+      "code_reuse": "FORBIDDEN"
+    }
+  ],
+  "source_findings": {
+    "idaes": {
+      "local_heat_transfer": "Local heat transfer variables and constraints are solved over a control-volume length domain.",
+      "wall_and_initialization": "One distributed wall temperature is temporarily fixed to a hot/cold estimate; selected constraints are deactivated, solved, restored and the wall is unfixed.",
+      "dof_scaling_failure": "Constraint scaling is applied; non-optimal final termination raises InitializationError.",
+      "flow_and_roles": "Hot/cold blocks are explicit and co-current/counter-current directions are configured separately.",
+      "external_q_scope": "A generic fixed-duty initialization path exists, but it is not evidence that native local closure requires an external Q receipt.",
+      "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
+    },
+    "ht": {
+      "bulk_wall_separation": "Wall-factor helpers require explicit bulk and wall properties or temperatures.",
+      "failure_behavior": "Missing wall property inputs raise TypeError; unsupported method options raise ValueError.",
+      "bell_helpers": "Bell correction helpers and reference tests expose implementation/crosscheck structure.",
+      "source_roles": ["IMPLEMENTATION_PATTERN_REFERENCE", "NUMERIC_CROSSCHECK_REFERENCE", "TEST_PATTERN_REFERENCE"]
+    },
+    "tespy": {
+      "section_state": "Section boundaries, per-section heat, cumulative heat and temperature profiles are explicit post-solve arrays.",
+      "energy_and_pressure": "Network energy balance is an explicit residual; pressure ratios and connection pressure states are separate quantities.",
+      "failure_behavior": "Tests distinguish converged profiles from negative-pinch/nonconverged post-processing with NaN/status.",
+      "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE", "TEST_PATTERN_REFERENCE"]
+    },
+    "modelica_buildings": {
+      "finite_volume": "Registers contain arrays of pipe segments; each smallest element has fluid volumes and a metal state.",
+      "flow_reversal_and_zero_flow": "allowFlowReversal is independent of medium identity; near-zero-flow diffusion conductors mitigate temperature separation.",
+      "wall_state": "A lumped metal heat-capacity state is coupled to two fluid-side convection interfaces.",
+      "source_roles": ["ARCHITECTURE_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"]
+    },
+    "pychemqt": {
+      "bell_composition": "The Bell-Delaware path composes Jc, Jl, Jb, Js and Jr around shell-side properties and returns HTC plus pressure drop.",
+      "edge_handling": "Reynolds and sealing-strip branches are implemented, but their coefficients/defaults are library-specific.",
+      "source_roles": ["NUMERIC_CROSSCHECK_REFERENCE", "IMPLEMENTATION_PATTERN_REFERENCE"],
+      "reuse_boundary": "GPL-3.0 source; code reuse and authority promotion are forbidden."
+    }
+  },
+  "comparison_matrix": [
+    {"dimension": "local heat rate is input/unknown/output", "hxforge": "q_hc signed unknown; local duty derived/output", "idaes": "local heat variables constrained and solved", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "Q input or solved; Q_per_section post-solve output", "modelica_buildings": "element heat-port flows and aggregate Q outputs", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "wall temperature", "hxforge": "two surface unknowns", "idaes": "one distributed temperature_wall variable", "ht": "wall property/temperature helper input", "tespy": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "modelica_buildings": "lumped metal state plus fluid interfaces", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "one wall state or multiple wall/interface states", "hxforge": "two surfaces; explicit extra node only if required", "idaes": "one wall field in reviewed model", "ht": "bulk/wall property pair only", "tespy": "R_cond/UA; no explicit surface state established", "modelica_buildings": "one metal state with two fluid interfaces", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "bulk property state", "hxforge": "located TASK171 local state plus property authority", "idaes": "control-volume state blocks", "ht": "bulk property arguments", "tespy": "connection/network thermodynamic states", "modelica_buildings": "medium volume states", "pychemqt": "shell stream Liquido property object"},
+    {"dimension": "wall property state", "hxforge": "shell fluid/wall interface property owned by J_mu", "idaes": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "ht": "explicit wall property/temperature relation", "tespy": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "modelica_buildings": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "pychemqt": "NOT_ESTABLISHED_FOR_BELL_PATH"},
+    {"dimension": "pressure source", "hxforge": "located local shell pressure state", "idaes": "local control-volume state; wall-property pressure rule not established", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "connection pressure and pressure-ratio equations", "modelica_buildings": "fluid port/volume pressure state", "pychemqt": "stream/design pressure usages; no local mean rule"},
+    {"dimension": "hot/cold and equipment side separation", "hxforge": "explicit TASK171 role and s_ts", "idaes": "explicit hot/cold blocks and separate flow pattern", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "component side convention; no R85 identity contract", "modelica_buildings": "medium/port identity separate from flow direction", "pychemqt": "named tube/shell streams; no explicit hot/cold contract"},
+    {"dimension": "signed heat-rate semantics", "hxforge": "signed q_hc; no clamp; negative disposition unbound", "idaes": "signed hot/cold transfer equations; negative policy not established", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "hot-side Q convention and signed section accounting", "modelica_buildings": "connector heat-flow signs; role policy not established", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "section/cell identity", "hxforge": "physical-support keyed identity", "idaes": "length-domain discretization", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "configurable section boundaries and arrays", "modelica_buildings": "register/pipe/segment arrays", "pychemqt": "whole-equipment method"},
+    {"dimension": "local energy residual", "hxforge": "r_i, r_w, r_o", "idaes": "heat-transfer and heat-conservation constraints", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "network energy balance plus section heat reconstruction", "modelica_buildings": "equation system over fluid/metal components", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "wall conduction representation", "hxforge": "explicit r_w and R_wall", "idaes": "NOT_ESTABLISHED_AS_SEPARATE_TWO_SURFACE_EQUATION", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "R_cond in UA construction", "modelica_buildings": "metal heat-capacity/convection network", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "HTC coupling", "hxforge": "tube/shell HTC coupled to wall states and J_mu", "idaes": "local HTC variables coupled to wall constraints", "ht": "wall factor wraps a base correlation", "tespy": "alpha/UA and section equations", "modelica_buildings": "conductance inputs/functions coupled to element states", "pychemqt": "Bell composition returns shell HTC"},
+    {"dimension": "wall-property correction", "hxforge": "J_mu source-bound and still separate/open", "idaes": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "ht": "bulk/wall correction helper; crosscheck only", "tespy": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "modelica_buildings": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "pychemqt": "separate non-authoritative helper only"},
+    {"dimension": "initialization strategy", "hxforge": "future staged architecture; not implemented", "idaes": "temporary wall fix, constraint deactivation, solve, restore, full solve", "ht": "stateless helper; missing input rejects", "tespy": "network initialization plus design/offdesign staging", "modelica_buildings": "initial conditions and dynamic/steady modes", "pychemqt": "procedural input/method checks"},
+    {"dimension": "nonlinear-system organization", "hxforge": "3 primary unknowns/3 residuals; method unbound", "idaes": "block initialization then full model solve", "ht": "direct function evaluation", "tespy": "network residual solve with section post-processing", "modelica_buildings": "equation-based element network", "pychemqt": "procedural calculation path"},
+    {"dimension": "simultaneous vs staged solution", "hxforge": "staged initialization recommended; production solver unbound", "idaes": "staged initialization then full solve", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "network solve with design/offdesign staging", "modelica_buildings": "simultaneous equation model with initial modes", "pychemqt": "procedural staging"},
+    {"dimension": "DOF management", "hxforge": "explicit 3/3 model-level contract", "idaes": "fix/unfix and constraint activation", "ht": "argument validation only", "tespy": "network input/output modes", "modelica_buildings": "connector/equation balance and conditional dynamics", "pychemqt": "isCalculable/input checks"},
+    {"dimension": "residual scaling", "hxforge": "numerical profile open", "idaes": "explicit constraint scaling", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "modelica_buildings": "NOT_ESTABLISHED_AS_PROJECT_FIELD", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "convergence/stopping", "hxforge": "separate numerical profile/error-budget gate", "idaes": "solver termination checked", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "network convergence/status and assertion", "modelica_buildings": "simulation initialization/dynamics; HXForge criterion not established", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "iteration failure", "hxforge": "future fail-closed contract", "idaes": "InitializationError on non-optimal final solve", "ht": "TypeError/ValueError for invalid inputs", "tespy": "nonconvergence/invalid pinch status or NaN post-processing", "modelica_buildings": "runtime/translation semantics not established as receipt", "pychemqt": "input exceptions; closure policy not established"},
+    {"dimension": "zero flow", "hxforge": "future contract; no implementation", "idaes": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "NOT_ESTABLISHED_AS_ZERO-FLOW_WALL_POLICY", "modelica_buildings": "near-zero-flow diffusion conductors", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "reverse heat flow/flow reversal", "hxforge": "signed q; role immutable", "idaes": "flow pattern explicit; reverse heat policy not established", "ht": "heating/cooling relation from state values", "tespy": "hot/cold convention; reverse policy not established", "modelica_buildings": "allowFlowReversal without medium identity reassignment", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "mesh/section refinement", "hxforge": "mesh authority remains open", "idaes": "finite-element/collocation domain", "ht": "NOT_ESTABLISHED_FROM_REVIEWED_CODE", "tespy": "num_sections and section arrays", "modelica_buildings": "nPipSeg/register/element arrays", "pychemqt": "NOT_ESTABLISHED_FROM_REVIEWED_CODE"},
+    {"dimension": "tests/oracles", "hxforge": "governance evidence only in this gate", "idaes": "flow-pattern, initialization and failure tests", "ht": "reference values and missing-input tests", "tespy": "section alignment, heat-sum and pinch/failure tests", "modelica_buildings": "examples/equation-model structure", "pychemqt": "numerical Bell crosscheck path"},
+    {"dimension": "deterministic replay", "hxforge": "canonical identity/provenance required", "idaes": "NOT_ESTABLISHED_AS_HXFORGE_RECEIPT", "ht": "deterministic function inputs", "tespy": "state save/replay pattern in examples", "modelica_buildings": "parameterized equation model; receipt not established", "pychemqt": "procedural input path; receipt not established"}
+  ],
+  "explicit_questions": {
+    "q1_local_q": {
+      "finding": "SUPPORTED_BY_REFERENCE_ARCHITECTURES",
+      "external_q_required_for_native_local_wall_closure": false,
+      "basis": ["IDAES temporary initialization duty/wall path", "TESPy solved section Q and separately constrained Q mode", "Modelica element heat-port outputs"],
+      "authority_effect": "R84 local-Q dependency correction preserved; no external Q receipt created."
+    },
+    "q2_wall_temperature": {
+      "finding": "EXPLICIT_WALL_STATE_SUPPORTED_SURFACE_MULTIPLICITY_PROJECT_SPECIFIC",
+      "two_surface_wall_state_recommendation": "PRESERVE_MINIMAL_TWO_SURFACE_STATE; ADD_EXPLICIT_INTERFACE_NODE_ONLY_IF_ADMITTED_CORRELATION_REQUIRES_IT",
+      "authority_effect": "R85A equations unchanged."
+    },
+    "q3_initialization": {
+      "architecture_support": "SUPPORTED",
+      "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+      "physical_source_authority": "NOT_GRANTED_BY_THIS_AUDIT"
+    },
+    "q4_jmu_initialization": {
+      "initialization_pattern_analogy": "SUPPORTED",
+      "jmu_zero_initial_value_physical_authority": false,
+      "jmu_zero_initial_value_execution_authorized": false,
+      "basis": "IDAES temporary wall/constraint simplification is analogous, but no reviewed external source establishes HXForge J_mu^(0)=1."
+    },
+    "q5_solver_form": {
+      "recommended_review": "BLOCK_INITIALIZATION_THEN_SIMULTANEOUS_VECTOR_NONLINEAR_REVIEW",
+      "scalar_reduction_recommended": "UNDETERMINED",
+      "vector_nonlinear_review_recommended": true,
+      "production_solver_selected": false,
+      "tolerances_or_iteration_limits_selected": false
+    },
+    "q6_signed_heat_semantics": {
+      "finding": "EXTERNAL_SIGN_CONVENTIONS_EXIST_BUT_DO_NOT_OVERRIDE_R85_R85A",
+      "q_hc_signed_unknown_preserved": true,
+      "q_hc_nonnegative_clamp_forbidden": true,
+      "hot_cold_role_reassignment_during_local_iteration": false,
+      "negative_q_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY"
+    }
+  },
+  "recommendation_layer": {
+    "adoptable_architecture_pattern": [
+      "STAGED_INITIALIZATION_WITH_TEMPORARY_CONSTRAINT_SIMPLIFICATION_AND_FULL_RESTORE",
+      "EXPLICIT_WALL_OR_INTERFACE_STATE_VARIABLES",
+      "PHYSICAL_SUPPORT_KEYED_SECTION_LOCAL_STATE_AND_RESULTS",
+      "EXPLICIT_DOF_ACCOUNTING_AND_CONSTRAINT_ACTIVATION_BOUNDARIES",
+      "RESIDUAL_SCALING_OR_CONDITIONING_REVIEW",
+      "FAIL_BEFORE_PARTIAL_SUCCESS",
+      "FLOW_DIRECTION_AND_EQUIPMENT_IDENTITY_SEPARATE_FROM_HOT_COLD_ROLE_IDENTITY"
+    ],
+    "numerical_or_test_crosscheck_only": [
+      "BELL_CORRECTION_REFERENCE_VALUES_FROM_HT_AND_PYCHEMQT",
+      "WALL_FACTOR_MISSING_INPUT_FAILURE_TESTS_FROM_HT",
+      "TESPY_SECTION_PROFILE_AND_HEAT_SUM_TESTS",
+      "IDAES_INITIALIZATION_AND_FLOW_PATTERN_TESTS",
+      "TESPY_PINCH_OR_NONCONVERGENCE_FAILURE_TESTS"
+    ],
+    "do_not_import_as_authority": [
+      "EXTERNAL_FORMULAS",
+      "EMPIRICAL_COEFFICIENTS_AND_EXPONENTS",
+      "LIBRARY_DEFAULTS_AND_CLIPPING_RULES",
+      "SOLVER_DEFAULTS_TOLERANCES_RELAXATION_AND_ITERATION_LIMITS",
+      "SECTION_COUNTS_OR_REFINEMENT_RULES",
+      "PRESSURE_CONVENTIONS",
+      "MODEL-SPECIFIC_MEDIUM_ASSUMPTIONS",
+      "PYCHEMQT_GPL_CODE"
+    ]
+  },
+  "recommendations": {
+    "task172_recommended_local_solver_architecture": "BLOCK_INITIALIZATION_THEN_SIMULTANEOUS_VECTOR_NONLINEAR_REVIEW",
+    "task172_recommended_initialization_architecture": "STAGED_INITIALIZATION_WITH_TEMPORARY_SIMPLIFICATION_AND_FULL_EQUATION_RESTORE",
+    "task172_recommended_wall_state_architecture": "TWO_SURFACE_WALL_STATE_PRESERVED_INTERFACE_NODES_ONLY_IF_REQUIRED",
+    "task172_recommended_section_state_architecture": "PHYSICAL_SUPPORT_KEYED_LOCAL_STATE_WITH_EXPLICIT_SECTION_IDENTITY",
+    "scalar_reduction_recommended_for_next_gate": "UNDETERMINED",
+    "vector_nonlinear_review_recommended": true,
+    "staged_initialization_recommended": true,
+    "external_q_dependency_correction_supported_by_reference_architectures": true,
+    "real_case_as_model_prerequisite_supported_by_reference_architectures": "NOT_AS_MODEL_LEVEL_PREREQUISITE",
+    "next_minimal_gate": "AUTHORIZE_TASK172_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1_ONLY"
+  },
+  "preserved_r85_r85a_state": {
+    "q_hc_is_signed_unknown": true,
+    "q_hc_positive_means_hot_to_cold": true,
+    "q_hc_zero_meaning": "ZERO_LOCAL_HEAT_TRANSFER",
+    "q_hc_negative_allowed_at_model_level": true,
+    "q_hc_negative_disposition": "UNBOUND_PENDING_APPLICABILITY_AND_FAILURE_POLICY",
+    "absolute_heat_rate_substitution_forbidden": true,
+    "q_hc_nonnegative_clamp_forbidden": true,
+    "hot_cold_role_is_explicit_task171_identity": true,
+    "hot_cold_role_reassignment_during_local_iteration": false,
+    "s_ts_allowed_values": [1, -1],
+    "q_ts_relation": "q_ts=s_ts*q_hc",
+    "unknown_set": ["q_hc", "T_wall_inner", "T_wall_outer"],
+    "unknown_count": 3,
+    "residual_set": ["r_i", "r_w", "r_o"],
+    "equation_count": 3,
+    "jmu_shell_side_interface_ownership_preserved": true,
+    "external_q_required_for_native_local_wall_closure": false,
+    "real_case_required_for_model_level_task172_closure": false,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE"
+  },
+  "blocker_state": {
+    "blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false,
+    "blockers_closed_by_this_audit": []
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "external_code_vendored": false,
+    "task172_implementation_started": false,
+    "physical_authority_promoted_from_open_source": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "validation": {
+    "external_repository_identity": "PASS",
+    "external_commit_pin": "PASS",
+    "external_file_identity": "PASS",
+    "license_classification": "PASS",
+    "idaes_architecture_review": "PASS",
+    "ht_reference_review": "PASS",
+    "tespy_architecture_review": "PASS",
+    "modelica_architecture_review": "PASS",
+    "pychemqt_crosscheck_review": "PASS",
+    "physical_authority_separation": "PASS",
+    "no_direct_code_import": "PASS",
+    "no_dependency_change": "PASS",
+    "comparison_matrix_complete": "PASS",
+    "hxforge_ownership_preserved": "PASS",
+    "r85_r85a_semantics_preserved": "PASS",
+    "r1_r86_immutability": "PASS",
+    "json_parse": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-open-source-reference-architecture-audit-r1.md",
+    "document_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_path": "docs/tasks/evidence/TASK-172-open-source-reference-architecture-audit-r1.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r87_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "decision": {
+    "result": "COMPLETED_OPEN_SOURCE_ARCHITECTURE_AUDIT",
+    "idaes_reviewed": true,
+    "ht_reviewed": true,
+    "tespy_reviewed": true,
+    "modelica_buildings_reviewed": true,
+    "pychemqt_reviewed": true,
+    "license_classification_complete": true,
+    "physical_authority_promoted_from_open_source": false,
+    "next_gate": "AUTHORIZE_TASK172_LOCAL_CONSTITUTIVE_NUMERICAL_METHOD_AND_FAILURE_CONTRACT_R1_ONLY",
+    "stop": true
+  },
+  "canonical_hash": "7613b2a5622d117222f46124c9d7afcc63e313bb259d8956f7871c9badabda5f"
+}

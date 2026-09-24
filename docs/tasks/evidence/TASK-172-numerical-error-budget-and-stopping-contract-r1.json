@@ -1,0 +1,346 @@
+{
+  "schema_version": "task172.numerical-error-budget-stopping-contract.r1",
+  "task_id": "TASK172_V0_7_NUMERICAL_ERROR_BUDGET_AND_STOPPING_CONTRACT_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "42a35271b791188da8215f79d044c492b6cff675",
+  "mode": "MODEL_LEVEL_CONTRACT_CONSTRUCTION_ONLY",
+  "authority_id": "V07-T172-NUMERICAL-ERROR-BUDGET-STOPPING-CONTRACT-R1",
+  "result": "RESOLVED",
+  "outcome": "OUTCOME_A_MODEL_LEVEL_ERROR_BUDGET_AND_STOPPING_CONTRACT_COMPLETE_QUANTITATIVE_ALLOCATION_UNBOUND",
+  "reviewed_framework": {
+    "numerical_profile_authority_id": "V07-T172-NUMERICAL-PROFILE-R1",
+    "effective_status": "REVIEWED_MODEL_LEVEL_FRAMEWORK",
+    "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+    "l2b_method_status": "METHOD_UNBOUND",
+    "l3_branch_status": "PAUSED_PENDING_DIRECT_LOCAL_STATE_PRODUCER_AUTHORITY_OR_RECONSTRUCTION_OPERATOR_AUTHORITY",
+    "l3_method_status": "METHOD_UNBOUND",
+    "local_residual_and_method_qualification": "OPEN",
+    "mesh_convergence_qualification": "OPEN"
+  },
+  "error_taxonomy": {
+    "bound": true,
+    "components": [
+      "REFERENCE_DATA_ERROR",
+      "PROPERTY_FORMULATION_ERROR",
+      "CORRELATION_MODEL_FORM_ERROR",
+      "DISCRETIZATION_ERROR",
+      "ITERATION_ROOT_ERROR",
+      "SERIALIZATION_QUANTIZATION_ERROR"
+    ],
+    "component_schema_bound": true,
+    "required_component_fields": [
+      "ERROR_COMPONENT_ID",
+      "ERROR_COMPONENT_CLASS",
+      "OWNER",
+      "PHYSICAL_OR_NUMERICAL",
+      "SYSTEMATIC_OR_STOCHASTIC_STATUS",
+      "OBSERVABLES_AFFECTED",
+      "SOURCE_AUTHORITY",
+      "DOMAIN",
+      "ESTIMATION_METHOD_STATUS",
+      "COMBINATION_ELIGIBILITY",
+      "LIFECYCLE_STATUS"
+    ],
+    "component_semantics": {
+      "REFERENCE_DATA_ERROR": {
+        "contract_bound": true,
+        "automatically_random": false,
+        "automatic_rss_eligible": false,
+        "quantification": "UNBOUND"
+      },
+      "PROPERTY_FORMULATION_ERROR": {
+        "contract_bound": true,
+        "property_model_uncertainty_equals_solver_tolerance": false,
+        "property_backend_reproduction_tolerance_reusable_as_root_tolerance": false,
+        "quantification": "UNBOUND"
+      },
+      "CORRELATION_MODEL_FORM_ERROR": {
+        "contract_bound": true,
+        "automatic_rss_eligible": false,
+        "correlation_domain_uncertainty_reusable_as_iteration_tolerance": false,
+        "quantification": "UNBOUND"
+      },
+      "DISCRETIZATION_ERROR": {
+        "contract_bound": true,
+        "estimator_bound": false,
+        "delegated_to_mesh_qualification": true,
+        "quantification": "UNBOUND"
+      },
+      "ITERATION_ROOT_ERROR": {
+        "contract_bound": true,
+        "actual_iteration_root_error_quantified": false,
+        "quantification": "UNBOUND_UNTIL_METHOD_AND_SENSITIVITY_REVIEWED"
+      },
+      "SERIALIZATION_QUANTIZATION_ERROR": {
+        "contract_bound": true,
+        "display_rounding_equals_internal_numerical_error": false,
+        "canonical_serialization_precision_automatically_engineering_acceptable": false,
+        "quantification": "UNBOUND"
+      }
+    }
+  },
+  "combination_policy": {
+    "contract_bound": true,
+    "automatic_root_sum_square_allowed": false,
+    "automatic_linear_sum_allowed": false,
+    "automatic_worst_case_max_allowed": false,
+    "quantitative_numerical_error_budget_bound": false,
+    "combined_numerical_error_budget_bound": false,
+    "future_rule_required_fields": [
+      "component_definitions",
+      "units",
+      "statistical_or_systematic_interpretation",
+      "dependency_and_correlation_assumptions",
+      "observable",
+      "sensitivity_or_propagation_method",
+      "domain"
+    ],
+    "numerical_error_must_not_dominate_accepted_engineering_uncertainty": true,
+    "engineering_acceptance_budget_actual_value_bound": false,
+    "numerical_error_allocation_actual_value_bound": false
+  },
+  "stopping_policy": {
+    "residual_specific": true,
+    "generic_single_stopping_error_metric_allowed": false,
+    "admission_predicate_schema_bound": true,
+    "required_predicates": [
+      "RESIDUAL_IDENTITY_VALID",
+      "STATE_IDENTITY_VALID",
+      "ALL_REQUIRED_INPUT_AUTHORITIES_VALID",
+      "FINITE_VALUES",
+      "DOMAIN_SAFE",
+      "METHOD_STATUS_VALID",
+      "RESIDUAL_CRITERION_SATISFIED",
+      "STATE_UPDATE_CRITERION_IF_REQUIRED",
+      "ENERGY_CLOSURE_CRITERION_IF_REQUIRED",
+      "PROPERTY_COUPLING_CRITERION_IF_REQUIRED",
+      "MESH_STATUS_IF_REQUIRED",
+      "NO_FAILURE_CLASS_ACTIVE"
+    ],
+    "converged_local_iteration_equals_engineering_acceptance": false,
+    "zero_bookkeeping_residual_equals_physical_closure": false,
+    "separate_status_model_preserved": true,
+    "separate_statuses": [
+      "WALL_ITERATION_STATUS",
+      "PROPERTY_COUPLING_STATUS",
+      "MESH_CONVERGENCE_STATUS",
+      "ENERGY_CLOSURE_STATUS"
+    ],
+    "zero_duty_stopping_policy_required": true,
+    "zero_duty_stopping_policy_bound": false,
+    "executable_stopping_policy_bound": false,
+    "dependency_graph_bound": true,
+    "dependency_graph": [
+      "actual_residual_identity",
+      "actual_method",
+      "valid_domain",
+      "error_budget_allocation",
+      "residual_specific_tolerance",
+      "state_and_status_rules",
+      "executable_stopping_policy"
+    ]
+  },
+  "tolerance_and_resource_contract": {
+    "tolerance_class_schema_bound": true,
+    "tolerance_classes": [
+      "LOCAL_HEAT_RATE_RESIDUAL_TOLERANCE",
+      "WALL_TEMPERATURE_RESIDUAL_TOLERANCE",
+      "PROPERTY_COUPLING_TOLERANCE",
+      "ENERGY_CLOSURE_TOLERANCE",
+      "ROOT_INTERVAL_OR_STATE_TOLERANCE_IF_METHOD_REQUIRES"
+    ],
+    "absolute_relative_policy_schema_bound": true,
+    "tolerance_values_bound": false,
+    "local_residual_tolerance_bound": false,
+    "property_coupling_tolerance_bound": false,
+    "wall_temperature_tolerance_bound": false,
+    "energy_closure_tolerance_bound": false,
+    "root_interval_tolerance_bound": false,
+    "future_tolerance_fields": [
+      "absolute_or_relative_criterion",
+      "reference_scale",
+      "zero_or_near_zero_behavior",
+      "units"
+    ],
+    "resource_cap_policy_contract_bound": true,
+    "max_iter_bound": false,
+    "max_mesh_refinement_bound": false,
+    "max_iter_is_convergence_proof": false,
+    "max_mesh_is_mesh_adequacy_proof": false,
+    "resource_cap_reached_without_convergence": "NOT_CONVERGED_BLOCKED",
+    "stagnation_detection_contract_schema_bound": true,
+    "stagnation_required_fields": [
+      "history_window",
+      "progress_metric",
+      "residual_or_state_quantity",
+      "threshold",
+      "minimum_history_length"
+    ],
+    "stagnation_window_bound": false,
+    "stagnation_progress_metric_bound": false,
+    "stagnation_threshold_bound": false,
+    "oscillation_detection_contract_schema_bound": true,
+    "oscillation_required_fields": [
+      "history_definition",
+      "oscillation_observable",
+      "sign_direction_period_interpretation",
+      "detection_threshold"
+    ],
+    "oscillation_window_bound": false,
+    "oscillation_threshold_bound": false,
+    "under_relaxation_status": "NOT_SELECTED",
+    "relaxation_factor_bound": false,
+    "last_iterate_accepted_as_valid_result": false,
+    "last_iterate_available_for_diagnostics": true,
+    "library_default_numerical_tolerance_promoted": false,
+    "library_default_max_iter_promoted": false,
+    "library_default_stopping_policy_promoted": false
+  },
+  "failure_taxonomy": {
+    "bound": true,
+    "classes": [
+      "NONFINITE",
+      "INVALID_PROPERTY_STATE",
+      "DOMAIN_EXCURSION",
+      "NO_BRACKET",
+      "SURFACE_INCONSISTENCY",
+      "STAGNATION",
+      "OSCILLATION",
+      "RESOURCE_EXHAUSTION",
+      "NOT_CONVERGED"
+    ],
+    "thresholds_bound": false,
+    "diagnostic_exit_is_success": false
+  },
+  "historical_threshold_inventory": {
+    "bound": true,
+    "transfer_authority_bound": false,
+    "entries": [
+      {
+        "source": "TASK-170-v0.7-scope-source-golden-freeze / TASK-169 v0.6 acceptance ledger",
+        "observed_items": ["energy/global duty relative ceiling 0.001", "published shell h/DP comparison ceiling 0.02", "direct published equation reproduction ceiling 0.005"],
+        "classification": "LEGACY_ACCEPTANCE_ONLY_OR_SOURCE_SPECIFIC",
+        "task172_transfer": "NOT_AUTHORIZED"
+      },
+      {
+        "source": "TASK-170 v0.7 tolerance authority section",
+        "observed_items": ["wall iteration, segment duty closure, outlet temperature, rating-duty values UNBOUND", "exact replay/hard constraints/Python parity"],
+        "classification": "POTENTIALLY_TRANSFERABLE_WITH_REVIEW_OR_LEGACY_ACCEPTANCE_ONLY",
+        "task172_transfer": "NO_VALUE_TRANSFERRED"
+      },
+      {
+        "source": "TASK-171 v0.7 topology engine",
+        "observed_items": ["bounded record/depth/string resource limits", "exact Decimal bookkeeping without epsilon"],
+        "classification": "RESOURCE_LIMIT_ONLY_OR_UNRELATED_METHOD",
+        "task172_transfer": "NOT_MESH_OR_STOPPING_AUTHORITY"
+      },
+      {
+        "source": "TASK-166 Bell-Delaware model",
+        "observed_items": ["correlation branch boundaries", "exact uniform-spacing Js=1 branch", "TASK166_TOLERANCE_CHANGE=false"],
+        "classification": "SOURCE_SPECIFIC",
+        "task172_transfer": "NOT_NUMERICAL_STOPPING_AUTHORITY"
+      },
+      {
+        "source": "TASK-037 and TASK-025 geometry/area authority",
+        "observed_items": ["1E-10 m2 area quantum", "ROUND_HALF_EVEN", "producer precision threshold not defined"],
+        "classification": "SOURCE_SPECIFIC",
+        "task172_transfer": "NOT_ROOT_TOLERANCE"
+      },
+      {
+        "source": "TASK-160/161/162 v0.6 closure authority",
+        "observed_items": ["TOLERANCE_CHANGE=false", "no new energy-balance tolerance"],
+        "classification": "UNRELATED_METHOD",
+        "task172_transfer": "NOT_AUTHORIZED"
+      },
+      {
+        "source": "TASK-009/TASK-010 legacy solver material",
+        "observed_items": ["1e-3 W absolute", "1e-8 relative", "1e-4 K bracket temperature", "MAX_ITER=100"],
+        "classification": "UNRELATED_METHOD",
+        "task172_transfer": "NOT_AUTHORIZED"
+      },
+      {
+        "source": "property backend implementations",
+        "observed_items": ["near-saturation and state-point reproduction tolerances"],
+        "classification": "SOURCE_SPECIFIC",
+        "task172_transfer": "NOT_ROOT_TOLERANCE"
+      }
+    ]
+  },
+  "preserved_downstream_state": {
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "numerical_error_budget_and_stopping_canonical_blocker_removed": false,
+    "mesh_convergence_qualification": "OPEN",
+    "mesh_convergence_rule_bound": false,
+    "mesh_refinement_sequence_bound": false,
+    "mesh_comparison_norm_bound": false,
+    "mesh_termination_threshold_bound": false,
+    "discretization_error_estimator_bound": false,
+    "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+    "l2b_method_status": "METHOD_UNBOUND",
+    "l3_branch_status": "PAUSED_PENDING_DIRECT_LOCAL_STATE_PRODUCER_AUTHORITY_OR_RECONSTRUCTION_OPERATOR_AUTHORITY",
+    "l3_method_status": "METHOD_UNBOUND",
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "source_mean_bulk_state_producer_contract_bound": false,
+    "source_mean_bulk_temperature_producer_bound": false,
+    "jmu_bulk_temperature_aggregation_rule_bound": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "production_numerical_method_authorized": false,
+    "task172_numerical_execution_authorized": false
+  },
+  "candidate_lifecycle": {
+    "candidate_created": true,
+    "authority_id": "V07-T172-NUMERICAL-ERROR-BUDGET-STOPPING-CONTRACT-R1",
+    "lifecycle": "PROPOSED_AUTHORITY",
+    "independent_review": "PENDING",
+    "new_authority_self_approval": false
+  },
+  "entry_blockers": {
+    "effective_remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "append_only_registry_extension": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "property_backend_called": false,
+    "tolerance_selected": false,
+    "solver_selected": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "decision": {
+    "result": "RESOLVED",
+    "outcome": "OUTCOME_A_MODEL_LEVEL_ERROR_BUDGET_AND_STOPPING_CONTRACT_COMPLETE_QUANTITATIVE_ALLOCATION_UNBOUND",
+    "production_admission": "BLOCKED_FAIL_CLOSED",
+    "next_gate": "AUTHORIZE_TASK172_NUMERICAL_ERROR_BUDGET_STOPPING_CONTRACT_INDEPENDENT_REVIEW_R1_ONLY",
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-numerical-error-budget-and-stopping-contract-r1.md",
+    "document_sha256": "aefc12d3846ea8a52f40a3581afccf3eb5e721aac2828e41e90125527c61f442",
+    "evidence_path": "docs/tasks/evidence/TASK-172-numerical-error-budget-and-stopping-contract-r1.json",
+    "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r67_extension"
+  },
+  "canonical_hash": "3cac95c7daa8507c6057553472a5a07b6d7eecd09810c97e57bcdc3abe501814"
+}

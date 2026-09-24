@@ -1,0 +1,162 @@
+{
+  "schema_version": "task172.mesh-cell-scale-holdout.r1",
+  "task_id": "TASK172_V0_7_MESH_CELL_SCALE_HOLDOUT_INDEPENDENCE_CORRECTION_R96A",
+  "parent_task_id": "TASK172_V0_7_MESH_CELL_SCALE_NUMERICAL_ACCEPTANCE_EXTENSION_R1",
+  "holdout_id": "R96A-NON-DYADIC-INDEPENDENT-REVIEW-HOLDOUT",
+  "supersedes_holdout_path": "docs/tasks/evidence/TASK-172-mesh-cell-scale-numerical-acceptance-holdout-input-r1.json",
+  "original_holdout_canonical_hash": "9c0d41a78836a24b55d21ff76ccb88b1c83d3df291f310cb106e9c653463f60a",
+  "holdout_lifecycle": "FROZEN_NOT_EXECUTED",
+  "case_count": 5,
+  "scale_count": 6,
+  "expected_future_case_count": 30,
+  "case_parameters_are_engineering_authority": false,
+  "base_area_i_m2": 0.04,
+  "base_area_o_m2": 0.055,
+  "corrected_base_case_matrix_canonical_hash": "8bfa38ae0c28a047000782b2dc484ddf62797ccbf6d55faa1034f8ddc2fa06d0",
+  "duplicate_audit_canonical_hash": "a8a18e1003f4ed09ed198a5a0bee90247408d07e9d1e6215aec80679109c697a",
+  "selected_candidate_id": "P1_ACCEPTANCE_EXTENSION",
+  "selected_candidate_profile": {
+    "candidate_id": "P1_ACCEPTANCE_EXTENSION",
+    "method": "trf",
+    "loss": "linear",
+    "ftol": 1e-6,
+    "xtol": 1e-12,
+    "gtol": 1e-12,
+    "jacobian": "2-point",
+    "diff_step": 1e-5,
+    "x_scale": "INITIALIZATION_DERIVED",
+    "max_nfev": 6,
+    "residual_callback_cap": 24,
+    "residual_scale": "abs(q_ts_seed)",
+    "tr_solver": "exact",
+    "tr_options": {},
+    "f_scale": 1.0,
+    "jac_sparsity": null,
+    "c_round": 1.0
+  },
+  "selected_candidate_profile_canonical_hash": "029b641b796c2feb699fb1fcc70386de716b7ac820684e507a3a6c0dc0b1eeb6",
+  "property_profile": {
+    "backend": "HEOS",
+    "backend_version": "CoolProp 8.0.0",
+    "fluid": "PURE_ORDINARY_WATER",
+    "phase": "STABLE_SINGLE_PHASE_LIQUID",
+    "reference_state": "DEF",
+    "temperature_domain_K": [298.15, 300.0],
+    "pressure_domain_Pa": [100000, 101325],
+    "tube_c3_reynolds_domain_open": [3000, 5000000]
+  },
+  "scale_fractions_exact": [
+    "1/3",
+    "1/6",
+    "1/12",
+    "1/24",
+    "1/48",
+    "1/96"
+  ],
+  "future_cases": [
+    {
+      "case_id": "K01",
+      "case_class": "DUAL_ACTIVE_TUBE_HOT",
+      "tube_bulk_K": 299.7,
+      "shell_bulk_K": 298.7,
+      "s_ts": 1,
+      "pressure_Pa": 101325,
+      "reynolds": 25000,
+      "total_resistance_base_K_W": "0.060",
+      "resistance_fractions": {
+        "tube_film": "0.70",
+        "wall": "0.20",
+        "shell_film": "0.10"
+      },
+      "tube_c3_active": true,
+      "shell_jmu_active": true,
+      "classification": "NUMERICAL_METHOD_FIXTURE_ONLY_NOT_ENGINEERING_AUTHORITY"
+    },
+    {
+      "case_id": "K02",
+      "case_class": "DUAL_ACTIVE_SHELL_HOT",
+      "tube_bulk_K": 298.7,
+      "shell_bulk_K": 299.7,
+      "s_ts": -1,
+      "pressure_Pa": 100000,
+      "reynolds": 75000,
+      "total_resistance_base_K_W": "0.055",
+      "resistance_fractions": {
+        "tube_film": "0.10",
+        "wall": "0.20",
+        "shell_film": "0.70"
+      },
+      "tube_c3_active": true,
+      "shell_jmu_active": true,
+      "classification": "NUMERICAL_METHOD_FIXTURE_ONLY_NOT_ENGINEERING_AUTHORITY"
+    },
+    {
+      "case_id": "K03",
+      "case_class": "DUAL_ACTIVE_NEAR_ZERO",
+      "tube_bulk_K": 299.6004,
+      "shell_bulk_K": 299.6,
+      "s_ts": 1,
+      "pressure_Pa": 101325,
+      "reynolds": 30000,
+      "total_resistance_base_K_W": "0.078",
+      "resistance_fractions": {
+        "tube_film": "0.20",
+        "wall": "0.60",
+        "shell_film": "0.20"
+      },
+      "tube_c3_active": true,
+      "shell_jmu_active": true,
+      "classification": "NUMERICAL_METHOD_FIXTURE_ONLY_NOT_ENGINEERING_AUTHORITY"
+    },
+    {
+      "case_id": "K04",
+      "case_class": "TUBE_C3_ONLY",
+      "tube_bulk_K": 299.58,
+      "shell_bulk_K": 298.92,
+      "s_ts": 1,
+      "pressure_Pa": 101325,
+      "reynolds": 8500,
+      "total_resistance_base_K_W": "0.064",
+      "resistance_fractions": {
+        "tube_film": "0.22",
+        "wall": "0.18",
+        "shell_film": "0.60"
+      },
+      "tube_c3_active": true,
+      "shell_jmu_active": false,
+      "classification": "NUMERICAL_METHOD_FIXTURE_ONLY_NOT_ENGINEERING_AUTHORITY"
+    },
+    {
+      "case_id": "K05",
+      "case_class": "DUAL_ACTIVE_NEGATIVE_Q",
+      "tube_bulk_K": 298.68,
+      "shell_bulk_K": 299.72,
+      "s_ts": 1,
+      "pressure_Pa": 100000,
+      "reynolds": 220000,
+      "total_resistance_base_K_W": "0.062",
+      "resistance_fractions": {
+        "tube_film": "0.48",
+        "wall": "0.32",
+        "shell_film": "0.20"
+      },
+      "tube_c3_active": true,
+      "shell_jmu_active": true,
+      "classification": "NUMERICAL_METHOD_FIXTURE_ONLY_NOT_ENGINEERING_AUTHORITY"
+    }
+  ],
+  "duplicate_audit_reference": {
+    "prior_case_sets": ["R94_H01_H08", "R95_M01_M06"],
+    "numeric_normalization": "Decimal value equality; resistance fractions compared by named role, independent of key order or string formatting",
+    "r95_temperature_identity": "Full support-dependent profile function identity; not a sampled midpoint scalar",
+    "corrected_cases_have_exact_prior_base_parameter_duplicate": false
+  },
+  "execution_controls": {
+    "holdout_lifecycle": "FROZEN_NOT_EXECUTED",
+    "holdout_executed": false,
+    "property_backend_called_for_holdout": false,
+    "solver_called_for_holdout": false,
+    "independent_review_required_before_execution": true
+  },
+  "canonical_hash": "5efc368eedee738d507fbf15bf592539d4c68b8017b4d254b6cc4c27ccfbd3e0"
+}

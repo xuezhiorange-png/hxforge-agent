@@ -1,0 +1,392 @@
+{
+  "schema_version": "task172.local-constitutive-closure-architecture-correction.r1",
+  "task_id": "TASK172_V0_7_LOCAL_CONSTITUTIVE_CLOSURE_ARCHITECTURE_CORRECTION_R1",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "branch": "docs/v0-7-task172-entry-authority",
+  "previous_head_sha": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+  "mode": "MODEL_LEVEL_LOCAL_CONSTITUTIVE_ARCHITECTURE_CORRECTION_ONLY",
+  "head_precondition": {
+    "expected_head_sha": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+    "verified_head_sha": "70dbbe1f0883b88aee415d8e48526201d40ff903",
+    "verified": true,
+    "pr_state": "OPEN_DRAFT",
+    "rebase_performed": false,
+    "reset_performed": false,
+    "force_push_performed": false
+  },
+  "scope": {
+    "task170_ownership_replayed": true,
+    "task171_interface_replayed": true,
+    "historical_source_research_reopened": false,
+    "real_case_discovery_performed": false,
+    "real_case_created": false,
+    "property_backend_called": false,
+    "jmu_executed": false,
+    "wall_solve_executed": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "production_implementation_performed": false
+  },
+  "historical_immutability": {
+    "r1_through_r83_documents_unchanged": true,
+    "r1_through_r83_evidence_unchanged": true,
+    "r1_through_r83_extensions_rewritten": false,
+    "r83_real_case_finding_preserved": true,
+    "historical_payloads_immutable": true
+  },
+  "ownership_replay": {
+    "task170_task172_owner_replay": "PASS",
+    "task173_boundary_preserved": true,
+    "task174_boundary_preserved": true,
+    "task175_boundary_preserved": true,
+    "evidence": [
+      {
+        "authority": "TASK170_V0_7_SCOPE_SOURCE_GOLDEN_FREEZE",
+        "path": "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md",
+        "document_sha256": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0",
+        "exact_location": "§9 segmented state and conservation; §10 property authority; §11 wall-temperature and viscosity authority; §12 convergence; §22 TASK171-TASK175 roadmap",
+        "observed": "TASK172=PROPERTY_WALL_AND_CONVERGENCE_CLOSURE; TASK173=FULL_RATING_AND_SIZING_SOLVER; TASK174=DETAILED_HYDRAULIC_AND_OPERABILITY_SCREENING; local duty and wall states are segmented outputs"
+      },
+      {
+        "authority": "TASK171_V0_7_SEGMENTED_THERMAL_STATE_TOPOLOGY_ENGINE",
+        "path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+        "document_sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+        "exact_location": "§Authority and scope; §Structural invariants; §Conservation and identity; §Verification and deferred work",
+        "observed": "TASK171 supplies explicit local topology/state/conservation interfaces, signed local wall heat-rate observations and local support identity, but not property, wall, pressure-loss or convergence solving"
+      }
+    ]
+  },
+  "dependency_correction": {
+    "external_q_required_for_native_local_wall_closure": false,
+    "local_constitutive_q_is_unknown_or_derived_output": true,
+    "historical_external_q_contract_remains_valid_for_external_q_input_mode": true,
+    "external_q_contract_is_not_required_for_native_local_constitutive_mode": true,
+    "real_case_required_for_model_level_task172_closure": false,
+    "real_case_required_for_production_replay_or_validation": true,
+    "real_case_required_for_task175_golden_release": true,
+    "whole_exchanger_mean_pressure_required_for_segment_local_jmu": false,
+    "local_property_pressure_is_state_input": true,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+    "task172_generates_hydraulic_pressure_field": false,
+    "jmu_bulk_pressure_rule_authority_missing_is_not_task172_local_model_blocker": true,
+    "preliminary_shell_film_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+    "preliminary_shell_film_is_not_permanent_physical_input": true,
+    "jmu_neutral_initialization_allowed": true,
+    "jmu_neutral_initialization_scope": "INITIALIZATION_CANDIDATE_ONLY",
+    "jmu_neutral_initialization_execution_authorized": false,
+    "jmu_equals_one_is_physical_production_correction": false,
+    "final_active_jmu_required": true,
+    "evidence": [
+      {
+        "authority": "V07-T172-EXTERNAL-SIGNED-Q-INPUT-AUTHORITY-CONTRACT-R3",
+        "path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-external-q-contract-review-receipt-r1.json",
+        "canonical_hash": "30c36f89b29c0c3540081120ff0a407a302c5f9ca1eba32f9ce0a044b9022119",
+        "exact_location": "external-Q contract review receipt §4, §5, §9 and §10",
+        "observed": "External Q is a separately scoped receipt mode; whole-exchanger Q cannot be silently localized; no Q instance is present"
+      },
+      {
+        "authority": "TASK170_SEGMENTED_STATE_OUTPUT_CONTRACT",
+        "path": "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md",
+        "document_sha256": "5fc00303e3a74a850b22f89a4c56bbad1b269f39d6a32e652b56b19402b22de0",
+        "exact_location": "§9 output fields and aggregate Q_total definition",
+        "observed": "local_heat_duty is a segment output and Q_total is the sum of accepted local duties"
+      },
+      {
+        "authority": "R83_REAL_CASE_INPUT_AUTHORITY_DISCOVERY",
+        "path": "docs/tasks/evidence/TASK-172-real-case-input-authority-discovery-and-bindability-audit-r1.json",
+        "canonical_hash": "29a913cafa9dd50f603aec254e31080ad8e07936ae54362f9eb790f79abe9185",
+        "exact_location": "case_identity_audit, dependency_matrix and external_input_requirements",
+        "observed": "No qualified real case was found; this is a case/replay finding and is not evidence that model-level closure cannot be defined"
+      }
+    ]
+  },
+  "local_constitutive_system": {
+    "runtime_granularity": "SEGMENT_LOCAL_CONSTITUTIVE_EVALUATION_STATE",
+    "input_set": [
+      "LOCATED_TUBE_BULK_STATE_TEMPERATURE_PRESSURE",
+      "LOCATED_SHELL_BULK_STATE_TEMPERATURE_PRESSURE",
+      "TUBE_MASS_FLOW_OR_LOCAL_HYDRAULIC_INPUTS_REQUIRED_BY_ADMITTED_TUBE_CORRELATION",
+      "SHELL_MASS_FLOW_OR_LOCAL_BELL_INPUTS_REQUIRED_BY_ADMITTED_SHELL_CORRELATION",
+      "TASK171_PHYSICAL_SUPPORT_AND_INTERVAL",
+      "EXPLICIT_LOCAL_GEOMETRY_AND_AREA_BASES",
+      "ADMITTED_WALL_MATERIAL_K_WALL_AND_FOULING_PROFILE",
+      "ADMITTED_TUBE_CORRELATION_PROFILE",
+      "ADMITTED_SHELL_BELL_PROFILE",
+      "ADMITTED_PROPERTY_PROFILE"
+    ],
+    "unknown_set": [
+      "q_local",
+      "T_wall_inner",
+      "T_wall_outer"
+    ],
+    "unknown_set_bound": true,
+    "residual_set": [
+      {
+        "id": "r_i",
+        "definition": "q_local - h_i(T_wall_inner, located_tube_state, admitted_tube_profile) * A_i * (T_tube_bulk - T_wall_inner)",
+        "unit": "W",
+        "role": "INNER_FILM_HEAT_TRANSFER"
+      },
+      {
+        "id": "r_w",
+        "definition": "q_local - (T_wall_inner - T_wall_outer) / R_wall",
+        "unit": "W",
+        "role": "WALL_CONDUCTION_AND_FOULING_NETWORK"
+      },
+      {
+        "id": "r_o",
+        "definition": "q_local - h_o(T_wall_outer, located_shell_state, admitted_shell_profile) * A_o * (T_wall_outer - T_shell_bulk)",
+        "unit": "W",
+        "role": "OUTER_FILM_HEAT_TRANSFER"
+      }
+    ],
+    "residual_set_bound": true,
+    "equation_count": 3,
+    "equation_count_bound": true,
+    "unknown_count": 3,
+    "unknown_count_bound": true,
+    "degrees_of_freedom_status": "CLOSED_MODEL_LEVEL_THREE_PRIMARY_UNKNOWNS_THREE_PRIMARY_RESIDUALS",
+    "signed_heat_event_semantics": "TASK171_POSITIVE_Q_HOT_TO_COLD",
+    "hot_cold_role_assumption": false,
+    "wall_surface_semantics": "T_wall_outer_is_explicit_shell_fluid_heat_transfer_surface_in_minimal_network;DISTINCT_INTERFACE_NODE_REQUIRED_IF_SOURCE_SEPARATES_METAL_AND_FLUID_SURFACES",
+    "derived_quantities": [
+      "MU_BULK_FROM_LOCATED_SHELL_PROPERTY_STATE",
+      "MU_WALL_FROM_EXPLICIT_WALL_INTERFACE_PROPERTY_STATE",
+      "J_MU_FROM_REVIEWED_PHYSICAL_RELATION_WHEN_TRANSFERRED",
+      "H_I",
+      "H_O",
+      "LOCAL_OVERALL_U",
+      "LOCAL_UA",
+      "LOCAL_HEAT_DUTY",
+      "LOCAL_ENERGY_RESIDUAL",
+      "LOCAL_CONVERGENCE_STATUS"
+    ],
+    "method_boundary": {
+      "scalar_reduction_bound": false,
+      "vector_method_review_required": true,
+      "method_status": "METHOD_UNBOUND",
+      "solver_selected": false,
+      "tolerances_selected": false,
+      "max_iter_selected": false,
+      "relaxation_factor_selected": false,
+      "stopping_policy_selected": false
+    }
+  },
+  "jmu_state_classification": {
+    "physical_form_observed": "J_mu=(mu_bulk/mu_wall)^m",
+    "physical_form_source_bound_as_observation": true,
+    "runtime_transfer_bound": false,
+    "whole_exchanger_source_mean_path_historically_valid": true,
+    "whole_exchanger_source_mean_path_selected_for_task172_runtime": false,
+    "local_property_pressure_source": "LOCATED_LOCAL_SHELL_PRESSURE_STATE",
+    "mean_pressure_rule_required_for_local_runtime": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "source_evidence": [
+      {
+        "authority": "TASK172_JMU_STATE_DOMAIN_TRANSFER_CONTRACT_R1",
+        "path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-state-domain-transfer-contract-r1.json",
+        "canonical_hash": "6e21d75890ce27a1f50c6b42e93086b7d0b7646e573768a36005ed14591486b6",
+        "exact_location": "jamil_source, thome_source, wall_state_and_producer, wall_coupling and jmu_domain_review",
+        "observed": "J_mu symbolic form and wall-viscosity coupling are observed, but local transfer, exponent/domain and wall-surface mapping remain unbound"
+      },
+      {
+        "authority": "TASK172_JMU_COEFFICIENT_LINEAGE_RESOLUTION_R1",
+        "path": "docs/tasks/evidence/TASK-172-shell-wall-correction-coefficient-lineage-resolution-r1.json",
+        "canonical_hash": "2b99eb5780a277078b99544de5fe94d42eb61cc10f17e033658de67ba491d06d",
+        "exact_location": "source_lineage.jamil_equation_locations and native_task166",
+        "observed": "J_mu is a separate source factor in the Jamil representation; no runtime local-state transfer is thereby created"
+      }
+    ],
+    "physical_authority_gaps_remaining": [
+      "JMU_EQUATION_TRANSFER_AUTHORITY",
+      "JMU_EXPONENT_AND_APPLICABILITY_TRANSFER",
+      "JMU_FLUID_AND_PROPERTY_DOMAIN_TRANSFER",
+      "WALL_INTERFACE_STATE_MAPPING",
+      "K_WALL_AUTHORITY",
+      "BASE_SHELL_FILM_AUTHORITY"
+    ]
+  },
+  "preliminary_shell_film_classification": {
+    "historical_source_rule_bound": false,
+    "effective_role": "NUMERICAL_INITIALIZATION_STATE_ONLY",
+    "permanent_physical_input": false,
+    "neutral_initialization_candidate": "JMU^(0)=1",
+    "neutral_initialization_allowed": true,
+    "neutral_initialization_execution_authorized": false,
+    "final_active_jmu_required": true,
+    "source_evidence": [
+      {
+        "authority": "TASK172_PRELIMINARY_FILM_AUTHORITY_R2",
+        "path": "docs/tasks/evidence/TASK-172-shell-wall-correction-jmu-preliminary-film-authority-r2.json",
+        "canonical_hash": "98cfe34bc30fe7725465c74c5024a86ea5c7ea76ca6d5e7a5dcd8d562aea7cd2",
+        "exact_location": "shell-side preliminary film candidate matrix and dependency graph",
+        "observed": "Source requires a preliminary heat-transfer calculation but does not select a permanent coefficient/correction set"
+      },
+      {
+        "authority": "TASK172_PRELIMINARY_TUBE_FILM_CASE_BRANCH_CLOSURE_R4",
+        "path": "docs/tasks/evidence/TASK-172-jmu-preliminary-tube-film-case-branch-role-and-support-transfer-closure-r4.json",
+        "canonical_hash": "d02894726ffa33034c99f4b230c3585e48f719e4fdd67bb1e0d99e5709f45ecb",
+        "exact_location": "decision summary and shell preliminary-film branch status",
+        "observed": "No TASK172 preliminary shell-film source branch or case transfer is selected"
+      }
+    ],
+    "preserved_physical_gap": "PRELIMINARY_SHELL_FILM_SOURCE_RULE_BOUND=false;PRELIMINARY_SHELL_FILM_TRANSFER_AUTHORITY_BOUND=false"
+  },
+  "real_case_and_instance_guards": {
+    "r83_no_qualified_real_case_finding_remains": true,
+    "real_task172_case_found": false,
+    "real_task172_case_required_for_model_level_closure": false,
+    "real_task172_case_required_for_replay_validation": true,
+    "real_task172_case_required_for_task175_release": true,
+    "real_external_q_receipt_created": false,
+    "qualified_q_authority_bound": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false,
+    "real_l3_direct_local_state_instance_present": false,
+    "real_l3_reconstructed_local_state_instance_present": false,
+    "real_task172_mesh_study_present": false
+  },
+  "entry_blocker_recomputation": {
+    "recomputed_from_ownership_and_required_authority": true,
+    "real_case_and_external_q_not_native_model_blockers": true,
+    "blockers": [
+      {
+        "id": "SHELL-WALL-CORRECTION-AUTHORITY",
+        "classification": "MODEL_DESIGN_ENTRY_BLOCKER",
+        "status": "OPEN",
+        "reason": "J_mu transfer/domain, wall-interface mapping, k_wall and shell-film authority remain incomplete; absence of external Q or real case is not the reason"
+      },
+      {
+        "id": "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+        "classification": "MODEL_DESIGN_AND_EXECUTION_ADMISSION_BLOCKER",
+        "status": "OPEN",
+        "reason": "Unknown/residual structure is bound, but method, domain/trial policy, tolerances and stopping remain unbound"
+      },
+      {
+        "id": "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+        "classification": "EXECUTION_ADMISSION_BLOCKER",
+        "status": "OPEN",
+        "reason": "Quantitative allocation and executable stopping policy remain unbound"
+      },
+      {
+        "id": "MESH-CONVERGENCE-QUALIFICATION",
+        "classification": "PRODUCTION_VALIDATION_RELEASE_BLOCKER",
+        "status": "OPEN",
+        "reason": "Actual sequence, comparison metric, threshold, mapping, estimator and evidence remain unbound"
+      }
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "remaining_gaps": {
+    "task172_model_level_gaps_remaining": [
+      "JMU_PHYSICAL_TRANSFER",
+      "WALL_INTERFACE_AND_K_WALL",
+      "BASE_SHELL_FILM",
+      "LOCAL_RESIDUAL_METHOD",
+      "QUANTITATIVE_NUMERICAL_ALLOCATION",
+      "MESH_QUALIFICATION"
+    ],
+    "task172_release_validation_gaps": [
+      "REAL_CASE_REPLAY",
+      "APPROVED_GOLDEN_RELEASE_FIXTURES",
+      "MESH_EVIDENCE",
+      "TASK173_INTEGRATION"
+    ],
+    "whole_exchanger_mean_pressure_rule_as_native_local_gap": false,
+    "external_q_receipt_as_native_local_gap": false
+  },
+  "preserved_predicate_state": {
+    "source_mean_temperature_predicate_satisfied": true,
+    "source_mean_pressure_predicate_satisfied": false,
+    "source_mean_endpoint_pair_predicate_satisfied": true,
+    "source_mean_property_authority_predicate_satisfied": true,
+    "source_mean_identity_provenance_predicate_satisfied": true,
+    "source_mean_fail_closed_predicate_satisfied": true,
+    "jmu_bulk_pressure_rule_authority_found": false,
+    "jmu_bulk_pressure_rule_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "local_residual_and_method_qualification": "OPEN",
+    "numerical_error_budget_and_stopping_review": "OPEN",
+    "mesh_convergence_qualification": "OPEN",
+    "production_numerical_method_authorized": false,
+    "task172_numerical_execution_authorized": false
+  },
+  "decision": {
+    "result": "CORRECTED_LOCAL_CONSTITUTIVE_ARCHITECTURE",
+    "outcome": "NATIVE_SEGMENT_LOCAL_CLOSURE_IS_MODEL_LEVEL_SELF_CONTAINED;REAL_CASE_EXTERNAL_Q_AND_WHOLE_EXCHANGER_MEAN_PRESSURE_ARE_NOT_NATIVE_LOCAL_PREREQUISITES",
+    "architecture_correction_recorded": true,
+    "physical_jmu_authority_promoted": false,
+    "pressure_rule_selected": false,
+    "external_q_instance_created": false,
+    "real_case_created": false,
+    "next_gate": "NONE_UNTIL_SEPARATELY_AUTHORIZED",
+    "stop": true
+  },
+  "validation": {
+    "task170_frozen_ownership_replay": "PASS",
+    "task171_interface_replay": "PASS",
+    "r1_r83_immutability": "PASS",
+    "q_direction_classification": "PASS",
+    "real_case_layer_classification": "PASS",
+    "local_vs_source_mean_state_classification": "PASS",
+    "pressure_ownership_classification": "PASS",
+    "preliminary_film_role_classification": "PASS",
+    "unknown_residual_dof_audit": "PASS",
+    "cross_task_owner_leakage": "PASS",
+    "json_parse": "PASS",
+    "canonical_hash": "PASS",
+    "artifact_linkage": "PASS",
+    "diff_allowlist": "PASS",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy": "PASS",
+    "manifest": "PASS",
+    "full_pytest": "NOT_RUN_DOCUMENTATION_ONLY",
+    "exact_final_head_ci": "PENDING_FINAL_HEAD_CI"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-local-constitutive-closure-architecture-correction-r1.md",
+    "document_sha256": "bb53aa76f57fb18e3fc867c9652462d15d22c3ffb7242829bb86c32037cfbf3d",
+    "evidence_path": "docs/tasks/evidence/TASK-172-local-constitutive-closure-architecture-correction-r1.json",
+    "evidence_file_sha256": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "evidence_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r84_extension",
+    "registry_extension_canonical_hash": "RECORDED_IN_APPEND_ONLY_REGISTRY",
+    "registry_root_canonical_hash": "RECORDED_IN_FINAL_REGISTRY",
+    "final_head_sha": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "numerical_experiment_performed": false,
+    "mesh_study_performed": false,
+    "task166_changed": false,
+    "task171_changed": false,
+    "task026_changed": false,
+    "pressure_source_researched": false,
+    "pressure_rule_selected": false,
+    "pressure_authority_created": false,
+    "real_case_created": false,
+    "external_q_receipt_created": false,
+    "property_snapshot_created": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "canonical_hash": "1f4668d99ba6c8b92ff1b74be941403e031d96624fb58099b9bb8f085107577c"
+}

@@ -1,0 +1,182 @@
+{
+  "schema_version": "task172.jmu-source-mean-contract-instance-and-dependency-semantics-correction.r2a",
+  "task_id": "TASK172_V0_7_JMU_SOURCE_MEAN_CONTRACT_INSTANCE_AND_DEPENDENCY_SEMANTICS_CORRECTION_R2A",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "previous_head_sha": "3701f1df08dc9a673944d76a6f0bfa7d477de60f",
+  "mode": "APPEND_ONLY_R71_SEMANTIC_CORRECTION_OVERLAY",
+  "result": "CORRECTED",
+  "historical_r71": {
+    "previous_r71_head": "3701f1df08dc9a673944d76a6f0bfa7d477de60f",
+    "r71_result": "BLOCKED",
+    "r71_outcome": "OUTCOME_B_TEMPERATURE_OPERATOR_BOUND_PRESSURE_RULE_UNRESOLVED",
+    "r71_original_document_changed": false,
+    "r71_original_evidence_changed": false,
+    "r71_extension_rewritten": false,
+    "historical_payloads_immutable": true,
+    "r71_extension_canonical_hash": "0d422248cd375bd752bd84d6aeed5cea6fbc458db40f4361aa5cb66312657008"
+  },
+  "accepted_temperature_operator": {
+    "source_mean_temperature_operator_authority_found": true,
+    "source_mean_temperature_operator": "(T_shell_in + T_shell_out) / 2; ARITHMETIC_MEAN",
+    "source_mean_temperature_operator_source_id": "ASME-PTC-12.5-2000-R2015-PUBLIC-COPY",
+    "source_mean_temperature_operator_transferable_to_task172_native_jmu": true,
+    "jmu_bulk_temperature_aggregation_rule_bound": true,
+    "source_mean_bulk_temperature_operator_contract_bound": true,
+    "transfer_broadened": false
+  },
+  "preserved_pressure_state": {
+    "jmu_bulk_pressure_rule_authority_found": false,
+    "jmu_bulk_pressure_rule": "NONE",
+    "jmu_bulk_pressure_rule_bound": false,
+    "pressure_insensitivity_authority_found": false,
+    "pressure_assumption_introduced": false
+  },
+  "endpoint_contract_instance_semantics": {
+    "pair_transfer_contract_status": "REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+    "source_mean_uses_reviewed_endpoint_pair_contract": true,
+    "real_endpoint_producer_required_for_model_level_source_mean_contract": false,
+    "real_endpoint_pair_required_for_model_level_source_mean_contract": false,
+    "real_endpoint_producer_required_for_real_source_mean_instance": true,
+    "real_endpoint_pair_required_for_real_source_mean_instance": true,
+    "model_contract_accepts_endpoint_contract_without_values": true
+  },
+  "blocking_layers": {
+    "source_mean_model_level_contract_primary_blocker": "JMU_BULK_PRESSURE_RULE_AUTHORITY_MISSING",
+    "source_mean_real_instance_additional_blockers": [
+      "REAL_REVIEWED_SHELL_INLET_PRODUCER_MISSING",
+      "REAL_REVIEWED_SHELL_OUTLET_PRODUCER_MISSING",
+      "REAL_ENDPOINT_PAIR_INSTANCE_MISSING"
+    ],
+    "model_and_real_instance_blockers_conflated": false
+  },
+  "real_instance_absence": {
+    "real_reviewed_shell_inlet_producer_found": false,
+    "real_reviewed_shell_outlet_producer_found": false,
+    "real_reviewed_shell_endpoint_pair_producer_found": false,
+    "real_shell_inlet_state_instance_present": false,
+    "real_shell_outlet_state_instance_present": false,
+    "real_shell_inlet_outlet_state_pair_bound": false,
+    "real_jmu_bulk_state_instance_present": false,
+    "real_jmu_bulk_property_snapshot_present": false
+  },
+  "dependency_semantics": {
+    "source_mean_temperature_operator_depends_on_jmu": false,
+    "source_mean_temperature_operator_depends_on_shell_film": false,
+    "source_mean_temperature_operator_depends_on_wall_state": false,
+    "source_mean_temperature_operator_depends_on_overall_u": false,
+    "source_mean_temperature_operator_depends_on_q": false,
+    "jmu_bulk_state_producer_depends_on_jmu": "undetermined",
+    "jmu_bulk_state_producer_depends_on_shell_film": "undetermined",
+    "jmu_bulk_state_producer_depends_on_wall_state": "undetermined",
+    "jmu_bulk_state_producer_depends_on_overall_u": "undetermined",
+    "jmu_bulk_state_producer_depends_on_q": "undetermined",
+    "source_mean_operator_dependency_distinct_from_endpoint_producer_dependency": true,
+    "upstream_endpoint_dependencies_propagate_to_source_mean_producer": true,
+    "unknown_upstream_dependency_may_not_be_recorded_as_false": true
+  },
+  "preserved_repository_findings": {
+    "task162_derived_outlet_present": true,
+    "task162_derived_outlet_depends_on_u": true,
+    "task162_derived_outlet_depends_on_tube_film": true,
+    "task162_derived_outlet_depends_on_shell_film": true,
+    "task162_derived_outlet_admissible_as_jmu_source_outlet": false,
+    "task160_to_jmu_shell_inlet_state_contract_compatible": true,
+    "task160_compatibility_scope": "CONDITIONAL_INLET_INPUT_ADAPTER_ONLY",
+    "task160_shell_inlet_state_producer_authority_bound": false,
+    "task032_existing_single_bulk_snapshot_is_inlet": false,
+    "task032_existing_single_bulk_snapshot_is_outlet": false,
+    "task032_existing_single_bulk_snapshot_is_source_mean": false,
+    "task171_thermodynamic_state_producer_bound": false
+  },
+  "candidate_and_instance_eligibility": {
+    "source_mean_bulk_state_producer_contract_bound": false,
+    "source_mean_bulk_state_authority_candidate_created": false,
+    "source_mean_bulk_state_authority_id": "NONE",
+    "source_mean_bulk_state_authority_lifecycle": "NONE",
+    "source_mean_bulk_state_independent_review": "NONE",
+    "source_mean_model_level_authority_candidate_eligibility_rule_bound": true,
+    "source_mean_model_level_authority_candidate_predicate": [
+      "SOURCE_MEAN_BULK_TEMPERATURE_OPERATOR_CONTRACT_BOUND=true",
+      "JMU_BULK_PRESSURE_RULE_BOUND=true",
+      "PAIR_TRANSFER_CONTRACT_STATUS=REVIEWED_JMU_SHELL_ENDPOINT_STATE_PAIR_CONTRACT",
+      "JMU_BULK_PROPERTY_AUTHORITY_CONTRACT_VALID=true",
+      "SOURCE_MEAN_IDENTITY_AND_PROVENANCE_SCHEMA_BOUND=true",
+      "SOURCE_MEAN_FAIL_CLOSED_ADMISSION_RULE_BOUND=true"
+    ],
+    "real_source_mean_instance_eligibility_rule_bound": true,
+    "real_source_mean_instance_additional_requirements": [
+      "REVIEWED_REAL_SHELL_INLET_PRODUCER",
+      "REVIEWED_REAL_SHELL_OUTLET_PRODUCER",
+      "CASE_BOUND_INLET_STATE",
+      "CASE_BOUND_OUTLET_STATE",
+      "REAL_ENDPOINT_PAIR_RECEIPT",
+      "ACTUAL_PRESSURE_STATE_AND_RULE_APPLICATION",
+      "ACTUAL_PROPERTY_SNAPSHOT",
+      "ADMITTED_PRODUCER_LIFECYCLE_AND_PROVENANCE"
+    ]
+  },
+  "granularity_and_boundaries": {
+    "jmu_source_bulk_state_granularity": "WHOLE_EXCHANGER_SHELL_STREAM_MEAN_OF_SOURCE_INLET_AND_OUTLET_BULK_STATE",
+    "whole_exchanger_source_state_localization_authorized": false,
+    "local_radial_wall_state_to_source_jmu_mapping_bound": false,
+    "wall_temperature_aggregation_rule_bound": false,
+    "qualified_q_authority_bound": false,
+    "preliminary_shell_film_source_rule_bound": false,
+    "preliminary_shell_film_transfer_authority_bound": false,
+    "wall_producer_k_wall_authority_bound": false,
+    "jmu_executable_authority_bound": false,
+    "shell_wall_correction_status": "BLOCKED",
+    "shell_wall_correction_canonical_blocker_removed": false
+  },
+  "preserved_numerical_branches": {
+    "l2b_branch_status": "PAUSED_PENDING_REQUIRED_PHYSICAL_AUTHORITY_CLOSURE",
+    "l2b_method_status": "METHOD_UNBOUND",
+    "l3_local_state_reconstruction_branch_status": "PAUSED_PENDING_DIRECT_LOCAL_STATE_PRODUCER_AUTHORITY_OR_RECONSTRUCTION_OPERATOR_AUTHORITY",
+    "l3_method_status": "METHOD_UNBOUND",
+    "numerical_error_budget_stopping_branch_status": "PAUSED_PENDING_ACTUAL_METHOD_SENSITIVITY_QUANTITATIVE_ERROR_ALLOCATION_AND_MESH_QUALIFICATION",
+    "mesh_convergence_branch_status": "PAUSED_PENDING_REAL_CASE_APPROVED_OBSERVABLES_MAPPING_METRIC_REFINEMENT_SEQUENCE_THRESHOLD_AND_ESTIMATOR"
+  },
+  "parent_blockers": {
+    "effective_remaining_task172_entry_blockers": [
+      "SHELL-WALL-CORRECTION-AUTHORITY",
+      "LOCAL-RESIDUAL-AND-METHOD-QUALIFICATION",
+      "NUMERICAL-ERROR-BUDGET-AND-STOPPING-REVIEW",
+      "MESH-CONVERGENCE-QUALIFICATION"
+    ],
+    "effective_remaining_task172_entry_blocker_count": 4,
+    "task172_entry_authority_complete": false
+  },
+  "governance": {
+    "documentation_evidence_only": true,
+    "append_only_correction_overlay": true,
+    "source_reacquired": false,
+    "pressure_rule_selected": false,
+    "endpoint_instance_created": false,
+    "property_calculation_performed": false,
+    "jmu_executed": false,
+    "wall_state_solved": false,
+    "production_code_changed": false,
+    "engineering_calculation_changed": false,
+    "dependency_changed": false,
+    "task172_implementation_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.md",
+    "document_sha256": "2be29f0fed768699e17e875555542854b6c406ae9632945f6db0ac54a0fc11ad",
+    "evidence_path": "docs/tasks/evidence/TASK-172-jmu-source-mean-contract-instance-and-dependency-semantics-correction-r2a.json",
+    "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
+    "registry_extension_key": "r72_extension"
+  },
+  "decision": {
+    "result": "CORRECTED",
+    "outcome": "MODEL_AND_REAL_INSTANCE_BLOCKERS_SEPARATED_PRESSURE_RULE_REMAINS_PRIMARY_MODEL_BLOCKER",
+    "production_admission": "BLOCKED_FAIL_CLOSED",
+    "next_gate": "AUTHORIZE_TASK172_JMU_BULK_PRESSURE_REFERENCE_CONVENTION_QUALIFICATION_R1_ONLY",
+    "stop": true
+  },
+  "canonical_hash": "81c11bc1819c9f138f9286b13202d74873589bd09ba9d074847fc0b4b709f821"
+}

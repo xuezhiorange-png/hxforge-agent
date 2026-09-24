@@ -1,0 +1,220 @@
+{
+  "schema_version": "hxforge.task172.real-case-mesh-admission-independent-review.r1",
+  "task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW_R1",
+  "review_target_task_id": "TASK172_V0_7_REAL_CASE_MESH_ADMISSION_CONTRACT_R1",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pr_number": 277,
+  "pr_state": "OPEN_DRAFT",
+  "authorized_predecessor_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+  "reviewed_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+  "r104_parent_head": "8703d17e88b9215b755d402bd4686d36f14ad673",
+  "r104_candidate_result_reproduced": true,
+  "r104_lifecycle_before_review": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "r104_hash_replay": {
+    "canonicalization_contract": "hexagent.canonical_json.canonical_sha256",
+    "document_file_sha256": {
+      "declared": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+      "recomputed": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+      "match": true
+    },
+    "evidence_file_sha256": {
+      "declared": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+      "recomputed": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+      "match": true
+    },
+    "evidence_canonical_hash": {
+      "declared": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d",
+      "recomputed": "2164dcfcdc585281238598d6bc271bbe015b72ce97fa5cc5326a888993457135",
+      "match": false
+    },
+    "transfer_matrix_file_sha256": {
+      "declared": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+      "recomputed": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+      "match": true
+    },
+    "transfer_matrix_canonical_hash": {
+      "declared": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+      "recomputed": "5b5e92f7346b22cd1de0e5c28caa0ef67e211df91febb70d3354f9ed3f94e14a",
+      "match": false
+    },
+    "r104_extension_canonical_hash": {
+      "declared": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d",
+      "recomputed": "e035372e976e1ede05482c30c59c0d8a3defd4c3bfc802c87321144ba3f1d8bc",
+      "match": false
+    },
+    "registry_root_canonical_hash": {
+      "declared": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887",
+      "recomputed": "00353f88e0c6c5aba94f2043403e41208014e769a05c8461ffada76169af41d7",
+      "match": false
+    },
+    "predecessor_registry_root_recomputed": "d1849d3f46b1d4c465a3ff3a2d86a3bfd8429f0120460c60b1f10c66a5ffd362"
+  },
+  "historical_boundary": {
+    "r1_r103_payloads_immutable": true,
+    "r1_r103_registry_extensions_rewritten": false,
+    "r104_payloads_unchanged_during_review": true,
+    "r104_registry_extension_rewritten": false,
+    "r104_was_append_only_at_predecessor": true
+  },
+  "r103_scope_review": {
+    "result": "PASS_MESH_CONVERGENCE_QUALIFICATION",
+    "lifecycle": "REVIEWED_AUTHORITY",
+    "scope": "FROZEN_SYNTHETIC_FIXTURE_PROFILE_ONLY",
+    "mesh_study_is_production_rating": false,
+    "real_case_created": false,
+    "production_cell_reconstruction_operator_created": false,
+    "independently_confirmed": true
+  },
+  "existing_reviewed_real_case_mesh_authority_search": {
+    "searched_independently": true,
+    "reviewed_real_case_production_mesh_authority_found": false,
+    "search_scope": [
+      "TASK170-TASK172 reviewed task documents and authority registry",
+      "R95-R103 mesh/reference evidence and registry entries",
+      "production source for mesh/profile/admission/selection rules",
+      "TASK171 topology, mapping, identity, and status implementation"
+    ]
+  },
+  "review_findings": [
+    {
+      "finding_id": "R104-HASH-01",
+      "severity": "HIGH",
+      "artifact": "R104 evidence, transfer matrix, r104_extension, authority registry",
+      "field_or_section": "canonical_hash / extension canonical_hash / registry canonical_hash",
+      "r104_claim": "R104 artifact and registry canonical hashes are valid under existing canonical JSON and are linked.",
+      "independent_finding": "Direct file SHA values match, but four canonical hashes differ from the shared hexagent.canonical_json.canonical_sha256 recomputation.",
+      "source_authority": "src/hexagent/canonical_json.py; TASK171 canonical JSON/SHA256 contract",
+      "required_correction": "Append-only correction must bind hashes recomputed with the shared project canonicalization; do not rewrite R104."
+    },
+    {
+      "finding_id": "R104-PREDICATE-02",
+      "severity": "HIGH",
+      "artifact": "R104 contract evidence and document production admission predicate",
+      "field_or_section": "contract.mesh_admissible_formula_bound / REAL_CASE_MESH_ADMISSIBLE",
+      "r104_claim": "Unbound production policy operands necessarily make real-case mesh admission false.",
+      "independent_finding": "The predicate does not explicitly gate headroom_rule_bound, reference_policy_bound, wall_acceptance_rule_bound, normalized descriptor disposition, or real-case rounding applicability; no definition makes mesh_profile_authority_valid/convergence_rule_bound a composite gate over those separate unbound slots.",
+      "source_authority": "R104 contract evidence's separately unbound fields; TASK172 mesh contract §§11-12; R98 scoped review",
+      "required_correction": "Define composite-validity semantics or explicitly gate each applicable policy decision; absence must not default true. No numeric value may be introduced."
+    },
+    {
+      "finding_id": "R104-XFER-07",
+      "severity": "MEDIUM",
+      "artifact": "R104 transfer matrix",
+      "field_or_section": "row one_later_headroom_level / transfer_basis",
+      "r104_claim": "TASK172 mesh model schema requires headroom evidence.",
+      "independent_finding": "TASK172 §11 requires a future criterion to bind consecutive evidence and related criterion fields; it does not specify a headroom requirement. R104's fail-closed additional-authority disposition is appropriate, but this source attribution is unsupported.",
+      "source_authority": "docs/tasks/TASK-172-v0.7-mesh-convergence-contract-r1.md §11",
+      "required_correction": "Describe headroom as a proposed R104 project-contract slot or future criterion, not inherited TASK172 authority; keep its value unbound."
+    }
+  ],
+  "review_adjudication": {
+    "supported_topology_review_pass": true,
+    "physical_to_cell_mapping_review_pass": true,
+    "mesh_identity_schema_structural_review_pass": true,
+    "canonicalization_review_pass": false,
+    "determinism_contract_review_pass": true,
+    "r103_transfer_matrix_row_count": 14,
+    "r103_transfer_matrix_independent_review_complete": true,
+    "r103_transfer_matrix_all_rows_pass": false,
+    "no_hidden_defaults_review_pass": true,
+    "unbound_policy_slots_preserved": true,
+    "case_level_authority_gates_preserved_review_pass": true,
+    "typed_failure_vocabulary_review_pass": true,
+    "real_case_mesh_admission_contract_review_result": "BLOCKED_REAL_CASE_MESH_ADMISSION_CONTRACT_INDEPENDENT_REVIEW",
+    "real_case_mesh_admission_contract_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "mesh_authority_real_case_generalization_bound": false,
+    "production_mesh_selection_contract_bound": false,
+    "production_mesh_admission_enabled": false
+  },
+  "real_case_quantitative_mesh_gaps": [
+    {
+      "gap_id": "REAL-MESH-INITIAL",
+      "current_status": "UNBOUND",
+      "why_unbound": "No reviewed real-case starting resolution or profile rule exists.",
+      "required_evidence": "Independently reviewed initial-mesh rule bound to admitted geometry/support authorities.",
+      "dependencies": ["REAL-MESH-NORMALIZATION", "case geometry and topology authorities"]
+    },
+    {
+      "gap_id": "REAL-MESH-REFINEMENT",
+      "current_status": "UNBOUND",
+      "why_unbound": "TASK171 permits explicit subdivision within native intervals but selects no production split operator or ratio.",
+      "required_evidence": "Reviewed deterministic refinement operator preserving native events and exact support/area/length identity.",
+      "dependencies": ["REAL-MESH-INITIAL", "physical-to-cell mapping"]
+    },
+    {
+      "gap_id": "REAL-MESH-CONVERGENCE",
+      "current_status": "UNBOUND",
+      "why_unbound": "R103 thresholds are synthetic-only; no real-case error budget or thresholds are reviewed.",
+      "required_evidence": "Case/profile-bound observables, metrics, precision floor, and acceptance thresholds.",
+      "dependencies": ["REAL-MESH-REFERENCE", "REAL-MESH-WALL-ACCEPTANCE", "REAL-MESH-ROUNDING"]
+    },
+    {
+      "gap_id": "REAL-MESH-HEADROOM",
+      "current_status": "UNBOUND",
+      "why_unbound": "R103's one-later-level rule is fixture-specific and TASK172 does not itself require headroom.",
+      "required_evidence": "Separate authority for a real-case headroom criterion, if selected.",
+      "dependencies": ["REAL-MESH-CONVERGENCE", "REAL-MESH-RESOURCE"]
+    },
+    {
+      "gap_id": "REAL-MESH-RESOURCE",
+      "current_status": "UNBOUND",
+      "why_unbound": "R103 cap grid is synthetic feasibility evidence; TASK171's raw-record limit is not a mesh cap.",
+      "required_evidence": "Reviewed scale/runtime/memory resource policy.",
+      "dependencies": ["REAL-MESH-INITIAL", "REAL-MESH-REFINEMENT"]
+    },
+    {
+      "gap_id": "REAL-MESH-REFERENCE",
+      "current_status": "UNBOUND",
+      "why_unbound": "R102 is a synthetic reference qualification producer and does not require online production references.",
+      "required_evidence": "Authority-bound reference-policy decision and case-specific producer/uncertainty propagation if comparison is used.",
+      "dependencies": ["case-specific observable and property authority"]
+    },
+    {
+      "gap_id": "REAL-MESH-WALL-ACCEPTANCE",
+      "current_status": "UNBOUND",
+      "why_unbound": "Wall observable identity is known but production metric, precision floor and acceptance rule are not.",
+      "required_evidence": "Case-bound wall producer, extrema metric, precision floor and accepted comparison rule.",
+      "dependencies": ["REAL-MESH-REFERENCE", "wall-state authority"]
+    },
+    {
+      "gap_id": "REAL-MESH-ROUNDING",
+      "current_status": "UNBOUND",
+      "why_unbound": "R98 C_round is limited to fixed synthetic training/holdout scope.",
+      "required_evidence": "Independent real-case applicability authority or reviewed alternative roundoff disposition.",
+      "dependencies": ["REAL-MESH-CONVERGENCE", "numerical-profile authority"]
+    },
+    {
+      "gap_id": "REAL-MESH-NORMALIZATION",
+      "current_status": "UNBOUND",
+      "why_unbound": "No approved normalized real-case mesh descriptor or reviewed case-specific non-normalized alternative exists.",
+      "required_evidence": "Reviewed geometry-normalized descriptor or explicit profile-bound non-applicability decision.",
+      "dependencies": ["case geometry and topology authorities"]
+    }
+  ],
+  "next_minimal_gate": "AUTHORIZE_TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_ONLY",
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "numerical_or_mesh_experiment_performed": false,
+    "mesh_authority_real_case_generalization_bound": false,
+    "production_mesh_selection_contract_bound": false,
+    "production_mesh_admission_enabled": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "review_document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-independent-review-r1.md",
+    "review_document_file_sha256": "1eaea1c248d4cf7fe2c27fe511f9df9a605772936036fb367135e0851e29785a",
+    "review_evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-independent-review-r1.json",
+    "review_matrix_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-independent-review-matrix-r1.json",
+    "review_matrix_file_sha256": "c3139f305d4b24ec175fbf8c2cfbcd46daf9e616de3c6111465e358d53d3ce7f",
+    "review_matrix_canonical_hash": "c251394811ac1d2aa073581594907047e13024df27a12e0c8823e4b4de3dbe75",
+    "registry_extension_key": "r105_extension",
+    "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "0c743257e2424410feddd2383c1baba5b7892237a61f98717549c6d47a74af64"
+}
