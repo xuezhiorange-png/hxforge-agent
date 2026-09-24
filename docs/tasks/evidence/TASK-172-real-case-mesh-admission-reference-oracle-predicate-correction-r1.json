@@ -1,0 +1,106 @@
+{
+  "schema_version": "hxforge.task172.real-case-mesh-admission-reference-oracle-predicate-correction.r1",
+  "task_id": "TASK172_REAL_CASE_MESH_ADMISSION_REFERENCE_ORACLE_PREDICATE_CORRECTION_ONLY",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pull_request": {
+    "number": 277,
+    "state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "92cf7d7392ace146310e387fe0a045fdf4d083d9",
+    "reviewed_predecessor_parent": "74919809dcdc663719dad1da86bac4267fbd3059"
+  },
+  "result": "REAL_CASE_MESH_ADMISSION_REFERENCE_ORACLE_PREDICATE_CORRECTION_CANDIDATE_COMPLETED",
+  "correction_scope": [
+    "R104-PREDICATE-02_RESIDUAL_REFERENCE_ORACLE_GATE_ONLY"
+  ],
+  "historical_boundary": {
+    "r104_artifacts_changed": false,
+    "r105_artifacts_changed": false,
+    "r106_artifacts_changed": false,
+    "r1_r106_registry_extensions_rewritten": false,
+    "append_only_overlay": true
+  },
+  "residual_replay": {
+    "R104_production_reference_oracle_required_at_source": "UNBOUND",
+    "R106_reference_policy_resolution_conjunct_present": true,
+    "R106_production_reference_oracle_requirement_conjunct_present": false,
+    "R106_says_reference_policy_not_applicable_does_not_resolve_oracle_requirement": true,
+    "R104_PREDICATE_02_residual_confirmed": true
+  },
+  "explicit_resolution_gate": {
+    "field": "production_reference_oracle_required",
+    "current_value": "UNBOUND",
+    "resolution_validity_symbol": "production_reference_oracle_requirement_resolution_valid",
+    "must_be_explicit_boolean": true,
+    "accepted_value_selected": false,
+    "requires_authority_identity_and_canonical_hash": true,
+    "requires_reviewed_authority_lifecycle": true,
+    "requires_exact_case_and_profile_scope": true,
+    "requires_case_binding": true,
+    "requires_applicability_evidence": true,
+    "reference_policy_not_applicable_can_substitute": false,
+    "unbound_missing_null_unknown_malformed_stale_non_boolean_non_reviewed_or_scope_mismatch_is_false": true,
+    "current_resolution_valid": false
+  },
+  "predicate_binding": {
+    "reference_policy_resolution_valid_is_composite": true,
+    "composite_definition": "reference_policy_applicability_resolution_valid AND production_reference_oracle_requirement_resolution_valid",
+    "explicit_oracle_requirement_conjunct_present": true,
+    "full_predicate_current_result": false,
+    "current_mesh_admission": false
+  },
+  "non_selection_boundary": {
+    "production_reference_oracle_required_value_selected": false,
+    "reference_policy_created": false,
+    "online_oracle_implemented": false,
+    "initial_mesh_policy_created": false,
+    "refinement_policy_created": false,
+    "convergence_threshold_created": false,
+    "headroom_policy_created": false,
+    "resource_policy_created": false,
+    "wall_acceptance_policy_created": false,
+    "R98_C_round_real_case_transfer_authorized": false,
+    "normalized_mesh_descriptor_created": false,
+    "production_mesh_admission_enabled": false,
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true
+  },
+  "effective_lifecycle": {
+    "correction_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review_required": true,
+    "R104_R105_R106_lifecycle_promoted": false,
+    "mesh_authority_real_case_generalization_bound": false,
+    "production_mesh_selection_contract_bound": false
+  },
+  "source_bindings": {
+    "R106_document_sha256": "81763418d1ba280fae30da440f31831e538b169a1fff083b99516bb16ec26e07",
+    "R106_evidence_file_sha256": "504219f2bf94d50c0fbd76ccb5c9aa5faf6c3bf77c0958172288fcc957f48821",
+    "R106_evidence_canonical_hash": "b101a63e74e6dcc4005d6023253472f6f66ef458d4ef21152ae11bc29954bbe3",
+    "R106_extension_canonical_hash": "8e92f24e0c96830cf08be77fee24c6500e981b3c0f402d01fb287aa5ddb04061",
+    "R106_registry_root_canonical_hash": "9620551f83d1ebd8b3606fbc5de20d1d8dc994e2072da9357b55781c9e7dc284"
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-reference-oracle-predicate-correction-r1.md",
+    "document_file_sha256": "16e8e92b70a29e2e33e0a42aee1bdbfb9edf3c28e8bc65cd4794f978d0ac22f5",
+    "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-reference-oracle-predicate-correction-r1.json",
+    "evidence_file_sha256": "TO_BE_CALCULATED",
+    "evidence_canonical_hash": "BOUND_BY_TOP_LEVEL_EVIDENCE_CANONICAL_HASH",
+    "registry_extension_key": "r107_extension",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
+  },
+  "validation": {
+    "predecessor_head_and_pr_state": "PASS",
+    "R104_R105_R106_immutability": "PASS",
+    "shared_canonical_hash_replay": "PASS",
+    "explicit_reference_oracle_gate": "PASS",
+    "no_oracle_value_selection": "PASS",
+    "no_quantitative_mesh_policy_creation": "PASS",
+    "append_only_registry": "PASS",
+    "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT"
+  },
+  "canonical_hash": "cc0b6a4b28168a15040f909249c101a0ff5edd163db269a20e0cfe9a9edd7169"
+}

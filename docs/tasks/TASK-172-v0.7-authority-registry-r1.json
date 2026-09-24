@@ -17933,5 +17933,80 @@
     },
     "canonical_hash": "8e92f24e0c96830cf08be77fee24c6500e981b3c0f402d01fb287aa5ddb04061"
   },
-  "canonical_hash": "9620551f83d1ebd8b3606fbc5de20d1d8dc994e2072da9357b55781c9e7dc284"
+  "r107_extension": {
+    "task_id": "TASK172_REAL_CASE_MESH_ADMISSION_REFERENCE_ORACLE_PREDICATE_CORRECTION_ONLY",
+    "mode": "APPEND_ONLY_REFERENCE_ORACLE_PREDICATE_CORRECTION",
+    "result": "REAL_CASE_MESH_ADMISSION_REFERENCE_ORACLE_PREDICATE_CORRECTION_CANDIDATE_COMPLETED",
+    "previous_head": "92cf7d7392ace146310e387fe0a045fdf4d083d9",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "correction_scope": [
+      "R104-PREDICATE-02_RESIDUAL_REFERENCE_ORACLE_GATE_ONLY"
+    ],
+    "historical_boundary": {
+      "r104_artifacts_changed": false,
+      "r105_artifacts_changed": false,
+      "r106_artifacts_changed": false,
+      "r1_r106_registry_extensions_rewritten": false,
+      "append_only_overlay": true
+    },
+    "residual_adjudication": {
+      "R104_production_reference_oracle_required_source_state": "UNBOUND",
+      "R106_explicit_production_reference_oracle_requirement_conjunct_present": false,
+      "residual_predicate_gap_confirmed": true
+    },
+    "explicit_resolution_gate": {
+      "field": "production_reference_oracle_required",
+      "accepted_decision_type": "REVIEWED_EXPLICIT_BOOLEAN_TRUE_OR_FALSE",
+      "authority_id_and_canonical_hash_required": true,
+      "reviewed_authority_lifecycle_required": true,
+      "exact_case_and_profile_scope_required": true,
+      "case_binding_required": true,
+      "applicability_evidence_required": true,
+      "unbound_missing_null_unknown_malformed_stale_non_boolean_non_reviewed_or_scope_mismatch_is_false": true,
+      "reference_policy_not_applicable_is_not_a_substitute": true,
+      "current_value_selected": false,
+      "current_resolution_valid": false
+    },
+    "predicate_binding": {
+      "resolution_symbol": "production_reference_oracle_requirement_resolution_valid",
+      "reference_policy_resolution_valid_composite": "reference_policy_applicability_resolution_valid AND production_reference_oracle_requirement_resolution_valid",
+      "explicit_resolution_conjunct_in_real_case_mesh_predicate": true,
+      "current_real_case_mesh_admissible": false
+    },
+    "no_policy_creation": {
+      "production_reference_oracle_required_value_selected": false,
+      "reference_policy_created": false,
+      "online_oracle_implementation_authorized": false,
+      "other_quantitative_mesh_policy_created": false,
+      "production_mesh_admission_enabled": false
+    },
+    "effective_lifecycle": {
+      "correction_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "independent_review_required": true,
+      "R104_R105_R106_lifecycle_promoted": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-reference-oracle-predicate-correction-r1.md",
+      "document_file_sha256": "16e8e92b70a29e2e33e0a42aee1bdbfb9edf3c28e8bc65cd4794f978d0ac22f5",
+      "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-reference-oracle-predicate-correction-r1.json",
+      "evidence_file_sha256": "93a93c8345ded5659aec782d8ff176b56ffe44d80a3d17cd940e3ff7513129e3",
+      "evidence_canonical_hash": "cc0b6a4b28168a15040f909249c101a0ff5edd163db269a20e0cfe9a9edd7169",
+      "registry_extension_key": "r107_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "canonical_hash": "b58aa811a45681ab578a5a10129e8271c36ddb613020ea021090445e2c753a4f"
+  },
+  "canonical_hash": "7ba787570aaaf178fd9971ab5088317136c26254b4be375ffb7ae7e8121b526c"
 }
