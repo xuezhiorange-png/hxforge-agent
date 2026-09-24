@@ -18100,6 +18100,7 @@
       "status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
       "independent_review_required": true,
       "independent_review_complete": false,
+      "codex_self_approval_claimed": false,
       "lifecycle_promotion_performed": false
     },
     "decision": {
@@ -18135,10 +18136,10 @@
     },
     "artifacts": {
       "document_path": "docs/tasks/TASK-172-v0.7-production-reference-oracle-requirement-authority-r1.md",
-      "document_file_sha256": "13c9bed2924441107be1fd8879a23daa56a6a7a274ee6614430e136170c8c9bd",
+      "document_file_sha256": "9438bdeeda476b9d691a7d44ebc6ce5ba3a3898eaaa4c5213a321d76e9f92a71",
       "evidence_path": "docs/tasks/evidence/TASK-172-production-reference-oracle-requirement-authority-r1.json",
-      "evidence_file_sha256": "bf7fd00f231a3386b9a05a877ebe9fc41220790f29c9f3ccd8420f6288ed67ea",
-      "evidence_canonical_hash": "c191577e6a7eafd964f309bb3e3e7b1bebfdb6000d71c66dfb11e7e0afecf784",
+      "evidence_file_sha256": "65807e42602b3f195d6257ac31dfd9d6c4b90f81c4ccdb8173720b1b6c23179e",
+      "evidence_canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7",
       "registry_extension_key": "r109_extension",
       "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
       "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
@@ -18150,7 +18151,7 @@
       "no_step_implies_the_next": true,
       "stop": true
     },
-    "canonical_hash": "da35364ef99febf683284131fa1fca8e4a00301200b7f916059b8104c8f2bd1d"
+    "canonical_hash": "537e6dae5c44e423a3363e673e47f80e8c3f1e4c72312b665014a20ec584641a"
   },
-  "canonical_hash": "1ae73a3958378d6f3e57d4d1e72b83400a80fcef4b8e6df60ee6911092f5205a"
+  "canonical_hash": "e314804319f63a41e85a92c153ae3afd0b157ebb1b168ca0d7500eb4c8234306"
 }

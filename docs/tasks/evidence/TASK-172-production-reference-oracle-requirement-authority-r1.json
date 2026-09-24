@@ -14,6 +14,7 @@
     "status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
     "independent_review_required": true,
     "independent_review_complete": false,
+    "codex_self_approval_claimed": false,
     "lifecycle_promotion_performed": false
   },
   "decision": {
@@ -134,12 +135,12 @@
   },
   "artifacts": {
     "document_path": "docs/tasks/TASK-172-v0.7-production-reference-oracle-requirement-authority-r1.md",
-    "document_sha256": "13c9bed2924441107be1fd8879a23daa56a6a7a274ee6614430e136170c8c9bd",
+    "document_sha256": "9438bdeeda476b9d691a7d44ebc6ce5ba3a3898eaaa4c5213a321d76e9f92a71",
     "evidence_path": "docs/tasks/evidence/TASK-172-production-reference-oracle-requirement-authority-r1.json",
     "evidence_file_sha256": "NOT_INCLUDED_IN_SELF_PREIMAGE",
     "registry_path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json",
     "registry_extension_key": "r109_extension",
     "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
   },
-  "canonical_hash": "c191577e6a7eafd964f309bb3e3e7b1bebfdb6000d71c66dfb11e7e0afecf784"
+  "canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7"
 }
