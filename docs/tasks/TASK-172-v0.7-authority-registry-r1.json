@@ -18525,5 +18525,120 @@
     },
     "canonical_hash": "335337133ca4ff6387cb0a827181198796bb0cae1fb2222c678ad8bc21fd43e4"
   },
-  "canonical_hash": "550ef41cf1029d46a8cd605f8c984187bd4d8cec1ecb2ddd597b0ae59c719143"
+  "r113_extension": {
+    "task_id": "TASK172_V0_7_REAL_CASE_REFERENCE_POLICY_AND_ORACLE_REQUIREMENT_BINDING_R1",
+    "mode": "REAL_CASE_BINDING_DISCOVERY_AND_CANDIDATE_ONLY",
+    "result": "BLOCKED_NO_REVIEWED_REAL_CASE_IDENTITY",
+    "previous_main_head": "e92ec69f29bce2340c9870ef3dc6787efea7c2a3",
+    "reviewed_authorities": {
+      "oracle_requirement_authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+      "oracle_requirement_reviewed_value": false,
+      "oracle_requirement_lifecycle": "REVIEWED_AUTHORITY",
+      "r109_evidence_canonical_hash": "5a302fadf7cc9fb5765f8630cf9c81ccceede66de0937b984a0af22e170350e7",
+      "r109_extension_canonical_hash": "537e6dae5c44e423a3363e673e47f80e8c3f1e4c72312b665014a20ec584641a",
+      "r110_evidence_canonical_hash": "d6f71b0abcfdefed9f5892c91011d6066d52500522b5fc9c3faa0581c35205e3",
+      "r110_extension_canonical_hash": "2f80e41406be2ee3bec40de448af115ac9458c61845ac27cba6e2056b8e69058",
+      "reference_policy_authority_id": "V07-T172-REAL-CASE-REFERENCE-POLICY-R1",
+      "reference_policy_lifecycle": "REVIEWED_AUTHORITY",
+      "reference_policy_mode": "NON_MANDATORY_REFERENCE_COMPARISON",
+      "reference_comparison_allowed": true,
+      "reference_comparison_mandatory": false,
+      "reference_comparison_forbidden": false,
+      "reference_comparison_can_be_separately_authorized": true,
+      "r111_evidence_canonical_hash": "6ea5f7a72c1754ad0200432dfc5ca8aeac991d6ddd58c91413d6c7413c527fc1",
+      "r111_extension_canonical_hash": "e67e742a1ae6f7d5fccf088dfe54f679fb47ab806a162cf7e7c23d9b3091ca28",
+      "r112_evidence_canonical_hash": "ed7586cfa7ceb1f9972be35e863f7626bc3a45006b1960ad83661aab81f24959",
+      "r112_extension_canonical_hash": "335337133ca4ff6387cb0a827181198796bb0cae1fb2222c678ad8bc21fd43e4",
+      "profile_scope_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-SCOPE-R1",
+      "scope_widening": false
+    },
+    "bindability_audit": {
+      "repository_wide_search_completed": true,
+      "complete_reviewed_real_case_identity_found": false,
+      "complete_reviewed_production_mesh_profile_found": false,
+      "prior_task172_discovery_rechecked": true,
+      "fixture_demo_benchmark_and_other_task_golden_substitution_allowed": false,
+      "missing_identities": [
+        "CASE_ID",
+        "CONFIGURATION_ID",
+        "GEOMETRY_ID",
+        "TOPOLOGY_AUTHORITY_ID case binding and hash",
+        "FLOW_PATH_MAPPING_ID",
+        "PHYSICAL_COMPARTMENT_MAP_ID",
+        "AREA_OWNERSHIP_MAP_ID",
+        "LENGTH_OWNERSHIP_MAP_ID",
+        "HOT_STREAM_PATH_ID case binding",
+        "COLD_STREAM_PATH_ID case binding",
+        "PRODUCTION_MESH_PROFILE_AUTHORITY_ID",
+        "APPLICABILITY_EVIDENCE_ID_OR_HASH",
+        "version/revision, canonical hash, lifecycle, allowed scope, and same-case applicability proof for each required identity"
+      ]
+    },
+    "binding_disposition": {
+      "binding_candidate_created": false,
+      "actual_real_case_binding_created": false,
+      "binding_canonical_hash_created": false,
+      "case_id": "UNBOUND",
+      "configuration_id": "UNBOUND",
+      "geometry_id": "UNBOUND",
+      "production_mesh_profile_authority_id": "UNBOUND"
+    },
+    "effective_state": {
+      "current_real_case_binding_present": false,
+      "production_reference_oracle_requirement_resolution_valid": false,
+      "reference_policy_applicability_resolution_valid": false,
+      "reference_policy_resolution_valid": false,
+      "effective_reviewed_binding": "UNBOUND",
+      "real_case_mesh_admissible": false,
+      "production_mesh_admission_enabled": false
+    },
+    "unbound_policy": {
+      "online_oracle_implemented": false,
+      "online_reference_implementation_bound": false,
+      "reference_numeric_tolerance_bound": false,
+      "reference_error_threshold_bound": false,
+      "initial_mesh_rule_bound": false,
+      "refinement_rule_bound": false,
+      "convergence_rule_bound": false,
+      "headroom_rule_bound": false,
+      "resource_policy_bound": false,
+      "wall_acceptance_rule_bound": false,
+      "r98_c_round_real_case_transfer_authorized": false,
+      "normalized_real_case_mesh_descriptor_bound": false,
+      "quantitative_mesh_policy_created": false
+    },
+    "validation": {
+      "authority_identity_replay": "PASS_SHARED_CANONICAL_HELPER",
+      "real_case_discovery": "PASS_NO_QUALIFIED_IDENTITY_FOUND",
+      "fail_closed_resolution": "PASS",
+      "historical_immutability": "PASS_APPEND_ONLY_DIFF_AND_OLD_REGISTRY_PAYLOAD_REPLAY",
+      "json_and_canonical_hash": "PASS_SHARED_CANONICAL_SHA256_AND_JSON_PARSE",
+      "static_checks": "PASS_RUFF_FORMAT_MYPY_MANIFEST_LOCK_AND_PIP_AUDIT",
+      "repository_regression": "NOT_CLEAN;6_FAILED;6778_PASSED;5_SKIPPED;70_ERRORS",
+      "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-real-case-reference-policy-oracle-requirement-binding-r1.md",
+      "document_sha256": "11521ac3e498d1d58a2c50a34df51cfb338761c87cd766f2265dd3fc99cc1f66",
+      "evidence_path": "docs/tasks/evidence/TASK-172-real-case-reference-policy-oracle-requirement-binding-r1.json",
+      "evidence_file_sha256": "fc69294278945f751f024e77df5815157bfad1d4064d1c307364cdbbc24251c2",
+      "evidence_canonical_hash": "081f21b9015bbe4f2ed4d23068d5b04b2f0365a7f29ad49ba1957493671a9310",
+      "registry_extension_key": "r113_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "next_gate": "AUTHORIZE_TASK172_REAL_CASE_IDENTITY_AND_PROVENANCE_EVIDENCE_INTAKE_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "ec8174e972fe1a3e85238c2e02f44809ed0bbfa33963d526f6ec3b89f87b7993"
+  },
+  "canonical_hash": "1d34b6a0fef88f0e09f21ab7662ccd1f8723533ddb107f4da860dd4fb6e2029c"
 }
