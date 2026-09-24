@@ -1,9 +1,9 @@
 # TASK-172 v0.7 — Real-Case Reference Policy Authority R1
 
-Task: `TASK172_V0_7_REAL_CASE_REFERENCE_POLICY_AUTHORITY_R1`  
-Short name: `R111`  
-Authority ID: `V07-T172-REAL-CASE-REFERENCE-POLICY-R1`  
-Base: `19925ba4f59fdb26bbcb8c7f43787e8e68af1304` (the current `main` at construction)  
+Task: `TASK172_V0_7_REAL_CASE_REFERENCE_POLICY_AUTHORITY_R1`
+Short name: `R111`
+Authority ID: `V07-T172-REAL-CASE-REFERENCE-POLICY-R1`
+Base: `19925ba4f59fdb26bbcb8c7f43787e8e68af1304` (the current `main` at construction)
 Result: `REAL_CASE_REFERENCE_POLICY_AUTHORITY_CANDIDATE_COMPLETED`
 
 ## Decision boundary

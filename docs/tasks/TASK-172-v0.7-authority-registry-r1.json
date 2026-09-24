@@ -18355,7 +18355,7 @@
     },
     "artifacts": {
       "document_path": "docs/tasks/TASK-172-v0.7-real-case-reference-policy-authority-r1.md",
-      "document_sha256": "1cbe0c6bf008e9d0977837cb22dadb6f8adf327d1bcdad963f5d6fc576831b95",
+      "document_sha256": "e63f9ff07f526de019b30faee49dbd8b4d625bf21c53937138b267bf45b71b9e",
       "evidence_path": "docs/tasks/evidence/TASK-172-real-case-reference-policy-authority-r1.json",
       "evidence_file_sha256": "a3b13091814475f50d25cc21ee545a5668285409a70d7b9668eb04b66421c216",
       "evidence_canonical_hash": "6ea5f7a72c1754ad0200432dfc5ca8aeac991d6ddd58c91413d6c7413c527fc1",
@@ -18381,7 +18381,7 @@
       "next_gate": "INDEPENDENT_REVIEW_R111_ONLY",
       "stop": true
     },
-    "canonical_hash": "f862ee954add9883b9c982d96881831b815f61f40015e7548b173bd453256fc0"
+    "canonical_hash": "e67e742a1ae6f7d5fccf088dfe54f679fb47ab806a162cf7e7c23d9b3091ca28"
   },
-  "canonical_hash": "5d07f34e87d3525380e864a7c50b8989b9d8583f620b127263a90ce1bfb5d888"
+  "canonical_hash": "be50d89b707f48db2ceb4072ee0f4eda049f7e15ca388af966e81448b4afa5e9"
 }
