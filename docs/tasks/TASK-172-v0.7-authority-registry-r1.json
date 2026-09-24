@@ -18271,7 +18271,7 @@
     "mode": "REFERENCE_POLICY_AUTHORITY_CANDIDATE_CONSTRUCTION_ONLY",
     "result": "REAL_CASE_REFERENCE_POLICY_AUTHORITY_CANDIDATE_COMPLETED",
     "base_main_sha": "19925ba4f59fdb26bbcb8c7f43787e8e68af1304",
-    "pr_number": null,
+    "pr_number": 280,
     "pr_state": "OPEN_DRAFT",
     "lifecycle": {
       "status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
@@ -18381,7 +18381,7 @@
       "next_gate": "INDEPENDENT_REVIEW_R111_ONLY",
       "stop": true
     },
-    "canonical_hash": "7d6649748eb2c865c37c3acccd60706df8c28629772beffa298fd06308b5f05f"
+    "canonical_hash": "f862ee954add9883b9c982d96881831b815f61f40015e7548b173bd453256fc0"
   },
-  "canonical_hash": "b4d009183cadcc4884fb2567eee0929cde70ede95ab281c53db5c8047e08eccf"
+  "canonical_hash": "5d07f34e87d3525380e864a7c50b8989b9d8583f620b127263a90ce1bfb5d888"
 }
