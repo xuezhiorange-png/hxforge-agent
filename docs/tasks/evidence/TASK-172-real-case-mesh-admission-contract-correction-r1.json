@@ -1,0 +1,198 @@
+{
+  "schema_version": "hxforge.task172.real-case-mesh-admission-contract-correction.r1",
+  "task_id": "TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_ONLY",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pull_request": {
+    "number": 277,
+    "state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "74919809dcdc663719dad1da86bac4267fbd3059",
+    "reviewed_predecessor_parent": "dccb51da09f1c7f730b51d20341786645fa4d8a5"
+  },
+  "result": "REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_CANDIDATE_COMPLETED",
+  "correction_scope": [
+    "R104-HASH-01",
+    "R104-PREDICATE-02",
+    "R104-XFER-07"
+  ],
+  "historical_boundary": {
+    "r104_document_evidence_matrix_unchanged": true,
+    "r104_extension_unchanged": true,
+    "r105_document_evidence_matrix_unchanged": true,
+    "r105_extension_unchanged": true,
+    "r1_r105_registry_extensions_rewritten": false,
+    "correction_is_append_only_overlay": true
+  },
+  "shared_canonicalization": {
+    "implementation": "hexagent.canonical_json.canonical_sha256",
+    "implementation_source": "src/hexagent/canonical_json.py",
+    "implementation_source_sha256": "ef964066780b5c662e553d5c86f5a52f7070c460dfae288993e3a8a156b5a2b6",
+    "canonicalization": "RFC8785",
+    "string_normalization": "NFC",
+    "excluded_hash_input_fields": [
+      "canonical_hash",
+      "mutable_review_comments"
+    ],
+    "non_finite_json_numbers_rejected": true,
+    "alternate_canonicalization_introduced": false
+  },
+  "r104_effective_hash_rebinding": {
+    "source_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+    "registry_file_sha256_at_source_head": "671ed3585d9eee0050100d17a86c8c9e24439818f96a93316c66a6d1e50d2adc",
+    "bindings": [
+      {
+        "artifact": "contract_document",
+        "path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-r1.md",
+        "file_sha256_declared": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+        "file_sha256_recomputed": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+        "file_sha256_match": true,
+        "canonical_hash_present": false,
+        "effective_canonical_hash": null
+      },
+      {
+        "artifact": "contract_evidence",
+        "path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-r1.json",
+        "file_sha256_declared": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+        "file_sha256_recomputed": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+        "file_sha256_match": true,
+        "historical_declared_canonical_hash": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d",
+        "effective_shared_canonical_hash": "2164dcfcdc585281238598d6bc271bbe015b72ce97fa5cc5326a888993457135",
+        "historical_canonical_declaration_matches": false
+      },
+      {
+        "artifact": "transfer_matrix",
+        "path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-transfer-matrix-r1.json",
+        "file_sha256_declared": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+        "file_sha256_recomputed": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+        "file_sha256_match": true,
+        "historical_declared_canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+        "effective_shared_canonical_hash": "5b5e92f7346b22cd1de0e5c28caa0ef67e211df91febb70d3354f9ed3f94e14a",
+        "historical_canonical_declaration_matches": false
+      },
+      {
+        "artifact": "r104_registry_extension",
+        "path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json#/r104_extension",
+        "historical_declared_canonical_hash": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d",
+        "effective_shared_canonical_hash": "e035372e976e1ede05482c30c59c0d8a3defd4c3bfc802c87321144ba3f1d8bc",
+        "historical_canonical_declaration_matches": false
+      },
+      {
+        "artifact": "r104_registry_root",
+        "path": "docs/tasks/TASK-172-v0.7-authority-registry-r1.json at source_head",
+        "historical_declared_canonical_hash": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887",
+        "effective_shared_canonical_hash": "00353f88e0c6c5aba94f2043403e41208014e769a05c8461ffada76169af41d7",
+        "historical_canonical_declaration_matches": false
+      }
+    ],
+    "effective_shared_hash_bindings_recorded": true,
+    "historical_payloads_modified": false
+  },
+  "r105_immutability_replay": {
+    "review_document_sha256": "1eaea1c248d4cf7fe2c27fe511f9df9a605772936036fb367135e0851e29785a",
+    "review_evidence_file_sha256": "936f87ee9bd2fe89d9952fc2797b7f2c0a9fd9ba8059174ca684f33269159d51",
+    "review_evidence_canonical_hash": "0c743257e2424410feddd2383c1baba5b7892237a61f98717549c6d47a74af64",
+    "review_matrix_file_sha256": "c3139f305d4b24ec175fbf8c2cfbcd46daf9e616de3c6111465e358d53d3ce7f",
+    "review_matrix_canonical_hash": "c251394811ac1d2aa073581594907047e13024df27a12e0c8823e4b4de3dbe75",
+    "r105_extension_canonical_hash": "4ee3f0ef68b19f8e2ae801bb283d5983e5972d0fc9a8709087b94518240c4de9",
+    "predecessor_registry_root_canonical_hash": "ffb1f2324c7a7cb95563399d28540043bbcdddd1d07139a5a8e986fa5298f1e0",
+    "replay_status": "PASS"
+  },
+  "fail_closed_resolution_contract": {
+    "resolution_states_are_contract_fields_not_runtime_enums": true,
+    "valid_bound_requires": [
+      "AUTHORITY_ID_AND_HASH",
+      "REVIEWED_AUTHORITY_LIFECYCLE",
+      "SCOPE_COVERS_EXACT_CASE_AND_PROFILE",
+      "CASE_BINDING_MATCHES",
+      "APPLICABILITY_EVIDENCE_PRESENT"
+    ],
+    "valid_not_applicable_requires": [
+      "REVIEWED_AUTHORITY_LIFECYCLE",
+      "EXACT_CASE_AND_PROFILE_BINDING",
+      "EXPLICIT_REASON",
+      "APPLICABILITY_EVIDENCE_PRESENT"
+    ],
+    "missing_null_unknown_malformed_stale_or_scope_mismatch_is_false": true,
+    "unbound_is_false": true,
+    "absence_implies_not_applicable": false,
+    "current_evaluation": "REAL_CASE_MESH_ADMISSIBLE=false",
+    "policy_slots": [
+      {"slot": "initial_mesh_rule", "current_state": "UNBOUND", "resolution_valid": false},
+      {"slot": "refinement_rule", "current_state": "UNBOUND", "resolution_valid": false},
+      {"slot": "convergence_rule", "current_state": "UNBOUND", "resolution_valid": false},
+      {"slot": "headroom_slot", "current_state": "UNBOUND", "resolution_valid": false, "origin": "R104_PROPOSED_SLOT_NOT_INHERITED_TASK172_REQUIREMENT"},
+      {"slot": "resource_policy", "current_state": "UNBOUND", "resolution_valid": false},
+      {"slot": "reference_policy", "current_state": "UNBOUND", "resolution_valid": false, "online_reference_requirement_decided": false},
+      {"slot": "wall_acceptance_policy", "current_state": "UNBOUND", "resolution_valid": false},
+      {"slot": "rounding_applicability", "current_state": "ADDITIONAL_AUTHORITY_REQUIRED", "resolution_valid": false, "R98_C_round_real_case_transfer_authorized": false},
+      {"slot": "normalized_mesh_descriptor", "current_state": "UNBOUND", "resolution_valid": false}
+    ],
+    "predicate_conjuncts": [
+      "topology_authority_valid",
+      "geometry_mapping_valid",
+      "mesh_identity_contract_valid",
+      "case_scope_supported",
+      "required_case_bindings_complete",
+      "initial_mesh_rule_resolution_valid",
+      "refinement_rule_resolution_valid",
+      "convergence_rule_resolution_valid",
+      "headroom_slot_resolution_valid",
+      "resource_policy_resolution_valid",
+      "reference_policy_resolution_valid",
+      "wall_acceptance_policy_resolution_valid",
+      "rounding_policy_resolution_valid",
+      "normalized_mesh_descriptor_resolution_valid",
+      "deterministic_mapping_valid",
+      "shared_canonicalization_valid"
+    ],
+    "case_production_admission_remains_separate": true
+  },
+  "headroom_attribution_correction": {
+    "matrix_row": "one_later_headroom_level",
+    "transfer_status_preserved": "ADDITIONAL_AUTHORITY_REQUIRED",
+    "R103_numeric_headroom_transferred": false,
+    "TASK172_requires_headroom_rule": false,
+    "R104_slot_origin": "R104_PROPOSED_PROJECT_CONTRACT_SLOT",
+    "R104_slot_may_be_retained_without_numeric_value": true,
+    "R104_transfer_basis_corrected": true,
+    "correction": "TASK172 mesh contract §11 requires consecutive evidence and other future criterion fields, not a headroom rule. R104 may propose an unbound headroom slot, but it is not inherited TASK172 authority."
+  },
+  "effective_lifecycle": {
+    "correction_candidate_created": true,
+    "correction_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review_required": true,
+    "R104_contract_promoted": false,
+    "real_case_mesh_generalization_bound": false,
+    "production_mesh_selection_contract_bound": false,
+    "production_mesh_admission_enabled": false
+  },
+  "governance": {
+    "initial_mesh_value_created": false,
+    "refinement_rule_created": false,
+    "convergence_threshold_created": false,
+    "headroom_value_created": false,
+    "resource_cap_created": false,
+    "reference_policy_selected": false,
+    "wall_acceptance_value_created": false,
+    "R98_C_round_real_case_transfer_authorized": false,
+    "normalized_mesh_descriptor_created": false,
+    "mesh_policy_retuned": false,
+    "precision_policy_retuned": false,
+    "reference_oracle_redefined": false,
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-correction-r1.md",
+    "document_file_sha256": "81763418d1ba280fae30da440f31831e538b169a1fff083b99516bb16ec26e07",
+    "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-correction-r1.json",
+    "registry_extension_key": "r106_extension",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
+  },
+  "canonical_hash": "b101a63e74e6dcc4005d6023253472f6f66ef458d4ef21152ae11bc29954bbe3"
+}

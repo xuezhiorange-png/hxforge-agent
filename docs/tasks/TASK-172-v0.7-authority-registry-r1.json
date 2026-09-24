@@ -17834,5 +17834,104 @@
     },
     "canonical_hash": "4ee3f0ef68b19f8e2ae801bb283d5983e5972d0fc9a8709087b94518240c4de9"
   },
-  "canonical_hash": "ffb1f2324c7a7cb95563399d28540043bbcdddd1d07139a5a8e986fa5298f1e0"
+  "r106_extension": {
+    "task_id": "TASK172_REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_ONLY",
+    "mode": "APPEND_ONLY_R104_CORRECTION",
+    "result": "REAL_CASE_MESH_ADMISSION_CONTRACT_CORRECTION_CANDIDATE_COMPLETED",
+    "previous_head": "74919809dcdc663719dad1da86bac4267fbd3059",
+    "pr_number": 277,
+    "pr_state": "OPEN_DRAFT",
+    "correction_scope": [
+      "R104-HASH-01",
+      "R104-PREDICATE-02",
+      "R104-XFER-07"
+    ],
+    "historical_boundary": {
+      "r104_payloads_changed": false,
+      "r105_payloads_changed": false,
+      "r1_r105_registry_extensions_rewritten": false,
+      "append_only_overlay": true
+    },
+    "r104_effective_hash_rebinding": {
+      "source_head": "dccb51da09f1c7f730b51d20341786645fa4d8a5",
+      "shared_implementation": "hexagent.canonical_json.canonical_sha256",
+      "bindings": {
+        "document_file_sha256": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c",
+        "evidence_file_sha256": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4",
+        "evidence_declared_canonical_hash": "3b01d5642e0f28c440a4409902fbd916dd1ac5ada5e83653c1cc31e2cdc90d2d",
+        "evidence_recomputed_canonical_hash": "2164dcfcdc585281238598d6bc271bbe015b72ce97fa5cc5326a888993457135",
+        "transfer_matrix_file_sha256": "06bf948f6508a5cafa120d5d8be6928e4d35ef7f6ee1f09b34cd16f96fc53c65",
+        "transfer_matrix_declared_canonical_hash": "991e4024e2bfed5f49eaff453f6a564d0a165036174ed6b06a8901038589509a",
+        "transfer_matrix_recomputed_canonical_hash": "5b5e92f7346b22cd1de0e5c28caa0ef67e211df91febb70d3354f9ed3f94e14a",
+        "r104_extension_declared_canonical_hash": "da7dc27f1e0094fc2880522593697bfc4eb31ba6ff676f6125540e3f9c54e44d",
+        "r104_extension_recomputed_canonical_hash": "e035372e976e1ede05482c30c59c0d8a3defd4c3bfc802c87321144ba3f1d8bc",
+        "r104_registry_root_declared_canonical_hash": "e69689e4960bad3ddb7ba961134cf27b6532cb118af8d614c8c31ea789771887",
+        "r104_registry_root_recomputed_canonical_hash": "00353f88e0c6c5aba94f2043403e41208014e769a05c8461ffada76169af41d7"
+      },
+      "all_direct_file_hashes_reproduced": true,
+      "historical_payloads_modified": false
+    },
+    "fail_closed_predicate_correction": {
+      "every_unbound_policy_slot_is_an_explicit_conjunct": true,
+      "valid_resolution_requires_reviewed_scope_and_case_binding": true,
+      "not_applicable_requires_explicit_reviewed_case_bound_evidence": true,
+      "missing_null_unknown_malformed_stale_or_unbound_is_false": true,
+      "absence_implies_not_applicable": false,
+      "current_real_case_mesh_admissible": false,
+      "all_quantitative_production_policy_slots_remain_unbound": true
+    },
+    "headroom_attribution_correction": {
+      "R104_headroom_slot_origin": "R104_PROPOSED_PROJECT_CONTRACT_SLOT",
+      "TASK172_requires_headroom_rule": false,
+      "R103_synthetic_headroom_value_transferred": false,
+      "real_case_headroom_rule_bound": false,
+      "headroom_absence_fails_closed_if_slot_retained": true
+    },
+    "policy_boundary": {
+      "initial_mesh_rule_bound": false,
+      "refinement_rule_bound": false,
+      "convergence_rule_bound": false,
+      "headroom_rule_bound": false,
+      "resource_policy_bound": false,
+      "reference_policy_bound": false,
+      "wall_acceptance_rule_bound": false,
+      "R98_C_round_real_case_transfer_authorized": false,
+      "normalized_mesh_descriptor_bound": false,
+      "mesh_policy_retuned": false,
+      "precision_policy_retuned": false,
+      "reference_oracle_redefined": false
+    },
+    "effective_lifecycle": {
+      "correction_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "independent_review_required": true,
+      "R104_contract_promoted": false,
+      "mesh_authority_real_case_generalization_bound": false,
+      "production_mesh_selection_contract_bound": false,
+      "production_mesh_admission_enabled": false
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-correction-r1.md",
+      "document_file_sha256": "81763418d1ba280fae30da440f31831e538b169a1fff083b99516bb16ec26e07",
+      "evidence_path": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-correction-r1.json",
+      "evidence_file_sha256": "504219f2bf94d50c0fbd76ccb5c9aa5faf6c3bf77c0958172288fcc957f48821",
+      "evidence_canonical_hash": "b101a63e74e6dcc4005d6023253472f6f66ef458d4ef21152ae11bc29954bbe3",
+      "registry_extension_key": "r106_extension",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_IN_FINAL_RECEIPT"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "mesh_study_performed": false,
+      "mesh_threshold_sensitivity_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "stop": true
+    },
+    "canonical_hash": "8e92f24e0c96830cf08be77fee24c6500e981b3c0f402d01fb287aa5ddb04061"
+  },
+  "canonical_hash": "9620551f83d1ebd8b3606fbc5de20d1d8dc994e2072da9357b55781c9e7dc284"
 }
