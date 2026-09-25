@@ -1,0 +1,160 @@
+{
+  "schema_version": "task172.project-designed-engineering-case-identity.r1",
+  "task_id": "TASK172_V0_7_PROJECT_DESIGNED_ENGINEERING_CASE_IDENTITY_R1",
+  "short_name": "R114",
+  "mode": "PROJECT_ENGINEERING_CASE_DESIGN_AND_AUTHORITY_CANDIDATE",
+  "result": "BLOCKED_NATIVE_GEOMETRY_AUTHORITY_PREREQUISITE",
+  "base_main_sha": "13e175fd9f826591dcc285b315fe61c2612fa867",
+  "branch": "docs/v0-7-task172-project-designed-case-r114",
+  "case_class_target": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+  "case_candidate_created": false,
+  "design_search_started": false,
+  "selected_engineering_values": [],
+  "external_source_claimed": false,
+  "synthetic_fixture_substitution": false,
+  "identities": {
+    "case_id": "UNBOUND",
+    "configuration_id": "UNBOUND",
+    "geometry_id": "UNBOUND",
+    "topology_authority_id": "UNBOUND",
+    "flow_path_mapping_id": "UNBOUND",
+    "physical_compartment_map_id": "UNBOUND",
+    "area_ownership_map_id": "UNBOUND",
+    "length_ownership_map_id": "UNBOUND",
+    "hot_stream_path_id": "UNBOUND",
+    "cold_stream_path_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND"
+  },
+  "case_identity_authority_lifecycle": "NOT_CREATED_BLOCKED_PREREQUISITE",
+  "independent_review_complete": false,
+  "codex_self_approval": false,
+  "topology_target": {
+    "profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "construction": "FIXED_TUBESHEET",
+    "shell_type": "E_SHELL",
+    "shell_pass_count": 1,
+    "tube_path_type": "STRAIGHT_THROUGH",
+    "declared_tube_pass_count": 1,
+    "flow_arrangement": "COUNTERCURRENT",
+    "steady_state": true,
+    "single_phase": true,
+    "newtonian": true,
+    "case_bound_topology_created": false
+  },
+  "source_audit": {
+    "base_sha": "13e175fd9f826591dcc285b315fe61c2612fa867",
+    "reviewed_runtime_selectable_tube_geometry_record_found": false,
+    "task016_preview_examples_present_but_ineligible": true,
+    "applicable_approved_tube_layout_rule_found": false,
+    "applicable_approved_bundle_geometry_rule_found": false,
+    "examples_and_tests_promoted": false,
+    "internal_seed_rules_applicable_to_geometry": false,
+    "findings": [
+      {
+        "finding_id": "R114-GEOMETRY-01",
+        "severity": "BLOCKER",
+        "authority": "TASK-016 plus TASK-021",
+        "claim": "TASK-021 input must carry a verifiable approved tube geometry snapshot; no non-test catalog record is present.",
+        "files_reviewed": [
+          "docs/tasks/TASK-016-approved-geometry-catalog.md",
+          "src/hexagent/geometry_catalogs/models.py",
+          "src/hexagent/geometry_catalogs/catalog.py",
+          "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md",
+          "src/hexagent/exchangers/shell_tube/tube_layout/validation.py",
+          "src/hexagent/exchangers/shell_tube/tube_layout/authority.py"
+        ]
+      },
+      {
+        "finding_id": "R114-GEOMETRY-02",
+        "severity": "BLOCKER",
+        "authority": "TASK-021",
+        "claim": "No applicable approved layout rule artifact binds the selected layout/pitch/placement; checked-in internal_seed rules are limited to TASK-012 identity/hash semantics.",
+        "files_reviewed": [
+          "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md",
+          "rule_packs/internal_seed/manifest.json",
+          "rule_packs/internal_seed/rules/internal_seed_rule_001.json",
+          "rule_packs/internal_seed/rules/internal_seed_rule_002.json"
+        ]
+      },
+      {
+        "finding_id": "R114-GEOMETRY-03",
+        "severity": "BLOCKER",
+        "authority": "TASK-022",
+        "claim": "No applicable approved bundle-geometry rule artifact with explicit allowance/minimum fields is available; caller-supplied shell ID alone does not satisfy it.",
+        "files_reviewed": [
+          "docs/tasks/TASK-022-shell-and-bundle-geometry.md",
+          "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/authority.py"
+        ]
+      }
+    ],
+    "source_file_sha256": {
+      "docs/tasks/TASK-016-approved-geometry-catalog.md": "bc4b96ec9fefdeeb3dc17517cf837c8cf1bc015a81bebd53ec788c3a6dc6f72c",
+      "docs/tasks/TASK-020-shell-and-tube-configuration-schema.md": "f9c2e820574ca363a92de63318f6fd717d5b5312159c49cbcdae63e01c56806c",
+      "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md": "f7435c2e8d52f5bd43efb985ae6eedd31ac030ca3b549fd22f8cd29b25c18bd6",
+      "docs/tasks/TASK-022-shell-and-bundle-geometry.md": "e968645f7ba727180d1fd3d6beab786bb4cb762d660adc464181a09d8066bb9b",
+      "docs/tasks/TASK-024-shell-and-tube-baffle-geometry-and-spacing.md": "704fe5b9e03f637fe5b158e2748b0a5341ba5762a0740799b518c5ea454785ca",
+      "src/hexagent/geometry_catalogs/catalog.py": "7c9cfee8a39a202498e18702787a28793779efa7a74d98f6802a44bee8f3e29a",
+      "src/hexagent/geometry_catalogs/models.py": "259a2ad401723953794630fe162a9badb173783634c2c7a50364da2d82a9615f",
+      "src/hexagent/exchangers/shell_tube/tube_layout/validation.py": "8e331cb0abfbe94fb183bc57e26eab12a3216ae8136155aa2648ebbac284953a",
+      "src/hexagent/exchangers/shell_tube/tube_layout/authority.py": "d431f3a0695f31190238009f9b707f720b27d65e431bf631823fa3fb954edc72",
+      "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/authority.py": "cd570941b50bdbd6e361676517b4bdbc175b1ed27fcbb046513cc86e648d1c2d",
+      "src/hexagent/exchangers/shell_tube/baffle_geometry/validation.py": "a4711ff8afe5f5a0270b5ba1cd7b2219e37e73baef56bf5afd9ac5f60e17fde8",
+      "rule_packs/internal_seed/manifest.json": "299edad711a1ab59edaa173579393a1df4532788b2afefc54846525fceb521a4",
+      "rule_packs/internal_seed/rules/internal_seed_rule_001.json": "ec78098243c68bf9add3110c1833d667610c369077c559f2bcf5bcf57ea9e586",
+      "rule_packs/internal_seed/rules/internal_seed_rule_002.json": "fa6701d4b0b71f328dabf6878bf9893c0a35d2e45b5a313f3bc4171d5653ee5e"
+    }
+  },
+  "validation_disposition": {
+    "task020_native_validation": "NOT_RUN_R114_STOPPED_BEFORE_CASE_CONFIGURATION_CONSTRUCTION",
+    "task021_native_validation": "NOT_RUN_BLOCKED_APPROVED_GEOMETRY_AND_LAYOUT_RULE_AUTHORITY_UNBOUND",
+    "task022_native_validation": "NOT_RUN_BLOCKED_UPSTREAM_AND_BUNDLE_RULE_AUTHORITY_UNBOUND",
+    "task024_native_validation": "NOT_RUN_BLOCKED_UPSTREAM",
+    "task166_bell_geometry_validation": "NOT_RUN_BLOCKED_UPSTREAM",
+    "task171_profile_compatibility": "NOT_RUN_BLOCKED_CASE_TOPOLOGY_UNBOUND",
+    "physical_event_completeness": "NOT_RUN",
+    "flow_path_direction_connectivity": "NOT_RUN",
+    "physical_compartment_coverage": "NOT_RUN",
+    "area_ownership": "NOT_RUN",
+    "length_ownership": "NOT_RUN",
+    "deterministic_design_replay": "NOT_RUN_NO_DESIGN_INPUTS_SELECTED",
+    "property_backend_called": false,
+    "operating_state_authority_complete": false,
+    "production_mesh_profile_authority_id": "UNBOUND"
+  },
+  "local_validation": {
+    "json_and_canonical_replay": "PASS",
+    "artifact_linkage": "PASS",
+    "r1_r113_registry_immutability": "PASS",
+    "registry_append_only": "PASS",
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "mypy": "PASS",
+    "manifest_d_equals_m": "PASS",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES;LOCAL_PROJECT_DISTRIBUTION_NOT_ON_PYPI_AND_NOT_AUDITABLE_AS_A_REGISTRY_PACKAGE",
+    "git_diff_check": "PASS",
+    "repository_full_regression": {
+      "status": "NOT_CLEAN",
+      "command": "uv run --locked pytest -q",
+      "collected": 6862,
+      "passed": 6780,
+      "failed": 7,
+      "errors": 70,
+      "skipped": 5,
+      "failure_attribution": "NOT_ESTABLISHED",
+      "tests_modified": false
+    }
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_runtime_implementation": false,
+    "production_mesh_policy_created": false,
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "next_gate": "AUTHORIZE_TASK172_PROJECT_DESIGNED_CASE_GEOMETRY_SOURCE_AND_RULE_AUTHORITY_PREREQUISITE_RESOLUTION_ONLY",
+    "stop": true
+  },
+  "canonical_hash": "7c3ce373fda3f75ba36259c68be9f6846e0a2c226783c1edc62e6df121dfd36a"
+}

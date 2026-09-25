@@ -18640,5 +18640,99 @@
     },
     "canonical_hash": "ec8174e972fe1a3e85238c2e02f44809ed0bbfa33963d526f6ec3b89f87b7993"
   },
-  "canonical_hash": "1d34b6a0fef88f0e09f21ab7662ccd1f8723533ddb107f4da860dd4fb6e2029c"
+  "r114_extension": {
+    "task_id": "TASK172_V0_7_PROJECT_DESIGNED_ENGINEERING_CASE_IDENTITY_R1",
+    "short_name": "R114",
+    "mode": "PROJECT_ENGINEERING_CASE_DESIGN_AND_AUTHORITY_CANDIDATE",
+    "result": "BLOCKED_NATIVE_GEOMETRY_AUTHORITY_PREREQUISITE",
+    "previous_main_head": "13e175fd9f826591dcc285b315fe61c2612fa867",
+    "case_class_target": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+    "case_candidate_created": false,
+    "design_search_started": false,
+    "identities": {
+      "case_id": "UNBOUND",
+      "configuration_id": "UNBOUND",
+      "geometry_id": "UNBOUND",
+      "topology_authority_id": "UNBOUND",
+      "flow_path_mapping_id": "UNBOUND",
+      "physical_compartment_map_id": "UNBOUND",
+      "area_ownership_map_id": "UNBOUND",
+      "length_ownership_map_id": "UNBOUND",
+      "hot_stream_path_id": "UNBOUND",
+      "cold_stream_path_id": "UNBOUND",
+      "production_mesh_profile_authority_id": "UNBOUND"
+    },
+    "blocking_prerequisites": [
+      {
+        "finding_id": "R114-GEOMETRY-01",
+        "authority": "TASK-016 plus TASK-021",
+        "status": "UNBOUND",
+        "reason": "No non-test approved tube geometry record with an adapter-verifiable record hash is present; R114 cannot invent approval provenance."
+      },
+      {
+        "finding_id": "R114-GEOMETRY-02",
+        "authority": "TASK-021",
+        "status": "UNBOUND",
+        "reason": "No applicable approved tube-layout rule artifact binds layout, pitch, and placement. Checked-in internal_seed rules cover only generic identity/hash semantics."
+      },
+      {
+        "finding_id": "R114-GEOMETRY-03",
+        "authority": "TASK-022",
+        "status": "UNBOUND",
+        "reason": "No applicable approved bundle-geometry rule artifact with explicit allowance/minimum fields is present."
+      }
+    ],
+    "native_validation": {
+      "task020": "NOT_RUN_R114_STOPPED_BEFORE_CASE_CONFIGURATION_CONSTRUCTION",
+      "task021": "NOT_RUN_BLOCKED_APPROVED_GEOMETRY_AND_LAYOUT_RULE_AUTHORITY_UNBOUND",
+      "task022": "NOT_RUN_BLOCKED_UPSTREAM_AND_BUNDLE_RULE_AUTHORITY_UNBOUND",
+      "task024": "NOT_RUN_BLOCKED_UPSTREAM",
+      "task166_bell_geometry": "NOT_RUN_BLOCKED_UPSTREAM",
+      "task171_profile_compatibility": "NOT_RUN_BLOCKED_CASE_TOPOLOGY_UNBOUND"
+    },
+    "local_validation": {
+      "static_and_linkage": "PASS",
+      "manifest_d_equals_m": "PASS",
+      "repository_full_regression": "NOT_CLEAN;6862_COLLECTED;6780_PASSED;7_FAILED;70_ERRORS;5_SKIPPED;FAILURE_ATTRIBUTION_NOT_ESTABLISHED",
+      "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES;LOCAL_PROJECT_DISTRIBUTION_NOT_ON_PYPI"
+    },
+    "effective_state": {
+      "operating_state_authority_complete": false,
+      "production_mesh_profile_authority_id": "UNBOUND",
+      "production_mesh_policy_created": false,
+      "independent_review_complete": false,
+      "codex_self_approval": false
+    },
+    "source_audit": {
+      "reviewed_runtime_selectable_tube_geometry_record_found": false,
+      "task016_preview_examples_present_but_ineligible": true,
+      "applicable_approved_tube_layout_rule_found": false,
+      "applicable_approved_bundle_geometry_rule_found": false,
+      "examples_test_fixtures_and_benchmarks_promoted": false,
+      "internal_seed_rules_applicable_to_geometry": false,
+      "evidence_path": "docs/tasks/evidence/TASK-172-project-designed-engineering-case-identity-r1.json",
+      "evidence_canonical_hash": "7c3ce373fda3f75ba36259c68be9f6846e0a2c226783c1edc62e6df121dfd36a"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-project-designed-engineering-case-identity-r1.md",
+      "document_sha256": "500c4299076c38ca3595aae8b25f9937184c3e86d188d04aeece14531cd09c98",
+      "evidence_path": "docs/tasks/evidence/TASK-172-project-designed-engineering-case-identity-r1.json",
+      "evidence_file_sha256": "27b6d0fef8ab36937a43ab0994f23cbbe419e5875f6891e5909111df66efece0",
+      "registry_extension_key": "r114_extension"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task172_implementation_started": false,
+      "production_mesh_policy_created": false,
+      "task173_solve_performed": false,
+      "task174_solve_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "next_gate": "AUTHORIZE_TASK172_PROJECT_DESIGNED_CASE_GEOMETRY_SOURCE_AND_RULE_AUTHORITY_PREREQUISITE_RESOLUTION_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "aedc0732e73416477b0f008463535a69ba471ecd2aa867bbb1b305185a8d8cbc"
+  },
+  "canonical_hash": "f81b5c23b37229040f4f34f7d663c799c6775fdf8a51581c5da3eeee720906b4"
 }
