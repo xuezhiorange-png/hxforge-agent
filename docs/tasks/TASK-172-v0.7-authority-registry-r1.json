@@ -19019,13 +19019,31 @@
     "case_design": {
       "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
       "case_design_path": "docs/tasks/evidence/TASK-172-project-engineering-reference-case-design-r1.json",
-      "case_design_file_sha256": "e04e025a918abf7fc08c7e5acb9b9d773222eed0281a30a5f4b4e74a1514d3a9",
-      "case_design_canonical_hash": "fa0c660cef237103a5ca93066107f37b7067bd14abd4207428fa7bd32753c616",
+      "case_design_file_sha256": "04524496a53506b54b31df45da43c49374ce32ea3b8a7bd36aa418210496a989",
+      "case_design_canonical_hash": "563e76ef594006a205759484f17c141f3daee969d2691baf9bb472d138f848d9",
       "case_design_present": true,
       "case_materialized": false,
       "case_id": "UNBOUND",
       "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
       "production_mesh_profile_authority_id": "UNBOUND"
+    },
+    "source_binding_correction": {
+      "task_id": "TASK172_V0_7_R117_CASE_DESIGN_SOURCE_BINDING_CORRECTION_R1",
+      "finding": "TASK022.maximum_position_count.source_id referenced a non-authoritative ID",
+      "field": "TASK022.maximum_position_count.source_id",
+      "old_source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-R1",
+      "new_source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+      "value": 10000,
+      "value_changed": false,
+      "engineering_semantics_changed": false,
+      "authority_scope_changed": false,
+      "correction_document_path": "docs/tasks/TASK-172-v0.7-r117-case-design-source-binding-correction-r1.md",
+      "correction_document_sha256": "7e9e1dbbe051ca4dcd7bd70b7137ceeb4d41178289b9064d2cc96d92e7bb0f83",
+      "correction_evidence_path": "docs/tasks/evidence/TASK-172-r117-case-design-source-binding-correction-r1.json",
+      "correction_evidence_file_sha256": "0379a2e2e884e4902ea0c123feb0c84beb48795cbbdb29a3468e5f1a84b168f3",
+      "correction_evidence_canonical_hash": "c1537ef3d9f2fed43c7db8b912e03452d5ad9400dab78f3286860298c4112057",
+      "unknown_source_binding_count": 0,
+      "invalid_reviewed_authority_reference_count": 0
     },
     "effective_state": {
       "r114_authority_prerequisite_review_complete": true,
@@ -19074,6 +19092,10 @@
       "native_task021_layout_snapshot_parse_and_hash_validation": true,
       "native_task021_layout_configuration_binding_deferred_without_task020": true,
       "native_task022_rule_snapshot_parse_and_authority_validation": true,
+      "case_design_bound_authority_source_resolution": true,
+      "unknown_source_binding_count": 0,
+      "invalid_reviewed_authority_reference_count": 0,
+      "runtime_snapshots_unchanged_by_source_binding_correction": true,
       "no_case_materialization": true,
       "no_mesh_or_reference_policy_change": true,
       "historical_registry_duplicate_canonical_hash_keys_before": 2,
@@ -19090,10 +19112,12 @@
       "document_path": "docs/tasks/TASK-172-v0.7-runtime-authority-materialization-and-project-engineering-case-design-r1.md",
       "document_sha256": "3d0aedd835062dedeec18a02e5ab276d891c0ae3aad7bc00d9f8fc0731e010a3",
       "evidence_path": "docs/tasks/evidence/TASK-172-runtime-authority-materialization-and-project-engineering-case-design-r1.json",
-      "evidence_file_sha256": "b8b25bae2885b10f47da6ecc937071dabea361c82135a738eed95034e39c6d69",
-      "evidence_canonical_hash": "cd9ec00e355a14dc99b3dedbc29f58ae8e896295dffe9f0087c699ce9e6c21f7",
+      "evidence_file_sha256": "0a88984869deb8514d6704329a97e40a147c188baa7007d59ce371e79f2e8f56",
+      "evidence_canonical_hash": "d232e9fbf569056b08adb0c9e69b0a38ffd43826736ce01411caf7cf2f236229",
       "approval_provenance_sidecar_path": "docs/tasks/evidence/TASK-172-r117-runtime-authority-approval-provenance-r1.json",
       "case_design_path": "docs/tasks/evidence/TASK-172-project-engineering-reference-case-design-r1.json",
+      "source_binding_correction_document_path": "docs/tasks/TASK-172-v0.7-r117-case-design-source-binding-correction-r1.md",
+      "source_binding_correction_evidence_path": "docs/tasks/evidence/TASK-172-r117-case-design-source-binding-correction-r1.json",
       "registry_extension_key": "r117_extension",
       "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
     },
@@ -19117,7 +19141,7 @@
       "next_gate": "R118_PROJECT_ENGINEERING_CASE_NATIVE_GEOMETRY_MATERIALIZATION_ONLY",
       "stop": true
     },
-    "canonical_hash": "1034e5fa0b7843dfca31a4a6f1c9701ebdaa70b91bc51cb3a3f100f7915c2c92"
+    "canonical_hash": "38b08035d19c69b10fa255d50cf89b4624986962a672ca73aeda97377b4ec679"
   },
-  "canonical_hash": "4aa35c34f592ae69b58b3b385f969faad43003cb17210c0d1e2b88b0fbbe47fc"
+  "canonical_hash": "c62efae5ca833b94928ee036b59273cb553ca386884338ab85501f992be2a464"
 }

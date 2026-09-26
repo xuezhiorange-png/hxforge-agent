@@ -98,7 +98,7 @@
         {"field": "required_minimum_radial_clearance_m", "value": "UNBOUND", "unit": "m", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
         {"field": "minimum_bundle_peripheral_allowance_rule_m", "value": "0.00635", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
         {"field": "minimum_radial_clearance_rule_m", "value": "0.00635", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
-        {"field": "maximum_position_count", "value": 10000, "unit": "positions", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-R1"}
+        {"field": "maximum_position_count", "value": 10000, "unit": "positions", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"}
       ]
     },
     {
@@ -163,5 +163,5 @@
     "task173_rating_or_sizing": false,
     "task175_release_acceptance": false
   },
-  "canonical_hash": "fa0c660cef237103a5ca93066107f37b7067bd14abd4207428fa7bd32753c616"
+  "canonical_hash": "563e76ef594006a205759484f17c141f3daee969d2691baf9bb472d138f848d9"
 }
