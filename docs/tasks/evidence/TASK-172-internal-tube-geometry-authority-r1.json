@@ -1,0 +1,72 @@
+{
+  "schema_version": "task172.project-internal-tube-geometry-candidate.r1",
+  "authority_bundle_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+  "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+  "authority_class": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY",
+  "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "project_designed": true,
+  "external_standard_claim": false,
+  "external_vendor_claim": false,
+  "external_as_built_source": false,
+  "source_class": "INTERNAL_ENGINEERING_DESIGN",
+  "standard_claim_status": "NO_STANDARD_CLAIM",
+  "geometry": {
+    "geometry_id": "tube/v07-t172-engineering-reference/od01905-id01575/r1",
+    "geometry_type": "tube",
+    "revision": "R1",
+    "candidate_approval_state": "pending",
+    "outer_diameter_m": "0.01905",
+    "inner_diameter_m": "0.01575",
+    "wall_thickness_m": "0.00165",
+    "cross_section_area_m2": "0.00009019512508456295703",
+    "flow_area_m2": "0.000194827831907779506515625",
+    "hydraulic_diameter_m": "0.01575",
+    "hydraulic_diameter_basis": "INNER_DIAMETER",
+    "area_derivation": {
+      "method": "DECIMAL_CIRCULAR_TUBE_GEOMETRY",
+      "pi_decimal_literal": "3.141592653589793",
+      "cross_section_area_formula": "pi*(outer_diameter_m^2-inner_diameter_m^2)/4",
+      "flow_area_formula": "pi*inner_diameter_m^2/4",
+      "hydraulic_diameter_formula": "inner_diameter_m",
+      "wall_thickness_formula": "(outer_diameter_m-inner_diameter_m)/2",
+      "rounding": "DECIMAL_CONTEXT_PRECISION_50_ROUND_HALF_EVEN_NO_QUANTIZATION"
+    },
+    "design_provenance": {
+      "design_authority_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+      "design_revision": "R1",
+      "design_algorithm_version": "R115_FIXED_INPUT_GEOMETRY_PROJECTION_V1",
+      "base_repository_sha": "15ff79ee39bbf6d162cc50e14a95f682a2f8b8a8",
+      "selection_rule": "EXPLICIT_PROJECT_INPUTS_THEN_DETERMINISTIC_DECIMAL_DERIVATION",
+      "external_source_claimed": false
+    },
+    "source_binding_candidate": {
+      "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-SOURCE-R1",
+      "source_type": "PROJECT_INTERNAL_ENGINEERING_DESIGN",
+      "source_revision": "R1",
+      "source_location": "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md#tube-geometry-source",
+      "evidence_ref": "docs/tasks/evidence/TASK-172-internal-tube-geometry-authority-r1.json#/geometry",
+      "approval_effective": false,
+      "future_approved_by_source": "R116_INDEPENDENT_REVIEW_RECEIPT_ID",
+      "future_approved_at_source": "R116_REVIEW_RECEIPT_TIMESTAMP",
+      "future_runtime_approval_state": "approved"
+    }
+  },
+  "scope": {
+    "case_family": "TASK172_PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE_FAMILY",
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "construction": "FIXED_TUBESHEET",
+    "shell_type": "E_SHELL",
+    "shell_pass_count": 1,
+    "tube_path_type": "STRAIGHT_THROUGH",
+    "declared_tube_pass_count": 1,
+    "flow_arrangement": "COUNTERCURRENT",
+    "steady_state": true,
+    "single_phase": true,
+    "newtonian": true,
+    "global_geometry_standard_created": false,
+    "tema_compliance_claimed": false,
+    "asme_compliance_claimed": false,
+    "manufacturer_catalog_equivalence_claimed": false
+  },
+  "canonical_hash": "d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd"
+}

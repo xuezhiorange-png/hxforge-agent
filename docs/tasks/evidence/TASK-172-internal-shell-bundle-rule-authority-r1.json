@@ -1,0 +1,84 @@
+{
+  "schema_version": "task172.project-internal-shell-bundle-rule-candidate.r1",
+  "authority_bundle_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+  "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+  "authority_class": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY",
+  "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "schema_version_for_runtime_snapshot": "task022.shell-bundle-rule-authority.v1",
+  "profile_id": "hxforge.shell_tube.shell_bundle_geometry.v1",
+  "authority_mode": "INTERNAL_GENERIC",
+  "rule_id": "V07-T172-SHELL-BUNDLE-INTERNAL-R1",
+  "rule_version": "R1",
+  "rule_pack_identity": null,
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "standard_family": "INTERNAL",
+  "standard_claim_status": "NO_STANDARD_CLAIM",
+  "license_evidence": {
+    "form": "project_internal_authority",
+    "value": "project_internal_authority",
+    "authority_class": "PROJECT_INTERNAL_ENGINEERING_RULE",
+    "standard_claim_status": "NO_STANDARD_CLAIM",
+    "external_standard_content_used": false,
+    "restricted_source_content_used": false,
+    "vendor_proprietary_content_used": false
+  },
+  "task012_license_evidence_value": "project_internal_authority",
+  "rule": {
+    "allowed_shell_authority_modes": [
+      "CALLER_SUPPLIED_EXPLICIT"
+    ],
+    "minimum_bundle_peripheral_allowance_m": "0.00635",
+    "minimum_radial_clearance_m": "0.00635",
+    "maximum_position_count": 10000,
+    "numeric_source": "PROJECT_ENGINEERING_DESIGN_DECISION",
+    "external_standard_derivation": false,
+    "approved_shell_geometry_catalog_required": false,
+    "caller_supplied_explicit_shell_inside_diameter_allowed": true
+  },
+  "design_provenance": {
+    "design_authority_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+    "design_revision": "R1",
+    "design_algorithm_version": "R115_FIXED_RULE_DECLARATION_V1",
+    "base_repository_sha": "15ff79ee39bbf6d162cc50e14a95f682a2f8b8a8",
+    "selection_rule": "FREEZE_EXPLICIT_PROJECT_RULE_VALUES_WITHOUT_CASE_BUNDLE_EXECUTION",
+    "external_source_claimed": false
+  },
+  "provenance_edge_ids": [
+    "R115-EDGE-BUNDLE-OWNER-DESIGN",
+    "R115-EDGE-BUNDLE-TASK012-LICENSE",
+    "R115-EDGE-BUNDLE-TASK022-SCHEMA"
+  ],
+  "evidence_refs": [
+    "docs/tasks/TASK-012-standards-rule-pack-license-boundary.md#rule-artifact-fields",
+    "docs/tasks/TASK-022-shell-and-bundle-geometry.md#permitted-authority-strategy",
+    "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md#task-022-bundle-geometry-rule",
+    "docs/tasks/evidence/TASK-172-internal-shell-bundle-rule-authority-r1.json#/rule"
+  ],
+  "candidate_approval_status": "under_review",
+  "approval_effective": false,
+  "future_runtime_materialization": {
+    "approval_status": "approved",
+    "approved_by_source": "R116_INDEPENDENT_REVIEW_RECEIPT_ID",
+    "approved_at_source": "R116_REVIEW_RECEIPT_TIMESTAMP",
+    "rule_artifact_canonical_hash_source": "this_candidate_payload_canonical_hash",
+    "rule_pack_identity": null
+  },
+  "scope": {
+    "case_family": "TASK172_PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE_FAMILY",
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "construction": "FIXED_TUBESHEET",
+    "shell_type": "E_SHELL",
+    "shell_pass_count": 1,
+    "tube_path_type": "STRAIGHT_THROUGH",
+    "declared_tube_pass_count": 1,
+    "flow_arrangement": "COUNTERCURRENT",
+    "steady_state": true,
+    "single_phase": true,
+    "newtonian": true,
+    "global_geometry_standard_created": false,
+    "tema_compliance_claimed": false,
+    "asme_compliance_claimed": false,
+    "manufacturer_catalog_equivalence_claimed": false
+  },
+  "canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282"
+}

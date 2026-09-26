@@ -1,0 +1,167 @@
+{
+  "schema_version": "task172.project-engineering-reference-case-design.r1",
+  "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
+  "case_class": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+  "project_engineering_design": true,
+  "synthetic_fixture": false,
+  "test_fixture": false,
+  "golden_fixture": false,
+  "benchmark_fixture": false,
+  "external_as_built_case": false,
+  "external_measured_case": false,
+  "external_source_claimed": false,
+  "provenance_class": "PROJECT_ENGINEERING_DESIGN_AUTHORITY",
+  "design_revision": "R1",
+  "design_scope_status": "INPUT_CONTRACT_ONLY_NOT_MATERIALIZED",
+  "reviewed_scope": {
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "construction_family": "FIXED_TUBESHEET",
+    "shell_type": "E_SHELL",
+    "shell_pass_count": 1,
+    "tube_path_type": "STRAIGHT_THROUGH",
+    "declared_tube_pass_count": 1,
+    "flow_arrangement": "COUNTERCURRENT",
+    "steady_state": true,
+    "single_phase": true,
+    "newtonian": true,
+    "scope_widening": false
+  },
+  "reviewed_authority_bindings": {
+    "r116_review_receipt_id": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+    "r116_review_receipt_timestamp": "2026-09-26T07:07:31Z",
+    "r116_evidence_canonical_hash": "282fbab992b0e0c6a48e2b9624884900c2ab96f8c49733c868904611a502c9f5",
+    "tube_geometry_authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+    "tube_geometry_candidate_canonical_hash": "d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd",
+    "layout_rule_authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+    "layout_rule_candidate_canonical_hash": "74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0",
+    "bundle_rule_authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+    "bundle_rule_candidate_canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282"
+  },
+  "native_materialization_dag": [
+    "R117_APPROVED_RUNTIME_AUTHORITY_SNAPSHOTS",
+    "TASK020_CONFIGURATION_MATERIALIZATION",
+    "TASK021_TUBE_LAYOUT_ENUMERATION",
+    "TASK022_SHELL_BUNDLE_GEOMETRY",
+    "TASK024_BAFFLE_GEOMETRY",
+    "TASK025_AREA_ACTIVE_TUBE_AND_LENGTH_GEOMETRY",
+    "TASK171_TOPOLOGY_BINDING",
+    "CASE_BOUND_TASK172_AUTHORITY_BINDING",
+    "PRODUCTION_MESH_ADMISSION",
+    "TASK172_RUNTIME_CLOSURE"
+  ],
+  "input_binding_classes": [
+    "BOUND_FROM_REVIEWED_AUTHORITY",
+    "BOUND_FROM_EXISTING_REVIEWED_PROFILE",
+    "EXPLICIT_PROJECT_DESIGN_INPUT",
+    "REQUIRED_BUT_UNBOUND"
+  ],
+  "inputs_by_native_stage": [
+    {
+      "stage": "TASK020",
+      "inputs": [
+        {"field": "equipment_family", "value": "SHELL_AND_TUBE", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_EXISTING_REVIEWED_PROFILE", "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"},
+        {"field": "construction_family", "value": "FIXED_TUBESHEET", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_EXISTING_REVIEWED_PROFILE", "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"},
+        {"field": "shell_pass_count", "value": 1, "unit": "pass", "classification": "BOUND_FROM_EXISTING_REVIEWED_PROFILE", "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"},
+        {"field": "tube_pass_count", "value": 1, "unit": "pass", "classification": "BOUND_FROM_EXISTING_REVIEWED_PROFILE", "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"},
+        {"field": "orientation", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "authority_mode_and_case_revision_binding", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "case_revision_evidence_refs", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null}
+      ]
+    },
+    {
+      "stage": "TASK021",
+      "inputs": [
+        {"field": "tube_geometry_id", "value": "tube/v07-t172-engineering-reference/od01905-id01575/r1", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "tube_outer_diameter_m", "value": "0.01905", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "tube_inner_diameter_m", "value": "0.01575", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "tube_wall_thickness_m", "value": "0.00165", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "cross_section_area_m2", "value": "0.00009019512508456295703", "unit": "m2", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "flow_area_m2", "value": "0.000194827831907779506515625", "unit": "m2", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "hydraulic_diameter_m", "value": "0.01575", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1"},
+        {"field": "layout_rule_id", "value": "V07-T172-LAYOUT-TRIANGULAR-02540-R1", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1"},
+        {"field": "pattern_family", "value": "TRIANGULAR", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1"},
+        {"field": "pitch_m", "value": "0.0254", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1"},
+        {"field": "edge_clearance_m", "value": "0.003175", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1"},
+        {"field": "selected_origin_mode", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "selected_axis_orientation", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "placement_envelope_and_case_exclusion_zones", "value": "UNBOUND", "unit": "m", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "candidate_position_limit", "value": 10000, "unit": "positions", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1"}
+      ]
+    },
+    {
+      "stage": "TASK022",
+      "inputs": [
+        {"field": "shell_bundle_rule_id", "value": "V07-T172-SHELL-BUNDLE-INTERNAL-R1", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
+        {"field": "shell_authority_mode", "value": "CALLER_SUPPLIED_EXPLICIT", "unit": "NOT_APPLICABLE", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
+        {"field": "shell_inside_diameter_m", "value": "UNBOUND", "unit": "m", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "bundle_peripheral_allowance_m", "value": "UNBOUND", "unit": "m", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "required_minimum_radial_clearance_m", "value": "UNBOUND", "unit": "m", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "minimum_bundle_peripheral_allowance_rule_m", "value": "0.00635", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
+        {"field": "minimum_radial_clearance_rule_m", "value": "0.00635", "unit": "m", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"},
+        {"field": "maximum_position_count", "value": 10000, "unit": "positions", "classification": "BOUND_FROM_REVIEWED_AUTHORITY", "source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1"}
+      ]
+    },
+    {
+      "stage": "TASK024",
+      "inputs": [
+        {"field": "baffle_type_count_cut_orientation_spacing_clearance_and_axial_span", "value": "UNBOUND", "unit": "native TASK024 fields", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null}
+      ]
+    },
+    {
+      "stage": "TASK025",
+      "inputs": [
+        {"field": "accepted_tube_length_and_area_request", "value": "UNBOUND", "unit": "native TASK025 fields", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null}
+      ],
+      "native_outputs_not_inputs": [
+        "physical_tube_count",
+        "active_tube_length",
+        "tube_inside_transfer_area",
+        "tube_outside_transfer_area",
+        "geometry_identity_and_hash"
+      ]
+    },
+    {
+      "stage": "TASK171_AND_CASE_BOUND_TASK172",
+      "inputs": [
+        {"field": "explicit_hot_cold_stream_ids_paths_and_opposing_inlet_boundary_bindings", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "case_bound_material_property_wall_correlation_and_numerical_profile_authorities", "value": "UNBOUND", "unit": "NOT_APPLICABLE", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null},
+        {"field": "steady_single_phase_newtonian_operating_state_and_domain_proofs", "value": "UNBOUND", "unit": "native state units", "classification": "REQUIRED_BUT_UNBOUND", "source_id": null}
+      ]
+    }
+  ],
+  "future_identity_slots": {
+    "case_id": "UNBOUND",
+    "configuration_id": "UNBOUND",
+    "case_geometry_id": "UNBOUND",
+    "topology_authority_id": "UNBOUND",
+    "flow_path_mapping_id": "UNBOUND",
+    "physical_compartment_map_id": "UNBOUND",
+    "area_ownership_map_id": "UNBOUND",
+    "length_ownership_map_id": "UNBOUND",
+    "hot_stream_path_id": "UNBOUND",
+    "cold_stream_path_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND"
+  },
+  "case_design_provenance": {
+    "design_authority_id": "TASK172_R117_PROJECT_ENGINEERING_CASE_DESIGN_CONTRACT",
+    "base_repository_sha": "48eaf88d57830719d1ce851dbbe33b96fb1454cb",
+    "r116_review_receipt_id": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+    "external_source_claimed": false,
+    "test_fixture_or_golden_reused": false
+  },
+  "non_actions": {
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "task025_area_length_executed": false,
+    "case_id_created": false,
+    "production_mesh_profile_created": false,
+    "reference_policy_changed": false,
+    "task172_runtime_solve": false,
+    "task174_hydraulic_solve": false,
+    "task173_rating_or_sizing": false,
+    "task175_release_acceptance": false
+  },
+  "canonical_hash": "563e76ef594006a205759484f17c141f3daee969d2691baf9bb472d138f848d9"
+}
