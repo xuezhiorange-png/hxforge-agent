@@ -18734,5 +18734,111 @@
     },
     "canonical_hash": "aedc0732e73416477b0f008463535a69ba471ecd2aa867bbb1b305185a8d8cbc"
   },
-  "canonical_hash": "f81b5c23b37229040f4f34f7d663c799c6775fdf8a51581c5da3eeee720906b4"
+  "r115_extension": {
+    "task_id": "TASK172_V0_7_PROJECT_INTERNAL_GEOMETRY_SOURCE_AND_RULE_AUTHORITY_BUNDLE_R1",
+    "short_name": "R115",
+    "mode": "PROJECT_INTERNAL_GEOMETRY_AUTHORITY_CANDIDATE_CONSTRUCTION_ONLY",
+    "result": "PROJECT_INTERNAL_GEOMETRY_AUTHORITY_BUNDLE_CANDIDATE_COMPLETED",
+    "base_main_sha": "15ff79ee39bbf6d162cc50e14a95f682a2f8b8a8",
+    "authority_bundle": {
+      "authority_bundle_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+      "authority_class": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "project_designed": true,
+      "external_standard_claim": false,
+      "external_vendor_claim": false,
+      "external_as_built_source": false,
+      "codex_self_approval": false,
+      "independent_review_complete": false,
+      "scope_topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"
+    },
+    "candidate_authorities": [
+      {
+        "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+        "source_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-SOURCE-R1",
+        "artifact_path": "docs/tasks/evidence/TASK-172-internal-tube-geometry-authority-r1.json",
+        "file_sha256": "779def0873a1da454d2ddc1f519832023a8a9fd31d2002874992ff119f26cfd6",
+        "canonical_hash": "d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd",
+        "effective_approval": false,
+        "design_values": {
+          "outer_diameter_m": "0.01905",
+          "inner_diameter_m": "0.01575",
+          "wall_thickness_m": "0.00165",
+          "cross_section_area_m2": "0.00009019512508456295703",
+          "flow_area_m2": "0.000194827831907779506515625",
+          "hydraulic_diameter_m": "0.01575"
+        }
+      },
+      {
+        "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+        "artifact_path": "docs/tasks/evidence/TASK-172-internal-tube-layout-rule-authority-r1.json",
+        "file_sha256": "81a0b3eb9603df8705d3353267cdd645d30369d4183b5cb16bcdd359d573f5b9",
+        "canonical_hash": "74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0",
+        "effective_approval": false,
+        "profile_id": "hxforge.shell_tube.tube_layout.v1",
+        "authority_mode": "INTERNAL_GENERIC",
+        "rule_id": "V07-T172-LAYOUT-TRIANGULAR-02540-R1"
+      },
+      {
+        "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+        "artifact_path": "docs/tasks/evidence/TASK-172-internal-shell-bundle-rule-authority-r1.json",
+        "file_sha256": "0ccd0a1483103d939743f700c8a5e8f5dcc662e0a37e39726a095d936da556fc",
+        "canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282",
+        "effective_approval": false,
+        "profile_id": "hxforge.shell_tube.shell_bundle_geometry.v1",
+        "authority_mode": "INTERNAL_GENERIC",
+        "rule_id": "V07-T172-SHELL-BUNDLE-INTERNAL-R1"
+      }
+    ],
+    "prospective_schema_compatibility": {
+      "result": "PASS_PROSPECTIVE_SCHEMA_COMPATIBILITY_ONLY",
+      "temporary_approval_placeholders_persisted": false,
+      "task020_configuration_materialized": false,
+      "task021_layout_executed_as_authority": false,
+      "task022_bundle_geometry_executed_as_authority": false,
+      "task024_baffle_geometry_executed": false,
+      "case_identity_created": false
+    },
+    "effective_state": {
+      "approved_tube_geometry_authority_effective": false,
+      "approved_layout_rule_authority_effective": false,
+      "approved_bundle_rule_authority_effective": false,
+      "r114_native_geometry_prerequisite_resolved": false,
+      "case_id": "UNBOUND",
+      "configuration_id": "UNBOUND",
+      "geometry_id": "UNBOUND",
+      "production_mesh_profile_authority_id": "UNBOUND"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md",
+      "document_sha256": "348f622909202b1faff4c6a2df3dded4b0ad63c760dc046d1f3b81ed2338ae10",
+      "evidence_path": "docs/tasks/evidence/TASK-172-project-internal-geometry-source-rule-authority-bundle-r1.json",
+      "evidence_file_sha256": "804d2a51d5d3146edca51b73a9c9310508b47205d362dfdafe661f299a83631e",
+      "evidence_canonical_hash": "dd4551d7b50d3395465d3d2efbbe0e9718e9ec1f4ce44d0b7ca0355e3a6206ac",
+      "registry_extension_key": "r115_extension",
+      "previous_registry_root_canonical_hash": "f81b5c23b37229040f4f34f7d663c799c6775fdf8a51581c5da3eeee720906b4",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY",
+      "exact_final_head_ci_run": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "governance": {
+      "production_code_changed": false,
+      "task020_configuration_materialized": false,
+      "task021_layout_executed_as_authority": false,
+      "task022_bundle_geometry_executed_as_authority": false,
+      "task024_baffle_geometry_executed": false,
+      "case_identity_created": false,
+      "production_mesh_policy_created": false,
+      "reference_policy_changed": false,
+      "task172_runtime_implementation_started": false,
+      "dependency_changed": false,
+      "lockfile_changed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "no_step_implies_the_next": true,
+      "next_gate": "INDEPENDENT_REVIEW_R115_ONLY",
+      "stop": true
+    },
+    "canonical_hash": "133b41d19d6bbb5f212418bd34121ab9fdfe71411872ea085ebee0f846feaa91"
+  },
+  "canonical_hash": "ee064519f37deff299dfdc7fd33cf40882d4ef9229bb3ea29d829263bf8a42ab"
 }
