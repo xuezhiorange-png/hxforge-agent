@@ -45,7 +45,7 @@ Counts include each native top-level request field and the exact caller-owned ne
 | TASK025 | 28 |
 | **Total** | **98** |
 
-Every required row is either bound to an exact reviewed authority/profile, explicitly designed in this candidate, not applicable under the selected topology/authority mode, or an output that only the named native producer may derive. No required input is left silently blank. Stream/property/material/thermal authorities and topology/case-bound runtime closure remain explicitly deferred outside R118-A; this geometry bundle does not make those downstream gates pass.
+Every required row is either bound to an exact reviewed authority/profile, explicitly designed in this candidate, identified as a native contract constant without a separate reviewed-profile claim, not applicable under the selected topology/authority mode, or an output that only the named native producer may derive. No required input is left silently blank. Stream/property/material/thermal authorities and topology/case-bound runtime closure remain explicitly deferred outside R118-A; this geometry bundle does not make those downstream gates pass.
 
 ## Explicit project design inputs
 
@@ -65,7 +65,7 @@ The complete values, units, rationale, source class, and evidence pointers are m
 | TASK025 geometry authority mode | `INTERNAL_ARITHMETIC_FROM_LENGTH` | Explicit case-level selection of the native accepted geometry-from-length mode; it does not select a thermal or hydraulic solve method. |
 | Baffles | 4 single-segmental, `0.006 m` thick; 5 equal `1.2 m` spaces | Explicit one-case geometry candidate. The spacing sequence sums to the 6 m span; each occupied thickness interval is inside that span and disjoint from its neighbors. |
 | Baffle cut fraction | `0.25657` | Explicit project design selection. With the candidate baffle diameter and R116 triangular row spacing, the native cut-chord formula places the cut between adjacent tube-center rows; the nearest-row distance exceeds the proposed tube-hole radius. No alternatives were searched or ranked. |
-| Baffle cut orientation sequence | `BOTTOM`, `BOTTOM`, `BOTTOM`, `BOTTOM` | Explicit uniform sequence. TASK024's canonical authority requires orientation tokens sorted by enum value; this candidate makes no inferred alternation and no gravity/nozzle claim. |
+| Baffle cut orientation sequence | `BOTTOM`, `BOTTOM`, `BOTTOM`, `BOTTOM` | Explicit project-design sequence in baffle-index semantic order. All four candidate baffles intentionally use BOTTOM orientation; no automatic alternation, lexical sorting, or inference from equipment orientation is applied. |
 | Shell-to-baffle diametral clearance | `0.003 m` | Explicit project geometry input; baffle diameter is then `0.497 m` from the native diametral-clearance relation. |
 | Tube-to-baffle-hole diametral clearance | `0.001 m` | Explicit project geometry input; hole diameter is `0.02005 m` from tube OD plus clearance. This is only a prospective geometric relation, not fabrication approval. |
 
@@ -99,7 +99,9 @@ These are candidate arithmetic/invariant checks, not a TASK022 geometry result o
 
 ## TASK025 caller-input/output separation
 
-The candidate defines the two length authorities as `6 m` with their native reference-plane pairs and explicitly selects the native `INTERNAL_ARITHMETIC_FROM_LENGTH` geometry authority mode. This is a geometry derivation mode only, not a solve method. It proposes that every position accepted by the eventual TASK021 layout participates in both straight-through tube geometry paths, with no inactive position. Actual position IDs and the participation hash cannot exist until TASK021 produces its native layout, so those are classified `DERIVED_ONLY_BY_NATIVE_PRODUCER`; R118-A does not invent position IDs.
+The candidate mirrors the exact TASK025 native object shape: `internal_flow_authority.start_plane` and `.end_plane`, and `heat_transfer_authority.start_plane` and `.end_plane`, each contain a `ReferencePlanePair` object with `start` and `end` members. Both start/end values use the corresponding canonical native pair. The two length hashes were replayed with the native hash functions and are unchanged. `profile_id=profile-001` is accepted by the native `SUPPORTED_PROFILE_IDS` constant, but no separate reviewed engineering-profile authority was found; the matrix classifies it as `NATIVE_CONTRACT_CONSTANT_ONLY`, not as an already-bound reviewed profile.
+
+The candidate defines the two length authorities as `6 m` and explicitly selects the native `INTERNAL_ARITHMETIC_FROM_LENGTH` geometry authority mode. This is a geometry derivation mode only, not a solve method. It proposes that every position accepted by the eventual TASK021 layout participates in both straight-through tube geometry paths, with no inactive position. Actual position IDs and the participation hash cannot exist until TASK021 produces its native layout, so those are classified `DERIVED_ONLY_BY_NATIVE_PRODUCER`; R118-A does not invent position IDs.
 
 TASK025's physical tube count, flow area, wetted perimeter, hydraulic diameter, internal volume, and heat-transfer surface area are native-derived outputs, not R118-A caller inputs. No historical v0.1 `4.85 m` / `8 tubes` fixture values are reused.
 

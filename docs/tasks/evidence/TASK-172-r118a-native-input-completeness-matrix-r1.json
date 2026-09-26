@@ -15,6 +15,7 @@
   "binding_classes": [
     "ALREADY_BOUND_REVIEWED_AUTHORITY",
     "ALREADY_BOUND_REVIEWED_PROFILE",
+    "NATIVE_CONTRACT_CONSTANT_ONLY",
     "DERIVED_ONLY_BY_NATIVE_PRODUCER",
     "PROJECT_ENGINEERING_INPUT_REQUIRED",
     "NOT_APPLICABLE",
@@ -32,7 +33,8 @@
   "binding_class_counts": {
     "PROJECT_ENGINEERING_INPUT_REQUIRED": 47,
     "ALREADY_BOUND_REVIEWED_AUTHORITY": 14,
-    "ALREADY_BOUND_REVIEWED_PROFILE": 10,
+    "ALREADY_BOUND_REVIEWED_PROFILE": 5,
+    "NATIVE_CONTRACT_CONSTANT_ONLY": 5,
     "DERIVED_ONLY_BY_NATIVE_PRODUCER": 23,
     "NOT_APPLICABLE": 4
   },
@@ -112,21 +114,21 @@
     ["TASK024","evidence_refs",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R118A candidate provenance","true","sorted unique R118A and R116 authority references","R118A evidence#/candidate_inputs/TASK024","TASK024 parser"],
 
     ["TASK025","schema_version",true,"ALREADY_BOUND_REVIEWED_AUTHORITY","R117_CASE_DESIGN_SCHEMA_BOUND","TASK025 task025.request.v1","true","task025.request.v1","R118A evidence#/candidate_inputs/TASK025","TASK025 request parser"],
-    ["TASK025","profile_id",true,"ALREADY_BOUND_REVIEWED_PROFILE","profile-001 is native supported profile","TASK025 SUPPORTED_PROFILE_IDS","true","profile-001","TASK025 request.py","TASK025 request validator"],
+    ["TASK025","profile_id",true,"NATIVE_CONTRACT_CONSTANT_ONLY","profile-001 is native supported profile","TASK025 SUPPORTED_PROFILE_IDS constant; no separate reviewed engineering profile authority found","true","profile-001","TASK025 request.py","TASK025 request validator"],
     ["TASK025","task020_configuration",true,"DERIVED_ONLY_BY_NATIVE_PRODUCER","UNBOUND","TASK020 output not materialized","true","TASK020 native output at R118-C","R118A evidence#/candidate_inputs/TASK025/upstream","TASK025 consumer"],
     ["TASK025","task021_layout",true,"DERIVED_ONLY_BY_NATIVE_PRODUCER","UNBOUND","TASK021 output not materialized","true","TASK021 native output at R118-C","R118A evidence#/candidate_inputs/TASK025/upstream","TASK025 consumer"],
     ["TASK025","internal_flow_authority",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 internal flow length UNBOUND","true","6 m; internal-flow reference-plane pairs; native length hash","R118A evidence#/candidate_inputs/TASK025/internal_flow_authority","TASK025 scheduler"],
     ["TASK025","internal_flow_authority.length_id",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 internal length UNBOUND","true","V07-T172-R118A-INTERNAL-FLOW-LENGTH-R1","R118A evidence#/candidate_inputs/TASK025/internal_flow_authority","TASK025 request validator"],
     ["TASK025","internal_flow_authority.length_m",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 internal length UNBOUND","true","6 m","R118A evidence#/design_decisions/tube_lengths","TASK025 geometry producer later"],
-    ["TASK025","internal_flow_authority.start_plane",true,"ALREADY_BOUND_REVIEWED_PROFILE","UNBOUND","TASK025 ReferencePlanePair closed enum","true","TUBE_INTERNAL_FLOW_START_PLANE + TUBE_INTERNAL_FLOW_END_PLANE pair","TASK025 owned_enums.py","TASK025 request validator"],
-    ["TASK025","internal_flow_authority.end_plane",true,"ALREADY_BOUND_REVIEWED_PROFILE","UNBOUND","TASK025 ReferencePlanePair closed enum","true","TUBE_INTERNAL_FLOW_START_PLANE + TUBE_INTERNAL_FLOW_END_PLANE pair","TASK025 owned_enums.py","TASK025 request validator"],
+    ["TASK025","internal_flow_authority.start_plane",true,"NATIVE_CONTRACT_CONSTANT_ONLY","UNBOUND","TASK025 ReferencePlanePair closed enum","true",{"start":"TUBE_INTERNAL_FLOW_START_PLANE","end":"TUBE_INTERNAL_FLOW_END_PLANE"},"TASK025 owned_enums.py; canonical_internal_flow_pair()","TASK025 request validator"],
+    ["TASK025","internal_flow_authority.end_plane",true,"NATIVE_CONTRACT_CONSTANT_ONLY","UNBOUND","TASK025 ReferencePlanePair closed enum","true",{"start":"TUBE_INTERNAL_FLOW_START_PLANE","end":"TUBE_INTERNAL_FLOW_END_PLANE"},"TASK025 owned_enums.py; canonical_internal_flow_pair()","TASK025 request validator"],
     ["TASK025","internal_flow_authority.authority_mode",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","TASK025 defines a closed accepted mode; no case selection existed in R117","true","INTERNAL_ARITHMETIC_FROM_LENGTH","R118A evidence#/design_decisions/hydraulic_authority_mode","TASK025 scheduler"],
     ["TASK025","internal_flow_authority.length_hash",true,"DERIVED_ONLY_BY_NATIVE_PRODUCER","UNBOUND","TASK025 native internal_flow_authority_length_hash","true","90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35","R118A evidence#/candidate_inputs/TASK025/internal_flow_authority","TASK025 hash DAG"],
     ["TASK025","heat_transfer_authority",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 heat transfer length UNBOUND","true","6 m; heat-transfer reference-plane pairs; native length hash","R118A evidence#/candidate_inputs/TASK025/heat_transfer_authority","TASK025 scheduler"],
     ["TASK025","heat_transfer_authority.length_id",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 heat-transfer length UNBOUND","true","V07-T172-R118A-HEAT-TRANSFER-LENGTH-R1","R118A evidence#/candidate_inputs/TASK025/heat_transfer_authority","TASK025 request validator"],
     ["TASK025","heat_transfer_authority.length_m",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","R117 heat-transfer length UNBOUND","true","6 m","R118A evidence#/design_decisions/tube_lengths","TASK025 geometry producer later"],
-    ["TASK025","heat_transfer_authority.start_plane",true,"ALREADY_BOUND_REVIEWED_PROFILE","UNBOUND","TASK025 ReferencePlanePair closed enum","true","TUBE_HEAT_TRANSFER_START_PLANE + TUBE_HEAT_TRANSFER_END_PLANE pair","TASK025 owned_enums.py","TASK025 request validator"],
-    ["TASK025","heat_transfer_authority.end_plane",true,"ALREADY_BOUND_REVIEWED_PROFILE","UNBOUND","TASK025 ReferencePlanePair closed enum","true","TUBE_HEAT_TRANSFER_START_PLANE + TUBE_HEAT_TRANSFER_END_PLANE pair","TASK025 owned_enums.py","TASK025 request validator"],
+    ["TASK025","heat_transfer_authority.start_plane",true,"NATIVE_CONTRACT_CONSTANT_ONLY","UNBOUND","TASK025 ReferencePlanePair closed enum","true",{"start":"TUBE_HEAT_TRANSFER_START_PLANE","end":"TUBE_HEAT_TRANSFER_END_PLANE"},"TASK025 owned_enums.py; canonical_heat_transfer_pair()","TASK025 request validator"],
+    ["TASK025","heat_transfer_authority.end_plane",true,"NATIVE_CONTRACT_CONSTANT_ONLY","UNBOUND","TASK025 ReferencePlanePair closed enum","true",{"start":"TUBE_HEAT_TRANSFER_START_PLANE","end":"TUBE_HEAT_TRANSFER_END_PLANE"},"TASK025 owned_enums.py; canonical_heat_transfer_pair()","TASK025 request validator"],
     ["TASK025","heat_transfer_authority.authority_mode",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","TASK025 defines a closed accepted mode; no case selection existed in R117","true","INTERNAL_ARITHMETIC_FROM_LENGTH","R118A evidence#/design_decisions/hydraulic_authority_mode","TASK025 scheduler"],
     ["TASK025","heat_transfer_authority.length_hash",true,"DERIVED_ONLY_BY_NATIVE_PRODUCER","UNBOUND","TASK025 native heat_transfer_authority_length_hash","true","e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da","R118A evidence#/candidate_inputs/TASK025/heat_transfer_authority","TASK025 hash DAG"],
     ["TASK025","hydraulic_participation_authority",true,"DERIVED_ONLY_BY_NATIVE_PRODUCER","UNBOUND","TASK021 native layout position IDs do not yet exist","true","all accepted TASK021 position IDs active; inactive list empty; no R118-A position IDs minted","R118A evidence#/candidate_inputs/TASK025/hydraulic_participation_authority","TASK025 scheduler"],
@@ -152,6 +154,6 @@
     "golden_fixture_reuse_count": 0,
     "external_standard_claim_count": 0,
     "project_design_value_provenance_complete": true,
-    "canonical_hash": "5bc67c2134aa0451aeb970675d12d38e26e1a3754efec5faf37735f5d5b8fe80"
+    "canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379"
   }
 }

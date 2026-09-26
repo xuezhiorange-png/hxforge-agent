@@ -19187,8 +19187,8 @@
     },
     "native_input_completeness": {
       "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
-      "matrix_file_sha256": "3ca3fb7768ecb0eb1e0533a43ac4cbd243a1d0017f8ef07a0cc5b811450d4857",
-      "matrix_canonical_hash": "5bc67c2134aa0451aeb970675d12d38e26e1a3754efec5faf37735f5d5b8fe80",
+      "matrix_file_sha256": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
+      "matrix_canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
       "stage_counts": {
         "TASK020": 18,
         "TASK021": 13,
@@ -19200,11 +19200,21 @@
       "binding_class_counts": {
         "PROJECT_ENGINEERING_INPUT_REQUIRED": 47,
         "ALREADY_BOUND_REVIEWED_AUTHORITY": 14,
-        "ALREADY_BOUND_REVIEWED_PROFILE": 10,
+        "ALREADY_BOUND_REVIEWED_PROFILE": 5,
+        "NATIVE_CONTRACT_CONSTANT_ONLY": 5,
         "DERIVED_ONLY_BY_NATIVE_PRODUCER": 23,
         "NOT_APPLICABLE": 4
       },
       "missing_required_input_classification_count": 0,
+      "native_contract_constant_input_count": 5,
+      "task025_native_field_name_mismatch_count": 0,
+      "task025_native_object_shape_mismatch_count": 0,
+      "task025_profile_id": "profile-001",
+      "task025_profile_native_supported": true,
+      "task025_profile_review_authority_status": "NATIVE_CONTRACT_CONSTANT_ONLY",
+      "task025_length_hash_semantics_changed": false,
+      "task024_orientation_ordering_semantics": "BAFFLE_INDEX_SEMANTIC_ORDER",
+      "task024_lexical_sort_requirement_claim_present": false,
       "hidden_default_count": 0,
       "project_design_value_provenance_complete": true
     },
@@ -19220,18 +19230,22 @@
     },
     "artifacts": {
       "document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
-      "document_sha256": "52499a0efb981d5b1e2eebcbcb1177293a6ae3cc160437ad4f125e183665f524",
+      "document_sha256": "5925b703def5e03f428e38e356e7fe3767e30908a6721fa9cfa813ddc66ee07c",
       "evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
-      "evidence_file_sha256": "0b12afeefd0b4c10af122832f3de8546bb3a403ed3d3ee40c5fea3cef11d84c1",
-      "evidence_canonical_hash": "eb29486815c9313857882339854e897ae8891b8298b1ed5c627010aa26098dae",
+      "evidence_file_sha256": "8553ed8eb19f3a30b5c9854ae461fb2aa7fd1ea7ad2d33a8711363b8b495c03f",
+      "evidence_canonical_hash": "c5c063bcee24fdacdf1c097aa220b6ce52ba1f3628b1ddae3021fb0a648f2ddc",
       "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
-      "matrix_file_sha256": "3ca3fb7768ecb0eb1e0533a43ac4cbd243a1d0017f8ef07a0cc5b811450d4857",
-      "matrix_canonical_hash": "5bc67c2134aa0451aeb970675d12d38e26e1a3754efec5faf37735f5d5b8fe80",
+      "matrix_file_sha256": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
+      "matrix_canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
       "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
     },
     "validation": {
       "predecessor_and_historical_replay": "PASS",
       "native_required_field_audit": "PASS_98_FIELDS",
+      "task025_native_field_name_and_object_shape": "PASS_ZERO_MISMATCHES",
+      "task025_native_length_hash_replay": "PASS_UNCHANGED",
+      "task025_profile_review_authority_status": "NATIVE_CONTRACT_CONSTANT_ONLY",
+      "task024_orientation_ordering_semantics": "PASS_BAFFLE_INDEX_ORDER_NO_LEXICAL_SORT_CLAIM",
       "prospective_native_schema_compatibility": "PASS_PREFLIGHT_ONLY",
       "prospective_geometry_coherence": "PASS_PREFLIGHT_ONLY",
       "no_hidden_defaults": true,
@@ -19245,7 +19259,7 @@
       "mypy_ci_scope": "PASS",
       "manifest_d_equals_m": "PASS_256_DISCOVERED_256_MANIFEST",
       "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_SKIPPED_BY_PYPI_AUDIT",
-      "registry_append_only": "PASS_R118A_EXTENSION_ONLY_HISTORIC_EXTENSIONS_UNCHANGED",
+      "registry_append_only": "PASS_R118A_CURRENT_BINDING_CORRECTION_AND_R118A_CORRECTION_APPEND_R1_R117_UNCHANGED",
       "historical_duplicate_canonical_hash_keys_preserved": 2,
       "new_duplicate_json_keys": 0,
       "exact_final_head_ci": "MUST_BE_REPORTED_AFTER_FINAL_COMMIT"
@@ -19275,7 +19289,158 @@
       "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
       "stop": true
     },
-    "canonical_hash": "543dd09597b2c8dde686f6015f7a7cca07bae5b42723d08b937b447929cc9921"
+    "canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5"
   },
-  "canonical_hash": "fb0062b27af2aae19b87ad1592aaa2be7aa7d80076768112e5fe94dc1d0a5069"
+  "r118a_correction_extension": {
+    "task_id": "TASK172_V0_7_R118A_INDEPENDENT_REVIEW_NATIVE_BINDING_CORRECTION_R1",
+    "short_name": "R118A-CORRECTION-R1",
+    "mode": "R118A_REVIEW_FINDINGS_CORRECTION_ONLY",
+    "result": "R118A_INDEPENDENT_REVIEW_NATIVE_BINDING_FINDINGS_CORRECTED",
+    "authorized_predecessor_head": "ea44d10b8eadc25f8d86d533a173a16c5b346f02",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "review_findings": {
+      "task025_native_shape": {
+        "field_name_mismatch_count": 0,
+        "object_shape_mismatch_count": 0,
+        "reference_plane_pair_fields": [
+          "start_plane",
+          "end_plane"
+        ],
+        "native_object_projection": {
+          "start": "ReferencePlaneToken",
+          "end": "ReferencePlaneToken"
+        },
+        "internal_flow_length_hash_before": "90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35",
+        "internal_flow_length_hash_after": "90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35",
+        "heat_transfer_length_hash_before": "e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da",
+        "heat_transfer_length_hash_after": "e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da",
+        "length_hash_semantics_changed": false,
+        "task025_result_producer_invoked": false
+      },
+      "task024_orientation_rationale": {
+        "orientation_sequence": [
+          "BOTTOM",
+          "BOTTOM",
+          "BOTTOM",
+          "BOTTOM"
+        ],
+        "sequence_changed": false,
+        "ordering_semantics": "BAFFLE_INDEX_SEMANTIC_ORDER",
+        "lexical_sort_claim_removed": true
+      },
+      "task025_profile": {
+        "profile_id": "profile-001",
+        "native_supported": true,
+        "review_authority_status": "NATIVE_CONTRACT_CONSTANT_ONLY",
+        "separate_reviewed_profile_authority_found": false
+      }
+    },
+    "candidate_artifact_bindings": {
+      "r118a_document_sha256_before": "52499a0efb981d5b1e2eebcbcb1177293a6ae3cc160437ad4f125e183665f524",
+      "r118a_document_sha256_after": "5925b703def5e03f428e38e356e7fe3767e30908a6721fa9cfa813ddc66ee07c",
+      "r118a_evidence_file_sha256_before": "0b12afeefd0b4c10af122832f3de8546bb3a403ed3d3ee40c5fea3cef11d84c1",
+      "r118a_evidence_canonical_hash_before": "eb29486815c9313857882339854e897ae8891b8298b1ed5c627010aa26098dae",
+      "r118a_evidence_file_sha256_after": "8553ed8eb19f3a30b5c9854ae461fb2aa7fd1ea7ad2d33a8711363b8b495c03f",
+      "r118a_evidence_canonical_hash_after": "c5c063bcee24fdacdf1c097aa220b6ce52ba1f3628b1ddae3021fb0a648f2ddc",
+      "matrix_file_sha256_before": "3ca3fb7768ecb0eb1e0533a43ac4cbd243a1d0017f8ef07a0cc5b811450d4857",
+      "matrix_canonical_hash_before": "5bc67c2134aa0451aeb970675d12d38e26e1a3754efec5faf37735f5d5b8fe80",
+      "matrix_file_sha256_after": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
+      "matrix_canonical_hash_after": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
+      "previous_r118a_extension_canonical_hash": "543dd09597b2c8dde686f6015f7a7cca07bae5b42723d08b937b447929cc9921",
+      "r118a_extension_canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5",
+      "previous_registry_root_canonical_hash": "fb0062b27af2aae19b87ad1592aaa2be7aa7d80076768112e5fe94dc1d0a5069"
+    },
+    "preservation": {
+      "engineering_value_change_count": 0,
+      "engineering_semantics_changed": false,
+      "authority_scope_changed": false,
+      "production_code_changed": false,
+      "native_geometry_execution_count": 0,
+      "r1_r117_historical_payloads_immutable": true,
+      "historical_registry_repair_authorized": false,
+      "preexisting_duplicate_json_keys_preserved": 2,
+      "new_duplicate_json_keys": 0
+    },
+    "predecessor_ci_history": {
+      "run_id": 36242834553,
+      "attempt_1": {
+        "conclusion": "cancelled",
+        "total_jobs": 49,
+        "success": 39,
+        "skipped": 8,
+        "failed": 1,
+        "cancelled": 1,
+        "cancelled_job": "shard-merge-ref",
+        "cancelled_job_id": 108406681318,
+        "cancelled_step": "Run shard with real telemetry",
+        "cancelled_step_status_at_job_end": "in_progress",
+        "job_timeout_minutes": 30,
+        "final_gate_failure_is_downstream": true
+      },
+      "attempt_2": {
+        "conclusion": "success",
+        "head_sha": "ea44d10b8eadc25f8d86d533a173a16c5b346f02",
+        "total_jobs": 50,
+        "success": 45,
+        "skipped": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "final_gate": "success"
+      }
+    },
+    "validation": {
+      "predecessor_head_replay": "PASS",
+      "r118a_attempt2_ci_replay": "PASS",
+      "task025_native_shape_and_hash_replay": "PASS",
+      "task025_profile_classification": "PASS_NATIVE_CONTRACT_CONSTANT_ONLY",
+      "task024_orientation_semantics": "PASS_BAFFLE_INDEX_ORDER",
+      "prospective_layout_bundle_baffle_replay": "PASS_IN_MEMORY_OR_ARITHMETIC_ONLY",
+      "historical_immutability": "PASS_R1_R117",
+      "git_diff_check": "PASS",
+      "ruff": "PASS",
+      "ruff_format": "PASS",
+      "mypy_ci_scope": "PASS",
+      "manifest_d_equals_m": "PASS_256_DISCOVERED_256_MANIFEST",
+      "lock_sync": "PASS",
+      "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_SKIPPED_BY_PYPI_AUDIT",
+      "local_full_regression": "NOT_EXECUTED",
+      "exact_final_head_ci": "RECORDED_AFTER_FINAL_HEAD"
+    },
+    "candidate_lifecycle": {
+      "r118a_input_authority_candidate_present": true,
+      "r118a_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "independent_review_complete": false,
+      "r118b_started": false,
+      "task020_configuration_materialized": false,
+      "task021_layout_executed_as_authority": false,
+      "task022_bundle_geometry_executed_as_authority": false,
+      "task024_baffle_geometry_executed": false,
+      "task025_area_length_executed": false,
+      "case_id": "UNBOUND",
+      "configuration_id": "UNBOUND",
+      "geometry_id": "UNBOUND",
+      "production_mesh_profile_authority_id": "UNBOUND",
+      "real_case_mesh_admissible": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+      "stop": true
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r118a-independent-review-native-binding-correction-r1.md",
+      "document_sha256": "51bb4d2011f0f22c61af99243d2517d1158979178a6d9304b3105058c3f78422",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r118a-independent-review-native-binding-correction-r1.json",
+      "evidence_file_sha256": "6d979675fdbeaa76869ea5ab4ee0675acd324e976cfc1f58690020231961f8b8",
+      "evidence_canonical_hash": "d906412c99c4701e4c86f5a154329a842a04d02d9fa585d0dbf379fe0fc862ed",
+      "r118a_extension_canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5",
+      "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
+    },
+    "canonical_hash": "b6565728118e29a0407eb0a4eb34043dbfa64be0b5ffeb0b5f95a0ce8d0a923c"
+  },
+  "canonical_hash": "746d43f6b1d3859c5cdc75340e945367e54e9951a496af7d32d40452156c806f"
 }
