@@ -56,6 +56,47 @@
     "invalid_reviewed_authority_reference_count": 0,
     "replay_status": "PASS"
   },
+  "task171_topology_compatibility": {
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "reviewed_shell_type": "E_SHELL",
+    "native_required_shell_token": "E",
+    "projected_task020_shell_token": "E",
+    "shell_token_binding": {
+      "field": "shell_token",
+      "classification": "ALREADY_BOUND_REVIEWED_PROFILE",
+      "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "semantic_binding": "E_SHELL -> TASK020 native component_tokens.shell \"E\"",
+      "standard_claim": false,
+      "tema_compliance_claimed": false,
+      "asme_compliance_claimed": false,
+      "vendor_equivalence_claimed": false
+    },
+    "reviewed_profile_artifact": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+    "reviewed_profile_artifact_sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+    "reviewed_scope_artifact": "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md",
+    "reviewed_scope_artifact_sha256": "ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca",
+    "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+    "native_requirement_source": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/native.py",
+    "native_requirement_source_sha256": "ab2740ae9eb0f00d53f3bc5bff68dd6c15d6627872af93b6cd0fb4422934cf3e",
+    "native_profile_constants_source": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/authority.py",
+    "native_profile_constants_source_sha256": "792caaaca1c70c7bc021dc211d6e2786ebcbc39d0a674700278f8aafb8da757f",
+    "compatibility": "PASS_STATIC_REPLAY",
+    "native_replay_executed": false
+  },
+  "r118c_execution_order": {
+    "required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
+    "future_native_dag": [
+      "TASK014_NATIVE_CASE_REVISION",
+      "TASK020_CONFIGURATION",
+      "TASK021_LAYOUT",
+      "TASK022_BUNDLE_GEOMETRY",
+      "TASK024_BAFFLE_GEOMETRY",
+      "TASK025_TUBE_SIDE_GEOMETRY"
+    ],
+    "dag_executed": false,
+    "task014_native_case_revision_materialized": false,
+    "task014_native_case_revision_committed": false
+  },
   "frozen_runtime_authorities": {
     "tube_geometry": {
       "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
@@ -97,7 +138,6 @@
   "design_decisions": [
     {"field":"orientation","value":"HORIZONTAL","unit":"NOT_APPLICABLE","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"One explicit orientation from TASK020's closed set; not used to infer baffle cut, nozzle location, gravity behavior, or mechanical adequacy.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
     {"field":"front_head_token","value":"T172_FRONT","unit":"NOT_APPLICABLE","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"Opaque internal-generic structure token under TASK020; it encodes no standard/vendor claim.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
-    {"field":"shell_token","value":"T172_SHELL","unit":"NOT_APPLICABLE","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"Opaque internal-generic structure token under TASK020; shell dimensions remain explicit caller input in TASK022.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
     {"field":"rear_head_token","value":"T172_REAR","unit":"NOT_APPLICABLE","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"Opaque internal-generic structure token under TASK020; it encodes no standard/vendor claim.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
     {"field":"tube_center_envelope_diameter_m","value":"0.45","unit":"m","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"A placement envelope chosen for this case only; distinct from shell ID, bundle diameter, and baffle diameter.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
     {"field":"origin_mode","value":"CENTER_ON_LATTICE_POINT","unit":"NOT_APPLICABLE","classification":"EXPLICIT_PROJECT_DESIGN_INPUT","design_rationale":"Explicit case selection from the closed set permitted by the reviewed layout rule.","source_type":"PROJECT_INTERNAL_ENGINEERING_DESIGN","external_standard_claim":false,"evidence_ref":"docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#project-design-inputs"},
@@ -128,13 +168,17 @@
       "case_id": "UNBOUND",
       "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
       "revision_number": 1,
+      "native_case_revision_materialized": false,
+      "native_case_revision_committed": false,
       "status_proposal_only": "committed",
+      "status_is_projection_only": true,
+      "persisted_status": "UNMATERIALIZED",
       "status_semantics": "Future TASK020 eligibility target only after native TASK014 validation and commit; not a current persisted or committed revision.",
       "payload": {
         "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
         "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
         "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
-        "configuration": {"equipment_family":"SHELL_AND_TUBE","authority_mode":"INTERNAL_GENERIC","construction_family":"FIXED_TUBESHEET","orientation":"HORIZONTAL","shell_pass_count":1,"tube_pass_count":1,"front_head_token":"T172_FRONT","shell_token":"T172_SHELL","rear_head_token":"T172_REAR","standard_system_id":null,"requested_rule_pack_identity":null},
+        "configuration": {"equipment_family":"SHELL_AND_TUBE","authority_mode":"INTERNAL_GENERIC","construction_family":"FIXED_TUBESHEET","orientation":"HORIZONTAL","shell_pass_count":1,"tube_pass_count":1,"front_head_token":"T172_FRONT","shell_token":"E","rear_head_token":"T172_REAR","standard_system_id":null,"requested_rule_pack_identity":null},
         "authority_bindings": {
           "tube_geometry": {"authority_id":"V07-T172-INTERNAL-TUBE-GEOMETRY-R1","canonical_hash":"d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd","runtime_snapshot_hash":"ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2"},
           "layout_rule": {"authority_id":"V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1","canonical_hash":"74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0","runtime_snapshot_hash":"a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319"},
@@ -147,14 +191,14 @@
       },
       "identity": {"candidate_revision_id":"V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1","case_design_id":"V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1","revision_number":1,"topology_profile_id":"V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"},
       "provenance": {"authority_bundle_id":"V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1","r116_review_receipt_id":"V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116","r116_evidence_canonical_hash":"282fbab992b0e0c6a48e2b9624884900c2ab96f8c49733c868904611a502c9f5","design_authority_id":"TASK172_V0_7_R118A_PROJECT_ENGINEERING_CASE_INPUT_AUTHORITY","source_class":"PROJECT_INTERNAL_ENGINEERING_DESIGN_AUTHORITY","external_standard_claim":false,"external_vendor_claim":false,"external_as_built_source":false},
-      "payload_hash": "5e50200b66d6e7d52139c563b66fedabbdb0255e6208e55981cc2cb870289792",
-      "domain_snapshot_hash": "0cc674b6f6e45741bb5364064ea80f14be5d29d9d313dd5e6d00039aac916558",
+      "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+      "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
       "hash_method": "hexagent.case_revisions.canonical.compute_payload_hash and compute_domain_snapshot_hash",
       "hashes_replay_required": true
     },
     "TASK020": {
       "schema_version": "task020.configuration-request.v1",
-      "case_authority": {"revision_id":"V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1","payload_hash":"5e50200b66d6e7d52139c563b66fedabbdb0255e6208e55981cc2cb870289792","domain_snapshot_hash":"0cc674b6f6e45741bb5364064ea80f14be5d29d9d313dd5e6d00039aac916558","status":"committed"},
+      "case_authority": {"revision_id":"V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1","payload_hash":"255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817","domain_snapshot_hash":"376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802","status":"committed"},
       "equipment_family": "SHELL_AND_TUBE",
       "authority_mode": "INTERNAL_GENERIC",
       "construction_family": "FIXED_TUBESHEET",
@@ -162,7 +206,7 @@
       "shell_pass_count": 1,
       "tube_pass_count": 1,
       "front_head_token": "T172_FRONT",
-      "shell_token": "T172_SHELL",
+      "shell_token": "E",
       "rear_head_token": "T172_REAR",
       "standard_system_id": null,
       "requested_rule_pack_identity": null,
@@ -171,6 +215,8 @@
     "TASK020_projection_metadata": {
       "proposed_native_request_projection_not_executable": true,
       "case_authority_status_semantics": "committed is a future eligibility target only after TASK014 native validation and commit; no committed CaseRevision exists in R118-A.",
+      "case_authority_status_is_projection_only": true,
+      "persisted_case_revision_status": "UNMATERIALIZED",
       "native_configuration_created": false
     },
     "TASK021": {
@@ -282,9 +328,9 @@
     "task024_required_field_count": 23,
     "task025_required_field_count": 28,
     "total_task020_to_task025_required_field_count": 98,
-    "project_design_input_count": 47,
-    "distinct_project_design_decision_count": 25,
-    "already_bound_authority_or_profile_input_count": 19,
+    "project_design_input_count": 46,
+    "distinct_project_design_decision_count": 24,
+    "already_bound_authority_or_profile_input_count": 20,
     "native_contract_constant_input_count": 5,
     "derived_native_output_or_authority_count": 23,
     "not_applicable_count": 4,
@@ -303,6 +349,8 @@
     "baffle_orientation_sequence_changed": false,
     "baffle_orientation_ordering_semantics": "BAFFLE_INDEX_SEMANTIC_ORDER",
     "lexical_sort_requirement_claim_present": false,
+    "shell_token_project_design_decision_present": false,
+    "shell_token_reviewed_profile_binding_present": true,
     "project_design_value_provenance_complete": true
   },
   "validation": {
@@ -314,6 +362,12 @@
     "native_task022_required_field_audit": "PASS",
     "native_task024_required_field_audit": "PASS",
     "native_task025_required_field_audit": "PASS",
+    "task171_reviewed_profile_replay": "PASS",
+    "task171_native_required_shell_token": "E",
+    "r118a_task020_shell_token": "E",
+    "task171_shell_token_compatibility": "PASS_STATIC_REPLAY",
+    "task171_native_replay_executed": false,
+    "known_downstream_hard_predicate_mismatch_count": 0,
     "missing_required_input_classification_count": 0,
     "hidden_default_count": 0,
     "fixture_reuse_count": 0,
@@ -324,6 +378,9 @@
     "prospective_geometry_coherence": "PASS_ARITHMETIC_AND_TASK021_ENUMERATION_PREFLIGHT_ONLY",
     "r118a_self_approval": false,
     "native_geometry_execution_count": 0,
+    "task014_native_case_revision_materialized": false,
+    "task014_native_case_revision_committed": false,
+    "r118c_required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
     "r1_r117_historical_immutability": "PASS",
     "registry_append_only": "PASS_R118A_EXTENSION_ONLY_HISTORIC_EXTENSIONS_UNCHANGED",
     "no_new_duplicate_json_keys": "PASS_TWO_PREEXISTING_KEYS_PRESERVED_ZERO_NEW",
@@ -348,6 +405,10 @@
     "independent_review_complete": false,
     "codex_self_approval": false,
     "production_code_changed": false,
+    "task014_revision_candidate_present": true,
+    "task014_native_case_revision_materialized": false,
+    "task014_native_case_revision_committed": false,
+    "r118c_required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
     "task020_configuration_materialized": false,
     "task021_layout_executed_as_authority": false,
     "task022_bundle_geometry_executed_as_authority": false,
@@ -377,14 +438,14 @@
   },
   "artifacts": {
     "document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
-    "document_sha256": "5925b703def5e03f428e38e356e7fe3767e30908a6721fa9cfa813ddc66ee07c",
+    "document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
     "evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
     "evidence_file_sha256": "BOUND_BY_R118A_EXTENSION",
     "native_input_completeness_matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
-    "native_input_completeness_matrix_file_sha256": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
-    "native_input_completeness_matrix_canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
+    "native_input_completeness_matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
+    "native_input_completeness_matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
     "registry_extension_key": "r118a_extension",
     "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
   },
-  "canonical_hash": "c5c063bcee24fdacdf1c097aa220b6ce52ba1f3628b1ddae3021fb0a648f2ddc"
+  "canonical_hash": "dcbda0055b7a5124ecc6bc87cb32ae3384fa51d1e95f5baab764c7a1bbee2f03"
 }

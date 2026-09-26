@@ -1,0 +1,210 @@
+{
+  "schema_version": "task172.r118a.e-shell-topology-binding-correction.r1",
+  "task_id": "TASK172_V0_7_R118A_E_SHELL_TOPOLOGY_BINDING_CORRECTION_R1",
+  "mode": "R118A_INDEPENDENT_REVIEW_TOPOLOGY_BINDING_CORRECTION_ONLY",
+  "result": "R118A_E_SHELL_TOPOLOGY_BINDING_CORRECTED",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pr_number": 283,
+  "pr_state": "OPEN_DRAFT",
+  "authorized_predecessor_head": "64a9e7efbc2c020d0823796572f287642770503e",
+  "finding": {
+    "id": "R118A_TASK020_E_SHELL_TOKEN_BINDING",
+    "old_shell_token": "T172_SHELL",
+    "new_shell_token": "E",
+    "old_classification": "EXPLICIT_PROJECT_DESIGN_INPUT",
+    "new_classification": "ALREADY_BOUND_REVIEWED_PROFILE",
+    "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "semantic_binding": "E_SHELL -> TASK020 native component_tokens.shell \"E\"",
+    "front_head_token_unchanged": "T172_FRONT",
+    "rear_head_token_unchanged": "T172_REAR",
+    "value_is_project_design_decision": false,
+    "tema_compliance_claimed": false,
+    "standard_claim_created": false
+  },
+  "task171_compatibility": {
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "reviewed_shell_type": "E_SHELL",
+    "native_required_shell_token": "E",
+    "projected_task020_shell_token": "E",
+    "compatibility": "PASS_STATIC_REPLAY",
+    "native_replay_executed": false,
+    "reviewed_entry_authority_id": "V07-T171-TOPOLOGY-R4-V1",
+    "reviewed_compartment_authority_id": "V07-T171-CELL-COMPARTMENT-R4-V1",
+    "reviewed_conservation_authority_id": "V07-T171-CONSERVATION-R4-V1",
+    "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+    "sources": [
+      {
+        "path": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md",
+        "sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+        "role": "reviewed profile scope"
+      },
+      {
+        "path": "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md",
+        "sha256": "ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca",
+        "role": "reviewed E-shell entry scope"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/native.py",
+        "sha256": "ab2740ae9eb0f00d53f3bc5bff68dd6c15d6627872af93b6cd0fb4422934cf3e",
+        "role": "native TASK171 shell-token hard predicate"
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/authority.py",
+        "sha256": "792caaaca1c70c7bc021dc211d6e2786ebcbc39d0a674700278f8aafb8da757f",
+        "role": "native profile identity and reviewed constants"
+      }
+    ]
+  },
+  "task014_hash_replay": {
+    "helper_payload": "hexagent.case_revisions.canonical.compute_payload_hash",
+    "helper_domain_snapshot": "hexagent.case_revisions.canonical.compute_domain_snapshot_hash",
+    "payload_hash_before": "5e50200b66d6e7d52139c563b66fedabbdb0255e6208e55981cc2cb870289792",
+    "payload_hash_after": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+    "domain_snapshot_hash_before": "0cc674b6f6e45741bb5364064ea80f14be5d29d9d313dd5e6d00039aac916558",
+    "domain_snapshot_hash_after": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+    "candidate_only": true,
+    "native_case_revision_materialized": false,
+    "native_case_revision_committed": false,
+    "candidate_status_proposal": "committed",
+    "candidate_status_is_projection_only": true,
+    "persisted_status": "UNMATERIALIZED",
+    "task020_projection_hashes_match": true
+  },
+  "input_classification": {
+    "shell_token_project_design_decision_present": false,
+    "shell_token_reviewed_profile_binding_present": true,
+    "project_design_input_count_before": 47,
+    "project_design_input_count_after": 46,
+    "already_bound_reviewed_profile_input_count_before": 5,
+    "already_bound_reviewed_profile_input_count_after": 6,
+    "distinct_project_design_decision_count_before": 25,
+    "distinct_project_design_decision_count_after": 24,
+    "task020_to_task025_required_field_total": 98,
+    "missing_required_input_classification_count": 0
+  },
+  "downstream_hard_predicate_audit": {
+    "known_downstream_hard_predicate_mismatch_count": 0,
+    "checks": [
+      {
+        "stage": "TASK020",
+        "status": "PASS_STATIC",
+        "basis": "Projected equipment family, construction, orientation, one shell pass, one tube pass and explicit component tokens remain in the request; the E-shell token now matches TASK171. TEMA, ASME and vendor claims remain false."
+      },
+      {
+        "stage": "TASK021",
+        "status": "PASS_UNCHANGED_PROSPECTIVE",
+        "basis": "Reviewed tube/layout bindings and explicit envelope/origin/axis/exclusion inputs are unchanged; prior in-memory-only position count remains 253."
+      },
+      {
+        "stage": "TASK022",
+        "status": "PASS_UNCHANGED_PROSPECTIVE_ARITHMETIC",
+        "basis": "Caller shell ID 0.500 m exceeds unchanged bundle outer envelope 0.45486592081130829065079429561196969724856074243842 m; prospective radial clearance remains 0.02256703959434585467460285219401515137571962878079 m, greater than the 0.010 m project requirement."
+      },
+      {
+        "stage": "TASK024",
+        "status": "PASS_UNCHANGED_PROSPECTIVE",
+        "basis": "Single-segmental baffle inputs and geometry are unchanged; four candidate baffles meet the reviewed TASK171 minimum of two; the 0–6 m span and spacing sequence remain unchanged."
+      },
+      {
+        "stage": "TASK025",
+        "status": "PASS_UNCHANGED_STATIC_LENGTH_BINDING",
+        "basis": "Internal-flow and heat-transfer candidate lengths remain 6 m and heat-transfer length equals the 6 m TASK024 active span; native length hashes remain unchanged."
+      },
+      {
+        "stage": "TASK171",
+        "status": "PASS_STATIC_REPLAY",
+        "basis": "Reviewed profile is fixed-tubesheet E-shell, one shell pass, one straight-through tube pass and countercurrent; native source requires shell token E. No TASK171 replay was invoked."
+      }
+    ],
+    "native_geometry_execution_count": 0,
+    "task171_native_replay_executed": false
+  },
+  "preservation": {
+    "numeric_engineering_value_change_count": 0,
+    "authority_scope_changed": false,
+    "production_code_changed": false,
+    "task014_native_case_revision_materialized": false,
+    "task014_native_case_revision_committed": false,
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "task025_area_length_executed": false,
+    "case_id": "UNBOUND",
+    "configuration_id": "UNBOUND",
+    "geometry_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "real_case_mesh_admissible": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "r118a_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review_complete": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "historical_registry_repair_authorized": false
+  },
+  "r118c_boundary": {
+    "required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
+    "future_execution_dag": [
+      "TASK014_NATIVE_CASE_REVISION",
+      "TASK020_CONFIGURATION",
+      "TASK021_LAYOUT",
+      "TASK022_BUNDLE_GEOMETRY",
+      "TASK024_BAFFLE_GEOMETRY",
+      "TASK025_TUBE_SIDE_GEOMETRY"
+    ],
+    "dag_started": false
+  },
+  "artifact_bindings": {
+    "correction_document_path": "docs/tasks/TASK-172-v0.7-r118a-e-shell-topology-binding-correction-r1.md",
+    "correction_document_sha256": "dc9ac237d52d862886f324a1cc1fcb66aa09ed312f160cd0906cd4a9a41f66ff",
+    "candidate_document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
+    "candidate_document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
+    "candidate_evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
+    "candidate_evidence_file_sha256": "009f9567e3fc7e9291c007b39c7f00fcc64f32f6c9717b302c1f1df75c7b87ab",
+    "candidate_evidence_canonical_hash": "c260fec2246d153d971f87463cc720ad041104b1b109632f8d45fc7dab01b6f5",
+    "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
+    "matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
+    "matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
+    "r118a_extension_canonical_hash": "b039aae0b8bc0cd26b673bebc3cffed7181da5f11835c921ffb1fa389801e1e2",
+    "previous_r118a_extension_canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5",
+    "previous_r118a_correction_extension_canonical_hash": "b6565728118e29a0407eb0a4eb34043dbfa64be0b5ffeb0b5f95a0ce8d0a923c",
+    "previous_registry_root_canonical_hash": "746d43f6b1d3859c5cdc75340e945367e54e9951a496af7d32d40452156c806f",
+    "registry_extension_key": "r118a_eshell_topology_correction_extension",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
+  },
+  "validation": {
+    "predecessor_head_replay": "PASS",
+    "previous_r118a_correction_replay": "PASS",
+    "task171_reviewed_profile_replay": "PASS",
+    "task171_shell_token_compatibility": "PASS_STATIC_REPLAY",
+    "task014_hash_replay": "PASS_NATIVE_HELPERS",
+    "task025_previous_correction_preserved": "PASS",
+    "task024_previous_correction_preserved": "PASS",
+    "known_downstream_hard_predicate_mismatch_count": 0,
+    "prospective_layout_bundle_baffle_and_length_replay": "PASS_UNCHANGED_VALUES_ONLY",
+    "json_parse_and_schema_shape": "PASS",
+    "canonical_hash_replay": "PASS_SHARED_CANONICAL_HELPERS",
+    "artifact_linkage": "PASS",
+    "changed_file_allowlist": "PASS_DOCUMENTATION_EVIDENCE_AND_REGISTRY_ONLY",
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy_ci_scope": "PASS",
+    "manifest_d_equals_m": "PASS_256_DISCOVERED_256_MANIFEST",
+    "lock_freshness": "PASS_UV_LOCK_CHECK",
+    "locked_sync": "PASS_UV_SYNC_LOCKED_ALL_EXTRAS",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_NOT_ON_PYPI",
+    "local_full_regression": "NOT_EXECUTED",
+    "native_geometry_execution_count": 0,
+    "r1_r117_historical_immutability": "PASS",
+    "registry_append_only": "PASS",
+    "new_duplicate_json_keys": 0,
+    "exact_final_head_ci": "RECORDED_OUTSIDE_ARTIFACT_AFTER_FINAL_COMMIT"
+  },
+  "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+  "stop": true,
+  "canonical_hash": "a5ebbdc49164a39ae1515a4c9ca2bb357b0195fc2b445ad75c75886cd6d31cea"
+}

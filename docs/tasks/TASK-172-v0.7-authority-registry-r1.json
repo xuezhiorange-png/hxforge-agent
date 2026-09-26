@@ -19187,8 +19187,8 @@
     },
     "native_input_completeness": {
       "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
-      "matrix_file_sha256": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
-      "matrix_canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
+      "matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
+      "matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
       "stage_counts": {
         "TASK020": 18,
         "TASK021": 13,
@@ -19198,13 +19198,18 @@
         "TOTAL_TASK020_TO_TASK025": 98
       },
       "binding_class_counts": {
-        "PROJECT_ENGINEERING_INPUT_REQUIRED": 47,
+        "PROJECT_ENGINEERING_INPUT_REQUIRED": 46,
         "ALREADY_BOUND_REVIEWED_AUTHORITY": 14,
-        "ALREADY_BOUND_REVIEWED_PROFILE": 5,
+        "ALREADY_BOUND_REVIEWED_PROFILE": 6,
         "NATIVE_CONTRACT_CONSTANT_ONLY": 5,
         "DERIVED_ONLY_BY_NATIVE_PRODUCER": 23,
         "NOT_APPLICABLE": 4
       },
+      "project_design_input_count": 46,
+      "distinct_project_design_decision_count": 24,
+      "already_bound_authority_or_profile_input_count": 20,
+      "shell_token_project_design_decision_present": false,
+      "shell_token_reviewed_profile_binding_present": true,
       "missing_required_input_classification_count": 0,
       "native_contract_constant_input_count": 5,
       "task025_native_field_name_mismatch_count": 0,
@@ -19228,20 +19233,46 @@
       "task025_area_length_producer_invoked": false,
       "prospective_geometry_coherence": "PASS_ARITHMETIC_AND_TASK021_ENUMERATION_PREFLIGHT_ONLY"
     },
+    "task171_topology_compatibility": {
+      "profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "reviewed_shell_type": "E_SHELL",
+      "native_required_shell_token": "E",
+      "projected_task020_shell_token": "E",
+      "compatibility": "PASS_STATIC_REPLAY",
+      "native_replay_executed": false,
+      "tema_compliance_claimed": false,
+      "standard_claim_created": false
+    },
+    "r118c_execution_order": {
+      "required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
+      "future_native_dag": [
+        "TASK014_NATIVE_CASE_REVISION",
+        "TASK020_CONFIGURATION",
+        "TASK021_LAYOUT",
+        "TASK022_BUNDLE_GEOMETRY",
+        "TASK024_BAFFLE_GEOMETRY",
+        "TASK025_TUBE_SIDE_GEOMETRY"
+      ],
+      "dag_executed": false
+    },
     "artifacts": {
       "document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
-      "document_sha256": "5925b703def5e03f428e38e356e7fe3767e30908a6721fa9cfa813ddc66ee07c",
+      "document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
       "evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
-      "evidence_file_sha256": "8553ed8eb19f3a30b5c9854ae461fb2aa7fd1ea7ad2d33a8711363b8b495c03f",
-      "evidence_canonical_hash": "c5c063bcee24fdacdf1c097aa220b6ce52ba1f3628b1ddae3021fb0a648f2ddc",
+      "evidence_file_sha256": "009f9567e3fc7e9291c007b39c7f00fcc64f32f6c9717b302c1f1df75c7b87ab",
+      "evidence_canonical_hash": "dcbda0055b7a5124ecc6bc87cb32ae3384fa51d1e95f5baab764c7a1bbee2f03",
       "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
-      "matrix_file_sha256": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
-      "matrix_canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379",
+      "matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
+      "matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
       "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
     },
     "validation": {
       "predecessor_and_historical_replay": "PASS",
       "native_required_field_audit": "PASS_98_FIELDS",
+      "task171_shell_token_binding": "PASS_STATIC_REPLAY",
+      "known_downstream_hard_predicate_mismatch_count": 0,
+      "task014_native_case_revision_materialized": false,
+      "task014_native_case_revision_committed": false,
       "task025_native_field_name_and_object_shape": "PASS_ZERO_MISMATCHES",
       "task025_native_length_hash_replay": "PASS_UNCHANGED",
       "task025_profile_review_authority_status": "NATIVE_CONTRACT_CONSTANT_ONLY",
@@ -19289,7 +19320,7 @@
       "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
       "stop": true
     },
-    "canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5"
+      "canonical_hash": "b039aae0b8bc0cd26b673bebc3cffed7181da5f11835c921ffb1fa389801e1e2"
   },
   "r118a_correction_extension": {
     "task_id": "TASK172_V0_7_R118A_INDEPENDENT_REVIEW_NATIVE_BINDING_CORRECTION_R1",
@@ -19442,5 +19473,139 @@
     },
     "canonical_hash": "b6565728118e29a0407eb0a4eb34043dbfa64be0b5ffeb0b5f95a0ce8d0a923c"
   },
-  "canonical_hash": "746d43f6b1d3859c5cdc75340e945367e54e9951a496af7d32d40452156c806f"
+  "r118a_eshell_topology_correction_extension": {
+    "task_id": "TASK172_V0_7_R118A_E_SHELL_TOPOLOGY_BINDING_CORRECTION_R1",
+    "mode": "R118A_INDEPENDENT_REVIEW_TOPOLOGY_BINDING_CORRECTION_ONLY",
+    "result": "R118A_E_SHELL_TOPOLOGY_BINDING_CORRECTED",
+    "authorized_predecessor_head": "64a9e7efbc2c020d0823796572f287642770503e",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "finding": {
+      "field": "TASK020.shell_token",
+      "old_value": "T172_SHELL",
+      "new_value": "E",
+      "old_classification": "EXPLICIT_PROJECT_DESIGN_INPUT",
+      "new_classification": "ALREADY_BOUND_REVIEWED_PROFILE",
+      "source_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "semantic_binding": "E_SHELL -> TASK020 native component_tokens.shell \"E\"",
+      "numeric_engineering_value_change_count": 0,
+      "tema_compliance_claimed": false,
+      "standard_claim_created": false
+    },
+    "task171_compatibility": {
+      "reviewed_shell_type": "E_SHELL",
+      "native_required_shell_token": "E",
+      "projected_task020_shell_token": "E",
+      "compatibility": "PASS_STATIC_REPLAY",
+      "native_replay_executed": false,
+      "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+      "reviewed_profile_document_sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943",
+      "reviewed_entry_scope_document_sha256": "ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca",
+      "native_requirement_source_sha256": "ab2740ae9eb0f00d53f3bc5bff68dd6c15d6627872af93b6cd0fb4422934cf3e",
+      "native_profile_constants_source_sha256": "792caaaca1c70c7bc021dc211d6e2786ebcbc39d0a674700278f8aafb8da757f"
+    },
+    "task014_candidate_hashes": {
+      "payload_hash_before": "5e50200b66d6e7d52139c563b66fedabbdb0255e6208e55981cc2cb870289792",
+      "payload_hash_after": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+      "domain_snapshot_hash_before": "0cc674b6f6e45741bb5364064ea80f14be5d29d9d313dd5e6d00039aac916558",
+      "domain_snapshot_hash_after": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+      "native_materialized": false,
+      "native_committed": false,
+      "candidate_status_committed_is_projection_only": true
+    },
+    "input_counts": {
+      "required_fields_total": 98,
+      "project_design_input_count": 46,
+      "already_bound_reviewed_profile_input_count": 6,
+      "distinct_project_design_decision_count": 24,
+      "missing_required_input_classification_count": 0
+    },
+    "known_downstream_hard_predicate_mismatch_count": 0,
+    "prospective_geometry_values_unchanged": true,
+    "native_geometry_execution_count": 0,
+    "r118c_required_first_stage": "TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION",
+    "future_native_execution_dag": [
+      "TASK014_NATIVE_CASE_REVISION",
+      "TASK020_CONFIGURATION",
+      "TASK021_LAYOUT",
+      "TASK022_BUNDLE_GEOMETRY",
+      "TASK024_BAFFLE_GEOMETRY",
+      "TASK025_TUBE_SIDE_GEOMETRY"
+    ],
+    "governance": {
+      "r118a_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "independent_review_complete": false,
+      "task014_native_case_revision_materialized": false,
+      "task014_native_case_revision_committed": false,
+      "task020_configuration_materialized": false,
+      "task021_layout_executed_as_authority": false,
+      "task022_bundle_geometry_executed_as_authority": false,
+      "task024_baffle_geometry_executed": false,
+      "task025_area_length_executed": false,
+      "case_id": "UNBOUND",
+      "configuration_id": "UNBOUND",
+      "geometry_id": "UNBOUND",
+      "production_mesh_profile_authority_id": "UNBOUND",
+      "real_case_mesh_admissible": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+      "stop": true
+    },
+    "previous_bindings": {
+      "previous_r118a_extension_canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5",
+      "previous_r118a_native_binding_correction_extension_canonical_hash": "b6565728118e29a0407eb0a4eb34043dbfa64be0b5ffeb0b5f95a0ce8d0a923c",
+      "previous_registry_root_canonical_hash": "746d43f6b1d3859c5cdc75340e945367e54e9951a496af7d32d40452156c806f",
+      "r1_r117_historical_payloads_immutable": true,
+      "historical_registry_repair_authorized": false
+    },
+    "artifacts": {
+      "correction_document_path": "docs/tasks/TASK-172-v0.7-r118a-e-shell-topology-binding-correction-r1.md",
+      "correction_document_sha256": "dc9ac237d52d862886f324a1cc1fcb66aa09ed312f160cd0906cd4a9a41f66ff",
+      "correction_evidence_path": "docs/tasks/evidence/TASK-172-r118a-e-shell-topology-binding-correction-r1.json",
+      "correction_evidence_file_sha256": "3732dc1c39e421cf04055f0dc75cc3c68c8cddd1c04424cef6b81340c8261d3a",
+      "correction_evidence_canonical_hash": "a5ebbdc49164a39ae1515a4c9ca2bb357b0195fc2b445ad75c75886cd6d31cea",
+      "candidate_document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
+      "candidate_document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
+      "candidate_evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
+      "candidate_evidence_file_sha256": "009f9567e3fc7e9291c007b39c7f00fcc64f32f6c9717b302c1f1df75c7b87ab",
+      "candidate_evidence_canonical_hash": "dcbda0055b7a5124ecc6bc87cb32ae3384fa51d1e95f5baab764c7a1bbee2f03",
+      "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
+      "matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
+      "matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
+      "updated_r118a_extension_canonical_hash": "b039aae0b8bc0cd26b673bebc3cffed7181da5f11835c921ffb1fa389801e1e2"
+    },
+    "validation": {
+      "predecessor_head_replay": "PASS",
+      "previous_r118a_correction_replay": "PASS",
+      "task171_reviewed_profile_replay": "PASS",
+      "task171_shell_token_compatibility": "PASS_STATIC_REPLAY",
+      "task014_hash_replay": "PASS_NATIVE_HELPERS",
+      "task025_previous_correction_preserved": "PASS",
+      "task024_previous_correction_preserved": "PASS",
+      "prospective_layout_bundle_baffle_and_length_replay": "PASS_UNCHANGED_VALUES_ONLY",
+      "json_parse_and_schema_shape": "PASS",
+      "canonical_hash_replay": "PASS_SHARED_CANONICAL_HELPERS",
+      "artifact_linkage": "PASS",
+      "changed_file_allowlist": "PASS_DOCUMENTATION_EVIDENCE_AND_REGISTRY_ONLY",
+      "git_diff_check": "PASS",
+      "ruff": "PASS",
+      "ruff_format": "PASS",
+      "mypy_ci_scope": "PASS",
+      "manifest_d_equals_m": "PASS_256_DISCOVERED_256_MANIFEST",
+      "lock_freshness": "PASS_UV_LOCK_CHECK",
+      "locked_sync": "PASS_UV_SYNC_LOCKED_ALL_EXTRAS",
+      "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_NOT_ON_PYPI",
+      "local_full_regression": "NOT_EXECUTED",
+      "registry_append_only": "PASS",
+      "new_duplicate_json_keys": 0,
+      "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT_AFTER_COMMIT"
+    },
+    "canonical_hash": "d140f4b0e7276d543aa1fb217bc9cf258e4e3691c114e577cf06e537dd83340b"
+  },
+  "canonical_hash": "28c50ad997d563020b5b95dfc45372c5154b34d8740134999038a390b62816b4"
 }

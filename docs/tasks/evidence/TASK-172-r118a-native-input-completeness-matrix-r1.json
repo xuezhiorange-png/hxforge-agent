@@ -31,9 +31,9 @@
     "TOTAL_TASK020_TO_TASK025": 98
   },
   "binding_class_counts": {
-    "PROJECT_ENGINEERING_INPUT_REQUIRED": 47,
+    "PROJECT_ENGINEERING_INPUT_REQUIRED": 46,
     "ALREADY_BOUND_REVIEWED_AUTHORITY": 14,
-    "ALREADY_BOUND_REVIEWED_PROFILE": 5,
+    "ALREADY_BOUND_REVIEWED_PROFILE": 6,
     "NATIVE_CONTRACT_CONSTANT_ONLY": 5,
     "DERIVED_ONLY_BY_NATIVE_PRODUCER": 23,
     "NOT_APPLICABLE": 4
@@ -52,7 +52,7 @@
     ["TASK020","shell_pass_count",true,"ALREADY_BOUND_REVIEWED_PROFILE",1,"V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1","true",1,"R117 topology profile","TASK020 parser"],
     ["TASK020","tube_pass_count",true,"ALREADY_BOUND_REVIEWED_PROFILE",1,"V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1","true",1,"R117 topology profile","TASK020 parser"],
     ["TASK020","front_head_token",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","No external component catalog is used","true","T172_FRONT","R118A evidence#/design_decisions/structural_tokens","TASK020 parser"],
-    ["TASK020","shell_token",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","No external component catalog is used","true","T172_SHELL","R118A evidence#/design_decisions/structural_tokens","TASK020 parser"],
+    ["TASK020","shell_token",true,"ALREADY_BOUND_REVIEWED_PROFILE","UNBOUND","V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1 is reviewed E_SHELL scope; TASK171 native topology replay requires shell token E","true","E","R118A evidence#/task171_topology_compatibility","TASK020 parser / TASK171 static compatibility binding"],
     ["TASK020","rear_head_token",true,"PROJECT_ENGINEERING_INPUT_REQUIRED","UNBOUND","No external component catalog is used","true","T172_REAR","R118A evidence#/design_decisions/structural_tokens","TASK020 parser"],
     ["TASK020","standard_system_id",true,"NOT_APPLICABLE","UNBOUND","INTERNAL_GENERIC forbids a standard system ID","true",null,"TASK020 native authority-mode contract","TASK020 authority validator"],
     ["TASK020","requested_rule_pack_identity",true,"NOT_APPLICABLE","UNBOUND","INTERNAL_GENERIC requires null rule-pack identity","true",null,"TASK020 native authority-mode contract","TASK020 authority validator"],
@@ -154,6 +154,6 @@
     "golden_fixture_reuse_count": 0,
     "external_standard_claim_count": 0,
     "project_design_value_provenance_complete": true,
-    "canonical_hash": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379"
+    "canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74"
   }
 }

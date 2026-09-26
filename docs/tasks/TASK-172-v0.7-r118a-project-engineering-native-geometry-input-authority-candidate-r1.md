@@ -54,7 +54,8 @@ The complete values, units, rationale, source class, and evidence pointers are m
 | Input | Candidate value | Design rationale / limitation |
 |---|---:|---|
 | TASK020 orientation | `HORIZONTAL` | Explicit reference-case orientation from TASK020's closed enum. It does not infer baffle orientation, nozzle location, gravity behavior, or mechanical adequacy. |
-| Structural tokens | `T172_FRONT`, `T172_SHELL`, `T172_REAR` | Opaque internal-generic component tokens; no TEMA or standards identity is encoded. |
+| TASK020 front/rear tokens | `T172_FRONT`, `T172_REAR` | Opaque internal-generic project tokens; they do not encode a standard/vendor identity. |
+| TASK020 shell token | `E` | Bound from reviewed profile `V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1`, whose scope is E-shell; TASK171 native replay requires `component_tokens.shell == "E"`. This token expresses the already reviewed topology only and does not establish TEMA compliance. |
 | TASK021 tube-center envelope diameter | `0.45 m` | Explicit placement envelope, distinct from shell ID, bundle diameter, and baffle diameter. |
 | Layout origin / axis | `CENTER_ON_LATTICE_POINT` / `PRIMARY_AXIS_X` | Explicit case selections permitted by the frozen R116 layout rule. |
 | Exclusion zones / U-tube pairing | `[]` / `null` | No nozzle/pass lane is invented. Empty zones mean no exclusion geometry is defined by this case input, not that a physical nozzle is absent. U-tube pairing is inapplicable to straight-through tubes. |
@@ -75,7 +76,9 @@ TASK020 requires a `CaseRevisionAuthority` with a committed/superseded/archived 
 
 The candidate revision ID is `V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1`. The proposed downstream TASK020 status is `committed` only as a post-TASK014-validation-and-commit target. The candidate request is non-executable until TASK014 actually materializes the matching revision and the applicable lifecycle gates are completed. If R118-C changes the native identity/payload, the native TASK014 hashes and TASK020 binding must be recomputed; no stale projection is authoritative.
 
-TASK020's intended mode is `INTERNAL_GENERIC`; accordingly `standard_system_id=null` and `requested_rule_pack_identity=null`. The three structural tokens are opaque. No standard rule pack is fabricated and no TEMA component claim is made. Schema parsing is prospective only; TASK020 validation/materialization is not invoked.
+TASK020's intended mode is `INTERNAL_GENERIC`; accordingly `standard_system_id=null` and `requested_rule_pack_identity=null`. The front/rear tokens remain opaque project tokens. The shell token is `E`, bound from the reviewed TASK171 E-shell profile because the TASK171 native topology contract rejects any other shell token. This expresses the reviewed E-shell topology; it makes no TEMA, ASME, vendor-equivalence, or other standard claim. The TASK171 source/profile compatibility check is static only; TASK171 replay and TASK020 validation/materialization are not invoked.
+
+The TASK014 case-revision object remains a candidate projection only: `status_proposal_only="committed"` is a future eligibility target after native TASK014 validation and commit, not persisted lifecycle state. `TASK014_NATIVE_CASE_REVISION_MATERIALIZED=false` and `TASK014_NATIVE_CASE_REVISION_COMMITTED=false`. The first R118-C execution stage is `TASK014_NATIVE_CASE_REVISION_MATERIALIZATION_AND_VALIDATION`; only its accepted immutable result may supply the TASK020 `CaseRevisionAuthority`. The future native dependency order is TASK014 revision → TASK020 configuration → TASK021 layout → TASK022 bundle geometry → TASK024 baffle geometry → TASK025 tube-side geometry. No stage is executed by this correction.
 
 ## Prospective layout and geometry coherence
 
@@ -113,4 +116,4 @@ Prospective schema/compatibility checks cover TASK020's request parser, TASK021 
 
 The historical local full regression is not relabeled: R115 was NOT_CLEAN (7 failed, 70 errors, 9 skipped); R116 final-head local full regression was NOT_EXECUTED; R117's final-head local full regression was NOT_CLEAN (7 failed, 70 errors, 9 skipped). Those are predecessor runs, not R118-A. The predecessor GitHub CI was independently counted as 50 total jobs: 45 success, 5 skipped, 0 failed at `b83849212703ea7c94366dbdb207a3f2d4d915f7` (run `36232499969`). R118-A validation and exact-final-head CI are reported separately in the final receipt.
 
-The registry update is append-only (`r118a_extension`). The historical two duplicate keys in the registry are preserved; no historical repair is authorized. No production code, existing test, dependency, lockfile, or workflow is changed. The next gate is `R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY`; R118-A stops here.
+The shell-token correction is recorded in the R118-A E-shell topology-binding correction receipt. The registry update is append-only; prior R118-A correction and R1–R117 records remain unchanged. The historical two duplicate keys in the registry are preserved; no historical repair is authorized. No production code, existing test, dependency, lockfile, or workflow is changed. The next gate is `R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY`; R118-A stops here.
