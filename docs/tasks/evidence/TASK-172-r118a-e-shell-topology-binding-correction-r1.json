@@ -164,7 +164,7 @@
     "candidate_document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
     "candidate_evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
     "candidate_evidence_file_sha256": "009f9567e3fc7e9291c007b39c7f00fcc64f32f6c9717b302c1f1df75c7b87ab",
-    "candidate_evidence_canonical_hash": "c260fec2246d153d971f87463cc720ad041104b1b109632f8d45fc7dab01b6f5",
+    "candidate_evidence_canonical_hash": "dcbda0055b7a5124ecc6bc87cb32ae3384fa51d1e95f5baab764c7a1bbee2f03",
     "matrix_path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
     "matrix_file_sha256": "b1f76d3441fa8878a37e37bbe2ad0e9412d74bb0e8133ac3cfbf36c6c41c7baa",
     "matrix_canonical_hash": "c7d6da402e62cd0565991d6a30eab96902882ec79e62a625d813765eccae4b74",
@@ -206,5 +206,5 @@
   },
   "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
   "stop": true,
-  "canonical_hash": "a5ebbdc49164a39ae1515a4c9ca2bb357b0195fc2b445ad75c75886cd6d31cea"
+  "canonical_hash": "198e2524277c6b78b48f3ddcba54b08b4a9365223844426295a8c27744b665a8"
 }

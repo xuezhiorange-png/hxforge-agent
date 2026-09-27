@@ -19567,8 +19567,8 @@
       "correction_document_path": "docs/tasks/TASK-172-v0.7-r118a-e-shell-topology-binding-correction-r1.md",
       "correction_document_sha256": "dc9ac237d52d862886f324a1cc1fcb66aa09ed312f160cd0906cd4a9a41f66ff",
       "correction_evidence_path": "docs/tasks/evidence/TASK-172-r118a-e-shell-topology-binding-correction-r1.json",
-      "correction_evidence_file_sha256": "3732dc1c39e421cf04055f0dc75cc3c68c8cddd1c04424cef6b81340c8261d3a",
-      "correction_evidence_canonical_hash": "a5ebbdc49164a39ae1515a4c9ca2bb357b0195fc2b445ad75c75886cd6d31cea",
+      "correction_evidence_file_sha256": "11a9ee0d12d6d47c345f49709d3b6e58bcf2ed7d79dc14d9a0c60013ee1708d6",
+      "correction_evidence_canonical_hash": "198e2524277c6b78b48f3ddcba54b08b4a9365223844426295a8c27744b665a8",
       "candidate_document_path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
       "candidate_document_sha256": "635ddd289ca3803ee7710d5cd8ec1a8ae972089aa9e671b575f87d4d516784b8",
       "candidate_evidence_path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
@@ -19605,7 +19605,7 @@
       "new_duplicate_json_keys": 0,
       "exact_final_head_ci": "RECORDED_IN_FINAL_RECEIPT_AFTER_COMMIT"
     },
-    "canonical_hash": "d140f4b0e7276d543aa1fb217bc9cf258e4e3691c114e577cf06e537dd83340b"
+    "canonical_hash": "f9902395c570348e1c9f3f4cd348e0bb4ad4a7360e529a236d6b888e66d05942"
   },
-  "canonical_hash": "28c50ad997d563020b5b95dfc45372c5154b34d8740134999038a390b62816b4"
+  "canonical_hash": "cdb4d13a624daf9f36999b75ba9b6334639b576578c08754280a6ca7af9d1361"
 }
