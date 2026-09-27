@@ -19805,5 +19805,174 @@
     },
     "canonical_hash": "5e0cdf6c7e0be245eff82f80a2738867a769a7baf25fb6d2efa4d46c176a2581"
   },
-  "canonical_hash": "faa66c9adbe4129a8b05e18f7d11065a1d0990961613380af0dee1b3f701dd40"
+  "r118b_native_quantization_comparison_amendment_extension": {
+    "task_id": "TASK172_V0_7_R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDMENT_AND_R118C_ATTEMPT1_INCIDENT_R1",
+    "short_name": "R118B_NATIVE_QUANTIZATION_AMENDMENT",
+    "mode": "REVIEWED_PREFLIGHT_COMPARISON_SEMANTICS_AMENDMENT_ONLY",
+    "result": "R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDED",
+    "previous_head_sha": "b6a9181656b1034c3c0c328195ecc4198a919089",
+    "previous_registry_root_canonical_hash": "faa66c9adbe4129a8b05e18f7d11065a1d0990961613380af0dee1b3f701dd40",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "authority": {
+      "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+      "review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+      "original_result": "PASS",
+      "effective_lifecycle": "REVIEWED_AUTHORITY",
+      "engineering_value_change_count": 0,
+      "scope_widening": false
+    },
+    "comparison": {
+      "field": "TASK024.cut_to_hole_margin_m",
+      "pre_native_analytic_reference_m": "0.00097256153674844976679141122274747436104176034035",
+      "native_pipeline_exact_expectation_m": "0.000972561537",
+      "basis": "EXACT_NATIVE_TASK021_PUBLIC_PROJECTION_THEN_TASK024_DECIMAL_PIPELINE",
+      "equality": "EXACT_DECIMAL",
+      "tolerance": "NONE",
+      "cross_stage_rule": "WHEN A DOWNSTREAM NATIVE OUTPUT DEPENDS ON AN UPSTREAM PUBLIC QUANTIZED VALUE, THE EXACT EXPECTATION MUST BE DERIVED FROM THE UPSTREAM NATIVE PUBLIC PROJECTION, NOT FROM A PRE-PROJECTION HIGHER-PRECISION INTERMEDIATE.",
+      "cause": "TASK021_PUBLIC_COORDINATE_QUANTIZATION_PROPAGATED_INTO_TASK024",
+      "engineering_input_mismatch": false,
+      "task024_formula_mismatch": false,
+      "task024_native_contract_violation": false,
+      "other_reviewed_expectations_changed": false
+    },
+    "causal_replay": {
+      "result": "PASS_PURE_REPLAY",
+      "task_producers_invoked": [],
+      "coordinate_quantum_m": "0.000000000001",
+      "decimal_precision": 50,
+      "rounding": "ROUND_HALF_EVEN",
+      "task024_consumes_task021_public_coordinates": true,
+      "task021_request_hash": "91d326b044874d44ee790f00e7373bf06169db3ef5f8b234d47448251ffba232",
+      "limiting_position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "unquantized_y_m": "-0.13198227153674844976679141122274747436104176034035",
+      "task021_public_y_m": "-0.131982271537",
+      "task024_chord_offset_m": "0.12098471",
+      "signed_window_distance_m": "0.010997561537",
+      "baffle_hole_radius_m": "0.010025",
+      "cut_margin_m": "0.000972561537",
+      "native_minus_analytic_delta_m": "0.00000000000025155023320858877725252563895823965965"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r118b-native-quantization-comparison-amendment-r1.md",
+      "document_sha256": "f1efc55d1f731d8f75d49c79d0aed20a2650cec1a702222827b406b5218737fc",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r118b-native-quantization-comparison-amendment-r1.json",
+      "evidence_file_sha256": "3fd3a3ac70a6e8585ff6e05944afdf5e9bea443a7d66d81eb02f8d1a1e8a001f",
+      "evidence_canonical_hash": "d1bb31697a0efa61299b402333adeec2f54292cd0b1f45e88927a21f0f0f1226",
+      "incident_document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt1-blocked-incident-r1.md",
+      "incident_document_sha256": "4dccd5d98a6df824f99e96c22f4ec68e9f1277b7ffe686c18446388c00c4167f",
+      "incident_evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt1-blocked-incident-r1.json",
+      "incident_evidence_file_sha256": "a57eb0d94a0bd10ff54f94c33964566ad4b53ca9a465a5ab344ae3e32bae9dba",
+      "incident_evidence_canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668"
+    },
+    "validation": {
+      "predecessor_head_replay": "PASS",
+      "r118b_review_receipt_replay": "PASS",
+      "task021_quantization_contract_replay": "PASS",
+      "task024_classification_contract_replay": "PASS",
+      "native_quantization_causal_replay": "PASS_PURE_REPLAY",
+      "engineering_values_unchanged": "PASS",
+      "r118b_receipt_immutable": "PASS",
+      "attempt1_sequence_violation_recorded": "PASS",
+      "stale_exact_native_expectation_count": 0,
+      "r1_r118b_historical_immutability": "PASS",
+      "registry_append_only": "PASS",
+      "new_duplicate_json_keys": 0
+    },
+    "governance": {
+      "production_code_changed": false,
+      "native_materialization_executed_in_amendment": false,
+      "r118c_retry_authorized": false,
+      "r118c_retry_started": false,
+      "task171_executed": false,
+      "production_mesh_admission_performed": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "stop": true
+    },
+    "canonical_hash": "d0fd2ba8cb37891bf1c8491b9279fcc8bc8186f722f79d5bb3e809f1e443f6a7"
+  },
+  "r118c_attempt1_blocked_incident_extension": {
+    "task_id": "TASK172_V0_7_R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDMENT_AND_R118C_ATTEMPT1_INCIDENT_R1",
+    "short_name": "R118C_ATTEMPT1_BLOCKED_INCIDENT",
+    "mode": "BLOCKED_ATTEMPT_INCIDENT_RECORD_ONLY",
+    "result": "R118C_ATTEMPT1_BLOCKED_INCIDENT_RECORDED",
+    "previous_head_sha": "b6a9181656b1034c3c0c328195ecc4198a919089",
+    "previous_registry_root_canonical_hash": "9d8ed392de49aeb15708b327f142df4840fa519dfddd3a0cd83efe28e2b9a6f8",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "attempt": {
+      "number": 1,
+      "result": "BLOCKED_R118C_TASK024_REVIEWED_PREFLIGHT_MISMATCH",
+      "authoritative": false,
+      "reusable": false,
+      "may_be_resumed": false,
+      "task025_producer_invocation_occurred": true,
+      "task025_invocation_timing": "BEFORE_TASK024_REVIEW_GATE_DISPOSITION_WAS_FINALIZED",
+      "sequential_gate_violation": true,
+      "task025_result_persisted": false,
+      "task025_result_admitted_as_authority": false,
+      "task025_result_included_in_r118c_evidence": false,
+      "task025_result_reusable": false
+    },
+    "in_memory_stage_history": {
+      "task014": "COMMITTED_READBACK_REACHED",
+      "task020": "VALID_NO_BLOCKERS_NO_STANDARD_CLAIM",
+      "task021": "VALID_253_POSITIONS",
+      "task022": "VALID_REVIEWED_GEOMETRY_OBSERVED",
+      "task024": "VALID_GEOMETRY_OBSERVED_THEN_CURRENT_EXACT_MARGIN_GATE_MISMATCH",
+      "task025": "EXPLORATORY_VALID_RESULT_REPORTED_DISCARDED_NOT_REUSABLE",
+      "separate_attempt_log_persisted": false,
+      "volatile_ids_or_hashes_promoted": false
+    },
+    "persistence": {
+      "in_memory_native_execution_occurred": true,
+      "persisted_authority_materialization_occurred": false,
+      "repository_materialization_artifacts_created": false,
+      "r118c_receipt_created": false,
+      "r118c_registry_extension_created": false,
+      "commit_created": false,
+      "push_performed": false
+    },
+    "amendment_dependency": {
+      "extension_key": "r118b_native_quantization_comparison_amendment_extension",
+      "extension_canonical_hash": "d0fd2ba8cb37891bf1c8491b9279fcc8bc8186f722f79d5bb3e809f1e443f6a7",
+      "evidence_canonical_hash": "d1bb31697a0efa61299b402333adeec2f54292cd0b1f45e88927a21f0f0f1226"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt1-blocked-incident-r1.md",
+      "document_sha256": "4dccd5d98a6df824f99e96c22f4ec68e9f1277b7ffe686c18446388c00c4167f",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt1-blocked-incident-r1.json",
+      "evidence_file_sha256": "a57eb0d94a0bd10ff54f94c33964566ad4b53ca9a465a5ab344ae3e32bae9dba",
+      "evidence_canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668"
+    },
+    "validation": {
+      "predecessor_head_replay": "PASS",
+      "attempt1_sequence_violation_recorded": "PASS",
+      "persisted_authority_materialization": "NONE",
+      "r118c_success_extension_created": false,
+      "r1_r118b_historical_immutability": "PASS",
+      "registry_append_only": "PASS",
+      "new_duplicate_json_keys": 0
+    },
+    "governance": {
+      "r118c_retry_authorized": false,
+      "r118c_retry_started": false,
+      "task171_executed": false,
+      "production_mesh_admission_performed": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "stop": true
+    },
+    "canonical_hash": "d9079d7301c10fc9e16460eed1119b65d556fcbd68341c8fa5fc4d7e3a01940a"
+  },
+  "canonical_hash": "4584c25c9514443f299e8f1aefccdd376fba6ba1f77fc6fe5089b0b4ef5437d3"
 }
