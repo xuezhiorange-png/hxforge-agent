@@ -19974,5 +19974,227 @@
     },
     "canonical_hash": "d9079d7301c10fc9e16460eed1119b65d556fcbd68341c8fa5fc4d7e3a01940a"
   },
-  "canonical_hash": "4584c25c9514443f299e8f1aefccdd376fba6ba1f77fc6fe5089b0b4ef5437d3"
+  "r118b_native_public_projection_oracle_amendment_extension": {
+    "task_id": "TASK172_V0_7_R118B_NATIVE_PUBLIC_PROJECTION_ORACLE_AMENDMENT_AND_R118C_ATTEMPT2_INCIDENT_R1",
+    "short_name": "R118B_NATIVE_PUBLIC_PROJECTION_ORACLE_AMENDMENT",
+    "mode": "OUTPUT_COMPARISON_ORACLE_AMENDMENT_AND_BLOCKED_ATTEMPT_RECORD_ONLY",
+    "result": "R118B_NATIVE_PUBLIC_PROJECTION_ORACLES_AMENDED",
+    "previous_head_sha": "fb3a5ea5dc32653d55b7b275717d56df9e963af0",
+    "previous_registry_root_canonical_hash": "4584c25c9514443f299e8f1aefccdd376fba6ba1f77fc6fe5089b0b4ef5437d3",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "authority": {
+      "bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+      "review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+      "review_result": "PASS",
+      "effective_lifecycle": "REVIEWED_AUTHORITY",
+      "numeric_engineering_value_change_count": 0,
+      "authority_scope_change": false,
+      "scope_widening": false
+    },
+    "oracle_amendment": {
+      "exact_output_rule": "NATIVE_OUTPUT_EXACT_ORACLE_RULE",
+      "task021": {
+        "quantum_m": "0.000000000001",
+        "precision": 50,
+        "rounding": "ROUND_HALF_EVEN",
+        "resolution_fixed": true,
+        "public_trailing_zero_scale_fixed": false,
+        "canonical_lexeme": "MINIMAL_CANONICAL_DECIMAL",
+        "limiting_position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+        "expected_x_m": "-0.1524",
+        "expected_y_m": "-0.131982271537",
+        "comparison": "EXACT_CANONICAL_LEXICAL_EQUALITY",
+        "tolerance": "NONE"
+      },
+      "task022": {
+        "native_shell_inside_diameter_m": "0.5",
+        "native_bundle_peripheral_allowance_m": "0.01",
+        "native_required_minimum_radial_clearance_m": "0.01",
+        "engineering_value_changed": false,
+        "long_value_oracle_replay": "PASS"
+      },
+      "task024": {
+        "baffle_diameter_m": "0.497000000000",
+        "baffle_hole_diameter_m": "0.020050000000",
+        "chord_offset_m": "0.120984710000",
+        "center_sequence_m": [
+          "1.200000000000",
+          "2.400000000000",
+          "3.600000000000",
+          "4.800000000000"
+        ],
+        "limiting_hole_radius_m": "0.010025",
+        "limiting_margin_m": "0.000972561537",
+        "comparison": "EXACT_CANONICAL_LEXICAL_EQUALITY",
+        "tolerance": "NONE"
+      },
+      "task025": {
+        "native_numeric_type": "Decimal",
+        "comparison": "EXACT_DECIMAL_EQUALITY",
+        "arbitrary_fixed_lexical_scale_forbidden": true
+      },
+      "cross_stage_rule": "WHEN_A_DOWNSTREAM_NATIVE_OUTPUT_DEPENDS_ON_AN_UPSTREAM_PUBLIC_QUANTIZED_VALUE, EXPECTATION MUST BE DERIVED_FROM_THAT_UPSTREAM_PUBLIC_PROJECTION.",
+      "matrix": {
+        "path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-matrix-r1.json",
+        "file_sha256": "a176ac61a8bdacf9698156f94747315242b9990510d5e71f4be0a5374e1745f6",
+        "canonical_hash": "654c4d30163fa573b4dc717189eb8870233b9ecc9b46965b4ba73eaa00b41947",
+        "gate_field_count": 87,
+        "unresolved_oracles": 0,
+        "hand_formatted_oracles": 0
+      }
+    },
+    "attempt2": {
+      "number": 2,
+      "result": "BLOCKED_R118C_R2_TASK021_NATIVE_PROJECTION_MISMATCH",
+      "authoritative": false,
+      "reusable": false,
+      "may_be_resumed": false,
+      "sequence_violation": false,
+      "downstream_producer_invocation_before_gate_pass_count": 0,
+      "task014": "PASS_IN_MEMORY_DISCARDED",
+      "task020": "VALID_IN_MEMORY_DISCARDED",
+      "task021": "VALID_253_POSITIONS_IN_MEMORY_DISCARDED",
+      "task022": "NOT_INVOKED",
+      "task024": "NOT_INVOKED",
+      "task025": "NOT_INVOKED",
+      "run_b": "NOT_EXECUTED",
+      "persisted_authority_materialization": false,
+      "success_artifacts_created": false,
+      "success_registry_extension_created": false,
+      "commit_created": false,
+      "repository_files_changed": false,
+      "volatile_ids_promoted": false
+    },
+    "artifacts": {
+      "amendment_document_path": "docs/tasks/TASK-172-v0.7-r118b-native-public-projection-oracle-amendment-r1.md",
+      "amendment_document_sha256": "78b30a03e8c2d5c140b146337d2b2cfdaca386ae18a4ac2de1f8542fa9396510",
+      "amendment_evidence_path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-amendment-r1.json",
+      "amendment_evidence_file_sha256": "49752989fefbdcc8508bbb700f0fc7f3eb588ec262ba99cc2db30ef9869133e3",
+      "amendment_evidence_canonical_hash": "a01bdc446922c489f5b530681d871c6597c18ac7cf169f1d7cbbd7d84bfdf9a1",
+      "oracle_matrix_path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-matrix-r1.json",
+      "oracle_matrix_file_sha256": "a176ac61a8bdacf9698156f94747315242b9990510d5e71f4be0a5374e1745f6",
+      "oracle_matrix_canonical_hash": "654c4d30163fa573b4dc717189eb8870233b9ecc9b46965b4ba73eaa00b41947",
+      "attempt2_incident_document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt2-blocked-incident-r1.md",
+      "attempt2_incident_document_sha256": "7b14673597489fe8f34a6ff73102ae6259b500ab5bb908149ce22a648a4d1c66",
+      "attempt2_incident_evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt2-blocked-incident-r1.json",
+      "attempt2_incident_evidence_file_sha256": "1c5ad67350f1fce57d5724030910b3ed3de30df3c8e7fbf89eadf5d8ddd09d36",
+      "attempt2_incident_evidence_canonical_hash": "21561b2c8d6adeeb0d84136d057c5897cefc53c373dae4513ba6538fd91d587d"
+    },
+    "validation": {
+      "predecessor_replay": "PASS",
+      "native_projection_replay": "PASS_PURE_REPLAY",
+      "attempt2_incident_recorded": "PASS",
+      "native_materialization_producer_invocation_count": 0,
+      "engineering_values_unchanged": "PASS",
+      "historical_immutability": "PASS",
+      "append_only": "PASS",
+      "new_duplicate_json_keys": 0,
+      "static_validation": {
+        "git_diff_check": "PASS",
+        "ruff": "PASS",
+        "ruff_format": "PASS",
+        "mypy_ci_scope": "PASS",
+        "manifest_d_equals_m": "PASS_DISCOVERED_256_MANIFEST_256",
+        "uv_lock_check": "PASS",
+        "uv_sync_locked_all_extras": "PASS",
+        "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_PACKAGE_SKIPPED",
+        "exact_final_head_ci": "REQUIRED_AFTER_FINAL_COMMIT"
+      }
+    },
+    "governance": {
+      "r118c_r3_retry_authorized": false,
+      "r118c_r3_started": false,
+      "task171_executed": false,
+      "production_mesh_admission_performed": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "stop": true
+    },
+    "canonical_hash": "4585e20d5921dd6d50bc455ac6fd917b5d4101dc351ab6a60ed31667e7900af1"
+  },
+  "r118c_attempt2_blocked_incident_extension": {
+    "task_id": "TASK172_V0_7_R118B_NATIVE_PUBLIC_PROJECTION_ORACLE_AMENDMENT_AND_R118C_ATTEMPT2_INCIDENT_R1",
+    "short_name": "R118C_ATTEMPT2_BLOCKED_INCIDENT",
+    "mode": "BLOCKED_ATTEMPT_INCIDENT_RECORD_ONLY",
+    "result": "R118C_ATTEMPT2_BLOCKED_INCIDENT_RECORDED",
+    "attempt_number": 2,
+    "previous_head_sha": "fb3a5ea5dc32653d55b7b275717d56df9e963af0",
+    "previous_registry_root_canonical_hash": "26340bfde12588f776d169f9dd9e2763f05df900d0b1a04a726e7193021ef72b",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "disposition": {
+      "result": "BLOCKED_R118C_R2_TASK021_NATIVE_PROJECTION_MISMATCH",
+      "authoritative": false,
+      "reusable": false,
+      "may_be_resumed": false,
+      "sequence_violation": false,
+      "downstream_producer_invocation_before_gate_pass_count": 0
+    },
+    "failed_gate": {
+      "stage": "TASK021",
+      "actual_public_x_m": "-0.1524",
+      "then_expected_x_m": "-0.152400000000",
+      "numeric_values_equal": true,
+      "canonical_lexemes_equal": false,
+      "reason": "POST_QUANTIZATION_DECIMAL_SCALE_WAS_USED_INSTEAD_OF_FINAL_CANONICAL_PUBLIC_LEXEME"
+    },
+    "stage_history": {
+      "task014": "PASS_IN_MEMORY_DISCARDED",
+      "task020": "VALID_IN_MEMORY_DISCARDED",
+      "task021": "VALID_253_POSITIONS_IN_MEMORY_DISCARDED",
+      "task022": "NOT_INVOKED",
+      "task024": "NOT_INVOKED",
+      "task025": "NOT_INVOKED",
+      "run_b": "NOT_EXECUTED"
+    },
+    "persistence": {
+      "in_memory_native_execution_occurred": true,
+      "persisted_authority_materialization_occurred": false,
+      "success_artifacts_created": false,
+      "success_extension_created": false,
+      "commit_created": false,
+      "repository_files_changed": false,
+      "volatile_ids_promoted": false,
+      "objects_discarded": true
+    },
+    "dependencies": {
+      "oracle_amendment_extension_key": "r118b_native_public_projection_oracle_amendment_extension",
+      "oracle_amendment_extension_canonical_hash": "4585e20d5921dd6d50bc455ac6fd917b5d4101dc351ab6a60ed31667e7900af1",
+      "oracle_amendment_evidence_canonical_hash": "a01bdc446922c489f5b530681d871c6597c18ac7cf169f1d7cbbd7d84bfdf9a1"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt2-blocked-incident-r1.md",
+      "document_sha256": "7b14673597489fe8f34a6ff73102ae6259b500ab5bb908149ce22a648a4d1c66",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt2-blocked-incident-r1.json",
+      "evidence_file_sha256": "1c5ad67350f1fce57d5724030910b3ed3de30df3c8e7fbf89eadf5d8ddd09d36",
+      "evidence_canonical_hash": "21561b2c8d6adeeb0d84136d057c5897cefc53c373dae4513ba6538fd91d587d"
+    },
+    "validation": {
+      "attempt2_incident_replayed": "PASS",
+      "stage_ordering": "PASS_NO_VIOLATION",
+      "historical_immutability": "PASS",
+      "append_only": true,
+      "new_duplicate_json_keys": 0
+    },
+    "governance": {
+      "r118c_r3_retry_authorized": false,
+      "r118c_r3_started": false,
+      "task171_executed": false,
+      "production_mesh_admission_performed": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "stop": true
+    },
+    "canonical_hash": "0f1e17ad045eb68e0b30ba168ea8f004b146dacedaeeecf0d711b9f7b3051e90"
+  },
+  "canonical_hash": "0af5cbafe5b475de8b99fb25837d87bb983c46a71982829ee3816384395b933b"
 }
