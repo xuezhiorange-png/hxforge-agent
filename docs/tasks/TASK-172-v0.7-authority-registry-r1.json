@@ -20434,5 +20434,100 @@
     "stop": true,
     "canonical_hash": "e463e41b4fa2844ba3296ef53e7c9369d4e3cc2b4bac13e686c451be05f4be25"
   },
-  "canonical_hash": "241f38ca663229333c15c7639d72ac52cf46ebdcabb234018245711a2918b359"
+  "r119a_extension":   {
+      "task_id": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+      "short_name": "R119-A",
+      "mode": "CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_ONLY",
+      "result": "CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_COMPLETED",
+      "authority_package_id": "V07-T172-R119A-CASE-BOUND-TASK171-DEFINITION-AUTHORITY-R1",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "previous_head_sha": "a96f9aeff4cb2c94824cdaece4d2062fc967ccc4",
+      "previous_registry_root_canonical_hash": "241f38ca663229333c15c7639d72ac52cf46ebdcabb234018245711a2918b359",
+      "pr_number": 283,
+      "pr_state": "OPEN_DRAFT",
+      "r118d_review_evidence_canonical_hash": "3a35df823adc4cfc2d6be8c1f56704d5b835e670f2848f6c380f5e368410353d",
+      "candidate_authority_ids": {
+        "flow_path_mapping": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+        "physical_compartment_mapping": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+        "area_ownership": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+        "length_ownership": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+        "mesh": "V07-T172-R119A-TASK171-MESH-R1"
+      },
+      "candidate_evidence": {
+        "document_path": "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+      "document_sha256": "74e1a648c7d668426558493d662161e0abeda96e8415e4857961696f7dff6a46",
+        "primary_evidence_path": "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+      "primary_evidence_file_sha256": "62964d674034e25662217a269299663f0e48583dc5110c11f544817c973c5d33",
+      "primary_evidence_canonical_hash": "a39be0a73fcd59ca2b338f0077a46ba962c42b5229fdded07dc7958c090ada3e",
+        "linked_candidate_files": {
+          "variant_a": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json",
+        "file_sha256": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+        "canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc"
+          },
+          "variant_b": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-b-r1.json",
+        "file_sha256": "a6a418787cb6857e580387519bdd04260e8ff944dfb3a8b17947204d63c424e7",
+        "canonical_hash": "85f0199bb3beef1ba297736126cd08ba059391ba9e13a30bea9e1a15111a00fe"
+          },
+          "flow": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-flow-path-mapping-candidate-r1.json",
+        "file_sha256": "c3e075f912e45ff8246d7f9902b342a4edc81c33fa40f90462d8cbeee63a9408",
+        "canonical_hash": "c728a589460f9667bc38700700ffde670ff59042f021c66228b91b4567a8c61d"
+          },
+          "comp": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-physical-compartment-mapping-candidate-r1.json",
+        "file_sha256": "03f3aed7525f2cebaae3b4697ec0d255c77ee59a7a2fa32b723e566e7261839d",
+        "canonical_hash": "57dcc49b31dafcb47178286247ec5bdb55d304b6e805162ada843d7db41c45b0"
+          },
+          "area": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-area-ownership-candidate-r1.json",
+        "file_sha256": "5a254de747695a46f63fa20dab704a0573d8edc18d4db83da50d735b817ca0e5",
+        "canonical_hash": "ab5c9ede1064ee0c17d7d07ab5cf3f4a8326b53bbf08935d125fedefe7939c98"
+          },
+          "length": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-length-ownership-candidate-r1.json",
+        "file_sha256": "22c6a0069dc525d7cce9d78a9c7c2362313a727b60d6c352673157f4fb0ac543",
+        "canonical_hash": "eb9924e25bb68393642d4fa0e573fb58875bc0320d284e327f334acf0c8aa60b"
+          },
+          "mesh": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-mesh-authority-candidate-r1.json",
+        "file_sha256": "512d7c759696ff74d81f0dd7130dc705c4154c92296a80ac4d430e8a627bb4ec",
+        "canonical_hash": "7e1b9134deed8e4e9071195a312b1f053d43cef43c997e0421fc4e0d9ca62456"
+          },
+          "identity": {
+            "path": "docs/tasks/evidence/TASK-172-r119a-task171-native-identity-binding-r1.json",
+            "file_sha256": "0af775c4f7c5631c7c19475dcdc5c6f1cabea484140db093025b8878b407303b",
+            "canonical_hash": "8fa35eaf694439ee5d5375e45bc1b7df753af2982910350531d0e9fe241235e4"
+          }
+        }
+      },
+      "candidate_summary": {
+        "physical_interval_count": 5,
+        "flow_path_count": 2,
+        "active_tube_position_count": 253,
+        "total_inside_area_m2": "75.1107679584",
+        "task037_outer_to_inner_area_ratio": "1.209523809523810",
+        "total_outside_area_m2": "90.848262197302892909889504",
+        "tube_path_cell_count": 5,
+        "shell_path_cell_count": 5,
+        "total_cell_count": 10,
+        "wall_interface_count": 5,
+        "physical_event_count": 19,
+        "role_variant_non_role_difference_count": 0,
+        "known_task171_hard_predicate_mismatch_count": 0
+      },
+      "task171_native_producer_invocation_count": 0,
+      "task171_result_identity_exists": false,
+      "selected_thermal_role_variant": "UNBOUND",
+      "aggregate_geometry_id": "UNBOUND",
+      "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+      "production_mesh_admission_enabled": false,
+      "ready_authorized": false,
+      "merge_authorized": false,
+      "next_gate": "R119B_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+      "stop": true,
+  "canonical_hash": "be4846f94906d419129c11ef0df924ec2106c89becb57485904d8fb925708e68"
+    },
+  "canonical_hash": "380ae163cde7cac415744e00d8fc4ae1964a9ea76c264440a6769a7c05b41549"
 }
