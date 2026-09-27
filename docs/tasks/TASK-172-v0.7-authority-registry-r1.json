@@ -20363,5 +20363,76 @@
     },
     "canonical_hash": "15e9a87a7b10cb836f50c77c52078de464cce0906948010675c8322f3ab3128e"
   },
-  "canonical_hash": "3b58f657cfb94fff6ed5009a4821063ec06a96a0c52b096078b5051b95f0db55"
+  "r118d_extension": {
+    "task_id": "TASK172_V0_7_R118D_NATIVE_GEOMETRY_MATERIALIZATION_INDEPENDENT_REVIEW_R1",
+    "short_name": "R118-D",
+    "mode": "INDEPENDENT_REVIEW_ONLY",
+    "result": "R118C_R9_NATIVE_GEOMETRY_MATERIALIZATION_INDEPENDENT_REVIEW_PASS",
+    "review_target_head": "8b36c1fc2db7dd26a2e1c4309b708b2716eb7b78",
+    "previous_registry_root_canonical_hash": "3b58f657cfb94fff6ed5009a4821063ec06a96a0c52b096078b5051b95f0db55",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "review_result": "PASS",
+    "materialization_accepted": true,
+    "native_producer_invocation_count": 0,
+    "accepted_native_identities": {
+      "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "task014_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "task020_configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "task020_configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "task021_layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+      "task021_layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "task022_bundle_geometry_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "task022_bundle_geometry_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "task024_baffle_geometry_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "task024_baffle_geometry_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "task025_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "task025_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "task025_request_hash": "ee0625273153d7a487f141fc153464d9e94132f5e280ad5e257b45473fcb84b8",
+      "task025_hydraulic_authority_hash": "2fb039ad6bc5a398ec75911c5b05b36e889d7d37a307ea424c4c7a15884365e5"
+    },
+    "aggregate_geometry_id": "UNBOUND",
+    "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+      "document_sha256": "e3e79ceff1c3c7a79bc96c4cdee37f09160233dd38990fd086c327c13142ad6f",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+      "evidence_file_sha256": "7ddb0851887ac95a2aac72435c6a0427e0c80b2e5a6b51b6fc03c55fbb310b8a",
+      "evidence_canonical_hash": "3a35df823adc4cfc2d6be8c1f56704d5b835e670f2848f6c380f5e368410353d"
+    },
+    "validation": {
+      "r9_primary_receipt_replay": "PASS",
+      "six_native_snapshot_hash_replays": "PASS",
+      "task025_native_hash_and_id_replays": "PASS",
+      "oracle_determinism_request_shape_and_sequence_review": "PASS",
+      "r117_runtime_authority_three_way_binding": "PASS",
+      "historical_payloads_unchanged": true,
+      "registry_append_only": true,
+      "preexisting_duplicate_json_keys": 2,
+      "new_duplicate_json_keys": 0,
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "exact_final_head_ci": "REQUIRED_AFTER_FINAL_COMMIT"
+    },
+    "downstream_boundary": {
+      "task171_executed": false,
+      "topology_authority_id": "UNBOUND",
+      "flow_path_mapping_id": "UNBOUND",
+      "physical_compartment_map_id": "UNBOUND",
+      "area_ownership_map_id": "UNBOUND",
+      "length_ownership_map_id": "UNBOUND",
+      "production_mesh_admitted": false,
+      "real_case_mesh_admissible": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false
+    },
+    "next_gate": "CASE_BOUND_TASK171_TOPOLOGY_AND_FLOW_PATH_MATERIALIZATION_ONLY",
+    "stop": true,
+    "canonical_hash": "e463e41b4fa2844ba3296ef53e7c9369d4e3cc2b4bac13e686c451be05f4be25"
+  },
+  "canonical_hash": "241f38ca663229333c15c7639d72ac52cf46ebdcabb234018245711a2918b359"
 }
