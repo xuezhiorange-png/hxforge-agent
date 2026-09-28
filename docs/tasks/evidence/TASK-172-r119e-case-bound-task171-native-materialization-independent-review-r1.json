@@ -1,0 +1,102 @@
+{
+  "schema_version": "task172.r119e.case-bound-task171-native-materialization-independent-review.r1",
+  "task_id": "TASK172_V0_7_R119E_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_INDEPENDENT_REVIEW_R1",
+  "short_name": "R119-E",
+  "mode": "RECORD_USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+  "result": "R119D_NATIVE_TASK171_MATERIALIZATION_INDEPENDENT_REVIEW_RECORDED",
+  "review_source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+  "self_approval": false,
+  "codex_self_approval_claimed": false,
+  "external_decision": {
+    "task_id": "TASK172_V0_7_R119E_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_INDEPENDENT_REVIEW_R1",
+    "result": "PASS",
+    "independent_review_result": "PASS",
+    "reviewed_previous_head_sha": "3df4df347933688e38a27861916f15845ede0bbe",
+    "reviewed_final_head_sha": "dcac4c6c9f66d866670caade37b4948499aa33ef",
+    "r119d_result": "CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_COMPLETE",
+    "r119d_materialization_accepted": true
+  },
+  "review_target": {
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "head_sha": "dcac4c6c9f66d866670caade37b4948499aa33ef",
+    "r119d_evidence_path": "docs/tasks/evidence/TASK-172-r119d-case-bound-task171-native-materialization-r1.json",
+    "r119d_evidence_canonical_hash": "7a76c7cc118c88a5ef7d1e40add66915e6b93190bfae15a31aee4687ab01e1af",
+    "r119d_extension_canonical_hash": "6d46819673b2948a74a10a39623fab4c0cb311cf31c0a92543201941d5a4b261",
+    "r119d_registry_root_canonical_hash": "87ccdf23451be87b4fd3142e7181d4a602ff9611ef1f8824d5b19d2b0a827d44"
+  },
+  "effective_thermal_role_selection": {
+    "authority_id": "V07-T172-R119C-THERMAL-ROLE-SELECTION-R1",
+    "selected_variant": "TUBE_HOT_SHELL_COLD",
+    "tube_side_role": "HOT",
+    "shell_side_role": "COLD",
+    "case_bound_definition_effective": true
+  },
+  "independent_review_acceptance": {
+    "selected_variant_a": true,
+    "native_task171_execution": true,
+    "two_clean_independent_runs": true,
+    "native_request_determinism": true,
+    "native_engineering_identity_determinism": true,
+    "native_output_determinism": true,
+    "topology_materially_bound": true,
+    "existing_reviewed_definition_authority_ids": true,
+    "synthetic_topology_authority_id_scalar_absent": true,
+    "synthetic_aggregate_geometry_id_absent": true,
+    "fluid_and_property_binding_absent": true,
+    "production_mesh_admission_absent": true,
+    "downstream_runtime_and_solves_absent": true
+  },
+  "native_task171_materialization": {
+    "status": "VALIDATED",
+    "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+    "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+    "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+    "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+    "topology_authority_id_native_scalar": "NOT_NATIVE_OUTPUT",
+    "reviewed_topology_authority_present_in_definition": true,
+    "run_a_complete": true,
+    "run_b_complete": true,
+    "same_native_request": true,
+    "same_native_engineering_identities": true,
+    "same_native_engineering_outputs": true
+  },
+  "retained_unbound_state": {
+    "geometry_id": "UNBOUND",
+    "geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "fluid_identity_bound": false,
+    "property_profile_authority_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "real_case_mesh_admissible": false,
+    "production_mesh_admission_enabled": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false
+  },
+  "exact_head_ci": {
+    "run_id": 36378456878,
+    "head_sha": "dcac4c6c9f66d866670caade37b4948499aa33ef",
+    "status": "completed",
+    "conclusion": "success",
+    "total_jobs": 50,
+    "success": 45,
+    "skipped": 5,
+    "failed": 0,
+    "cancelled": 0,
+    "final_gate": "success",
+    "complete_job_collection_checked": true
+  },
+  "r119e_execution_boundary": {
+    "task171_native_producer_invocation_count": 0,
+    "r119a_artifacts_rewritten": false,
+    "r119b_artifacts_rewritten": false,
+    "r119c_artifacts_rewritten": false,
+    "r119d_artifacts_rewritten": false,
+    "production_code_changed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "canonical_hash": "5ad8343e342ad2bc4f1c3560fa9dc47e97b61f9b4e37e21ede2e35f63c63fbda"
+}
