@@ -126,6 +126,7 @@ def _request_projection(request: Task172LocalRequest) -> dict[str, Any]:
     return {
         "schema_version": TASK172_REQUEST_SCHEMA,
         "case_id": request.case_id,
+        "case_revision_id": request.case_revision_id,
         "topology": request.topology.model_dump(mode="json"),
         "support": {
             "physical_segment_id": support.physical_segment_id,
@@ -635,6 +636,7 @@ def _build_valid_result(
         "implementation_version": TASK172_IMPLEMENTATION_VERSION,
         "status": "VALIDATED",
         "case_id": request.case_id,
+        "case_revision_id": request.case_revision_id,
         "topology_id": request.topology.topology_id,
         "task171_result_hash": request.topology.task171_result_hash,
         "task171_mesh_identity": request.topology.mesh_identity,

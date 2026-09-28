@@ -22,6 +22,7 @@ from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     canonical as task031_canonical,
 )
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.models import (
+    AGGREGATE_AUTHORITY_PROFILE_ID,
     FLOW_REGION_IDENTITY,
     FORMULA_A_ID,
     FORMULA_B_ID,
@@ -126,7 +127,7 @@ def _native_shell_flow_authority() -> runtime_models.ShellFlowAuthority:
             "docs/tasks/TASK-031-shell-and-tube-shell-side-flow-path-hydraulic-geometry.md"
         ),
         **upstream,
-        "engineering_authority_profile_id": task031_canonical.ENGINEERING_AUTHORITY_ID,
+        "engineering_authority_profile_id": AGGREGATE_AUTHORITY_PROFILE_ID,
         "engineering_authority_hash": task031_canonical.ENGINEERING_AUTHORITY_HASH,
         "formula_a_id": FORMULA_A_ID,
         "formula_b_id": FORMULA_B_ID,
@@ -224,9 +225,21 @@ def _request(
         shell_bulk_state=runtime_models.LocalState(
             temperature_k=Decimal(shell_temperature), pressure_pa=Decimal("101325")
         ),
-        tube_mass_flow_kg_s=Decimal("10.000000"),
+        tube_mass_flow_kg_s=Decimal("12.000000"),
         shell_mass_flow_kg_s=Decimal("20.000000"),
         shell_flow_authority=shell_flow,
+    )
+
+
+def test_task172_keeps_task031_authority_profile_and_identity_layers_distinct() -> None:
+    authority = _native_shell_flow_authority()
+    provenance = dict(authority.task031_geometry.provenance)
+    assert provenance["engineering_authority_profile_id"] == AGGREGATE_AUTHORITY_PROFILE_ID
+    assert authority.task031_geometry.engineering_authority_id == (
+        task031_canonical.ENGINEERING_AUTHORITY_ID
+    )
+    assert provenance["engineering_authority_profile_id"] != (
+        authority.task031_geometry.engineering_authority_id
     )
 
 
@@ -245,6 +258,7 @@ def test_task172_clean_local_closure_replays_exact_result_bytes() -> None:
     assert first.result_id == f"urn:hxforge:task172:{first.result_hash}"
     assert first.signed_q_hot_to_cold_w > 0
     assert first.case_id == runtime_models.CASE_ID
+    assert first.case_revision_id == runtime_models.CASE_REVISION_ID
     assert first.topology_id == runtime_models.TOPOLOGY_ID
     assert first.shell_j_mu > Decimal("0")
     assert (
@@ -269,6 +283,18 @@ def test_task172_schema_rejects_unknown_fields_and_wrong_authority() -> None:
     blocked = validate_request(raw, CoolPropProvider())
     assert type(blocked) is Task172BlockedResult
     assert blocked.failure_code == "BLOCKED_INVALID_REQUEST_SCHEMA"
+
+
+def test_task172_r2_case_binding_rejects_predecessor_tube_flow() -> None:
+    raw = _request().model_dump(mode="python")
+    raw["tube_mass_flow_kg_s"] = Decimal("10.000000")
+    blocked = validate_request(raw, CoolPropProvider())
+    assert type(blocked) is Task172BlockedResult
+    assert blocked.failure_code == "BLOCKED_INVALID_REQUEST_SCHEMA"
+
+    request = _request()
+    assert request.case_revision_id == "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"
+    assert request.tube_mass_flow_kg_s == Decimal("12.000000")
 
 
 def test_task172_local_support_cannot_cross_or_reassign_physical_interval() -> None:

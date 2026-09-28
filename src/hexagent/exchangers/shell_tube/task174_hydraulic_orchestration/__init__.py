@@ -1,7 +1,7 @@
 """Public TASK174 case-bound hydraulic orchestration API."""
 
 from .models import (
-    BellEventPressureBinding,
+    BellEventRegionAllocation,
     HydraulicComponentBinding,
     PhysicalAbsenceExclusion,
     PhysicalEventBinding,
@@ -19,7 +19,7 @@ from .service import (
 )
 
 __all__ = [
-    "BellEventPressureBinding",
+    "BellEventRegionAllocation",
     "HydraulicComponentBinding",
     "PhysicalAbsenceExclusion",
     "PhysicalEventBinding",

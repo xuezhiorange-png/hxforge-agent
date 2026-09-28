@@ -18,6 +18,9 @@ from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     canonical as task031_canonical,
 )
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.models import (
+    AGGREGATE_AUTHORITY_PROFILE_ID as TASK031_AUTHORITY_PROFILE_ID,
+)
+from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.models import (
     ShellSideHydraulicGeometry,
 )
 
@@ -27,6 +30,7 @@ TASK172_BLOCKED_SCHEMA: Final = "task172.local-constitutive-blocked.v1"
 TASK172_IMPLEMENTATION_VERSION: Final = "task172.local-runtime-v1"
 
 CASE_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"
+CASE_REVISION_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"
 PROFILE_ID: Final = "V07-T172-WATER-PROPERTY-PROFILE-R2"
 PROPERTY_PROFILE_CANONICAL_HASH: Final = (
     "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de"
@@ -402,7 +406,10 @@ class ShellFlowAuthority(StrictModel):
                 ("task022_geometry_hash", geometry.task022_geometry_hash),
                 ("task024_geometry_id", geometry.task024_geometry_id),
                 ("task024_geometry_hash", geometry.task024_geometry_hash),
-                ("engineering_authority_profile_id", geometry.engineering_authority_id),
+                (
+                    "engineering_authority_profile_id",
+                    TASK031_AUTHORITY_PROFILE_ID,
+                ),
                 ("engineering_authority_hash", geometry.engineering_authority_hash),
                 ("pattern_family", geometry.pattern_family),
                 ("flow_region_identity", geometry.flow_region_identity),
@@ -410,6 +417,8 @@ class ShellFlowAuthority(StrictModel):
             )
             if any(provenance.get(key) != value for key, value in provenance_bindings):
                 raise ValueError("TASK031 provenance does not match its public identity fields")
+            if geometry.engineering_authority_id != task031_canonical.ENGINEERING_AUTHORITY_ID:
+                raise ValueError("TASK031 public authority identity does not replay")
             expected_geometry_hash = task031_canonical.sha256_hex(
                 task031_canonical.success_geometry_canonical_projection(geometry)
             )
@@ -509,6 +518,7 @@ class ShellFlowAuthority(StrictModel):
 class Task172LocalRequest(StrictModel):
     schema_version: Literal["task172.local-constitutive-request.v1"] = TASK172_REQUEST_SCHEMA
     case_id: Literal["V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"] = CASE_ID
+    case_revision_id: Literal["V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"] = CASE_REVISION_ID
     topology: TopologyBinding
     support: LocalSupport
     tube_bulk_state: LocalState
@@ -560,8 +570,8 @@ class Task172LocalRequest(StrictModel):
 
     @model_validator(mode="after")
     def reviewed_state_and_surface(self) -> Task172LocalRequest:
-        if self.tube_mass_flow_kg_s != Decimal("10.000000"):
-            raise ValueError("tube mass flow differs from the accepted reference-case input")
+        if self.tube_mass_flow_kg_s != Decimal("12.000000"):
+            raise ValueError("tube mass flow differs from the accepted Stage-2 case revision")
         if self.shell_mass_flow_kg_s != Decimal("20.000000"):
             raise ValueError("shell mass flow differs from the accepted reference-case input")
         if self.tube_inside_fouling_m2_k_w != 0 or self.shell_outside_fouling_m2_k_w != 0:
@@ -579,6 +589,7 @@ class Task172LocalResult(StrictModel):
     status: Literal["VALIDATED"]
     implementation_version: Literal["task172.local-runtime-v1"] = TASK172_IMPLEMENTATION_VERSION
     case_id: str
+    case_revision_id: str
     topology_id: str
     task171_result_hash: str
     task171_mesh_identity: str

@@ -7,10 +7,10 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-TASK174_REQUEST_SCHEMA: Final = "task174.case-hydraulic-orchestration-request.v1"
-TASK174_RESULT_SCHEMA: Final = "task174.case-hydraulic-orchestration-result.v1"
-TASK174_BLOCKED_SCHEMA: Final = "task174.case-hydraulic-orchestration-blocked.v1"
-TASK174_IMPLEMENTATION_VERSION: Final = "task174.hydraulic-orchestration-v1"
+TASK174_REQUEST_SCHEMA: Final = "task174.case-hydraulic-orchestration-request.v2"
+TASK174_RESULT_SCHEMA: Final = "task174.case-hydraulic-orchestration-result.v2"
+TASK174_BLOCKED_SCHEMA: Final = "task174.case-hydraulic-orchestration-blocked.v2"
+TASK174_IMPLEMENTATION_VERSION: Final = "task174.hydraulic-orchestration-v2"
 
 TOPOLOGY_ID: Final = (
     "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7"
@@ -19,6 +19,7 @@ TASK171_RESULT_HASH: Final = "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4e
 MESH_IDENTITY: Final = "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607"
 PHYSICAL_OWNERSHIP_HASH: Final = "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe"
 CASE_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"
+CASE_REVISION_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"
 TASK020_CONFIGURATION_ID: Final = "96637b2b-3583-5fdd-8645-bb2b5526996a"
 TASK020_CONFIGURATION_HASH: Final = (
     "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125"
@@ -35,8 +36,9 @@ AREA_OWNERSHIP_ID: Final = "V07-T172-R119A-AREA-OWNERSHIP-R1"
 LENGTH_OWNERSHIP_ID: Final = "V07-T172-R119A-LENGTH-OWNERSHIP-R1"
 TASK171_MESH_AUTHORITY_ID: Final = "V07-T172-R119A-TASK171-MESH-R1"
 FIV_REQUIREMENT_MODE: Final = "DIAGNOSTIC_SCREENING_ONLY"
-PRESSURE_COUPLING_AUTHORITY_ID: Final = "UNBOUND"
-EVENT_TO_BELL_REGION_AUTHORITY_ID: Final = "UNBOUND"
+TUBE_MODELED_BOUNDARY_AUTHORITY_ID: Final = "V07-T174-TUBE-INTERNAL-MODELED-BOUNDARY-R1"
+PRESSURE_COUPLING_AUTHORITY_ID: Final = "V07-T174-REFERENCE-PRESSURE-COUPLING-R1"
+EVENT_TO_BELL_REGION_AUTHORITY_ID: Final = "V07-T174-BELL-EVENT-REGION-ALLOCATION-R1"
 
 TUBE_COMPONENT_TYPES = frozenset(
     {"ENTRANCE", "EXIT", "CHANNEL_HEAD", "NOZZLE", "CONTRACTION", "EXPANSION"}
@@ -85,19 +87,12 @@ class PhysicalEventBinding(StrictModel):
     multiplicity: int = Field(gt=0)
 
 
-class BellEventPressureBinding(StrictModel):
+class BellEventRegionAllocation(StrictModel):
     physical_event_id: str = Field(min_length=1)
-    bell_physical_region_id: str = Field(min_length=1)
+    allocation_role: Literal["ADDITIVE_PRESSURE_REGION", "CORRECTION_OR_GEOMETRY_SUPPORT"]
+    bell_region_or_support_role: str = Field(min_length=1)
     task166_result_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    modeled_pressure_drop_pa: Decimal | None
-    multiplicity: int = Field(gt=0)
-
-    @field_validator("modeled_pressure_drop_pa")
-    @classmethod
-    def finite_nonnegative_pressure(cls, value: Decimal | None) -> Decimal | None:
-        if value is not None and (type(value) is not Decimal or not value.is_finite() or value < 0):
-            raise ValueError("Bell pressure contribution must be nonnegative finite Decimal")
-        return value
+    evidence_refs: tuple[str, ...] = Field(min_length=1)
 
 
 class PressurePropertyBinding(StrictModel):
@@ -117,10 +112,11 @@ class PressurePropertyBinding(StrictModel):
 
 
 class Task174CaseRequest(StrictModel):
-    schema_version: Literal["task174.case-hydraulic-orchestration-request.v1"] = (
+    schema_version: Literal["task174.case-hydraulic-orchestration-request.v2"] = (
         TASK174_REQUEST_SCHEMA
     )
     case_id: Literal["V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"] = CASE_ID
+    case_revision_id: Literal["V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"] = CASE_REVISION_ID
     topology_id: Literal[
         "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7"
     ] = TOPOLOGY_ID
@@ -149,10 +145,17 @@ class Task174CaseRequest(StrictModel):
     tube_component_bindings: tuple[HydraulicComponentBinding, ...] = ()
     physical_absence_exclusions: tuple[PhysicalAbsenceExclusion, ...] = ()
     physical_events: tuple[PhysicalEventBinding, ...] = ()
-    bell_event_pressure_bindings: tuple[BellEventPressureBinding, ...] = ()
+    bell_event_region_allocations: tuple[BellEventRegionAllocation, ...] = ()
     pressure_property_bindings: tuple[PressurePropertyBinding, ...] = ()
-    pressure_coupling_authority_id: Literal["UNBOUND"] = PRESSURE_COUPLING_AUTHORITY_ID
-    event_to_bell_region_authority_id: Literal["UNBOUND"] = EVENT_TO_BELL_REGION_AUTHORITY_ID
+    tube_modeled_boundary_authority_id: Literal["V07-T174-TUBE-INTERNAL-MODELED-BOUNDARY-R1"] = (
+        TUBE_MODELED_BOUNDARY_AUTHORITY_ID
+    )
+    pressure_coupling_authority_id: Literal["V07-T174-REFERENCE-PRESSURE-COUPLING-R1"] = (
+        PRESSURE_COUPLING_AUTHORITY_ID
+    )
+    event_to_bell_region_authority_id: Literal["V07-T174-BELL-EVENT-REGION-ALLOCATION-R1"] = (
+        EVENT_TO_BELL_REGION_AUTHORITY_ID
+    )
     fiv_requirement_mode: Literal["DIAGNOSTIC_SCREENING_ONLY"] = FIV_REQUIREMENT_MODE
     fiv_array_specific_critical_velocity_limit_m_s: Decimal | None = None
 
@@ -179,7 +182,9 @@ class Task174CaseRequest(StrictModel):
             raise ValueError(
                 "physical events must retain the reviewed TASK024 native geometry binding"
             )
-        bell_ids = tuple(binding.physical_event_id for binding in self.bell_event_pressure_bindings)
+        bell_ids = tuple(
+            binding.physical_event_id for binding in self.bell_event_region_allocations
+        )
         if len(bell_ids) != len(set(bell_ids)):
             raise ValueError("Bell event allocations must not multiply a TASK171 physical event")
         return self
@@ -193,14 +198,17 @@ class Task174Blocker(StrictModel):
 
 
 class Task174BlockedResult(StrictModel):
-    schema_version: Literal["task174.case-hydraulic-orchestration-blocked.v1"] = (
+    schema_version: Literal["task174.case-hydraulic-orchestration-blocked.v2"] = (
         TASK174_BLOCKED_SCHEMA
     )
     status: Literal["BLOCKED"]
     request_hash: str
-    tube_pressure_drop_status: Literal["BLOCKED_INCOMPLETE_MODELED_BOUNDARY"]
-    shell_pressure_drop_status: Literal["BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION"]
-    bell_aggregation_status: Literal["BLOCKED_EVENT_TO_REGION_MAPPING"]
+    tube_pressure_drop_status: Literal["VALIDATED", "BLOCKED_INCOMPLETE_MODELED_BOUNDARY"]
+    shell_pressure_drop_status: Literal[
+        "VALIDATED", "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION"
+    ]
+    bell_aggregation_status: Literal["VALIDATED", "BLOCKED_EVENT_TO_REGION_MAPPING"]
+    pressure_coupling_status: Literal["VALIDATED", "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY"]
     fiv_status: Literal["DIAGNOSTIC_ONLY", "WARN_MISSING_NUMERIC_LIMIT"]
     fiv_numeric_limit_authority_missing: bool
     fiv_numeric_limit_not_guessed: Literal[True]
@@ -211,19 +219,31 @@ class Task174BlockedResult(StrictModel):
 
 
 class Task174SuccessResult(StrictModel):
-    schema_version: Literal["task174.case-hydraulic-orchestration-result.v1"] = (
+    schema_version: Literal["task174.case-hydraulic-orchestration-result.v2"] = (
         TASK174_RESULT_SCHEMA
     )
     status: Literal["VALIDATED"]
     request_hash: str
     task029_result_id: str
     task029_result_hash: str
-    task034_result_id: str
-    task034_result_hash: str
-    tube_modeled_pressure_drop_pa: Decimal
-    shell_modeled_pressure_drop_pa: Decimal
+    task166_result_id: str
+    task166_result_hash: str
+    modeled_total_tube_side_pressure_drop_pa: Decimal
+    bell_total_shell_pressure_drop_pa: Decimal
+    bell_central_crossflow_contribution_pa: Decimal
+    bell_window_contribution_pa: Decimal
+    bell_inlet_end_zone_contribution_pa: Decimal
+    bell_outlet_end_zone_contribution_pa: Decimal
+    task034_screening_result_id: str | None = None
+    task034_screening_result_hash: str | None = None
+    kern_screening_pressure_drop_pa: Decimal | None = None
+    tube_outlet_pressure_pa: Decimal
+    shell_outlet_pressure_pa: Decimal
     bell_physical_event_count: int
     event_multiplicity_sum: int
+    bell_additive_event_count: int
+    bell_support_event_count: int
+    pressure_coupling_authority_id: str
     fiv_status: Literal["DIAGNOSTIC_ONLY", "WARN_MISSING_NUMERIC_LIMIT"]
     fiv_numeric_limit_authority_missing: bool
     fiv_numeric_limit_not_guessed: Literal[True]
@@ -232,7 +252,7 @@ class Task174SuccessResult(StrictModel):
 
 
 __all__ = [
-    "BellEventPressureBinding",
+    "BellEventRegionAllocation",
     "HydraulicComponentBinding",
     "PhysicalAbsenceExclusion",
     "PhysicalEventBinding",

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
-from typing import cast
+from decimal import Decimal, localcontext
+from typing import Literal, cast
 
 from pydantic import ValidationError
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.bell_delaware import canonical as task166_canonical
+from hexagent.exchangers.shell_tube.bell_delaware.decimal_math import engineering_context
 from hexagent.exchangers.shell_tube.bell_delaware.models import (
     Task166BlockedResult,
     Task166Result,
@@ -54,6 +55,20 @@ _EVENT_ROLE_COUNTS = {
     "TUBE_ROW_OR_CROSSED_ROW": 1,
 }
 
+_BELL_ALLOCATION_BY_EVENT_ROLE = {
+    "CENTRAL_CROSSFLOW": ("ADDITIVE_PRESSURE_REGION", "BELL_CENTRAL_CROSSFLOW_REGION"),
+    "WINDOW": ("ADDITIVE_PRESSURE_REGION", "BELL_WINDOW_REGION"),
+    "INLET_END_ZONE": ("ADDITIVE_PRESSURE_REGION", "BELL_INLET_END_ZONE"),
+    "OUTLET_END_ZONE": ("ADDITIVE_PRESSURE_REGION", "BELL_OUTLET_END_ZONE"),
+    "BAFFLE": ("CORRECTION_OR_GEOMETRY_SUPPORT", "BAFFLE_GEOMETRY_SUPPORT"),
+    "LEAKAGE_GEOMETRY": ("CORRECTION_OR_GEOMETRY_SUPPORT", "RL_LEAKAGE_CORRECTION_SUPPORT"),
+    "BYPASS_GEOMETRY": ("CORRECTION_OR_GEOMETRY_SUPPORT", "RB_BYPASS_CORRECTION_SUPPORT"),
+    "TUBE_ROW_OR_CROSSED_ROW": (
+        "CORRECTION_OR_GEOMETRY_SUPPORT",
+        "CROSS_FLOW_ROW_COUNT_SUPPORT",
+    ),
+}
+
 
 @dataclass(frozen=True)
 class Task174NativeOutputs:
@@ -91,20 +106,75 @@ def _native_event_ledger_valid(
     if role_counts != _EVENT_ROLE_COUNTS or len(request.physical_events) != 19:
         return False
     event_ids = {event.physical_event_id for event in request.physical_events}
-    bell_ids = {binding.physical_event_id for binding in request.bell_event_pressure_bindings}
-    if event_ids != bell_ids or len(bell_ids) != len(request.bell_event_pressure_bindings):
+    bell_ids = {binding.physical_event_id for binding in request.bell_event_region_allocations}
+    if event_ids != bell_ids or len(bell_ids) != len(request.bell_event_region_allocations):
         return False
     by_event = {event.physical_event_id: event for event in request.physical_events}
-    for binding in request.bell_event_pressure_bindings:
+    for binding in request.bell_event_region_allocations:
         event = by_event[binding.physical_event_id]
+        expected_allocation = _BELL_ALLOCATION_BY_EVENT_ROLE.get(event.event_role)
         if (
             binding.task166_result_hash != task166.result_hash
-            or binding.multiplicity != event.multiplicity
-            or binding.multiplicity != 1
-            or binding.modeled_pressure_drop_pa is None
+            or expected_allocation is None
+            or (binding.allocation_role, binding.bell_region_or_support_role) != expected_allocation
+            or event.multiplicity != 1
+            or not binding.evidence_refs
         ):
             return False
-    return True
+    additive_count = sum(
+        binding.allocation_role == "ADDITIVE_PRESSURE_REGION"
+        for binding in request.bell_event_region_allocations
+    )
+    support_count = sum(
+        binding.allocation_role == "CORRECTION_OR_GEOMETRY_SUPPORT"
+        for binding in request.bell_event_region_allocations
+    )
+    with localcontext(engineering_context()):
+        try:
+            reconciles = (
+                task166.central_crossflow_contribution
+                + task166.window_contribution
+                + task166.entrance_zone_contribution
+                + task166.exit_zone_contribution
+                == task166.total_shell_pressure_drop
+            )
+        except Exception:
+            return False
+    return additive_count == 9 and support_count == 10 and reconciles
+
+
+def _native_task166_valid(task166: Task166Result | Task166BlockedResult | None) -> bool:
+    if type(task166) is not Task166Result:
+        return False
+    try:
+        result_hash = task166_canonical.result_hash(task166)
+        result_id = task166_canonical.result_id(result_hash)
+    except Exception:
+        return False
+    return (
+        task166.result_hash == result_hash
+        and task166.result_id == result_id
+        and not task166.blockers
+        and not task166.warnings
+        and task166.bell_geometry is not None
+        and task166.applicability is not None
+        and task166.applicability.status.value == "APPLICABLE"
+        and task166.completeness is not None
+        and task166.completeness.status == "COMPLETE"
+    )
+
+
+def _pressure_bindings_valid(request: Task174CaseRequest) -> bool:
+    bindings = request.pressure_property_bindings
+    if len(bindings) != 2:
+        return False
+    by_side = {item.side: item for item in bindings}
+    return (
+        len(by_side) == 2
+        and set(by_side) == {"TUBE", "SHELL"}
+        and by_side["TUBE"].pressure_pa == Decimal("101325")
+        and by_side["SHELL"].pressure_pa == Decimal("101325")
+    )
 
 
 def _tube_path_complete(
@@ -210,11 +280,20 @@ def _blocker_result(
     request_hash: str,
     blockers: tuple[Task174Blocker, ...],
     fiv_limit_missing: bool,
+    *,
+    tube_status: Literal["VALIDATED", "BLOCKED_INCOMPLETE_MODELED_BOUNDARY"],
+    shell_status: Literal["VALIDATED", "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION"],
+    bell_status: Literal["VALIDATED", "BLOCKED_EVENT_TO_REGION_MAPPING"],
+    pressure_status: Literal["VALIDATED", "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY"],
 ) -> Task174BlockedResult:
     evidence = {
-        "schema_version": "task174.case-hydraulic-orchestration-blocked.v1",
+        "schema_version": "task174.case-hydraulic-orchestration-blocked.v2",
         "request_hash": request_hash,
         "blockers": [item.model_dump(mode="json") for item in blockers],
+        "tube_pressure_drop_status": tube_status,
+        "shell_pressure_drop_status": shell_status,
+        "bell_aggregation_status": bell_status,
+        "pressure_coupling_status": pressure_status,
         "fiv_mode": "DIAGNOSTIC_SCREENING_ONLY",
         "fiv_numeric_limit_authority_missing": fiv_limit_missing,
         "fiv_numeric_limit_not_guessed": True,
@@ -222,9 +301,10 @@ def _blocker_result(
     return Task174BlockedResult(
         status="BLOCKED",
         request_hash=request_hash,
-        tube_pressure_drop_status="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
-        shell_pressure_drop_status="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
-        bell_aggregation_status="BLOCKED_EVENT_TO_REGION_MAPPING",
+        tube_pressure_drop_status=tube_status,
+        shell_pressure_drop_status=shell_status,
+        bell_aggregation_status=bell_status,
+        pressure_coupling_status=pressure_status,
         fiv_status="WARN_MISSING_NUMERIC_LIMIT" if fiv_limit_missing else "DIAGNOSTIC_ONLY",
         fiv_numeric_limit_authority_missing=fiv_limit_missing,
         fiv_numeric_limit_not_guessed=True,
@@ -241,25 +321,51 @@ def recompute_task174_result_hash(result: Task174Outcome) -> str:
     """Replay either TASK174 outcome identity from its closed public fields."""
     if type(result) is Task174BlockedResult:
         projection = {
-            "schema_version": "task174.case-hydraulic-orchestration-blocked.v1",
+            "schema_version": "task174.case-hydraulic-orchestration-blocked.v2",
             "request_hash": result.request_hash,
             "blockers": [item.model_dump(mode="json") for item in result.blockers],
+            "tube_pressure_drop_status": result.tube_pressure_drop_status,
+            "shell_pressure_drop_status": result.shell_pressure_drop_status,
+            "bell_aggregation_status": result.bell_aggregation_status,
+            "pressure_coupling_status": result.pressure_coupling_status,
             "fiv_mode": "DIAGNOSTIC_SCREENING_ONLY",
             "fiv_numeric_limit_authority_missing": result.fiv_numeric_limit_authority_missing,
             "fiv_numeric_limit_not_guessed": result.fiv_numeric_limit_not_guessed,
         }
     elif type(result) is Task174SuccessResult:
         projection = {
-            "schema_version": "task174.case-hydraulic-orchestration-result.v1",
+            "schema_version": "task174.case-hydraulic-orchestration-result.v2",
             "request_hash": result.request_hash,
             "task029_result_id": result.task029_result_id,
             "task029_result_hash": result.task029_result_hash,
-            "task034_result_id": result.task034_result_id,
-            "task034_result_hash": result.task034_result_hash,
-            "tube_modeled_pressure_drop_pa": str(result.tube_modeled_pressure_drop_pa),
-            "shell_modeled_pressure_drop_pa": str(result.shell_modeled_pressure_drop_pa),
+            "task166_result_id": result.task166_result_id,
+            "task166_result_hash": result.task166_result_hash,
+            "modeled_total_tube_side_pressure_drop_pa": str(
+                result.modeled_total_tube_side_pressure_drop_pa
+            ),
+            "bell_total_shell_pressure_drop_pa": str(result.bell_total_shell_pressure_drop_pa),
+            "bell_central_crossflow_contribution_pa": str(
+                result.bell_central_crossflow_contribution_pa
+            ),
+            "bell_window_contribution_pa": str(result.bell_window_contribution_pa),
+            "bell_inlet_end_zone_contribution_pa": str(result.bell_inlet_end_zone_contribution_pa),
+            "bell_outlet_end_zone_contribution_pa": str(
+                result.bell_outlet_end_zone_contribution_pa
+            ),
+            "task034_screening_result_id": result.task034_screening_result_id,
+            "task034_screening_result_hash": result.task034_screening_result_hash,
+            "kern_screening_pressure_drop_pa": (
+                None
+                if result.kern_screening_pressure_drop_pa is None
+                else str(result.kern_screening_pressure_drop_pa)
+            ),
+            "tube_outlet_pressure_pa": str(result.tube_outlet_pressure_pa),
+            "shell_outlet_pressure_pa": str(result.shell_outlet_pressure_pa),
             "bell_physical_event_count": result.bell_physical_event_count,
             "event_multiplicity_sum": result.event_multiplicity_sum,
+            "bell_additive_event_count": result.bell_additive_event_count,
+            "bell_support_event_count": result.bell_support_event_count,
+            "pressure_coupling_authority_id": result.pressure_coupling_authority_id,
             "fiv_status": result.fiv_status,
             "fiv_numeric_limit_authority_missing": result.fiv_numeric_limit_authority_missing,
             "fiv_numeric_limit_not_guessed": result.fiv_numeric_limit_not_guessed,
@@ -291,6 +397,10 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
                     ),
                 ),
                 True,
+                tube_status="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+                shell_status="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+                bell_status="BLOCKED_EVENT_TO_REGION_MAPPING",
+                pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
             )
     else:
         digest = canonical_sha256({"schema": "task174.invalid-request.v1", "status": "BLOCKED"})
@@ -305,6 +415,10 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
                 ),
             ),
             True,
+            tube_status="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+            shell_status="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+            bell_status="BLOCKED_EVENT_TO_REGION_MAPPING",
+            pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
         )
 
     request_projection = request.model_dump(mode="json")
@@ -346,45 +460,47 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
             )
         )
 
-    task034_total = _task034_total(native_outputs.task034, native_outputs.task166)
-    if task034_total is None or not _native_event_ledger_valid(request, native_outputs.task166):
+    shell_valid = _native_task166_valid(native_outputs.task166) and _native_event_ledger_valid(
+        request, native_outputs.task166
+    )
+    if not shell_valid:
         missing_shell: list[str] = []
-        if task034_total is None:
-            missing_shell.append("valid native TASK034 complete shell pressure-drop result")
+        if not _native_task166_valid(native_outputs.task166):
+            missing_shell.append("valid native TASK166 Bell-Delaware result")
         if not _native_event_ledger_valid(request, native_outputs.task166):
             missing_shell.append(
                 "one-to-one source-bound TASK171 physical-event to Bell-region allocation"
             )
-        if request.event_to_bell_region_authority_id == "UNBOUND":
+        if request.event_to_bell_region_authority_id != "V07-T174-BELL-EVENT-REGION-ALLOCATION-R1":
             missing_shell.append(
                 "reviewed TASK171-event to Bell pressure-region allocation authority"
             )
         blockers.append(
             Task174Blocker(
                 code="SHELL_DP_BLOCKED_PHYSICAL_EVENT_AND_PRESSURE_STATE_BINDING",
-                scope="SHELL_SIDE_TASK034_BELL_AGGREGATION",
+                scope="SHELL_SIDE_TASK166_BELL_AGGREGATION",
                 missing_bindings=tuple(missing_shell),
                 consumer=(
-                    "TASK034/TASK166 physical-event aggregation; every physical event "
-                    "must be allocated once"
+                    "TASK166 native Bell decomposition and exact-once physical-event allocation"
                 ),
             )
         )
 
-    if (
-        request.pressure_coupling_authority_id == "UNBOUND"
-        or not request.pressure_property_bindings
-    ):
+    pressure_valid = (
+        request.pressure_coupling_authority_id == "V07-T174-REFERENCE-PRESSURE-COUPLING-R1"
+        and _pressure_bindings_valid(request)
+    )
+    if not pressure_valid:
         blockers.append(
             Task174Blocker(
                 code="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
                 scope="CASE_PRESSURE_PATH",
                 missing_bindings=(
-                    "reviewed pressure-state coupling authority",
-                    "exact support/location pressure-state and property-snapshot bindings",
+                    "one-way frozen reference-pressure authority",
+                    "exact tube and shell 101325 Pa reference-pressure snapshots",
                 ),
                 consumer=(
-                    "TASK172 property provider + TASK027/TASK034 pressure-dependent state inputs"
+                    "Stage-1 property provider and one-way post-hydraulic outlet-domain guard"
                 ),
             )
         )
@@ -394,34 +510,110 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
             request_hash,
             tuple(blockers),
             request.fiv_array_specific_critical_velocity_limit_m_s is None,
+            tube_status=(
+                "VALIDATED"
+                if component_coverage and type(native_outputs.task029) is Task029SuccessResult
+                else "BLOCKED_INCOMPLETE_MODELED_BOUNDARY"
+            ),
+            shell_status="VALIDATED"
+            if shell_valid
+            else "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+            bell_status="VALIDATED" if shell_valid else "BLOCKED_EVENT_TO_REGION_MAPPING",
+            pressure_status=(
+                "VALIDATED" if pressure_valid else "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY"
+            ),
         )
 
     task029 = cast(Task029SuccessResult, native_outputs.task029)
-    task034_validation = native_outputs.task034
-    if (
-        task034_validation is None
-        or type(task034_validation.pressure_drop) is not ShellSidePressureDropResult
-    ):
-        raise RuntimeError("complete TASK034 result disappeared after blocker evaluation")
-    task034 = task034_validation.pressure_drop
+    task166 = cast(Task166Result, native_outputs.task166)
+    tube_reference_pressure = next(
+        item.pressure_pa for item in request.pressure_property_bindings if item.side == "TUBE"
+    )
+    shell_reference_pressure = next(
+        item.pressure_pa for item in request.pressure_property_bindings if item.side == "SHELL"
+    )
+    with localcontext(engineering_context()):
+        tube_outlet_pressure = (
+            tube_reference_pressure - task029.modeled_total_tube_side_pressure_drop_pa
+        )
+        shell_outlet_pressure = shell_reference_pressure - task166.total_shell_pressure_drop
+    pressure_domain_pass = all(
+        Decimal("100000") <= pressure <= Decimal("101325")
+        for pressure in (tube_outlet_pressure, shell_outlet_pressure)
+    )
+    if not pressure_domain_pass:
+        return _blocker_result(
+            request_hash,
+            (
+                Task174Blocker(
+                    code="BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT",
+                    scope="CASE_PRESSURE_PATH",
+                    missing_bindings=(
+                        "both one-way calculated outlet pressures remain within 100000..101325 Pa",
+                    ),
+                    consumer="Stage-1 property-provider admitted pressure domain",
+                ),
+            ),
+            request.fiv_array_specific_critical_velocity_limit_m_s is None,
+            tube_status="VALIDATED",
+            shell_status="VALIDATED",
+            bell_status="VALIDATED",
+            pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+        )
+    task034_total = _task034_total(native_outputs.task034, task166)
+    task034_result = (
+        native_outputs.task034.pressure_drop
+        if native_outputs.task034 is not None
+        and type(native_outputs.task034.pressure_drop) is ShellSidePressureDropResult
+        and task034_total is not None
+        else None
+    )
     fiv_missing = request.fiv_array_specific_critical_velocity_limit_m_s is None
+    additive_event_count = sum(
+        item.allocation_role == "ADDITIVE_PRESSURE_REGION"
+        for item in request.bell_event_region_allocations
+    )
+    support_event_count = sum(
+        item.allocation_role == "CORRECTION_OR_GEOMETRY_SUPPORT"
+        for item in request.bell_event_region_allocations
+    )
     success_projection = {
         "request_hash": request_hash,
         "task029_result_id": task029.result_id,
         "task029_result_hash": task029.result_hash,
-        "task034_result_id": task034.result_id,
-        "task034_result_hash": task034.result_hash,
-        "tube_modeled_pressure_drop_pa": str(task029.modeled_total_tube_side_pressure_drop_pa),
-        "shell_modeled_pressure_drop_pa": str(task034.modeled_shell_side_pressure_drop_pa),
+        "task166_result_id": task166.result_id,
+        "task166_result_hash": task166.result_hash,
+        "modeled_total_tube_side_pressure_drop_pa": str(
+            task029.modeled_total_tube_side_pressure_drop_pa
+        ),
+        "bell_total_shell_pressure_drop_pa": str(task166.total_shell_pressure_drop),
+        "bell_central_crossflow_contribution_pa": str(task166.central_crossflow_contribution),
+        "bell_window_contribution_pa": str(task166.window_contribution),
+        "bell_inlet_end_zone_contribution_pa": str(task166.entrance_zone_contribution),
+        "bell_outlet_end_zone_contribution_pa": str(task166.exit_zone_contribution),
+        "task034_screening_result_id": None if task034_result is None else task034_result.result_id,
+        "task034_screening_result_hash": None
+        if task034_result is None
+        else task034_result.result_hash,
+        "kern_screening_pressure_drop_pa": (
+            None
+            if task034_result is None
+            else str(task034_result.modeled_shell_side_pressure_drop_pa)
+        ),
+        "tube_outlet_pressure_pa": str(tube_outlet_pressure),
+        "shell_outlet_pressure_pa": str(shell_outlet_pressure),
         "bell_physical_event_count": len(request.physical_events),
         "event_multiplicity_sum": sum(event.multiplicity for event in request.physical_events),
+        "bell_additive_event_count": additive_event_count,
+        "bell_support_event_count": support_event_count,
+        "pressure_coupling_authority_id": request.pressure_coupling_authority_id,
         "fiv_status": "WARN_MISSING_NUMERIC_LIMIT" if fiv_missing else "DIAGNOSTIC_ONLY",
         "fiv_numeric_limit_authority_missing": fiv_missing,
         "fiv_numeric_limit_not_guessed": True,
     }
     result_hash = canonical_sha256(
         {
-            "schema_version": "task174.case-hydraulic-orchestration-result.v1",
+            "schema_version": "task174.case-hydraulic-orchestration-result.v2",
             **success_projection,
         }
     )
@@ -430,12 +622,28 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
         request_hash=request_hash,
         task029_result_id=task029.result_id,
         task029_result_hash=task029.result_hash,
-        task034_result_id=task034.result_id,
-        task034_result_hash=task034.result_hash,
-        tube_modeled_pressure_drop_pa=task029.modeled_total_tube_side_pressure_drop_pa,
-        shell_modeled_pressure_drop_pa=task034.modeled_shell_side_pressure_drop_pa,
+        task166_result_id=task166.result_id,
+        task166_result_hash=task166.result_hash,
+        modeled_total_tube_side_pressure_drop_pa=task029.modeled_total_tube_side_pressure_drop_pa,
+        bell_total_shell_pressure_drop_pa=task166.total_shell_pressure_drop,
+        bell_central_crossflow_contribution_pa=task166.central_crossflow_contribution,
+        bell_window_contribution_pa=task166.window_contribution,
+        bell_inlet_end_zone_contribution_pa=task166.entrance_zone_contribution,
+        bell_outlet_end_zone_contribution_pa=task166.exit_zone_contribution,
+        task034_screening_result_id=None if task034_result is None else task034_result.result_id,
+        task034_screening_result_hash=None
+        if task034_result is None
+        else task034_result.result_hash,
+        kern_screening_pressure_drop_pa=(
+            None if task034_result is None else task034_result.modeled_shell_side_pressure_drop_pa
+        ),
+        tube_outlet_pressure_pa=tube_outlet_pressure,
+        shell_outlet_pressure_pa=shell_outlet_pressure,
         bell_physical_event_count=len(request.physical_events),
         event_multiplicity_sum=sum(event.multiplicity for event in request.physical_events),
+        bell_additive_event_count=additive_event_count,
+        bell_support_event_count=support_event_count,
+        pressure_coupling_authority_id=request.pressure_coupling_authority_id,
         fiv_status="WARN_MISSING_NUMERIC_LIMIT" if fiv_missing else "DIAGNOSTIC_ONLY",
         fiv_numeric_limit_authority_missing=fiv_missing,
         fiv_numeric_limit_not_guessed=True,
