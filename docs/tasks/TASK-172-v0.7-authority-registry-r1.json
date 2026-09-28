@@ -20895,5 +20895,97 @@
     "stop": true,
     "canonical_hash": "7c6d4eea7accd5c1771c7cdefa3a6fecd32b810f68c6d5301a1aa3ca39daa7e2"
   },
-  "canonical_hash": "81fac29f7d1bb47b544afbec9b0594a18b3d7f08938ed8b4ba0c2c2dee8ab83b"
+  "stage1_pre_runtime_authority_closure_extension": {
+    "task_id": "TASK172_V0_7_STAGE1_PRE_RUNTIME_AUTHORITY_CLOSURE_R1",
+    "short_name": "STAGE-1 PRE-RUNTIME AUTHORITY CLOSURE",
+    "mode": "CONSOLIDATED_PRE_RUNTIME_AUTHORITY_CLOSURE",
+    "result": "AWAITING_SINGLE_PROJECT_OWNER_DECISION_PACKAGE",
+    "stage1_status": "PREPARATION_COMPLETE_AWAITING_OWNER_PACKAGE",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "predecessor_head": "c60fc5d50b1ec1bc16c3b800fc94d9d382bfacd8",
+    "previous_registry_root_canonical_hash": "81fac29f7d1bb47b544afbec9b0594a18b3d7f08938ed8b4ba0c2c2dee8ab83b",
+    "r119e_external_review": {
+      "result": "PASS",
+      "review_source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+      "self_approval": false,
+      "codex_self_approval_claimed": false,
+      "evidence_canonical_hash": "5ad8343e342ad2bc4f1c3560fa9dc47e97b61f9b4e37e21ede2e35f63c63fbda"
+    },
+    "accepted_task171_materialization": {
+      "status": "VALIDATED",
+      "selected_variant": "TUBE_HOT_SHELL_COLD",
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe"
+    },
+    "authority_matrix": {
+      "field_count": 81,
+      "reused_reviewed_values": 32,
+      "derived_bindings": 1,
+      "project_owner_decisions_required": 12,
+      "project_owner_decision_matrix_fields": 43,
+      "not_applicable": 3,
+      "native_contract_constants": 2
+    },
+    "owner_decision_package": {
+      "path": "docs/tasks/TASK-172-v0.7-stage1-project-owner-decision-package-r1.md",
+      "sha256": "9d694d7efffb47a86a86d351ae5d73443a766555f5c7425c048a946f25a354b9",
+      "decision_count": 12,
+      "bundle_sections": [
+        "A_CASE_STREAMS_AND_OPERATING_POINT",
+        "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+        "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+        "D_NUMERICAL_AND_REAL_CASE_ADMISSION"
+      ]
+    },
+    "artifacts": {
+      "authority_bundle_document_path": "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-bundle-r1.md",
+      "authority_bundle_document_sha256": "454956fb3d15c2431729e2b627f5e894cd8fe0c05d62cdc288961331b4db7456",
+      "evidence_path": "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
+      "evidence_file_sha256": "5237ed367129b7e4634c3858789537373c8ca21b5e90d2b63e8674526721f43b",
+      "evidence_canonical_hash": "d16975d85f902a564d339e824560d7927dc2931c6844b7f8d1609f079bf026cd"
+    },
+    "geometry_id_contract_resolution": {
+      "aggregate_geometry_id_required_before_task172_runtime": false,
+      "admission_scalar_prerequisite_conflicts_with_native_semantics": true,
+      "disposition": "C_ADMISSION_CONTRACT_REQUIRES_CORRECTION_BECAUSE_AGGREGATE_ID_HAS_NO_NATIVE_SEMANTICS",
+      "candidate_correction_pending_owner_acceptance_and_review": true,
+      "geometry_id": "UNBOUND"
+    },
+    "stage1_readiness": {
+      "case_stream_authority_bound": false,
+      "property_package_bound": false,
+      "material_wall_constitutive_authority_bound": false,
+      "case_executable_numerical_profile_bound": false,
+      "production_mesh_profile_authority_bound": false,
+      "reference_policy_resolution_valid": false,
+      "production_reference_oracle_requirement_resolved_for_case": false,
+      "real_case_mesh_admission_prerequisites_resolved": false,
+      "real_case_mesh_admissible": false,
+      "task172_runtime_ready": false
+    },
+    "change_boundary": {
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "dependencies_changed": false,
+      "workflows_changed": false,
+      "lockfiles_changed": false,
+      "r119a_through_r119e_artifacts_rewritten": false,
+      "task172_task174_task173_task175_execution_performed": false,
+      "registry_append_only": true,
+      "preexisting_duplicate_json_keys": 2,
+      "new_duplicate_json_keys": 0
+    },
+    "validation": {
+      "canonical_hash_audit": "PASS",
+      "registry_duplicate_audit": "PASS_PREEXISTING_DUPLICATES_PRESERVED",
+      "local_static_validation": "PASS_CI_EQUIVALENT_STATIC_GATES",
+      "exact_head_ci": "REQUIRED_AFTER_COMMIT"
+    },
+    "next_gate": "STAGE_1_PRE_RUNTIME_AUTHORITY_CLOSURE_PENDING_OWNER_DECISION_PACKAGE",
+    "stop": true,
+    "canonical_hash": "a1296a091be401d46c8a884fde607dca5551390324e22a8b16451497d06efe3a"
+  },
+  "canonical_hash": "4c757704b56ea25995565cdf2db6ad499c802b95ea7e100f8e02ef011b2085d4"
 }
