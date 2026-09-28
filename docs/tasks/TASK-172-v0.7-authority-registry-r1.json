@@ -20529,5 +20529,87 @@
       "stop": true,
   "canonical_hash": "be4846f94906d419129c11ef0df924ec2106c89becb57485904d8fb925708e68"
     },
-  "canonical_hash": "380ae163cde7cac415744e00d8fc4ae1964a9ea76c264440a6769a7c05b41549"
+  "r119b_extension": {
+    "task_id": "TASK172_V0_7_R119B_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_INDEPENDENT_REVIEW_R1",
+    "short_name": "R119-B",
+    "mode": "INDEPENDENT_REVIEW_ONLY",
+    "result": "R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_INDEPENDENT_REVIEW_PASS",
+    "review_target_task": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+    "review_target_head": "f0f7c5645de156a3ffd60acb079b810cc92f078b",
+    "previous_registry_root_canonical_hash": "380ae163cde7cac415744e00d8fc4ae1964a9ea76c264440a6769a7c05b41549",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "review_result": "PASS",
+    "review_target_authority_package_id": "V07-T172-R119A-CASE-BOUND-TASK171-DEFINITION-AUTHORITY-R1",
+    "core_effective_lifecycle": "REVIEWED_AUTHORITY",
+    "case_bound_task171_definition_effective": false,
+    "thermal_role_selection": "UNBOUND",
+    "candidate_authority_ids": {
+      "flow_path_mapping": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+      "physical_compartment_mapping": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+      "area_ownership": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+      "length_ownership": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+      "task171_structural_mesh": "V07-T172-R119A-TASK171-MESH-R1"
+    },
+    "authority_disposition": {
+      "flow_path_mapping": "REVIEWED_AUTHORITY",
+      "side_direction_scope": "PROJECT_INTERNAL_CANONICAL_SIDE_PATH_ORIENTATION",
+      "physical_compartment_mapping": "REVIEWED_AUTHORITY_STRUCTURAL_ONLY",
+      "area_ownership": "REVIEWED_AUTHORITY_THIS_EXACT_CASE_ONLY_NO_STANDARD_CLAIM",
+      "length_ownership": "REVIEWED_AUTHORITY_TASK171_PHYSICAL_INTERVAL_OWNERSHIP_ONLY",
+      "task171_structural_mesh": "REVIEWED_AUTHORITY_TASK171_STRUCTURAL_EXECUTION_ONLY",
+      "production_mesh_profile_authority_id": "UNBOUND"
+    },
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r119b-case-bound-task171-definition-authority-independent-review-r1.md",
+      "document_sha256": "6f49348e4ff0e3db43924036bbc03395beaa8b7e2d2f6cbaba91768bdbf73fa7",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r119b-case-bound-task171-definition-authority-independent-review-r1.json",
+      "evidence_file_sha256": "4934bb0deb1506e14287db91b45be0d7dc1b1f4fb6a990d6f40536c97b96ffe7",
+      "evidence_canonical_hash": "aabbf6a01936ca149ad9d7f9feef2de6b8fb15f7c4165cd46a2589c3ced80b5a"
+    },
+    "validation": {
+      "r119a_artifacts_unchanged": true,
+      "r118d_artifacts_unchanged": true,
+      "native_identity_binding_review": "PASS",
+      "strict_definition_validation": "2/2_PASS",
+      "physical_segment_id_replay": "5/5_PASS",
+      "physical_event_id_replay": "19/19_PASS",
+      "physical_compartment_id_replay": "19/19_PASS",
+      "role_variant_non_role_difference_count": 0,
+      "task171_native_producer_invocation_count": 0,
+      "task014_025_producer_invocation_count": 0,
+      "engineering_value_change_count": 0,
+      "authority_scope_widening": false,
+      "append_only": true,
+      "preexisting_duplicate_json_keys": 2,
+      "new_duplicate_json_keys": 0,
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "exact_final_head_ci": "REQUIRED_AFTER_FINAL_COMMIT"
+    },
+    "downstream_boundary": {
+      "selected_thermal_role_variant": "UNBOUND",
+      "thermal_role_selection_authority_id": "UNBOUND",
+      "hot_stream_path_id": "UNBOUND",
+      "cold_stream_path_id": "UNBOUND",
+      "task171_executed": false,
+      "topology_id": "UNBOUND",
+      "topology_authority_id": "UNBOUND",
+      "aggregate_geometry_id": "UNBOUND",
+      "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+      "production_mesh_profile_authority_id": "UNBOUND",
+      "real_case_mesh_admissible": false,
+      "production_mesh_admission_enabled": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "ready_authorized": false,
+      "merge_authorized": false
+    },
+    "next_gate": "R119C_EXPLICIT_THERMAL_ROLE_SELECTION_AUTHORITY_ONLY",
+    "stop": true,
+    "canonical_hash": "9a53c313fc28c1f771e6c7d32d023ac926f894829283f0901462a569a1e44dbd"
+  },
+  "canonical_hash": "86c5d7816af947a276c88d72430eea325fb31d03bd2409a302b4984acee28602"
 }
