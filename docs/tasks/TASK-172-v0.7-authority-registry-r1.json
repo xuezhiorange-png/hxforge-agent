@@ -20701,5 +20701,99 @@
     "stop": true,
     "canonical_hash": "1c80c016f3c770a8f1f9c60200d9c6cf8ad40fb1fc4d25e4fd8056e6c9ee9cfb"
   },
-  "canonical_hash": "346cc4e29e1fb42bcb4e89cc5f27679f7eb4f16b7ec6d90b35563a35356a7d7d"
+  "r119d_extension": {
+    "task_id": "TASK172_V0_7_R119D_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_R1",
+    "short_name": "R119-D",
+    "mode": "R119D_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_ONLY",
+    "result": "CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_COMPLETE",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "predecessor_head": "3df4df347933688e38a27861916f15845ede0bbe",
+    "previous_registry_root_canonical_hash": "346cc4e29e1fb42bcb4e89cc5f27679f7eb4f16b7ec6d90b35563a35356a7d7d",
+    "predecessor_r119c_evidence_canonical_hash": "3ba7cdcf2c438570328ecb8cb9ddc591b05b01b04bf4a5832a71e6a77aeed5fb",
+    "predecessor_r119c_extension_canonical_hash": "1c80c016f3c770a8f1f9c60200d9c6cf8ad40fb1fc4d25e4fd8056e6c9ee9cfb",
+    "thermal_role_selection_authority_id": "V07-T172-R119C-THERMAL-ROLE-SELECTION-R1",
+    "selected_variant": "TUBE_HOT_SHELL_COLD",
+    "selected_variant_canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc",
+    "native_task171": {
+      "producer_api": "hexagent.exchangers.shell_tube.segmented_thermal_state_topology.validate_request",
+      "invocation_count_per_run": 1,
+      "run_count": 2,
+      "status": "VALIDATED",
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "same_native_request": true,
+      "same_native_engineering_identities": true,
+      "same_native_engineering_outputs": true
+    },
+    "retained_authorities": {
+      "task171_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "implementation_version": "task171.v1",
+      "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+      "authority_ids": [
+        "V07-T171-TOPOLOGY-R4-V1",
+        "V07-T171-CELL-COMPARTMENT-R4-V1",
+        "V07-T171-CONSERVATION-R4-V1"
+      ],
+      "envelope": {
+        "steady_state": true,
+        "single_phase": true,
+        "newtonian": true,
+        "construction_family": "FIXED_TUBESHEET",
+        "shell_type": "E",
+        "shell_pass_count": 1,
+        "tube_pass_count": 1,
+        "tube_path": "STRAIGHT_THROUGH",
+        "flow_arrangement": "COUNTERCURRENT"
+      },
+      "flow_path_mapping_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+      "physical_compartment_map_id": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+      "area_ownership_map_id": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+      "length_ownership_map_id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+      "task171_structural_mesh_authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+      "r119a_reviewed_core_lifecycle": "REVIEWED_AUTHORITY",
+      "scope": "UNCHANGED_REVIEWED_CASE_BOUND_AUTHORITIES"
+    },
+    "aggregate_geometry_id": "UNBOUND",
+    "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "fluid_identity_bound": false,
+    "property_profile_authority_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "real_case_mesh_admissible": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "artifacts": {
+      "document_path": "docs/tasks/TASK-172-v0.7-r119d-case-bound-task171-native-materialization-r1.md",
+      "document_sha256": "d28b9111ca7bb8a009b199cc65e51deac20e6e07b8910f5ae490b613a3e0a647",
+      "evidence_path": "docs/tasks/evidence/TASK-172-r119d-case-bound-task171-native-materialization-r1.json",
+      "evidence_file_sha256": "03f2082284d7f56b0f3b1ec5661084427bbe02dd44c419b9be3fec67f7746dda",
+      "evidence_canonical_hash": "7a76c7cc118c88a5ef7d1e40add66915e6b93190bfae15a31aee4687ab01e1af"
+    },
+    "change_boundary": {
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "dependencies_changed": false,
+      "workflows_changed": false,
+      "reviewed_authorities_changed": false,
+      "engineering_values_changed": false,
+      "authority_scope_changed": false,
+      "registry_append_only": true
+    },
+    "validation": {
+      "native_producer_invocation_count": 2,
+      "run_a": "PASS",
+      "run_b": "PASS",
+      "native_identity_replay": "PASS",
+      "native_output_replay": "PASS",
+      "exact_final_head_ci": "REQUIRED_AFTER_COMMIT"
+    },
+    "next_gate": "R119E_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_INDEPENDENT_REVIEW_ONLY",
+    "stop": true,
+    "canonical_hash": "6d46819673b2948a74a10a39623fab4c0cb311cf31c0a92543201941d5a4b261"
+  },
+  "canonical_hash": "87ccdf23451be87b4fd3142e7181d4a602ff9611ef1f8824d5b19d2b0a827d44"
 }
