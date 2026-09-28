@@ -20987,5 +20987,124 @@
     "stop": true,
     "canonical_hash": "a1296a091be401d46c8a884fde607dca5551390324e22a8b16451497d06efe3a"
   },
-  "canonical_hash": "4c757704b56ea25995565cdf2db6ad499c802b95ea7e100f8e02ef011b2085d4"
+  "stage1_real_case_production_mesh_policy_closure_extension": {
+    "task_id": "TASK172_V0_7_STAGE1_REAL_CASE_PRODUCTION_MESH_POLICY_CLOSURE_R1",
+    "short_name": "STAGE-1 REAL-CASE PRODUCTION MESH POLICY CLOSURE",
+    "mode": "CONSOLIDATED_OWNER_AUTHORITY_BINDING_AND_REAL_CASE_MESH_POLICY_CLOSURE",
+    "result": "STAGE1_AUTHORITY_BUNDLE_COMPLETE_PENDING_SINGLE_INDEPENDENT_REVIEW",
+    "stage1_status": "COMPLETE_PENDING_SINGLE_INDEPENDENT_REVIEW",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "predecessor_head": "5905e262172a4660f1fe53823af79c090e46883f",
+    "previous_registry_root_canonical_hash": "4c757704b56ea25995565cdf2db6ad499c802b95ea7e100f8e02ef011b2085d4",
+    "previous_blocker": "BLOCKED_PROFILE_BINDING_SEMANTICS",
+    "previous_blocker_resolved": true,
+    "project_owner_decisions": {
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+      "package_complete": true,
+      "decision_count": 12,
+      "remaining_count": 0,
+      "self_approval": false,
+      "codex_self_approval_claimed": false
+    },
+    "reused_r119e": {
+      "result": "PASS",
+      "review_source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+      "r119e_evidence_canonical_hash": "5ad8343e342ad2bc4f1c3560fa9dc47e97b61f9b4e37e21ede2e35f63c63fbda"
+    },
+    "case_authorities": {
+      "case_stream_authority_bound": true,
+      "property_package_bound": true,
+      "material_wall_constitutive_authority_bound": true,
+      "case_executable_numerical_profile_bound": true,
+      "r98_c_round": "1.0",
+      "reference_policy_resolution_valid": true,
+      "production_reference_oracle_requirement_resolved": true,
+      "geometry_id_contract_disposition": "C_ADMISSION_CONTRACT_CORRECTED_TO_STRUCTURED_NATIVE_REFERENCES",
+      "geometry_id": "UNBOUND"
+    },
+    "real_case_production_mesh_profile": {
+      "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+      "scope": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "physical_interval_count": 5,
+      "count_semantics": "SUBDIVISIONS_PER_PHYSICAL_INTERVAL_PER_SIDE",
+      "primary_subdivisions": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "primary_total_cells": [
+        10,
+        20,
+        40,
+        80,
+        160,
+        320,
+        640
+      ],
+      "wall_interfaces": [
+        5,
+        10,
+        20,
+        40,
+        80,
+        160,
+        320
+      ],
+      "consecutive_passing_pairs": 2,
+      "later_headroom_levels": 1,
+      "max_subdivisions": 64,
+      "max_total_cells": 640,
+      "max_wall_interfaces": 320,
+      "latest_acceptable_candidate_subdivisions": 32,
+      "duty_relative_threshold": "0.01",
+      "near_zero_duty_absolute_threshold_W": "0.01",
+      "wall_extrema_absolute_threshold_K": "0.01",
+      "R103_absolute_cell_counts_transferred": false,
+      "R103_supporting_qualification_only": true,
+      "production_reference_oracle_required": false,
+      "R102_synthetic_reference_values_transferred": false,
+      "schema_capacity_check": "PASS_SCHEMA_CAPACITY_ONLY",
+      "real_case_mesh_admissible": false
+    },
+    "native_property_replay": {
+      "provider": "CoolProp HEOS",
+      "version": "8.0.0",
+      "git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+      "tube_snapshot_hash": "984b3e72893b357535ed500294453b5e6b1f902a71a3c93357fe1a9978947819",
+      "shell_snapshot_hash": "e48b6a28f999e9cffc3cd873eeaede338c4de6ee16c897802bb19eeb41f23c19",
+      "domain_grid_liquid_count": 9
+    },
+    "artifacts": {
+      "authority_bundle_document_path": "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-bundle-r1.md",
+      "authority_bundle_document_sha256": "27574fc3b9d47a6445ef611a24b9bcb06eebdcee8eb20bf5a0bd7166909c2947",
+      "owner_decision_record_path": "docs/tasks/TASK-172-v0.7-stage1-project-owner-decision-package-r1.md",
+      "owner_decision_record_sha256": "c0130cff38faa9cd34c72ce422bb823f93d7ef4dc7951e48cc79f853654d557b",
+      "evidence_path": "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
+      "evidence_file_sha256": "75ce11322359bfe81c1ef0d95525a5f4d7f9ad0283675bac263a6e5c63bee952",
+      "evidence_canonical_hash": "2ec99ff3f0a784388a77332c2f6fbc28bc8ec533b104d1cd6fb770bd3ed6214c"
+    },
+    "change_boundary": {
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "dependencies_changed": false,
+      "workflows_changed": false,
+      "lockfiles_changed": false,
+      "r119a_through_r119e_artifacts_rewritten": false,
+      "task172_runtime_implementation": false,
+      "task174_solve_performed": false,
+      "task173_solve_performed": false,
+      "task175_release_acceptance_performed": false,
+      "append_only": true
+    },
+    "next_gate": "STAGE1_SINGLE_INDEPENDENT_REVIEW",
+    "stop": true,
+    "canonical_hash": "acfb34da55cc7d950ee8deecf9c5a3f1333c5c25c8c6e19e064a7a3eb3a2375b"
+  },
+  "canonical_hash": "e01b5a6c02a177a30b62557efba3898303fc79fd5abe77dfdd35692b25660936"
 }
