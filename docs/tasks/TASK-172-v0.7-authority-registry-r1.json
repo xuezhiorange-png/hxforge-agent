@@ -21106,5 +21106,54 @@
     "stop": true,
     "canonical_hash": "acfb34da55cc7d950ee8deecf9c5a3f1333c5c25c8c6e19e064a7a3eb3a2375b"
   },
-  "canonical_hash": "e01b5a6c02a177a30b62557efba3898303fc79fd5abe77dfdd35692b25660936"
+  "stage1_final_candidate_consistency_correction_extension": {
+    "task_id": "TASK172_V0_7_STAGE1_FINAL_CANDIDATE_CONSISTENCY_CORRECTION_R1",
+    "short_name": "STAGE-1 FINAL CANDIDATE CONSISTENCY CORRECTION",
+    "mode": "TRACEABILITY_CONSISTENCY_ONLY",
+    "result": "STAGE1_CANDIDATE_CONSISTENCY_CORRECTED",
+    "previous_registry_root_canonical_hash": "e01b5a6c02a177a30b62557efba3898303fc79fd5abe77dfdd35692b25660936",
+    "previous_stage1_evidence_file_sha256": "75ce11322359bfe81c1ef0d95525a5f4d7f9ad0283675bac263a6e5c63bee952",
+    "previous_stage1_evidence_canonical_hash": "2ec99ff3f0a784388a77332c2f6fbc28bc8ec533b104d1cd6fb770bd3ed6214c",
+    "corrected_stage1_evidence_path": "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
+    "corrected_stage1_evidence_file_sha256": "e001c3ac4a1702d9368d007d98aa912d22991ab847d3a0001563c65e53e24e49",
+    "corrected_stage1_evidence_canonical_hash": "60d1270c52ea226df28634003b4beaf6a8d006915d6454fe7e55dfaaca8771c1",
+    "stale_field_count": 2,
+    "corrected_fields": [
+      {
+        "field_path": "numerical_profile_authority.real_case_fit_and_profile_binding",
+        "previous_value": "UNRESOLVED",
+        "corrected_value": "BOUND_BY_PROJECT_OWNER_D1_PENDING_SINGLE_INDEPENDENT_REVIEW"
+      },
+      {
+        "field_path": "numerical_profile_authority.failure_semantics.negative_q_model_semantics",
+        "previous_value": "SIGNED_VALUE_NUMERICALLY_ALLOWED_CASE_APPLICABILITY_UNBOUND",
+        "corrected_value": "SIGNED_VALUE_NUMERICALLY_ALLOWED; NEGATIVE_PHYSICAL_RESULT_BLOCKED_FOR_THIS_CASE"
+      }
+    ],
+    "preserved_state": {
+      "case_executable_profile_bound": true,
+      "r98_real_case_applicability_bound": true,
+      "effective_c_round": "1.0",
+      "negative_q_numeric_variable_allowed": true,
+      "negative_q_accepted_physical_case_result": false,
+      "negative_q_case_disposition": "typed BLOCKED applicability result; no clamp, absolute direction, or role swap",
+      "project_owner_decision_count": 12,
+      "project_owner_decision_count_remaining": 0,
+      "stage1_status": "COMPLETE_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "production_mesh_profile_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "real_case_mesh_admissible": false
+    },
+    "change_boundary": {
+      "engineering_values_changed": false,
+      "owner_decisions_changed": false,
+      "mesh_policy_changed": false,
+      "production_code_changed": false,
+      "existing_tests_changed": false,
+      "dependencies_changed": false,
+      "workflows_changed": false,
+      "append_only": true
+    },
+    "canonical_hash": "2c53fc2865f71312f81dd6121eb7fe091785e084619b147a159c5fd0dd415e9a"
+  },
+  "canonical_hash": "d9f5fbaf65a3846d0758991038cc550e25778bc8d566a4e2dad7a5931b89b1eb"
 }

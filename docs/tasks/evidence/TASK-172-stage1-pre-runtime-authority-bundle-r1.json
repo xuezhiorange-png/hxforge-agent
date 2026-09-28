@@ -2021,9 +2021,9 @@
       "nonconvergence_or_cap_hit": "NO_AUTHORITATIVE_RESULT_LAST_ITERATE_DIAGNOSTIC_ONLY",
       "property_failure": "TYPED_FAILURE_NO_EXTRAPOLATION_OR_CLIPPING",
       "domain_exit": "TYPED_FAIL_CLOSED_NO_CLAMP",
-      "negative_q_model_semantics": "SIGNED_VALUE_NUMERICALLY_ALLOWED_CASE_APPLICABILITY_UNBOUND"
+      "negative_q_model_semantics": "SIGNED_VALUE_NUMERICALLY_ALLOWED; NEGATIVE_PHYSICAL_RESULT_BLOCKED_FOR_THIS_CASE"
     },
-    "real_case_fit_and_profile_binding": "UNRESOLVED",
+    "real_case_fit_and_profile_binding": "BOUND_BY_PROJECT_OWNER_D1_PENDING_SINGLE_INDEPENDENT_REVIEW",
     "owner_decision_ids": [
       "D1"
     ],
@@ -2545,7 +2545,7 @@
   },
   "next_stage": "STAGE1_SINGLE_INDEPENDENT_REVIEW",
   "stop": true,
-  "canonical_hash": "2ec99ff3f0a784388a77332c2f6fbc28bc8ec533b104d1cd6fb770bd3ed6214c",
+  "canonical_hash": "60d1270c52ea226df28634003b4beaf6a8d006915d6454fe7e55dfaaca8771c1",
   "project_owner_decisions_supplied": [
     {
       "id": "A1",
