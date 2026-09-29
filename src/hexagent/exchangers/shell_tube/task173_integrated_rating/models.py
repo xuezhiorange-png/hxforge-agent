@@ -12,6 +12,7 @@ TASK173_RESULT_SCHEMA: Final = "task173.fixed-geometry-rating-result.v1"
 TASK173_BLOCKED_SCHEMA: Final = "task173.fixed-geometry-rating-blocked.v1"
 OUTER_BOUNDARY_SOLVER_AUTHORITY_ID: Final = "V07-T173-OUTER-BOUNDARY-FEASIBILITY-BISECTION-R1"
 LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID: Final = "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R1"
+CELL_ROOT_SOLVER_AUTHORITY_ID: Final = "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R1"
 PRODUCTION_MESH_PROFILE_AUTHORITY_ID: Final = "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1"
 REVIEWED_MESH_SEQUENCE = (1, 2, 4, 8, 16, 32, 64)
 H_MIN_J_KG = Decimal("104920.11980926784")
@@ -156,6 +157,10 @@ class MeshObservables(StrictModel):
     terminal_boundary_residual_j_kg: Decimal
     duty_roundoff_floor_w: Decimal
     wall_temperature_roundoff_floor_k: Decimal
+    task172_local_evaluation_count: int
+    task172_numerical_hole_count: int
+    task172_numerical_hole_counts_by_code: dict[str, int]
+    task172_numerical_hole_neighborhoods: tuple[dict[str, Any], ...]
     rating_result_hash: str
     local_task172_result_hashes: tuple[str, ...]
 
@@ -166,6 +171,9 @@ class ConvergenceComparison(StrictModel):
     interval_duty_differences_w: tuple[Decimal, ...]
     duty_difference_w: Decimal
     duty_metric: Decimal
+    duty_metric_units: Literal["W", "RELATIVE_FRACTION"]
+    duty_metric_threshold: Decimal
+    duty_precision_floor_metric: Decimal
     duty_precision_floor_w: Decimal
     duty_status: Literal["PASS", "FAIL", "PRECISION_FLOOR_UNRESOLVED"]
     wall_extrema_differences_k: dict[str, Decimal]
@@ -198,6 +206,8 @@ class Task173SuccessResult(StrictModel):
     property_profile_id: str
     reconstruction_authority_id: str
     reconstruction_authority_hash: str
+    cell_root_solver_authority_id: str
+    cell_root_solver_authority_hash: str
     outer_solver_authority_id: str
     outer_solver_authority_hash: str
     outer_low_endpoint_class: Literal["LOW_SIDE_DOMAIN_INFEASIBLE"]
@@ -269,6 +279,7 @@ Task173Outcome = Task173SuccessResult | Task173BlockedResult
 
 __all__ = [
     "ConvergenceComparison",
+    "CELL_ROOT_SOLVER_AUTHORITY_ID",
     "FaceState",
     "H_MAX_J_KG",
     "H_MIN_J_KG",

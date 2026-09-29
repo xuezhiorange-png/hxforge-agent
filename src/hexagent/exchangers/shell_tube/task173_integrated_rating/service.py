@@ -5,12 +5,11 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
 from pydantic import ValidationError
-from scipy.optimize import brentq
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
@@ -18,6 +17,7 @@ from hexagent.exchangers.shell_tube.task172_local_runtime import (
     Task172LocalRequest,
     Task172LocalResult,
     build_local_support,
+    recompute_task172_blocked_result_hash,
     recompute_task172_local_roundoff_bounds,
     recompute_task172_request_hash,
     recompute_task172_result_hash,
@@ -40,6 +40,7 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     mesh_level_identity,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
+    CELL_ROOT_SOLVER_AUTHORITY_ID,
     H_MAX_J_KG,
     H_MIN_J_KG,
     LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
@@ -93,6 +94,8 @@ REQUIRED_CONSECUTIVE_PASSING_PAIRS = 2
 REQUIRED_LATER_HEADROOM_LEVELS = 1
 MAX_SUBDIVISIONS_PER_INTERVAL = 64
 LATEST_ACCEPTABLE_CANDIDATE_SUBDIVISIONS = 32
+MAX_HOLE_DYADIC_LEVELS_PER_BRACKET = 12
+MAX_CELL_TASK172_EVALUATIONS = 512
 
 LOCAL_STATE_RECONSTRUCTION_AUTHORITY = {
     "schema_version": "task173.local-state-reconstruction-authority.v1",
@@ -129,6 +132,23 @@ OUTER_BOUNDARY_SOLVER_AUTHORITY = {
     "scope_guard": "TARGET_STATE_EQUALS_HARD_PROPERTY_DOMAIN_BOUNDARY",
 }
 OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH = canonical_sha256(OUTER_BOUNDARY_SOLVER_AUTHORITY)
+CELL_ROOT_SOLVER_AUTHORITY = {
+    "schema_version": "task173.valid-point-cell-root-authority.v1",
+    "authority_id": CELL_ROOT_SOLVER_AUTHORITY_ID,
+    "scope": CASE_REVISION_ID,
+    "equation": "F(q)=q-q_TASK172(q)",
+    "method": "VALID_POINT_ONLY_DYADIC_BRACKET_REFINEMENT",
+    "valid_endpoint_signs": "F(q_low)<=0<=F(q_high)",
+    "blocked_residual_acceptance_class": "TASK172_NUMERICAL_HOLE",
+    "blocked_diagnostics_used_for_sign": False,
+    "blocked_result_accepted_as_physical": False,
+    "hole_probe_order": "ODD_DYADIC_FRACTIONS_BY_LEVEL_IN_INCREASING_Q",
+    "maximum_hole_dyadic_levels_per_bracket": MAX_HOLE_DYADIC_LEVELS_PER_BRACKET,
+    "maximum_task172_evaluations_per_cell": MAX_CELL_TASK172_EVALUATIONS,
+    "cell_residual_acceptance_w": "1e-6",
+    "task172_acceptance_policy_changed": False,
+}
+CELL_ROOT_SOLVER_AUTHORITY_HASH = canonical_sha256(CELL_ROOT_SOLVER_AUTHORITY)
 
 
 class _Stage3Failure(Exception):
@@ -140,6 +160,31 @@ class _Stage3Failure(Exception):
 
 class _LowSideDomainInfeasible(Exception):
     """Search-only classification for an insufficient shell outlet enthalpy."""
+
+
+class _Task172NumericalHole(Exception):
+    """A preflight-valid trial rejected only by native residual acceptance."""
+
+
+@dataclass
+class _CellSearchStats:
+    task172_local_evaluation_count: int = 0
+    task172_numerical_hole_count: int = 0
+    task172_numerical_hole_counts_by_code: dict[str, int] = field(default_factory=dict)
+    task172_numerical_hole_trials: list[dict[str, str]] = field(default_factory=list)
+
+    def record_evaluation(self) -> None:
+        self.task172_local_evaluation_count += 1
+
+    def record_hole(self, q_w: float, support_id: str) -> None:
+        code = "BLOCKED_RESIDUAL_ACCEPTANCE"
+        self.task172_numerical_hole_count += 1
+        self.task172_numerical_hole_counts_by_code[code] = (
+            self.task172_numerical_hole_counts_by_code.get(code, 0) + 1
+        )
+        self.task172_numerical_hole_trials.append(
+            {"q_trial_w": repr(q_w), "failure_code": code, "physical_support_id": support_id}
+        )
 
 
 @dataclass(frozen=True)
@@ -158,6 +203,160 @@ class _CellEvaluation:
     shell_local: _ThermoState
     task172_request: Task172LocalRequest
     task172_result: Task172LocalResult
+
+
+@dataclass(frozen=True)
+class _CellTrial:
+    q_w: float
+    classification: Literal[
+        "VALID_CELL_EVALUATION", "TASK172_NUMERICAL_HOLE", "LOW_SIDE_DOMAIN_INFEASIBLE"
+    ]
+    evaluation: _CellEvaluation | None = None
+    residual: Decimal | None = None
+
+
+def _dyadic_refine_valid_bracket(
+    left: _CellTrial,
+    right: _CellTrial,
+    *,
+    evaluate: Callable[[float], _CellTrial],
+    all_trials: Callable[[], list[_CellTrial]],
+    record_hole_neighbors: Callable[[list[_CellTrial]], None],
+) -> tuple[_CellTrial, _CellTrial, _CellTrial | None]:
+    """Refine a mixed-evaluation neighborhood using valid TASK172 points only."""
+    if (
+        left.classification != "VALID_CELL_EVALUATION"
+        or right.classification != "VALID_CELL_EVALUATION"
+        or left.residual is None
+        or right.residual is None
+        or left.residual > 0
+        or right.residual < 0
+    ):
+        raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
+        denominator = 2 ** (level + 1)
+        level_trials: list[_CellTrial] = []
+        evaluated_q = {trial.q_w for trial in all_trials()}
+        for numerator in range(1, denominator, 2):
+            probe = left.q_w + (right.q_w - left.q_w) * (numerator / denominator)
+            if probe <= left.q_w or probe >= right.q_w or probe in evaluated_q:
+                continue
+            trial = evaluate(probe)
+            level_trials.append(trial)
+        eligible = [
+            trial
+            for trial in level_trials
+            if trial.classification == "VALID_CELL_EVALUATION"
+            and trial.evaluation is not None
+            and trial.residual is not None
+            and abs(trial.residual) <= Decimal("1e-6")
+        ]
+        if eligible:
+            record_hole_neighbors(all_trials())
+            selected = min(
+                eligible,
+                key=lambda trial: (abs(trial.residual or Decimal(0)), trial.q_w),
+            )
+            return left, right, selected
+        valid = sorted(
+            (
+                trial
+                for trial in all_trials()
+                if left.q_w <= trial.q_w <= right.q_w
+                and trial.classification == "VALID_CELL_EVALUATION"
+                and trial.evaluation is not None
+                and trial.residual is not None
+            ),
+            key=lambda trial: trial.q_w,
+        )
+        sign_pairs = [
+            (first, second)
+            for first, second in zip(valid, valid[1:], strict=False)
+            if first.residual is not None
+            and second.residual is not None
+            and first.residual <= 0
+            and second.residual >= 0
+        ]
+        sign_pairs.sort(key=lambda pair: (pair[1].q_w - pair[0].q_w, pair[0].q_w))
+        if sign_pairs:
+            next_left, next_right = sign_pairs[0]
+            if next_right.q_w - next_left.q_w < right.q_w - left.q_w:
+                record_hole_neighbors(all_trials())
+                return next_left, next_right, None
+    raise _Stage3Failure(
+        "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+        f"maximum_hole_dyadic_levels={MAX_HOLE_DYADIC_LEVELS_PER_BRACKET}",
+        f"valid_bracket=[{left.q_w!r},{right.q_w!r}]",
+    )
+
+
+def _discover_valid_sign_bracket_from_endpoint_holes(
+    lower_bound_q: float,
+    upper_bound_q: float,
+    endpoint_trials: tuple[_CellTrial, _CellTrial],
+    *,
+    evaluate: Callable[[float], _CellTrial],
+    all_trials: Callable[[], list[_CellTrial]],
+    record_hole_neighbors: Callable[[list[_CellTrial]], None],
+) -> tuple[_CellTrial, _CellTrial, _CellTrial | None]:
+    """Find a valid sign bracket inside the physical range around endpoint holes."""
+    if upper_bound_q <= lower_bound_q or any(
+        trial.classification not in ("VALID_CELL_EVALUATION", "TASK172_NUMERICAL_HOLE")
+        for trial in endpoint_trials
+    ):
+        raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
+        denominator = 2 ** (level + 1)
+        evaluated_q = {trial.q_w for trial in all_trials()}
+        for numerator in range(1, denominator, 2):
+            probe = lower_bound_q + (upper_bound_q - lower_bound_q) * (numerator / denominator)
+            if probe <= lower_bound_q or probe >= upper_bound_q or probe in evaluated_q:
+                continue
+            trial = evaluate(probe)
+            if trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                    "interior_endpoint-discovery trial exited property domain",
+                )
+        valid = sorted(
+            (
+                trial
+                for trial in all_trials()
+                if lower_bound_q <= trial.q_w <= upper_bound_q
+                and trial.classification == "VALID_CELL_EVALUATION"
+                and trial.evaluation is not None
+                and trial.residual is not None
+            ),
+            key=lambda trial: trial.q_w,
+        )
+        eligible = [
+            trial for trial in valid if abs(trial.residual or Decimal(0)) <= Decimal("1e-6")
+        ]
+        if eligible:
+            record_hole_neighbors(all_trials())
+            selected = min(
+                eligible,
+                key=lambda trial: (abs(trial.residual or Decimal(0)), trial.q_w),
+            )
+            return selected, selected, selected
+        sign_pairs = [
+            (left, right)
+            for left, right in zip(valid, valid[1:], strict=False)
+            if left.residual is not None
+            and right.residual is not None
+            and left.residual <= 0
+            and right.residual >= 0
+        ]
+        if sign_pairs:
+            sign_pairs.sort(key=lambda pair: (pair[1].q_w - pair[0].q_w, pair[0].q_w))
+            record_hole_neighbors(all_trials())
+            left, right = sign_pairs[0]
+            return left, right, None
+    raise _Stage3Failure(
+        "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+        f"maximum_hole_dyadic_levels={MAX_HOLE_DYADIC_LEVELS_PER_BRACKET}",
+        f"physical_interval=[{lower_bound_q!r},{upper_bound_q!r}]",
+    )
 
 
 @dataclass(frozen=True)
@@ -185,6 +384,7 @@ class _MeshRun:
     mesh_result_hash: str
     shooting_enthalpy: Decimal
     bisection_iterations: int
+    task172_numerical_hole_neighborhoods: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -545,6 +745,62 @@ def _task172_request(
     )
 
 
+def _preflight_task172_trial(
+    q_w: float,
+    *,
+    support: Any,
+    tube_local: _ThermoState,
+    shell_local: _ThermoState,
+    shell_authority: Any,
+    request: Task172LocalRequest,
+) -> None:
+    """Prove all caller-known trial guards before native TASK172 evaluation."""
+    if not math.isfinite(q_w) or q_w < 0:
+        raise _Stage3Failure("BLOCKED_NONFINITE_OR_NEGATIVE_CELL_TRIAL", repr(q_w))
+    for side, state in (("tube", tube_local), ("shell", shell_local)):
+        native = state.native
+        numeric_values = (
+            native.temperature_k,
+            native.pressure_pa,
+            native.enthalpy_j_kg,
+            native.density_kg_m3,
+            native.cp_j_kg_k,
+            native.viscosity_pa_s,
+            native.conductivity_w_m_k,
+        )
+        if not all(math.isfinite(value) for value in numeric_values):
+            raise _Stage3Failure("BLOCKED_NONFINITE_LOCAL_PROPERTY_STATE", side)
+        if (
+            not T_MIN_K <= _d(native.temperature_k) <= T_MAX_K
+            or _d(native.pressure_pa) != REFERENCE_PRESSURE_PA
+            or native.phase is not PhaseRegion.LIQUID
+            or state.snapshot.backend != "HEOS::Water"
+            or state.snapshot.provider != "CoolProp"
+            or state.snapshot.provider_version != "8.0.0"
+            or state.snapshot.reference_state != "DEF"
+            or state.snapshot.phase != "liquid"
+        ):
+            raise _Stage3Failure("BLOCKED_LOCAL_PROPERTY_STATE_PREFLIGHT", side)
+    if tube_local.native.temperature_k < shell_local.native.temperature_k:
+        raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", "local-state-preflight")
+    if (
+        request.case_revision_id != CASE_REVISION_ID
+        or request.topology.topology_id != TOPOLOGY_ID
+        or request.topology.task171_result_hash != TASK171_RESULT_HASH
+        or request.topology.physical_ownership_hash != PHYSICAL_OWNERSHIP_HASH
+        or request.topology.tube_role != "HOT"
+        or request.topology.shell_role != "COLD"
+        or request.support != support
+        or len(recompute_task172_support_id(request)) != 64
+    ):
+        raise _Stage3Failure("BLOCKED_TASK172_SUPPORT_OR_ROLE_PREFLIGHT")
+    if (
+        shell_authority.task031_geometry.geometry_hash != EXPECTED_TASK031_GEOMETRY_HASH
+        or shell_authority.task166_result.result_hash != EXPECTED_TASK166_RESULT_HASH
+    ):
+        raise _Stage3Failure("BLOCKED_NATIVE_SHELL_FLOW_AUTHORITY_PREFLIGHT")
+
+
 def _cell_evaluation(
     q_w: float,
     *,
@@ -581,13 +837,28 @@ def _cell_evaluation(
     tube_local = _state_from_enthalpy(provider, tube_mid_h)
     shell_local = _state_from_enthalpy(provider, shell_mid_h)
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
+    _preflight_task172_trial(
+        q_w,
+        support=support,
+        tube_local=tube_local,
+        shell_local=shell_local,
+        shell_authority=shell_authority,
+        request=task172_request,
+    )
     task172_result = task172_validate(task172_request, provider)
     if type(task172_result) is Task172BlockedResult:
+        if task172_result.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE":
+            if task172_result.request_hash != recompute_task172_request_hash(
+                task172_request
+            ) or task172_result.blocked_result_hash != recompute_task172_blocked_result_hash(
+                task172_result
+            ):
+                raise _Stage3Failure("BLOCKED_TASK172_BLOCKED_RESULT_IDENTITY_REPLAY")
+            # Do not inspect/use diagnostic_last_iterate: it is not an evaluation of F(q).
+            raise _Task172NumericalHole
         raise _Stage3Failure(
             "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE",
             task172_result.failure_code,
-            task172_result.field_path,
-            *task172_result.blockers,
         )
     if type(task172_result) is not Task172LocalResult:
         raise _Stage3Failure("BLOCKED_TASK172_RESULT_CONTRACT_TYPE")
@@ -624,6 +895,8 @@ def _solve_cell(
     shell_physical_left: _ThermoState,
     provider: PropertyProvider,
     shell_authority: Any,
+    search_stats: _CellSearchStats | None = None,
+    hole_neighborhoods: list[dict[str, str]] | None = None,
 ) -> _CellEvaluation:
     h_tube = _d(tube_upstream.native.enthalpy_j_kg)
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
@@ -634,36 +907,116 @@ def _solve_cell(
     if tube_capacity < 0 or shell_capacity < 0:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT")
 
-    evaluations: dict[float, _CellEvaluation] = {}
+    stats = search_stats if search_stats is not None else _CellSearchStats()
+    neighborhoods = hole_neighborhoods if hole_neighborhoods is not None else []
+    trials: dict[float, _CellTrial] = {}
+    unrecorded_holes: list[float] = []
+    closure_tolerance = Decimal("1e-6")
+    cell_evaluation_count = 0
 
-    def evaluate(q: float) -> _CellEvaluation:
-        if q not in evaluations:
-            evaluations[q] = _cell_evaluation(
-                q,
-                support=support,
-                tube_upstream=tube_upstream,
-                shell_physical_left=shell_physical_left,
-                provider=provider,
-                shell_authority=shell_authority,
+    def evaluate(q: float) -> _CellTrial:
+        nonlocal cell_evaluation_count
+        if q not in trials:
+            if cell_evaluation_count >= MAX_CELL_TASK172_EVALUATIONS:
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_ROOT_RESOURCE_EXHAUSTION",
+                    f"maximum_task172_evaluations={MAX_CELL_TASK172_EVALUATIONS}",
+                )
+            cell_evaluation_count += 1
+            stats.record_evaluation()
+            try:
+                evaluation = _cell_evaluation(
+                    q,
+                    support=support,
+                    tube_upstream=tube_upstream,
+                    shell_physical_left=shell_physical_left,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                )
+            except _Task172NumericalHole:
+                stats.record_hole(q, support.physical_segment_id)
+                unrecorded_holes.append(q)
+                trials[q] = _CellTrial(q, "TASK172_NUMERICAL_HOLE")
+            except _LowSideDomainInfeasible:
+                trials[q] = _CellTrial(q, "LOW_SIDE_DOMAIN_INFEASIBLE")
+            else:
+                residual = _d(q) - evaluation.task172_result.signed_q_hot_to_cold_w
+                trials[q] = _CellTrial(q, "VALID_CELL_EVALUATION", evaluation, residual)
+        return trials[q]
+
+    def require_valid(trial: _CellTrial, endpoint_name: str) -> tuple[_CellEvaluation, Decimal]:
+        if trial.classification != "VALID_CELL_EVALUATION" or trial.evaluation is None:
+            raise _Stage3Failure(
+                "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                f"{endpoint_name}_classification={trial.classification}",
             )
-        return evaluations[q]
+        if trial.residual is None:
+            raise _Stage3Failure("BLOCKED_CELL_ROOT_RESIDUAL_MISSING")
+        return trial.evaluation, trial.residual
 
-    def residual(q: float) -> float:
-        result = evaluate(q).task172_result
-        return q - float(result.signed_q_hot_to_cold_w)
+    def is_eligible(trial: _CellTrial) -> bool:
+        return (
+            trial.classification == "VALID_CELL_EVALUATION"
+            and trial.evaluation is not None
+            and trial.residual is not None
+            and abs(trial.residual) <= closure_tolerance
+        )
+
+    def record_hole_neighbors(samples: list[_CellTrial]) -> None:
+        valid = sorted(
+            (
+                sample
+                for sample in samples
+                if sample.classification == "VALID_CELL_EVALUATION"
+                and sample.evaluation is not None
+                and sample.residual is not None
+            ),
+            key=lambda sample: sample.q_w,
+        )
+        for hole_q in unrecorded_holes:
+            left = [sample for sample in valid if sample.q_w < hole_q]
+            right = [sample for sample in valid if sample.q_w > hole_q]
+            if not left or not right:
+                continue
+            left_trial = left[-1]
+            right_trial = right[0]
+            assert left_trial.evaluation is not None and left_trial.residual is not None
+            assert right_trial.evaluation is not None and right_trial.residual is not None
+            neighborhoods.append(
+                {
+                    "physical_support_id": support.physical_segment_id,
+                    "hole_q_trial_w": repr(hole_q),
+                    "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+                    "left_valid_q_w": repr(left_trial.q_w),
+                    "left_task172_result_hash": left_trial.evaluation.task172_result.result_hash,
+                    "left_f_q_w": str(left_trial.residual),
+                    "right_valid_q_w": repr(right_trial.q_w),
+                    "right_task172_result_hash": right_trial.evaluation.task172_result.result_hash,
+                    "right_f_q_w": str(right_trial.residual),
+                }
+            )
+        unrecorded_holes.clear()
 
     lower = 0.0
-    lower_residual = residual(lower)
-    if lower_residual > 0:
-        raise _Stage3Failure(
-            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
-            "native TASK172 requests negative q at the nonnegative cell boundary",
-        )
-    if lower_residual == 0:
-        return evaluate(lower)
+    lower_trial = evaluate(lower)
+    lower_is_hole = lower_trial.classification == "TASK172_NUMERICAL_HOLE"
+    if not lower_is_hole:
+        lower_evaluation, lower_residual = require_valid(lower_trial, "lower_endpoint")
+        if lower_residual > 0:
+            raise _Stage3Failure(
+                "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+                "native TASK172 requests negative q at the nonnegative cell boundary",
+            )
+        if is_eligible(lower_trial):
+            return lower_evaluation
 
     cap = min(tube_capacity, shell_capacity)
     if cap <= 0:
+        if lower_is_hole:
+            raise _Stage3Failure(
+                "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                "no positive-width valid q interval remains after lower-endpoint hole",
+            )
         if shell_capacity <= tube_capacity:
             # At the lower shell boundary, the valid q=0 constitutive evaluation
             # is positive. Any normal positive propagation leaves the domain.
@@ -685,11 +1038,36 @@ def _solve_cell(
     else:
         raise _Stage3Failure("BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED")
     if upper <= lower:
+        if lower_is_hole:
+            raise _Stage3Failure(
+                "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                "no positive-width valid q interval remains after lower-endpoint hole",
+            )
         if shell_capacity <= tube_capacity:
             raise _LowSideDomainInfeasible
         raise _Stage3Failure("BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED")
 
-    upper_residual = residual(upper)
+    upper_trial = evaluate(upper)
+    upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
+    if lower_is_hole or upper_is_hole:
+        lower_trial, upper_trial, eligible = _discover_valid_sign_bracket_from_endpoint_holes(
+            lower,
+            upper,
+            (lower_trial, upper_trial),
+            evaluate=evaluate,
+            all_trials=lambda: list(trials.values()),
+            record_hole_neighbors=record_hole_neighbors,
+        )
+        if eligible is not None:
+            assert eligible.evaluation is not None
+            return eligible.evaluation
+    _, lower_residual = require_valid(lower_trial, "lower_endpoint")
+    upper_evaluation, upper_residual = require_valid(upper_trial, "upper_endpoint")
+    if lower_residual > 0:
+        raise _Stage3Failure(
+            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+            "valid lower cell bracket endpoint has positive residual",
+        )
     if upper_residual < 0:
         if shell_capacity <= tube_capacity:
             # No valid constitutive root exists before the shell reaches its
@@ -700,59 +1078,72 @@ def _solve_cell(
             f"q_upper={upper}",
             f"residual_upper={upper_residual}",
         )
-    if upper_residual == 0:
-        return evaluate(upper)
-    try:
-        root = brentq(
-            residual,
-            lower,
-            upper,
-            xtol=1e-10,
-            rtol=1e-14,
-            maxiter=100,
-            full_output=False,
-            disp=True,
-        )
-    except (ValueError, RuntimeError) as exc:
+    if is_eligible(upper_trial):
+        return upper_evaluation
+    if lower_residual > 0 or upper_residual < 0:
         raise _Stage3Failure(
-            "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED", type(exc).__name__
-        ) from exc
-    solution = evaluate(root)
-    closure = abs(solution.q_w - solution.task172_result.signed_q_hot_to_cold_w)
-    if closure > Decimal("1e-6"):
-        # TASK172's reviewed nonlinear closure is deterministic but its
-        # binary64 R94 output makes the composed scalar residual locally
-        # staircase-valued. Keep brentq as the root solver, then inspect a
-        # fixed, bounded neighborhood at 1 micro-watt increments solely to
-        # find an actually evaluated point meeting the stricter Stage-3
-        # acceptance bound. This is not an alternate equation or tolerance.
-        step = 1e-6
-        for multiple in range(1, 9):
-            for direction in (-1.0, 1.0):
-                candidate_q = root + direction * multiple * step
-                if not lower <= candidate_q <= upper:
-                    continue
-                candidate = evaluate(candidate_q)
-                candidate_closure = abs(
-                    candidate.q_w - candidate.task172_result.signed_q_hot_to_cold_w
-                )
-                if candidate_closure <= Decimal("1e-6"):
-                    solution = candidate
-                    closure = candidate_closure
-                    break
-            if closure <= Decimal("1e-6"):
-                break
-    if closure > Decimal("1e-6"):
-        raise _Stage3Failure(
-            "BLOCKED_CELL_CONSTITUTIVE_RESIDUAL",
-            f"residual_w={closure}",
-            f"q_w={solution.q_w}",
-            f"task172_q_w={solution.task172_result.signed_q_hot_to_cold_w}",
-            f"support={support.tube_cell_id}",
-            f"tube_upstream_h={h_tube}",
-            f"shell_physical_left_h={h_shell}",
+            "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+            f"F_lower_w={lower_residual}",
+            f"F_upper_w={upper_residual}",
         )
-    return solution
+
+    left = lower_trial
+    right = upper_trial
+    iterations = 0
+    while cell_evaluation_count < MAX_CELL_TASK172_EVALUATIONS:
+        _, left_f = require_valid(left, "left_bracket")
+        _, right_f = require_valid(right, "right_bracket")
+        if left_f > 0 or right_f < 0:
+            raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+        midpoint = left.q_w + (right.q_w - left.q_w) / 2.0
+        if midpoint == left.q_w or midpoint == right.q_w:
+            eligible_endpoint = next(
+                (sample for sample in (left, right) if is_eligible(sample)), None
+            )
+            if eligible_endpoint is not None and eligible_endpoint.evaluation is not None:
+                return eligible_endpoint.evaluation
+            raise _Stage3Failure(
+                "PRECISION_FLOOR_UNRESOLVED",
+                "CELL_ROOT_PRECISION_FLOOR_REACHED",
+                f"left_q_w={left.q_w}",
+                f"right_q_w={right.q_w}",
+            )
+        iterations += 1
+        midpoint_trial = evaluate(midpoint)
+        if midpoint_trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+            raise _Stage3Failure(
+                "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                "interior_trial_became_low_side_domain_infeasible",
+            )
+        if midpoint_trial.classification == "VALID_CELL_EVALUATION":
+            if is_eligible(midpoint_trial):
+                record_hole_neighbors(list(trials.values()))
+                assert midpoint_trial.evaluation is not None
+                return midpoint_trial.evaluation
+            assert midpoint_trial.residual is not None
+            if midpoint_trial.residual <= 0:
+                left = midpoint_trial
+            else:
+                right = midpoint_trial
+            continue
+
+        # The hole has no residual sign. Refine only with valid native points.
+        left, right, eligible = _dyadic_refine_valid_bracket(
+            left,
+            right,
+            evaluate=evaluate,
+            all_trials=lambda: list(trials.values()),
+            record_hole_neighbors=record_hole_neighbors,
+        )
+        if eligible is not None:
+            assert eligible.evaluation is not None
+            return eligible.evaluation
+    raise _Stage3Failure(
+        "BLOCKED_CELL_ROOT_RESOURCE_EXHAUSTION",
+        f"maximum_task172_evaluations={MAX_CELL_TASK172_EVALUATIONS}",
+        f"evaluations={cell_evaluation_count}",
+        f"iterations={iterations}",
+    )
 
 
 def _make_rated_cell(
@@ -845,7 +1236,10 @@ def _valid_trajectory(
     provider: PropertyProvider,
     shell_authority: Any,
     outer_iterations: int,
+    search_stats: _CellSearchStats | None = None,
 ) -> _MeshRun:
+    stats = search_stats if search_stats is not None else _CellSearchStats()
+    hole_neighborhoods: list[dict[str, str]] = []
     mesh_id = mesh_level_identity(subdivisions)
     tube_face_thermo = _state_at_inlet(provider, TUBE_INLET_T_K)
     shell_face_thermo = _state_from_enthalpy(provider, shell_outlet_enthalpy)
@@ -890,6 +1284,8 @@ def _valid_trajectory(
                 shell_physical_left=shell_physical_left,
                 provider=provider,
                 shell_authority=shell_authority,
+                search_stats=stats,
+                hole_neighborhoods=hole_neighborhoods,
             )
             coordinate = support.support_end_m
             face_index = len(tube_faces)
@@ -1026,6 +1422,10 @@ def _valid_trajectory(
         "task032_result_hash": EXPECTED_TASK032_RESULT_HASH,
         "task166_result_hash": EXPECTED_TASK166_RESULT_HASH,
         "task174_result_hash": EXPECTED_TASK174_RESULT_HASH,
+        "task172_local_evaluation_count": stats.task172_local_evaluation_count,
+        "task172_numerical_hole_count": stats.task172_numerical_hole_count,
+        "task172_numerical_hole_counts_by_code": stats.task172_numerical_hole_counts_by_code,
+        "task172_numerical_hole_neighborhoods": hole_neighborhoods,
     }
     rating_hash = canonical_sha256(projection)
     observables = MeshObservables(
@@ -1052,6 +1452,10 @@ def _valid_trajectory(
         terminal_boundary_residual_j_kg=terminal_residual_h,
         duty_roundoff_floor_w=duty_floor,
         wall_temperature_roundoff_floor_k=wall_floor,
+        task172_local_evaluation_count=stats.task172_local_evaluation_count,
+        task172_numerical_hole_count=stats.task172_numerical_hole_count,
+        task172_numerical_hole_counts_by_code=dict(stats.task172_numerical_hole_counts_by_code),
+        task172_numerical_hole_neighborhoods=tuple(hole_neighborhoods),
         rating_result_hash=rating_hash,
         local_task172_result_hashes=tuple(cell.rated_cell.task172_result_hash for cell in cells),
     )
@@ -1064,6 +1468,7 @@ def _valid_trajectory(
         mesh_result_hash=rating_hash,
         shooting_enthalpy=shell_outlet_enthalpy,
         bisection_iterations=outer_iterations,
+        task172_numerical_hole_neighborhoods=tuple(hole_neighborhoods),
     )
 
 
@@ -1073,6 +1478,7 @@ def _outer_trial(
     provider: PropertyProvider,
     shell_authority: Any,
     iterations: int,
+    search_stats: _CellSearchStats | None = None,
 ) -> _OuterTrial:
     try:
         run = _valid_trajectory(
@@ -1081,6 +1487,7 @@ def _outer_trial(
             provider,
             shell_authority,
             iterations,
+            search_stats,
         )
     except _LowSideDomainInfeasible:
         # Search classification only: never return a partial trajectory as a result.
@@ -1136,15 +1543,23 @@ def _solve_outer_boundary(
     subdivisions: int,
     provider: PropertyProvider,
     shell_authority: Any,
+    search_stats: _CellSearchStats | None = None,
 ) -> _MeshRun:
+    def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
+        if search_stats is None:
+            return _outer_trial(subdivisions, enthalpy, provider, shell_authority, iteration)
+        return _outer_trial(
+            subdivisions, enthalpy, provider, shell_authority, iteration, search_stats
+        )
+
     h_low = H_MIN_J_KG
     h_high = H_MAX_J_KG
-    low_trial = _outer_trial(subdivisions, h_low, provider, shell_authority, 0)
+    low_trial = trial_at(h_low, 0)
     if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
         if low_trial.classification == "HARD_BLOCKER":
             raise _Stage3Failure(*low_trial.diagnostics)
         raise _Stage3Failure("BLOCKED_OUTER_LOW_ENDPOINT_NOT_INFEASIBLE")
-    high_trial = _outer_trial(subdivisions, h_high, provider, shell_authority, 0)
+    high_trial = trial_at(h_high, 0)
     if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
         if high_trial.classification == "HARD_BLOCKER":
             raise _Stage3Failure(*high_trial.diagnostics)
@@ -1185,7 +1600,7 @@ def _solve_outer_boundary(
                 f"terminal_residual_k={high_run.observables.terminal_boundary_residual_k}",
             )
         iterations += 1
-        trial = _outer_trial(subdivisions, h_mid, provider, shell_authority, iterations)
+        trial = trial_at(h_mid, iterations)
         if trial.classification == "HARD_BLOCKER":
             raise _Stage3Failure(*trial.diagnostics)
         if trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
@@ -1238,13 +1653,25 @@ def _compare_meshes(coarse: _MeshRun, fine: _MeshRun) -> ConvergenceComparison:
     duty_difference = abs(fine_obs.total_duty_w - coarse_obs.total_duty_w)
     denominator = max(abs(coarse_obs.total_duty_w), abs(fine_obs.total_duty_w))
     if denominator <= MESH_DUTY_ABSOLUTE_THRESHOLD_W:
-        duty_threshold = MESH_DUTY_ABSOLUTE_THRESHOLD_W
         duty_metric = duty_difference
+        duty_metric_units: Literal["W", "RELATIVE_FRACTION"] = "W"
+        duty_metric_threshold = MESH_DUTY_ABSOLUTE_THRESHOLD_W
+        duty_precision_floor_metric = (
+            coarse_obs.duty_roundoff_floor_w + fine_obs.duty_roundoff_floor_w
+        )
     else:
-        duty_threshold = denominator * MESH_DUTY_RELATIVE_THRESHOLD
         duty_metric = duty_difference / denominator
+        duty_metric_units = "RELATIVE_FRACTION"
+        duty_metric_threshold = MESH_DUTY_RELATIVE_THRESHOLD
+        duty_precision_floor_metric = (
+            coarse_obs.duty_roundoff_floor_w + fine_obs.duty_roundoff_floor_w
+        ) / denominator
     duty_floor = coarse_obs.duty_roundoff_floor_w + fine_obs.duty_roundoff_floor_w
-    duty_status = _classify_difference(duty_difference, duty_floor, duty_threshold)
+    duty_status = _classify_difference(
+        duty_metric,
+        duty_precision_floor_metric,
+        duty_metric_threshold,
+    )
 
     extrema = {
         "T_wall_inner_min": abs(fine_obs.wall_inner_min_k - coarse_obs.wall_inner_min_k),
@@ -1278,6 +1705,9 @@ def _compare_meshes(coarse: _MeshRun, fine: _MeshRun) -> ConvergenceComparison:
         interval_duty_differences_w=interval_differences,
         duty_difference_w=duty_difference,
         duty_metric=duty_metric,
+        duty_metric_units=duty_metric_units,
+        duty_metric_threshold=duty_metric_threshold,
+        duty_precision_floor_metric=duty_precision_floor_metric,
         duty_precision_floor_w=duty_floor,
         duty_status=duty_status,
         wall_extrema_differences_k=extrema,
@@ -1317,15 +1747,44 @@ def _run_mesh_sequence(
     comparisons: list[ConvergenceComparison] = []
     candidate_index: int | None = None
     headroom_index: int | None = None
+    search_summaries: list[dict[str, Any]] = []
     for subdivisions in REVIEWED_MESH_SEQUENCE:
+        search_stats = _CellSearchStats()
         try:
-            run = _solve_outer_boundary(subdivisions, provider_factory(), shell_authority)
+            run = _solve_outer_boundary(
+                subdivisions,
+                provider_factory(),
+                shell_authority,
+                search_stats,
+            )
         except _Stage3Failure as exc:
+            search_summaries.append(
+                {
+                    "subdivisions_per_interval": subdivisions,
+                    "task172_local_evaluation_count": search_stats.task172_local_evaluation_count,
+                    "task172_numerical_hole_count": search_stats.task172_numerical_hole_count,
+                    "task172_numerical_hole_counts_by_code": dict(
+                        search_stats.task172_numerical_hole_counts_by_code
+                    ),
+                }
+            )
             raise _Stage3Failure(
                 exc.code,
                 *exc.diagnostics,
+                "task172_numerical_hole_count_by_mesh="
+                + json.dumps(search_summaries, sort_keys=True, separators=(",", ":")),
                 f"mesh_subdivisions={subdivisions}",
             ) from exc
+        search_summaries.append(
+            {
+                "subdivisions_per_interval": subdivisions,
+                "task172_local_evaluation_count": search_stats.task172_local_evaluation_count,
+                "task172_numerical_hole_count": search_stats.task172_numerical_hole_count,
+                "task172_numerical_hole_counts_by_code": dict(
+                    search_stats.task172_numerical_hole_counts_by_code
+                ),
+            }
+        )
         runs.append(run)
         if len(runs) > 1:
             comparison = _compare_meshes(runs[-2], runs[-1])
@@ -1426,6 +1885,8 @@ def _build_success(
         property_profile_id=PROFILE_ID,
         reconstruction_authority_id=LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
         reconstruction_authority_hash=LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+        cell_root_solver_authority_id=CELL_ROOT_SOLVER_AUTHORITY_ID,
+        cell_root_solver_authority_hash=CELL_ROOT_SOLVER_AUTHORITY_HASH,
         outer_solver_authority_id=OUTER_BOUNDARY_SOLVER_AUTHORITY_ID,
         outer_solver_authority_hash=OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH,
         outer_low_endpoint_class="LOW_SIDE_DOMAIN_INFEASIBLE",
@@ -1489,6 +1950,16 @@ def _build_success(
             ].solution.task172_result.implementation_version,
             "outer_solver_authority_hash": OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH,
             "local_reconstruction_authority_hash": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+            "cell_root_solver_authority_hash": CELL_ROOT_SOLVER_AUTHORITY_HASH,
+            "task172_acceptance_policy_changed": "false",
+            "task172_numerical_hole_count_by_mesh": json.dumps(
+                {
+                    str(run.subdivisions): run.observables.task172_numerical_hole_count
+                    for run in runs
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
             "same_input_same_result": "true",
             "same_face_state_identities": str(same_face_ids).lower(),
             "same_local_task172_identities": str(same_local_ids).lower(),
@@ -1575,6 +2046,8 @@ def validate_request(
 
 
 __all__ = [
+    "CELL_ROOT_SOLVER_AUTHORITY",
+    "CELL_ROOT_SOLVER_AUTHORITY_HASH",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH",
     "OUTER_BOUNDARY_SOLVER_AUTHORITY",

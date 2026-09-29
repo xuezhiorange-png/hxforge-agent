@@ -13,8 +13,10 @@ from pydantic import ValidationError
 
 from hexagent.exchangers.shell_tube import task173_integrated_rating as task173
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
+    Task172BlockedResult,
     Task172LocalRequest,
     build_local_support,
+    recompute_task172_blocked_result_hash,
     recompute_task172_local_roundoff_bounds,
     recompute_task172_support_id,
 )
@@ -160,6 +162,365 @@ def test_task172_support_identity_and_roundoff_floor_replay() -> None:
     duty_i, duty_wall, duty_o, temp_floor = recompute_task172_local_roundoff_bounds(request, result)
     assert min(duty_i, duty_wall, duty_o, temp_floor) >= 0
     assert temp_floor.is_finite()
+
+
+def _historical_n2_cell_inputs() -> tuple[Any, Any, Any, Any, Any]:
+    provider = CoolPropProvider()
+    authority, _, _ = replay_shell_flow_authority(
+        json.loads(EVIDENCE_PATH.read_text(encoding="utf-8")), provider
+    )
+    support = build_local_support(4, 2, 0)
+    tube = service._state_from_enthalpy(provider, Decimal("109051.37045646932"))
+    shell = service._state_from_enthalpy(provider, Decimal("105416.83286221564"))
+    return support, tube, shell, provider, authority
+
+
+def test_historical_n2_residual_acceptance_hole_is_bypassed_by_valid_native_points(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    support, tube, shell, provider, authority = _historical_n2_cell_inputs()
+    q_hole = 4436.3679921671355
+    q_left = q_hole - 0.01
+    q_right = q_hole + 0.01
+    native_results: list[Any] = []
+    native_validate = service.task172_validate
+
+    def record_native_result(*args: Any, **kwargs: Any) -> Any:
+        result = native_validate(*args, **kwargs)
+        native_results.append(result)
+        return result
+
+    monkeypatch.setattr(service, "task172_validate", record_native_result)
+    trials: dict[float, service._CellTrial] = {}
+    stats = service._CellSearchStats()
+
+    def evaluate(q: float) -> service._CellTrial:
+        if q not in trials:
+            stats.record_evaluation()
+            try:
+                evaluation = service._cell_evaluation(
+                    q,
+                    support=support,
+                    tube_upstream=tube,
+                    shell_physical_left=shell,
+                    provider=provider,
+                    shell_authority=authority,
+                )
+            except service._Task172NumericalHole:
+                stats.record_hole(q, support.physical_segment_id)
+                trials[q] = service._CellTrial(q, "TASK172_NUMERICAL_HOLE")
+            else:
+                residual = service._d(q) - evaluation.task172_result.signed_q_hot_to_cold_w
+                trials[q] = service._CellTrial(q, "VALID_CELL_EVALUATION", evaluation, residual)
+        return trials[q]
+
+    left = evaluate(q_left)
+    hole = evaluate(q_hole)
+    right = evaluate(q_right)
+    assert type(native_results[1]) is Task172BlockedResult
+    assert native_results[1].failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+    assert native_results[1].blocked_result_hash == recompute_task172_blocked_result_hash(
+        native_results[1]
+    )
+    assert hole.classification == "TASK172_NUMERICAL_HOLE"
+    assert hole.evaluation is None
+    assert hole.residual is None
+    assert left.classification == right.classification == "VALID_CELL_EVALUATION"
+    assert left.residual is not None and left.residual < 0
+    assert right.residual is not None and right.residual > 0
+
+    neighbor_receipts: list[dict[str, str]] = []
+
+    def record_neighbors(samples: list[service._CellTrial]) -> None:
+        valid = sorted(
+            (sample for sample in samples if sample.classification == "VALID_CELL_EVALUATION"),
+            key=lambda sample: sample.q_w,
+        )
+        below = [sample for sample in valid if sample.q_w < q_hole]
+        above = [sample for sample in valid if sample.q_w > q_hole]
+        assert below and above
+        lower = below[-1]
+        upper = above[0]
+        assert lower.evaluation is not None and lower.residual is not None
+        assert upper.evaluation is not None and upper.residual is not None
+        neighbor_receipts.append(
+            {
+                "left_q": repr(lower.q_w),
+                "left_hash": lower.evaluation.task172_result.result_hash,
+                "left_f": str(lower.residual),
+                "right_q": repr(upper.q_w),
+                "right_hash": upper.evaluation.task172_result.result_hash,
+                "right_f": str(upper.residual),
+            }
+        )
+
+    refined_left, refined_right, solution = service._dyadic_refine_valid_bracket(
+        left,
+        right,
+        evaluate=evaluate,
+        all_trials=lambda: list(trials.values()),
+        record_hole_neighbors=record_neighbors,
+    )
+    assert solution is None
+    assert refined_left.classification == refined_right.classification == "VALID_CELL_EVALUATION"
+    assert refined_left.q_w < q_hole < refined_right.q_w
+    assert refined_left.residual is not None and refined_left.residual <= 0
+    assert refined_right.residual is not None and refined_right.residual >= 0
+    assert neighbor_receipts[0]["left_q"] == repr(q_left + 0.005)
+    assert neighbor_receipts[0]["right_q"] == repr(q_right - 0.005)
+    assert neighbor_receipts[0]["left_hash"] and neighbor_receipts[0]["right_hash"]
+    assert stats.task172_numerical_hole_count == 1
+    assert stats.task172_numerical_hole_counts_by_code == {"BLOCKED_RESIDUAL_ACCEPTANCE": 1}
+    assert [q for q in trials if q not in (q_left, q_hole, q_right)] == [
+        q_left + 0.005,
+        q_right - 0.005,
+    ]
+
+    final_stats = service._CellSearchStats()
+    accepted = service._solve_cell(
+        support=support,
+        tube_upstream=tube,
+        shell_physical_left=shell,
+        provider=provider,
+        shell_authority=authority,
+        search_stats=final_stats,
+    )
+    assert type(accepted.task172_result) is task172_models.Task172LocalResult
+    assert abs(accepted.q_w - accepted.task172_result.signed_q_hot_to_cold_w) <= Decimal("1e-6")
+    assert accepted.q_w >= 0
+
+
+def test_task172_non_residual_blocker_remains_hard_blocker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    support, tube, shell, provider, authority = _historical_n2_cell_inputs()
+    request = service._task172_request(support, tube, shell, authority)
+    blocked = Task172BlockedResult(
+        status="BLOCKED",
+        failure_code="BLOCKED_NONCONVERGENCE",
+        field_path="solver",
+        request_hash=service.recompute_task172_request_hash(request),
+        blockers=("BLOCKED_NONCONVERGENCE",),
+        blocked_result_hash="0" * 64,
+    )
+    monkeypatch.setattr(service, "task172_validate", lambda *_args, **_kwargs: blocked)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._cell_evaluation(
+            4436.0,
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+        )
+    assert caught.value.code == "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE"
+    assert caught.value.diagnostics == ("BLOCKED_NONCONVERGENCE",)
+
+
+def test_dyadic_probe_order_narrowest_pair_and_tie_break_are_deterministic() -> None:
+    endpoint_left = service._CellTrial(
+        0.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="l")),
+        Decimal("-1"),
+    )
+    endpoint_right = service._CellTrial(
+        1.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="r")),
+        Decimal("1"),
+    )
+    cache: dict[float, service._CellTrial] = {}
+    order: list[float] = []
+
+    def evaluate(q: float) -> service._CellTrial:
+        order.append(q)
+        if q in {0.25, 0.75}:
+            trial = service._CellTrial(q, "TASK172_NUMERICAL_HOLE")
+        else:
+            residual = Decimal("-1") if q in {0.125, 0.625} else Decimal("1")
+            trial = service._CellTrial(
+                q,
+                "VALID_CELL_EVALUATION",
+                SimpleNamespace(task172_result=SimpleNamespace(result_hash=f"{q}")),
+                residual,
+            )
+        cache[q] = trial
+        return trial
+
+    neighbors: list[list[service._CellTrial]] = []
+    left, right, solution = service._dyadic_refine_valid_bracket(
+        endpoint_left,
+        endpoint_right,
+        evaluate=evaluate,
+        all_trials=lambda: [endpoint_left, endpoint_right, *cache.values()],
+        record_hole_neighbors=neighbors.append,
+    )
+    assert solution is None
+    assert order == [0.25, 0.75, 0.125, 0.375, 0.625, 0.875]
+    assert (left.q_w, right.q_w) == (0.125, 0.375)
+    assert len(neighbors) == 1
+
+
+def test_initial_upper_numerical_hole_can_yield_a_valid_only_sign_bracket() -> None:
+    lower = service._CellTrial(
+        0.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="lower")),
+        Decimal("-1"),
+    )
+    upper_hole = service._CellTrial(1.0, "TASK172_NUMERICAL_HOLE")
+    cache = {0.0: lower, 1.0: upper_hole}
+    probes: list[float] = []
+
+    def evaluate(q: float) -> service._CellTrial:
+        probes.append(q)
+        residual = Decimal("-0.5") if q == 0.25 else Decimal("0.5")
+        trial = service._CellTrial(
+            q,
+            "VALID_CELL_EVALUATION",
+            SimpleNamespace(task172_result=SimpleNamespace(result_hash=f"{q}")),
+            residual,
+        )
+        cache[q] = trial
+        return trial
+
+    left, right, eligible = service._discover_valid_sign_bracket_from_endpoint_holes(
+        0.0,
+        1.0,
+        (lower, upper_hole),
+        evaluate=evaluate,
+        all_trials=lambda: list(cache.values()),
+        record_hole_neighbors=lambda _trials: None,
+    )
+    assert probes == [0.25, 0.75]
+    assert eligible is None
+    assert (left.q_w, right.q_w) == (0.25, 0.75)
+    assert left.classification == right.classification == "VALID_CELL_EVALUATION"
+    assert left.residual is not None and left.residual < 0
+    assert right.residual is not None and right.residual > 0
+    assert upper_hole.evaluation is None and upper_hole.residual is None
+
+
+def test_initial_lower_numerical_hole_can_yield_a_valid_only_sign_bracket() -> None:
+    lower_hole = service._CellTrial(0.0, "TASK172_NUMERICAL_HOLE")
+    upper = service._CellTrial(
+        1.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="upper")),
+        Decimal("1"),
+    )
+    cache = {0.0: lower_hole, 1.0: upper}
+    probes: list[float] = []
+
+    def evaluate(q: float) -> service._CellTrial:
+        probes.append(q)
+        residual = Decimal("-0.5") if q == 0.25 else Decimal("0.5")
+        trial = service._CellTrial(
+            q,
+            "VALID_CELL_EVALUATION",
+            SimpleNamespace(task172_result=SimpleNamespace(result_hash=f"{q}")),
+            residual,
+        )
+        cache[q] = trial
+        return trial
+
+    left, right, eligible = service._discover_valid_sign_bracket_from_endpoint_holes(
+        0.0,
+        1.0,
+        (lower_hole, upper),
+        evaluate=evaluate,
+        all_trials=lambda: list(cache.values()),
+        record_hole_neighbors=lambda _trials: None,
+    )
+    assert probes == [0.25, 0.75]
+    assert eligible is None
+    assert (left.q_w, right.q_w) == (0.25, 0.75)
+    assert left.classification == right.classification == "VALID_CELL_EVALUATION"
+    assert left.residual is not None and left.residual < 0
+    assert right.residual is not None and right.residual > 0
+    assert lower_hole.evaluation is None and lower_hole.residual is None
+
+
+def test_dyadic_hole_search_enforces_twelve_levels() -> None:
+    left = service._CellTrial(
+        0.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="l")),
+        Decimal("-1"),
+    )
+    right = service._CellTrial(
+        1.0,
+        "VALID_CELL_EVALUATION",
+        SimpleNamespace(task172_result=SimpleNamespace(result_hash="r")),
+        Decimal("1"),
+    )
+    cache: dict[float, service._CellTrial] = {}
+
+    def evaluate(q: float) -> service._CellTrial:
+        trial = service._CellTrial(q, "TASK172_NUMERICAL_HOLE")
+        cache[q] = trial
+        return trial
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._dyadic_refine_valid_bracket(
+            left,
+            right,
+            evaluate=evaluate,
+            all_trials=lambda: [left, right, *cache.values()],
+            record_hole_neighbors=lambda _trials: None,
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    assert "maximum_hole_dyadic_levels=12" in caught.value.diagnostics
+    assert len(cache) == sum(2**level for level in range(1, 13))
+
+
+def test_cell_task172_evaluation_cap_is_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    support = build_local_support(0, 1, 0)
+    provider = CoolPropProvider()
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    monkeypatch.setattr(service, "MAX_CELL_TASK172_EVALUATIONS", 3)
+    fake = SimpleNamespace(
+        task172_result=SimpleNamespace(signed_q_hot_to_cold_w=Decimal("1.234567"))
+    )
+    monkeypatch.setattr(service, "_cell_evaluation", lambda *_args, **_kwargs: fake)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=object(),
+        )
+    assert caught.value.code == "BLOCKED_CELL_ROOT_RESOURCE_EXHAUSTION"
+
+
+def test_duty_relative_metric_is_compared_and_reported_dimensionlessly() -> None:
+    def run(n: int, duty: str, floor: str) -> Any:
+        return SimpleNamespace(
+            subdivisions=n,
+            observables=SimpleNamespace(
+                interval_duty_w=(Decimal(duty),) * 5,
+                total_duty_w=Decimal(duty),
+                duty_roundoff_floor_w=Decimal(floor),
+                wall_inner_min_k=Decimal("299"),
+                wall_inner_max_k=Decimal("300"),
+                wall_outer_min_k=Decimal("298.5"),
+                wall_outer_max_k=Decimal("299.5"),
+                wall_temperature_roundoff_floor_k=Decimal("1e-10"),
+            ),
+        )
+
+    comparison = service._compare_meshes(run(1, "1000", "0.001"), run(2, "992", "0.001"))
+    assert comparison.duty_difference_w == Decimal("8")
+    assert comparison.duty_metric == Decimal("8") / Decimal("1000")
+    assert comparison.duty_metric_units == "RELATIVE_FRACTION"
+    assert comparison.duty_metric_threshold == Decimal("0.01")
+    assert comparison.duty_precision_floor_metric == Decimal("0.002") / Decimal("1000")
+    assert comparison.duty_status == "PASS"
 
 
 def _fake_mesh_run(enthalpy: Decimal, residual_h: Decimal) -> Any:

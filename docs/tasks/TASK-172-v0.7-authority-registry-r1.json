@@ -21451,5 +21451,32 @@
     "stop": true,
     "canonical_hash": "316e13802471968970382c116a1687fde687f78eae37b301ff7b6bf35cbf747a"
   },
-  "canonical_hash": "8e0ea091597bc1318481a9dd0d9bd223cd65313bc965f90fa2ec6463296e3268"
+  "stage3_valid_point_cell_root_resolution_extension": {
+    "task_id": "TASK172_V0_7_STAGE3_TASK172_NUMERICAL_HOLE_TOLERANT_CELL_ROOT_RESOLUTION_R1",
+    "short_name": "STAGE-3 VALID-POINT CELL ROOT AND TASK172 NUMERICAL HOLES",
+    "mode": "STAGE3_CELL_ROOT_RESOLUTION_AND_PRODUCTION_MESH_RESUME",
+    "result": "STAGE3_BLOCKED_INTEGRATED_RATING_CONTRACT",
+    "previous_registry_root_canonical_hash": "8e0ea091597bc1318481a9dd0d9bd223cd65313bc965f90fa2ec6463296e3268",
+    "evidence_path": "docs/tasks/evidence/TASK-172-stage3-task172-numerical-hole-tolerant-cell-root-resolution-r1.json",
+    "evidence_canonical_hash": "54f3986908f04c07524b7a079a709793bfa25de073ae9a0b48776eaea9629c57",
+    "cell_root_solver_authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R1",
+    "task172_acceptance_policy_changed": false,
+    "r98_c_round": "1.0",
+    "blocked_task172_result_used_for_residual_sign": false,
+    "blocked_task172_result_used_as_physical_result": false,
+    "historical_n2_numerical_hole_reproduced": true,
+    "historical_n2_hole_bypassed_with_valid_task172_points": true,
+    "mesh_levels_completed": [1, 2, 4, 8],
+    "failed_mesh_subdivisions_per_interval": 16,
+    "failed_mesh_blocker": "BLOCKED_CELL_ROOT_RESOURCE_EXHAUSTION",
+    "maximum_task172_evaluations_per_cell": 512,
+    "real_case_mesh_admissible": false,
+    "task175_release_acceptance_performed": false,
+    "self_approval": false,
+    "codex_self_approval_claimed": false,
+    "next_gate": "STAGE3_INTEGRATED_RATING_CONTRACT_RESOLUTION",
+    "stop": true,
+    "canonical_hash": "1e2883b3279052917fc82fdf9247cc5ef65595d1197f9ca0057d85da6c14cc29"
+  },
+  "canonical_hash": "6145f12896e3e618ed7638aadd712beeb971be5ccb5acabcffaea88d282d7cdb"
 }
