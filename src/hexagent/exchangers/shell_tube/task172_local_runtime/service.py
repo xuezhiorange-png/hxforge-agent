@@ -216,6 +216,31 @@ def recompute_task172_request_hash(request: Task172LocalRequest) -> str:
     return canonical_sha256(_request_projection(request))
 
 
+def recompute_task172_support_id(request: Task172LocalRequest) -> str:
+    """Replay the native TASK172 physical-support identity bound by a request."""
+    if type(request) is not Task172LocalRequest:
+        raise TypeError("support identity replay requires exact Task172LocalRequest")
+    support = request.support
+    return canonical_sha256(
+        {
+            "topology_id": request.topology.topology_id,
+            "mesh_identity": request.topology.mesh_identity,
+            "physical_ownership_hash": request.topology.physical_ownership_hash,
+            "physical_segment_id": support.physical_segment_id,
+            "mesh_level_identity": support.mesh_level_identity,
+            "subdivisions_per_physical_interval_per_side": (
+                support.subdivisions_per_physical_interval_per_side
+            ),
+            "subdivision_index": support.subdivision_index,
+            "support_start_m": _decimal(support.support_start_m),
+            "support_end_m": _decimal(support.support_end_m),
+            "tube_cell_id": support.tube_cell_id,
+            "shell_cell_id": support.shell_cell_id,
+            "wall_interface_id": support.wall_interface_id,
+        }
+    )
+
+
 def recompute_task172_result_hash(result: Task172LocalResult) -> str:
     """Replay the successful result identity from its closed public fields."""
     if type(result) is not Task172LocalResult:
@@ -227,6 +252,108 @@ def recompute_task172_result_hash(result: Task172LocalResult) -> str:
             "request_hash": result.request_hash,
             "result": _result_projection(fields),
         }
+    )
+
+
+def recompute_task172_local_roundoff_bounds(
+    request: Task172LocalRequest,
+    result: Task172LocalResult,
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """Replay accepted R98 residual bounds and the published wall-value ULP floor.
+
+    The first three returned values are the existing inner-film, cylindrical
+    wall, and outer-film residual operation bounds. The fourth is a
+    componentwise inverse-Jacobian bound for both wall temperatures, plus the
+    representable spacing of the published values. This diagnostic replay
+    does not alter TASK172 physics or result IDs.
+    """
+    if type(request) is not Task172LocalRequest or type(result) is not Task172LocalResult:
+        raise TypeError("roundoff replay requires exact TASK172 request/result models")
+    if (
+        recompute_task172_request_hash(request) != result.request_hash
+        or recompute_task172_result_hash(result) != result.result_hash
+        or request.support.tube_cell_id != result.tube_cell_id
+        or request.support.shell_cell_id != result.shell_cell_id
+        or request.support.wall_interface_id != result.wall_interface_id
+        or request.topology.topology_id != result.topology_id
+    ):
+        raise ValueError("TASK172 result does not bind the supplied request/support")
+
+    q = float(result.signed_q_hot_to_cold_w)
+    residuals = tuple(float(value) for value in result.residual_vector_w)
+    q_i, q_wall, q_o = (q - residual for residual in residuals)
+    g_i = float(result.tube_htc_w_m2_k) * float(request.support.inside_area_m2)
+    g_wall = 1.0 / float(result.wall_resistance_k_w)
+    g_o = float(result.shell_htc_w_m2_k) * float(request.support.outside_area_m2)
+    tube_bulk = float(request.tube_bulk_state.temperature_k)
+    shell_bulk = float(request.shell_bulk_state.temperature_k)
+    wall_inner = float(result.wall_temperature_inner_k)
+    wall_outer = float(result.wall_temperature_outer_k)
+    bounds = _c_residual_bounds(
+        q,
+        q_i,
+        q_wall,
+        q_o,
+        g_i,
+        g_wall,
+        g_o,
+        tube_bulk,
+        shell_bulk,
+        wall_inner,
+        wall_outer,
+    )
+    outward_bounds = tuple(math.nextafter(value, math.inf) for value in bounds)
+
+    def add_up(left: float, right: float) -> float:
+        return math.nextafter(left + right, math.inf)
+
+    def multiply_up(left: float, right: float) -> float:
+        return math.nextafter(left * right, math.inf)
+
+    def add_down(left: float, right: float) -> float:
+        return max(0.0, math.nextafter(left + right, -math.inf))
+
+    def multiply_down(left: float, right: float) -> float:
+        return max(0.0, math.nextafter(left * right, -math.inf))
+
+    def divide_up(numerator: float, denominator: float) -> float:
+        return math.nextafter(numerator / denominator, math.inf)
+
+    determinant_lower = add_down(
+        add_down(
+            multiply_down(g_i, g_wall),
+            multiply_down(g_i, g_o),
+        ),
+        multiply_down(g_wall, g_o),
+    )
+    if determinant_lower <= 0.0:
+        raise ValueError("TASK172 wall conductance Jacobian is not positively invertible")
+    inner_numerator_upper = add_up(
+        add_up(
+            multiply_up(add_up(g_wall, g_o), outward_bounds[0]),
+            multiply_up(g_o, outward_bounds[1]),
+        ),
+        multiply_up(g_wall, outward_bounds[2]),
+    )
+    outer_numerator_upper = add_up(
+        add_up(
+            multiply_up(g_wall, outward_bounds[0]),
+            multiply_up(g_i, outward_bounds[1]),
+        ),
+        multiply_up(add_up(g_i, g_wall), outward_bounds[2]),
+    )
+    temperature_floor = max(
+        math.ulp(wall_inner),
+        math.ulp(wall_outer),
+        divide_up(inner_numerator_upper, determinant_lower),
+        divide_up(outer_numerator_upper, determinant_lower),
+    )
+    temperature_floor = math.nextafter(temperature_floor, math.inf)
+    return (
+        Decimal(str(outward_bounds[0])),
+        Decimal(str(outward_bounds[1])),
+        Decimal(str(outward_bounds[2])),
+        Decimal(str(temperature_floor)),
     )
 
 
@@ -725,24 +852,7 @@ def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172L
         raise _RuntimeFailure("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider")
 
     support = request.support
-    support_id = canonical_sha256(
-        {
-            "topology_id": request.topology.topology_id,
-            "mesh_identity": request.topology.mesh_identity,
-            "physical_ownership_hash": request.topology.physical_ownership_hash,
-            "physical_segment_id": support.physical_segment_id,
-            "mesh_level_identity": support.mesh_level_identity,
-            "subdivisions_per_physical_interval_per_side": (
-                support.subdivisions_per_physical_interval_per_side
-            ),
-            "subdivision_index": support.subdivision_index,
-            "support_start_m": _decimal(support.support_start_m),
-            "support_end_m": _decimal(support.support_end_m),
-            "tube_cell_id": support.tube_cell_id,
-            "shell_cell_id": support.shell_cell_id,
-            "wall_interface_id": support.wall_interface_id,
-        }
-    )
+    support_id = recompute_task172_support_id(request)
     tube_bulk_snapshot, tube_bulk_id, _tube_state = _snapshot(
         provider,
         request,
@@ -972,7 +1082,9 @@ def validate_request(raw_request: object, provider: PropertyProvider) -> Task172
 
 __all__ = [
     "recompute_task172_blocked_result_hash",
+    "recompute_task172_local_roundoff_bounds",
     "recompute_task172_request_hash",
     "recompute_task172_result_hash",
+    "recompute_task172_support_id",
     "validate_request",
 ]
