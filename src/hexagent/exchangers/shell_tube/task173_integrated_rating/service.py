@@ -41,6 +41,7 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     CELL_ROOT_SOLVER_AUTHORITY_ID,
+    ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID,
     H_MAX_J_KG,
     H_MIN_J_KG,
     LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
@@ -121,6 +122,51 @@ LOCAL_STATE_RECONSTRUCTION_AUTHORITY = {
     "task171_cell_mean_interpretation_claimed": False,
 }
 LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH = canonical_sha256(LOCAL_STATE_RECONSTRUCTION_AUTHORITY)
+ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY = {
+    "schema_version": "task173.endpoint-hole-low-side-classification-authority.v1",
+    "authority_id": ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID,
+    "scope": CASE_REVISION_ID,
+    "classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+    "trigger_conditions": {
+        "endpoint_side_is_upper": True,
+        "shell_capacity_le_tube_capacity": True,
+        "upper_endpoint_is_production_capacity_cap_after_existing_nextafter_adjustment": True,
+        "upper_endpoint_task172_result_is_replay_valid_blocked_result": True,
+        "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "request_hash_replay_passed": True,
+        "blocked_result_hash_replay_passed": True,
+        "existing_endpoint_hole_recovery_used": True,
+        "recovery_ended_only_after_all_twelve_levels": True,
+        "at_least_one_valid_recovery_sample": True,
+        "every_valid_recovery_sample_has_f_q_less_than_zero": True,
+        "no_valid_adjacent_sign_pair": True,
+        "no_valid_eligible_root": True,
+        "no_non_residual_task172_hard_blocker": True,
+        "no_low_side_probe_before_classification": True,
+        "no_invalid_identity_or_hash_result": True,
+    },
+    "non_applicability_conditions": {
+        "lower_endpoint_hole": True,
+        "tube_capacity_binding": True,
+        "zero_valid_recovery_samples": True,
+        "mixed_sign_or_sign_pair": True,
+        "eligible_valid_root": True,
+        "non_residual_task172_blocker": True,
+        "invalid_identity_or_hash": True,
+        "low_side_probe_during_recovery": True,
+    },
+    "blocked_result_contributes_residual_or_sign": False,
+    "blocked_result_accepted_as_physical": False,
+    "diagnostic_last_iterate_used": False,
+    "extrapolated_limit_used_for_production_decision": False,
+    "task172_acceptance_policy_changed": False,
+    "r98_changed": False,
+    "r98_c_round": "1.0",
+    "search_method_or_limits_changed": False,
+}
+ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH = canonical_sha256(
+    ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY
+)
 OUTER_BOUNDARY_SOLVER_AUTHORITY = {
     "schema_version": "task173.outer-boundary-solver-authority.v1",
     "authority_id": OUTER_BOUNDARY_SOLVER_AUTHORITY_ID,
@@ -140,7 +186,7 @@ OUTER_BOUNDARY_SOLVER_AUTHORITY = {
 }
 OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH = canonical_sha256(OUTER_BOUNDARY_SOLVER_AUTHORITY)
 CELL_ROOT_SOLVER_AUTHORITY = {
-    "schema_version": "task173.valid-point-cell-root-authority.v2",
+    "schema_version": "task173.valid-point-cell-root-authority.v3",
     "authority_id": CELL_ROOT_SOLVER_AUTHORITY_ID,
     "scope": CASE_REVISION_ID,
     "equation": "F(q)=q-q_TASK172(q)",
@@ -157,6 +203,12 @@ CELL_ROOT_SOLVER_AUTHORITY = {
     "maximum_hole_recovery_probes_per_cell": MAX_HOLE_RECOVERY_PROBES_PER_CELL,
     "maximum_cell_root_bisection_iterations": MAX_CELL_ROOT_BISECTION_ITERATIONS,
     "maximum_task172_evaluations_per_cell": MAX_CELL_TASK172_EVALUATIONS,
+    "endpoint_hole_low_side_classification_authority_id": (
+        ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID
+    ),
+    "endpoint_hole_low_side_classification_authority_hash": (
+        ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH
+    ),
     "worst_case_authorized_task172_evaluations": (
         CELL_ROOT_ENDPOINT_EVALUATIONS
         + MAX_CELL_ROOT_BISECTION_ITERATIONS
@@ -190,13 +242,61 @@ class _LowSideDomainInfeasible(Exception):
     """Search-only classification for an insufficient shell outlet enthalpy."""
 
 
+class _EndpointHoleRecoveryExhausted(_Stage3Failure):
+    """Structured, depth-exhausted endpoint recovery with valid-only samples."""
+
+    def __init__(
+        self,
+        *,
+        endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"],
+        recovery_levels_executed: int,
+        valid_recovery_samples: tuple[_CellTrial, ...],
+        sign_pair_found: bool,
+        eligible_root_found: bool,
+    ) -> None:
+        super().__init__(
+            "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+            f"endpoint_side={endpoint_side}",
+            f"recovery_levels_executed={recovery_levels_executed}",
+            f"valid_recovery_sample_count={len(valid_recovery_samples)}",
+            f"sign_pair_found={str(sign_pair_found).lower()}",
+            f"eligible_root_found={str(eligible_root_found).lower()}",
+            f"maximum_hole_dyadic_levels={MAX_HOLE_DYADIC_LEVELS_PER_BRACKET}",
+        )
+        self.endpoint_side = endpoint_side
+        self.recovery_levels_executed = recovery_levels_executed
+        self.valid_recovery_samples = valid_recovery_samples
+        self.valid_sample_count = len(valid_recovery_samples)
+        self.all_valid_residuals_negative = bool(valid_recovery_samples) and all(
+            sample.classification == "VALID_CELL_EVALUATION"
+            and sample.evaluation is not None
+            and type(sample.evaluation.task172_result) is Task172LocalResult
+            and sample.residual is not None
+            and sample.residual < 0
+            for sample in valid_recovery_samples
+        )
+        self.sign_pair_found = sign_pair_found
+        self.eligible_root_found = eligible_root_found
+
+
 class _Task172NumericalHole(Exception):
     """A preflight-valid trial rejected only by native residual acceptance."""
 
-    def __init__(self, request_hash: str | None = None, blocked_result_hash: str | None = None):
+    def __init__(
+        self,
+        request_hash: str | None = None,
+        blocked_result_hash: str | None = None,
+        *,
+        request_hash_replay_passed: bool = False,
+        blocked_result_hash_replay_passed: bool = False,
+        exact_blocked_result_type: bool = False,
+    ):
         super().__init__("BLOCKED_RESIDUAL_ACCEPTANCE")
         self.request_hash = request_hash
         self.blocked_result_hash = blocked_result_hash
+        self.request_hash_replay_passed = request_hash_replay_passed
+        self.blocked_result_hash_replay_passed = blocked_result_hash_replay_passed
+        self.exact_blocked_result_type = exact_blocked_result_type
 
 
 @dataclass(frozen=True)
@@ -227,6 +327,9 @@ class _CellRootTrialReceipt:
     shell_local_temperature_k: str | None = None
     failure_code: str | None = None
     blocked_result_hash: str | None = None
+    blocked_request_hash_replay_passed: bool | None = None
+    blocked_result_hash_replay_passed: bool | None = None
+    exact_blocked_result_type: bool | None = None
     physical_result_id: str | None = None
     physical_result_hash: str | None = None
     residual_sign: Literal["NEGATIVE", "ZERO", "POSITIVE"] | None = None
@@ -349,6 +452,9 @@ class _CellTrial:
     failure_code: str | None = None
     task172_request_hash: str | None = None
     blocked_result_hash: str | None = None
+    blocked_request_hash_replay_passed: bool = False
+    blocked_result_hash_replay_passed: bool = False
+    exact_blocked_result_type: bool = False
 
 
 def _eligible_trial(trial: _CellTrial) -> bool:
@@ -492,6 +598,10 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
     anchor = upper_trial if lower_hole else lower_trial
     if anchor.residual is None or anchor.evaluation is None:
         raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+    endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"] = (
+        "LOWER_ENDPOINT" if lower_hole else "UPPER_ENDPOINT"
+    )
+    valid_recovery_samples: list[_CellTrial] = []
     for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
         if on_level is not None:
             on_level(level)
@@ -527,6 +637,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             continue
         if trial.classification != "VALID_CELL_EVALUATION" or trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+        valid_recovery_samples.append(trial)
         if _eligible_trial(trial):
             if on_recovery_level is not None:
                 on_recovery_level(
@@ -568,9 +679,18 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             record_hole_neighbors(all_trials())
             return sign_pairs[0][0], sign_pairs[0][1], None
         anchor = trial
+    else:
+        raise _EndpointHoleRecoveryExhausted(
+            endpoint_side=endpoint_side,
+            recovery_levels_executed=MAX_HOLE_DYADIC_LEVELS_PER_BRACKET,
+            valid_recovery_samples=tuple(valid_recovery_samples),
+            sign_pair_found=False,
+            eligible_root_found=False,
+        )
     raise _Stage3Failure(
         "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
-        f"maximum_hole_dyadic_levels={MAX_HOLE_DYADIC_LEVELS_PER_BRACKET}",
+        "endpoint-hole recovery stopped before exhausting all authorized levels",
+        f"endpoint_side={endpoint_side}",
         f"physical_interval=[{lower_bound_q!r},{upper_bound_q!r}]",
     )
 
@@ -1074,6 +1194,9 @@ def _cell_evaluation(
             raise _Task172NumericalHole(
                 task172_result.request_hash,
                 task172_result.blocked_result_hash,
+                request_hash_replay_passed=True,
+                blocked_result_hash_replay_passed=True,
+                exact_blocked_result_type=True,
             )
         raise _Stage3Failure(
             "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE",
@@ -1251,6 +1374,21 @@ def _solve_cell(
                 else None
             ),
             blocked_result_hash=trial.blocked_result_hash,
+            blocked_request_hash_replay_passed=(
+                trial.blocked_request_hash_replay_passed
+                if trial.classification == "TASK172_NUMERICAL_HOLE"
+                else None
+            ),
+            blocked_result_hash_replay_passed=(
+                trial.blocked_result_hash_replay_passed
+                if trial.classification == "TASK172_NUMERICAL_HOLE"
+                else None
+            ),
+            exact_blocked_result_type=(
+                trial.exact_blocked_result_type
+                if trial.classification == "TASK172_NUMERICAL_HOLE"
+                else None
+            ),
             physical_result_id=result_id,
             physical_result_hash=result_hash,
             residual_sign=residual_sign,
@@ -1340,8 +1478,12 @@ def _solve_cell(
                 trials[q] = _CellTrial(
                     q,
                     "TASK172_NUMERICAL_HOLE",
+                    failure_code="BLOCKED_RESIDUAL_ACCEPTANCE",
                     task172_request_hash=exc.request_hash,
                     blocked_result_hash=exc.blocked_result_hash,
+                    blocked_request_hash_replay_passed=exc.request_hash_replay_passed,
+                    blocked_result_hash_replay_passed=exc.blocked_result_hash_replay_passed,
+                    exact_blocked_result_type=exc.exact_blocked_result_type,
                 )
             except _LowSideDomainInfeasible:
                 trials[q] = _CellTrial(q, "LOW_SIDE_DOMAIN_INFEASIBLE")
@@ -1517,16 +1659,54 @@ def _solve_cell(
                 )
             )
         begin_hole_recovery()
-        lower_trial, upper_trial, eligible = _discover_valid_sign_bracket_from_endpoint_holes(
-            lower,
-            upper,
-            (lower_trial, upper_trial),
-            evaluate=lambda q: recovery_evaluate(q, "ENDPOINT_HOLE_RECOVERY"),
-            all_trials=lambda: list(trials.values()),
-            record_hole_neighbors=record_hole_neighbors,
-            on_level=set_search_level,
-            on_recovery_level=(record_endpoint_recovery_level if capture_diagnostics else None),
-        )
+        try:
+            lower_trial, upper_trial, eligible = _discover_valid_sign_bracket_from_endpoint_holes(
+                lower,
+                upper,
+                (lower_trial, upper_trial),
+                evaluate=lambda q: recovery_evaluate(q, "ENDPOINT_HOLE_RECOVERY"),
+                all_trials=lambda: list(trials.values()),
+                record_hole_neighbors=record_hole_neighbors,
+                on_level=set_search_level,
+                on_recovery_level=(record_endpoint_recovery_level if capture_diagnostics else None),
+            )
+        except _EndpointHoleRecoveryExhausted as exhausted:
+            record_hole_neighbors(list(trials.values()))
+            upper_endpoint_is_replayed_residual_hole = (
+                upper_is_hole
+                and upper_trial.q_w == upper
+                and upper_trial.classification == "TASK172_NUMERICAL_HOLE"
+                and upper_trial.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+                and upper_trial.exact_blocked_result_type
+                and upper_trial.blocked_request_hash_replay_passed
+                and upper_trial.blocked_result_hash_replay_passed
+                and upper_trial.task172_request_hash is not None
+                and upper_trial.blocked_result_hash is not None
+                and len(upper_trial.task172_request_hash) == 64
+                and len(upper_trial.blocked_result_hash) == 64
+            )
+            no_prior_low_side_probe = not any(
+                trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE" for trial in trials.values()
+            )
+            no_hard_blocker = not any(
+                trial.classification == "HARD_BLOCKER" for trial in trials.values()
+            )
+            if (
+                exhausted.endpoint_side == "UPPER_ENDPOINT"
+                and hole_endpoint_side == "UPPER_ENDPOINT"
+                and upper_endpoint_is_replayed_residual_hole
+                and shell_capacity <= tube_capacity
+                and upper_trial.q_w == upper
+                and exhausted.recovery_levels_executed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
+                and exhausted.valid_sample_count > 0
+                and exhausted.all_valid_residuals_negative
+                and not exhausted.sign_pair_found
+                and not exhausted.eligible_root_found
+                and no_prior_low_side_probe
+                and no_hard_blocker
+            ):
+                raise _LowSideDomainInfeasible from None
+            raise
         if eligible is not None:
             assert eligible.evaluation is not None
             return eligible.evaluation
@@ -2429,7 +2609,14 @@ def _build_success(
             ].solution.task172_result.implementation_version,
             "outer_solver_authority_hash": OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH,
             "local_reconstruction_authority_hash": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+            "cell_root_solver_authority_id": CELL_ROOT_SOLVER_AUTHORITY_ID,
             "cell_root_solver_authority_hash": CELL_ROOT_SOLVER_AUTHORITY_HASH,
+            "endpoint_hole_low_side_classification_authority_id": (
+                ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID
+            ),
+            "endpoint_hole_low_side_classification_authority_hash": (
+                ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH
+            ),
             "task172_acceptance_policy_changed": "false",
             "task172_numerical_hole_count_by_mesh": json.dumps(
                 {
@@ -2527,6 +2714,8 @@ def validate_request(
 __all__ = [
     "CELL_ROOT_SOLVER_AUTHORITY",
     "CELL_ROOT_SOLVER_AUTHORITY_HASH",
+    "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY",
+    "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH",
     "OUTER_BOUNDARY_SOLVER_AUTHORITY",
