@@ -21478,5 +21478,37 @@
     "stop": true,
     "canonical_hash": "1e2883b3279052917fc82fdf9247cc5ef65595d1197f9ca0057d85da6c14cc29"
   },
-  "canonical_hash": "6145f12896e3e618ed7638aadd712beeb971be5ccb5acabcffaea88d282d7cdb"
+  "stage3_integrated_rating_contract_resolution_r2_extension": {
+    "task_id": "TASK172_V0_7_STAGE3_INTEGRATED_RATING_CONTRACT_RESOLUTION_R2",
+    "short_name": "STAGE-3 TASK172 NUMERICAL-HOLE PORTABILITY AND CELL-ROOT BUDGET CORRECTION",
+    "mode": "STAGE3_TASK173_CONTRACT_REPAIR_ONLY",
+    "result": "CONTRACT_REPAIR_CANDIDATE_PENDING_EXACT_HEAD_CI",
+    "previous_registry_root_canonical_hash": "6145f12896e3e618ed7638aadd712beeb971be5ccb5acabcffaea88d282d7cdb",
+    "evidence_path": "docs/tasks/evidence/TASK-172-stage3-task172-numerical-hole-tolerant-cell-root-resolution-r1.json",
+    "evidence_canonical_hash": "c864fb194d5610eb5f46b11918ab0a7781a5e9bba6a79116ecc51e67da7cf6ee",
+    "historical_n2_classification_portable": false,
+    "historical_n2_contract_assertion": "NONE",
+    "local_native_observation": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "ci_python_311_observation": "VALID_TASK172_RESULT",
+    "ci_python_312_observation": "VALID_TASK172_RESULT",
+    "cell_root_authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R2",
+    "cell_root_method": "VALID_POINT_ONLY_LOCAL_DYADIC_BRACKET_REFINEMENT",
+    "maximum_hole_search_levels": 12,
+    "maximum_task172_evaluations_per_cell": 512,
+    "worst_case_authorized_evaluations": 491,
+    "depth_budget_compatibility_proven": true,
+    "task172_acceptance_policy_changed": false,
+    "r98_c_round": "1.0",
+    "production_mesh_executed": false,
+    "real_case_mesh_admissible": false,
+    "stage3_result_identity_created": false,
+    "task175_release_acceptance_performed": false,
+    "self_approval": false,
+    "codex_self_approval_claimed": false,
+    "exact_head_ci_record_location": "FINAL_TASK_CLOSEOUT_RECEIPT",
+    "next_gate": "STAGE3_PRODUCTION_MESH_REEXECUTION_FROM_N1",
+    "stop": true,
+    "canonical_hash": "a87f94ce314842ff0b2726b083f69ce124b47488d6a26374e2819658eb7a0c95"
+  },
+  "canonical_hash": "dee44e2869b339c8bf30de6ab7cc63ff7a09a0bff8fee2f3937092c189cee0f7"
 }

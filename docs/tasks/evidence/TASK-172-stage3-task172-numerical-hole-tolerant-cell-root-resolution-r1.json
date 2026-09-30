@@ -1,19 +1,31 @@
 {
-  "schema_version": "task172.stage3.numerical-hole-cell-root-resolution.v1",
-  "task_id": "TASK172_V0_7_STAGE3_TASK172_NUMERICAL_HOLE_TOLERANT_CELL_ROOT_RESOLUTION_R1",
-  "mode": "STAGE3_CELL_ROOT_RESOLUTION_AND_PRODUCTION_MESH_RESUME",
-  "result": "STAGE3_BLOCKED_INTEGRATED_RATING_CONTRACT",
+  "schema_version": "task172.stage3.cell-root-contract-resolution.r2.v1",
+  "task_id": "TASK172_V0_7_STAGE3_INTEGRATED_RATING_CONTRACT_RESOLUTION_R2",
+  "mode": "STAGE3_TASK173_CONTRACT_REPAIR_ONLY",
+  "result": "CONTRACT_REPAIR_CANDIDATE_PENDING_EXACT_HEAD_CI",
   "review_target": "SAME_STAGE3_PACKAGE_SINGLE_INDEPENDENT_REVIEW_AFTER_COMPLETION",
   "predecessor_state": {
-    "authorized_head": "0e633ed555bc404ab7e43fe632234c0807eaf7a3",
+    "authorized_head": "44033be35eddaf2d10b3c68c24aadccdd3126c35",
     "pr_number": 283,
     "pr_state": "OPEN_DRAFT",
-    "predecessor_exact_head_ci_run": "36560445404",
-    "predecessor_exact_head_ci_result": "SUCCESS",
-    "predecessor_ci_success": 45,
-    "predecessor_ci_skipped": 5,
-    "predecessor_ci_failed": 0,
-    "predecessor_ci_cancelled": 0
+    "predecessor_exact_head_ci_run": "36586943815",
+    "predecessor_exact_head_ci_head_sha": "44033be35eddaf2d10b3c68c24aadccdd3126c35",
+    "predecessor_exact_head_ci_result": "FAILURE",
+    "predecessor_ci_total": 48,
+    "predecessor_ci_success": 32,
+    "predecessor_ci_skipped": 11,
+    "predecessor_ci_failed": 5,
+    "predecessor_ci_cancelled": 0,
+    "predecessor_failures_are_test_regressions_not_infrastructure": true,
+    "common_failed_test": "test_historical_n2_residual_acceptance_hole_is_bypassed_by_valid_native_points",
+    "failed_shards": [
+      "PR-head Python 3.11",
+      "PR-head Python 3.12",
+      "merge-ref Python 3.11",
+      "merge-ref Python 3.12"
+    ],
+    "earlier_stage3_r1_successful_ci_run": "36560445404",
+    "earlier_stage3_r1_successful_ci_head_sha": "0e633ed555bc404ab7e43fe632234c0807eaf7a3"
   },
   "effective_stage2_identities": {
     "task031_geometry_hash": "1dc32d501ee1ba283e4d2bb5eab2f2f5ffc81e464fd6f254ff13b02ceb01519e",
@@ -23,10 +35,15 @@
     "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"
   },
   "cell_root_authority": {
-    "authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R1",
-    "method": "VALID_POINT_ONLY_DYADIC_BRACKET_REFINEMENT",
+    "authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R2",
+    "method": "VALID_POINT_ONLY_LOCAL_DYADIC_BRACKET_REFINEMENT",
     "maximum_hole_dyadic_levels_per_bracket": 12,
+    "maximum_hole_probes_per_level": 2,
+    "maximum_hole_recovery_brackets_per_cell": 15,
+    "maximum_hole_recovery_probes_per_cell": 360,
+    "maximum_cell_root_bisection_iterations": 128,
     "maximum_task172_evaluations_per_cell": 512,
+    "worst_case_authorized_task172_evaluations": 491,
     "task172_acceptance_policy_changed": false,
     "r98_c_round": "1.0",
     "scipy_brentq_used_for_cell_root": false,
@@ -40,17 +57,23 @@
     "other_task172_blocker_is_hard_blocker": true
   },
   "historical_n2_regression": {
-    "reproduced": true,
+    "classification_portable": false,
+    "portable_contract_assertion": "NONE",
+    "local_observation": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "ci_py311_observation": "VALID_TASK172_RESULT",
+    "ci_py312_observation": "VALID_TASK172_RESULT",
+    "ci_observations_are_characterization_only": true,
     "mesh_subdivisions_per_interval": 2,
     "physical_support_m": ["4.8", "6.0"],
     "subdivision_index": 0,
     "outer_bisection_iteration": 5,
     "q_trial_w": "4436.3679921671355",
-    "task172_failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
-    "classification": "TASK172_NUMERICAL_HOLE",
+    "local_classification": "TASK172_NUMERICAL_HOLE",
+    "ci_classification": "VALID_CELL_EVALUATION",
+    "classification_characterization_only": true,
     "blocked_trial_residual_or_q_diagnostics_used": false,
     "task172_acceptance_behavior_unchanged": true,
-    "valid_neighbor_points": [
+    "r1_local_observation_valid_neighbor_points": [
       {
         "q_trial_w": "4436.357992167135",
         "classification": "VALID_CELL_EVALUATION",
@@ -68,9 +91,10 @@
         "f_q_w": "0.010212683352"
       }
     ],
-    "final_cell_solution_is_valid_task172_result": true,
+    "r1_local_observation_final_cell_solution_is_valid_task172_result": true,
     "final_cell_residual_tolerance_w": "1e-6",
-    "bypass_status": "PASS_VALID_TASK172_CELL_RESULT"
+    "r1_local_bypass_status": "PASS_VALID_TASK172_CELL_RESULT",
+    "r2_portable_contract_covered_by_injected_blocked_result_test": true
   },
   "production_mesh_policy": {
     "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
@@ -85,7 +109,9 @@
     "policy_changed": false,
     "cell_root_resource_cap_changed": false
   },
-  "mesh_execution": {
+  "historical_pre_r2_mesh_execution": {
+    "current_r2_mesh_execution_performed": false,
+    "current_r2_new_task173_result_created": false,
     "sequence_restarted_from_n1": true,
     "mesh_levels_completed": [1, 2, 4, 8],
     "mesh_levels_attempted": [1, 2, 4, 8, 16],
@@ -243,11 +269,47 @@
     "resource_cap_increased": false,
     "n32_n64_executed": false
   },
+  "r2_contract_resolution": {
+    "historical_n2_classification_portable": false,
+    "historical_n2_runtime_characterization_only": true,
+    "local_native_observation": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "local_python_version": "3.14.5",
+    "ci_py311_native_observation": "VALID_TASK172_RESULT",
+    "ci_py312_native_observation": "VALID_TASK172_RESULT",
+    "ci_observations_are_characterization_only": true,
+    "portable_contract_assertion": "NONE",
+    "injected_residual_acceptance_hole_contract_test": "PASS",
+    "blocked_result_used_for_residual_sign": false,
+    "blocked_result_used_as_physical_result": false,
+    "diagnostic_last_iterate_used": false,
+    "historical_q_native_classification_forced": false,
+    "cell_root_method": "VALID_POINT_ONLY_LOCAL_DYADIC_BRACKET_REFINEMENT",
+    "cell_root_search_local_bounded": true,
+    "cell_root_search_worst_case_complexity": "O(levels), at most 2 probes per level per recovery bracket",
+    "cell_root_search_exponential_full_grid": false,
+    "maximum_hole_search_levels": 12,
+    "maximum_hole_recovery_brackets_per_cell": 15,
+    "maximum_hole_recovery_probes_per_cell": 360,
+    "maximum_cell_root_bisection_iterations": 128,
+    "maximum_task172_evaluations_per_cell": 512,
+    "worst_case_authorized_evaluations": 491,
+    "depth_budget_compatibility_proven": true,
+    "budget_arithmetic": "2 endpoints + 128 root evaluations + 15*2*12 local probes + 1 conservative final verification reserve = 491 <= 512",
+    "resource_exhaustion_fail_closed": true,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "r98_c_round": "1.0",
+    "production_mesh_executed": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE"
+  },
   "change_boundary": {
     "production_code_changed": true,
     "task173_production_code_changed": true,
     "task172_production_acceptance_logic_changed": false,
-    "existing_tests_changed": false,
+    "existing_tests_changed": true,
+    "existing_test_change_reason": "AUTHORIZED_HISTORICAL_CLASSIFICATION_PORTABILITY_CORRECTION",
     "new_test_functions_added": 8,
     "dependencies_changed": false,
     "lockfiles_changed": false,
@@ -255,25 +317,36 @@
     "task175_release_acceptance_performed": false
   },
   "validation": {
-    "task173_focused_tests": "PASS: 30 passed",
-    "full_shell_tube_suite": "PASS: exit code 0; three existing warnings",
+    "task173_focused_tests": "PASS: 36 passed",
+    "full_shell_tube_suite": "PASS: exit code 0; four documented environment/runtime skips; three pre-existing warnings",
     "ruff": "PASS",
     "ruff_format": "PASS: 777 files already formatted",
-    "mypy": "PASS: 448 source files",
+    "mypy": "PASS: 450 source files",
     "manifest_d_equals_m": true,
     "manifest_discovered_count": 259,
     "manifest_count": 259,
     "uv_lock_check": "PASS",
     "pip_audit": "PASS: no known vulnerabilities; local project package skipped because unavailable on PyPI",
-    "git_diff_check": "PENDING_AFTER_EVIDENCE_AND_REGISTRY_APPEND",
+    "git_diff_check": "PASS",
     "duplicate_key_audit": {
       "new_evidence": "PASS",
       "new_registry_extension": "PASS",
-      "predecessor_registry_duplicate_root_keys": 4,
+      "predecessor_registry_duplicate_root_key_repetitions": 2,
       "new_duplicate_keys": 0,
       "historical_duplicate_root_canonical_hash_keys_preserved_unchanged": true
     },
-    "exact_final_head_ci": "REQUIRED_AFTER_CANDIDATE_COMMIT"
+    "exact_final_head_ci": {
+      "status": "RUN_AFTER_SINGLE_CANDIDATE_COMMIT",
+      "run_id": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "head_sha": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "result": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "total_jobs": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "success": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "skipped": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "failed": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "cancelled": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT",
+      "final_gate": "RECORDED_IN_FINAL_CLOSEOUT_RECEIPT"
+    }
   },
   "lifecycle": {
     "stage3_candidate_complete": false,
@@ -281,8 +354,8 @@
     "codex_self_approval_claimed": false,
     "ready_authorized": false,
     "merge_authorized": false,
-    "next_gate": "STAGE3_INTEGRATED_RATING_CONTRACT_RESOLUTION",
+    "next_gate": "STAGE3_PRODUCTION_MESH_REEXECUTION_FROM_N1",
     "stop": true
   },
-  "canonical_hash": "54f3986908f04c07524b7a079a709793bfa25de073ae9a0b48776eaea9629c57"
+  "canonical_hash": "c864fb194d5610eb5f46b11918ab0a7781a5e9bba6a79116ecc51e67da7cf6ee"
 }
