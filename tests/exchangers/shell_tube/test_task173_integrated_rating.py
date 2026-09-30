@@ -637,6 +637,278 @@ def test_cell_task172_evaluation_cap_is_fail_closed(
         assert any(item.startswith(key) for item in diagnostics)
 
 
+def _fake_cell_evaluation_for_capture(
+    q_w: float, signed_q_w: str, request: Task172LocalRequest
+) -> Any:
+    digest = service.canonical_sha256({"q_trial_w": repr(q_w), "signed_q_w": signed_q_w})
+    return SimpleNamespace(
+        task172_request=request,
+        task172_result=SimpleNamespace(
+            request_hash=service.recompute_task172_request_hash(request),
+            result_id=f"result-{digest}",
+            result_hash=digest,
+            signed_q_hot_to_cold_w=Decimal(signed_q_w),
+        ),
+        tube_local=SimpleNamespace(native=SimpleNamespace(temperature_k=299.5)),
+        shell_local=SimpleNamespace(native=SimpleNamespace(temperature_k=299.0)),
+    )
+
+
+def test_endpoint_hole_capture_keeps_each_valid_recovery_level_and_depth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = CoolPropProvider()
+    support = build_local_support(3, 16, 0)
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    stats = service._CellSearchStats()
+    calls: list[float] = []
+    authority, _, _ = replay_shell_flow_authority(
+        json.loads(EVIDENCE_PATH.read_text(encoding="utf-8")), provider
+    )
+
+    def endpoint_hole_then_valid_points(q_w: float, **kwargs: Any) -> Any:
+        calls.append(q_w)
+        if q_w == 0.0:
+            raise service._Task172NumericalHole("request-hole", "blocked-hash")
+        request = service._task172_request(
+            kwargs["support"],
+            kwargs["tube_upstream"],
+            kwargs["shell_physical_left"],
+            authority,
+        )
+        return _fake_cell_evaluation_for_capture(q_w, "0", request)
+
+    monkeypatch.setattr(service, "_cell_evaluation", endpoint_hole_then_valid_points)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=object(),
+            search_stats=stats,
+            capture_diagnostics=True,
+            mesh_subdivisions=16,
+            outer_iteration=2,
+            shooting_enthalpy=Decimal("106853.814770607445"),
+        )
+
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    summary = stats.endpoint_hole_summaries[-1]
+    assert summary.hole_endpoint_side == "LOWER_ENDPOINT"
+    assert summary.hole_endpoint_q_w == "0.0"
+    assert summary.initial_valid_anchor_f_q_w == summary.physical_upper_q_w
+    level_receipts = [
+        receipt
+        for receipt in stats.endpoint_hole_level_receipts
+        if receipt.physical_support_id == support.physical_segment_id
+    ]
+    assert [receipt.level for receipt in level_receipts] == list(range(1, 13))
+    assert len(calls) == 14
+    assert len(stats.trial_receipts) == len(calls)
+    assert stats.maximum_hole_recovery_depth_observed == 12
+    for receipt in level_receipts:
+        assert receipt.probe_classification == "VALID_CELL_EVALUATION"
+        assert receipt.probe_f_q_w == receipt.probe_q_w
+        assert receipt.probe_task172_result_hash is not None
+        assert receipt.valid_anchor_before_task172_result_hash
+        assert receipt.valid_anchor_after_task172_result_hash
+        assert receipt.sign_pair_found is False
+        assert receipt.eligible_root_found is False
+
+    hole_receipt = next(
+        receipt
+        for receipt in stats.trial_receipts
+        if receipt.classification == "TASK172_NUMERICAL_HOLE"
+    )
+    assert hole_receipt.task172_request_hash == "request-hole"
+    assert hole_receipt.blocked_result_hash == "blocked-hash"
+    assert hole_receipt.f_q_w is None
+    assert hole_receipt.residual_sign is None
+    assert hole_receipt.physical_result_id is None
+    assert hole_receipt.physical_result_hash is None
+    assert hole_receipt.diagnostic_last_iterate_used is False
+
+
+def test_upper_endpoint_hole_capture_retains_all_twelve_valid_probes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = CoolPropProvider()
+    support = build_local_support(3, 16, 0)
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    authority, _, _ = replay_shell_flow_authority(
+        json.loads(EVIDENCE_PATH.read_text(encoding="utf-8")), provider
+    )
+    stats = service._CellSearchStats()
+    calls: list[float] = []
+
+    def upper_endpoint_hole(q_w: float, **kwargs: Any) -> Any:
+        calls.append(q_w)
+        if len(calls) == 2:
+            raise service._Task172NumericalHole("upper-hole-request", "upper-hole-result")
+        request = service._task172_request(
+            kwargs["support"],
+            kwargs["tube_upstream"],
+            kwargs["shell_physical_left"],
+            authority,
+        )
+        signed_q = str(Decimal(str(q_w)) + Decimal("1000"))
+        return _fake_cell_evaluation_for_capture(q_w, signed_q, request)
+
+    monkeypatch.setattr(service, "_cell_evaluation", upper_endpoint_hole)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            search_stats=stats,
+            capture_diagnostics=True,
+            mesh_subdivisions=16,
+            outer_iteration=2,
+            shooting_enthalpy=Decimal("106853.814770607445"),
+        )
+
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    summary = stats.endpoint_hole_summaries[-1]
+    assert summary.hole_endpoint_side == "UPPER_ENDPOINT"
+    assert summary.hole_endpoint_q_w == repr(calls[1])
+    level_receipts = stats.endpoint_hole_level_receipts
+    assert [receipt.level for receipt in level_receipts] == list(range(1, 13))
+    assert len(stats.trial_receipts) == len(calls) == 14
+    assert all(
+        receipt.probe_classification == "VALID_CELL_EVALUATION" for receipt in level_receipts
+    )
+    assert all(
+        receipt.probe_f_q_w is not None and Decimal(receipt.probe_f_q_w) < 0
+        for receipt in level_receipts
+    )
+    assert all(receipt.sign_pair_found is False for receipt in level_receipts)
+    hole_receipt = next(
+        receipt
+        for receipt in stats.trial_receipts
+        if receipt.classification == "TASK172_NUMERICAL_HOLE"
+    )
+    assert hole_receipt.q_trial_w == repr(calls[1])
+    assert hole_receipt.task172_request_hash == "upper-hole-request"
+    assert hole_receipt.blocked_result_hash == "upper-hole-result"
+    assert hole_receipt.f_q_w is None
+    assert hole_receipt.residual_sign is None
+    assert hole_receipt.physical_result_hash is None
+    assert hole_receipt.diagnostic_last_iterate_used is False
+
+
+def test_multiple_numerical_holes_are_all_retained_without_blocked_signs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = CoolPropProvider()
+    support = build_local_support(0, 1, 0)
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    stats = service._CellSearchStats()
+    calls: list[float] = []
+    tube_capacity = service.TUBE_MASS_FLOW_KG_S * (
+        Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MIN_J_KG
+    )
+    shell_capacity = service.SHELL_MASS_FLOW_KG_S * (
+        Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG
+    )
+    upper_q = float(min(tube_capacity, shell_capacity))
+    authority, _, _ = replay_shell_flow_authority(
+        json.loads(EVIDENCE_PATH.read_text(encoding="utf-8")), provider
+    )
+
+    def multiple_holes(q_w: float, **kwargs: Any) -> Any:
+        calls.append(q_w)
+        if q_w not in (0.0, upper_q):
+            raise service._Task172NumericalHole(f"request-{repr(q_w)}", f"blocked-{repr(q_w)}")
+        signed_q = "1" if q_w == 0.0 else "0"
+        request = service._task172_request(
+            kwargs["support"],
+            kwargs["tube_upstream"],
+            kwargs["shell_physical_left"],
+            authority,
+        )
+        return _fake_cell_evaluation_for_capture(q_w, signed_q, request)
+
+    monkeypatch.setattr(service, "_cell_evaluation", multiple_holes)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=object(),
+            search_stats=stats,
+            capture_diagnostics=True,
+        )
+
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    hole_receipts = [
+        receipt
+        for receipt in stats.trial_receipts
+        if receipt.classification == "TASK172_NUMERICAL_HOLE"
+    ]
+    assert len(hole_receipts) == stats.task172_numerical_hole_count == 25
+    assert len(stats.task172_numerical_hole_trials) == 25
+    assert len(calls) == len(stats.trial_receipts) == 27
+    assert all(
+        receipt.f_q_w is None
+        and receipt.residual_sign is None
+        and receipt.physical_result_id is None
+        and receipt.physical_result_hash is None
+        and receipt.diagnostic_last_iterate_used is False
+        for receipt in hole_receipts
+    )
+
+
+def test_diagnostic_capture_does_not_change_native_trial_or_task172_call_sequence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    support, tube, shell, provider, authority = _historical_n2_cell_inputs()
+    native_validate = service.task172_validate
+
+    def run(capture: service._CellSearchStats | None) -> tuple[Any, list[tuple[str, str]]]:
+        observed: list[tuple[str, str]] = []
+
+        def counted_validate(request: Task172LocalRequest, state_provider: Any) -> Any:
+            result = native_validate(request, state_provider)
+            identity = (
+                result.result_hash
+                if type(result) is task172_models.Task172LocalResult
+                else result.blocked_result_hash
+            )
+            observed.append((service.recompute_task172_request_hash(request), identity))
+            return result
+
+        monkeypatch.setattr(service, "task172_validate", counted_validate)
+        try:
+            result = service._solve_cell(
+                support=support,
+                tube_upstream=tube,
+                shell_physical_left=shell,
+                provider=provider,
+                shell_authority=authority,
+                search_stats=capture,
+                capture_diagnostics=capture is not None,
+            )
+        except service._Stage3Failure as exc:
+            outcome: Any = ("BLOCKED", exc.code, exc.diagnostics)
+        else:
+            outcome = ("VALID", result.task172_result.result_hash)
+        return outcome, observed
+
+    without_capture = run(None)
+    captured_stats = service._CellSearchStats()
+    with_capture = run(captured_stats)
+    assert with_capture == without_capture
+    assert len(captured_stats.trial_receipts) == len(with_capture[1])
+    assert captured_stats.task172_local_evaluation_count == len(with_capture[1])
+
+
 def test_duty_relative_metric_is_compared_and_reported_dimensionlessly() -> None:
     def run(n: int, duty: str, floor: str) -> Any:
         return SimpleNamespace(

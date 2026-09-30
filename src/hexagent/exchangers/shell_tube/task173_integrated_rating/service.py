@@ -193,6 +193,104 @@ class _LowSideDomainInfeasible(Exception):
 class _Task172NumericalHole(Exception):
     """A preflight-valid trial rejected only by native residual acceptance."""
 
+    def __init__(self, request_hash: str | None = None, blocked_result_hash: str | None = None):
+        super().__init__("BLOCKED_RESIDUAL_ACCEPTANCE")
+        self.request_hash = request_hash
+        self.blocked_result_hash = blocked_result_hash
+
+
+@dataclass(frozen=True)
+class _CellRootTrialReceipt:
+    mesh_subdivisions: int | None
+    physical_support_id: str
+    tube_cell_id: str
+    shell_cell_id: str
+    wall_interface_id: str
+    outer_iteration: int | None
+    shooting_enthalpy_j_kg: str | None
+    trial_sequence_index: int
+    search_phase: str
+    search_level: int
+    q_trial_w: str
+    classification: Literal[
+        "VALID_CELL_EVALUATION",
+        "TASK172_NUMERICAL_HOLE",
+        "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "HARD_BLOCKER",
+    ]
+    task172_request_hash: str | None = None
+    task172_result_id: str | None = None
+    task172_result_hash: str | None = None
+    task172_signed_q_hot_to_cold_w: str | None = None
+    f_q_w: str | None = None
+    tube_local_temperature_k: str | None = None
+    shell_local_temperature_k: str | None = None
+    failure_code: str | None = None
+    blocked_result_hash: str | None = None
+    physical_result_id: str | None = None
+    physical_result_hash: str | None = None
+    residual_sign: Literal["NEGATIVE", "ZERO", "POSITIVE"] | None = None
+    diagnostic_last_iterate_used: Literal[False] = False
+
+
+@dataclass(frozen=True)
+class _EndpointHoleLevelEvent:
+    level: int
+    probe_q_w: float
+    trial: _CellTrial
+    hole_edge_before_q_w: float
+    anchor_before: _CellTrial
+    hole_edge_after_q_w: float
+    anchor_after: _CellTrial
+    sign_pair_found: bool
+    eligible_root_found: bool
+
+
+@dataclass(frozen=True)
+class _EndpointHoleLevelReceipt:
+    mesh_subdivisions: int | None
+    physical_support_id: str
+    tube_cell_id: str
+    shell_cell_id: str
+    wall_interface_id: str
+    outer_iteration: int | None
+    shooting_enthalpy_j_kg: str | None
+    hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"]
+    level: int
+    probe_q_w: str
+    probe_classification: str
+    probe_task172_result_hash: str | None
+    probe_task172_q_w: str | None
+    probe_f_q_w: str | None
+    hole_edge_before_q_w: str
+    valid_anchor_before_q_w: str | None
+    valid_anchor_before_f_q_w: str | None
+    valid_anchor_before_task172_result_hash: str | None
+    hole_edge_after_q_w: str
+    valid_anchor_after_q_w: str | None
+    valid_anchor_after_f_q_w: str | None
+    valid_anchor_after_task172_result_hash: str | None
+    sign_pair_found: bool
+    eligible_root_found: bool
+
+
+@dataclass(frozen=True)
+class _EndpointHoleSummary:
+    mesh_subdivisions: int | None
+    physical_support_id: str
+    tube_cell_id: str
+    shell_cell_id: str
+    wall_interface_id: str
+    outer_iteration: int | None
+    shooting_enthalpy_j_kg: str | None
+    physical_lower_q_w: str
+    physical_upper_q_w: str
+    hole_endpoint_q_w: str
+    hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"]
+    initial_valid_anchor_q_w: str
+    initial_valid_anchor_f_q_w: str
+    initial_valid_anchor_task172_result_hash: str
+
 
 @dataclass
 class _CellSearchStats:
@@ -200,6 +298,10 @@ class _CellSearchStats:
     task172_numerical_hole_count: int = 0
     task172_numerical_hole_counts_by_code: dict[str, int] = field(default_factory=dict)
     task172_numerical_hole_trials: list[dict[str, str]] = field(default_factory=list)
+    trial_receipts: list[_CellRootTrialReceipt] = field(default_factory=list)
+    endpoint_hole_summaries: list[_EndpointHoleSummary] = field(default_factory=list)
+    endpoint_hole_level_receipts: list[_EndpointHoleLevelReceipt] = field(default_factory=list)
+    maximum_hole_recovery_depth_observed: int = 0
 
     def record_evaluation(self) -> None:
         self.task172_local_evaluation_count += 1
@@ -245,6 +347,8 @@ class _CellTrial:
     evaluation: _CellEvaluation | None = None
     residual: Decimal | None = None
     failure_code: str | None = None
+    task172_request_hash: str | None = None
+    blocked_result_hash: str | None = None
 
 
 def _eligible_trial(trial: _CellTrial) -> bool:
@@ -366,6 +470,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
     all_trials: Callable[[], list[_CellTrial]],
     record_hole_neighbors: Callable[[list[_CellTrial]], None],
     on_level: Callable[[int], None] | None = None,
+    on_recovery_level: Callable[[_EndpointHoleLevelEvent], None] | None = None,
 ) -> tuple[_CellTrial, _CellTrial, _CellTrial | None]:
     """Resolve one endpoint hole by bounded bisection toward its valid anchor."""
     if upper_bound_q <= lower_bound_q or any(
@@ -390,6 +495,8 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
     for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
         if on_level is not None:
             on_level(level)
+        hole_edge_before = hole_edge
+        anchor_before = anchor
         probe = (hole_edge + anchor.q_w) / 2.0
         if probe == hole_edge or probe == anchor.q_w:
             break
@@ -403,10 +510,38 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             )
         if trial.classification == "TASK172_NUMERICAL_HOLE":
             hole_edge = probe
+            if on_recovery_level is not None:
+                on_recovery_level(
+                    _EndpointHoleLevelEvent(
+                        level=level,
+                        probe_q_w=probe,
+                        trial=trial,
+                        hole_edge_before_q_w=hole_edge_before,
+                        anchor_before=anchor_before,
+                        hole_edge_after_q_w=hole_edge,
+                        anchor_after=anchor,
+                        sign_pair_found=False,
+                        eligible_root_found=False,
+                    )
+                )
             continue
         if trial.classification != "VALID_CELL_EVALUATION" or trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
         if _eligible_trial(trial):
+            if on_recovery_level is not None:
+                on_recovery_level(
+                    _EndpointHoleLevelEvent(
+                        level=level,
+                        probe_q_w=probe,
+                        trial=trial,
+                        hole_edge_before_q_w=hole_edge_before,
+                        anchor_before=anchor_before,
+                        hole_edge_after_q_w=hole_edge,
+                        anchor_after=trial,
+                        sign_pair_found=False,
+                        eligible_root_found=True,
+                    )
+                )
             record_hole_neighbors(all_trials())
             return trial, trial, trial
         samples = [
@@ -415,6 +550,20 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             if lower_bound_q <= candidate.q_w <= upper_bound_q
         ]
         sign_pairs = _valid_sign_pairs(samples)
+        if on_recovery_level is not None:
+            on_recovery_level(
+                _EndpointHoleLevelEvent(
+                    level=level,
+                    probe_q_w=probe,
+                    trial=trial,
+                    hole_edge_before_q_w=hole_edge_before,
+                    anchor_before=anchor_before,
+                    hole_edge_after_q_w=hole_edge,
+                    anchor_after=trial,
+                    sign_pair_found=bool(sign_pairs),
+                    eligible_root_found=False,
+                )
+            )
         if sign_pairs:
             record_hole_neighbors(all_trials())
             return sign_pairs[0][0], sign_pairs[0][1], None
@@ -922,7 +1071,10 @@ def _cell_evaluation(
             ):
                 raise _Stage3Failure("BLOCKED_TASK172_BLOCKED_RESULT_IDENTITY_REPLAY")
             # Do not inspect/use diagnostic_last_iterate: it is not an evaluation of F(q).
-            raise _Task172NumericalHole
+            raise _Task172NumericalHole(
+                task172_result.request_hash,
+                task172_result.blocked_result_hash,
+            )
         raise _Stage3Failure(
             "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE",
             task172_result.failure_code,
@@ -967,6 +1119,7 @@ def _solve_cell(
     mesh_subdivisions: int | None = None,
     outer_iteration: int | None = None,
     shooting_enthalpy: Decimal | None = None,
+    capture_diagnostics: bool = False,
 ) -> _CellEvaluation:
     h_tube = _d(tube_upstream.native.enthalpy_j_kg)
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
@@ -987,6 +1140,8 @@ def _solve_cell(
     hole_recovery_probe_count = 0
     hole_recovery_bracket_count = 0
     current_search_level = 0
+    active_search_phase = "PHYSICAL_ENDPOINT_EVALUATION"
+    cell_trial_sequence_index = 0
     current_left_trial: _CellTrial | None = None
     current_right_trial: _CellTrial | None = None
 
@@ -1037,6 +1192,122 @@ def _solve_cell(
     def set_search_level(level: int) -> None:
         nonlocal current_search_level
         current_search_level = level
+        stats.maximum_hole_recovery_depth_observed = max(
+            stats.maximum_hole_recovery_depth_observed,
+            level,
+        )
+
+    def append_trial_receipt(q: float, trial: _CellTrial, search_phase: str) -> None:
+        nonlocal cell_trial_sequence_index
+        evaluation = trial.evaluation
+        result = evaluation.task172_result if evaluation is not None else None
+        residual_sign: Literal["NEGATIVE", "ZERO", "POSITIVE"] | None = None
+        if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None:
+            residual_sign = (
+                "NEGATIVE" if trial.residual < 0 else "POSITIVE" if trial.residual > 0 else "ZERO"
+            )
+        tube_local = getattr(evaluation, "tube_local", None)
+        shell_local = getattr(evaluation, "shell_local", None)
+        tube_native = getattr(tube_local, "native", None)
+        shell_native = getattr(shell_local, "native", None)
+        result_id = getattr(result, "result_id", None)
+        result_hash = getattr(result, "result_hash", None)
+        result_q = getattr(result, "signed_q_hot_to_cold_w", None)
+        receipt = _CellRootTrialReceipt(
+            mesh_subdivisions=mesh_subdivisions,
+            physical_support_id=support.physical_segment_id,
+            tube_cell_id=support.tube_cell_id,
+            shell_cell_id=support.shell_cell_id,
+            wall_interface_id=support.wall_interface_id,
+            outer_iteration=outer_iteration,
+            shooting_enthalpy_j_kg=(
+                str(shooting_enthalpy) if shooting_enthalpy is not None else None
+            ),
+            trial_sequence_index=cell_trial_sequence_index,
+            search_phase=search_phase,
+            search_level=current_search_level,
+            q_trial_w=repr(q),
+            classification=trial.classification,
+            task172_request_hash=(
+                getattr(result, "request_hash", None)
+                if result is not None
+                else trial.task172_request_hash
+            ),
+            task172_result_id=result_id,
+            task172_result_hash=result_hash,
+            task172_signed_q_hot_to_cold_w=(str(result_q) if result_q is not None else None),
+            f_q_w=str(trial.residual) if trial.residual is not None else None,
+            tube_local_temperature_k=(
+                str(tube_native.temperature_k) if tube_native is not None else None
+            ),
+            shell_local_temperature_k=(
+                str(shell_native.temperature_k) if shell_native is not None else None
+            ),
+            failure_code=(
+                trial.failure_code
+                if trial.failure_code is not None
+                else "BLOCKED_RESIDUAL_ACCEPTANCE"
+                if trial.classification == "TASK172_NUMERICAL_HOLE"
+                else None
+            ),
+            blocked_result_hash=trial.blocked_result_hash,
+            physical_result_id=result_id,
+            physical_result_hash=result_hash,
+            residual_sign=residual_sign,
+            diagnostic_last_iterate_used=False,
+        )
+        stats.trial_receipts.append(receipt)
+        cell_trial_sequence_index += 1
+
+    def record_endpoint_recovery_level(event: _EndpointHoleLevelEvent) -> None:
+        def anchor_values(anchor: _CellTrial) -> tuple[str | None, str | None, str | None]:
+            result = anchor.evaluation.task172_result if anchor.evaluation is not None else None
+            return (
+                repr(anchor.q_w),
+                str(anchor.residual) if anchor.residual is not None else None,
+                result.result_hash if result is not None else None,
+            )
+
+        before_q, before_f, before_hash = anchor_values(event.anchor_before)
+        after_q, after_f, after_hash = anchor_values(event.anchor_after)
+        trial_evaluation = event.trial.evaluation
+        trial_result = trial_evaluation.task172_result if trial_evaluation is not None else None
+        stats.endpoint_hole_level_receipts.append(
+            _EndpointHoleLevelReceipt(
+                mesh_subdivisions=mesh_subdivisions,
+                physical_support_id=support.physical_segment_id,
+                tube_cell_id=support.tube_cell_id,
+                shell_cell_id=support.shell_cell_id,
+                wall_interface_id=support.wall_interface_id,
+                outer_iteration=outer_iteration,
+                shooting_enthalpy_j_kg=(
+                    str(shooting_enthalpy) if shooting_enthalpy is not None else None
+                ),
+                hole_endpoint_side=("LOWER_ENDPOINT" if lower_is_hole else "UPPER_ENDPOINT"),
+                level=event.level,
+                probe_q_w=repr(event.probe_q_w),
+                probe_classification=event.trial.classification,
+                probe_task172_result_hash=(
+                    trial_result.result_hash if trial_result is not None else None
+                ),
+                probe_task172_q_w=(
+                    str(trial_result.signed_q_hot_to_cold_w) if trial_result is not None else None
+                ),
+                probe_f_q_w=(
+                    str(event.trial.residual) if event.trial.residual is not None else None
+                ),
+                hole_edge_before_q_w=repr(event.hole_edge_before_q_w),
+                valid_anchor_before_q_w=before_q,
+                valid_anchor_before_f_q_w=before_f,
+                valid_anchor_before_task172_result_hash=before_hash,
+                hole_edge_after_q_w=repr(event.hole_edge_after_q_w),
+                valid_anchor_after_q_w=after_q,
+                valid_anchor_after_f_q_w=after_f,
+                valid_anchor_after_task172_result_hash=after_hash,
+                sign_pair_found=event.sign_pair_found,
+                eligible_root_found=event.eligible_root_found,
+            )
+        )
 
     def resource_exhaustion(message: str) -> _Stage3Failure:
         return _Stage3Failure(
@@ -1047,7 +1318,7 @@ def _solve_cell(
             *resource_diagnostics(),
         )
 
-    def evaluate(q: float) -> _CellTrial:
+    def evaluate(q: float, *, search_phase: str | None = None) -> _CellTrial:
         nonlocal cell_evaluation_count, cell_valid_evaluation_count
         if q not in trials:
             if cell_evaluation_count >= MAX_CELL_TASK172_EVALUATIONS:
@@ -1063,28 +1334,47 @@ def _solve_cell(
                     provider=provider,
                     shell_authority=shell_authority,
                 )
-            except _Task172NumericalHole:
+            except _Task172NumericalHole as exc:
                 stats.record_hole(q, support.physical_segment_id)
                 unrecorded_holes.append(q)
-                trials[q] = _CellTrial(q, "TASK172_NUMERICAL_HOLE")
+                trials[q] = _CellTrial(
+                    q,
+                    "TASK172_NUMERICAL_HOLE",
+                    task172_request_hash=exc.request_hash,
+                    blocked_result_hash=exc.blocked_result_hash,
+                )
             except _LowSideDomainInfeasible:
                 trials[q] = _CellTrial(q, "LOW_SIDE_DOMAIN_INFEASIBLE")
             except _Stage3Failure as exc:
                 trials[q] = _CellTrial(q, "HARD_BLOCKER", failure_code=exc.code)
+                if capture_diagnostics:
+                    append_trial_receipt(q, trials[q], search_phase or active_search_phase)
                 raise
             else:
                 cell_valid_evaluation_count += 1
                 residual = _d(q) - evaluation.task172_result.signed_q_hot_to_cold_w
-                trials[q] = _CellTrial(q, "VALID_CELL_EVALUATION", evaluation, residual)
+                trials[q] = _CellTrial(
+                    q,
+                    "VALID_CELL_EVALUATION",
+                    evaluation,
+                    residual,
+                    task172_request_hash=getattr(
+                        evaluation.task172_result,
+                        "request_hash",
+                        None,
+                    ),
+                )
+            if capture_diagnostics:
+                append_trial_receipt(q, trials[q], search_phase or active_search_phase)
         return trials[q]
 
-    def recovery_evaluate(q: float) -> _CellTrial:
+    def recovery_evaluate(q: float, phase: str) -> _CellTrial:
         nonlocal hole_recovery_probe_count
         if q not in trials:
             if hole_recovery_probe_count >= MAX_HOLE_RECOVERY_PROBES_PER_CELL:
                 raise resource_exhaustion("local numerical-hole probe cap reached")
             hole_recovery_probe_count += 1
-        return evaluate(q)
+        return evaluate(q, search_phase=phase)
 
     def begin_hole_recovery() -> None:
         nonlocal hole_recovery_bracket_count
@@ -1141,6 +1431,7 @@ def _solve_cell(
         unrecorded_holes.clear()
 
     lower = 0.0
+    active_search_phase = "PHYSICAL_LOWER_ENDPOINT"
     lower_trial = evaluate(lower)
     lower_is_hole = lower_trial.classification == "TASK172_NUMERICAL_HOLE"
     if not lower_is_hole:
@@ -1190,19 +1481,51 @@ def _solve_cell(
             raise _LowSideDomainInfeasible
         raise _Stage3Failure("BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED")
 
+    active_search_phase = "PHYSICAL_UPPER_ENDPOINT"
     upper_trial = evaluate(upper)
     upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
     if lower_is_hole or upper_is_hole:
         current_left_trial, current_right_trial = lower_trial, upper_trial
+        hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"] = (
+            "LOWER_ENDPOINT" if lower_is_hole else "UPPER_ENDPOINT"
+        )
+        hole_trial = lower_trial if lower_is_hole else upper_trial
+        anchor_trial = upper_trial if lower_is_hole else lower_trial
+        if anchor_trial.evaluation is None or anchor_trial.residual is None:
+            raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
+        if capture_diagnostics:
+            stats.endpoint_hole_summaries.append(
+                _EndpointHoleSummary(
+                    mesh_subdivisions=mesh_subdivisions,
+                    physical_support_id=support.physical_segment_id,
+                    tube_cell_id=support.tube_cell_id,
+                    shell_cell_id=support.shell_cell_id,
+                    wall_interface_id=support.wall_interface_id,
+                    outer_iteration=outer_iteration,
+                    shooting_enthalpy_j_kg=(
+                        str(shooting_enthalpy) if shooting_enthalpy is not None else None
+                    ),
+                    physical_lower_q_w=repr(lower),
+                    physical_upper_q_w=repr(upper),
+                    hole_endpoint_q_w=repr(hole_trial.q_w),
+                    hole_endpoint_side=hole_endpoint_side,
+                    initial_valid_anchor_q_w=repr(anchor_trial.q_w),
+                    initial_valid_anchor_f_q_w=str(anchor_trial.residual),
+                    initial_valid_anchor_task172_result_hash=(
+                        anchor_trial.evaluation.task172_result.result_hash
+                    ),
+                )
+            )
         begin_hole_recovery()
         lower_trial, upper_trial, eligible = _discover_valid_sign_bracket_from_endpoint_holes(
             lower,
             upper,
             (lower_trial, upper_trial),
-            evaluate=recovery_evaluate,
+            evaluate=lambda q: recovery_evaluate(q, "ENDPOINT_HOLE_RECOVERY"),
             all_trials=lambda: list(trials.values()),
             record_hole_neighbors=record_hole_neighbors,
             on_level=set_search_level,
+            on_recovery_level=(record_endpoint_recovery_level if capture_diagnostics else None),
         )
         if eligible is not None:
             assert eligible.evaluation is not None
@@ -1257,6 +1580,7 @@ def _solve_cell(
             )
         iterations += 1
         current_search_level = 0
+        active_search_phase = "CELL_ROOT_BISECTION_MIDPOINT"
         midpoint_trial = evaluate(midpoint)
         if midpoint_trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
             raise _Stage3Failure(
@@ -1281,7 +1605,7 @@ def _solve_cell(
             left,
             right,
             midpoint_trial,
-            evaluate=recovery_evaluate,
+            evaluate=lambda q: recovery_evaluate(q, "INTERIOR_HOLE_RECOVERY"),
             all_trials=lambda: list(trials.values()),
             record_hole_neighbors=record_hole_neighbors,
             on_level=set_search_level,
@@ -1387,6 +1711,7 @@ def _valid_trajectory(
     shell_authority: Any,
     outer_iterations: int,
     search_stats: _CellSearchStats | None = None,
+    capture_diagnostics: bool = False,
 ) -> _MeshRun:
     stats = search_stats if search_stats is not None else _CellSearchStats()
     hole_neighborhoods: list[dict[str, str]] = []
@@ -1439,6 +1764,7 @@ def _valid_trajectory(
                 mesh_subdivisions=subdivisions,
                 outer_iteration=outer_iterations,
                 shooting_enthalpy=shell_outlet_enthalpy,
+                capture_diagnostics=capture_diagnostics,
             )
             coordinate = support.support_end_m
             face_index = len(tube_faces)
