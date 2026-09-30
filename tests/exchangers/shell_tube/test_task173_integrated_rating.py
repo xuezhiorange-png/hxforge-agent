@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
+import math
+import platform
+import sys
+from decimal import Decimal, localcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import CoolProp
 import pytest
 from pydantic import ValidationError
 
@@ -942,10 +946,125 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
     authority, _, _ = replay_shell_flow_authority(_evidence(), provider)
     stats = service._CellSearchStats()
     native_trajectory = service._valid_trajectory
+    native_solve_cell = service._solve_cell
+    native_build_support = service.build_local_support
+    target_support = build_local_support(3, 16, 0)
+    target_inputs: dict[str, Any] = {}
+    cell_calls: list[dict[str, Any]] = []
+    support_builds: list[dict[str, Any]] = []
+
+    def state_projection(thermo: Any) -> dict[str, Any]:
+        state = thermo.native
+        return {
+            "temperature_k": state.temperature_k,
+            "pressure_pa": state.pressure_pa,
+            "enthalpy_j_kg": state.enthalpy_j_kg,
+            "phase": state.phase.value,
+            "provider": state.provenance.backend_name,
+            "provider_version": state.provenance.backend_version,
+            "fluid_identifier": state.provenance.fluid_identifier,
+            "reference_state": state.provenance.reference_state_policy,
+            "query_type": state.provenance.query_type.value,
+            "property_snapshot_hash": thermo.snapshot_hash,
+        }
+
+    def diagnostic_build_support(*args: Any, **kwargs: Any) -> Any:
+        support = native_build_support(*args, **kwargs)
+        support_builds.append(
+            [
+                args[0] if args else kwargs.get("interval_index"),
+                args[2] if len(args) > 2 else kwargs.get("subdivision_index"),
+                str(support.support_start_m),
+                str(support.support_end_m),
+            ]
+        )
+        return support
+
+    def diagnostic_solve_cell(**kwargs: Any) -> Any:
+        support = kwargs["support"]
+        record: dict[str, Any] = {
+            "physical_support_id": support.physical_segment_id,
+            "tube_cell_id": support.tube_cell_id,
+            "shell_cell_id": support.shell_cell_id,
+            "wall_interface_id": support.wall_interface_id,
+            "axial_start_m": str(support.support_start_m),
+            "axial_end_m": str(support.support_end_m),
+            "outer_iteration": kwargs.get("outer_iteration"),
+            "shooting_enthalpy_j_kg": (
+                str(kwargs["shooting_enthalpy"])
+                if kwargs.get("shooting_enthalpy") is not None
+                else None
+            ),
+        }
+        if support.physical_segment_id == target_support.physical_segment_id:
+            tube_upstream = kwargs["tube_upstream"]
+            shell_physical_left = kwargs["shell_physical_left"]
+            target_inputs.update(
+                {
+                    "support": support,
+                    "tube_upstream": tube_upstream,
+                    "shell_physical_left": shell_physical_left,
+                    "provider": kwargs["provider"],
+                    "shell_authority": kwargs["shell_authority"],
+                }
+            )
+            face_index = 3 * 16
+            target_inputs["tube_upstream_face"] = service._face_state(
+                tube_upstream,
+                side="TUBE",
+                face_index=face_index,
+                coordinate_m=support.support_start_m,
+                face_count=5 * 16,
+                producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
+            )
+            target_inputs["shell_physical_left_face"] = service._face_state(
+                shell_physical_left,
+                side="SHELL",
+                face_index=face_index,
+                coordinate_m=support.support_start_m,
+                face_count=5 * 16,
+                producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
+            )
+        try:
+            result = native_solve_cell(**kwargs)
+        except service._LowSideDomainInfeasible:
+            record["classification"] = "LOW_SIDE_DOMAIN_INFEASIBLE"
+            if support.physical_segment_id == target_support.physical_segment_id:
+                cell_calls.append(record)
+                target_inputs["integrated_cell_classification"] = record["classification"]
+            raise
+        except service._Stage3Failure as exc:
+            record["classification"] = "HARD_BLOCKER"
+            record["failure_code"] = exc.code
+            record["diagnostics"] = list(exc.diagnostics)
+            cell_calls.append(record)
+            if support.physical_segment_id == target_support.physical_segment_id:
+                target_inputs["integrated_cell_classification"] = record["classification"]
+                target_inputs["integrated_cell_blocker_code"] = exc.code
+            raise
+        except Exception as exc:
+            record["classification"] = "UNEXPECTED_EXCEPTION"
+            record["exception_type"] = type(exc).__name__
+            cell_calls.append(record)
+            if support.physical_segment_id == target_support.physical_segment_id:
+                target_inputs["integrated_cell_classification"] = record["classification"]
+                target_inputs["integrated_cell_blocker_code"] = type(exc).__name__
+            raise
+        record["classification"] = "VALID_CELL_SOLUTION"
+        record["task172_result_id"] = result.task172_result.result_id
+        record["task172_result_hash"] = result.task172_result.result_hash
+        if support.physical_segment_id == target_support.physical_segment_id:
+            cell_calls.append(record)
+            target_inputs["integrated_cell_classification"] = record["classification"]
+            target_inputs["integrated_task172_result_id"] = result.task172_result.result_id
+            target_inputs["integrated_task172_result_hash"] = result.task172_result.result_hash
+        return result
 
     def capture_target_diagnostics(*args: Any, **kwargs: Any) -> Any:
         return native_trajectory(*args, **kwargs, capture_diagnostics=True)
 
+    monkeypatch.setattr(service, "build_local_support", diagnostic_build_support)
+    monkeypatch.setattr(service, "_solve_cell", diagnostic_solve_cell)
     monkeypatch.setattr(service, "_valid_trajectory", capture_target_diagnostics)
     trial = service._outer_trial(
         16,
@@ -956,14 +1075,295 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
         stats,
     )
 
-    target_support = build_local_support(3, 16, 0)
     target_receipts = [
         receipt
         for receipt in stats.trial_receipts
         if receipt.physical_support_id == target_support.physical_segment_id
         and receipt.outer_iteration == 2
     ]
-    assert trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE"
+    target_reached = bool(target_inputs) or bool(target_receipts)
+    isolated_target: dict[str, Any] = {"status": "NOT_RUN_TARGET_NOT_REACHED"}
+    isolated_stats = service._CellSearchStats()
+    if target_reached:
+        isolated_kwargs = {
+            "support": target_inputs["support"],
+            "tube_upstream": target_inputs["tube_upstream"],
+            "shell_physical_left": target_inputs["shell_physical_left"],
+            "provider": target_inputs["provider"],
+            "shell_authority": target_inputs["shell_authority"],
+            "search_stats": isolated_stats,
+            "hole_neighborhoods": [],
+            "mesh_subdivisions": 16,
+            "outer_iteration": 2,
+            "shooting_enthalpy": Decimal("106853.814770607445"),
+            "capture_diagnostics": True,
+        }
+        try:
+            isolated_result = native_solve_cell(**isolated_kwargs)
+        except service._LowSideDomainInfeasible:
+            isolated_target = {"classification": "LOW_SIDE_DOMAIN_INFEASIBLE"}
+        except service._Stage3Failure as exc:
+            isolated_target = {
+                "classification": "HARD_BLOCKER",
+                "blocker_code": exc.code,
+                "diagnostics": list(exc.diagnostics),
+            }
+        except Exception as exc:
+            isolated_target = {
+                "classification": "UNEXPECTED_EXCEPTION",
+                "exception_type": type(exc).__name__,
+            }
+        else:
+            isolated_target = {
+                "classification": "VALID_CELL_SOLUTION",
+                "task172_result_id": isolated_result.task172_result.result_id,
+                "task172_result_hash": isolated_result.task172_result.result_hash,
+            }
+
+    def trial_receipt_projection(receipt: Any) -> dict[str, Any]:
+        return {
+            "search_phase": receipt.search_phase,
+            "search_level": receipt.search_level,
+            "q_w": receipt.q_trial_w,
+            "classification": receipt.classification,
+            "failure_code": receipt.failure_code,
+            "task172_request_hash": receipt.task172_request_hash,
+            "task172_result_id": receipt.task172_result_id,
+            "task172_result_hash": receipt.task172_result_hash,
+            "blocked_result_hash": receipt.blocked_result_hash,
+            "request_hash_replay_passed": receipt.blocked_request_hash_replay_passed,
+            "result_hash_replay_passed": receipt.blocked_result_hash_replay_passed,
+            "exact_blocked_result_type": receipt.exact_blocked_result_type,
+            "f_q_w": receipt.f_q_w,
+            "residual_sign": receipt.residual_sign,
+            "diagnostic_last_iterate_used": receipt.diagnostic_last_iterate_used,
+        }
+
+    upper_receipt = next(
+        (item for item in target_receipts if item.search_phase == "PHYSICAL_UPPER_ENDPOINT"),
+        None,
+    )
+    recovery_receipts = [
+        item
+        for item in stats.endpoint_hole_level_receipts
+        if item.physical_support_id == target_support.physical_segment_id
+        and item.outer_iteration == 2
+    ]
+    blocker_call = next(
+        (item for item in cell_calls if item["classification"] == "HARD_BLOCKER"), None
+    )
+    first_blocker_code = (
+        trial.diagnostics[0]
+        if trial.classification == "HARD_BLOCKER" and trial.diagnostics
+        else blocker_call.get("failure_code")
+        if blocker_call
+        else None
+    )
+    if blocker_call is not None:
+        blocker_start = Decimal(blocker_call["axial_start_m"])
+        target_start = target_support.support_start_m
+        blocker_position = (
+            "AT_TARGET"
+            if blocker_call["physical_support_id"] == target_support.physical_segment_id
+            else "BEFORE_TARGET"
+            if blocker_start < target_start
+            else "AFTER_TARGET"
+            if blocker_start > target_start
+            else "UNRESOLVED_LOCATION"
+        )
+    elif trial.classification == "HARD_BLOCKER":
+        blocker_position = "UNRESOLVED_LOCATION"
+    else:
+        blocker_position = "NONE"
+
+    target_state_projection: dict[str, Any] | None = None
+    target_capacities: dict[str, Any] | None = None
+    if target_reached:
+        tube_state = target_inputs["tube_upstream"]
+        shell_state = target_inputs["shell_physical_left"]
+        with localcontext() as context:
+            context.prec = 70
+            tube_capacity = service.TUBE_MASS_FLOW_KG_S * (
+                Decimal(str(tube_state.native.enthalpy_j_kg)) - service.H_MIN_J_KG
+            )
+            shell_capacity = service.SHELL_MASS_FLOW_KG_S * (
+                Decimal(str(shell_state.native.enthalpy_j_kg)) - service.H_MIN_J_KG
+            )
+            raw_cap = min(tube_capacity, shell_capacity)
+        upper = float(raw_cap)
+        nextafter_steps = 0
+        for _ in range(8):
+            q_decimal = Decimal(str(upper))
+            with localcontext() as context:
+                context.prec = 70
+                tube_h = Decimal(str(tube_state.native.enthalpy_j_kg)) - (
+                    q_decimal / service.TUBE_MASS_FLOW_KG_S
+                )
+                shell_h = Decimal(str(shell_state.native.enthalpy_j_kg)) - (
+                    q_decimal / service.SHELL_MASS_FLOW_KG_S
+                )
+            if tube_h >= service.H_MIN_J_KG and shell_h >= service.H_MIN_J_KG:
+                break
+            upper = math.nextafter(upper, 0.0)
+            nextafter_steps += 1
+        tube_face = target_inputs["tube_upstream_face"]
+        shell_face = target_inputs["shell_physical_left_face"]
+        target_state_projection = {
+            "tube_upstream_enthalpy_j_kg": str(tube_state.native.enthalpy_j_kg),
+            "tube_upstream_temperature_k": str(tube_state.native.temperature_k),
+            "tube_upstream_state_identity": {
+                "face_id": tube_face.face_id,
+                "face_hash": tube_face.face_hash,
+                "property_snapshot_hash": tube_state.snapshot_hash,
+            },
+            "shell_physical_left_enthalpy_j_kg": str(shell_state.native.enthalpy_j_kg),
+            "shell_physical_left_temperature_k": str(shell_state.native.temperature_k),
+            "shell_physical_left_state_identity": {
+                "face_id": shell_face.face_id,
+                "face_hash": shell_face.face_hash,
+                "property_snapshot_hash": shell_state.snapshot_hash,
+            },
+            "tube_upstream_state": state_projection(tube_state),
+            "shell_physical_left_state": state_projection(shell_state),
+        }
+        target_capacities = {
+            "tube_capacity_w": str(tube_capacity),
+            "shell_capacity_w": str(shell_capacity),
+            "binding_side": "SHELL"
+            if shell_capacity < tube_capacity
+            else "TUBE"
+            if tube_capacity < shell_capacity
+            else "TIE",
+            "raw_cap_decimal_w": str(raw_cap),
+            "production_q_upper_w": repr(upper),
+            "nextafter_step_count": nextafter_steps,
+            "tube_downstream_h_at_q_upper_j_kg": str(tube_h),
+            "shell_next_h_at_q_upper_j_kg": str(shell_h),
+        }
+
+    target_cell_classification = (
+        target_inputs.get("integrated_cell_classification") if target_reached else "NOT_REACHED"
+    )
+    integrated_isolated_match = (
+        target_cell_classification == isolated_target.get("classification")
+        if target_reached
+        else None
+    )
+    diagnostic_projection = {
+        "python_version": platform.python_version(),
+        "python_implementation": sys.implementation.name,
+        "platform": platform.platform(),
+        "coolprop_version": CoolProp.__version__,
+        "outer_trial_classification": trial.classification,
+        "outer_trial_diagnostics": list(trial.diagnostics),
+        "first_hard_blocker": {
+            "code": first_blocker_code,
+            "failure_code": blocker_call.get("failure_code") if blocker_call else None,
+            "location_class": blocker_position,
+            "physical_support_id": blocker_call.get("physical_support_id")
+            if blocker_call
+            else None,
+            "tube_cell_id": blocker_call.get("tube_cell_id") if blocker_call else None,
+            "shell_cell_id": blocker_call.get("shell_cell_id") if blocker_call else None,
+            "wall_interface_id": blocker_call.get("wall_interface_id") if blocker_call else None,
+            "axial_start_m": blocker_call.get("axial_start_m") if blocker_call else None,
+            "axial_end_m": blocker_call.get("axial_end_m") if blocker_call else None,
+            "search_phase": next(
+                (
+                    receipt.search_phase
+                    for receipt in stats.trial_receipts
+                    if receipt.classification == "HARD_BLOCKER"
+                ),
+                None,
+            ),
+            "search_level": next(
+                (
+                    receipt.search_level
+                    for receipt in stats.trial_receipts
+                    if receipt.classification == "HARD_BLOCKER"
+                ),
+                None,
+            ),
+            "q_w": next(
+                (
+                    receipt.q_trial_w
+                    for receipt in stats.trial_receipts
+                    if receipt.classification == "HARD_BLOCKER"
+                ),
+                None,
+            ),
+            "call_diagnostics": blocker_call.get("diagnostics") if blocker_call else None,
+            "outer_diagnostics": list(trial.diagnostics),
+        },
+        "target_support": {
+            "support_index": [3, 16, 0],
+            "physical_support_id": target_support.physical_segment_id,
+            "tube_cell_id": target_support.tube_cell_id,
+            "shell_cell_id": target_support.shell_cell_id,
+            "wall_interface_id": target_support.wall_interface_id,
+            "reached": target_reached,
+            "receipt_count": len(target_receipts),
+            "integrated_cell_classification": target_cell_classification,
+            "integrated_cell_blocker_code": target_inputs.get("integrated_cell_blocker_code"),
+            "upstream_states": target_state_projection,
+            "capacities_and_upper_bound": target_capacities,
+            "lower_endpoint": next(
+                (
+                    trial_receipt_projection(item)
+                    for item in target_receipts
+                    if item.search_phase == "PHYSICAL_LOWER_ENDPOINT"
+                ),
+                None,
+            ),
+            "upper_endpoint": trial_receipt_projection(upper_receipt) if upper_receipt else None,
+            "recovery_probes": [
+                {
+                    "level": item.level,
+                    "q_w": item.probe_q_w,
+                    "classification": item.probe_classification,
+                    "f_q_w": item.probe_f_q_w,
+                    "request_hash": next(
+                        (
+                            r.task172_request_hash
+                            for r in target_receipts
+                            if r.q_trial_w == item.probe_q_w
+                        ),
+                        None,
+                    ),
+                    "result_hash": item.probe_task172_result_hash,
+                }
+                for item in recovery_receipts
+            ],
+            "recovery_level_count": len(recovery_receipts),
+            "recovery_valid_sample_count": sum(
+                item.probe_classification == "VALID_CELL_EVALUATION" for item in recovery_receipts
+            ),
+            "recovery_hole_sample_count": sum(
+                item.probe_classification == "TASK172_NUMERICAL_HOLE" for item in recovery_receipts
+            ),
+            "recovery_other_blocker_count": sum(
+                item.probe_classification
+                not in {
+                    "VALID_CELL_EVALUATION",
+                    "TASK172_NUMERICAL_HOLE",
+                }
+                for item in recovery_receipts
+            ),
+            "isolated_replay": isolated_target,
+            "integrated_isolated_classification_match": integrated_isolated_match,
+        },
+        "support_path": {
+            "supports_entered_count": len(support_builds),
+            "interval_subdivision_and_axial_order": support_builds,
+        },
+    }
+    diagnostic_message = json.dumps(diagnostic_projection, sort_keys=True, separators=(",", ":"))
+
+    # This remains the original contract assertion.  CI failure is intentional
+    # until the observed blocker path has been adjudicated; the deterministic
+    # JSON message is the diagnostic evidence, not a relaxation of R3.
+    print(f"R3_CI_PATH_DIAGNOSTIC={diagnostic_message}")
+    assert trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE", diagnostic_message
     assert trial.mesh_run is None
     assert len(target_receipts) == 14
     assert sum(item.classification == "VALID_CELL_EVALUATION" for item in target_receipts) == 13
