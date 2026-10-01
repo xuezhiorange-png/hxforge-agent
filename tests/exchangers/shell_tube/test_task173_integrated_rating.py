@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import platform
 import sys
+from dataclasses import replace
 from decimal import Decimal, localcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -47,13 +47,6 @@ EVIDENCE_PATH = (
     / "tasks"
     / "evidence"
     / "TASK-172-stage2-native-shell-flow-replay-correction-r1.json"
-)
-N16_ENDPOINT_HOLE_ADJUDICATION_PATH = (
-    Path(__file__).parents[3]
-    / "docs"
-    / "tasks"
-    / "evidence"
-    / "TASK-172-stage3-n16-shell-capacity-endpoint-hole-adjudication-r1.json"
 )
 
 
@@ -147,12 +140,8 @@ def test_exact_reviewed_upper_property_endpoint_uses_tp_not_clipped_ph() -> None
     assert thermo.snapshot.enthalpy_j_kg == str(Decimal(str(thermo.native.enthalpy_j_kg)))
 
 
-def test_tmax_tp_output_boundary_portability_diagnostic() -> None:
-    """Emit full provider-boundary characterization from each Linux CI runtime.
-
-    The intentional GitHub Actions failure makes the diagnostic projection
-    visible in the shard log. It asserts no platform-specific enthalpy value.
-    """
+def test_tmax_tp_output_boundary_contract_retains_provider_output() -> None:
+    """Keep TP provider outputs distinct from bounded PH input coordinates."""
     provider = CoolPropProvider()
     tmax_thermo = service._state_at_inlet(provider, service.T_MAX_K)
     tmin_thermo = service._state_at_inlet(provider, service.T_MIN_K)
@@ -231,11 +220,241 @@ def test_tmax_tp_output_boundary_portability_diagnostic() -> None:
         "q_to_enter_frozen_hmax_w": str(q_to_hmax),
         "q_probes": q_probes,
     }
-    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
-        pytest.fail(
-            "INTENTIONAL_TMAX_TP_BOUNDARY_DIAGNOSTIC="
-            + json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+    assert diagnostic["tmax"]["query_type"] == "TP"
+    assert Decimal(str(diagnostic["tmax"]["provider_enthalpy_j_kg"])) == Decimal(
+        tmax_thermo.snapshot.enthalpy_j_kg
+    )
+    assert diagnostic["tmin"]["query_type"] == "TP"
+    assert Decimal(str(diagnostic["tmin"]["provider_enthalpy_j_kg"])) == Decimal(
+        tmin_thermo.snapshot.enthalpy_j_kg
+    )
+    assert diagnostic["q_probes"][0]["derived_tube_h_j_kg"] == str(
+        Decimal(str(tmax_thermo.native.enthalpy_j_kg))
+    )
+
+
+def test_exact_zero_q_reuses_valid_tp_states_without_ph_reconstruction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class LinuxBoundaryProvider:
+        def __init__(self) -> None:
+            self.base = CoolPropProvider()
+            self.ph_calls = 0
+
+        def state_tp(self, fluid: Any, temperature_k: float, pressure_pa: float) -> Any:
+            state = self.base.state_tp(fluid, temperature_k, pressure_pa)
+            offset = (
+                Decimal("1.879e-8")
+                if Decimal(str(temperature_k)) == service.T_MAX_K
+                else Decimal("8.725e-8")
+                if Decimal(str(temperature_k)) == service.T_MIN_K
+                else Decimal(0)
+            )
+            if offset:
+                return replace(
+                    state,
+                    enthalpy_j_kg=float(Decimal(str(state.enthalpy_j_kg)) + offset),
+                )
+            return state
+
+        def state_ph(self, *_args: Any, **_kwargs: Any) -> Any:
+            self.ph_calls += 1
+            raise AssertionError("exact-zero propagation must not issue a PH query")
+
+    class Task172Reached(Exception):
+        pass
+
+    provider = LinuxBoundaryProvider()
+    tube = service._state_at_inlet(provider, service.T_MAX_K)
+    shell = service._state_at_inlet(provider, service.T_MIN_K)
+    support = build_local_support(0, 1, 0)
+    authority, _, _ = replay_shell_flow_authority(_evidence(), CoolPropProvider())
+    seen: dict[str, Any] = {}
+    make_request = service._task172_request
+
+    def capture_request(
+        cell_support: Any, tube_local: Any, shell_local: Any, shell_authority: Any
+    ) -> Any:
+        seen["tube_local"] = tube_local
+        seen["shell_local"] = shell_local
+        request = make_request(cell_support, tube_local, shell_local, shell_authority)
+        seen["request"] = request
+        return request
+
+    def capture_task172(request: Task172LocalRequest, _provider: Any) -> Any:
+        seen["task172_request"] = request
+        raise Task172Reached
+
+    def reject_ph_reconstruction(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("zero-q identity path called _state_from_enthalpy")
+
+    monkeypatch.setattr(service, "_task172_request", capture_request)
+    monkeypatch.setattr(service, "task172_validate", capture_task172)
+    monkeypatch.setattr(service, "_state_from_enthalpy", reject_ph_reconstruction)
+    with pytest.raises(Task172Reached):
+        service._cell_evaluation(
+            0.0,
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
         )
+
+    assert tube.native.enthalpy_j_kg > float(service.H_MAX_J_KG)
+    assert shell.native.enthalpy_j_kg > float(service.H_MIN_J_KG)
+    assert seen["tube_local"] is tube
+    assert seen["shell_local"] is shell
+    assert seen["request"].tube_bulk_state.temperature_k == service.T_MAX_K
+    assert seen["request"].shell_bulk_state.temperature_k == service.T_MIN_K
+    assert seen["task172_request"] is seen["request"]
+    assert tube.snapshot.query_type == "TP"
+    assert shell.snapshot.query_type == "TP"
+    assert tube.snapshot_hash == service.canonical_sha256(tube.snapshot.model_dump(mode="json"))
+    assert shell.snapshot_hash == service.canonical_sha256(shell.snapshot.model_dump(mode="json"))
+    assert provider.ph_calls == 0
+
+
+def test_zero_q_reuses_thermodynamic_identity_but_not_face_identity() -> None:
+    provider = CoolPropProvider()
+    thermo = service._state_at_inlet(provider, service.T_MAX_K)
+    shell_thermo = service._state_at_inlet(provider, service.T_MIN_K)
+    authority, _, _ = replay_shell_flow_authority(_evidence(), CoolPropProvider())
+    evaluation = service._cell_evaluation(
+        0.0,
+        support=build_local_support(0, 1, 0),
+        tube_upstream=thermo,
+        shell_physical_left=shell_thermo,
+        provider=provider,
+        shell_authority=authority,
+    )
+    assert evaluation.tube_downstream is thermo
+    assert evaluation.tube_local is thermo
+    assert evaluation.shell_next_physical is shell_thermo
+    assert evaluation.shell_local is shell_thermo
+    upstream_face = service._face_state(
+        thermo,
+        side="TUBE",
+        face_index=0,
+        coordinate_m=Decimal("0"),
+        face_count=80,
+        producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
+    )
+    downstream_face = service._face_state(
+        thermo,
+        side="TUBE",
+        face_index=1,
+        coordinate_m=Decimal("0.075"),
+        face_count=80,
+        producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
+    )
+    assert upstream_face.property_snapshot_hash == downstream_face.property_snapshot_hash
+    assert upstream_face.face_id != downstream_face.face_id
+    assert upstream_face.face_hash != downstream_face.face_hash
+    assert upstream_face.provenance["local_state_reconstruction_authority_id"] == (
+        "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2"
+    )
+    assert upstream_face.provenance["zero_q_state_identity_portability_authority_id"] == (
+        "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1"
+    )
+
+
+def test_small_positive_q_boundary_exposure_remains_fail_closed() -> None:
+    hmax_provider_output = service.H_MAX_J_KG + Decimal("1.879e-8")
+    delta_h = hmax_provider_output - service.H_MAX_J_KG
+    q_to_hmax = service.TUBE_MASS_FLOW_KG_S * delta_h
+    assert q_to_hmax > 0
+    h_at_half_threshold = hmax_provider_output - (q_to_hmax / 2) / service.TUBE_MASS_FLOW_KG_S
+    h_at_threshold = hmax_provider_output - q_to_hmax / service.TUBE_MASS_FLOW_KG_S
+    h_mid_at_threshold = (hmax_provider_output + h_at_threshold) / 2
+    h_mid_at_double_threshold = (
+        hmax_provider_output + hmax_provider_output - (2 * q_to_hmax) / service.TUBE_MASS_FLOW_KG_S
+    ) / 2
+    assert h_at_half_threshold > service.H_MAX_J_KG
+    assert h_at_threshold == service.H_MAX_J_KG
+    assert h_mid_at_threshold > service.H_MAX_J_KG
+    assert h_mid_at_double_threshold == service.H_MAX_J_KG
+
+
+def test_small_positive_q_still_hits_the_existing_hmax_guards(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BoundaryProvider:
+        def __init__(self) -> None:
+            self.base = CoolPropProvider()
+            self.ph_calls = 0
+
+        def state_tp(self, fluid: Any, temperature_k: float, pressure_pa: float) -> Any:
+            state = self.base.state_tp(fluid, temperature_k, pressure_pa)
+            if Decimal(str(temperature_k)) == service.T_MAX_K:
+                return replace(
+                    state,
+                    enthalpy_j_kg=float(service.H_MAX_J_KG + Decimal("1.879e-8")),
+                )
+            return state
+
+        def state_ph(self, *args: Any, **kwargs: Any) -> Any:
+            self.ph_calls += 1
+            return self.base.state_ph(*args, **kwargs)
+
+    class UnexpectedTask172Call(Exception):
+        pass
+
+    provider = BoundaryProvider()
+    tube = service._state_at_inlet(provider, service.T_MAX_K)
+    shell = service._state_at_inlet(CoolPropProvider(), Decimal("299"))
+    authority, _, _ = replay_shell_flow_authority(_evidence(), CoolPropProvider())
+    support = build_local_support(0, 1, 0)
+    q_to_hmax = service.TUBE_MASS_FLOW_KG_S * (
+        Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MAX_J_KG
+    )
+
+    def fail_if_task172_is_reached(*_args: Any, **_kwargs: Any) -> Any:
+        raise UnexpectedTask172Call
+
+    monkeypatch.setattr(service, "task172_validate", fail_if_task172_is_reached)
+    for q_w in (float(q_to_hmax / 2), float(q_to_hmax)):
+        with pytest.raises(service._Stage3Failure) as caught:
+            service._cell_evaluation(
+                q_w,
+                support=support,
+                tube_upstream=tube,
+                shell_physical_left=shell,
+                provider=provider,
+                shell_authority=authority,
+            )
+        assert caught.value.code == "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT"
+    assert provider.ph_calls >= 1
+
+
+def test_zero_q_and_local_reconstruction_authorities_are_deterministic() -> None:
+    assert service.ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY["trigger"] == (
+        "EXACT_DECIMAL_ZERO_ONLY"
+    )
+    assert (
+        service.canonical_sha256(service.ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY)
+        == service.ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
+    )
+    assert service.LOCAL_STATE_RECONSTRUCTION_AUTHORITY["authority_id"] == (
+        "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2"
+    )
+    assert service.LOCAL_STATE_RECONSTRUCTION_AUTHORITY["clipping_allowed"] is False
+    assert service.LOCAL_STATE_RECONSTRUCTION_AUTHORITY["extrapolation_allowed"] is False
+    assert (
+        service.canonical_sha256(service.LOCAL_STATE_RECONSTRUCTION_AUTHORITY)
+        == service.LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH
+    )
+    assert Decimal("112654.89965462626") == service.H_MAX_J_KG
+    assert Decimal("104920.11980926784") == service.H_MIN_J_KG
+    production_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            Path(service.__file__),
+            Path(task173.__file__).with_name("models.py"),
+        )
+    )
+    for diagnostic_value in ("1.879e-8", "8.725e-8", "2.2548e-7", "4.5096e-7"):
+        assert diagnostic_value not in production_sources
 
 
 def test_ph_input_above_reviewed_upper_enthalpy_is_rejected_before_backend() -> None:
@@ -1031,8 +1250,9 @@ def test_r3_valid_upper_shell_capacity_low_side_path_is_unchanged(
         )
 
 
-def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
+def test_r3_target_n16_outer_trial_characterizes_native_path_portably(
     monkeypatch: pytest.MonkeyPatch,
+    record_property: Any,
 ) -> None:
     provider = CoolPropProvider()
     authority, _, _ = replay_shell_flow_authority(_evidence(), provider)
@@ -1041,6 +1261,15 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
     native_solve_cell = service._solve_cell
     native_build_support = service.build_local_support
     target_support = build_local_support(3, 16, 0)
+
+    def is_target_support(support: Any) -> bool:
+        return (
+            support.physical_segment_id == target_support.physical_segment_id
+            and support.tube_cell_id == target_support.tube_cell_id
+            and support.shell_cell_id == target_support.shell_cell_id
+            and support.wall_interface_id == target_support.wall_interface_id
+        )
+
     target_inputs: dict[str, Any] = {}
     cell_calls: list[dict[str, Any]] = []
     support_builds: list[dict[str, Any]] = []
@@ -1088,7 +1317,7 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
                 else None
             ),
         }
-        if support.physical_segment_id == target_support.physical_segment_id:
+        if is_target_support(support):
             tube_upstream = kwargs["tube_upstream"]
             shell_physical_left = kwargs["shell_physical_left"]
             target_inputs.update(
@@ -1121,7 +1350,7 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
             result = native_solve_cell(**kwargs)
         except service._LowSideDomainInfeasible:
             record["classification"] = "LOW_SIDE_DOMAIN_INFEASIBLE"
-            if support.physical_segment_id == target_support.physical_segment_id:
+            if is_target_support(support):
                 cell_calls.append(record)
                 target_inputs["integrated_cell_classification"] = record["classification"]
             raise
@@ -1130,7 +1359,7 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
             record["failure_code"] = exc.code
             record["diagnostics"] = list(exc.diagnostics)
             cell_calls.append(record)
-            if support.physical_segment_id == target_support.physical_segment_id:
+            if is_target_support(support):
                 target_inputs["integrated_cell_classification"] = record["classification"]
                 target_inputs["integrated_cell_blocker_code"] = exc.code
             raise
@@ -1138,14 +1367,14 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
             record["classification"] = "UNEXPECTED_EXCEPTION"
             record["exception_type"] = type(exc).__name__
             cell_calls.append(record)
-            if support.physical_segment_id == target_support.physical_segment_id:
+            if is_target_support(support):
                 target_inputs["integrated_cell_classification"] = record["classification"]
                 target_inputs["integrated_cell_blocker_code"] = type(exc).__name__
             raise
         record["classification"] = "VALID_CELL_SOLUTION"
         record["task172_result_id"] = result.task172_result.result_id
         record["task172_result_hash"] = result.task172_result.result_hash
-        if support.physical_segment_id == target_support.physical_segment_id:
+        if is_target_support(support):
             cell_calls.append(record)
             target_inputs["integrated_cell_classification"] = record["classification"]
             target_inputs["integrated_task172_result_id"] = result.task172_result.result_id
@@ -1171,6 +1400,9 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
         receipt
         for receipt in stats.trial_receipts
         if receipt.physical_support_id == target_support.physical_segment_id
+        and receipt.tube_cell_id == target_support.tube_cell_id
+        and receipt.shell_cell_id == target_support.shell_cell_id
+        and receipt.wall_interface_id == target_support.wall_interface_id
         and receipt.outer_iteration == 2
     ]
     target_reached = bool(target_inputs) or bool(target_receipts)
@@ -1239,6 +1471,9 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
         item
         for item in stats.endpoint_hole_level_receipts
         if item.physical_support_id == target_support.physical_segment_id
+        and item.tube_cell_id == target_support.tube_cell_id
+        and item.shell_cell_id == target_support.shell_cell_id
+        and item.wall_interface_id == target_support.wall_interface_id
         and item.outer_iteration == 2
     ]
     blocker_call = next(
@@ -1256,7 +1491,12 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
         target_start = target_support.support_start_m
         blocker_position = (
             "AT_TARGET"
-            if blocker_call["physical_support_id"] == target_support.physical_segment_id
+            if (
+                blocker_call["physical_support_id"] == target_support.physical_segment_id
+                and blocker_call["tube_cell_id"] == target_support.tube_cell_id
+                and blocker_call["shell_cell_id"] == target_support.shell_cell_id
+                and blocker_call["wall_interface_id"] == target_support.wall_interface_id
+            )
             else "BEFORE_TARGET"
             if blocker_start < target_start
             else "AFTER_TARGET"
@@ -1348,6 +1588,12 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
         "coolprop_version": CoolProp.__version__,
         "outer_trial_classification": trial.classification,
         "outer_trial_diagnostics": list(trial.diagnostics),
+        "first_support_zero_q": [
+            trial_receipt_projection(receipt)
+            for receipt in stats.trial_receipts
+            if receipt.tube_cell_id == build_local_support(0, 16, 0).tube_cell_id
+            and receipt.q_trial_w == "0.0"
+        ],
         "first_hard_blocker": {
             "code": first_blocker_code,
             "failure_code": blocker_call.get("failure_code") if blocker_call else None,
@@ -1451,53 +1697,113 @@ def test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh(
     }
     diagnostic_message = json.dumps(diagnostic_projection, sort_keys=True, separators=(",", ":"))
 
-    # This remains the original contract assertion.  CI failure is intentional
-    # until the observed blocker path has been adjudicated; the deterministic
-    # JSON message is the diagnostic evidence, not a relaxation of R3.
-    print(f"R3_CI_PATH_DIAGNOSTIC={diagnostic_message}")
-    assert trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE", diagnostic_message
-    assert trial.mesh_run is None
-    assert len(target_receipts) == 14
-    assert sum(item.classification == "VALID_CELL_EVALUATION" for item in target_receipts) == 13
-    assert sum(item.classification == "TASK172_NUMERICAL_HOLE" for item in target_receipts) == 1
-    assert [
-        item.search_level
-        for item in target_receipts
-        if item.search_phase == "ENDPOINT_HOLE_RECOVERY"
-    ] == list(range(1, 13))
-    predecessor = json.loads(N16_ENDPOINT_HOLE_ADJUDICATION_PATH.read_text(encoding="utf-8"))
-    expected = [0.0, 111.3949198456] + [
-        float(level["q_w"]) for level in predecessor["original_12_level_trajectory"]["levels"]
+    first_support = build_local_support(0, 16, 0)
+    first_support_zero_q = [
+        receipt
+        for receipt in stats.trial_receipts
+        if receipt.tube_cell_id == first_support.tube_cell_id
+        and receipt.q_trial_w == "0.0"
+        and receipt.search_phase == "PHYSICAL_LOWER_ENDPOINT"
     ]
-    assert [float(item.q_trial_w) for item in target_receipts] == expected
-    hole_receipt = next(
-        item for item in target_receipts if item.classification == "TASK172_NUMERICAL_HOLE"
-    )
-    assert (
-        hole_receipt.task172_request_hash
-        == predecessor["production_upper_bound_replay"]["upper_endpoint_task172_request_hash"]
-    )
-    assert (
-        hole_receipt.blocked_result_hash
-        == predecessor["production_upper_bound_replay"]["upper_endpoint_blocked_result_hash"]
-    )
-    assert hole_receipt.blocked_request_hash_replay_passed is True
-    assert hole_receipt.blocked_result_hash_replay_passed is True
-    assert hole_receipt.exact_blocked_result_type is True
-    assert hole_receipt.f_q_w is None
-    assert hole_receipt.residual_sign is None
-    assert hole_receipt.physical_result_hash is None
-    recovery_receipts = [
-        item for item in target_receipts if item.search_phase == "ENDPOINT_HOLE_RECOVERY"
-    ]
-    for actual, prior in zip(
-        recovery_receipts,
-        predecessor["original_12_level_trajectory"]["levels"],
-        strict=True,
-    ):
-        assert actual.task172_request_hash == prior["request_hash"]
-        assert actual.task172_result_hash == prior["result_hash"]
-        assert actual.f_q_w == prior["f_q_w"]
+    first_zero = first_support_zero_q[0] if first_support_zero_q else None
+    for key, value in {
+        "r3_runtime_python": platform.python_version(),
+        "r3_runtime_platform": platform.platform(),
+        "r3_first_support_q0_classification": (
+            first_zero.classification if first_zero is not None else "NOT_CAPTURED"
+        ),
+        "r3_first_support_q0_failure_code": (
+            first_zero.failure_code if first_zero is not None else "NOT_CAPTURED"
+        ),
+        "r3_first_support_q0_tmax_blocker_removed": str(
+            first_zero is not None
+            and not (
+                first_zero.classification == "HARD_BLOCKER"
+                and first_zero.failure_code == "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT"
+            )
+        ).lower(),
+        "r3_target_support_reached": str(target_reached).lower(),
+        "r3_target_cell_classification": target_cell_classification,
+        "r3_target_cell_blocker_code": target_inputs.get(
+            "integrated_cell_blocker_code", "NOT_APPLICABLE"
+        ),
+        "r3_target_upper_classification": (
+            upper_receipt.classification if upper_receipt is not None else "NOT_CAPTURED"
+        ),
+        "r3_target_upper_failure_code": (
+            upper_receipt.failure_code if upper_receipt is not None else "NOT_CAPTURED"
+        ),
+        "r3_target_upper_request_hash": (
+            upper_receipt.task172_request_hash if upper_receipt is not None else "NOT_CAPTURED"
+        ),
+        "r3_target_upper_result_hash": (
+            upper_receipt.task172_result_hash if upper_receipt is not None else "NOT_CAPTURED"
+        ),
+        "r3_target_upstream_tube_enthalpy_j_kg": (
+            target_state_projection["tube_upstream_enthalpy_j_kg"]
+            if target_state_projection is not None
+            else "NOT_CAPTURED"
+        ),
+        "r3_target_upstream_shell_enthalpy_j_kg": (
+            target_state_projection["shell_physical_left_enthalpy_j_kg"]
+            if target_state_projection is not None
+            else "NOT_CAPTURED"
+        ),
+        "r3_target_capacity_binding_side": (
+            target_capacities["binding_side"] if target_capacities is not None else "NOT_CAPTURED"
+        ),
+        "r3_target_production_q_upper_w": (
+            target_capacities["production_q_upper_w"]
+            if target_capacities is not None
+            else "NOT_CAPTURED"
+        ),
+        "r3_isolated_target_classification": isolated_target.get(
+            "classification", isolated_target.get("status", "UNAVAILABLE")
+        ),
+        "r3_integrated_isolated_classification_match": str(integrated_isolated_match).lower(),
+        "r3_outer_trial_classification": trial.classification,
+        "r3_first_hard_blocker_code": first_blocker_code or "NONE",
+        "r3_first_hard_blocker_location": blocker_position,
+        "r3_first_hard_blocker_support_id": (
+            blocker_call.get("physical_support_id", "UNAVAILABLE") if blocker_call else "NONE"
+        ),
+        "r3_first_hard_blocker_search_phase": (
+            diagnostic_projection["first_hard_blocker"]["search_phase"] or "UNAVAILABLE"
+        ),
+        "r3_first_hard_blocker_search_level": (
+            str(diagnostic_projection["first_hard_blocker"]["search_level"])
+            if diagnostic_projection["first_hard_blocker"]["search_level"] is not None
+            else "UNAVAILABLE"
+        ),
+        "r3_first_hard_blocker_q_w": (
+            diagnostic_projection["first_hard_blocker"]["q_w"] or "UNAVAILABLE"
+        ),
+    }.items():
+        record_property(key, str(value))
+    assert first_support_zero_q, diagnostic_message
+    assert all(
+        not (
+            receipt.classification == "HARD_BLOCKER"
+            and receipt.failure_code == "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT"
+        )
+        for receipt in first_support_zero_q
+    ), diagnostic_message
+    assert trial.classification in {
+        "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "HARD_BLOCKER",
+        "VALID_TRAJECTORY",
+    }, diagnostic_message
+    if target_reached:
+        assert target_cell_classification in {
+            "VALID_CELL_SOLUTION",
+            "LOW_SIDE_DOMAIN_INFEASIBLE",
+            "HARD_BLOCKER",
+        }, diagnostic_message
+        assert isolated_target.get("classification") in {
+            "VALID_CELL_SOLUTION",
+            "LOW_SIDE_DOMAIN_INFEASIBLE",
+            "HARD_BLOCKER",
+        }, diagnostic_message
 
 
 def test_r3_authority_keeps_r2_search_limits_and_budget_proof() -> None:

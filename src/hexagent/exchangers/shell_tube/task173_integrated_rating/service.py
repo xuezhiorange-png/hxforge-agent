@@ -53,6 +53,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     T_MAX_K,
     T_MIN_K,
     TERMINAL_TOLERANCE_K,
+    ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID,
     ConvergenceComparison,
     FaceState,
     LocalStateReceipt,
@@ -105,6 +106,18 @@ MAX_CELL_TASK172_EVALUATIONS = 512
 CELL_ROOT_ENDPOINT_EVALUATIONS = 2
 CELL_ROOT_FINAL_VERIFICATION_RESERVE = 1
 
+ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY = {
+    "schema_version": "task173.zero-q-state-identity-portability-authority.v1",
+    "authority_id": ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID,
+    "trigger": "EXACT_DECIMAL_ZERO_ONLY",
+    "thermodynamic_propagation": "REUSE_AUTHORITY_VALID_UPSTREAM_STATES",
+    "ph_reconstruction_for_unchanged_state": False,
+    "enthalpy_output_compared_to_ph_input_bounds": False,
+    "small_positive_q_in_scope": False,
+}
+ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH = canonical_sha256(
+    ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY
+)
 LOCAL_STATE_RECONSTRUCTION_AUTHORITY = {
     "schema_version": "task173.local-state-reconstruction-authority.v1",
     "authority_id": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
@@ -120,6 +133,9 @@ LOCAL_STATE_RECONSTRUCTION_AUTHORITY = {
     "property_averaging_allowed": False,
     "backend_fallback_allowed": False,
     "task171_cell_mean_interpretation_claimed": False,
+    "exact_zero_q_identity_authority_id": ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID,
+    "exact_zero_q_identity_authority_hash": ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH,
+    "exact_zero_q_reuses_authority_valid_upstream_states": True,
 }
 LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH = canonical_sha256(LOCAL_STATE_RECONSTRUCTION_AUTHORITY)
 ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY = {
@@ -859,6 +875,28 @@ def _checked_thermo(
     return _ThermoState(state, snapshot, identity)
 
 
+def _reuse_authority_valid_thermo_state(state: _ThermoState) -> _ThermoState:
+    """Validate an existing state identity without issuing a new property query."""
+    if type(state) is not _ThermoState:
+        raise _Stage3Failure("BLOCKED_LOCAL_STATE_IDENTITY_REPLAY", "unexpected thermo state type")
+    try:
+        replayed_snapshot = _property_snapshot(state.native)
+    except _Stage3Failure as exc:
+        raise _Stage3Failure("BLOCKED_LOCAL_STATE_IDENTITY_REPLAY", *exc.diagnostics) from exc
+    if (
+        replayed_snapshot != state.snapshot
+        or canonical_sha256(state.snapshot.model_dump(mode="json")) != state.snapshot_hash
+        or not T_MIN_K <= _d(state.native.temperature_k) <= T_MAX_K
+        or _d(state.native.pressure_pa) != REFERENCE_PRESSURE_PA
+        or state.native.phase is not PhaseRegion.LIQUID
+        or state.snapshot.query_type not in {"TP", "PH"}
+    ):
+        raise _Stage3Failure(
+            "BLOCKED_LOCAL_STATE_IDENTITY_REPLAY", "state authority replay mismatch"
+        )
+    return state
+
+
 def _state_from_enthalpy(
     provider: PropertyProvider,
     enthalpy_j_kg: Decimal,
@@ -942,7 +980,14 @@ def _face_state(
         "backend": "HEOS::Water",
         "version": "8.0.0",
         "reference_state": "DEF",
+        "local_state_reconstruction_authority_id": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
         "reconstruction_authority_hash": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+        "zero_q_state_identity_portability_authority_id": (
+            ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID
+        ),
+        "zero_q_state_identity_portability_authority_hash": (
+            ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
+        ),
     }
     projection = {
         "schema_version": "task173.face-state.v1",
@@ -1012,6 +1057,12 @@ def _local_state_receipt(
         "property_snapshot_hash": evaluation_state.snapshot_hash,
         "reconstruction_authority_id": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
         "reconstruction_authority_hash": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+        "zero_q_state_identity_portability_authority_id": (
+            ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID
+        ),
+        "zero_q_state_identity_portability_authority_hash": (
+            ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
+        ),
     }
     state_hash = canonical_sha256(state_projection)
     receipt_projection = {
@@ -1147,31 +1198,40 @@ def _cell_evaluation(
     shell_authority: Any,
 ) -> _CellEvaluation:
     q = _d(q_w)
-    with localcontext() as context:
-        context.prec = 70
-        tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / TUBE_MASS_FLOW_KG_S
-        shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / SHELL_MASS_FLOW_KG_S
-        tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
-        shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
-    if tube_downstream_h < H_MIN_J_KG or tube_downstream_h > H_MAX_J_KG:
-        raise _Stage3Failure(
-            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-            "tube downstream face enthalpy outside admitted domain",
-            str(tube_downstream_h),
-        )
-    if shell_next_h < H_MIN_J_KG:
-        # Search-side feasibility only. No property call is made for this state.
-        raise _LowSideDomainInfeasible
-    if shell_next_h > H_MAX_J_KG:
-        raise _Stage3Failure(
-            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-            "shell next face enthalpy outside admitted domain",
-            str(shell_next_h),
-        )
-    tube_downstream = _state_from_enthalpy(provider, tube_downstream_h)
-    shell_next = _state_from_enthalpy(provider, shell_next_h, shell_search_state=True)
-    tube_local = _state_from_enthalpy(provider, tube_mid_h)
-    shell_local = _state_from_enthalpy(provider, shell_mid_h)
+    if q == Decimal(0):
+        # No thermodynamic state changes at exact zero duty. Preserve the
+        # validated provider snapshots rather than reinterpreting TP output
+        # enthalpy as a new PH input coordinate.
+        tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
+        tube_local = tube_downstream
+        shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
+        shell_local = shell_next
+    else:
+        with localcontext() as context:
+            context.prec = 70
+            tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / TUBE_MASS_FLOW_KG_S
+            shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / SHELL_MASS_FLOW_KG_S
+            tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
+            shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
+        if tube_downstream_h < H_MIN_J_KG or tube_downstream_h > H_MAX_J_KG:
+            raise _Stage3Failure(
+                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+                "tube downstream face enthalpy outside admitted domain",
+                str(tube_downstream_h),
+            )
+        if shell_next_h < H_MIN_J_KG:
+            # Search-side feasibility only. No property call is made for this state.
+            raise _LowSideDomainInfeasible
+        if shell_next_h > H_MAX_J_KG:
+            raise _Stage3Failure(
+                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+                "shell next face enthalpy outside admitted domain",
+                str(shell_next_h),
+            )
+        tube_downstream = _state_from_enthalpy(provider, tube_downstream_h)
+        shell_next = _state_from_enthalpy(provider, shell_next_h, shell_search_state=True)
+        tube_local = _state_from_enthalpy(provider, tube_mid_h)
+        shell_local = _state_from_enthalpy(provider, shell_mid_h)
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
     _preflight_task172_trial(
         q_w,
@@ -2609,6 +2669,13 @@ def _build_success(
             ].solution.task172_result.implementation_version,
             "outer_solver_authority_hash": OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH,
             "local_reconstruction_authority_hash": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
+            "local_state_reconstruction_authority_id": LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
+            "zero_q_state_identity_portability_authority_id": (
+                ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID
+            ),
+            "zero_q_state_identity_portability_authority_hash": (
+                ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
+            ),
             "cell_root_solver_authority_id": CELL_ROOT_SOLVER_AUTHORITY_ID,
             "cell_root_solver_authority_hash": CELL_ROOT_SOLVER_AUTHORITY_HASH,
             "endpoint_hole_low_side_classification_authority_id": (
@@ -2718,6 +2785,8 @@ __all__ = [
     "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY",
     "LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH",
+    "ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY",
+    "ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH",
     "OUTER_BOUNDARY_SOLVER_AUTHORITY",
     "OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH",
     "recompute_task173_request_hash",

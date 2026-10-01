@@ -11,7 +11,10 @@ TASK173_REQUEST_SCHEMA: Final = "task173.fixed-geometry-rating-request.v1"
 TASK173_RESULT_SCHEMA: Final = "task173.fixed-geometry-rating-result.v1"
 TASK173_BLOCKED_SCHEMA: Final = "task173.fixed-geometry-rating-blocked.v1"
 OUTER_BOUNDARY_SOLVER_AUTHORITY_ID: Final = "V07-T173-OUTER-BOUNDARY-FEASIBILITY-BISECTION-R1"
-LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID: Final = "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R1"
+LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID: Final = "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2"
+ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID: Final = (
+    "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1"
+)
 CELL_ROOT_SOLVER_AUTHORITY_ID: Final = "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3"
 ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID: Final = (
     "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1"
@@ -103,7 +106,7 @@ class LocalStateReceipt(StrictModel):
     constitutive_evaluation_enthalpy_j_kg: Decimal
     constitutive_evaluation_property_snapshot_hash: str
     constitutive_evaluation_property_snapshot: PropertySnapshot
-    reconstruction_authority_id: Literal["V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R1"]
+    reconstruction_authority_id: Literal["V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2"]
     reconstruction_authority_hash: str
     property_profile_id: Literal["V07-T172-WATER-PROPERTY-PROFILE-R2"]
     topology_id: str
@@ -302,4 +305,5 @@ __all__ = [
     "Task173Outcome",
     "Task173Request",
     "Task173SuccessResult",
+    "ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID",
 ]
