@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import platform
 import sys
 from decimal import Decimal, localcontext
@@ -144,6 +145,97 @@ def test_exact_reviewed_upper_property_endpoint_uses_tp_not_clipped_ph() -> None
     assert thermo.native.phase.value == "liquid"
     assert thermo.snapshot.query_type == "TP"
     assert thermo.snapshot.enthalpy_j_kg == str(Decimal(str(thermo.native.enthalpy_j_kg)))
+
+
+def test_tmax_tp_output_boundary_portability_diagnostic() -> None:
+    """Emit full provider-boundary characterization from each Linux CI runtime.
+
+    The intentional GitHub Actions failure makes the diagnostic projection
+    visible in the shard log. It asserts no platform-specific enthalpy value.
+    """
+    provider = CoolPropProvider()
+    tmax_thermo = service._state_at_inlet(provider, service.T_MAX_K)
+    tmin_thermo = service._state_at_inlet(provider, service.T_MIN_K)
+    hmax_delta = Decimal(str(tmax_thermo.native.enthalpy_j_kg)) - service.H_MAX_J_KG
+    q_to_hmax = service.TUBE_MASS_FLOW_KG_S * hmax_delta
+
+    def ph_projection(enthalpy_j_kg: float) -> dict[str, Any]:
+        try:
+            state = provider.state_ph(
+                service.FluidIdentifier(name="Water"),
+                pressure_pa=float(service.REFERENCE_PRESSURE_PA),
+                enthalpy_j_kg=enthalpy_j_kg,
+                reference_state=service.ReferenceStatePolicy.DEF,
+            )
+        except Exception as exc:
+            return {"accepted": False, "error_type": type(exc).__name__}
+        return {
+            "accepted": True,
+            "temperature_k": state.temperature_k,
+            "phase": state.phase.value,
+            "enthalpy_j_kg": state.enthalpy_j_kg,
+            "query_type": state.provenance.query_type.value,
+        }
+
+    q_probes: list[dict[str, str | bool]] = []
+    for multiplier in (Decimal(0), Decimal("0.5"), Decimal(1), Decimal(2)):
+        q_w = q_to_hmax * multiplier
+        derived_h = Decimal(str(tmax_thermo.native.enthalpy_j_kg)) - (
+            q_w / service.TUBE_MASS_FLOW_KG_S
+        )
+        q_probes.append(
+            {
+                "q_w": str(q_w),
+                "derived_tube_h_j_kg": str(derived_h),
+                "derived_h_minus_hmax_j_kg": str(derived_h - service.H_MAX_J_KG),
+                "would_current_precheck_block": derived_h > service.H_MAX_J_KG,
+            }
+        )
+
+    diagnostic = {
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "platform": platform.platform(),
+        "coolprop_version": CoolProp.__version__,
+        "tmax": {
+            "temperature_k": tmax_thermo.native.temperature_k,
+            "pressure_pa": tmax_thermo.native.pressure_pa,
+            "phase": tmax_thermo.native.phase.value,
+            "provider_enthalpy_j_kg": tmax_thermo.native.enthalpy_j_kg,
+            "frozen_h_max_j_kg": str(service.H_MAX_J_KG),
+            "provider_h_minus_hmax_j_kg": str(hmax_delta),
+            "query_type": tmax_thermo.snapshot.query_type,
+            "snapshot_hash": tmax_thermo.snapshot_hash,
+            "state_identity": tmax_thermo.snapshot_hash,
+            "property_snapshot": tmax_thermo.snapshot.model_dump(mode="json"),
+        },
+        "tmin": {
+            "temperature_k": tmin_thermo.native.temperature_k,
+            "pressure_pa": tmin_thermo.native.pressure_pa,
+            "phase": tmin_thermo.native.phase.value,
+            "provider_enthalpy_j_kg": tmin_thermo.native.enthalpy_j_kg,
+            "frozen_h_min_j_kg": str(service.H_MIN_J_KG),
+            "provider_h_minus_hmin_j_kg": str(
+                Decimal(str(tmin_thermo.native.enthalpy_j_kg)) - service.H_MIN_J_KG
+            ),
+            "query_type": tmin_thermo.snapshot.query_type,
+            "snapshot_hash": tmin_thermo.snapshot_hash,
+            "state_identity": tmin_thermo.snapshot_hash,
+            "property_snapshot": tmin_thermo.snapshot.model_dump(mode="json"),
+        },
+        "ph_roundtrip": {
+            "state_ph_of_tmax_tp_output": ph_projection(tmax_thermo.native.enthalpy_j_kg),
+            "state_ph_of_frozen_hmax": ph_projection(float(service.H_MAX_J_KG)),
+        },
+        "tube_mass_flow_kg_s": str(service.TUBE_MASS_FLOW_KG_S),
+        "q_to_enter_frozen_hmax_w": str(q_to_hmax),
+        "q_probes": q_probes,
+    }
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        pytest.fail(
+            "INTENTIONAL_TMAX_TP_BOUNDARY_DIAGNOSTIC="
+            + json.dumps(diagnostic, sort_keys=True, separators=(",", ":"))
+        )
 
 
 def test_ph_input_above_reviewed_upper_enthalpy_is_rejected_before_backend() -> None:
