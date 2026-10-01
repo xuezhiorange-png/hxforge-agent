@@ -1250,7 +1250,11 @@ def test_r3_valid_upper_shell_capacity_low_side_path_is_unchanged(
         )
 
 
-def test_r3_target_n16_outer_trial_characterizes_native_path_portably(
+# Manual-only characterization harness. The full n=16 native trajectory is
+# intentionally excluded from the standard CI suite; its historical outcome is
+# retained in the committed R1 evidence, while portable R3 behavior is tested
+# with injected results above.
+def characterize_historical_n16_native_r3_trajectory(
     monkeypatch: pytest.MonkeyPatch,
     record_property: Any,
 ) -> None:
@@ -1804,6 +1808,41 @@ def test_r3_target_n16_outer_trial_characterizes_native_path_portably(
             "LOW_SIDE_DOMAIN_INFEASIBLE",
             "HARD_BLOCKER",
         }, diagnostic_message
+
+
+def test_n16_first_support_q0_native_provider_reaches_task172_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = CoolPropProvider()
+    authority, _, replay = replay_shell_flow_authority(_evidence(), provider)
+    support = build_local_support(0, 16, 0)
+    tube_upstream = service._state_at_inlet(provider, service.T_MAX_K)
+    shell_physical_left = service._state_at_inlet(provider, service.T_MIN_K)
+
+    class Task172RequestReached(Exception):
+        pass
+
+    def capture_native_request(request: Task172LocalRequest, actual_provider: Any) -> Any:
+        assert type(request) is Task172LocalRequest
+        assert actual_provider is provider
+        assert request.support == support
+        assert request.tube_bulk_state.temperature_k == service.T_MAX_K
+        assert request.shell_bulk_state.temperature_k == service.T_MIN_K
+        assert tube_upstream.snapshot.query_type == "TP"
+        assert shell_physical_left.snapshot.query_type == "TP"
+        assert replay["status"] == "PASS"
+        raise Task172RequestReached
+
+    monkeypatch.setattr(service, "task172_validate", capture_native_request)
+    with pytest.raises(Task172RequestReached):
+        service._cell_evaluation(
+            0.0,
+            support=support,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+            shell_authority=authority,
+        )
 
 
 def test_r3_authority_keeps_r2_search_limits_and_budget_proof() -> None:

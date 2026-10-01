@@ -1,0 +1,166 @@
+{
+  "schema_version": "task172.stage3.zero-q-portability-ci-runtime-budget-correction.r1",
+  "task_id": "TASK172_V0_7_STAGE3_ZERO_Q_PORTABILITY_CI_RUNTIME_BUDGET_CORRECTION_R1",
+  "mode": "TEST_CONTRACT_AND_CI_RUNTIME_BUDGET_CORRECTION_ONLY",
+  "predecessor_head": "89437883ff47a3ec7915118ce0a0152636e62989",
+  "predecessor_ci": {
+    "run_id": 36826527880,
+    "head_sha": "89437883ff47a3ec7915118ce0a0152636e62989",
+    "result": "FAILURE",
+    "total_jobs": 49,
+    "success": 37,
+    "skipped": 9,
+    "failed": 3,
+    "cancelled": 0,
+    "failures": [
+      "lint: pip-audit known urllib3 vulnerabilities",
+      "PR-head Python 3.12 test shard: timed out at 600 seconds; pytest exit -9",
+      "final-gate: consequence of lint and shard failures"
+    ],
+    "matrix_runtime_seconds": {
+      "PR_HEAD_PY311": 566.055,
+      "PR_HEAD_PY312": 600.008,
+      "MERGE_REF_PY311": 458.391,
+      "MERGE_REF_PY312": 589.104
+    },
+    "runtime_measurement_note": "Test-step timings are from the predecessor CI evidence; PR-head Python 3.12 was terminated at the 600-second timeout and did not produce a complete test report."
+  },
+  "test_contract_before": {
+    "collected_native_test": "test_r3_target_n16_outer_trial_characterizes_native_path_portably",
+    "runs_full_native_outer_trial": true,
+    "mesh_subdivisions": 16,
+    "shooting_enthalpy_j_kg": "106853.814770607445",
+    "portable_ci_contract_role": "INCORRECTLY_INCLUDED_AS_NATIVE_CHARACTERIZATION",
+    "zero_q_deterministic_portability_test_present": true,
+    "positive_q_fail_closed_test_present": true,
+    "injected_r3_contract_test_present": true
+  },
+  "test_contract_after": {
+    "native_characterization_function": "characterize_historical_n16_native_r3_trajectory",
+    "native_characterization_collected_by_pytest": false,
+    "native_full_n16_replay_removed_from_standard_test": true,
+    "portable_zero_q_contract_retained": true,
+    "positive_q_fail_closed_contract_retained": true,
+    "portable_injected_r3_contract_retained": true,
+    "native_first_support_smoke_added": true,
+    "task173_test_module_collected_count": 53
+  },
+  "portable_contract_boundary": {
+    "zero_q_test_double": {
+      "tmax_enthalpy_offset_j_kg": "1.879E-8",
+      "tmin_enthalpy_offset_j_kg": "8.725E-8",
+      "exact_zero_uses_identity_state": true,
+      "ph_reconstruction_for_zero_q": false,
+      "task172_request_construction_reached": true
+    },
+    "positive_q": {
+      "existing_hmax_guards_retained": true,
+      "half_threshold_fails_closed": true,
+      "threshold_midpoint_fails_closed": true,
+      "acceptance_expanded": false
+    },
+    "r3": {
+      "deterministic_injected_results": true,
+      "shell_capacity_endpoint_hole_contract_present": true,
+      "historical_native_q_hash_call_count_or_frozen_residual_used_as_invariant": false
+    }
+  },
+  "native_characterization_boundary": {
+    "historical_evidence_path": "docs/tasks/evidence/TASK-172-stage3-tmax-zero-q-state-identity-portability-correction-r1.json",
+    "trajectory": "n=16, outer iteration 2, shooting enthalpy 106853.814770607445 J/kg",
+    "role": "CHARACTERIZATION_AND_PRODUCTION_EVIDENCE",
+    "portable_ci_contract_role": false,
+    "full_native_n16_replay_in_standard_suite": false
+  },
+  "removed_production_scale_test_replay": {
+    "old_test_name": "test_r3_target_n16_outer_trial_characterizes_native_path_portably",
+    "new_manual_characterization_name": "characterize_historical_n16_native_r3_trajectory",
+    "pytest_collection_removed": true,
+    "historical_evidence_overwritten": false
+  },
+  "first_support_portability_gate": {
+    "test_name": "test_n16_first_support_q0_native_provider_reaches_task172_request",
+    "provider": "CoolPropProvider",
+    "support": "build_local_support(0, 16, 0)",
+    "tube_inlet_temperature_k": "300",
+    "shell_inlet_temperature_k": "298.15",
+    "request_type": "Task172LocalRequest",
+    "task172_validation_replaced_by_sentinel_after_request_construction": true,
+    "expensive_task172_native_solve_performed": false,
+    "full_outer_trial_performed": false
+  },
+  "ci_runtime_matrix": {
+    "maximum_acceptable_test_step_runtime_seconds": 540,
+    "predecessor_run_id": 36826527880,
+    "required_candidate_environments": [
+      "PR_HEAD_PY311",
+      "PR_HEAD_PY312",
+      "MERGE_REF_PY311",
+      "MERGE_REF_PY312"
+    ],
+    "candidate_exact_head_ci_status": "REQUIRED_AFTER_CANDIDATE_COMMIT",
+    "candidate_runtime_values_location": "FINAL_TASK_RECEIPT_AND_EXACT_HEAD_GITHUB_ACTIONS_RUN",
+    "candidate_matrix_must_all_succeed": true,
+    "candidate_matrix_runtime_must_each_be_at_most_540_seconds": true,
+    "workflow_or_timeout_changed": false
+  },
+  "security_gate_status": {
+    "pip_audit": "FAIL_KNOWN_URLLIB3_VULNERABILITIES",
+    "dependency": "urllib3==2.7.0",
+    "reported_cves": [
+      "CVE-2026-97687",
+      "CVE-2026-97688",
+      "CVE-2026-97689"
+    ],
+    "fix_version": "2.8.0",
+    "dependencies_changed": false,
+    "lockfiles_changed": false
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "zero_q_production_logic_changed": false,
+    "r3_classification_logic_changed": false,
+    "task172_source_changed": false,
+    "task171_changed": false,
+    "task174_changed": false,
+    "r98_changed": false,
+    "production_mesh_policy_changed": false,
+    "dependencies_changed": false,
+    "lockfiles_changed": false,
+    "workflows_changed": false,
+    "ci_timeout_changed": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false
+  },
+  "validation": {
+    "focused_task173_contract_selection": "PASS; 11 tests",
+    "task173_integrated_rating_test_module": "PASS; 53 tests; 9.28 seconds on local CPython 3.14.5 macOS",
+    "full_shell_tube_suite": "PASS; 29.99 seconds on local CPython 3.14.5 macOS",
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "mypy_ci_scope": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; discovered=259; manifest=259",
+    "uv_lock_check": "PASS",
+    "git_diff_check": "PASS",
+    "pip_audit": "FAIL; urllib3==2.7.0; CVE-2026-97687, CVE-2026-97688, CVE-2026-97689; fix=2.8.0"
+  },
+  "lifecycle": {
+    "result": "CANDIDATE_PENDING_EXACT_HEAD_CI",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_created": false,
+    "task175_release_acceptance_performed": false,
+    "next_gate_if_four_test_shards_pass_with_runtime_le_540_seconds": "SECURITY_DEPENDENCY_REMEDIATION_URLLIB3_2_8_0",
+    "next_gate_if_any_required_test_shard_fails_or_exceeds_540_seconds": "STAGE3_ZERO_Q_PORTABILITY_CI_RUNTIME_BUDGET_CORRECTION_R2",
+    "exact_head_ci_record_location": "FINAL_TASK_RECEIPT_AND_GITHUB_ACTIONS_RUN",
+    "stop": true
+  },
+  "canonical_hash": "55869168b2fe6e8cd201a8b509f1979f74d387ff29059136d7182ed876a139ff"
+}
