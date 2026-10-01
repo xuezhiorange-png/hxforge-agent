@@ -21826,5 +21826,42 @@
     "stop": true,
     "canonical_hash": "bd73373a98f07136d69bad0fa7555fed011da9f52c58b394d364aa83b6d8616d"
   },
-  "canonical_hash": "5a02a6b37e8cfb73f7a28632b9d64d5f76f60d781b7257a12d9476b96e6415d1"
+  "security_dependency_remediation_urllib3_2_8_0_r1_extension": {
+    "task_id": "SECURITY_DEPENDENCY_REMEDIATION_URLLIB3_2_8_0_R1",
+    "short_name": "TRANSITIVE URLLIB3 SECURITY LOCK REMEDIATION",
+    "mode": "TARGETED_TRANSITIVE_SECURITY_LOCK_REMEDIATION",
+    "result_at_candidate_commit": "SECURITY_LOCK_REMEDIATION_CANDIDATE_PENDING_EXACT_HEAD_CI",
+    "previous_registry_root_canonical_hash": "5a02a6b37e8cfb73f7a28632b9d64d5f76f60d781b7257a12d9476b96e6415d1",
+    "predecessor_head": "c0193c2e4d77caea13d763b7fb1b13900a9b49fa",
+    "evidence_path": "docs/tasks/evidence/SECURITY-dependency-remediation-urllib3-2.8.0-r1.json",
+    "evidence_canonical_hash": "e42fd9bc95a233dac2cba2ad8692746ae9fd2bbac9c3ab014d8b570c3c2badf4",
+    "human_readable_record_path": "docs/tasks/SECURITY-dependency-remediation-urllib3-2.8.0-r1.md",
+    "human_readable_record_sha256": "0c651779d14ad14d53737b365c333fa6f1ca4126e41b379a757aef5ee053f217",
+    "dependency_change": {
+      "direct_project_dependency": false,
+      "transitive_path": "requests==2.34.2 -> urllib3",
+      "old_version": "2.7.0",
+      "new_version": "2.8.0",
+      "unrelated_package_version_changes": 0
+    },
+    "security_gate": {
+      "pip_audit": "PASS",
+      "CVE-2026-97687_resolved": true,
+      "CVE-2026-97688_resolved": true,
+      "CVE-2026-97689_resolved": true
+    },
+    "stage3_authority_hashes_changed": false,
+    "registry_role": "APPEND_ONLY_SECURITY_TASK_RECEIPT_NOT_NUMERICAL_AUTHORITY",
+    "candidate_exact_head_ci_required": true,
+    "runtime_budget_seconds": 540,
+    "runtime_matrix_record_location": "FINAL_TASK_RECEIPT_AND_PR_METADATA",
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_created": false,
+    "task175_release_acceptance_performed": false,
+    "next_gate_after_all_success": "STAGE3_PRODUCTION_MESH_REEXECUTION_FROM_N1_AFTER_R3_ZERO_Q_AND_SECURITY_CLOSURE",
+    "stop": true,
+    "canonical_hash": "741c889ed56f0b3b4509616d23328c51d45f16da17bc4ba113b8b3bfb99ae49c"
+  },
+  "canonical_hash": "3c0a5a04184a5394448b55e6a87c7e3a98be4b06a1112822173873a71f0bc6af"
 }
