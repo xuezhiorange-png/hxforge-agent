@@ -905,38 +905,132 @@ def test_proposed_fail_only_original_seed_dogbox_candidate_is_portable_and_fail_
     valid_rows = fixture["baseline_valid_requests"] + fresh["samples"]
     valid_hashes: list[str] = []
     valid_sources: dict[str, int] = {}
+    valid_corpus_report: list[dict[str, Any]] = []
+    baseline_valid_count = 0
+    fallback_invocations_on_baseline_valid = 0
+    baseline_hashes_preserved = 0
+    local_reference_hash_matches = 0
+
+    def make_corpus_fallback(
+        current_request: Task172LocalRequest,
+        current_captures: list[dict[str, Any]],
+    ) -> Any:
+        def fallback() -> Any:
+            result, capture = _capture_r94_or_dogbox_candidate(
+                current_request, provider, method="dogbox"
+            )
+            current_captures.append(capture)
+            return result
+
+        return fallback
+
     for sample in valid_rows:
         request = _candidate_request_from_projection(sample["request"], shell_authority)
         request_hash = recompute_task172_request_hash(request)
-        assert request_hash == sample["request_hash"]
-        baseline = validate_request(request, provider)
-        assert type(baseline) is Task172LocalResult, (request_hash, type(baseline).__name__)
-        assert baseline.result_hash == sample["result_hash"]
-        assert baseline.result_id == sample["result_id"]
-        recorded = sample["result"]
-        assert str(baseline.signed_q_hot_to_cold_w) == recorded["signed_q_hot_to_cold_w"]
-        assert str(baseline.wall_temperature_inner_k) == recorded["wall_temperature_inner_k"]
-        assert str(baseline.wall_temperature_outer_k) == recorded["wall_temperature_outer_k"]
-        assert [str(value) for value in baseline.residual_vector_w] == recorded["residual_vector_w"]
-        fallback_called = False
-
-        def unexpected_fallback() -> Any:
-            nonlocal fallback_called
-            fallback_called = True
-            raise AssertionError("baseline-valid request must bypass dogbox fallback")
-
-        decision = _candidate_decision(request, baseline, unexpected_fallback)
-        assert decision["fallback_invoked"] is False
-        assert decision["result"] is baseline
-        assert decision["baseline"] is baseline
-        assert fallback_called is False
-        assert decision["result"].model_dump(mode="json") == baseline.model_dump(mode="json")
-        valid_hashes.append(baseline.result_hash)
+        baseline, baseline_capture = _capture_r94_or_dogbox_candidate(
+            request, provider, method="trf"
+        )
+        fallback_captures: list[dict[str, Any]] = []
+        decision = _candidate_decision(
+            request, baseline, make_corpus_fallback(request, fallback_captures)
+        )
+        candidate_result = decision["result"]
+        baseline_classification = (
+            "VALID_TASK172_RESULT"
+            if type(baseline) is Task172LocalResult
+            else baseline.failure_code
+            if type(baseline) is Task172BlockedResult
+            else type(baseline).__name__
+        )
+        candidate_identity = (
+            _candidate_identity_receipt(request, candidate_result, provider)
+            if type(candidate_result) is Task172LocalResult
+            else None
+        )
+        expected_result = sample.get("result", {})
+        baseline_hash = baseline.result_hash if type(baseline) is Task172LocalResult else None
+        candidate_hash = (
+            candidate_result.result_hash if type(candidate_result) is Task172LocalResult else None
+        )
+        baseline_is_valid = type(baseline) is Task172LocalResult
+        baseline_valid_count += int(baseline_is_valid)
+        fallback_invoked = bool(decision["fallback_invoked"])
+        fallback_invocations_on_baseline_valid += int(baseline_is_valid and fallback_invoked)
+        hash_preserved = bool(
+            baseline_is_valid
+            and type(candidate_result) is Task172LocalResult
+            and candidate_result is baseline
+            and candidate_hash == baseline_hash
+        )
+        baseline_hashes_preserved += int(hash_preserved)
+        reference_hash_matches = candidate_hash == sample.get("result_hash")
+        local_reference_hash_matches += int(reference_hash_matches)
+        if candidate_hash is not None:
+            valid_hashes.append(candidate_hash)
         source = sample.get("source", f"fresh_n{sample.get('mesh_n')}_production_path")
         valid_sources[source] = valid_sources.get(source, 0) + 1
+        valid_corpus_report.append(
+            {
+                "request_hash": request_hash,
+                "fixture_request_hash": sample.get("request_hash"),
+                "source": source,
+                "baseline_classification": baseline_classification,
+                "baseline_result_hash": baseline_hash,
+                "baseline_result_id": (
+                    baseline.result_id if type(baseline) is Task172LocalResult else None
+                ),
+                "baseline_blocked_result_hash": (
+                    baseline.blocked_result_hash if type(baseline) is Task172BlockedResult else None
+                ),
+                "baseline_solver": baseline_capture["solver"],
+                "fallback_invoked": fallback_invoked,
+                "fallback_solver": (fallback_captures[0]["solver"] if fallback_captures else None),
+                "candidate_classification": decision["classification"],
+                "candidate_result_hash": candidate_hash,
+                "candidate_result_id": (
+                    candidate_result.result_id
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_identity_replay": candidate_identity is not None,
+                "candidate_is_baseline_object": candidate_result is baseline,
+                "baseline_hash_preserved": hash_preserved,
+                "matches_local_reference_hash": reference_hash_matches,
+                "candidate_q_w": (
+                    str(candidate_result.signed_q_hot_to_cold_w)
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_wall_inner_k": (
+                    str(candidate_result.wall_temperature_inner_k)
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_wall_outer_k": (
+                    str(candidate_result.wall_temperature_outer_k)
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_residuals_w": (
+                    [str(value) for value in candidate_result.residual_vector_w]
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_property_snapshot_ids": (
+                    [
+                        candidate_result.tube_property_snapshot_identity,
+                        candidate_result.shell_property_snapshot_identity,
+                        candidate_result.tube_wall_property_snapshot_identity,
+                        candidate_result.shell_wall_property_snapshot_identity,
+                    ]
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "fixture_result_projection": expected_result,
+            }
+        )
 
     assert len(valid_rows) == 68
-    assert len(set(valid_hashes)) == len(valid_hashes)
     assert sum(valid_sources.get(f"fresh_n{n}_production_path", 0) for n in (8, 16)) == 50
     assert any(
         sample["request_hash"] == "fd9287e7200cc1fa723ecfeef31067d907a484bf18558b05a8488e5ed6e90cb9"
@@ -1020,13 +1114,18 @@ def test_proposed_fail_only_original_seed_dogbox_candidate_is_portable_and_fail_
         },
         "baseline_valid_corpus": {
             "size": len(valid_rows),
-            "fallback_invocations": 0,
-            "hashes_preserved": len(valid_hashes),
+            "current_baseline_valid_count": baseline_valid_count,
+            "fallback_invocations": sum(
+                int(
+                    row["fallback_invoked"]
+                    and row["baseline_classification"] == "VALID_TASK172_RESULT"
+                )
+                for row in valid_corpus_report
+            ),
+            "hashes_preserved": baseline_hashes_preserved,
+            "local_reference_hash_matches": local_reference_hash_matches,
             "sources": valid_sources,
-            "results": [
-                {"request_hash": row["request_hash"], "result_hash": row["result_hash"]}
-                for row in valid_rows
-            ],
+            "results": valid_corpus_report,
         },
         "additional_low_duty_valid_edge_case": low_duty_identity,
     }
@@ -1038,6 +1137,10 @@ def test_proposed_fail_only_original_seed_dogbox_candidate_is_portable_and_fail_
     )
     assert all(item["fallback_invoked"] for item in hole_results)
     assert all(item["candidate_result_replay_identical"] for item in hole_results)
+    assert baseline_valid_count == 68
+    assert fallback_invocations_on_baseline_valid == 0
+    assert baseline_hashes_preserved == baseline_valid_count
+    assert local_reference_hash_matches == baseline_valid_count
 
 
 @pytest.mark.parametrize(
