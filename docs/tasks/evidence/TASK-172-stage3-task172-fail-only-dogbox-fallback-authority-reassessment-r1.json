@@ -12,6 +12,13 @@
   "predecessor_evidence": {
     "dogbox_characterization_hash": "15f43a15896081839a6607b7bf45c4834b3273a55c704ba8835eb8ea2edf9e58",
     "identity_contract_hash": "d9c44837a38bc66a6372e32b3d7a5dfba7a8a09ca049dc29dab06fa968b3d7b2",
+    "dogbox_portability_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+    "dogbox_portability_exact_head_ci_run": 36965219941,
+    "dogbox_portability_result": "BLOCKED_PORTABILITY",
+    "identity_contract_head": "dc2eac0cf39d73645cab170673dbfdd6ed065886",
+    "identity_contract_exact_head_ci_run": 36973198114,
+    "identity_contract_exact_head_ci_result": "SUCCESS",
+    "identity_contract_adjudication_result": "PASS_PLATFORM_NATIVE_IDENTITY_CONTRACT",
     "characterization_exact_head_ci_run": 36962301921,
     "characterization_exact_head_ci_result": "SUCCESS",
     "characterization_exact_head_ci_head": "86849841a5314f6ee82eebc117ece8f969829e06"
@@ -228,7 +235,7 @@
   "validation_reuse": {
     "candidate_characterization_local_and_ci_validation": "PASS; reused from exact candidate evidence lineage, not rerun as a new characterization campaign.",
     "candidate_matrix_exact_head_ci_run": 36962301921,
-    "identity_contract_exact_head_ci_run": 36965219941,
+    "identity_contract_exact_head_ci_run": 36973198114,
     "current_source_head_exact_head_ci_run": 36973198114,
     "current_source_head_exact_head_ci": "SUCCESS; 50 jobs, 45 success, 5 skipped, 0 failed, 0 cancelled; max shard telemetry 457/540 seconds.",
     "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
@@ -264,5 +271,5 @@
     "stop": true
   },
   "proposed_authority_canonical_hash": "e72efc573a39710584bd342a6287655056525b3dc38e3e81bca100844b4f81f0",
-  "canonical_hash": "6ad1b98d4dd2c7cc5db5e4fd27f264862bf7a55442b1ab5e76a316b04eeb04eb"
+  "canonical_hash": "1e8b01c007b7b44abe9d7b12415ba95c54146b0ad7cf47eaf965e2a7e1ad3c9e"
 }
