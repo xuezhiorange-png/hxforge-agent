@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import json
+import platform
+import sys
 from dataclasses import replace
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import CoolProp
 import pytest
+import scipy
 
 from hexagent.exchangers.shell_tube.bell_delaware import canonical as task166_canonical
 from hexagent.exchangers.shell_tube.bell_delaware.models import (
@@ -458,3 +464,585 @@ def test_task172_reviewed_temperature_domain_includes_closed_boundaries(temperat
     request = _request(tube_temperature=temperature)
     outcome = validate_request(request, CoolPropProvider())
     assert type(outcome) is Task172LocalResult
+
+
+_DOGBOX_CANDIDATE_AUTHORITY_ID = "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-CANDIDATE-R1"
+_DOGBOX_HOLE_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "task172_n32_residual_holes_candidate_r1.json"
+)
+_DOGBOX_CORPUS_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "task172_fail_only_dogbox_characterization_r1.json"
+)
+_DOGBOX_FRESH_CORPUS_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "task172_fail_only_dogbox_fresh_n8_n16_r1.json"
+)
+
+
+def _candidate_request_from_projection(
+    payload: dict[str, Any], shell_authority: Any
+) -> Task172LocalRequest:
+    raw = dict(payload)
+    authority_projection = raw["shell_flow_authority"]
+    if "task031_geometry" not in authority_projection:
+        raw["shell_flow_authority"] = shell_authority.model_dump(mode="json")
+    return Task172LocalRequest.model_validate_json(json.dumps(raw), strict=True)
+
+
+def _capture_r94_or_dogbox_candidate(
+    request: Task172LocalRequest,
+    provider: CoolPropProvider,
+    *,
+    method: str,
+) -> tuple[Any, dict[str, Any]]:
+    original_least_squares = runtime_service.least_squares
+    capture: dict[str, Any] = {}
+
+    def selected_solver(fun: Any, x0: Any, **kwargs: Any) -> Any:
+        callback_count = 0
+
+        def counted_residual(values: Any) -> Any:
+            nonlocal callback_count
+            callback_count += 1
+            return fun(values)
+
+        capture["initial_x"] = [repr(float(value)) for value in x0]
+        capture["requested_options"] = {
+            "method": kwargs["method"],
+            "loss": kwargs["loss"],
+            "ftol": kwargs["ftol"],
+            "xtol": kwargs["xtol"],
+            "gtol": kwargs["gtol"],
+            "jac": kwargs["jac"],
+            "diff_step": kwargs["diff_step"],
+            "max_nfev": kwargs["max_nfev"],
+            "tr_solver": kwargs["tr_solver"],
+            "x_scale": [repr(float(value)) for value in kwargs["x_scale"]],
+            "f_scale": kwargs["f_scale"],
+        }
+        assert kwargs["method"] == "trf"
+        assert kwargs["max_nfev"] == 6
+        assert runtime_service._CALLBACK_CAP == 24
+        selected = dict(kwargs)
+        selected["method"] = method
+        solver = original_least_squares(counted_residual, x0, **selected)
+        capture["solver"] = {
+            "method": method,
+            "success": bool(solver.success),
+            "status": int(solver.status),
+            "message": str(solver.message),
+            "nfev": int(solver.nfev),
+            "njev": None if solver.njev is None else int(solver.njev),
+            "callback_count": callback_count,
+            "cost": float(solver.cost),
+            "optimality": float(solver.optimality),
+            "active_mask": [int(value) for value in solver.active_mask],
+            "scaled_residual_vector": [float(value) for value in solver.fun],
+            "solution": [float(value) for value in solver.x],
+        }
+        return solver
+
+    runtime_service.least_squares = selected_solver
+    try:
+        outcome = validate_request(request, provider)
+    finally:
+        runtime_service.least_squares = original_least_squares
+    return outcome, capture
+
+
+def _dogbox_candidate_projection(result: Task172LocalResult) -> Task172LocalResult:
+    projected = result.model_copy(
+        update={
+            "numerical_profile_id": _DOGBOX_CANDIDATE_AUTHORITY_ID,
+            "solver_status": (
+                "R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_"
+                + result.solver_status.rsplit("_", 1)[-1]
+            ),
+            "result_hash": "",
+            "result_id": "",
+        }
+    )
+    result_hash = recompute_task172_result_hash(projected)
+    return projected.model_copy(
+        update={
+            "result_hash": result_hash,
+            "result_id": f"urn:hxforge:task172:{result_hash}",
+        }
+    )
+
+
+def _candidate_decision(
+    request: Task172LocalRequest,
+    baseline: Any,
+    fallback: Any,
+) -> dict[str, Any]:
+    if type(baseline) is Task172LocalResult:
+        return {
+            "baseline": baseline,
+            "result": baseline,
+            "path": "PRIMARY_R94_TRF",
+            "fallback_invoked": False,
+            "classification": "VALIDATED",
+        }
+    if type(baseline) is not Task172BlockedResult:
+        return {
+            "baseline": baseline,
+            "result": baseline,
+            "path": "HARD_BLOCKER_UNEXPECTED_TYPE",
+            "fallback_invoked": False,
+            "classification": "HARD_BLOCKER",
+        }
+    if baseline.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return {
+            "baseline": baseline,
+            "result": baseline,
+            "path": "HARD_BLOCKER_NON_RESIDUAL",
+            "fallback_invoked": False,
+            "classification": baseline.failure_code,
+        }
+    if baseline.request_hash != recompute_task172_request_hash(
+        request
+    ) or baseline.blocked_result_hash != recompute_task172_blocked_result_hash(baseline):
+        return {
+            "baseline": baseline,
+            "result": baseline,
+            "path": "HARD_BLOCKER_BLOCKED_IDENTITY_REPLAY",
+            "fallback_invoked": False,
+            "classification": "BLOCKED_RESULT_IDENTITY_REPLAY",
+        }
+    fallback_result = fallback()
+    if type(fallback_result) is not Task172LocalResult:
+        return {
+            "baseline": baseline,
+            "result": fallback_result,
+            "path": "DOGBOX_FALLBACK_NOT_VALID",
+            "fallback_invoked": True,
+            "classification": getattr(fallback_result, "failure_code", "HARD_BLOCKER"),
+        }
+    candidate_result = _dogbox_candidate_projection(fallback_result)
+    return {
+        "baseline": baseline,
+        "result": candidate_result,
+        "path": "R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK",
+        "fallback_invoked": True,
+        "classification": "VALIDATED",
+    }
+
+
+def _candidate_identity_receipt(
+    request: Task172LocalRequest,
+    result: Task172LocalResult,
+    provider: CoolPropProvider,
+) -> dict[str, Any]:
+    assert recompute_task172_request_hash(request) == result.request_hash
+    assert recompute_task172_result_hash(result) == result.result_hash
+    assert result.result_id == f"urn:hxforge:task172:{result.result_hash}"
+    support_id = runtime_service.recompute_task172_support_id(request)
+    assert result.physical_support_id == support_id
+    assert result.tube_cell_id == request.support.tube_cell_id
+    assert result.shell_cell_id == request.support.shell_cell_id
+    assert result.wall_interface_id == request.support.wall_interface_id
+    tube_snapshot, tube_id, _ = runtime_service._snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{request.support.tube_cell_id}:CELL_MEAN",
+        request.tube_bulk_state.temperature_k,
+        request.tube_bulk_state.pressure_pa,
+    )
+    shell_snapshot, shell_id, _ = runtime_service._snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{request.support.shell_cell_id}:CELL_MEAN",
+        request.shell_bulk_state.temperature_k,
+        request.shell_bulk_state.pressure_pa,
+    )
+    tube_wall_snapshot, tube_wall_id, _ = runtime_service._snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{request.support.wall_interface_id}:TUBE_FLUID_WALL_INTERFACE",
+        result.wall_temperature_inner_k,
+        request.tube_bulk_state.pressure_pa,
+    )
+    shell_wall_snapshot, shell_wall_id, _ = runtime_service._snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{request.support.wall_interface_id}:SHELL_FLUID_WALL_INTERFACE",
+        result.wall_temperature_outer_k,
+        request.shell_bulk_state.pressure_pa,
+    )
+    assert result.tube_property_snapshot_identity == tube_id
+    assert result.shell_property_snapshot_identity == shell_id
+    assert result.tube_wall_property_snapshot_identity == tube_wall_id
+    assert result.shell_wall_property_snapshot_identity == shell_wall_id
+    bounds = runtime_service.recompute_task172_local_roundoff_bounds(request, result)[:3]
+    assert all(
+        abs(residual) <= bound
+        for residual, bound in zip(result.residual_vector_w, bounds, strict=True)
+    )
+    assert result.signed_q_hot_to_cold_w >= 0
+    assert (
+        request.shell_bulk_state.temperature_k
+        <= result.wall_temperature_outer_k
+        <= result.wall_temperature_inner_k
+        <= request.tube_bulk_state.temperature_k
+    )
+    return {
+        "request_hash": result.request_hash,
+        "result_id": result.result_id,
+        "result_hash": result.result_hash,
+        "support_id": support_id,
+        "tube_cell_id": result.tube_cell_id,
+        "shell_cell_id": result.shell_cell_id,
+        "wall_interface_id": result.wall_interface_id,
+        "property_snapshot_ids": [tube_id, shell_id, tube_wall_id, shell_wall_id],
+        "property_snapshot_hashes": [
+            tube_snapshot.property_snapshot_hash,
+            shell_snapshot.property_snapshot_hash,
+            tube_wall_snapshot.property_snapshot_hash,
+            shell_wall_snapshot.property_snapshot_hash,
+        ],
+        "q_w": str(result.signed_q_hot_to_cold_w),
+        "wall_inner_k": str(result.wall_temperature_inner_k),
+        "wall_outer_k": str(result.wall_temperature_outer_k),
+        "residuals_w": [str(value) for value in result.residual_vector_w],
+        "r98_bounds_w": [str(value) for value in bounds],
+        "solver_status": result.solver_status,
+        "solver_nfev": result.solver_nfev,
+        "callback_count": result.residual_callback_count,
+    }
+
+
+def test_proposed_fail_only_original_seed_dogbox_candidate_is_portable_and_fail_closed(
+    record_property: Any,
+) -> None:
+    """Diagnostic-only proposed fallback; never changes TASK172 production authority."""
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.replay import (
+        replay_shell_flow_authority,
+    )
+
+    provider = CoolPropProvider()
+    repository_root = Path(__file__).parents[3]
+    stage2_path = (
+        repository_root
+        / "docs"
+        / "tasks"
+        / "evidence"
+        / "TASK-172-stage2-native-shell-flow-replay-correction-r1.json"
+    )
+    stage2 = json.loads(stage2_path.read_text(encoding="utf-8"))
+    shell_authority, _, shell_replay = replay_shell_flow_authority(stage2, provider)
+    assert shell_replay["status"] == "PASS"
+
+    holes = json.loads(_DOGBOX_HOLE_FIXTURE.read_text(encoding="utf-8"))["holes"]
+    fixture = json.loads(_DOGBOX_CORPUS_FIXTURE.read_text(encoding="utf-8"))
+    fresh = json.loads(_DOGBOX_FRESH_CORPUS_FIXTURE.read_text(encoding="utf-8"))
+    assert fixture["n32_fresh_replay"]["task172_attempts"] == 4617
+    assert fixture["n32_fresh_replay"]["hole_count"] == 6
+    assert len(fixture["baseline_valid_requests"]) == 18
+    assert len(fresh["samples"]) == 50
+
+    n32_hole_q = {
+        "91c13f7949d32d90de13f95b14b2fc521f822c13f009ea6d132f965936cbb75f": 13126.5211409284,
+        "946e8d83c8052f3c1db6f8aa31793f2b0b1523f7e392a1fa9e1da675daadde85": 12238.6979627684,
+        "0b1a138aa86081e91b23d814fd9309c14ae0d8087bdff230b41ca1cf9dfb9d9a": 281.753033433674,
+        "5fd98bd16cf306447b5ba359f44078d4dedca27d861d5573a0cafc4eeab2d0d3": 282.95916799460576,
+        "3ffebffa5aaf4957cd4d743e8530885795831d29328b5a2fc63e55287d08720d": 0.0,
+        "a52cda0abab920f9fd3a853e0ba3f3fa4289c38c88768bcda054377af08b70ec": 1834.90115580185,
+    }
+    hole_results: list[dict[str, Any]] = []
+    for item in holes:
+        request = _candidate_request_from_projection(item["request"], shell_authority)
+        request_hash = recompute_task172_request_hash(request)
+        assert request_hash == item["request_hash"]
+        baseline, baseline_capture = _capture_r94_or_dogbox_candidate(
+            request, provider, method="trf"
+        )
+        assert type(baseline) is Task172BlockedResult
+        assert baseline.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+        assert baseline.request_hash == request_hash
+        assert baseline_capture["solver"]["success"] is True
+        assert baseline.blocked_result_hash == recompute_task172_blocked_result_hash(baseline)
+        assert baseline_capture["requested_options"]["method"] == "trf"
+        assert baseline_capture["requested_options"]["max_nfev"] == 6
+
+        fallback_calls: list[dict[str, Any]] = []
+
+        def make_fallback(
+            current_request: Task172LocalRequest,
+            current_calls: list[dict[str, Any]],
+        ) -> Any:
+            def fallback() -> Any:
+                result, capture = _capture_r94_or_dogbox_candidate(
+                    current_request, provider, method="dogbox"
+                )
+                current_calls.append(capture)
+                return result
+
+            return fallback
+
+        decision = _candidate_decision(request, baseline, make_fallback(request, fallback_calls))
+        assert decision["fallback_invoked"] is True
+        assert decision["path"] == "R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK"
+        result = decision["result"]
+        assert type(result) is Task172LocalResult
+        assert fallback_calls[0]["requested_options"]["method"] == "trf"
+        assert fallback_calls[0]["requested_options"] == baseline_capture["requested_options"]
+        assert fallback_calls[0]["initial_x"] == baseline_capture["initial_x"]
+        assert fallback_calls[0]["solver"]["method"] == "dogbox"
+        assert fallback_calls[0]["solver"]["nfev"] <= 6
+        assert fallback_calls[0]["solver"]["nfev"] > 0
+        assert fallback_calls[0]["solver"]["callback_count"] <= 24
+        assert result.residual_callback_count <= 24
+        assert result.numerical_profile_id == _DOGBOX_CANDIDATE_AUTHORITY_ID
+        assert result.solver_status.startswith("R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_")
+        identity = _candidate_identity_receipt(request, result, provider)
+        assert identity["result_hash"] == recompute_task172_result_hash(result)
+
+        replay, replay_capture = _capture_r94_or_dogbox_candidate(
+            request, provider, method="dogbox"
+        )
+        assert type(replay) is Task172LocalResult
+        replay_projection = _dogbox_candidate_projection(replay)
+        assert replay_capture["initial_x"] == baseline_capture["initial_x"]
+        assert replay_projection.result_hash == result.result_hash
+        assert replay_projection.result_id == result.result_id
+        assert replay_projection.model_dump(mode="json") == result.model_dump(mode="json")
+        q_trial = Decimal(str(n32_hole_q[request_hash]))
+        hole_results.append(
+            {
+                "request_hash": request_hash,
+                "baseline_failure_code": baseline.failure_code,
+                "baseline_blocked_result_hash": baseline.blocked_result_hash,
+                "baseline_solver": baseline_capture["solver"],
+                "original_seed": baseline_capture["initial_x"],
+                "seed_projection_hash": runtime_service.canonical_sha256(
+                    {"request_hash": request_hash, "original_seed": baseline_capture["initial_x"]}
+                ),
+                "candidate_solver": fallback_calls[0]["solver"],
+                "candidate_callback_count": result.residual_callback_count,
+                "candidate_result": identity,
+                "task173_q_trial_w": str(q_trial),
+                "f_q_w": str(q_trial - result.signed_q_hot_to_cold_w),
+                "candidate_result_replay_identical": True,
+            }
+        )
+
+    assert len(hole_results) == 6
+    assert all(item["candidate_result_replay_identical"] for item in hole_results)
+
+    historical = fixture["n16_upper_target_hole"]
+    historical_request = _candidate_request_from_projection(historical["request"], shell_authority)
+    assert recompute_task172_request_hash(historical_request) == historical["request_hash"]
+    historical_baseline, historical_baseline_capture = _capture_r94_or_dogbox_candidate(
+        historical_request, provider, method="trf"
+    )
+    assert type(historical_baseline) is Task172BlockedResult
+    assert historical_baseline.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+    historical_fallback_captures: list[dict[str, Any]] = []
+
+    def historical_fallback() -> Any:
+        result, capture = _capture_r94_or_dogbox_candidate(
+            historical_request, provider, method="dogbox"
+        )
+        historical_fallback_captures.append(capture)
+        return result
+
+    historical_decision = _candidate_decision(
+        historical_request, historical_baseline, historical_fallback
+    )
+    assert historical_decision["fallback_invoked"] is True
+    historical_result = historical_decision["result"]
+    assert type(historical_result) is Task172LocalResult
+    historical_identity = _candidate_identity_receipt(
+        historical_request, historical_result, provider
+    )
+    historical_f_q = Decimal("111.3949198456") - historical_result.signed_q_hot_to_cold_w
+    assert historical_f_q < 0
+
+    valid_rows = fixture["baseline_valid_requests"] + fresh["samples"]
+    valid_hashes: list[str] = []
+    valid_sources: dict[str, int] = {}
+    for sample in valid_rows:
+        request = _candidate_request_from_projection(sample["request"], shell_authority)
+        request_hash = recompute_task172_request_hash(request)
+        assert request_hash == sample["request_hash"]
+        baseline = validate_request(request, provider)
+        assert type(baseline) is Task172LocalResult, (request_hash, type(baseline).__name__)
+        assert baseline.result_hash == sample["result_hash"]
+        assert baseline.result_id == sample["result_id"]
+        recorded = sample["result"]
+        assert str(baseline.signed_q_hot_to_cold_w) == recorded["signed_q_hot_to_cold_w"]
+        assert str(baseline.wall_temperature_inner_k) == recorded["wall_temperature_inner_k"]
+        assert str(baseline.wall_temperature_outer_k) == recorded["wall_temperature_outer_k"]
+        assert [str(value) for value in baseline.residual_vector_w] == recorded["residual_vector_w"]
+        fallback_called = False
+
+        def unexpected_fallback() -> Any:
+            nonlocal fallback_called
+            fallback_called = True
+            raise AssertionError("baseline-valid request must bypass dogbox fallback")
+
+        decision = _candidate_decision(request, baseline, unexpected_fallback)
+        assert decision["fallback_invoked"] is False
+        assert decision["result"] is baseline
+        assert decision["baseline"] is baseline
+        assert fallback_called is False
+        assert decision["result"].model_dump(mode="json") == baseline.model_dump(mode="json")
+        valid_hashes.append(baseline.result_hash)
+        source = sample.get("source", f"fresh_n{sample.get('mesh_n')}_production_path")
+        valid_sources[source] = valid_sources.get(source, 0) + 1
+
+    assert len(valid_rows) == 68
+    assert len(set(valid_hashes)) == len(valid_hashes)
+    assert sum(valid_sources.get(f"fresh_n{n}_production_path", 0) for n in (8, 16)) == 50
+    assert any(
+        sample["request_hash"] == "fd9287e7200cc1fa723ecfeef31067d907a484bf18558b05a8488e5ed6e90cb9"
+        for sample in valid_rows
+    )
+    assert valid_sources.get("predecessor_n16_upper_target_13_valid_requests") == 13
+    assert valid_sources.get("fresh_n32_outer_iteration_23_valid_request") == 5
+
+    low_duty_base = _candidate_request_from_projection(
+        fresh["samples"][0]["request"], shell_authority
+    )
+    low_duty_request = low_duty_base.model_copy(
+        update={
+            "tube_bulk_state": low_duty_base.tube_bulk_state.model_copy(
+                update={"temperature_k": Decimal("298.30")}
+            ),
+            "shell_bulk_state": low_duty_base.shell_bulk_state.model_copy(
+                update={"temperature_k": Decimal("298.20")}
+            ),
+        }
+    )
+    low_duty_baseline = validate_request(low_duty_request, provider)
+    assert type(low_duty_baseline) is Task172LocalResult
+    low_duty_fallback_called = False
+
+    def unexpected_low_duty_fallback() -> Any:
+        nonlocal low_duty_fallback_called
+        low_duty_fallback_called = True
+        raise AssertionError("baseline-valid low-duty request must bypass fallback")
+
+    low_duty_decision = _candidate_decision(
+        low_duty_request, low_duty_baseline, unexpected_low_duty_fallback
+    )
+    assert low_duty_decision["fallback_invoked"] is False
+    assert low_duty_decision["result"] is low_duty_baseline
+    assert low_duty_fallback_called is False
+    assert low_duty_baseline.signed_q_hot_to_cold_w < Decimal("525.8138170509478")
+    low_duty_identity = _candidate_identity_receipt(low_duty_request, low_duty_baseline, provider)
+
+    candidate_report = {
+        "proposed_only": True,
+        "authority_id": _DOGBOX_CANDIDATE_AUTHORITY_ID,
+        "python": sys.version,
+        "platform": platform.platform(),
+        "coolprop": CoolProp.__version__,
+        "scipy": scipy.__version__,
+        "primary": {"method": "trf", "max_nfev": 6, "callback_cap": 24},
+        "fallback": {
+            "method": "dogbox",
+            "initialization": "ORIGINAL_R94_DETERMINISTIC_SEED",
+            "max_nfev": 6,
+            "callback_cap": 24,
+        },
+        "target_holes": hole_results,
+        "n16_upper_endpoint": {
+            "request_hash": historical["request_hash"],
+            "baseline_failure_code": historical_baseline.failure_code,
+            "fallback_solver": historical_fallback_captures[0]["solver"],
+            "candidate_result": historical_identity,
+            "candidate_f_q_w": str(historical_f_q),
+            "r3_authority_changed": False,
+        },
+        "baseline_valid_corpus": {
+            "size": len(valid_rows),
+            "fallback_invocations": 0,
+            "hashes_preserved": len(valid_hashes),
+            "sources": valid_sources,
+            "results": [
+                {"request_hash": row["request_hash"], "result_hash": row["result_hash"]}
+                for row in valid_rows
+            ],
+        },
+        "additional_low_duty_valid_edge_case": low_duty_identity,
+    }
+    serialized = json.dumps(candidate_report, sort_keys=True, separators=(",", ":"))
+    record_property("task172_fail_only_dogbox_candidate", serialized)
+    print(f"TASK172_FAIL_ONLY_DOGBOX_CANDIDATE={serialized}")
+
+
+@pytest.mark.parametrize(
+    "failure_code",
+    [
+        "BLOCKED_NONCONVERGENCE",
+        "BLOCKED_SOLVER_FAILURE",
+        "BLOCKED_SOLVER_RESOURCE_EXHAUSTION",
+        "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT",
+        "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+        "BLOCKED_PHYSICAL_WALL_ORDERING",
+        "BLOCKED_INVALID_REQUEST_IDENTITY_REPLAY",
+    ],
+)
+def test_proposed_dogbox_fallback_never_consumes_non_residual_blockers(
+    failure_code: str,
+) -> None:
+    request = _request()
+    blocked = runtime_service._blocked(
+        failure_code,
+        "candidate.non_residual_blocker",
+        recompute_task172_request_hash(request),
+    )
+    calls: list[bool] = []
+
+    def fallback() -> Any:
+        calls.append(True)
+        raise AssertionError("non-residual blocker must not trigger fallback")
+
+    decision = _candidate_decision(request, blocked, fallback)
+    assert decision["fallback_invoked"] is False
+    assert decision["result"] is blocked
+    assert decision["classification"] == failure_code
+    assert calls == []
+
+
+def test_proposed_dogbox_fallback_rejects_invalid_residual_blocked_identity() -> None:
+    request = _request()
+    blocked = runtime_service._blocked(
+        "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "candidate.invalid_request_hash",
+        "0" * 64,
+    )
+    calls: list[bool] = []
+
+    def fallback() -> Any:
+        calls.append(True)
+        raise AssertionError("invalid blocked-result request binding must not trigger fallback")
+
+    decision = _candidate_decision(request, blocked, fallback)
+    assert decision["fallback_invoked"] is False
+    assert decision["classification"] == "BLOCKED_RESULT_IDENTITY_REPLAY"
+    assert calls == []
+
+
+def test_proposed_dogbox_fallback_rejects_invalid_blocked_result_hash() -> None:
+    request = _request()
+    blocked = runtime_service._blocked(
+        "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "candidate.invalid_blocked_result_hash",
+        recompute_task172_request_hash(request),
+    ).model_copy(update={"blocked_result_hash": "0" * 64})
+    calls: list[bool] = []
+
+    def fallback() -> Any:
+        calls.append(True)
+        raise AssertionError("invalid blocked-result hash must not trigger fallback")
+
+    decision = _candidate_decision(request, blocked, fallback)
+    assert decision["fallback_invoked"] is False
+    assert decision["classification"] == "BLOCKED_RESULT_IDENTITY_REPLAY"
+    assert calls == []
