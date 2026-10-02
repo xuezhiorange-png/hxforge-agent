@@ -704,6 +704,8 @@ def _candidate_identity_receipt(
             tube_wall_snapshot.property_snapshot_hash,
             shell_wall_snapshot.property_snapshot_hash,
         ],
+        "tube_htc_w_m2_k": str(result.tube_htc_w_m2_k),
+        "shell_htc_w_m2_k": str(result.shell_htc_w_m2_k),
         "q_w": str(result.signed_q_hot_to_cold_w),
         "wall_inner_k": str(result.wall_temperature_inner_k),
         "wall_outer_k": str(result.wall_temperature_outer_k),
@@ -1024,6 +1026,19 @@ def test_proposed_fail_only_original_seed_dogbox_candidate_diagnostic_capture(
                         candidate_result.tube_wall_property_snapshot_identity,
                         candidate_result.shell_wall_property_snapshot_identity,
                     ]
+                    if type(candidate_result) is Task172LocalResult
+                    else None
+                ),
+                "candidate_property_snapshot_hashes": (
+                    candidate_identity["property_snapshot_hashes"]
+                    if candidate_identity is not None
+                    else None
+                ),
+                "candidate_htc_w_m2_k": (
+                    {
+                        "tube": str(candidate_result.tube_htc_w_m2_k),
+                        "shell": str(candidate_result.shell_htc_w_m2_k),
+                    }
                     if type(candidate_result) is Task172LocalResult
                     else None
                 ),
