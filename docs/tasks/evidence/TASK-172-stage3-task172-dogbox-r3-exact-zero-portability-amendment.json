@@ -9,15 +9,23 @@
     "authorized_source_head": "6063149fc5fbecd448b7d6c04d5df02cde427a9c"
   },
   "predecessor": {
-    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R2",
-    "authority_canonical_hash": "a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318",
-    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
-    "review_result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW",
-    "review_finding": "EXACT_ZERO_Q_PORTABILITY_STATUS_UNSPECIFIED",
     "r1_review_finding_closed": true,
-    "review_evidence_head": "717c2d07e676231fbcd3b4ea474a9bd5475b4320",
-    "review_evidence_hash": "1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e",
-    "r2_candidate_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9"
+    "candidate_under_review": {
+      "head": "717c2d07e676231fbcd3b4ea474a9bd5475b4320",
+      "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R2",
+      "authority_canonical_hash": "a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318",
+      "candidate_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9"
+    },
+    "independent_review_receipt": {
+      "final_head": "6063149fc5fbecd448b7d6c04d5df02cde427a9c",
+      "result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW",
+      "finding": "EXACT_ZERO_Q_PORTABILITY_STATUS_UNSPECIFIED",
+      "evidence_canonical_hash": "8a2943ab1db04e2551fd766f916dc3fd09981f6e37894fa8b61d6d013184f5ff"
+    },
+    "historical_r1_independent_review": {
+      "evidence_canonical_hash": "1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e",
+      "scope_note": "Historical R1 review lineage only; not the R2 review receipt evidence hash."
+    }
   },
   "owner_decision": {
     "exact_zero_q_is_discrete_portability_semantic": true,
@@ -412,13 +420,13 @@
     "manifest": "PASS; D==M; 259/259",
     "pip_audit": "PASS; no known vulnerabilities; unpublished local project package unavailable on PyPI was skipped",
     "uv_lock_check": "PASS",
-    "git_diff_check": "PENDING_STAGING",
+    "git_diff_check": "PASS; traceability-only worktree diff",
     "duplicate_key_audit": "PASS; new evidence JSON has no duplicate keys",
     "requests_version": "2.34.2",
     "urllib3_version": "2.8.0",
     "uv_lock_changed": false,
     "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
-    "exact_head_ci": "PENDING_AFTER_EVIDENCE_COMMIT; CI outcome will be recorded in PR closeout without a follow-up repository commit"
+    "exact_head_ci": "PENDING_AFTER_TRACEABILITY_CORRECTION_COMMIT; CI outcome will be recorded in PR closeout without a follow-up repository commit"
   },
   "lifecycle": {
     "authority_accepted": false,
@@ -434,5 +442,5 @@
     "next_gate_executed": false,
     "stop": true
   },
-  "canonical_hash": "9f2430891dcec1dbd78c1b2c7616ec7eeb763311f33081239bba0ccab504cc15"
+  "canonical_hash": "e9677c64a5e7d0d32f3129228bcf4bf17098a73ea2339a442d030c9acd01ac5c"
 }

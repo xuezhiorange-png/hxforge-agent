@@ -21,6 +21,10 @@ The contract examples in the machine evidence are normative truth-table statemen
 
 The new candidate is `V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3`, lifecycle `PROPOSED_AUTHORITY_REVIEW_PENDING`, with canonical authority projection hash `9a226f98de9dc40025fd4e26f83ce22f29df0b6ba10542ac282cc97f739b4b6b`. R2 remains immutable. R3 carries forward the R2 candidate semantics and adds only the exact-zero portability status rule to the portability policy.
 
+The R2 lineage distinguishes the candidate from its review receipt: candidate-under-review HEAD `717c2d07e676231fbcd3b4ea474a9bd5475b4320` has authority hash `a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318` and candidate evidence hash `3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9`; the R2 review receipt is final HEAD `6063149fc5fbecd448b7d6c04d5df02cde427a9c`, result `FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW`, finding `EXACT_ZERO_Q_PORTABILITY_STATUS_UNSPECIFIED`, and evidence canonical hash `8a2943ab1db04e2551fd766f916dc3fd09981f6e37894fa8b61d6d013184f5ff`. Historical R1 review evidence hash `1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e` remains identified only as R1 lineage.
+
+This closeout includes a traceability-only correction: the earlier R3 evidence bound the R2 review receipt HEAD to the R2 candidate HEAD and labeled the historical R1 review hash as the R2 review hash. The R3 authority projection is unchanged; only the evidence canonical hash changes.
+
 The reviewed `V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1` governs TASK173 state propagation, not this TASK172 cross-platform output comparison. Its exact-zero-only convention is consistent with this clarification, but its authority is not directly transferred.
 
 The q/Twi/Two projection and numerical limits are unchanged. Existing persisted evidence shows all six n=32 targets are nonzero on both local and Linux sides and already pass the numerical/full projection envelope (6/6). The historical n=16 upper comparison is also nonzero on both sides and remains within the envelope with the same final low-side semantics. For the 68-row corpus, the persisted aggregate supports the numeric envelope proof; it does not retain rowwise q values sufficient to prove the exact-zero status count. That count is therefore explicitly unavailable and is not inferred. The new rule is prospective and fail-closed.
@@ -59,5 +63,5 @@ Machine evidence: `docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-exact-z
 
 ```ini
 R3_PROPOSED_AUTHORITY_CANONICAL_HASH=9a226f98de9dc40025fd4e26f83ce22f29df0b6ba10542ac282cc97f739b4b6b
-EVIDENCE_CANONICAL_HASH=9f2430891dcec1dbd78c1b2c7616ec7eeb763311f33081239bba0ccab504cc15
+EVIDENCE_CANONICAL_HASH=e9677c64a5e7d0d32f3129228bcf4bf17098a73ea2339a442d030c9acd01ac5c
 ```
