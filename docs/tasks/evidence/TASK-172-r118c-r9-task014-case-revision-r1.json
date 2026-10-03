@@ -1,0 +1,171 @@
+{
+  "schema_version": "task172.r118c-r9.task014-case-revision-evidence.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "attempt_number": 9,
+  "native_stage": "TASK014",
+  "materialization_code_sha": "ff8f703e6204faa257eb4c4e4090f4bee8bf4be8",
+  "materialization_software_version": "0.6.0",
+  "native_snapshot": {
+    "audit_events": [
+      {
+        "actor_id": "codex:TASK172_R118C_R9",
+        "event_id": "audit:V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1:revision_created:2026-09-27T13:55:03.241460+00:00",
+        "event_type": "revision_created",
+        "occurred_at": "2026-09-27T13:55:03.241460+00:00",
+        "payload": {},
+        "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+        "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+        "source": "TASK172_V0_7_R118C_R9_NATIVE_MATERIALIZATION"
+      },
+      {
+        "actor_id": "codex:TASK172_R118C_R9",
+        "event_id": "audit:V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1:revision_validated:2026-09-27T13:55:03.244082+00:00",
+        "event_type": "revision_validated",
+        "occurred_at": "2026-09-27T13:55:03.244082+00:00",
+        "payload": {},
+        "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+        "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+        "source": "TASK172_V0_7_R118C_R9_NATIVE_MATERIALIZATION"
+      },
+      {
+        "actor_id": "codex:TASK172_R118C_R9",
+        "event_id": "audit:V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1:revision_committed:2026-09-27T13:55:03.245153+00:00",
+        "event_type": "revision_committed",
+        "occurred_at": "2026-09-27T13:55:03.245153+00:00",
+        "payload": {},
+        "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+        "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+        "source": "TASK172_V0_7_R118C_R9_NATIVE_MATERIALIZATION"
+      }
+    ],
+    "case": {
+      "archived_at": null,
+      "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "created_at": "2026-09-27T13:55:03.241460+00:00",
+      "created_by": "codex:TASK172_R118C_R9",
+      "first_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "status": "active",
+      "tombstone_at": null
+    },
+    "lifecycle_timestamps": {
+      "committed_at": "2026-09-27T13:55:03.245153+00:00",
+      "created_at": "2026-09-27T13:55:03.241460+00:00",
+      "validated_at": "2026-09-27T13:55:03.244082+00:00"
+    },
+    "revision": {
+      "archived_at": null,
+      "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "committed_at": "2026-09-27T13:55:03.245153+00:00",
+      "committed_by": "codex:TASK172_R118C_R9",
+      "created_at": "2026-09-27T13:55:03.241460+00:00",
+      "created_by": "codex:TASK172_R118C_R9",
+      "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+      "expected_parent_revision_id": null,
+      "idempotency_key": null,
+      "identity": {
+        "candidate_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+        "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
+        "revision_number": 1,
+        "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"
+      },
+      "optimistic_concurrency_token": null,
+      "parent_chain_hash": null,
+      "parent_revision_id": null,
+      "payload": {
+        "authority_bindings": {
+          "bundle_rule": {
+            "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+            "canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282",
+            "runtime_snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8"
+          },
+          "layout_rule": {
+            "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+            "canonical_hash": "74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0",
+            "runtime_snapshot_hash": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319"
+          },
+          "tube_geometry": {
+            "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+            "canonical_hash": "d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd",
+            "runtime_snapshot_hash": "ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2"
+          }
+        },
+        "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+        "baffle": {
+          "axial_end_coordinate_m": "6",
+          "axial_start_coordinate_m": "0",
+          "baffle_count": 4,
+          "baffle_cut_fraction": "0.25657",
+          "baffle_thickness_m": "0.006",
+          "baffle_type": "SINGLE_SEGMENTAL",
+          "orientation_sequence": [
+            "BOTTOM",
+            "BOTTOM",
+            "BOTTOM",
+            "BOTTOM"
+          ],
+          "shell_to_baffle_diametral_clearance_m": "0.003",
+          "spacing_sequence_m": [
+            "1.2",
+            "1.2",
+            "1.2",
+            "1.2",
+            "1.2"
+          ],
+          "tube_to_baffle_hole_diametral_clearance_m": "0.001"
+        },
+        "bundle": {
+          "bundle_peripheral_allowance_m": "0.010",
+          "required_minimum_radial_clearance_m": "0.010",
+          "shell_inside_diameter_m": "0.500"
+        },
+        "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
+        "configuration": {
+          "authority_mode": "INTERNAL_GENERIC",
+          "construction_family": "FIXED_TUBESHEET",
+          "equipment_family": "SHELL_AND_TUBE",
+          "front_head_token": "T172_FRONT",
+          "orientation": "HORIZONTAL",
+          "rear_head_token": "T172_REAR",
+          "requested_rule_pack_identity": null,
+          "shell_pass_count": 1,
+          "shell_token": "E",
+          "standard_system_id": null,
+          "tube_pass_count": 1
+        },
+        "layout": {
+          "axis_orientation": "PRIMARY_AXIS_X",
+          "exclusion_zones": [],
+          "origin_mode": "CENTER_ON_LATTICE_POINT",
+          "tube_center_envelope_diameter_m": "0.45",
+          "u_tube_pairing_plan": null
+        },
+        "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+        "tube_lengths": {
+          "heat_transfer_length_m": "6",
+          "hydraulic_authority_mode": "INTERNAL_ARITHMETIC_FROM_LENGTH",
+          "hydraulic_participation_rule": "ALL_ACCEPTED_STRAIGHT_THROUGH_LAYOUT_POSITIONS_ACTIVE",
+          "internal_flow_length_m": "6"
+        }
+      },
+      "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+      "provenance": {
+        "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+        "design_authority_id": "TASK172_V0_7_R118A_PROJECT_ENGINEERING_CASE_INPUT_AUTHORITY",
+        "external_as_built_source": false,
+        "external_standard_claim": false,
+        "external_vendor_claim": false,
+        "r116_evidence_canonical_hash": "282fbab992b0e0c6a48e2b9624884900c2ab96f8c49733c868904611a502c9f5",
+        "r116_review_receipt_id": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+        "source_class": "PROJECT_INTERNAL_ENGINEERING_DESIGN_AUTHORITY"
+      },
+      "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "revision_number": 1,
+      "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "status": "committed",
+      "superseded_by": null,
+      "tombstone_at": null
+    }
+  },
+  "canonical_hash": "2d5a304cef1461aef23b2a2ff4a2e30c90e7109c947ae90462dc4e3303ae15c3"
+}

@@ -1,0 +1,446 @@
+{
+  "schema_version": "1.0",
+  "task_id": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_R3_EXACT_ZERO_PORTABILITY_AMENDMENT",
+  "mode": "OWNER_DIRECTED_AUTHORITY_CANDIDATE_AMENDMENT_ONLY",
+  "result": "PASS_DOGBOX_FALLBACK_R3_CANDIDATE_WITH_EXACT_ZERO_PORTABILITY_SEMANTICS_PENDING_INDEPENDENT_REVIEW",
+  "pr": {
+    "number": 283,
+    "required_state": "OPEN_DRAFT",
+    "authorized_source_head": "6063149fc5fbecd448b7d6c04d5df02cde427a9c"
+  },
+  "predecessor": {
+    "r1_review_finding_closed": true,
+    "candidate_under_review": {
+      "head": "717c2d07e676231fbcd3b4ea474a9bd5475b4320",
+      "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R2",
+      "authority_canonical_hash": "a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318",
+      "candidate_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9"
+    },
+    "independent_review_receipt": {
+      "final_head": "6063149fc5fbecd448b7d6c04d5df02cde427a9c",
+      "result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW",
+      "finding": "EXACT_ZERO_Q_PORTABILITY_STATUS_UNSPECIFIED",
+      "evidence_canonical_hash": "8a2943ab1db04e2551fd766f916dc3fd09981f6e37894fa8b61d6d013184f5ff"
+    },
+    "historical_r1_independent_review": {
+      "evidence_canonical_hash": "1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e",
+      "scope_note": "Historical R1 review lineage only; not the R2 review receipt evidence hash."
+    }
+  },
+  "owner_decision": {
+    "exact_zero_q_is_discrete_portability_semantic": true,
+    "exact_zero_status_match_required": true,
+    "zero_definition": "EXACT_DECIMAL_ZERO_ONLY",
+    "zero_test": "q == Decimal(\"0\")",
+    "zero_nonzero_pair_within_numeric_floor_allowed": false,
+    "zero_status_mismatch_failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH",
+    "epsilon": false,
+    "deadband": false,
+    "tolerance_based_zero": false,
+    "rounding": false,
+    "clipping": false,
+    "numerical_experiments_performed": false
+  },
+  "authority_basis": {
+    "existing_task173_zero_q_authority_id": "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1",
+    "existing_task173_rule": "Exact q == Decimal(0) branch; no tolerance, epsilon, or clipping; all nonzero q follows the ordinary nonzero path.",
+    "zero_q_task173_authority_directly_transferred": false,
+    "exact_zero_discrete_semantic_consistent_with_existing_authority": true,
+    "new_rule_scope": "OWNER_SCOPED_TASK172_CROSS_PLATFORM_OUTPUT_PORTABILITY_CONTRACT_CLARIFICATION"
+  },
+  "candidate_authority": {
+    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "accepted": false,
+    "parent_authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R2",
+    "parent_authority_canonical_hash": "a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318",
+    "projection_derivation": "Copy the complete R1 proposed authority projection, replace authority_id with R3, and attach the R2 portability comparison policy with only the exact-zero status semantics added. No other R2 semantic field changes.",
+    "canonical_hash_algorithm": "SHA-256 over RFC 8785 canonical JSON of the authority projection only.",
+    "r3_proposed_authority_canonical_hash": "9a226f98de9dc40025fd4e26f83ce22f29df0b6ba10542ac282cc97f739b4b6b",
+    "projection": {
+      "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "accepted": false,
+      "architecture": "FAIL_ONLY_ORIGINAL_SEED_DOGBOX_FALLBACK",
+      "scope": "Narrow fallback overlay on unchanged R94; not a global dogbox profile and not an R94 replacement.",
+      "primary": {
+        "authority": "R94_UNCHANGED",
+        "method": "TRF",
+        "loss": "linear",
+        "ftol": "1e-6",
+        "xtol": "1e-12",
+        "gtol": "1e-12",
+        "jacobian": "2-point",
+        "diff_step": "1e-5",
+        "max_nfev": 6,
+        "callback_cap": 24,
+        "tr_solver": "exact",
+        "initialization": "CURRENT_R94_DETERMINISTIC_SEED",
+        "x_scale": "CURRENT_R94",
+        "residual_scaling": "CURRENT_R94"
+      },
+      "fallback_trigger": {
+        "code": "REPLAY_VALID_BLOCKED_RESIDUAL_ACCEPTANCE_ONLY",
+        "conditions": [
+          "R94 primary solver normally completes and reaches the existing residual-acceptance check.",
+          "The request identity and request-hash replay are valid.",
+          "The typed blocked result is exactly BLOCKED_RESIDUAL_ACCEPTANCE.",
+          "The blocked-result hash replay passes.",
+          "No other hard blocker is present; residual acceptance is the sole failure."
+        ],
+        "non_residual_or_identity_blockers_trigger_fallback": false
+      },
+      "fallback": {
+        "method": "DOGBOX",
+        "initialization": "ORIGINAL_R94_DETERMINISTIC_SEED",
+        "primary_final_iterate_used_as_seed": false,
+        "max_nfev": 6,
+        "callback_cap": 24,
+        "other_controls": "Same as R94 candidate characterization; no equations, provider, request inputs, correlations, wall model, or R98 changes."
+      },
+      "acceptance_and_fail_closed": {
+        "must_materialize_valid_task172_local_result_projection": true,
+        "must_pass_original_r98_bounds": true,
+        "request_result_hash_and_id_replay_required": true,
+        "support_cell_wall_and_property_snapshot_identity_replay_required": true,
+        "negative_heat_rate_or_physical_ordering_failure_accepted": false,
+        "fallback_solver_failure_nonconvergence_resource_or_domain_blocker_accepted": false,
+        "diagnostic_last_iterate_accepted": false,
+        "failure_after_fallback": "Fail closed; no partial valid result and no residual/sign derived from blocked diagnostics."
+      },
+      "bypass": {
+        "baseline_valid_r94_result_invokes_fallback": false,
+        "baseline_valid_returns_original_result_unchanged": true,
+        "non_residual_blocker_invokes_fallback": false,
+        "invalid_request_or_blocked_hash_invokes_fallback": false
+      },
+      "portability": {
+        "same_environment_exact_replay_required": true,
+        "cross_platform_exact_result_hash_required": false,
+        "cross_platform_engineering_semantic_portability_required": true,
+        "semantic_invariants": [
+          "Final Task172 result is VALIDATED and passes the unchanged original R98 bounds.",
+          "Heat-transfer direction/sign is preserved.",
+          "Physical wall ordering is valid and preserved.",
+          "Property domain, property identities, constitutive equations, correlations, and engineering authority are unchanged."
+        ],
+        "rounding_quantization_clipping_or_tolerance_hash_used": false
+      },
+      "resource_budget": {
+        "primary_max_nfev": 6,
+        "primary_callback_cap": 24,
+        "fallback_max_nfev": 6,
+        "fallback_callback_cap": 24,
+        "theoretical_max_nfev_per_request": 12,
+        "theoretical_callback_cap_per_request": 48,
+        "bounded": true,
+        "global_minimum_budget_proven": false
+      },
+      "r94_equations_initialization_and_baseline_controls_changed": false,
+      "r98_changed": false,
+      "c_round_changed": false,
+      "constitutive_equations_changed": false,
+      "property_domain_changed": false,
+      "portability_comparison_policy": {
+        "projection_id": "V07-T172-PORTABLE-ENGINEERING-OUTPUT-PROJECTION-R1",
+        "purpose": "CROSS_PLATFORM_TASK172_ENGINEERING_OUTPUT_PORTABILITY",
+        "compared_fields": [
+          "signed_q_hot_to_cold_w",
+          "wall_temperature_inner_k",
+          "wall_temperature_outer_k"
+        ],
+        "includes_q": true,
+        "includes_twi": true,
+        "includes_two": true,
+        "includes_residual_vector": false,
+        "includes_property_snapshot_numeric_fields": false,
+        "includes_htc": false,
+        "includes_reynolds": false,
+        "includes_prandtl": false,
+        "includes_jmu": false,
+        "includes_solver_trace": false,
+        "q_absolute_floor_w": "1e-8",
+        "q_relative_limit": "1e-8",
+        "q_allowed_delta_formula": "max(1e-8, 1e-8 * max(abs(q_a), abs(q_b)))",
+        "both_exact_zero_requires_both_exact_physical_zero": true,
+        "twi_absolute_limit_k": "1e-8",
+        "two_absolute_limit_k": "1e-8",
+        "temperature_relative_limit": "NONE",
+        "observed_deltas_used_to_select_limits": false,
+        "r101_reference_precision_scope_transferred_directly": false,
+        "limits_owner_scope": "PROJECT_OWNER_TASK172_PORTABILITY_POLICY",
+        "comparison_precondition": "Each platform-native result independently validates and passes original R98.",
+        "native_provenance_fields_retained": true,
+        "not_used_for": [
+          "R98 acceptance",
+          "physical residual tolerance",
+          "solver stopping",
+          "blocked-result recovery",
+          "property domain",
+          "result identity"
+        ],
+        "exact_zero_q_is_discrete_portability_semantic": true,
+        "exact_zero_status_match_required": true,
+        "zero_definition": "EXACT_DECIMAL_ZERO_ONLY",
+        "zero_nonzero_pair_within_numeric_floor_allowed": false,
+        "exact_zero_status_mismatch_failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH",
+        "comparison_order": [
+          "Both platform-native Task172 results independently validate and pass original R98.",
+          "Define ZERO_A and ZERO_B by exact Decimal zero only.",
+          "If exact-zero status differs, fail q portability before applying the numerical q envelope.",
+          "If both q values are exact zero, q portability passes exact physical-zero semantics; the numeric floor cannot replace zero with nearby nonzero output.",
+          "If both q values are nonzero, apply the existing q absolute/relative envelope.",
+          "Always compare Twi and Two against their existing absolute limits and retain existing sign, domain, wall-order, correlation, authority, and provenance invariants."
+        ]
+      }
+    }
+  },
+  "portability_comparison_policy": {
+    "projection_id": "V07-T172-PORTABLE-ENGINEERING-OUTPUT-PROJECTION-R1",
+    "purpose": "CROSS_PLATFORM_TASK172_ENGINEERING_OUTPUT_PORTABILITY",
+    "compared_fields": [
+      "signed_q_hot_to_cold_w",
+      "wall_temperature_inner_k",
+      "wall_temperature_outer_k"
+    ],
+    "includes_q": true,
+    "includes_twi": true,
+    "includes_two": true,
+    "includes_residual_vector": false,
+    "includes_property_snapshot_numeric_fields": false,
+    "includes_htc": false,
+    "includes_reynolds": false,
+    "includes_prandtl": false,
+    "includes_jmu": false,
+    "includes_solver_trace": false,
+    "q_absolute_floor_w": "1e-8",
+    "q_relative_limit": "1e-8",
+    "q_allowed_delta_formula": "max(1e-8, 1e-8 * max(abs(q_a), abs(q_b)))",
+    "both_exact_zero_requires_both_exact_physical_zero": true,
+    "twi_absolute_limit_k": "1e-8",
+    "two_absolute_limit_k": "1e-8",
+    "temperature_relative_limit": "NONE",
+    "observed_deltas_used_to_select_limits": false,
+    "r101_reference_precision_scope_transferred_directly": false,
+    "limits_owner_scope": "PROJECT_OWNER_TASK172_PORTABILITY_POLICY",
+    "comparison_precondition": "Each platform-native result independently validates and passes original R98.",
+    "native_provenance_fields_retained": true,
+    "not_used_for": [
+      "R98 acceptance",
+      "physical residual tolerance",
+      "solver stopping",
+      "blocked-result recovery",
+      "property domain",
+      "result identity"
+    ],
+    "exact_zero_q_is_discrete_portability_semantic": true,
+    "exact_zero_status_match_required": true,
+    "zero_definition": "EXACT_DECIMAL_ZERO_ONLY",
+    "zero_nonzero_pair_within_numeric_floor_allowed": false,
+    "exact_zero_status_mismatch_failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH",
+    "comparison_order": [
+      "Both platform-native Task172 results independently validate and pass original R98.",
+      "Define ZERO_A and ZERO_B by exact Decimal zero only.",
+      "If exact-zero status differs, fail q portability before applying the numerical q envelope.",
+      "If both q values are exact zero, q portability passes exact physical-zero semantics; the numeric floor cannot replace zero with nearby nonzero output.",
+      "If both q values are nonzero, apply the existing q absolute/relative envelope.",
+      "Always compare Twi and Two against their existing absolute limits and retain existing sign, domain, wall-order, correlation, authority, and provenance invariants."
+    ]
+  },
+  "contract_truth_table": [
+    {
+      "q_a": "0",
+      "q_b": "0",
+      "zero_status_match": true,
+      "q_portability_pass": true,
+      "rule": "both exact physical zero"
+    },
+    {
+      "q_a": "0",
+      "q_b": "1e-12",
+      "zero_status_match": false,
+      "q_portability_pass": false,
+      "failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH"
+    },
+    {
+      "q_a": "0",
+      "q_b": "1e-9",
+      "zero_status_match": false,
+      "q_portability_pass": false,
+      "failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH"
+    },
+    {
+      "q_a": "0",
+      "q_b": "9.999e-9",
+      "zero_status_match": false,
+      "q_portability_pass": false,
+      "failure_code": "CROSS_PLATFORM_EXACT_ZERO_STATUS_MISMATCH"
+    },
+    {
+      "q_a": "1e-9",
+      "q_b": "2e-9",
+      "zero_status_match": true,
+      "q_portability_pass": true,
+      "rule": "both nonzero; apply ordinary q envelope"
+    }
+  ],
+  "persisted_evidence_reassessment": {
+    "numerical_experiments_performed": false,
+    "target_count": 6,
+    "target_source_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9",
+    "target_rows": [
+      {
+        "request_hash": "91c13f7949d32d90de13f95b14b2fc521f822c13f009ea6d132f965936cbb75f",
+        "local_q_w": "279.6428084422918",
+        "linux_q_w": "279.64280844231325",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      },
+      {
+        "request_hash": "946e8d83c8052f3c1db6f8aa31793f2b0b1523f7e392a1fa9e1da675daadde85",
+        "local_q_w": "278.4621115308888",
+        "linux_q_w": "278.4621115308767",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      },
+      {
+        "request_hash": "0b1a138aa86081e91b23d814fd9309c14ae0d8087bdff230b41ca1cf9dfb9d9a",
+        "local_q_w": "282.8367069664459",
+        "linux_q_w": "282.8367069664438",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      },
+      {
+        "request_hash": "5fd98bd16cf306447b5ba359f44078d4dedca27d861d5573a0cafc4eeab2d0d3",
+        "local_q_w": "282.8351020677846",
+        "linux_q_w": "282.83510206779323",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      },
+      {
+        "request_hash": "3ffebffa5aaf4957cd4d743e8530885795831d29328b5a2fc63e55287d08720d",
+        "local_q_w": "281.7082529109981",
+        "linux_q_w": "281.70825291103137",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      },
+      {
+        "request_hash": "a52cda0abab920f9fd3a853e0ba3f3fa4289c38c88768bcda054377af08b70ec",
+        "local_q_w": "279.2674742343681",
+        "linux_q_w": "279.2674742343595",
+        "local_zero": false,
+        "linux_zero": false,
+        "exact_zero_status_match": true,
+        "numeric_envelope_pass": true,
+        "full_projection_pass": true
+      }
+    ],
+    "target_exact_zero_status_match_count": "6/6",
+    "target_zero_nonzero_mismatch_count": 0,
+    "target_numerical_envelope_pass_count": "6/6",
+    "target_full_projection_pass_count": "6/6",
+    "target_final_validated_count": "6/6",
+    "target_original_r98_pass_count": "6/6",
+    "target_q_sign_match_count": "6/6",
+    "target_physical_ordering_pass_count": "6/6",
+    "target_property_domain_pass_count": "6/6",
+    "target_engineering_authority_match_count": "6/6",
+    "linux_py311_py312_projection_equal": true,
+    "n16_upper": {
+      "request_hash": "22be7911da59d0cfd54d922142570ad9f15b2dca2aeb36f415a9d3859ab16970",
+      "local_q_w": "703.6847988973881",
+      "linux_q_w": "703.6847988973623",
+      "local_zero": false,
+      "linux_zero": false,
+      "exact_zero_status_match": true,
+      "portability_envelope_pass": true,
+      "local_f_q_w": "-592.2898790517881",
+      "linux_f_q_w": "-592.2898790517623",
+      "final_semantic_match": true,
+      "r3_authority_changed": false
+    },
+    "corpus_68": {
+      "corpus_size": 68,
+      "existing_numeric_envelope_proof": "PASS_68_OF_68_FROM_PREEXISTING_AUTHORITATIVE_MAXIMUM_BOUND",
+      "maximum_delta_source_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9",
+      "exact_zero_status_count": "UNAVAILABLE_NOT_PRESENT_IN_PERSISTED_AGGREGATE",
+      "zero_nonzero_mismatch_count": "UNAVAILABLE_NOT_PRESENT_IN_PERSISTED_AGGREGATE",
+      "exact_zero_status_inferred": false,
+      "interpretation": "The existing aggregate proves the numerical envelope only. It does not prove the rowwise exact-zero status count; the R3 rule is prospective and fails closed on any future zero/nonzero pair."
+    }
+  },
+  "numerical_envelope": {
+    "q_absolute_floor_w": "1e-8",
+    "q_relative_limit": "1e-8",
+    "q_allowed_delta_formula": "max(1e-8, 1e-8 * max(abs(q_a), abs(q_b)))",
+    "twi_absolute_limit_k": "1e-8",
+    "two_absolute_limit_k": "1e-8",
+    "observed_deltas_used_to_select_limits": false,
+    "zero_nonzero_pair_allowed_by_numeric_floor": false
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "fixtures_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "registry_changed": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "c_round_changed": false,
+    "constitutive_equations_changed": false,
+    "property_domain_changed": false,
+    "solver_changed": false,
+    "correction_implemented": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task175_release_acceptance_performed": false
+  },
+  "validation": {
+    "focused_task172_task173": "PASS; two focused modules; proposed dogbox characterization-matrix test excluded; exit status 0",
+    "ruff": "PASS",
+    "format": "PASS; 777 files already formatted",
+    "mypy": "PASS; 450 source files",
+    "manifest": "PASS; D==M; 259/259",
+    "pip_audit": "PASS; no known vulnerabilities; unpublished local project package unavailable on PyPI was skipped",
+    "uv_lock_check": "PASS",
+    "git_diff_check": "PASS; traceability-only worktree diff",
+    "duplicate_key_audit": "PASS; new evidence JSON has no duplicate keys",
+    "requests_version": "2.34.2",
+    "urllib3_version": "2.8.0",
+    "uv_lock_changed": false,
+    "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "exact_head_ci": "PENDING_AFTER_TRACEABILITY_CORRECTION_COMMIT; CI outcome will be recorded in PR closeout without a follow-up repository commit"
+  },
+  "lifecycle": {
+    "authority_accepted": false,
+    "correction_implemented": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_R3_INDEPENDENT_REVIEW",
+    "next_gate_executed": false,
+    "stop": true
+  },
+  "canonical_hash": "e9677c64a5e7d0d32f3129228bcf4bf17098a73ea2339a442d030c9acd01ac5c"
+}

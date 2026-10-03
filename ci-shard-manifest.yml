@@ -190,6 +190,9 @@ shards:
       - tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py
       - tests/exchangers/shell_tube/segmented_thermal_state_topology/test_engine.py
       - tests/exchangers/shell_tube/test_task169_selection_release.py
+      - tests/exchangers/shell_tube/test_task172_local_runtime.py
+      - tests/exchangers/shell_tube/test_task173_integrated_rating.py
+      - tests/exchangers/shell_tube/test_task174_hydraulic_orchestration.py
       - tests/test_release_version_alignment.py
       - tests/release_demo/test_task164_integration_release_acceptance.py
       - tests/shell_geometry_catalogs/test_models.py

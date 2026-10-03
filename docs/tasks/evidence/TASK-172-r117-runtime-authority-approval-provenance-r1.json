@@ -1,0 +1,51 @@
+{
+  "schema_version": "task172.runtime-authority-materialization-provenance.r1",
+  "review_receipt_id": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+  "review_receipt_timestamp": "2026-09-26T07:07:31Z",
+  "reviewed_values_frozen": true,
+  "authority_materializations": [
+    {
+      "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+      "native_contract": "TASK016_APPROVED_GEOMETRY_CATALOG_AND_TASK021_APPROVED_TUBE_GEOMETRY_SNAPSHOT",
+      "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-runtime-snapshot-r1.json",
+      "snapshot_hash": "ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2",
+      "approved_by": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+      "approved_at": "2026-09-26T07:07:31Z"
+    },
+    {
+      "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+      "native_contract": "TASK021_LAYOUT_RULE_AUTHORITY_SNAPSHOT",
+      "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-tube-layout-rule-runtime-snapshot-r1.json",
+      "snapshot_hash": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319",
+      "approval_status": "approved",
+      "approved_by": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+      "approved_at": "2026-09-26T07:07:31Z"
+    },
+    {
+      "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+      "native_contract": "TASK022_SHELL_BUNDLE_GEOMETRY_RULE_AUTHORITY_SNAPSHOT",
+      "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-shell-bundle-rule-runtime-snapshot-r1.json",
+      "snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8",
+      "approval_status": "approved",
+      "approved_by": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+      "approved_at": "2026-09-26T07:07:31Z"
+    }
+  ],
+  "lifecycle_semantics": {
+    "r115": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "r116_effective_overlay": "REVIEWED_AUTHORITY",
+    "r117_runtime_snapshot_state": "APPROVED_RUNTIME_SNAPSHOT_MATERIALIZED",
+    "self_approval": false,
+    "codex_self_approval": false
+  },
+  "native_schema_boundary": {
+    "approval_provenance_embedded_natively": {
+      "tube_geometry": true,
+      "tube_layout_rule": false,
+      "shell_bundle_rule": false
+    },
+    "rule_approval_provenance_binding": "R116 receipt id/timestamp are bound by this sidecar and r117 registry extension because the TASK021/TASK022 rule snapshot schemas expose approval_status but no approved_by/approved_at fields.",
+    "r116_candidate_provenance_edges_unchanged": true
+  },
+  "canonical_hash": ""
+}

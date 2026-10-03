@@ -1,0 +1,176 @@
+{
+  "schema_version": "task172.project-internal-geometry-authority-bundle-evidence.r1",
+  "task_id": "TASK172_V0_7_PROJECT_INTERNAL_GEOMETRY_SOURCE_AND_RULE_AUTHORITY_BUNDLE_R1",
+  "short_name": "R115",
+  "mode": "PROJECT_INTERNAL_GEOMETRY_AUTHORITY_CANDIDATE_CONSTRUCTION_ONLY",
+  "result": "PROJECT_INTERNAL_GEOMETRY_AUTHORITY_BUNDLE_CANDIDATE_COMPLETED",
+  "base_main_sha": "15ff79ee39bbf6d162cc50e14a95f682a2f8b8a8",
+  "branch": "docs/v0-7-task172-internal-geometry-authority-r115",
+  "design_provenance": {
+    "design_authority_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+    "design_revision": "R1",
+    "design_algorithm_version": "R115_FIXED_INPUT_GEOMETRY_PROJECTION_V1",
+    "provenance_class": "PROJECT_ENGINEERING_DESIGN_AUTHORITY",
+    "external_source_claimed": false,
+    "selection_method": "DECLARATIVE_PROJECT_DESIGN_VALUES_WITH_DETERMINISTIC_SCHEMA_COMPATIBILITY_CHECKS_ONLY",
+    "continuous_geometry_optimization": false,
+    "random_search": false,
+    "hidden_heuristic": false,
+    "native_geometry_generation_performed": false,
+    "native_producer_ids": [
+      "TASK016_APPROVED_GEOMETRY_CATALOG_CONTRACT_AND_CATALOG_LOADER",
+      "TASK021_TUBE_GEOMETRY_AND_LAYOUT_AUTHORITY_SNAPSHOT_CONTRACT",
+      "TASK022_SHELL_BUNDLE_RULE_AUTHORITY_CONTRACT",
+      "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1"
+    ],
+    "authority_basis_artifacts": [
+      {"authority_id": "TASK012_INTERNAL_RULE_LICENSE_BOUNDARY", "artifact": "docs/tasks/TASK-012-standards-rule-pack-license-boundary.md", "sha256": "bb46bfa3d5fb3108befd4ad5a26cfb5ae893cd1fff38ab817c5e3e9f014601d2"},
+      {"authority_id": "TASK016_APPROVED_GEOMETRY_CATALOG", "artifact": "docs/tasks/TASK-016-approved-geometry-catalog.md", "sha256": "bc4b96ec9fefdeeb3dc17517cf837c8cf1bc015a81bebd53ec788c3a6dc6f72c"},
+      {"authority_id": "TASK016_CATALOG_MODEL", "artifact": "src/hexagent/geometry_catalogs/models.py", "sha256": "259a2ad401723953794630fe162a9badb173783634c2c7a50364da2d82a9615f"},
+      {"authority_id": "TASK016_CATALOG_LOADER", "artifact": "src/hexagent/geometry_catalogs/catalog.py", "sha256": "7c9cfee8a39a202498e18702787a28793779efa7a74d98f6802a44bee8f3e29a"},
+      {"authority_id": "TASK021_TUBE_LAYOUT_CONTRACT", "artifact": "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md", "sha256": "f7435c2e8d52f5bd43efb985ae6eedd31ac030ca3b549fd22f8cd29b25c18bd6"},
+      {"authority_id": "TASK021_LAYOUT_SCHEMA", "artifact": "src/hexagent/exchangers/shell_tube/tube_layout/schema.py", "sha256": "0027a1ffd2eb2f9a932067a1a72e554c136cd074829bc5ac4652132eb8e45d9b"},
+      {"authority_id": "TASK021_LAYOUT_AUTHORITY", "artifact": "src/hexagent/exchangers/shell_tube/tube_layout/authority.py", "sha256": "d431f3a0695f31190238009f9b707f720b27d65e431bf631823fa3fb954edc72"},
+      {"authority_id": "TASK021_CANONICALIZATION", "artifact": "src/hexagent/exchangers/shell_tube/tube_layout/canonical.py", "sha256": "0810974a23898bf04fe5e2ed2ac34bddd64da0b336830719e8bb2f26a039e939"},
+      {"authority_id": "TASK021_TUBE_GEOMETRY_SNAPSHOT_ADAPTER", "artifact": "src/hexagent/exchangers/shell_tube/tube_layout/geometry_adapter.py", "sha256": "8b3dd29f20328924b5daf8f9018a827a20d77f7e3c72643abe8592a37b219499"},
+      {"authority_id": "TASK022_SHELL_BUNDLE_CONTRACT", "artifact": "docs/tasks/TASK-022-shell-and-bundle-geometry.md", "sha256": "e968645f7ba727180d1fd3d6beab786bb4cb762d660adc464181a09d8066bb9b"},
+      {"authority_id": "TASK022_RULE_SCHEMA", "artifact": "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/schema.py", "sha256": "a6927b1e71c4d4eca59de8cbb8b3918f6b1dc735166b894913397b01d35ef6a7"},
+      {"authority_id": "TASK022_RULE_AUTHORITY", "artifact": "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/authority.py", "sha256": "cd570941b50bdbd6e361676517b4bdbc175b1ed27fcbb046513cc86e648d1c2d"},
+      {"authority_id": "TASK022_CANONICALIZATION", "artifact": "src/hexagent/exchangers/shell_tube/shell_bundle_geometry/canonical.py", "sha256": "6597db1acb4f8364708e1e3c5f1b311272afc56ea1b165813f3e13ea57431061"},
+      {"authority_id": "TASK171_REVIEWED_TOPOLOGY_PROFILE", "artifact": "docs/tasks/TASK-171-v0.7-segmented-thermal-state-topology-engine.md", "sha256": "62d03bb1d95ee647870b62d2c5a8bafbff4df2fa215c6d282c379a4876311943"},
+      {"authority_id": "TASK170_TASK171_ENTRY_REVIEW", "artifact": "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md", "sha256": "ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca"},
+      {"authority_id": "TASK172_R104_STRUCTURAL_MESH_ADMISSION_CONTRACT", "artifact": "docs/tasks/TASK-172-v0.7-real-case-mesh-admission-contract-r1.md", "sha256": "8154066139f6587be3f627e1d73c882d5719a53a1c828f22a3f04024de2ee73c"},
+      {"authority_id": "TASK172_R104_STRUCTURAL_MESH_ADMISSION_EVIDENCE", "artifact": "docs/tasks/evidence/TASK-172-real-case-mesh-admission-contract-r1.json", "sha256": "2a9f16b7eda50e568dd627bba27fc5d137d83ac80c11baabec8f9729a53a7cc4"}
+    ]
+  },
+  "authority_bundle": {
+    "authority_bundle_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+    "authority_class": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "project_designed": true,
+    "external_standard_claim": false,
+    "external_vendor_claim": false,
+    "external_as_built_source": false,
+    "codex_self_approval": false,
+    "independent_review_complete": false,
+    "scope": {
+      "case_family": "TASK172_PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE_FAMILY",
+      "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "construction": "FIXED_TUBESHEET",
+      "shell_type": "E_SHELL",
+      "shell_pass_count": 1,
+      "tube_path_type": "STRAIGHT_THROUGH",
+      "declared_tube_pass_count": 1,
+      "flow_arrangement": "COUNTERCURRENT",
+      "steady_state": true,
+      "single_phase": true,
+      "newtonian": true,
+      "global_geometry_standard_created": false,
+      "tema_compliance_claimed": false,
+      "asme_compliance_claimed": false,
+      "manufacturer_catalog_equivalence_claimed": false
+    }
+  },
+  "candidate_authorities": [
+    {
+      "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+      "artifact_path": "docs/tasks/evidence/TASK-172-internal-tube-geometry-authority-r1.json",
+      "canonical_hash": "d09ef842ce7ed3797cdcd2dd30eef577126a45583e6da0fa1fb2dca2346278bd",
+      "effective_approval": false
+    },
+    {
+      "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+      "artifact_path": "docs/tasks/evidence/TASK-172-internal-tube-layout-rule-authority-r1.json",
+      "canonical_hash": "74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0",
+      "effective_approval": false
+    },
+    {
+      "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+      "artifact_path": "docs/tasks/evidence/TASK-172-internal-shell-bundle-rule-authority-r1.json",
+      "canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282",
+      "effective_approval": false
+    }
+  ],
+  "artifact_linkage": {
+    "document_path": "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md",
+    "document_sha256": "348f622909202b1faff4c6a2df3dded4b0ad63c760dc046d1f3b81ed2338ae10",
+    "tube_candidate_file_sha256": "779def0873a1da454d2ddc1f519832023a8a9fd31d2002874992ff119f26cfd6",
+    "layout_candidate_file_sha256": "81a0b3eb9603df8705d3353267cdd645d30369d4183b5cb16bcdd359d573f5b9",
+    "bundle_candidate_file_sha256": "0ccd0a1483103d939743f700c8a5e8f5dcc662e0a37e39726a095d936da556fc"
+  },
+  "prospective_schema_compatibility": {
+    "check_only": true,
+    "temporary_in_memory_projections_only": true,
+    "native_authority_approval_claimed": false,
+    "native_case_geometry_execution": false,
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "task172_runtime_implementation_started": false,
+    "expected_checks": [
+      "TASK016_DIMENSION_AND_DERIVED_GEOMETRY_SHAPE",
+      "TASK021_INTERNAL_GENERIC_LAYOUT_RULE_SCHEMA",
+      "TASK021_ENUM_DECIMAL_HASH_SOURCE_AND_SCOPE_COMPATIBILITY",
+      "TASK022_INTERNAL_GENERIC_BUNDLE_RULE_SCHEMA",
+      "TASK022_NO_STANDARD_CLAIM_AND_EXPLICIT_SHELL_MODE"
+    ],
+    "approval_placeholder_policy": "R116_PENDING_PLACEHOLDERS_ONLY_IN_MEMORY; NEVER_PERSISTED_OR_TREATED_AS_APPROVED",
+    "result": "PASS_PROSPECTIVE_SCHEMA_COMPATIBILITY_ONLY",
+    "native_task016_pending_tube_record_load": true,
+    "task016_pending_record_hash_test_only": "d186ac029da7cfb5a83883141b904553b5d4011765ea63fff53c0012854347c2",
+    "task016_approved_only_selection_count": 0,
+    "task016_approved_record_materialized": false,
+    "native_task021_tube_snapshot_parse_and_verify": true,
+    "native_task021_layout_rule_parse_and_profile_verify": true,
+    "native_task022_bundle_rule_parse_and_authority_verify": true,
+    "temporary_approval_status_used_only_in_memory": "approved",
+    "task021_temporary_snapshot_hashes": {
+      "tube_geometry": "8bf7e2c112acb1327558572cc7accc9ac187020ad103bc515285105bcd58d1a2",
+      "layout_rule": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319"
+    },
+    "task022_temporary_snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8",
+    "tube_derived_dimensions": {
+      "wall_thickness_m": "0.00165",
+      "cross_section_area_m2": "0.00009019512508456295703",
+      "flow_area_m2": "0.000194827831907779506515625",
+      "hydraulic_diameter_m": "0.01575",
+      "derivation": "PROJECT_EXPLICIT_CIRCULAR_GEOMETRY_DECIMAL_RULE; TASK016 stores and validates these fields but does not derive area values"
+    },
+    "pitch_ge_outer_diameter_pass": true,
+    "layout_candidate_position_limit_pass": true,
+    "bundle_internal_generic_no_standard_claim_pass": true,
+    "explicit_shell_authority_mode_pass": true,
+    "approval_placeholders_persisted": false
+  },
+  "effective_state": {
+    "approved_tube_geometry_authority_effective": false,
+    "approved_layout_rule_authority_effective": false,
+    "approved_bundle_rule_authority_effective": false,
+    "r114_native_geometry_prerequisite_resolved": false,
+    "case_id": "UNBOUND",
+    "configuration_id": "UNBOUND",
+    "geometry_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND"
+  },
+  "non_actions": {
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "case_identity_created": false,
+    "topology_identity_created": false,
+    "flow_path_mapping_created": false,
+    "production_mesh_policy_created": false,
+    "reference_policy_changed": false,
+    "task172_runtime_implementation_started": false,
+    "production_code_changed": false,
+    "dependency_changed": false,
+    "lockfile_changed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "canonical_hash": "dd4551d7b50d3395465d3d2efbbe0e9718e9ec1f4ce44d0b7ca0355e3a6206ac"
+}

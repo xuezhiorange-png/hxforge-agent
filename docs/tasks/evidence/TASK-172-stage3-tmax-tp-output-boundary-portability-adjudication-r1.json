@@ -1,0 +1,451 @@
+{
+  "schema_version": "task172.stage3.tmax-tp-output-boundary-portability-adjudication.r1",
+  "task_id": "TASK172_V0_7_STAGE3_TMAX_TP_OUTPUT_BOUNDARY_PORTABILITY_ADJUDICATION_R1",
+  "mode": "PROPERTY_BOUNDARY_SEMANTIC_ADJUDICATION_ONLY",
+  "predecessor_head": "a4cec6029525fb0de63a9875955ed63450ef4b9d",
+  "diagnostic_test_commit": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+  "stage1_ci": {
+    "run_id": "36817909105",
+    "run_url": "https://github.com/xuezhiorange-png/hxforge-agent/actions/runs/36817909105",
+    "head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+    "conclusion": "FAILURE_DIAGNOSTIC_AND_KNOWN_DOWNSTREAM_ASSERTION_AND_PIP_AUDIT",
+    "jobs": {
+      "total": 48,
+      "success": 31,
+      "skipped": 11,
+      "failed": 6,
+      "cancelled": 0
+    },
+    "failed_job_classes": {
+      "matrix_pytest_shards": 4,
+      "lint_pip_audit": 1,
+      "final_gate": 1
+    },
+    "each_matrix_shard_failed_tests": [
+      "test_tmax_tp_output_boundary_portability_diagnostic (intentional diagnostic emission)",
+      "test_r3_target_n16_outer_trial_is_low_side_without_partial_mesh (known downstream assertion; target is not reached after the pre-target property boundary blocker)"
+    ],
+    "infrastructure_failures": 0,
+    "artifact_matrix": {
+      "pr_head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "merge_ref_sha": "c94081e40ed8a71e8cb943eaac4883530fc2d768",
+      "producer_bundles_downloaded": 4,
+      "bundle_files_used": [
+        "artifact-metadata.json",
+        "behavior-environment.json",
+        "junit.xml",
+        "pytest-outcomes.json"
+      ]
+    }
+  },
+  "existing_property_contracts": {
+    "contract_a_tp_boundary_state": {
+      "authority_source": "task173_integrated_rating/service.py:_checked_thermo and _state_from_enthalpy",
+      "approved_domain_coordinates": [
+        "temperature_k",
+        "pressure_pa",
+        "phase"
+      ],
+      "tp_enthalpy_role": "provider output, not an independent PH shooting coordinate",
+      "tp_output_is_clipped": false,
+      "tp_provider_enthalpy_is_retained": true,
+      "test": "test_exact_reviewed_upper_property_endpoint_uses_tp_not_clipped_ph",
+      "asserted_behavior": "H_MAX input selects TP producer at T_MAX; T, P, liquid phase, TP query type, and provider-returned enthalpy are retained"
+    },
+    "contract_b_ph_input_coordinate": {
+      "authority_source": "task173_integrated_rating/service.py:_state_from_enthalpy",
+      "ph_input_hard_upper_bound_j_kg": "112654.89965462626",
+      "ph_input_above_hmax_rejected_pre_backend": true,
+      "test": "test_ph_input_above_reviewed_upper_enthalpy_is_rejected_before_backend",
+      "asserted_behavior": "PH enthalpy coordinate greater than frozen H_MAX is rejected before PropertyProvider.state_ph"
+    },
+    "h_max_role": "PH_INPUT_COORDINATE_BOUND_ONLY",
+    "h_max_also_bounds_outer_shooting_coordinate": true,
+    "h_max_is_universal_provider_output_bound": false,
+    "tp_provider_output_allowed_to_differ_from_frozen_hmax": true,
+    "authority_reason": "The checked TP contract validates T/P/phase/query type and retains provider h; only a PH/shooting enthalpy coordinate is compared with the frozen hard bound."
+  },
+  "platform_tmax_matrix": {
+    "local_macos_py314": {
+      "python_version": "3.14.5",
+      "python_implementation": "CPython",
+      "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+      "coolprop_version": "8.0.0",
+      "backend": "HEOS::Water",
+      "reference_state": "DEF",
+      "tmax_tp_temperature_k": "300.0",
+      "tmax_tp_pressure_pa": "101325.0",
+      "tmax_tp_phase": "liquid",
+      "tmax_tp_query_type": "TP",
+      "tmax_tp_provider_enthalpy_j_kg": "112654.89965462626",
+      "frozen_h_max_j_kg": "112654.89965462626",
+      "tmax_h_minus_hmax_j_kg": "0E-11",
+      "tmax_property_snapshot_hash": "4c2a817b2b9e27afb3fe1aa0e7e3eb6aa4103131789d6d644511f6636923cba6",
+      "tmax_state_identity": "4c2a817b2b9e27afb3fe1aa0e7e3eb6aa4103131789d6d644511f6636923cba6",
+      "tmin_tp_temperature_k": "298.15",
+      "tmin_tp_pressure_pa": "101325.0",
+      "tmin_tp_phase": "liquid",
+      "tmin_tp_query_type": "TP",
+      "tmin_tp_provider_enthalpy_j_kg": "104920.11980926784",
+      "frozen_h_min_j_kg": "104920.11980926784",
+      "tmin_h_minus_hmin_j_kg": "0E-11",
+      "tmin_property_snapshot_hash": "e7c8a9924bbfd5edd29f40ed204748f741a106c801bcb6d0a388322233018fdf",
+      "q_to_enter_frozen_hmax_w": "0E-11",
+      "q_probe_boundary_interpretation": "The local TP output equals frozen H_MAX; all scaled q probes reduce to zero at this precision.",
+      "q_probes": [
+        {"q_w": "0", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"},
+        {"q_w": "0", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"},
+        {"q_w": "0", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"},
+        {"q_w": "0", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"}
+      ],
+      "ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.0000000000099", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"},
+      "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000099", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}
+    },
+    "pr_head_py311": {
+      "python_version": "3.11.16",
+      "python_implementation": "CPython",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "coolprop_version": "8.0.0",
+      "backend": "HEOS::Water",
+      "reference_state": "DEF",
+      "pr_head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "merge_ref_sha": "c94081e40ed8a71e8cb943eaac4883530fc2d768",
+      "ci_run_id": "36817909105",
+      "artifact": "pr-head-d328642ab77e0516c11fb2a788e80de17692ecd5-36817909105-attempt1-py3.11-ci-producer-bundle",
+      "tmax_tp_temperature_k": "300.0",
+      "tmax_tp_pressure_pa": "101325.0",
+      "tmax_tp_phase": "liquid",
+      "tmax_tp_query_type": "TP",
+      "tmax_tp_provider_enthalpy_j_kg": "112654.89965464505",
+      "frozen_h_max_j_kg": "112654.89965462626",
+      "tmax_h_minus_hmax_j_kg": "1.879E-8",
+      "tmax_property_snapshot_hash": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmax_state_identity": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmin_tp_temperature_k": "298.15",
+      "tmin_tp_pressure_pa": "101325.0",
+      "tmin_tp_phase": "liquid",
+      "tmin_tp_query_type": "TP",
+      "tmin_tp_provider_enthalpy_j_kg": "104920.11980935509",
+      "frozen_h_min_j_kg": "104920.11980926784",
+      "tmin_h_minus_hmin_j_kg": "8.725E-8",
+      "tmin_property_snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+      "q_to_enter_frozen_hmax_w": "2.2548E-7",
+      "q_probes": [
+        {"q_w": "0E-11", "derived_tube_h_j_kg": "112654.89965464505", "derived_h_minus_hmax_j_kg": "1.879E-8", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.89965464505", "midpoint_h_minus_hmax_j_kg": "1.879E-8"},
+        {"q_w": "1.12740E-7", "derived_tube_h_j_kg": "112654.899654635655", "derived_h_minus_hmax_j_kg": "9.395E-9", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.8996546403525", "midpoint_h_minus_hmax_j_kg": "1.4095E-8"},
+        {"q_w": "2.2548E-7", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.899654635655", "midpoint_h_minus_hmax_j_kg": "9.395E-9"},
+        {"q_w": "4.5096E-7", "derived_tube_h_j_kg": "112654.89965460747", "derived_h_minus_hmax_j_kg": "-1.879E-8", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"}
+      ],
+      "ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"},
+      "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}
+    },
+    "pr_head_py312": {
+      "python_version": "3.12.14",
+      "python_implementation": "CPython",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "coolprop_version": "8.0.0",
+      "backend": "HEOS::Water",
+      "reference_state": "DEF",
+      "pr_head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "merge_ref_sha": "c94081e40ed8a71e8cb943eaac4883530fc2d768",
+      "ci_run_id": "36817909105",
+      "artifact": "pr-head-d328642ab77e0516c11fb2a788e80de17692ecd5-36817909105-attempt1-py3.12-ci-producer-bundle",
+      "tmax_tp_temperature_k": "300.0",
+      "tmax_tp_pressure_pa": "101325.0",
+      "tmax_tp_phase": "liquid",
+      "tmax_tp_query_type": "TP",
+      "tmax_tp_provider_enthalpy_j_kg": "112654.89965464505",
+      "frozen_h_max_j_kg": "112654.89965462626",
+      "tmax_h_minus_hmax_j_kg": "1.879E-8",
+      "tmax_property_snapshot_hash": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmax_state_identity": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmin_tp_temperature_k": "298.15",
+      "tmin_tp_pressure_pa": "101325.0",
+      "tmin_tp_phase": "liquid",
+      "tmin_tp_query_type": "TP",
+      "tmin_tp_provider_enthalpy_j_kg": "104920.11980935509",
+      "frozen_h_min_j_kg": "104920.11980926784",
+      "tmin_h_minus_hmin_j_kg": "8.725E-8",
+      "tmin_property_snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+      "q_to_enter_frozen_hmax_w": "2.2548E-7",
+      "q_probes": [
+        {"q_w": "0E-11", "derived_tube_h_j_kg": "112654.89965464505", "derived_h_minus_hmax_j_kg": "1.879E-8", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.89965464505", "midpoint_h_minus_hmax_j_kg": "1.879E-8"},
+        {"q_w": "1.12740E-7", "derived_tube_h_j_kg": "112654.899654635655", "derived_h_minus_hmax_j_kg": "9.395E-9", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.8996546403525", "midpoint_h_minus_hmax_j_kg": "1.4095E-8"},
+        {"q_w": "2.2548E-7", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.899654635655", "midpoint_h_minus_hmax_j_kg": "9.395E-9"},
+        {"q_w": "4.5096E-7", "derived_tube_h_j_kg": "112654.89965460747", "derived_h_minus_hmax_j_kg": "-1.879E-8", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"}
+      ],
+      "ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"},
+      "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}
+    },
+    "merge_ref_py311": {
+      "python_version": "3.11.16",
+      "python_implementation": "CPython",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "coolprop_version": "8.0.0",
+      "backend": "HEOS::Water",
+      "reference_state": "DEF",
+      "pr_head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "merge_ref_sha": "c94081e40ed8a71e8cb943eaac4883530fc2d768",
+      "ci_run_id": "36817909105",
+      "artifact": "merge-ref-c94081e40ed8a71e8cb943eaac4883530fc2d768-36817909105-attempt1-py3.11-ci-producer-bundle",
+      "tmax_tp_temperature_k": "300.0",
+      "tmax_tp_pressure_pa": "101325.0",
+      "tmax_tp_phase": "liquid",
+      "tmax_tp_query_type": "TP",
+      "tmax_tp_provider_enthalpy_j_kg": "112654.89965464505",
+      "frozen_h_max_j_kg": "112654.89965462626",
+      "tmax_h_minus_hmax_j_kg": "1.879E-8",
+      "tmax_property_snapshot_hash": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmax_state_identity": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmin_tp_temperature_k": "298.15",
+      "tmin_tp_pressure_pa": "101325.0",
+      "tmin_tp_phase": "liquid",
+      "tmin_tp_query_type": "TP",
+      "tmin_tp_provider_enthalpy_j_kg": "104920.11980935509",
+      "frozen_h_min_j_kg": "104920.11980926784",
+      "tmin_h_minus_hmin_j_kg": "8.725E-8",
+      "tmin_property_snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+      "q_to_enter_frozen_hmax_w": "2.2548E-7",
+      "q_probes": [
+        {"q_w": "0E-11", "derived_tube_h_j_kg": "112654.89965464505", "derived_h_minus_hmax_j_kg": "1.879E-8", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.89965464505", "midpoint_h_minus_hmax_j_kg": "1.879E-8"},
+        {"q_w": "1.12740E-7", "derived_tube_h_j_kg": "112654.899654635655", "derived_h_minus_hmax_j_kg": "9.395E-9", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.8996546403525", "midpoint_h_minus_hmax_j_kg": "1.4095E-8"},
+        {"q_w": "2.2548E-7", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.899654635655", "midpoint_h_minus_hmax_j_kg": "9.395E-9"},
+        {"q_w": "4.5096E-7", "derived_tube_h_j_kg": "112654.89965460747", "derived_h_minus_hmax_j_kg": "-1.879E-8", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"}
+      ],
+      "ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"},
+      "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}
+    },
+    "merge_ref_py312": {
+      "python_version": "3.12.14",
+      "python_implementation": "CPython",
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "coolprop_version": "8.0.0",
+      "backend": "HEOS::Water",
+      "reference_state": "DEF",
+      "pr_head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "merge_ref_sha": "c94081e40ed8a71e8cb943eaac4883530fc2d768",
+      "ci_run_id": "36817909105",
+      "artifact": "merge-ref-c94081e40ed8a71e8cb943eaac4883530fc2d768-36817909105-attempt1-py3.12-ci-producer-bundle",
+      "tmax_tp_temperature_k": "300.0",
+      "tmax_tp_pressure_pa": "101325.0",
+      "tmax_tp_phase": "liquid",
+      "tmax_tp_query_type": "TP",
+      "tmax_tp_provider_enthalpy_j_kg": "112654.89965464505",
+      "frozen_h_max_j_kg": "112654.89965462626",
+      "tmax_h_minus_hmax_j_kg": "1.879E-8",
+      "tmax_property_snapshot_hash": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmax_state_identity": "974e1456cc1fa3ca99e78a9ee70ee43df0273358892eb4ee1c4d2e6ee0fbb5e3",
+      "tmin_tp_temperature_k": "298.15",
+      "tmin_tp_pressure_pa": "101325.0",
+      "tmin_tp_phase": "liquid",
+      "tmin_tp_query_type": "TP",
+      "tmin_tp_provider_enthalpy_j_kg": "104920.11980935509",
+      "frozen_h_min_j_kg": "104920.11980926784",
+      "tmin_h_minus_hmin_j_kg": "8.725E-8",
+      "tmin_property_snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+      "q_to_enter_frozen_hmax_w": "2.2548E-7",
+      "q_probes": [
+        {"q_w": "0E-11", "derived_tube_h_j_kg": "112654.89965464505", "derived_h_minus_hmax_j_kg": "1.879E-8", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.89965464505", "midpoint_h_minus_hmax_j_kg": "1.879E-8"},
+        {"q_w": "1.12740E-7", "derived_tube_h_j_kg": "112654.899654635655", "derived_h_minus_hmax_j_kg": "9.395E-9", "would_current_precheck_block": true, "derived_tube_midpoint_h_j_kg": "112654.8996546403525", "midpoint_h_minus_hmax_j_kg": "1.4095E-8"},
+        {"q_w": "2.2548E-7", "derived_tube_h_j_kg": "112654.89965462626", "derived_h_minus_hmax_j_kg": "0E-11", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.899654635655", "midpoint_h_minus_hmax_j_kg": "9.395E-9"},
+        {"q_w": "4.5096E-7", "derived_tube_h_j_kg": "112654.89965460747", "derived_h_minus_hmax_j_kg": "-1.879E-8", "would_current_precheck_block": false, "derived_tube_midpoint_h_j_kg": "112654.89965462626", "midpoint_h_minus_hmax_j_kg": "0E-11"}
+      ],
+      "ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"},
+      "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}
+    }
+  },
+  "platform_tmin_risk_scan": {
+    "tmin_portability_exposure_detected": true,
+    "interpretation": "On the four Linux CI combinations the valid TP provider output is 8.725E-8 J/kg above frozen H_MIN; on local macOS it equals H_MIN. This is a provider-output variation, not a lower-bound rejection: the current PH precheck rejects values below H_MIN, not above it. No H_MIN semantics are changed or adjudicated here.",
+    "ci_values": {
+      "pr_head_py311": {"temperature_k": "298.15", "pressure_pa": "101325.0", "phase": "liquid", "query_type": "TP", "provider_enthalpy_j_kg": "104920.11980935509", "frozen_h_min_j_kg": "104920.11980926784", "delta_j_kg": "8.725E-8", "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6"},
+      "pr_head_py312": {"temperature_k": "298.15", "pressure_pa": "101325.0", "phase": "liquid", "query_type": "TP", "provider_enthalpy_j_kg": "104920.11980935509", "frozen_h_min_j_kg": "104920.11980926784", "delta_j_kg": "8.725E-8", "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6"},
+      "merge_ref_py311": {"temperature_k": "298.15", "pressure_pa": "101325.0", "phase": "liquid", "query_type": "TP", "provider_enthalpy_j_kg": "104920.11980935509", "frozen_h_min_j_kg": "104920.11980926784", "delta_j_kg": "8.725E-8", "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6"},
+      "merge_ref_py312": {"temperature_k": "298.15", "pressure_pa": "101325.0", "phase": "liquid", "query_type": "TP", "provider_enthalpy_j_kg": "104920.11980935509", "frozen_h_min_j_kg": "104920.11980926784", "delta_j_kg": "8.725E-8", "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6"},
+      "local_macos_py314": {"temperature_k": "298.15", "pressure_pa": "101325.0", "phase": "liquid", "query_type": "TP", "provider_enthalpy_j_kg": "104920.11980926784", "frozen_h_min_j_kg": "104920.11980926784", "delta_j_kg": "0E-11", "snapshot_hash": "e7c8a9924bbfd5edd29f40ed204748f741a106c801bcb6d0a388322233018fdf"}
+    }
+  },
+  "zero_q_semantic_analysis": {
+    "zero_q_state_is_identity_transform": true,
+    "zero_q_should_require_new_ph_reconstruction": false,
+    "physical_reason": "With q exactly zero, both face enthalpy propagation equations are identity maps. The thermodynamic state is unchanged; re-inverting provider-output h as a fresh PH input is not a physical state change.",
+    "current_implementation": "At q=0 the arithmetic preserves h, then _cell_evaluation compares the copied tube downstream face against frozen H_MAX before reconstruction. On Linux the valid TMAX TP output is greater than H_MAX, so it fails at the first support. The midpoint PH coordinate would also remain above H_MAX if reached.",
+    "identity_distinction": {
+      "thermodynamic_state": "Reusing the upstream _ThermoState preserves its TP snapshot identity and provider output.",
+      "face_state": "Face-level identities remain distinct because side, physical coordinate, face role, and face index are contextual identity inputs even if the thermodynamic state object is reused.",
+      "task172_request_and_result": "If q=0 TASK172 inputs switch from synthetic PH reconstructions to retained TP snapshots, request/result hashes may change deterministically; TASK172 acceptance behavior itself need not change.",
+      "task173_result": "TASK173 request/result canonical hashes would change because provenance/state identities bound in the integration result change."
+    }
+  },
+  "root_cause_chain": [
+    {"step": 1, "statement": "At T=300 K, P=101325 Pa, CoolProp 8.0.0 returns a liquid TP state with query_type=TP.", "valid": true},
+    {"step": 2, "statement": "The approved TP domain is expressed by T/P/phase; the provider-returned enthalpy is retained output.", "valid": true},
+    {"step": 3, "statement": "On Linux the provider output is 112654.89965464505 J/kg, 1.879E-8 J/kg above the frozen PH/shooting coordinate upper bound.", "valid": true},
+    {"step": 4, "statement": "For q=0 the tube downstream enthalpy equals the upstream TP provider-output enthalpy exactly.", "valid": true},
+    {"step": 5, "statement": "_cell_evaluation treats that propagated value as a derived face enthalpy subject to H_MAX and raises before any PH provider call.", "valid": true},
+    {"step": 6, "statement": "The same q=0 midpoint would also be above H_MAX if execution reached _state_from_enthalpy for the midpoint.", "valid": true},
+    {"step": 7, "statement": "The first physical lower-endpoint support therefore raises BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT before the n=16 target support is reached.", "valid": true}
+  ],
+  "root_cause_class": "TP_PROVIDER_OUTPUT_REINTERPRETED_AS_PH_INPUT_COORDINATE",
+  "ci_state_adjudication": {
+    "tmax_state_temperature_domain_valid": true,
+    "tmax_state_pressure_domain_valid": true,
+    "tmax_state_phase_valid": true,
+    "tmax_state_query_type_valid": true,
+    "tmax_state_authority_valid": true,
+    "failure_is_physical_domain_exit": false,
+    "failure_is_representational_boundary_mismatch": true,
+    "reason": "CI state satisfies the approved T/P/phase and TP query authority; only the provider-output enthalpy differs slightly from a frozen PH input-coordinate endpoint."
+  },
+  "tp_ph_roundtrip_characterization": {
+    "diagnostic_only": true,
+    "pr_head_py311": {"ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"}, "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}},
+    "pr_head_py312": {"ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"}, "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}},
+    "merge_ref_py311": {"ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"}, "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}},
+    "merge_ref_py312": {"ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.00000000002524", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965464505"}, "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000134", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}},
+    "local_macos_py314": {"ph_of_local_tp_h": {"accepted": true, "temperature_k": "300.0000000000099", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}, "ph_of_frozen_hmax": {"accepted": true, "temperature_k": "300.0000000000099", "phase": "liquid", "query_type": "PH", "enthalpy_j_kg": "112654.89965462626"}},
+    "scope_note": "These raw provider calls characterize outputs only. Production still rejects PH input above frozen H_MAX before backend invocation."
+  },
+  "small_q_exposure_analysis": {
+    "tube_mass_flow_kg_s": "12",
+    "linux_tmax_h_delta_j_kg": "1.879E-8",
+    "q_to_enter_frozen_hmax_w": "2.2548E-7",
+    "exposure_strictly_q_zero_only": false,
+    "diagnostic_face_enthalpy_probes": "The emitted would_current_precheck_block field reflects only the downstream-face H_MAX precheck in _cell_evaluation.",
+    "cell_midpoint_guard_analysis": {
+      "midpoint_specific_enthalpy": "(h_upstream + h_downstream) / 2",
+      "q_at_which_midpoint_reaches_hmax_w": "4.5096E-7",
+      "equal_to": "2 * q_to_enter_frozen_hmax_w",
+      "q_zero_to_below_q_threshold": "downstream face exceeds H_MAX and the downstream-face guard blocks",
+      "q_threshold_to_below_twice_threshold": "downstream face is within H_MAX, but cell midpoint PH coordinate remains above H_MAX and _state_from_enthalpy blocks before state_ph",
+      "at_twice_threshold": "midpoint equals H_MAX; the exact-endpoint TP path is available",
+      "meaning": "Exact-zero identity preservation addresses the observed q=0 failure only; it does not claim to remove the full small-positive-q representational exposure."
+    },
+    "one_sided_zero_q_option_solves_all_small_positive_q_exposure": false
+  },
+  "candidate_correction_matrix": {
+    "option_a_hmax_epsilon": {
+      "authority_preserving": false,
+      "platform_independent": false,
+      "arbitrary_tolerance_required": true,
+      "recommended": false,
+      "reason": "Changes the hard PH input boundary and introduces an unreviewed tolerance."
+    },
+    "option_b_clip_tp_provider_output": {
+      "alters_provider_output": true,
+      "breaks_snapshot_provenance": true,
+      "recommended": false,
+      "reason": "Would falsify the retained native TP snapshot and alter its identity."
+    },
+    "option_c_dynamic_provider_local_hmax": {
+      "changes_frozen_authority": true,
+      "cross_platform_identity_impact": true,
+      "request_hash_impact": true,
+      "recommended": false,
+      "reason": "Makes the accepted coordinate limit depend on runtime provider output, changing cross-platform request/result identities."
+    },
+    "option_d_exact_zero_identity_preservation": {
+      "preserves_provider_output": true,
+      "avoids_ph_reinterpretation_at_q_zero": true,
+      "changes_ph_input_authority": false,
+      "changes_task172_acceptance": false,
+      "changes_physical_state": false,
+      "scope": "EXACT_Q_ZERO_IDENTITY_ONLY",
+      "solves_all_small_positive_q_exposure": false,
+      "recommended": true,
+      "reason": "For q exactly zero, preserve the already-authorized upstream TP thermodynamic state instead of reconstructing the identical state from h as a new PH coordinate. Keep the hard H_MAX unchanged for every actual PH input."
+    }
+  },
+  "identity_and_hash_impact": {
+    "option_d_thermodynamic_state_identity": "Same upstream TP state and same snapshot identity are preserved.",
+    "option_d_face_state_identity": "Face identity remains context-specific and need not equal upstream face identity; coordinate/side/role/index continue to distinguish faces.",
+    "property_snapshot_hash": "Reused upstream snapshot remains unchanged.",
+    "thermo_state_identity": "Reused upstream identity remains unchanged.",
+    "face_state_hash": "May differ by face context as intended.",
+    "task172_request_hash": "May change if the local property snapshot/query type changes from an unnecessary PH reconstruction to the retained TP snapshot.",
+    "task172_result_hash": "May change as a deterministic consequence of changed request binding; acceptance policy is unchanged.",
+    "task173_result_hash": "Will change if bound state/face/request identities change.",
+    "same_physical_state_same_identity": true,
+    "thermodynamic_and_face_identity_are_distinct": true
+  },
+  "r3_scope_boundary": {
+    "r3_endpoint_hole_rule_reevaluated": false,
+    "r3_endpoint_hole_rule_changed": false,
+    "r3_portable_status": "NOT_YET_EVALUATED_AFTER_PRE_TARGET_BOUNDARY_FIX",
+    "target_support_reached_in_ci": false,
+    "ci_target_classification": "NOT_REACHED"
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "r3_classification_logic_changed": false,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "r98_c_round": "1.0",
+    "production_mesh_policy_changed": false,
+    "dependencies_changed": false,
+    "lockfiles_changed": false,
+    "workflows_changed": false,
+    "stage1_tests_changed_only": "tests/exchangers/shell_tube/test_task173_integrated_rating.py",
+    "stage2_tests_changed": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "validation": {
+    "focused_task173_tests": "PASS",
+    "full_shell_tube_suite": "PASS",
+    "ruff": "PASS",
+    "format": "PASS",
+    "mypy": "PASS",
+    "manifest_d_equals_m": "PASS; 259 = 259",
+    "uv_lock_check": "PASS",
+    "git_diff_check": "PASS",
+    "pip_audit": {
+      "result": "FAIL",
+      "dependency_vulnerability_report": true,
+      "dependency": "urllib3==2.7.0",
+      "known_vulnerabilities_reported": 3,
+      "advisories": ["CVE-2026-97687", "CVE-2026-97688", "CVE-2026-97689"],
+      "non_pypi_distribution_skipped": "heat-exchanger-design-agent==0.6.0; package not found on PyPI",
+      "dependency_or_lockfile_changed": false,
+      "remediation_authorized": false
+    },
+    "stage1_ci_exact_head": {
+      "run_id": "36817909105",
+      "head_sha": "d328642ab77e0516c11fb2a788e80de17692ecd5",
+      "result": "FAILURE_DIAGNOSTIC_ASSERTION_AND_KNOWN_DOWNSTREAM_ASSERTION",
+      "jobs": {"total": 48, "success": 31, "skipped": 11, "failed": 6, "cancelled": 0},
+      "final_gate": "FAILURE",
+      "expected_failures": [
+        "intentional TMAX/TMIN diagnostic assertion in four matrix shards",
+        "existing R3 target assertion in four matrix shards because the first support fails before target reach",
+        "pip-audit reports three known urllib3 vulnerabilities",
+        "final gate reflects the failed shards/lint job"
+      ],
+      "unexpected_infrastructure_failure": false
+    },
+    "stage2_exact_head_ci": {
+      "state_at_evidence_commit": "REQUIRED_AFTER_EVIDENCE_COMMIT",
+      "result_recording": "FINAL_TASK_CLOSEOUT_RECEIPT",
+      "expected_to_remain_red_for_authorized_diagnostic_and_pip_audit": true
+    },
+    "duplicate_key_audit": "PASS for new JSON evidence; existing registry keys are append-only and were not rewritten"
+  },
+  "lifecycle": {
+    "result": "ADJUDICATION_EVIDENCE_COMPLETE; POST_COMMIT_CI_RECORDED_IN_FINAL_RECEIPT",
+    "h_max_role": "PH_INPUT_COORDINATE_BOUND_ONLY",
+    "tp_provider_output_allowed_to_differ_from_frozen_hmax": true,
+    "zero_q_state_is_identity_transform": true,
+    "zero_q_should_require_new_ph_reconstruction": false,
+    "small_positive_q_exposure_adjudicated": true,
+    "recommended_correction_option": "D",
+    "option_d_scope": "EXACT_Q_ZERO_IDENTITY_ONLY",
+    "next_gate": "STAGE3_TMAX_ZERO_Q_STATE_IDENTITY_PORTABILITY_CORRECTION_R1",
+    "stop": true
+  },
+  "canonical_hash": "e5ae2d80d34d73a672c4f674219634610da1f39f25f18af62203466aea91362f"
+}
