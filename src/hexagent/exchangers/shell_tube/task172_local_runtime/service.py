@@ -6,7 +6,7 @@ import math
 import sys
 from dataclasses import fields
 from decimal import Decimal, localcontext
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from pydantic import ValidationError
@@ -76,10 +76,15 @@ _CALLBACK_CAP = 24
 _NUMERICAL_PROFILE_ID = "R94_R98_STAGE1_CASE_PROFILE_CROUND_1.0"
 _TASK026_PROPERTY_SOURCE_ID = "CoolProp::HEOS::Water"
 _TASK026_PROPERTY_SOURCE_VERSION = f"{COOLPROP_VERSION}+{COOLPROP_GIT_REVISION}"
+_DOGBOX_FALLBACK_AUTHORITY_ID = "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3"
 _EVIDENCE_REFS = (
     "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
     "docs/tasks/evidence/TASK-172-stage1-independent-review-r1.json",
     "docs/tasks/evidence/TASK-172-r119d-case-bound-task171-native-materialization-r1.json",
+)
+_DOGBOX_FALLBACK_EVIDENCE_REFS = (
+    "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-exact-zero-portability-amendment.json",
+    "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-independent-review.json",
 )
 
 
@@ -755,6 +760,9 @@ def _build_valid_result(
     solver_status: str,
     nfev: int,
     callback_count: int,
+    *,
+    numerical_profile_id: str = _NUMERICAL_PROFILE_ID,
+    provenance_refs: tuple[str, ...] = _EVIDENCE_REFS,
 ) -> Task172LocalResult:
     q, twi, two = solution
     residuals = cast(tuple[float, float, float], final["residuals"])
@@ -818,14 +826,14 @@ def _build_valid_result(
         "material_source_sha256": MATERIAL_SOURCE_SHA256,
         "clean_wall_authority_hash": request.clean_wall_authority_hash,
         "cylindrical_mapping_hash": request.cylindrical_mapping_hash,
-        "numerical_profile_id": _NUMERICAL_PROFILE_ID,
+        "numerical_profile_id": numerical_profile_id,
         "r94_model_profile_canonical_hash": request.r94_model_profile_canonical_hash,
         "r98_overlay_canonical_hash": request.r98_overlay_canonical_hash,
         "stage1_authority_evidence_canonical_hash": (
             request.stage1_authority_evidence_canonical_hash
         ),
         "request_hash": request_hash,
-        "provenance_refs": _EVIDENCE_REFS,
+        "provenance_refs": provenance_refs,
         "warnings": (),
         "blockers": (),
     }
@@ -842,7 +850,12 @@ def _build_valid_result(
     return Task172LocalResult(**fields)
 
 
-def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172LocalResult:
+def _solve_once(
+    request: Task172LocalRequest,
+    provider: PropertyProvider,
+    *,
+    method: Literal["trf", "dogbox"],
+) -> Task172LocalResult:
     if (
         provider.name != "CoolProp"
         or provider.version != COOLPROP_VERSION
@@ -979,7 +992,7 @@ def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172L
         solver = least_squares(
             residual,
             np.asarray([q_seed, wall_inner_seed, wall_outer_seed], dtype=float),
-            method="trf",
+            method=method,
             loss="linear",
             ftol=1e-6,
             xtol=1e-12,
@@ -1032,6 +1045,12 @@ def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172L
         <= float(request.tube_bulk_state.temperature_k)
     ):
         raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+    fallback = method == "dogbox"
+    solver_status = (
+        f"R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_{solver.status}"
+        if fallback
+        else f"SCIPY_TRF_STATUS_{solver.status}"
+    )
     return _build_valid_result(
         request,
         canonical_sha256(_request_projection(request)),
@@ -1046,10 +1065,97 @@ def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172L
         tube_corr_version,
         final,
         (q, twi, two),
-        f"SCIPY_TRF_STATUS_{solver.status}",
+        solver_status,
         int(solver.nfev),
         callback_count,
+        numerical_profile_id=(_DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID),
+        provenance_refs=(
+            (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
+        ),
     )
+
+
+def _solve_attempt(
+    request: Task172LocalRequest,
+    provider: PropertyProvider,
+    *,
+    method: Literal["trf", "dogbox"],
+) -> Task172LocalOutcome:
+    """Run one bounded numerical attempt without applying fallback policy."""
+    try:
+        return _solve_once(request, provider, method=method)
+    except _RuntimeFailure as exc:
+        diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
+        try:
+            request_hash = canonical_sha256(_request_projection(request))
+        except Exception:
+            request_hash = None
+        return _blocked(exc.code, exc.field_path, request_hash, diagnostics)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
+
+
+def _fallback_result_replays_request(
+    request: Task172LocalRequest,
+    result: Task172LocalResult,
+) -> bool:
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        return (
+            result.request_hash == request_hash
+            and recompute_task172_result_hash(result) == result.result_hash
+            and result.result_id == f"urn:hxforge:task172:{result.result_hash}"
+            and result.physical_support_id == recompute_task172_support_id(request)
+            and result.physical_segment_id == request.support.physical_segment_id
+            and result.mesh_level_identity == request.support.mesh_level_identity
+            and result.subdivisions_per_physical_interval_per_side
+            == request.support.subdivisions_per_physical_interval_per_side
+            and result.subdivision_index == request.support.subdivision_index
+            and result.tube_cell_id == request.support.tube_cell_id
+            and result.shell_cell_id == request.support.shell_cell_id
+            and result.wall_interface_id == request.support.wall_interface_id
+            and bool(result.tube_property_snapshot_identity)
+            and bool(result.shell_property_snapshot_identity)
+            and bool(result.tube_wall_property_snapshot_identity)
+            and bool(result.shell_wall_property_snapshot_identity)
+        )
+    except Exception:
+        return False
+
+
+def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172LocalOutcome:
+    """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
+    primary = _solve_attempt(request, provider, method="trf")
+    if type(primary) is Task172LocalResult:
+        return primary
+    if (
+        type(primary) is not Task172BlockedResult
+        or primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+    ):
+        return primary
+
+    request_hash: str | None = None
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        replay_valid = (
+            primary.request_hash == request_hash
+            and primary.blocked_result_hash == recompute_task172_blocked_result_hash(primary)
+        )
+    except Exception:
+        replay_valid = False
+    if not replay_valid:
+        return primary
+
+    fallback = _solve_attempt(request, provider, method="dogbox")
+    if type(fallback) is Task172LocalResult and not _fallback_result_replays_request(
+        request, fallback
+    ):
+        return _blocked(
+            "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+            "fallback.result_identity",
+            request_hash,
+        )
+    return fallback
 
 
 def validate_request(raw_request: object, provider: PropertyProvider) -> Task172LocalOutcome:
