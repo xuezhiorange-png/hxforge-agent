@@ -1944,6 +1944,63 @@ def _make_rated_cell(
     )
 
 
+def _mesh_rating_projection(
+    *,
+    subdivisions: int,
+    mesh_id: str,
+    shell_outlet_enthalpy: Decimal,
+    outer_iterations: int,
+    tube_faces: list[FaceState],
+    shell_faces: list[FaceState],
+    cells: list[_CellRecord],
+    interval_duties: list[Decimal],
+    total_duty: Decimal,
+    hot_loss: Decimal,
+    cold_gain: Decimal,
+    energy_residual: Decimal,
+    terminal_residual_t: Decimal,
+    terminal_residual_h: Decimal,
+    stats: _CellSearchStats,
+    hole_neighborhoods: list[dict[str, str]],
+) -> dict[str, Any]:
+    """Build the unchanged, hash-bound mesh-rating projection."""
+    tube_count = 5 * subdivisions
+    shell_count = 5 * subdivisions
+    wall_count = 5 * subdivisions
+    if tube_count + shell_count != 10 * subdivisions:
+        raise _Stage3Failure("BLOCKED_MESH_CELL_COUNT_CONTRACT")
+    return {
+        "schema_version": "task173.mesh-rating-run.v1",
+        "case_revision_id": CASE_REVISION_ID,
+        "mesh_identity": mesh_id,
+        "subdivisions_per_physical_interval_per_side": subdivisions,
+        "tube_cell_count": tube_count,
+        "shell_cell_count": shell_count,
+        "total_numerical_cell_count": tube_count + shell_count,
+        "wall_interface_count": wall_count,
+        "shooting_enthalpy_j_kg": str(shell_outlet_enthalpy),
+        "outer_bisection_iterations": outer_iterations,
+        "tube_face_hashes": [face.face_hash for face in tube_faces],
+        "shell_face_hashes": [face.face_hash for face in shell_faces],
+        "cells": [cell.rated_cell.model_dump(mode="json") for cell in cells],
+        "interval_duties_w": [str(value) for value in interval_duties],
+        "total_duty_w": str(total_duty),
+        "hot_energy_loss_w": str(hot_loss),
+        "cold_energy_gain_w": str(cold_gain),
+        "energy_balance_residual_w": str(energy_residual),
+        "terminal_boundary_residual_k": str(terminal_residual_t),
+        "terminal_boundary_residual_j_kg": str(terminal_residual_h),
+        "task031_geometry_hash": EXPECTED_TASK031_GEOMETRY_HASH,
+        "task032_result_hash": EXPECTED_TASK032_RESULT_HASH,
+        "task166_result_hash": EXPECTED_TASK166_RESULT_HASH,
+        "task174_result_hash": EXPECTED_TASK174_RESULT_HASH,
+        "task172_local_evaluation_count": stats.task172_local_evaluation_count,
+        "task172_numerical_hole_count": stats.task172_numerical_hole_count,
+        "task172_numerical_hole_counts_by_code": stats.task172_numerical_hole_counts_by_code,
+        "task172_numerical_hole_neighborhoods": hole_neighborhoods,
+    }
+
+
 def _valid_trajectory(
     subdivisions: int,
     shell_outlet_enthalpy: Decimal,
@@ -2114,38 +2171,24 @@ def _valid_trajectory(
     tube_count = 5 * subdivisions
     shell_count = 5 * subdivisions
     wall_count = 5 * subdivisions
-    if tube_count + shell_count != 10 * subdivisions:
-        raise _Stage3Failure("BLOCKED_MESH_CELL_COUNT_CONTRACT")
-    projection = {
-        "schema_version": "task173.mesh-rating-run.v1",
-        "case_revision_id": CASE_REVISION_ID,
-        "mesh_identity": mesh_id,
-        "subdivisions_per_physical_interval_per_side": subdivisions,
-        "tube_cell_count": tube_count,
-        "shell_cell_count": shell_count,
-        "total_numerical_cell_count": tube_count + shell_count,
-        "wall_interface_count": wall_count,
-        "shooting_enthalpy_j_kg": str(shell_outlet_enthalpy),
-        "outer_bisection_iterations": outer_iterations,
-        "tube_face_hashes": [face.face_hash for face in tube_faces],
-        "shell_face_hashes": [face.face_hash for face in shell_faces],
-        "cells": [cell.rated_cell.model_dump(mode="json") for cell in cells],
-        "interval_duties_w": [str(value) for value in interval_duties],
-        "total_duty_w": str(q_wall),
-        "hot_energy_loss_w": str(hot_loss),
-        "cold_energy_gain_w": str(cold_gain),
-        "energy_balance_residual_w": str(energy_residual),
-        "terminal_boundary_residual_k": str(terminal_residual_t),
-        "terminal_boundary_residual_j_kg": str(terminal_residual_h),
-        "task031_geometry_hash": EXPECTED_TASK031_GEOMETRY_HASH,
-        "task032_result_hash": EXPECTED_TASK032_RESULT_HASH,
-        "task166_result_hash": EXPECTED_TASK166_RESULT_HASH,
-        "task174_result_hash": EXPECTED_TASK174_RESULT_HASH,
-        "task172_local_evaluation_count": stats.task172_local_evaluation_count,
-        "task172_numerical_hole_count": stats.task172_numerical_hole_count,
-        "task172_numerical_hole_counts_by_code": stats.task172_numerical_hole_counts_by_code,
-        "task172_numerical_hole_neighborhoods": hole_neighborhoods,
-    }
+    projection = _mesh_rating_projection(
+        subdivisions=subdivisions,
+        mesh_id=mesh_id,
+        shell_outlet_enthalpy=shell_outlet_enthalpy,
+        outer_iterations=outer_iterations,
+        tube_faces=tube_faces,
+        shell_faces=shell_faces,
+        cells=cells,
+        interval_duties=interval_duties,
+        total_duty=q_wall,
+        hot_loss=hot_loss,
+        cold_gain=cold_gain,
+        energy_residual=energy_residual,
+        terminal_residual_t=terminal_residual_t,
+        terminal_residual_h=terminal_residual_h,
+        stats=stats,
+        hole_neighborhoods=hole_neighborhoods,
+    )
     rating_hash = canonical_sha256(projection)
     observables = MeshObservables(
         subdivisions_per_interval=subdivisions,
@@ -2552,8 +2595,9 @@ def _build_success(
 ) -> Task173SuccessResult:
     accepted = runs[candidate_index]
     headroom = runs[headroom_index]
+    replay_stats = _CellSearchStats()
     deterministic_replay = _solve_outer_boundary(
-        accepted.subdivisions, CoolPropProvider(), shell_authority
+        accepted.subdivisions, CoolPropProvider(), shell_authority, replay_stats
     )
     same_face_ids = tuple(face.face_id for face in accepted.faces_tube) == tuple(
         face.face_id for face in deterministic_replay.faces_tube

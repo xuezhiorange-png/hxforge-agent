@@ -2076,6 +2076,151 @@ def _fake_mesh_run(enthalpy: Decimal, residual_h: Decimal) -> Any:
     )
 
 
+def test_accepted_mesh_replay_uses_fresh_full_search_stats_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate_calls: list[tuple[int, service._CellSearchStats | None]] = []
+    replay_calls: list[tuple[int, service._CellSearchStats | None]] = []
+    active_calls = candidate_calls
+
+    def fake_outer_trial(
+        subdivisions: int,
+        enthalpy: Decimal,
+        _provider: Any,
+        _authority: Any,
+        _iteration: int,
+        search_stats: service._CellSearchStats | None = None,
+    ) -> Any:
+        active_calls.append((subdivisions, search_stats))
+        if search_stats is not None:
+            search_stats.record_evaluation()
+        if enthalpy == service.H_MIN_J_KG:
+            return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", enthalpy)
+        run = SimpleNamespace(
+            subdivisions=subdivisions,
+            shooting_enthalpy=enthalpy,
+            bisection_iterations=0,
+            mesh_result_hash="controlled-mesh-hash",
+            faces_tube=(),
+            faces_shell=(),
+            cells=(),
+            observables=SimpleNamespace(
+                terminal_boundary_residual_j_kg=Decimal("0"),
+                terminal_boundary_residual_k=Decimal("0"),
+                local_task172_result_hashes=(),
+                energy_balance_residual_w=Decimal("0"),
+                duty_roundoff_floor_w=Decimal("0"),
+            ),
+        )
+        return service._OuterTrial("VALID_TRAJECTORY", enthalpy, mesh_run=run)
+
+    monkeypatch.setattr(service, "REVIEWED_MESH_SEQUENCE", (1, 2, 4, 8))
+    monkeypatch.setattr(service, "_outer_trial", fake_outer_trial)
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: True)
+    monkeypatch.setattr(
+        service,
+        "_compare_meshes",
+        lambda coarse, fine: SimpleNamespace(
+            coarse_subdivisions=coarse.subdivisions,
+            fine_subdivisions=fine.subdivisions,
+            overall_status="PASS",
+        ),
+    )
+
+    runs, comparisons, candidate_index, headroom_index = service._run_mesh_sequence(
+        lambda: object(), object()
+    )
+    candidate_stats_by_level: dict[int, set[int]] = {}
+    for subdivisions, stats in candidate_calls:
+        assert isinstance(stats, service._CellSearchStats)
+        candidate_stats_by_level.setdefault(subdivisions, set()).add(id(stats))
+    assert set(candidate_stats_by_level) == {1, 2, 4, 8}
+    assert all(len(stats_ids) == 1 for stats_ids in candidate_stats_by_level.values())
+    assert len({next(iter(ids)) for ids in candidate_stats_by_level.values()}) == 4
+
+    original_solve_outer_boundary = service._solve_outer_boundary
+    replay_stats_at_entry: list[service._CellSearchStats | None] = []
+
+    class ReplayCaptured(Exception):
+        pass
+
+    def capture_replay_stats(
+        subdivisions: int,
+        provider: Any,
+        authority: Any,
+        search_stats: service._CellSearchStats | None = None,
+    ) -> Any:
+        replay_stats_at_entry.append(search_stats)
+        active_calls_for_replay = replay_calls
+        nonlocal active_calls
+        active_calls = active_calls_for_replay
+        if search_stats is not None:
+            assert search_stats.task172_local_evaluation_count == 0
+        original_solve_outer_boundary(subdivisions, provider, authority, search_stats)
+        raise ReplayCaptured from None
+
+    monkeypatch.setattr(service, "_solve_outer_boundary", capture_replay_stats)
+    with pytest.raises(ReplayCaptured):
+        service._build_success(
+            request=SimpleNamespace(),
+            request_hash="controlled-request-hash",
+            shell_authority=object(),
+            task174=object(),
+            replay={},
+            runs=runs,
+            comparisons=comparisons,
+            candidate_index=candidate_index,
+            headroom_index=headroom_index,
+        )
+
+    replay_stats = replay_stats_at_entry[0]
+    assert isinstance(replay_stats, service._CellSearchStats)
+    assert all(replay_stats is not stats for _, stats in candidate_calls)
+    assert len(replay_calls) == 2
+    assert all(stats is replay_stats for _, stats in replay_calls)
+    assert replay_stats.task172_local_evaluation_count == 2
+
+
+def test_mesh_rating_hash_keeps_diagnostic_stats_hash_bound() -> None:
+    def projection(evaluation_count: int) -> dict[str, Any]:
+        stats = service._CellSearchStats(
+            task172_local_evaluation_count=evaluation_count,
+            task172_numerical_hole_count=1,
+            task172_numerical_hole_counts_by_code={"BLOCKED_RESIDUAL_ACCEPTANCE": 1},
+        )
+        return service._mesh_rating_projection(
+            subdivisions=1,
+            mesh_id="controlled-mesh-identity",
+            shell_outlet_enthalpy=Decimal("105000"),
+            outer_iterations=3,
+            tube_faces=[],
+            shell_faces=[],
+            cells=[],
+            interval_duties=[Decimal("1")] * 5,
+            total_duty=Decimal("5"),
+            hot_loss=Decimal("5"),
+            cold_gain=Decimal("5"),
+            energy_residual=Decimal("0"),
+            terminal_residual_t=Decimal("0"),
+            terminal_residual_h=Decimal("0"),
+            stats=stats,
+            hole_neighborhoods=[],
+        )
+
+    first = projection(10)
+    same_scope_replay = projection(10)
+    changed_diagnostic_projection = projection(11)
+    assert service.canonical_sha256(first) == service.canonical_sha256(same_scope_replay)
+    assert service.canonical_sha256(first) != service.canonical_sha256(
+        changed_diagnostic_projection
+    )
+    assert first["schema_version"] == "task173.mesh-rating-run.v1"
+    assert first["task172_local_evaluation_count"] == 10
+    assert first["task172_numerical_hole_count"] == 1
+    assert first["task172_numerical_hole_counts_by_code"] == {"BLOCKED_RESIDUAL_ACCEPTANCE": 1}
+    assert "task172_numerical_hole_neighborhoods" in first
+
+
 def test_boundary_root_uses_infeasible_low_and_valid_high_only(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
