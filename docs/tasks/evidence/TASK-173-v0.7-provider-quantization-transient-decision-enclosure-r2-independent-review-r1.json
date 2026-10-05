@@ -3,8 +3,9 @@
   "task_id": "STAGE3_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2_INDEPENDENT_REVIEW_R1",
   "result": "FAIL_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2_INDEPENDENT_REVIEW",
   "reviewer": {
-    "name": "Boole (OpenAI GPT-6 / Codex)",
-    "id": "01a10e1e-4b7c-7082-b2f8-e7547ea9b6cf",
+    "name": "OpenAI GPT-6 (Codex)",
+    "id": "NOT_EXPOSED",
+    "reviewer_context_id": "01a10e1e-4b7c-7082-b2f8-e7547ea9b6cf",
     "context": "FRESH",
     "self_approval": false,
     "candidate_author_self_approval": false
@@ -103,6 +104,16 @@
     "qualification_instrumentation_restoration": "PASS",
     "qualification_control_flow_representativeness": "FAIL"
   },
+  "parent_sizing_authority_package_binding": {
+    "status": "FAIL_INPUT_BINDING_MISMATCH",
+    "request_hash": "750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9",
+    "request_hash_hex_length": 63,
+    "committed_package_hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "committed_package_hash_hex_length": 64,
+    "candidate_matches_committed_package": true,
+    "candidate_matches_request_literal": false,
+    "normalization_performed": false
+  },
   "qualification_summary": {
     "candidate_cases": [
       {"label": "TRAIN_A", "cut": "0.215", "trajectory_hash": "c865fabcd42658368fa3eb10a4e6edbd1124a1ba649dfc7cd650ae7bc7358843", "accepted_cells": 5, "accepted_enclosures": 0},
@@ -138,6 +149,12 @@
       "severity": "BLOCKING_REPLAY_CONTRACT",
       "status": "OPEN",
       "details": "The committed R2 replay and H2 replay commands fail at reviewed HEAD 9172befb… before data replay because they require runtime HEAD/tree b1b9d676… . Supplemental native-model replay passes but does not satisfy the mandated committed-entrypoint replay at the exact reviewed checkout."
+    },
+    {
+      "id": "PARENT_SIZING_AUTHORITY_PACKAGE_HASH_INPUT_MISMATCH",
+      "severity": "BLOCKING_AUTHORITY_BINDING",
+      "status": "OPEN",
+      "details": "The review request specifies a 63-hex-character parent package hash, while both exact committed package and R2 candidate bind a different 64-hex-character SHA-256. The candidate matches the package, but the request binding cannot be verified as provided; values were not normalized."
     }
   ],
   "review_decision": "FAIL",

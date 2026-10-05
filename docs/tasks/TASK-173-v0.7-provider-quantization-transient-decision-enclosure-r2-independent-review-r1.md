@@ -7,12 +7,12 @@
 **Reviewed head:** `9172befb3566f9acb47488232f1dc01959297606`
 **Runtime source:** `b1b9d676c693e09d740c47b642198b5e4f543409` (`b0cfbdb7c4a9c3136fda317723fb5eab30c40e1e`)
 **PR:** #283, OPEN / Draft
-**Reviewer:** Boole (OpenAI GPT-6 / Codex), reviewer context `01a10e1e-4b7c-7082-b2f8-e7547ea9b6cf`
+**Reviewer:** OpenAI GPT-6 (Codex); model-reported reviewer ID `NOT_EXPOSED`; fresh reviewer context ID `01a10e1e-4b7c-7082-b2f8-e7547ea9b6cf`
 **Independence:** `REVIEWER_CONTEXT=FRESH`; `SELF_APPROVAL=false`; `CANDIDATE_AUTHOR_SELF_APPROVAL=false`
 
 ## Decision
 
-The R2 candidate is **not accepted**. Its recorded numerical data and endpoint identities are substantially replayable, and the transient-only/accepted-path separation is coherent on the five recorded cases. However, the qualification runner is not control-flow equivalent to the production outer solver at precision-floor and resource-exhaustion branches, despite control-flow parity being a hard review requirement. In addition, the two committed replay entrypoints cannot execute from the mandated reviewed HEAD: both stop at an exact runtime-HEAD guard before replaying their evidence.
+The R2 candidate is **not accepted**. Its recorded numerical data and endpoint identities are substantially replayable, and the transient-only/accepted-path separation is coherent on the five recorded cases. However, the qualification runner is not control-flow equivalent to the production outer solver at precision-floor and resource-exhaustion branches, despite control-flow parity being a hard review requirement. In addition, the two committed replay entrypoints cannot execute from the mandated reviewed HEAD: both stop at an exact runtime-HEAD guard before replaying their evidence. The supplied parent-package hash is also malformed (63 hex characters) and differs from the 64-character binding in the committed package and R2 candidate; this input-binding mismatch remains unresolved.
 
 The R2 candidate projection, qualification evidence, runtime, and prior R1 review were not modified. This review did not implement the R2 policy, run full Sizing, execute TASK175, or change PR readiness/merge state.
 
@@ -57,9 +57,9 @@ QUALIFICATION_OUTER_SOLVER_CONTROL_FLOW_PARITY=FAIL
 
 Both committed replay commands fail before replaying data because their head guards pin the runtime commit, while this review is required to execute them at the exact evidence head `9172bef…`. A self-contained review replay must support an evidence descendant when the bound runtime paths are unchanged, or otherwise explicitly provide a committed exact-head replay contract. No inline workaround or candidate edit was made.
 
-### Review-input discrepancy: parent sizing package hash
+### `PARENT_SIZING_AUTHORITY_PACKAGE_HASH_INPUT_MISMATCH`
 
-The task text supplies `750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9`, which is 63 hexadecimal characters and therefore not a SHA-256 value. The exact committed package and R2 authority projection bind the 64-character value `750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9`. The committed candidate matches the committed package; this review preserves both literals as observed and does not silently normalize the prompt value.
+The task text supplies `750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9`, which is 63 hexadecimal characters and therefore not a SHA-256 value. The exact committed package and R2 authority projection bind the 64-character value `750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9`. The committed candidate matches the committed package, but not the value declared by this review request. The reviewer preserves both literals as observed and does not silently normalize them; because the supplied parent binding cannot be verified as stated, this remains a review finding.
 
 ## Substantive review matrix
 
@@ -67,6 +67,7 @@ The task text supplies `750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69
 |---|---|---|
 | Artifact integrity and exact Git membership | PASS | 311/311 bundle entries verified. |
 | Authority and matrix projection | PASS | Hashes match the committed projections. |
+| Parent sizing authority package binding | FAIL | Request hash is 63 hex characters and differs from the package/candidate's 64-character hash. |
 | R2/H2 committed replay entrypoints | FAIL | Both stop at runtime-head guards at the mandated review HEAD. |
 | Supplemental events/endpoints/continuations/certificates/trajectories | PASS | 16 events, 57 endpoint request/result identities, 16 continuations, 8 certificates, 5 trajectories replayed with native model/hash helpers. |
 | Runtime ancestry, source binding, and V3 provenance | PASS | Runtime commit is an ancestor; runtime paths match; V3 provenance hash recomputes. Historical byte equivalence was not required. |
@@ -101,4 +102,4 @@ NEXT_GATE=OWNER_DIRECTION_REQUIRED_AFTER_TRANSIENT_DECISION_ENCLOSURE_R2_REVIEW_
 NEXT_GATE_EXECUTED=false
 ```
 
-Exact-head CI is run after this receipt commit; its run identity and outcome are returned separately with the final review receipt so the tested head is unambiguous.
+Exact-head CI is run after the final receipt update; its run identity and outcome are returned separately with the final review receipt so the tested head is unambiguous.
