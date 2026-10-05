@@ -5,12 +5,16 @@ from __future__ import annotations
 import enum
 import itertools
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
-from typing import Any, cast
+from typing import Any, Final, Literal, cast
 
 from pydantic import ValidationError
 
 from hexagent.canonical_json import canonical_sha256
-from hexagent.exchangers.shell_tube.bell_delaware.models import Task166Result
+from hexagent.exchangers.shell_tube.bell_delaware.models import (
+    Task166BlockedResult,
+    Task166Result,
+)
+from hexagent.exchangers.shell_tube.engineering_screening.models import Task167Result
 from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     candidate_space_hash as task168_candidate_space_hash,
@@ -22,12 +26,14 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     request_hash as task168_request_hash,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    DIMENSION_ORDER,
     CandidateSpec,
     CandidateStage,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating import (
     CandidateRatingRequest,
     CandidateRatingSuccessResult,
+    Task173BlockedResult,
     candidate_rating_request_hash,
     candidate_rating_result_hash,
     validate_candidate_rating,
@@ -55,6 +61,7 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     HydraulicComponentBinding,
     PhysicalEventBinding,
     PressurePropertyBinding,
+    Task174BlockedResult,
     Task174NativeOutputs,
     Task174SuccessResult,
     recompute_task174_result_hash,
@@ -62,15 +69,22 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
 from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     validate_candidate_request as validate_task174_candidate,
 )
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    Task029BlockedResult,
+    Task029RawBoundaryBlockedResult,
+    Task029SuccessResult,
+)
 
-_TASK171_AUTHORITY_HASH = "bf014e7ca44eb5f9a3a2abec7c41f44b39a2590e7efaf31d77c70c892bcd1a9e"
-_TASK172_AUTHORITY_HASH = "fc7afcc9c51ed5920e3258b2a5683f1274d45df6c7d7e624be29614f97691483"
-_TASK174_AUTHORITY_HASH = "4d0f83b8ab1777ba6516dfc607c7accc814ef8a521d26c25c8cf0adc1b264023"
-_TASK173_RATING_AUTHORITY_HASH = "a5536ba8e93dcf9a94f26a8c5274672494dd53b9391a9dad60553067967f49aa"
-_JMU_TRANSFER_HASH = "6d716f541c44aeaa6911efe5919ed2f1474f4af93a4c06fcb01a672c56d234cc"
-_BELL_TRANSFER_HASH = "28c89b6c58fef6050f9a0f5d33b80ce686f875a4ba9350e254d43ff699dccc58"
-_PRESSURE_TRANSFER_HASH = "7506d4217d27123cdec1a5d46813445a1a8b500ef24af39e10b7598ba163ce19"
-_TASK174_TRANSFER_HASH = "893a6c1644a940b27fbad85ef4d4fc402a7999971dc5e2ed3603fada0398b857"
+_TASK171_AUTHORITY_HASH: Final = "bf014e7ca44eb5f9a3a2abec7c41f44b39a2590e7efaf31d77c70c892bcd1a9e"
+_TASK172_AUTHORITY_HASH: Final = "fc7afcc9c51ed5920e3258b2a5683f1274d45df6c7d7e624be29614f97691483"
+_TASK174_AUTHORITY_HASH: Final = "4d0f83b8ab1777ba6516dfc607c7accc814ef8a521d26c25c8cf0adc1b264023"
+_TASK173_RATING_AUTHORITY_HASH: Final = (
+    "a5536ba8e93dcf9a94f26a8c5274672494dd53b9391a9dad60553067967f49aa"
+)
+_JMU_TRANSFER_HASH: Final = "6d716f541c44aeaa6911efe5919ed2f1474f4af93a4c06fcb01a672c56d234cc"
+_BELL_TRANSFER_HASH: Final = "28c89b6c58fef6050f9a0f5d33b80ce686f875a4ba9350e254d43ff699dccc58"
+_PRESSURE_TRANSFER_HASH: Final = "7506d4217d27123cdec1a5d46813445a1a8b500ef24af39e10b7598ba163ce19"
+_TASK174_TRANSFER_HASH: Final = "893a6c1644a940b27fbad85ef4d4fc402a7999971dc5e2ed3603fada0398b857"
 _TUBE_COMPONENT_TYPES = (
     "ENTRANCE",
     "EXIT",
@@ -79,7 +93,10 @@ _TUBE_COMPONENT_TYPES = (
     "CONTRACTION",
     "EXPANSION",
 )
-_BELL_ROLE = {
+_BELL_ROLE: dict[
+    str,
+    tuple[Literal["ADDITIVE_PRESSURE_REGION", "CORRECTION_OR_GEOMETRY_SUPPORT"], str],
+] = {
     "CENTRAL_CROSSFLOW": ("ADDITIVE_PRESSURE_REGION", "BELL_CENTRAL_CROSSFLOW_REGION"),
     "WINDOW": ("ADDITIVE_PRESSURE_REGION", "BELL_WINDOW_REGION"),
     "INLET_END_ZONE": ("ADDITIVE_PRESSURE_REGION", "BELL_INLET_END_ZONE"),
@@ -516,7 +533,7 @@ def _make_success_result(
             RankingTraceEntry(
                 candidate_id=item.candidate_id,
                 candidate_hash=item.candidate_hash,
-                source_status=item.status,
+                source_status=cast(Literal["PASS", "WARN"], item.status),
                 objective_metric="shell_dp_pa",
                 objective_value=cast(Decimal, item.shell_dp_pa),
                 normalized_objective=normalized_objective,
@@ -650,7 +667,7 @@ def _make_success_result(
 
     if not all(visit(node) for node in node_ids):
         raise ValueError("Sizing provenance graph contains a cycle")
-    selection = (
+    selection: Literal["RECOMMENDATION_AVAILABLE", "NO_RECOMMENDABLE_CANDIDATE"] = (
         "RECOMMENDATION_AVAILABLE" if recommended is not None else "NO_RECOMMENDABLE_CANDIDATE"
     )
     provisional = Task173SizingSuccessResult(
@@ -791,7 +808,7 @@ def validate_sizing_request(
         authorities = task168._authority_map(task168_request)
         dimensions = tuple(
             task168._sort_values(authorities[role].values)
-            for role in task168.DIMENSION_ORDER
+            for role in DIMENSION_ORDER
             if role != "SHELL_GEOMETRY_ID"
         )
         if len(task168_request.shell_geometry_catalog.records) > 32:
@@ -890,7 +907,18 @@ def validate_sizing_request(
                 task174 = validate_task174_candidate(
                     task174_request,
                     Task174NativeOutputs(
-                        task029=bundle.task029_result, task034=None, task166=bundle.task166_result
+                        task029=cast(
+                            Task029SuccessResult
+                            | Task029BlockedResult
+                            | Task029RawBoundaryBlockedResult
+                            | None,
+                            bundle.task029_result,
+                        ),
+                        task034=None,
+                        task166=cast(
+                            Task166Result | Task166BlockedResult | None,
+                            bundle.task166_result,
+                        ),
                     ),
                 )
             except Exception as exc:
@@ -904,7 +932,8 @@ def validate_sizing_request(
                 )
                 continue
             if type(task174) is not Task174SuccessResult:
-                blocker_codes = tuple(item.code for item in task174.blockers)
+                blocked_task174 = cast(Task174BlockedResult, task174)
+                blocker_codes = tuple(item.code for item in blocked_task174.blockers)
                 entries.append(
                     _candidate_blocked_entry(
                         candidate,
@@ -945,7 +974,7 @@ def validate_sizing_request(
                     _candidate_blocked_entry(
                         candidate,
                         "TASK173_CANDIDATE_RATING",
-                        rating_outcome.failure_code,
+                        cast(Task173BlockedResult, rating_outcome).failure_code,
                         identities,
                         rating_request_hash,
                         rating_outcome.result_hash,
@@ -990,7 +1019,7 @@ def validate_sizing_request(
             warnings = tuple(
                 sorted(
                     set(
-                        tuple(bundle.task167_result.warnings)
+                        tuple(cast(Task167Result, bundle.task167_result).warnings)
                         + (
                             ("FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",)
                             if task174.fiv_numeric_limit_authority_missing
@@ -1000,7 +1029,9 @@ def validate_sizing_request(
                     key=lambda item: item.encode("utf-8"),
                 )
             )
-            status = "BLOCKED" if blockers else "WARN" if warnings else "PASS"
+            status: Literal["PASS", "WARN", "BLOCKED"] = (
+                "BLOCKED" if blockers else "WARN" if warnings else "PASS"
+            )
             score: Decimal | None = None
             if status in ("PASS", "WARN"):
                 with localcontext() as context:

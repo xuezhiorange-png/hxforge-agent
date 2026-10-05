@@ -3,21 +3,36 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Literal
+from typing import TYPE_CHECKING, Final, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import Task168Request
 
-SIZING_REQUEST_SCHEMA = "task173.sizing-request.v1"
-SIZING_RESULT_SCHEMA = "task173.sizing-result.v1"
-SIZING_BLOCKED_SCHEMA = "task173.sizing-blocked.v1"
-SIZING_PACKAGE_ID = "V07-T173-SIZING-AUTHORITY-PACKAGE-R2"
-SIZING_PACKAGE_HASH = "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
-SIZING_SCOPE_HASH = "7072db59a1f80609b0d502de7dc61a8d047d9cbe302c40b717a39f443440570b"
-RANKING_POLICY_ID = "V07-T173-SIZING-RANKING-POLICY-R1"
-RANKING_POLICY_HASH = "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+SIZING_REQUEST_SCHEMA: Final = "task173.sizing-request.v1"
+SIZING_RESULT_SCHEMA: Final = "task173.sizing-result.v1"
+SIZING_BLOCKED_SCHEMA: Final = "task173.sizing-blocked.v1"
+SIZING_PACKAGE_ID: Final = "V07-T173-SIZING-AUTHORITY-PACKAGE-R2"
+SIZING_PACKAGE_HASH: Final = "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
+SIZING_SCOPE_HASH: Final = "7072db59a1f80609b0d502de7dc61a8d047d9cbe302c40b717a39f443440570b"
+RANKING_POLICY_ID: Final = "V07-T173-SIZING-RANKING-POLICY-R1"
+RANKING_POLICY_HASH: Final = "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+
+if TYPE_CHECKING:
+    _TubeMassFlow: TypeAlias = Decimal
+    _ShellMassFlow: TypeAlias = Decimal
+    _MinimumTemperature: TypeAlias = Decimal
+    _MaximumTemperature: TypeAlias = Decimal
+    _MinimumPressure: TypeAlias = Decimal
+    _MaximumPressure: TypeAlias = Decimal
+else:
+    _TubeMassFlow: TypeAlias = Literal[Decimal("12.000000")]
+    _ShellMassFlow: TypeAlias = Literal[Decimal("20.000000")]
+    _MinimumTemperature: TypeAlias = Literal[Decimal("298.15")]
+    _MaximumTemperature: TypeAlias = Literal[Decimal("300.00")]
+    _MinimumPressure: TypeAlias = Literal[Decimal("100000")]
+    _MaximumPressure: TypeAlias = Literal[Decimal("101325")]
 
 
 class StrictModel(BaseModel):
@@ -40,12 +55,12 @@ class SizingServiceAuthority(StrictModel):
     fluid: Literal["PURE_ORDINARY_WATER"]
     property_profile_id: Literal["V07-T172-WATER-PROPERTY-PROFILE-R2"]
     clean_surface_only: Literal[True]
-    tube_mass_flow_kg_s: Literal[Decimal("12.000000")]
-    shell_mass_flow_kg_s: Literal[Decimal("20.000000")]
-    minimum_temperature_k: Literal[Decimal("298.15")]
-    maximum_temperature_k: Literal[Decimal("300.00")]
-    minimum_pressure_pa: Literal[Decimal("100000")]
-    maximum_pressure_pa: Literal[Decimal("101325")]
+    tube_mass_flow_kg_s: _TubeMassFlow
+    shell_mass_flow_kg_s: _ShellMassFlow
+    minimum_temperature_k: _MinimumTemperature
+    maximum_temperature_k: _MaximumTemperature
+    minimum_pressure_pa: _MinimumPressure
+    maximum_pressure_pa: _MaximumPressure
     production_mesh_profile_id: Literal["V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1"]
 
 
