@@ -1,0 +1,163 @@
+{
+  "schema_version": "task173.provider-quantization-transient-decision-enclosure-independent-review.v1",
+  "task_id": "STAGE3_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2_INDEPENDENT_REVIEW_R1",
+  "result": "FAIL_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2_INDEPENDENT_REVIEW",
+  "reviewer": {
+    "name": "Boole (OpenAI GPT-6 / Codex)",
+    "id": "01a10e1e-4b7c-7082-b2f8-e7547ea9b6cf",
+    "context": "FRESH",
+    "self_approval": false,
+    "candidate_author_self_approval": false
+  },
+  "pull_request": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true,
+    "reviewed_head": "9172befb3566f9acb47488232f1dc01959297606"
+  },
+  "runtime_source": {
+    "head": "b1b9d676c693e09d740c47b642198b5e4f543409",
+    "tree": "b0cfbdb7c4a9c3136fda317723fb5eab30c40e1e",
+    "runtime_paths_byte_identical_at_reviewed_head": true,
+    "rebaseline_v3_provenance_hash": "1f65fd736f4d5565d2f4a9037fabe8d9c48a7b0770ccb4414d86c7d82bb47574",
+    "historical_byte_equivalence_required": false,
+    "runtime_source_binding": "PASS"
+  },
+  "review_bundle": {
+    "file_count": 311,
+    "sha256": "c6dcde773e8554369de3db2c25bf16f1cd9a1b5c5c03d47d92106083c409b45d",
+    "manifest_sha256": "f273708d8f1d8af88e0ebd8a6d2975bbf7460f3779522f2d321a443ed209b6b3",
+    "exact_git_blob_membership": "PASS",
+    "raw_byte_length_and_sha256": "PASS",
+    "archive_member_identity": "PASS",
+    "artifact_file_integrity": "PASS"
+  },
+  "authority": {
+    "id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2",
+    "canonical_hash": "a388f3ed8a59bc408f53f35a50f3741e44a0c5399b27ad5bf75234f0036981fa",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "accepted": false,
+    "authority_hash_replay": "PASS",
+    "qualification_matrix_hash": "f659ef3be2e2e0766af9a004dc131e468433ae46e94a0470fb49509ff675ef6d",
+    "qualification_matrix_hash_replay": "PASS"
+  },
+  "replay": {
+    "committed_r2_command": {
+      "command": "uv run --locked --no-sync python docs/tasks/evidence/TASK-173-v0.7-provider-quantization-transient-decision-enclosure-r2-replay.py",
+      "status": "FAIL_HEAD_GUARD",
+      "error": "RUNTIME_HEAD_MISMATCH:9172befb3566f9acb47488232f1dc01959297606"
+    },
+    "committed_h2_command": {
+      "command": "uv run --locked --no-sync python docs/tasks/evidence/TASK-173-v0.7-provider-quantization-transient-decision-enclosure-r2-h2-hole-replay.py",
+      "status": "FAIL_HEAD_GUARD",
+      "error": "RUNTIME_BASELINE_MISMATCH:9172befb3566f9acb47488232f1dc01959297606:24fb55837e7cbb52dfa0a21f3e6e7a365f37a237"
+    },
+    "supplemental_native_model_replay": "PASS",
+    "event_hash_replay_count": 16,
+    "endpoint_request_result_replay_count": 57,
+    "continuation_hash_replay_count": 16,
+    "outer_decision_certificate_hash_replay_count": 8,
+    "trajectory_hash_replay_count": 5,
+    "r2_replay_all_pass_at_reviewed_head": false,
+    "h2_hole_evidence_hash": "968e50038a558af7f28d57364082c356b4a1c26aa90d40a5e65463a3c7a18afe",
+    "h2_hole_supplemental_replay": "PASS"
+  },
+  "validation_repair_review": {
+    "paths": [
+      "ci-shard-manifest.yml",
+      "src/hexagent/exchangers/shell_tube/task173_integrated_sizing/models.py",
+      "src/hexagent/exchangers/shell_tube/task173_integrated_sizing/service.py"
+    ],
+    "file_count": 3,
+    "type_repair_runtime_semantics": "PASS_NO_MATERIAL_CHANGE_FOUND",
+    "schema_canonical_projection_changed": false,
+    "manifest_newly_registered_path_count": 1,
+    "manifest_registered_path": "tests/exchangers/shell_tube/test_task173_integrated_sizing.py",
+    "manifest_d_eq_m": "PASS",
+    "ci_policy_weakening": false
+  },
+  "review_checks": {
+    "point_root_contract": "PASS",
+    "transient_only_scope": "PASS",
+    "q1_q15_recorded_events": "PASS",
+    "left_right_continuation": "PASS",
+    "outer_classification_invariance_recorded_certificates": "PASS",
+    "terminal_tolerance_invariance_recorded_certificates": "PASS",
+    "outer_action_invariance_recorded_certificates": "PASS",
+    "qualification_outer_solver_control_flow_parity": "FAIL",
+    "accepted_trajectory_rerun": "PASS",
+    "accepted_exact_root_count": 25,
+    "accepted_provider_enclosure_count": 0,
+    "transient_vs_final_physical_uncertainty": "PASS",
+    "complete_endpoint_identity_supplemental_replay": "PASS",
+    "five_case_trajectory_review": "PASS",
+    "h2_numerical_hole_review": "PASS_SUPPLEMENTAL_REPLAY",
+    "task174_grouped_reduction": "PASS",
+    "reference_task174_result_identity": {
+      "status": "PASS",
+      "hash": "ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419"
+    },
+    "reference_n1_dormancy": "PASS_LIMITED_TO_N1",
+    "scope_containment": "PASS",
+    "resource_cap_containment": "PASS",
+    "qualification_instrumentation_restoration": "PASS",
+    "qualification_control_flow_representativeness": "FAIL"
+  },
+  "qualification_summary": {
+    "candidate_cases": [
+      {"label": "TRAIN_A", "cut": "0.215", "trajectory_hash": "c865fabcd42658368fa3eb10a4e6edbd1124a1ba649dfc7cd650ae7bc7358843", "accepted_cells": 5, "accepted_enclosures": 0},
+      {"label": "TRAIN_B", "cut": "0.220", "trajectory_hash": "b2e579624aae8a1a09a89c6236e3dc4ee40bf8aa952681ef884ee5f8ff179cfc", "accepted_cells": 5, "accepted_enclosures": 0},
+      {"label": "H1", "cut": "0.225", "trajectory_hash": "c76b049b491235066ed8ea8ae005c3e125b359b8fd8fc1dd91938c8ff1d1bf50", "accepted_cells": 5, "accepted_enclosures": 0},
+      {"label": "H2", "cut": "0.275", "trajectory_hash": "52b93a79a30693a843fab7cb7575560ecebc3051512fdf987d6eef040aa839d0", "accepted_cells": 5, "accepted_enclosures": 0},
+      {"label": "H3", "cut": "0.350", "trajectory_hash": "73a0e5e199d452ba7e8a6dc7239c43f1f9bd857028c9722a6db9e9a1a444698a", "accepted_cells": 5, "accepted_enclosures": 0}
+    ],
+    "transient_event_count": 16,
+    "outer_decision_certificate_count": 8,
+    "outer_decision_invariance_pass_count": 8,
+    "terminal_tolerance_invariance_pass_count": 8,
+    "nested_enclosure_count": 0,
+    "final_accepted_trajectory_enclosure_count": 0,
+    "five_case_n1_evidence": "PASS"
+  },
+  "review_input_discrepancy": {
+    "prompt_parent_package_hash": "750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9",
+    "prompt_hash_hex_length": 63,
+    "committed_package_and_candidate_hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "committed_hash_hex_length": 64,
+    "normalized": false
+  },
+  "findings": [
+    {
+      "id": "QUALIFICATION_OUTER_SOLVER_CONTROL_FLOW_DIVERGENCE",
+      "severity": "BLOCKING_SUBSTANTIVE",
+      "status": "OPEN",
+      "details": "Production outer midpoint precision-floor handling and resource exhaustion use structured Stage3Failure outcomes and checks; the qualification reconstruction raises generic RuntimeError at these branches. These branches were not observed in the five cases, but the required qualification/production control-flow parity gate applies to them."
+    },
+    {
+      "id": "R2_REPLAY_ENTRYPOINT_RUNTIME_HEAD_GUARD_MISMATCH",
+      "severity": "BLOCKING_REPLAY_CONTRACT",
+      "status": "OPEN",
+      "details": "The committed R2 replay and H2 replay commands fail at reviewed HEAD 9172befb… before data replay because they require runtime HEAD/tree b1b9d676… . Supplemental native-model replay passes but does not satisfy the mandated committed-entrypoint replay at the exact reviewed checkout."
+    }
+  ],
+  "review_decision": "FAIL",
+  "effective_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "authority_accepted": false,
+  "boundaries": {
+    "production_code_changed_by_review": false,
+    "qualification_evidence_changed": false,
+    "production_r2_enclosure_implemented": false,
+    "candidate_full_rating_executed": false,
+    "sizing_executed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "next_gate": "OWNER_DIRECTION_REQUIRED_AFTER_TRANSIENT_DECISION_ENCLOSURE_R2_REVIEW_FAILURE",
+  "next_gate_executed": false,
+  "exact_head_ci": {
+    "status": "TO_RUN_AFTER_REVIEW_RECEIPT_COMMIT",
+    "recorded_in_final_conversational_receipt": true,
+    "runtime_budget_seconds": 540
+  }
+}
