@@ -38,6 +38,7 @@ from .models import (
     TASK025_HYDRAULIC_AUTHORITY_HASH,
     TASK025_RESULT_HASH,
     TUBE_COMPONENT_TYPES,
+    CandidateTask174Request,
     Task174BlockedResult,
     Task174Blocker,
     Task174CaseRequest,
@@ -70,6 +71,25 @@ _BELL_ALLOCATION_BY_EVENT_ROLE = {
 }
 
 
+def _native_bell_region_reconciliation_valid(task166: Task166Result) -> bool:
+    """Replay TASK166's canonical end-zone and total reduction order exactly."""
+    if type(task166) is not Task166Result:
+        return False
+    try:
+        with localcontext(engineering_context()):
+            end_zone_replay = task166.entrance_zone_contribution + task166.exit_zone_contribution
+            if end_zone_replay != task166.end_zone_pressure_drop:
+                return False
+            total_replay = (
+                task166.central_crossflow_contribution
+                + task166.window_contribution
+                + task166.end_zone_pressure_drop
+            )
+            return total_replay == task166.total_shell_pressure_drop
+    except Exception:
+        return False
+
+
 @dataclass(frozen=True)
 class Task174NativeOutputs:
     """Already-produced lower-level results; TASK174 never fabricates them."""
@@ -80,6 +100,13 @@ class Task174NativeOutputs:
 
 
 Task174Outcome = Task174BlockedResult | Task174SuccessResult
+
+TASK174_CANDIDATE_PROJECT_TRANSFER_AUTHORITY_ID = (
+    "V07-T173-SIZING-TASK174-CANDIDATE-PROJECT-TRANSFER-R1"
+)
+TASK174_CANDIDATE_REFERENCE_PRESSURE_AUTHORITY_ID = (
+    "V07-T174-CANDIDATE-REFERENCE-PRESSURE-COUPLING-R1"
+)
 
 
 def _native_event_ledger_valid(
@@ -129,18 +156,11 @@ def _native_event_ledger_valid(
         binding.allocation_role == "CORRECTION_OR_GEOMETRY_SUPPORT"
         for binding in request.bell_event_region_allocations
     )
-    with localcontext(engineering_context()):
-        try:
-            reconciles = (
-                task166.central_crossflow_contribution
-                + task166.window_contribution
-                + task166.entrance_zone_contribution
-                + task166.exit_zone_contribution
-                == task166.total_shell_pressure_drop
-            )
-        except Exception:
-            return False
-    return additive_count == 9 and support_count == 10 and reconciles
+    return (
+        additive_count == 9
+        and support_count == 10
+        and _native_bell_region_reconciliation_valid(task166)
+    )
 
 
 def _native_task166_valid(task166: Task166Result | Task166BlockedResult | None) -> bool:
@@ -652,9 +672,297 @@ def validate_request(raw_request: object, native_outputs: Task174NativeOutputs) 
     )
 
 
+def _candidate_task029_complete(
+    request: CandidateTask174Request,
+    task029: Task029SuccessResult | Task029BlockedResult | Task029RawBoundaryBlockedResult | None,
+) -> bool:
+    if type(task029) is not Task029SuccessResult or task029.blockers or task029.warnings:
+        return False
+    try:
+        if task029.result_hash != task029_identity.compute_success_result_hash(
+            task029
+        ) or task029.result_id != task029_identity.derive_result_id(task029.result_hash):
+            return False
+    except Exception:
+        return False
+    ledger = task029.completeness_ledger
+    if (
+        ledger.completeness_status
+        is not CompletenessStatus.COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY
+        or ledger.expected_member_count != ledger.observed_member_count
+        or len(ledger.ordered_member_evidence) != ledger.observed_member_count
+    ):
+        return False
+    if (
+        task029.task025_result_hash != request.task025_result_hash
+        or task029.task025_hydraulic_authority_hash != request.task025_hydraulic_authority_hash
+        or type(task029.modeled_total_tube_side_pressure_drop_pa) is not Decimal
+        or not task029.modeled_total_tube_side_pressure_drop_pa.is_finite()
+        or task029.modeled_total_tube_side_pressure_drop_pa < 0
+    ):
+        return False
+    members = ledger.ordered_member_evidence
+    if len({item.global_path_sequence_index for item in members}) != len(members):
+        return False
+    modeled = {item.component_type: item for item in request.tube_component_bindings}
+    for binding in request.tube_component_bindings:
+        matches = [
+            member
+            for member in members
+            if member.producer_component_type == binding.component_type
+            and member.producer_component_identity == binding.component_id
+            and member.producer_authority_hash == binding.component_authority_hash
+            and member.upstream_reference_plane == binding.upstream_reference_plane
+            and member.downstream_reference_plane == binding.downstream_reference_plane
+            and member.expected_multiplicity == binding.multiplicity
+            and member.observed_multiplicity == binding.multiplicity
+        ]
+        if len(matches) != 1:
+            return False
+    return len(modeled) + len(request.physical_absence_proofs) == len(TUBE_COMPONENT_TYPES)
+
+
+def _candidate_bell_ledger_valid(
+    request: CandidateTask174Request,
+    task166: Task166Result | Task166BlockedResult | None,
+) -> bool:
+    if not _native_task166_valid(task166) or type(task166) is not Task166Result:
+        return False
+    task020_evidence = dict(task166.task020_evidence)
+    layout_evidence = dict(task166.tube_layout_evidence)
+    shell_evidence = dict(task166.shell_bundle_evidence)
+    baffle_evidence = dict(task166.baffle_evidence)
+    if (
+        task166.result_id != request.task166_result_id
+        or task166.result_hash != request.task166_result_hash
+        or task020_evidence.get("result_id") != request.task020_configuration_id
+        or task020_evidence.get("result_hash") != request.task020_configuration_hash
+        or layout_evidence.get("result_id") != request.task021_layout_id
+        or layout_evidence.get("result_hash") != request.task021_layout_hash
+        or shell_evidence.get("result_id") != request.task022_geometry_id
+        or shell_evidence.get("result_hash") != request.task022_geometry_hash
+        or baffle_evidence.get("result_id") != request.task024_geometry_id
+        or baffle_evidence.get("result_hash") != request.task024_geometry_hash
+    ):
+        return False
+    events = {event.physical_event_id: event for event in request.physical_events}
+    allocations = {item.physical_event_id: item for item in request.bell_event_region_allocations}
+    if set(events) != set(allocations) or len(events) != len(request.physical_events):
+        return False
+    if any(
+        allocation.task166_result_hash != task166.result_hash
+        or events[event_id].native_geometry_id != request.task024_geometry_id
+        or events[event_id].native_geometry_hash != request.task024_geometry_hash
+        for event_id, allocation in allocations.items()
+    ):
+        return False
+    return _native_bell_region_reconciliation_valid(task166)
+
+
+def validate_candidate_request(
+    raw_request: CandidateTask174Request | dict[str, object],
+    native_outputs: Task174NativeOutputs,
+) -> Task174Outcome:
+    """Candidate sibling using only candidate-native TASK029/TASK166 outputs."""
+    if type(native_outputs) is not Task174NativeOutputs:
+        raise TypeError("native_outputs must be exact Task174NativeOutputs")
+    if type(raw_request) is CandidateTask174Request:
+        request = raw_request
+    elif type(raw_request) is dict:
+        try:
+            request = CandidateTask174Request.model_validate(raw_request, strict=True)
+        except ValidationError:
+            return _blocker_result(
+                canonical_sha256({"schema": "task174.invalid-candidate-request.v1"}),
+                (
+                    Task174Blocker(
+                        code="INVALID_CANDIDATE_TASK174_REQUEST_SCHEMA",
+                        scope="REQUEST",
+                        missing_bindings=("strict candidate-native request",),
+                        consumer="TASK174.candidate_request_validation",
+                    ),
+                ),
+                True,
+                tube_status="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+                shell_status="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+                bell_status="BLOCKED_EVENT_TO_REGION_MAPPING",
+                pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+            )
+    else:
+        return _blocker_result(
+            canonical_sha256({"schema": "task174.invalid-candidate-request.v1"}),
+            (
+                Task174Blocker(
+                    code="INVALID_CANDIDATE_TASK174_REQUEST_TYPE",
+                    scope="REQUEST",
+                    missing_bindings=("exact candidate TASK174 request",),
+                    consumer="TASK174.candidate_request_validation",
+                ),
+            ),
+            True,
+            tube_status="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+            shell_status="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+            bell_status="BLOCKED_EVENT_TO_REGION_MAPPING",
+            pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+        )
+
+    task029_hash = _task029_result_hash(native_outputs.task029)
+    task166_hash = _task166_result_hash(native_outputs.task166)
+    request_hash = canonical_sha256(
+        {
+            "request": request.model_dump(mode="json"),
+            "native_task029_result_hash": task029_hash,
+            "native_task166_result_hash": task166_hash,
+        }
+    )
+    tube_valid = _candidate_task029_complete(request, native_outputs.task029)
+    bell_valid = _candidate_bell_ledger_valid(request, native_outputs.task166)
+    pressure_valid = (
+        request.pressure_coupling_authority_hash
+        == "7506d4217d27123cdec1a5d46813445a1a8b500ef24af39e10b7598ba163ce19"
+        and all(
+            item.pressure_pa == Decimal("101325") for item in request.pressure_property_bindings
+        )
+    )
+    blockers: list[Task174Blocker] = []
+    if not tube_valid:
+        blockers.append(
+            Task174Blocker(
+                code="BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+                scope="CANDIDATE_TUBE_TASK029_PATH",
+                missing_bindings=(
+                    "candidate-bound complete TASK029 partition and exact modeled/absence coverage",
+                ),
+                consumer="TASK174 candidate tube-side closure",
+            )
+        )
+    if not bell_valid:
+        blockers.append(
+            Task174Blocker(
+                code="BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+                scope="CANDIDATE_TASK171_TO_TASK166_EVENT_LEDGER",
+                missing_bindings=(
+                    "exact-once candidate TASK171 event allocation to candidate TASK166",
+                ),
+                consumer="TASK174 candidate Bell aggregation",
+            )
+        )
+    if not pressure_valid:
+        blockers.append(
+            Task174Blocker(
+                code="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+                scope="CANDIDATE_PRESSURE_PATH",
+                missing_bindings=("candidate-bound one-way frozen 101325 Pa pressure coupling",),
+                consumer="TASK174 candidate pressure coupling",
+            )
+        )
+    fiv_missing = request.fiv_array_specific_critical_velocity_limit_m_s is None
+    if blockers:
+        return _blocker_result(
+            request_hash,
+            tuple(blockers),
+            fiv_missing,
+            tube_status="VALIDATED" if tube_valid else "BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+            shell_status="VALIDATED"
+            if bell_valid
+            else "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+            bell_status="VALIDATED" if bell_valid else "BLOCKED_EVENT_TO_REGION_MAPPING",
+            pressure_status="VALIDATED"
+            if pressure_valid
+            else "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+        )
+    task029 = cast(Task029SuccessResult, native_outputs.task029)
+    task166 = cast(Task166Result, native_outputs.task166)
+    with localcontext(engineering_context()):
+        tube_outlet = Decimal("101325") - task029.modeled_total_tube_side_pressure_drop_pa
+        shell_outlet = Decimal("101325") - task166.total_shell_pressure_drop
+    if any(
+        not Decimal("100000") <= value <= Decimal("101325") for value in (tube_outlet, shell_outlet)
+    ):
+        return _blocker_result(
+            request_hash,
+            (
+                Task174Blocker(
+                    code="BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT",
+                    scope="CANDIDATE_PRESSURE_PATH",
+                    missing_bindings=("candidate outlet pressures within 100000..101325 Pa",),
+                    consumer="candidate water-property domain guard",
+                ),
+            ),
+            fiv_missing,
+            tube_status="VALIDATED",
+            shell_status="VALIDATED",
+            bell_status="VALIDATED",
+            pressure_status="BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+        )
+    additive = sum(
+        item.allocation_role == "ADDITIVE_PRESSURE_REGION"
+        for item in request.bell_event_region_allocations
+    )
+    support = len(request.bell_event_region_allocations) - additive
+    result_projection = {
+        "request_hash": request_hash,
+        "task029_result_id": task029.result_id,
+        "task029_result_hash": task029.result_hash,
+        "task166_result_id": task166.result_id,
+        "task166_result_hash": task166.result_hash,
+        "modeled_total_tube_side_pressure_drop_pa": str(
+            task029.modeled_total_tube_side_pressure_drop_pa
+        ),
+        "bell_total_shell_pressure_drop_pa": str(task166.total_shell_pressure_drop),
+        "bell_central_crossflow_contribution_pa": str(task166.central_crossflow_contribution),
+        "bell_window_contribution_pa": str(task166.window_contribution),
+        "bell_inlet_end_zone_contribution_pa": str(task166.entrance_zone_contribution),
+        "bell_outlet_end_zone_contribution_pa": str(task166.exit_zone_contribution),
+        "task034_screening_result_id": None,
+        "task034_screening_result_hash": None,
+        "kern_screening_pressure_drop_pa": None,
+        "tube_outlet_pressure_pa": str(tube_outlet),
+        "shell_outlet_pressure_pa": str(shell_outlet),
+        "bell_physical_event_count": len(request.physical_events),
+        "event_multiplicity_sum": sum(item.multiplicity for item in request.physical_events),
+        "bell_additive_event_count": additive,
+        "bell_support_event_count": support,
+        "pressure_coupling_authority_id": TASK174_CANDIDATE_REFERENCE_PRESSURE_AUTHORITY_ID,
+        "fiv_status": "WARN_MISSING_NUMERIC_LIMIT" if fiv_missing else "DIAGNOSTIC_ONLY",
+        "fiv_numeric_limit_authority_missing": fiv_missing,
+        "fiv_numeric_limit_not_guessed": True,
+    }
+    result_hash = canonical_sha256(
+        {"schema_version": "task174.case-hydraulic-orchestration-result.v2", **result_projection}
+    )
+    return Task174SuccessResult(
+        status="VALIDATED",
+        request_hash=request_hash,
+        task029_result_id=task029.result_id,
+        task029_result_hash=task029.result_hash,
+        task166_result_id=task166.result_id,
+        task166_result_hash=task166.result_hash,
+        modeled_total_tube_side_pressure_drop_pa=task029.modeled_total_tube_side_pressure_drop_pa,
+        bell_total_shell_pressure_drop_pa=task166.total_shell_pressure_drop,
+        bell_central_crossflow_contribution_pa=task166.central_crossflow_contribution,
+        bell_window_contribution_pa=task166.window_contribution,
+        bell_inlet_end_zone_contribution_pa=task166.entrance_zone_contribution,
+        bell_outlet_end_zone_contribution_pa=task166.exit_zone_contribution,
+        tube_outlet_pressure_pa=tube_outlet,
+        shell_outlet_pressure_pa=shell_outlet,
+        bell_physical_event_count=len(request.physical_events),
+        event_multiplicity_sum=sum(item.multiplicity for item in request.physical_events),
+        bell_additive_event_count=additive,
+        bell_support_event_count=support,
+        pressure_coupling_authority_id=TASK174_CANDIDATE_REFERENCE_PRESSURE_AUTHORITY_ID,
+        fiv_status="WARN_MISSING_NUMERIC_LIMIT" if fiv_missing else "DIAGNOSTIC_ONLY",
+        fiv_numeric_limit_authority_missing=fiv_missing,
+        fiv_numeric_limit_not_guessed=True,
+        result_hash=result_hash,
+        result_id=f"urn:hxforge:task174:{result_hash}",
+    )
+
+
 __all__ = [
     "Task174NativeOutputs",
     "Task174Outcome",
     "recompute_task174_result_hash",
+    "validate_candidate_request",
     "validate_request",
 ]

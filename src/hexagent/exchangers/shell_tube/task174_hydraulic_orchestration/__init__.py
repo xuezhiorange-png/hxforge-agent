@@ -2,6 +2,8 @@
 
 from .models import (
     BellEventRegionAllocation,
+    CandidatePhysicalAbsenceProof,
+    CandidateTask174Request,
     HydraulicComponentBinding,
     PhysicalAbsenceExclusion,
     PhysicalEventBinding,
@@ -15,11 +17,14 @@ from .service import (
     Task174NativeOutputs,
     Task174Outcome,
     recompute_task174_result_hash,
+    validate_candidate_request,
     validate_request,
 )
 
 __all__ = [
     "BellEventRegionAllocation",
+    "CandidatePhysicalAbsenceProof",
+    "CandidateTask174Request",
     "HydraulicComponentBinding",
     "PhysicalAbsenceExclusion",
     "PhysicalEventBinding",
@@ -31,5 +36,6 @@ __all__ = [
     "Task174Outcome",
     "Task174SuccessResult",
     "recompute_task174_result_hash",
+    "validate_candidate_request",
     "validate_request",
 ]

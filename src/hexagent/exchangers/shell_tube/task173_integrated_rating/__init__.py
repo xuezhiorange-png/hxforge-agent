@@ -1,5 +1,11 @@
 """TASK173 fixed-geometry countercurrent rating API."""
 
+from .candidate_models import (
+    CandidateRatingRequest,
+    CandidateRatingSuccessResult,
+    candidate_rating_request_hash,
+    candidate_rating_result_hash,
+)
 from .models import (
     CELL_ROOT_SOLVER_AUTHORITY_ID,
     ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID,
@@ -26,6 +32,7 @@ from .service import (
     ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH,
     recompute_task173_request_hash,
     recompute_task173_result_hash,
+    validate_candidate_rating,
     validate_request,
 )
 
@@ -34,6 +41,8 @@ __all__ = [
     "CELL_ROOT_SOLVER_AUTHORITY_HASH",
     "CELL_ROOT_SOLVER_AUTHORITY_ID",
     "ConvergenceComparison",
+    "CandidateRatingRequest",
+    "CandidateRatingSuccessResult",
     "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY",
     "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_HASH",
     "ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID",
@@ -53,5 +62,8 @@ __all__ = [
     "ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_ID",
     "recompute_task173_request_hash",
     "recompute_task173_result_hash",
+    "candidate_rating_request_hash",
+    "candidate_rating_result_hash",
+    "validate_candidate_rating",
     "validate_request",
 ]

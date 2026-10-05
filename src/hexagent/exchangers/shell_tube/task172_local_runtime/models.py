@@ -14,6 +14,12 @@ from hexagent.exchangers.shell_tube.bell_delaware.models import (
     BellGeometry,
     Task166Result,
 )
+from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.engineering import (
+    compute_outer_to_inner_area_ratio,
+)
+from hexagent.exchangers.shell_tube.segmented_thermal_state_topology.models import (
+    Result as Task171Result,
+)
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     canonical as task031_canonical,
 )
@@ -23,11 +29,23 @@ from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.models import 
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry.models import (
     ShellSideHydraulicGeometry,
 )
+from hexagent.exchangers.shell_tube.tube_side.valid_result import Task025ValidResult
 
 TASK172_REQUEST_SCHEMA: Final = "task172.local-constitutive-request.v1"
 TASK172_RESULT_SCHEMA: Final = "task172.local-constitutive-result.v1"
 TASK172_BLOCKED_SCHEMA: Final = "task172.local-constitutive-blocked.v1"
 TASK172_IMPLEMENTATION_VERSION: Final = "task172.local-runtime-v1"
+TASK172_CANDIDATE_REQUEST_SCHEMA: Final = "task172.candidate-local-constitutive-request.v1"
+TASK173_SIZING_AUTHORITY_PACKAGE_ID: Final = "V07-T173-SIZING-AUTHORITY-PACKAGE-R2"
+TASK173_SIZING_AUTHORITY_PACKAGE_HASH: Final = (
+    "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
+)
+TASK173_SIZING_TASK172_AUTHORITY_HASH: Final = (
+    "fc7afcc9c51ed5920e3258b2a5683f1274d45df6c7d7e624be29614f97691483"
+)
+TASK173_SIZING_JMU_TRANSFER_HASH: Final = (
+    "6d716f541c44aeaa6911efe5919ed2f1474f4af93a4c06fcb01a672c56d234cc"
+)
 
 CASE_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"
 CASE_REVISION_ID: Final = "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2"
@@ -581,6 +599,329 @@ class Task172LocalRequest(StrictModel):
                 raise ValueError("bulk temperature is outside the reviewed case property domain")
             if not Decimal("100000") <= state.pressure_pa <= Decimal("101325"):
                 raise ValueError("bulk pressure is outside the reviewed case property domain")
+        return self
+
+
+class CandidateTopologyBinding(StrictModel):
+    """Candidate-owned TASK171 identities; never aliases the reference binding."""
+
+    topology_id: str = Field(min_length=1)
+    task171_result_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    mesh_identity: str = Field(pattern=r"^[0-9a-f]{64}$")
+    physical_ownership_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    definition_projection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    production_mesh_profile_authority_id: Literal[
+        "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1"
+    ] = PRODUCTION_MESH_PROFILE_ID
+    structural_mesh_authority_id: Literal["V07-T172-R119A-TASK171-MESH-R1"] = (
+        TASK171_STRUCTURAL_MESH_AUTHORITY_ID
+    )
+    selected_variant: Literal["TUBE_HOT_SHELL_COLD"]
+    thermal_role_selection_authority_id: Literal["V07-T172-R119C-THERMAL-ROLE-SELECTION-R1"] = (
+        THERMAL_ROLE_AUTHORITY_ID
+    )
+    tube_role: Literal["HOT"] = "HOT"
+    shell_role: Literal["COLD"] = "COLD"
+    tube_flow_path_id: str = Field(min_length=1)
+    shell_flow_path_id: str = Field(min_length=1)
+
+
+class CandidateLocalSupport(StrictModel):
+    """One candidate-native physical support and one numerical refinement child."""
+
+    candidate_id: str = Field(min_length=1)
+    candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    physical_segment_id: str = Field(min_length=1)
+    physical_segment_start_m: Decimal
+    physical_segment_end_m: Decimal
+    support_start_m: Decimal
+    support_end_m: Decimal
+    subdivisions_per_physical_interval_per_side: int = Field(ge=1, le=64)
+    subdivision_index: int = Field(ge=0, le=63)
+    mesh_level_identity: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tube_cell_id: str = Field(min_length=1)
+    shell_cell_id: str = Field(min_length=1)
+    wall_interface_id: str = Field(min_length=1)
+    inside_area_m2: Decimal
+    outside_area_m2: Decimal
+
+    @field_validator(
+        "physical_segment_start_m",
+        "physical_segment_end_m",
+        "support_start_m",
+        "support_end_m",
+        "inside_area_m2",
+        "outside_area_m2",
+    )
+    @classmethod
+    def finite_candidate_decimal(cls, value: Decimal) -> Decimal:
+        if type(value) is not Decimal or not value.is_finite():
+            raise ValueError("candidate support fields must be finite Decimal values")
+        return value
+
+    @model_validator(mode="after")
+    def valid_refinement_child(self) -> CandidateLocalSupport:
+        n = self.subdivisions_per_physical_interval_per_side
+        if n not in _ALLOWED_SUBDIVISIONS or not 0 <= self.subdivision_index < n:
+            raise ValueError("candidate support is outside the reviewed mesh sequence")
+        if self.physical_segment_end_m <= self.physical_segment_start_m:
+            raise ValueError("candidate physical support must have positive length")
+        if self.support_end_m <= self.support_start_m:
+            raise ValueError("candidate numerical support must have positive length")
+        with localcontext() as context:
+            context.prec = 80
+            length = self.physical_segment_end_m - self.physical_segment_start_m
+            child_length = length / Decimal(n)
+            expected_start = self.physical_segment_start_m + child_length * self.subdivision_index
+            expected_end = expected_start + child_length
+        if (self.support_start_m, self.support_end_m) != (expected_start, expected_end):
+            raise ValueError("candidate numerical support is not an exact interval refinement")
+        if self.inside_area_m2 <= 0 or self.outside_area_m2 <= 0:
+            raise ValueError("candidate support areas must be positive")
+        return self
+
+
+class CandidateShellFlowAuthority(StrictModel):
+    """Candidate-native TASK031/TASK166 pair, validated without reference IDs."""
+
+    task031_geometry: ShellSideHydraulicGeometry
+    task166_result: Task166Result
+
+    @model_validator(mode="after")
+    def native_candidate_binding(self) -> CandidateShellFlowAuthority:
+        geometry = self.task031_geometry
+        result = self.task166_result
+        if type(geometry) is not ShellSideHydraulicGeometry or type(result) is not Task166Result:
+            raise ValueError("candidate shell authority requires exact native TASK031/TASK166")
+        if (
+            geometry.blockers
+            or result.blockers
+            or result.warnings
+            or result.applicability is None
+            or result.applicability.status is not ApplicabilityStatus.APPLICABLE
+            or result.completeness is None
+            or result.completeness.status != "COMPLETE"
+            or result.bell_geometry is None
+        ):
+            raise ValueError("candidate TASK031/TASK166 applicability is not complete")
+        if (
+            dict(result.task020_evidence).get("result_id") != geometry.task020_configuration_id
+            or dict(result.task020_evidence).get("result_hash")
+            != geometry.task020_configuration_hash
+            or dict(result.tube_layout_evidence).get("result_id") != geometry.task021_layout_id
+            or dict(result.tube_layout_evidence).get("result_hash") != geometry.task021_layout_hash
+            or dict(result.shell_bundle_evidence).get("result_id") != geometry.task022_geometry_id
+            or dict(result.shell_bundle_evidence).get("result_hash")
+            != geometry.task022_geometry_hash
+            or dict(result.baffle_evidence).get("result_id") != geometry.task024_geometry_id
+            or dict(result.baffle_evidence).get("result_hash") != geometry.task024_geometry_hash
+        ):
+            raise ValueError("candidate TASK031 and TASK166 native geometry bindings disagree")
+        if (
+            geometry.geometry_hash
+            != task031_canonical.sha256_hex(
+                task031_canonical.success_geometry_canonical_projection(geometry)
+            )
+            or result.result_hash != task166_canonical.result_hash(result)
+            or result.result_id != task166_canonical.result_id(result.result_hash)
+        ):
+            raise ValueError("candidate TASK031/TASK166 canonical identity replay failed")
+        return self
+
+
+class CandidateThermalBinding(StrictModel):
+    """Producer-issued candidate lineage used to authorize the shared kernel."""
+
+    candidate_id: str = Field(min_length=1)
+    candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authority_package_id: Literal["V07-T173-SIZING-AUTHORITY-PACKAGE-R2"] = (
+        TASK173_SIZING_AUTHORITY_PACKAGE_ID
+    )
+    authority_package_hash: Literal[
+        "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
+    ] = TASK173_SIZING_AUTHORITY_PACKAGE_HASH
+    task172_candidate_authority_hash: Literal[
+        "fc7afcc9c51ed5920e3258b2a5683f1274d45df6c7d7e624be29614f97691483"
+    ] = TASK173_SIZING_TASK172_AUTHORITY_HASH
+    jmu_transfer_authority_hash: Literal[
+        "6d716f541c44aeaa6911efe5919ed2f1474f4af93a4c06fcb01a672c56d234cc"
+    ] = TASK173_SIZING_JMU_TRANSFER_HASH
+    task171_result: Task171Result
+    task025_result: Task025ValidResult
+    task166_result: Task166Result
+
+    @model_validator(mode="after")
+    def candidate_lineage_matches(self) -> CandidateThermalBinding:
+        topology = self.task171_result
+        area = self.task025_result
+        bell = self.task166_result
+        if (
+            topology.status != "VALIDATED"
+            or topology.topology_id is None
+            or topology.result_hash is None
+            or topology.mesh_identity is None
+            or topology.physical_ownership_hash is None
+            or topology.native_identity is None
+            or area.result_hash != topology.native_identity.area_result_hash
+            or area.result_id != topology.native_identity.area_result_id
+            or bell.result_hash == ""
+            or not area.heat_transfer_authority.length_m.is_finite()
+        ):
+            raise ValueError("candidate TASK171/TASK025/TASK166 producer lineage is incomplete")
+        definition = topology.topology_definition
+        if definition is None:
+            raise ValueError("candidate TASK171 validated result must carry its Definition")
+        native = topology.native_identity
+        if native is None:
+            raise ValueError("candidate TASK171 result must carry native identity")
+        native_pairs = (
+            (bell.task020_evidence, native.configuration_id, native.configuration_hash),
+            (bell.tube_layout_evidence, native.layout_id, native.layout_hash),
+            (bell.shell_bundle_evidence, native.bundle_id, native.bundle_hash),
+            (bell.baffle_evidence, native.baffle_id, native.baffle_hash),
+        )
+        if any(
+            dict(evidence).get("result_id") != expected_id
+            or dict(evidence).get("result_hash") != expected_hash
+            for evidence, expected_id, expected_hash in native_pairs
+        ):
+            raise ValueError(
+                "candidate TASK166 result is bound to different TASK171 native geometry"
+            )
+        interval_inside = sum(Decimal(item.inside_area_m2) for item in definition.intervals)
+        interval_outside = sum(Decimal(item.outside_area_m2) for item in definition.intervals)
+        bell_geometry = bell.bell_geometry
+        if bell_geometry is None:
+            raise ValueError("candidate TASK166 result must carry native Bell geometry")
+        expected_outside = area.internal_heat_transfer_surface_area_m2 * (
+            compute_outer_to_inner_area_ratio(
+                area.hydraulic_diameter_m, bell_geometry.tube_outer_diameter_m
+            )
+        )
+        if (
+            interval_inside != Decimal(area.internal_heat_transfer_surface_area_m2)
+            or interval_outside != expected_outside
+        ):
+            raise ValueError("candidate TASK171 support areas do not reconcile to TASK025")
+        return self
+
+
+class CandidateTask172LocalRequest(StrictModel):
+    """Strict candidate sibling; the existing reference request remains unchanged."""
+
+    schema_version: Literal["task172.candidate-local-constitutive-request.v1"] = (
+        TASK172_CANDIDATE_REQUEST_SCHEMA
+    )
+    case_id: str = Field(min_length=1)
+    case_revision_id: str = Field(min_length=1)
+    topology: CandidateTopologyBinding
+    support: CandidateLocalSupport
+    tube_bulk_state: LocalState
+    shell_bulk_state: LocalState
+    tube_mass_flow_kg_s: Decimal
+    shell_mass_flow_kg_s: Decimal
+    property_profile_id: Literal["V07-T172-WATER-PROPERTY-PROFILE-R2"] = PROFILE_ID
+    property_profile_canonical_hash: Literal[
+        "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de"
+    ] = PROPERTY_PROFILE_CANONICAL_HASH
+    r94_model_profile_canonical_hash: Literal[
+        "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec"
+    ] = R94_MODEL_PROFILE_CANONICAL_HASH
+    r98_overlay_canonical_hash: Literal[
+        "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78"
+    ] = R98_OVERLAY_CANONICAL_HASH
+    stage1_authority_evidence_canonical_hash: Literal[
+        "60d1270c52ea226df28634003b4beaf6a8d006915d6454fe7e55dfaaca8771c1"
+    ] = STAGE1_AUTHORITY_EVIDENCE_CANONICAL_HASH
+    shell_jmu_model_authority_canonical_hash: Literal[
+        "ea6041287c407afe735148e12866f02026d23ba6e9c881ba22c076c032b5cac6"
+    ] = SHELL_JMU_MODEL_AUTHORITY_CANONICAL_HASH
+    shell_flow_authority: CandidateShellFlowAuthority
+    material_source_sha256: Literal[
+        "eda6e84f95c4cc2a46bb8c902cf066c4f51b9108d951d5490222cb365219ac48"
+    ] = MATERIAL_SOURCE_SHA256
+    clean_wall_authority_hash: Literal[
+        "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29"
+    ] = CLEAN_WALL_AUTHORITY_HASH
+    cylindrical_mapping_hash: Literal[
+        "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c"
+    ] = CYLINDRICAL_MAPPING_HASH
+    tube_inside_fouling_m2_k_w: Decimal = Decimal("0")
+    shell_outside_fouling_m2_k_w: Decimal = Decimal("0")
+    candidate_binding: CandidateThermalBinding
+
+    @field_validator("tube_mass_flow_kg_s", "shell_mass_flow_kg_s")
+    @classmethod
+    def positive_candidate_mass_flow(cls, value: Decimal) -> Decimal:
+        if type(value) is not Decimal or not value.is_finite() or value <= 0:
+            raise ValueError("candidate mass flow must be positive finite Decimal")
+        return value
+
+    @field_validator("tube_inside_fouling_m2_k_w", "shell_outside_fouling_m2_k_w")
+    @classmethod
+    def finite_candidate_fouling(cls, value: Decimal) -> Decimal:
+        if type(value) is not Decimal or not value.is_finite():
+            raise ValueError("candidate fouling resistance must be finite Decimal")
+        return value
+
+    @model_validator(mode="after")
+    def candidate_reviewed_service(self) -> CandidateTask172LocalRequest:
+        if self.tube_mass_flow_kg_s != Decimal("12.000000") or self.shell_mass_flow_kg_s != Decimal(
+            "20.000000"
+        ):
+            raise ValueError("candidate transfer is limited to the reviewed 12/20 kg/s service")
+        if self.tube_inside_fouling_m2_k_w != 0 or self.shell_outside_fouling_m2_k_w != 0:
+            raise ValueError("candidate transfer is limited to the reviewed clean-surface profile")
+        for state in (self.tube_bulk_state, self.shell_bulk_state):
+            if not Decimal("298.15") <= state.temperature_k <= Decimal("300.00"):
+                raise ValueError("candidate bulk temperature leaves the reviewed domain")
+            if not Decimal("100000") <= state.pressure_pa <= Decimal("101325"):
+                raise ValueError("candidate bulk pressure leaves the reviewed domain")
+        return self
+
+    @model_validator(mode="after")
+    def candidate_binding_is_exact(self) -> CandidateTask172LocalRequest:
+        native = self.candidate_binding.task171_result
+        definition = native.topology_definition
+        if definition is None:
+            raise ValueError("candidate topology Definition is required")
+        if (
+            self.case_id != self.candidate_binding.candidate_id
+            or self.case_revision_id != self.candidate_binding.candidate_id
+            or self.topology.topology_id != native.topology_id
+            or self.topology.task171_result_hash != native.result_hash
+            or self.topology.mesh_identity != native.mesh_identity
+            or self.topology.physical_ownership_hash != native.physical_ownership_hash
+            or self.topology.tube_flow_path_id
+            not in {path.flow_path_id for path in definition.paths if path.side == "TUBE"}
+            or self.topology.shell_flow_path_id
+            not in {path.flow_path_id for path in definition.paths if path.side == "SHELL"}
+            or self.support.candidate_id != self.candidate_binding.candidate_id
+            or self.support.candidate_hash != self.candidate_binding.candidate_hash
+            or self.support.mesh_level_identity
+            != canonical_sha256(
+                {
+                    "profile_authority_id": self.topology.production_mesh_profile_authority_id,
+                    "candidate_id": self.candidate_binding.candidate_id,
+                    "candidate_hash": self.candidate_binding.candidate_hash,
+                    "task171_mesh_identity": self.topology.mesh_identity,
+                    "subdivisions_per_physical_interval_per_side": (
+                        self.support.subdivisions_per_physical_interval_per_side
+                    ),
+                }
+            )
+            or self.shell_flow_authority.task166_result.result_hash
+            != self.candidate_binding.task166_result.result_hash
+        ):
+            raise ValueError("candidate TASK172 identities do not match native producer outputs")
+        intervals = {item.physical_segment_id: item for item in definition.intervals}
+        interval = intervals.get(self.support.physical_segment_id)
+        if (
+            interval is None
+            or Decimal(interval.start_m) != self.support.physical_segment_start_m
+            or Decimal(interval.end_m) != self.support.physical_segment_end_m
+        ):
+            raise ValueError("candidate TASK172 support is not from the TASK171 Definition")
         return self
 
 

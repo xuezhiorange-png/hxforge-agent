@@ -7,10 +7,13 @@ from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from hexagent.canonical_json import canonical_sha256
+
 TASK174_REQUEST_SCHEMA: Final = "task174.case-hydraulic-orchestration-request.v2"
 TASK174_RESULT_SCHEMA: Final = "task174.case-hydraulic-orchestration-result.v2"
 TASK174_BLOCKED_SCHEMA: Final = "task174.case-hydraulic-orchestration-blocked.v2"
 TASK174_IMPLEMENTATION_VERSION: Final = "task174.hydraulic-orchestration-v2"
+TASK174_CANDIDATE_REQUEST_SCHEMA: Final = "task174.candidate-hydraulic-orchestration-request.v1"
 
 TOPOLOGY_ID: Final = (
     "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7"
@@ -190,6 +193,163 @@ class Task174CaseRequest(StrictModel):
         return self
 
 
+class CandidatePhysicalAbsenceProof(StrictModel):
+    """Candidate-native evidence for a component absent from this topology."""
+
+    candidate_id: str = Field(min_length=1)
+    candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task020_configuration_id: str = Field(min_length=1)
+    task020_configuration_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task021_layout_id: str = Field(min_length=1)
+    task021_layout_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task022_geometry_id: str = Field(min_length=1)
+    task022_geometry_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task024_geometry_id: str = Field(min_length=1)
+    task024_geometry_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    component_type: Literal[
+        "ENTRANCE", "EXIT", "CHANNEL_HEAD", "NOZZLE", "CONTRACTION", "EXPANSION"
+    ]
+    upstream_reference_plane: str = Field(min_length=1)
+    downstream_reference_plane: str = Field(min_length=1)
+    structural_reason: str = Field(min_length=1)
+    exclusion_authority_id: Literal["V07-T173-SIZING-TASK174-CANDIDATE-PROJECT-TRANSFER-R1"]
+    exclusion_authority_hash: Literal[
+        "893a6c1644a940b27fbad85ef4d4fc402a7999971dc5e2ed3603fada0398b857"
+    ]
+    evidence_ref: str = Field(min_length=1)
+    canonical_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def valid_boundary(self) -> CandidatePhysicalAbsenceProof:
+        if self.upstream_reference_plane == self.downstream_reference_plane:
+            raise ValueError("candidate absence proof must identify its equipment boundary")
+        projection = self.model_dump(mode="json", exclude={"canonical_hash"})
+        if self.canonical_hash != canonical_sha256(projection):
+            raise ValueError("candidate physical absence proof canonical hash does not replay")
+        return self
+
+
+class CandidateTask174Request(StrictModel):
+    """Candidate-bound TASK174 sibling; reference-case literals remain untouched."""
+
+    schema_version: Literal["task174.candidate-hydraulic-orchestration-request.v1"] = (
+        TASK174_CANDIDATE_REQUEST_SCHEMA
+    )
+    candidate_id: str = Field(min_length=1)
+    candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authority_package_id: Literal["V07-T173-SIZING-AUTHORITY-PACKAGE-R2"]
+    authority_package_hash: Literal[
+        "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
+    ]
+    task174_candidate_authority_hash: Literal[
+        "4d0f83b8ab1777ba6516dfc607c7accc814ef8a521d26c25c8cf0adc1b264023"
+    ]
+    task174_project_transfer_authority_hash: Literal[
+        "893a6c1644a940b27fbad85ef4d4fc402a7999971dc5e2ed3603fada0398b857"
+    ]
+    bell_event_transfer_authority_hash: Literal[
+        "28c89b6c58fef6050f9a0f5d33b80ce686f875a4ba9350e254d43ff699dccc58"
+    ]
+    pressure_coupling_authority_hash: Literal[
+        "7506d4217d27123cdec1a5d46813445a1a8b500ef24af39e10b7598ba163ce19"
+    ]
+    task020_configuration_id: str = Field(min_length=1)
+    task020_configuration_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task021_layout_id: str = Field(min_length=1)
+    task021_layout_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task022_geometry_id: str = Field(min_length=1)
+    task022_geometry_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task024_geometry_id: str = Field(min_length=1)
+    task024_geometry_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task025_result_id: str = Field(min_length=1)
+    task025_result_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task025_hydraulic_authority_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task171_topology_id: str = Field(min_length=1)
+    task171_result_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    mesh_identity: str = Field(pattern=r"^[0-9a-f]{64}$")
+    physical_ownership_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    task166_result_id: str = Field(min_length=1)
+    task166_result_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tube_component_bindings: tuple[HydraulicComponentBinding, ...]
+    physical_absence_proofs: tuple[CandidatePhysicalAbsenceProof, ...]
+    physical_events: tuple[PhysicalEventBinding, ...] = Field(min_length=1)
+    bell_event_region_allocations: tuple[BellEventRegionAllocation, ...] = Field(min_length=1)
+    pressure_property_bindings: tuple[PressurePropertyBinding, ...] = Field(min_length=2)
+    fiv_requirement_mode: Literal["DIAGNOSTIC_SCREENING_ONLY"] = FIV_REQUIREMENT_MODE
+    fiv_array_specific_critical_velocity_limit_m_s: Decimal | None = None
+
+    @model_validator(mode="after")
+    def candidate_identity_and_coverage(self) -> CandidateTask174Request:
+        modeled = [item.component_type for item in self.tube_component_bindings]
+        absent = [item.component_type for item in self.physical_absence_proofs]
+        if len(modeled + absent) != len(TUBE_COMPONENT_TYPES):
+            raise ValueError("candidate tube boundary must cover all six component classes")
+        if set(modeled + absent) != TUBE_COMPONENT_TYPES:
+            raise ValueError("candidate tube boundary must cover all six component classes")
+        if len(set(modeled + absent)) != len(modeled + absent):
+            raise ValueError("a candidate component class must be modeled or absent exactly once")
+        if any(
+            proof.candidate_id != self.candidate_id
+            or proof.candidate_hash != self.candidate_hash
+            or proof.task020_configuration_id != self.task020_configuration_id
+            or proof.task020_configuration_hash != self.task020_configuration_hash
+            or proof.task021_layout_id != self.task021_layout_id
+            or proof.task021_layout_hash != self.task021_layout_hash
+            or proof.task022_geometry_id != self.task022_geometry_id
+            or proof.task022_geometry_hash != self.task022_geometry_hash
+            or proof.task024_geometry_id != self.task024_geometry_id
+            or proof.task024_geometry_hash != self.task024_geometry_hash
+            for proof in self.physical_absence_proofs
+        ):
+            raise ValueError("candidate physical absence proof is stale or cross-candidate")
+        event_ids = [event.physical_event_id for event in self.physical_events]
+        allocation_ids = [item.physical_event_id for item in self.bell_event_region_allocations]
+        if len(event_ids) != len(set(event_ids)) or set(event_ids) != set(allocation_ids):
+            raise ValueError("candidate TASK171 physical events need exact-once Bell allocation")
+        if len(allocation_ids) != len(set(allocation_ids)):
+            raise ValueError("candidate TASK171 event may not be allocated more than once")
+        if any(
+            event.native_geometry_id != self.task024_geometry_id
+            or event.native_geometry_hash != self.task024_geometry_hash
+            for event in self.physical_events
+        ):
+            raise ValueError("candidate physical events must bind its native TASK024 geometry")
+        by_id = {event.physical_event_id: event for event in self.physical_events}
+        expected_roles = {
+            "CENTRAL_CROSSFLOW": ("ADDITIVE_PRESSURE_REGION", "BELL_CENTRAL_CROSSFLOW_REGION"),
+            "WINDOW": ("ADDITIVE_PRESSURE_REGION", "BELL_WINDOW_REGION"),
+            "INLET_END_ZONE": ("ADDITIVE_PRESSURE_REGION", "BELL_INLET_END_ZONE"),
+            "OUTLET_END_ZONE": ("ADDITIVE_PRESSURE_REGION", "BELL_OUTLET_END_ZONE"),
+            "BAFFLE": ("CORRECTION_OR_GEOMETRY_SUPPORT", "BAFFLE_GEOMETRY_SUPPORT"),
+            "LEAKAGE_GEOMETRY": (
+                "CORRECTION_OR_GEOMETRY_SUPPORT",
+                "RL_LEAKAGE_CORRECTION_SUPPORT",
+            ),
+            "BYPASS_GEOMETRY": ("CORRECTION_OR_GEOMETRY_SUPPORT", "RB_BYPASS_CORRECTION_SUPPORT"),
+            "TUBE_ROW_OR_CROSSED_ROW": (
+                "CORRECTION_OR_GEOMETRY_SUPPORT",
+                "CROSS_FLOW_ROW_COUNT_SUPPORT",
+            ),
+        }
+        for allocation in self.bell_event_region_allocations:
+            event = by_id[allocation.physical_event_id]
+            if allocation.task166_result_hash != self.task166_result_hash or expected_roles.get(
+                event.event_role
+            ) != (allocation.allocation_role, allocation.bell_region_or_support_role):
+                raise ValueError("candidate Bell event allocation does not match native event role")
+        pressure_sides = [item.side for item in self.pressure_property_bindings]
+        if set(pressure_sides) != {"TUBE", "SHELL"} or len(pressure_sides) != 2:
+            raise ValueError("candidate must bind one frozen reference pressure per side")
+        if any(item.pressure_pa != Decimal("101325") for item in self.pressure_property_bindings):
+            raise ValueError("candidate pressure coupling is frozen at 101325 Pa")
+        if self.fiv_array_specific_critical_velocity_limit_m_s is not None and (
+            not self.fiv_array_specific_critical_velocity_limit_m_s.is_finite()
+            or self.fiv_array_specific_critical_velocity_limit_m_s <= 0
+        ):
+            raise ValueError("explicit FIV diagnostic limit must be positive and finite")
+        return self
+
+
 class Task174Blocker(StrictModel):
     code: str
     scope: str
@@ -253,6 +413,8 @@ class Task174SuccessResult(StrictModel):
 
 __all__ = [
     "BellEventRegionAllocation",
+    "CandidatePhysicalAbsenceProof",
+    "CandidateTask174Request",
     "HydraulicComponentBinding",
     "PhysicalAbsenceExclusion",
     "PhysicalEventBinding",

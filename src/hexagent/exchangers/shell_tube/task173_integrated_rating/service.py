@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
@@ -13,6 +14,11 @@ from pydantic import ValidationError
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
+    CandidateLocalSupport,
+    CandidateShellFlowAuthority,
+    CandidateTask172LocalRequest,
+    CandidateThermalBinding,
+    CandidateTopologyBinding,
     Task172BlockedResult,
     Task172LocalRequest,
     Task172LocalResult,
@@ -22,6 +28,9 @@ from hexagent.exchangers.shell_tube.task172_local_runtime import (
     recompute_task172_request_hash,
     recompute_task172_result_hash,
     recompute_task172_support_id,
+)
+from hexagent.exchangers.shell_tube.task172_local_runtime import (
+    validate_candidate_request as task172_validate_candidate,
 )
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
     validate_request as task172_validate,
@@ -38,6 +47,12 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     LocalState,
     TopologyBinding,
     mesh_level_identity,
+)
+from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
+    CandidateRatingRequest,
+    CandidateRatingSuccessResult,
+    candidate_rating_request_hash,
+    candidate_rating_result_hash,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     CELL_ROOT_SOLVER_AUTHORITY_ID,
@@ -450,7 +465,7 @@ class _CellEvaluation:
     shell_next_physical: _ThermoState
     tube_local: _ThermoState
     shell_local: _ThermoState
-    task172_request: Task172LocalRequest
+    task172_request: Task172LocalRequest | CandidateTask172LocalRequest
     task172_result: Task172LocalResult
 
 
@@ -747,6 +762,24 @@ class _OuterTrial:
     diagnostics: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class _CandidateRatingContext:
+    request: CandidateRatingRequest
+    shell_authority: CandidateShellFlowAuthority
+    topology_id: str
+    task171_result_hash: str
+    mesh_identity: str
+    physical_ownership_hash: str
+    tube_flow_path_id: str
+    shell_flow_path_id: str
+    interval_count: int
+
+
+_CANDIDATE_RATING_CONTEXT: ContextVar[_CandidateRatingContext | None] = ContextVar(
+    "task173_candidate_rating_context", default=None
+)
+
+
 def _d(value: float | Decimal) -> Decimal:
     if type(value) is Decimal:
         result = value
@@ -757,6 +790,101 @@ def _d(value: float | Decimal) -> Decimal:
     if not result.is_finite():
         raise ValueError("non-finite TASK173 value")
     return result
+
+
+def _candidate_context(request: CandidateRatingRequest) -> _CandidateRatingContext:
+    topology = request.task171_result
+    definition = topology.topology_definition
+    if (
+        topology.status != "VALIDATED"
+        or topology.topology_id is None
+        or topology.result_hash is None
+        or topology.mesh_identity is None
+        or topology.physical_ownership_hash is None
+        or definition is None
+        or not definition.intervals
+    ):
+        raise _Stage3Failure("BLOCKED_CANDIDATE_TASK171_BINDING")
+    tube_paths = [path.flow_path_id for path in definition.paths if path.side.value == "TUBE"]
+    shell_paths = [path.flow_path_id for path in definition.paths if path.side.value == "SHELL"]
+    if len(tube_paths) != 1 or len(shell_paths) != 1:
+        raise _Stage3Failure("BLOCKED_CANDIDATE_FLOW_PATH_IDENTITY")
+    shell_authority = CandidateShellFlowAuthority(
+        task031_geometry=request.task031_geometry,
+        task166_result=request.task166_result,
+    )
+    return _CandidateRatingContext(
+        request=request,
+        shell_authority=shell_authority,
+        topology_id=topology.topology_id,
+        task171_result_hash=topology.result_hash,
+        mesh_identity=topology.mesh_identity,
+        physical_ownership_hash=topology.physical_ownership_hash,
+        tube_flow_path_id=tube_paths[0],
+        shell_flow_path_id=shell_paths[0],
+        interval_count=len(definition.intervals),
+    )
+
+
+def _candidate_mesh_identity(context: _CandidateRatingContext, subdivisions: int) -> str:
+    return canonical_sha256(
+        {
+            "profile_authority_id": PRODUCTION_MESH_PROFILE_AUTHORITY_ID,
+            "candidate_id": context.request.candidate_id,
+            "candidate_hash": context.request.candidate_hash,
+            "task171_mesh_identity": context.mesh_identity,
+            "subdivisions_per_physical_interval_per_side": subdivisions,
+        }
+    )
+
+
+def _build_candidate_local_support(
+    context: _CandidateRatingContext,
+    physical_interval_index: int,
+    subdivisions: int,
+    subdivision_index: int,
+) -> CandidateLocalSupport:
+    definition = context.request.task171_result.topology_definition
+    if definition is None or not 0 <= physical_interval_index < len(definition.intervals):
+        raise _Stage3Failure("BLOCKED_CANDIDATE_PHYSICAL_INTERVAL_BINDING")
+    interval = definition.intervals[physical_interval_index]
+    start = Decimal(interval.start_m)
+    end = Decimal(interval.end_m)
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        child_length = (end - start) / Decimal(subdivisions)
+        support_start = start + child_length * subdivision_index
+        support_end = support_start + child_length
+        inside_area = Decimal(interval.inside_area_m2) / Decimal(subdivisions)
+        outside_area = Decimal(interval.outside_area_m2) / Decimal(subdivisions)
+    mesh_id = _candidate_mesh_identity(context, subdivisions)
+    identity = {
+        "candidate_hash": context.request.candidate_hash,
+        "task171_result_hash": context.task171_result_hash,
+        "mesh_identity": mesh_id,
+        "physical_segment_id": interval.physical_segment_id,
+        "subdivision_index": subdivision_index,
+    }
+    tube_id = canonical_sha256({"role": "TUBE_CELL", **identity})
+    shell_id = canonical_sha256({"role": "SHELL_CELL", **identity})
+    wall_id = canonical_sha256({"role": "WALL_INTERFACE", **identity})
+    return CandidateLocalSupport(
+        candidate_id=context.request.candidate_id,
+        candidate_hash=context.request.candidate_hash,
+        physical_segment_id=interval.physical_segment_id,
+        physical_segment_start_m=start,
+        physical_segment_end_m=end,
+        support_start_m=support_start,
+        support_end_m=support_end,
+        subdivisions_per_physical_interval_per_side=subdivisions,
+        subdivision_index=subdivision_index,
+        mesh_level_identity=mesh_id,
+        tube_cell_id=f"urn:hxforge:task173:candidate-cell:tube:{tube_id}",
+        shell_cell_id=f"urn:hxforge:task173:candidate-cell:shell:{shell_id}",
+        wall_interface_id=f"urn:hxforge:task173:candidate-wall-interface:{wall_id}",
+        inside_area_m2=inside_area,
+        outside_area_m2=outside_area,
+    )
 
 
 def recompute_task173_request_hash(request: Task173Request) -> str:
@@ -968,7 +1096,20 @@ def _face_state(
     face_count: int,
     producer_authority_id: str,
 ) -> FaceState:
-    path_id = TUBE_FLOW_PATH_ID if side == "TUBE" else SHELL_FLOW_PATH_ID
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+    case_revision_id = (
+        candidate_context.request.candidate_id if candidate_context else CASE_REVISION_ID
+    )
+    topology_id = candidate_context.topology_id if candidate_context else TOPOLOGY_ID
+    path_id = (
+        candidate_context.tube_flow_path_id
+        if candidate_context is not None and side == "TUBE"
+        else candidate_context.shell_flow_path_id
+        if candidate_context is not None
+        else TUBE_FLOW_PATH_ID
+        if side == "TUBE"
+        else SHELL_FLOW_PATH_ID
+    )
     if face_index == 0:
         role: Literal["INLET", "OUTLET", "INTERIOR"] = "INLET" if side == "TUBE" else "OUTLET"
     elif face_index == face_count:
@@ -989,10 +1130,18 @@ def _face_state(
             ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
         ),
     }
+    if candidate_context is not None:
+        provenance.update(
+            {
+                "candidate_id": candidate_context.request.candidate_id,
+                "candidate_hash": candidate_context.request.candidate_hash,
+                "sizing_authority_package_hash": candidate_context.request.authority_package_hash,
+            }
+        )
     projection = {
         "schema_version": "task173.face-state.v1",
-        "case_revision_id": CASE_REVISION_ID,
-        "topology_id": TOPOLOGY_ID,
+        "case_revision_id": case_revision_id,
+        "topology_id": topology_id,
         "flow_path_id": path_id,
         "side": side,
         "face_index": face_index,
@@ -1010,8 +1159,8 @@ def _face_state(
     return FaceState(
         face_id=f"urn:hxforge:task173:face:{digest}",
         face_hash=digest,
-        case_revision_id=CASE_REVISION_ID,
-        topology_id=TOPOLOGY_ID,
+        case_revision_id=case_revision_id,
+        topology_id=topology_id,
         flow_path_id=path_id,
         side=side,
         face_index=face_index,
@@ -1037,11 +1186,25 @@ def _local_state_receipt(
     evaluation_state: _ThermoState,
     cell_id: str,
 ) -> LocalStateReceipt:
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+    case_revision_id = (
+        candidate_context.request.candidate_id if candidate_context else CASE_REVISION_ID
+    )
+    topology_id = candidate_context.topology_id if candidate_context else TOPOLOGY_ID
+    flow_path_id = (
+        candidate_context.tube_flow_path_id
+        if candidate_context is not None and side == "TUBE"
+        else candidate_context.shell_flow_path_id
+        if candidate_context is not None
+        else TUBE_FLOW_PATH_ID
+        if side == "TUBE"
+        else SHELL_FLOW_PATH_ID
+    )
     state_projection = {
         "schema_version": "task173.constitutive-evaluation-state.v1",
-        "case_revision_id": CASE_REVISION_ID,
-        "topology_id": TOPOLOGY_ID,
-        "flow_path_id": TUBE_FLOW_PATH_ID if side == "TUBE" else SHELL_FLOW_PATH_ID,
+        "case_revision_id": case_revision_id,
+        "topology_id": topology_id,
+        "flow_path_id": flow_path_id,
         "side": side,
         "physical_support_id": support.physical_segment_id,
         "physical_segment_id": support.physical_segment_id,
@@ -1064,6 +1227,13 @@ def _local_state_receipt(
             ZERO_Q_STATE_IDENTITY_PORTABILITY_AUTHORITY_HASH
         ),
     }
+    if candidate_context is not None:
+        state_projection.update(
+            {
+                "candidate_id": candidate_context.request.candidate_id,
+                "candidate_hash": candidate_context.request.candidate_hash,
+            }
+        )
     state_hash = canonical_sha256(state_projection)
     receipt_projection = {
         **state_projection,
@@ -1091,8 +1261,8 @@ def _local_state_receipt(
         reconstruction_authority_id=LOCAL_STATE_RECONSTRUCTION_AUTHORITY_ID,
         reconstruction_authority_hash=LOCAL_STATE_RECONSTRUCTION_AUTHORITY_HASH,
         property_profile_id=PROFILE_ID,
-        topology_id=TOPOLOGY_ID,
-        flow_path_id=TUBE_FLOW_PATH_ID if side == "TUBE" else SHELL_FLOW_PATH_ID,
+        topology_id=topology_id,
+        flow_path_id=flow_path_id,
     )
 
 
@@ -1101,8 +1271,53 @@ def _task172_request(
     tube_state: _ThermoState,
     shell_state: _ThermoState,
     shell_authority: Any,
-) -> Task172LocalRequest:
-    topology = TopologyBinding(
+) -> Task172LocalRequest | CandidateTask172LocalRequest:
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+    if candidate_context is not None:
+        candidate = candidate_context.request
+        support_definition = candidate.task171_result.topology_definition
+        if support_definition is None or type(support) is not CandidateLocalSupport:
+            raise _Stage3Failure("BLOCKED_CANDIDATE_TASK172_SUPPORT")
+        projection_hash = canonical_sha256(support_definition.model_dump(mode="json"))
+        candidate_topology = CandidateTopologyBinding(
+            topology_id=candidate_context.topology_id,
+            task171_result_hash=candidate_context.task171_result_hash,
+            mesh_identity=candidate_context.mesh_identity,
+            physical_ownership_hash=candidate_context.physical_ownership_hash,
+            definition_projection_hash=projection_hash,
+            selected_variant="TUBE_HOT_SHELL_COLD",
+            tube_flow_path_id=candidate_context.tube_flow_path_id,
+            shell_flow_path_id=candidate_context.shell_flow_path_id,
+        )
+        binding = CandidateThermalBinding(
+            candidate_id=candidate.candidate_id,
+            candidate_hash=candidate.candidate_hash,
+            task171_result=candidate.task171_result,
+            task025_result=candidate.task025_result,
+            task166_result=candidate.task166_result,
+        )
+        return CandidateTask172LocalRequest(
+            case_id=candidate.candidate_id,
+            case_revision_id=candidate.candidate_id,
+            topology=candidate_topology,
+            support=support,
+            tube_bulk_state=LocalState(
+                temperature_k=_d(tube_state.native.temperature_k),
+                pressure_pa=REFERENCE_PRESSURE_PA,
+            ),
+            shell_bulk_state=LocalState(
+                temperature_k=_d(shell_state.native.temperature_k),
+                pressure_pa=REFERENCE_PRESSURE_PA,
+            ),
+            tube_mass_flow_kg_s=TUBE_MASS_FLOW_KG_S,
+            shell_mass_flow_kg_s=SHELL_MASS_FLOW_KG_S,
+            shell_flow_authority=CandidateShellFlowAuthority(
+                task031_geometry=candidate.task031_geometry,
+                task166_result=candidate.task166_result,
+            ),
+            candidate_binding=binding,
+        )
+    reference_topology = TopologyBinding(
         topology_id=TOPOLOGY_ID,
         task171_result_hash=TASK171_RESULT_HASH,
         mesh_identity="ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
@@ -1116,7 +1331,7 @@ def _task172_request(
         shell_flow_path_id=SHELL_FLOW_PATH_ID,
     )
     return Task172LocalRequest(
-        topology=topology,
+        topology=reference_topology,
         support=support,
         tube_bulk_state=LocalState(
             temperature_k=_d(tube_state.native.temperature_k),
@@ -1139,7 +1354,7 @@ def _preflight_task172_trial(
     tube_local: _ThermoState,
     shell_local: _ThermoState,
     shell_authority: Any,
-    request: Task172LocalRequest,
+    request: Task172LocalRequest | CandidateTask172LocalRequest,
 ) -> None:
     """Prove all caller-known trial guards before native TASK172 evaluation."""
     if not math.isfinite(q_w) or q_w < 0:
@@ -1170,18 +1385,32 @@ def _preflight_task172_trial(
             raise _Stage3Failure("BLOCKED_LOCAL_PROPERTY_STATE_PREFLIGHT", side)
     if tube_local.native.temperature_k < shell_local.native.temperature_k:
         raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", "local-state-preflight")
-    if (
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+    identity_failure = (
         request.case_revision_id != CASE_REVISION_ID
         or request.topology.topology_id != TOPOLOGY_ID
         or request.topology.task171_result_hash != TASK171_RESULT_HASH
         or request.topology.physical_ownership_hash != PHYSICAL_OWNERSHIP_HASH
         or request.topology.tube_role != "HOT"
         or request.topology.shell_role != "COLD"
+    )
+    if candidate_context is not None and type(request) is CandidateTask172LocalRequest:
+        identity_failure = (
+            request.case_id != candidate_context.request.candidate_id
+            or request.case_revision_id != candidate_context.request.candidate_id
+            or request.topology.topology_id != candidate_context.topology_id
+            or request.topology.task171_result_hash != candidate_context.task171_result_hash
+            or request.topology.physical_ownership_hash != candidate_context.physical_ownership_hash
+            or request.topology.tube_role != "HOT"
+            or request.topology.shell_role != "COLD"
+        )
+    if (
+        identity_failure
         or request.support != support
         or len(recompute_task172_support_id(request)) != 64
     ):
         raise _Stage3Failure("BLOCKED_TASK172_SUPPORT_OR_ROLE_PREFLIGHT")
-    if (
+    if candidate_context is None and (
         shell_authority.task031_geometry.geometry_hash != EXPECTED_TASK031_GEOMETRY_HASH
         or shell_authority.task166_result.result_hash != EXPECTED_TASK166_RESULT_HASH
     ):
@@ -1241,7 +1470,10 @@ def _cell_evaluation(
         shell_authority=shell_authority,
         request=task172_request,
     )
-    task172_result = task172_validate(task172_request, provider)
+    if type(task172_request) is CandidateTask172LocalRequest:
+        task172_result = task172_validate_candidate(task172_request, provider)
+    else:
+        task172_result = task172_validate(task172_request, provider)
     if type(task172_result) is Task172BlockedResult:
         if task172_result.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE":
             if task172_result.request_hash != recompute_task172_request_hash(
@@ -1964,15 +2196,30 @@ def _mesh_rating_projection(
     hole_neighborhoods: list[dict[str, str]],
 ) -> dict[str, Any]:
     """Build the unchanged, hash-bound mesh-rating projection."""
-    tube_count = 5 * subdivisions
-    shell_count = 5 * subdivisions
-    wall_count = 5 * subdivisions
-    if tube_count + shell_count != 10 * subdivisions:
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+    interval_count = candidate_context.interval_count if candidate_context is not None else 5
+    tube_count = interval_count * subdivisions
+    shell_count = interval_count * subdivisions
+    wall_count = interval_count * subdivisions
+    if tube_count + shell_count != 2 * interval_count * subdivisions:
         raise _Stage3Failure("BLOCKED_MESH_CELL_COUNT_CONTRACT")
-    return {
+    projection: dict[str, Any] = {
         "schema_version": "task173.mesh-rating-run.v1",
-        "case_revision_id": CASE_REVISION_ID,
+        "case_revision_id": (
+            candidate_context.request.candidate_id
+            if candidate_context is not None
+            else CASE_REVISION_ID
+        ),
         "mesh_identity": mesh_id,
+        "candidate_id": (
+            candidate_context.request.candidate_id if candidate_context is not None else None
+        ),
+        "candidate_hash": (
+            candidate_context.request.candidate_hash if candidate_context is not None else None
+        ),
+        "candidate_task171_result_hash": (
+            candidate_context.task171_result_hash if candidate_context is not None else None
+        ),
         "subdivisions_per_physical_interval_per_side": subdivisions,
         "tube_cell_count": tube_count,
         "shell_cell_count": shell_count,
@@ -1990,15 +2237,38 @@ def _mesh_rating_projection(
         "energy_balance_residual_w": str(energy_residual),
         "terminal_boundary_residual_k": str(terminal_residual_t),
         "terminal_boundary_residual_j_kg": str(terminal_residual_h),
-        "task031_geometry_hash": EXPECTED_TASK031_GEOMETRY_HASH,
-        "task032_result_hash": EXPECTED_TASK032_RESULT_HASH,
-        "task166_result_hash": EXPECTED_TASK166_RESULT_HASH,
-        "task174_result_hash": EXPECTED_TASK174_RESULT_HASH,
+        "task031_geometry_hash": (
+            candidate_context.request.task031_geometry.geometry_hash
+            if candidate_context is not None
+            else EXPECTED_TASK031_GEOMETRY_HASH
+        ),
+        "task032_result_hash": (
+            dict(candidate_context.request.task166_result.shell_side_flow_evidence).get(
+                "result_hash", ""
+            )
+            if candidate_context is not None
+            else EXPECTED_TASK032_RESULT_HASH
+        ),
+        "task166_result_hash": (
+            candidate_context.request.task166_result.result_hash
+            if candidate_context is not None
+            else EXPECTED_TASK166_RESULT_HASH
+        ),
+        "task174_result_hash": (
+            candidate_context.request.task174_result.result_hash
+            if candidate_context is not None
+            else EXPECTED_TASK174_RESULT_HASH
+        ),
         "task172_local_evaluation_count": stats.task172_local_evaluation_count,
         "task172_numerical_hole_count": stats.task172_numerical_hole_count,
         "task172_numerical_hole_counts_by_code": stats.task172_numerical_hole_counts_by_code,
         "task172_numerical_hole_neighborhoods": hole_neighborhoods,
     }
+    if candidate_context is None:
+        projection.pop("candidate_id")
+        projection.pop("candidate_hash")
+        projection.pop("candidate_task171_result_hash")
+    return projection
 
 
 def _valid_trajectory(
@@ -2011,8 +2281,22 @@ def _valid_trajectory(
     capture_diagnostics: bool = False,
 ) -> _MeshRun:
     stats = search_stats if search_stats is not None else _CellSearchStats()
+    candidate_context = _CANDIDATE_RATING_CONTEXT.get()
     hole_neighborhoods: list[dict[str, str]] = []
-    mesh_id = mesh_level_identity(subdivisions)
+    mesh_id = (
+        _candidate_mesh_identity(candidate_context, subdivisions)
+        if candidate_context is not None
+        else mesh_level_identity(subdivisions)
+    )
+    interval_count = candidate_context.interval_count if candidate_context is not None else 5
+    face_count = interval_count * subdivisions
+    if candidate_context is not None:
+        topology_definition = candidate_context.request.task171_result.topology_definition
+        if topology_definition is None:
+            raise _Stage3Failure("BLOCKED_CANDIDATE_TASK171_BINDING")
+        first_coordinate = Decimal(topology_definition.intervals[0].start_m)
+    else:
+        first_coordinate = Decimal("0")
     tube_face_thermo = _state_at_inlet(provider, TUBE_INLET_T_K)
     shell_face_thermo = _state_from_enthalpy(provider, shell_outlet_enthalpy)
     tube_faces: list[FaceState] = [
@@ -2020,8 +2304,8 @@ def _valid_trajectory(
             tube_face_thermo,
             side="TUBE",
             face_index=0,
-            coordinate_m=Decimal("0"),
-            face_count=5 * subdivisions,
+            coordinate_m=first_coordinate,
+            face_count=face_count,
             producer_authority_id="V07-T173-CASE-BOUNDARY-STATE-PROVIDER-R1",
         )
     ]
@@ -2030,17 +2314,23 @@ def _valid_trajectory(
             shell_face_thermo,
             side="SHELL",
             face_index=0,
-            coordinate_m=Decimal("0"),
-            face_count=5 * subdivisions,
+            coordinate_m=first_coordinate,
+            face_count=face_count,
             producer_authority_id=OUTER_BOUNDARY_SOLVER_AUTHORITY_ID,
         )
     ]
     cells: list[_CellRecord] = []
     interval_duties: list[Decimal] = []
-    for interval_index in range(5):
+    for interval_index in range(interval_count):
         interval_duty = Decimal(0)
         for subdivision_index in range(subdivisions):
-            support = build_local_support(interval_index, subdivisions, subdivision_index)
+            support = (
+                _build_candidate_local_support(
+                    candidate_context, interval_index, subdivisions, subdivision_index
+                )
+                if candidate_context is not None
+                else build_local_support(interval_index, subdivisions, subdivision_index)
+            )
             # The paired shell and tube numerical supports are one exact physical support.
             if not (
                 support.support_start_m < support.support_end_m
@@ -2070,7 +2360,7 @@ def _valid_trajectory(
                 side="TUBE",
                 face_index=face_index,
                 coordinate_m=coordinate,
-                face_count=5 * subdivisions,
+                face_count=face_count,
                 producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
             )
             shell_right = _face_state(
@@ -2078,7 +2368,7 @@ def _valid_trajectory(
                 side="SHELL",
                 face_index=face_index,
                 coordinate_m=coordinate,
-                face_count=5 * subdivisions,
+                face_count=face_count,
                 producer_authority_id="V07-T173-FACE-ENTHALPY-PROPAGATION-R1",
             )
             record = _make_rated_cell(
@@ -2104,7 +2394,10 @@ def _valid_trajectory(
             shell_faces.append(shell_right)
         interval_duties.append(interval_duty)
 
-    if len(cells) != 5 * subdivisions or len(tube_faces) != 5 * subdivisions + 1:
+    if (
+        len(cells) != interval_count * subdivisions
+        or len(tube_faces) != interval_count * subdivisions + 1
+    ):
         raise _Stage3Failure("BLOCKED_MESH_SUPPORT_CARDINALITY")
     if len(shell_faces) != len(tube_faces):
         raise _Stage3Failure("BLOCKED_MESH_FACE_CARDINALITY")
@@ -2168,9 +2461,9 @@ def _valid_trajectory(
     ):
         raise _Stage3Failure("BLOCKED_NONFINITE_MESH_OBSERVABLE")
 
-    tube_count = 5 * subdivisions
-    shell_count = 5 * subdivisions
-    wall_count = 5 * subdivisions
+    tube_count = interval_count * subdivisions
+    shell_count = interval_count * subdivisions
+    wall_count = interval_count * subdivisions
     projection = _mesh_rating_projection(
         subdivisions=subdivisions,
         mesh_id=mesh_id,
@@ -2822,6 +3115,175 @@ def validate_request(
         )
 
 
+def validate_candidate_rating(
+    raw_request: CandidateRatingRequest | dict[str, Any],
+    provider: PropertyProvider | None = None,
+) -> CandidateRatingSuccessResult | Task173BlockedResult:
+    """Run the full v0.7 Rating kernel for one R2-authorized native candidate."""
+    request: CandidateRatingRequest | None = None
+    request_hash: str | None = None
+    context: _CandidateRatingContext | None = None
+    token = None
+    try:
+        if type(raw_request) is CandidateRatingRequest:
+            request = raw_request
+        elif type(raw_request) is dict:
+            encoded = json.dumps(raw_request, separators=(",", ":"), ensure_ascii=False)
+            request = CandidateRatingRequest.model_validate_json(encoded, strict=True)
+        else:
+            raise TypeError("expected exact candidate Task173 request or raw dict")
+        request_hash = candidate_rating_request_hash(request)
+        context = _candidate_context(request)
+        token = _CANDIDATE_RATING_CONTEXT.set(context)
+        if provider is not None and type(provider) is not CoolPropProvider:
+            raise _Stage3Failure("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH")
+        active_provider = provider if provider is not None else CoolPropProvider()
+        runs, comparisons, candidate_index, headroom_index = _run_mesh_sequence(
+            lambda: active_provider, context.shell_authority
+        )
+        if candidate_index is None or headroom_index is None:
+            raise _Stage3Failure("MESH_NOT_CONVERGED")
+        accepted = runs[candidate_index]
+        headroom = runs[headroom_index]
+        replay_stats = _CellSearchStats()
+        deterministic_replay = _solve_outer_boundary(
+            accepted.subdivisions,
+            active_provider,
+            context.shell_authority,
+            replay_stats,
+        )
+        same_face_ids = tuple(face.face_id for face in accepted.faces_tube) == tuple(
+            face.face_id for face in deterministic_replay.faces_tube
+        ) and tuple(face.face_id for face in accepted.faces_shell) == tuple(
+            face.face_id for face in deterministic_replay.faces_shell
+        )
+        same_local_ids = (
+            accepted.observables.local_task172_result_hashes
+            == deterministic_replay.observables.local_task172_result_hashes
+        )
+        if (
+            accepted.mesh_result_hash != deterministic_replay.mesh_result_hash
+            or not same_face_ids
+            or not same_local_ids
+        ):
+            raise _Stage3Failure("BLOCKED_TASK173_DETERMINISM_REPLAY_MISMATCH")
+        if not _terminal_tolerance_pass(accepted):
+            raise _Stage3Failure("BLOCKED_COUNTERCURRENT_TERMINAL_BOUNDARY_TOLERANCE")
+        if accepted.observables.energy_balance_residual_w > max(
+            ENERGY_ACCEPTANCE_FLOOR_W, accepted.observables.duty_roundoff_floor_w
+        ):
+            raise _Stage3Failure("BLOCKED_WHOLE_EXCHANGER_ENERGY_BALANCE")
+        provenance = tuple(
+            sorted(
+                (
+                    ("authority_package_id", request.authority_package_id),
+                    ("authority_package_hash", request.authority_package_hash),
+                    ("candidate_id", request.candidate_id),
+                    ("candidate_hash", request.candidate_hash),
+                    ("candidate_space_hash", request.candidate_space_hash),
+                    ("task020_configuration_hash", request.task020_configuration_hash),
+                    ("task021_layout_hash", request.task021_layout_hash),
+                    ("task022_geometry_hash", request.task022_geometry_hash),
+                    ("task024_geometry_hash", request.task024_geometry_hash),
+                    ("task025_result_hash", request.task025_result.result_hash),
+                    ("task031_geometry_hash", request.task031_geometry.geometry_hash),
+                    ("task166_result_hash", request.task166_result.result_hash),
+                    ("task029_result_hash", request.task029_result.result_hash),
+                    ("task171_result_hash", request.task171_result.result_hash or ""),
+                    ("task174_result_hash", request.task174_result.result_hash),
+                    ("task172_candidate_authority_hash", request.task172_candidate_authority_hash),
+                    ("jmu_transfer_authority_hash", request.jmu_transfer_authority_hash),
+                    (
+                        "task174_project_transfer_authority_hash",
+                        request.task174_project_transfer_authority_hash,
+                    ),
+                    (
+                        "task174_bell_event_transfer_authority_hash",
+                        request.task174_bell_event_transfer_authority_hash,
+                    ),
+                    (
+                        "task174_pressure_transfer_authority_hash",
+                        request.task174_pressure_transfer_authority_hash,
+                    ),
+                    ("accepted_mesh_result_hash", accepted.mesh_result_hash),
+                    ("face_id_replay", str(same_face_ids).lower()),
+                    ("local_task172_hash_replay", str(same_local_ids).lower()),
+                )
+            )
+        )
+        result = CandidateRatingSuccessResult(
+            status="VALIDATED",
+            candidate_id=request.candidate_id,
+            candidate_hash=request.candidate_hash,
+            authority_package_id=request.authority_package_id,
+            authority_package_hash=request.authority_package_hash,
+            task171_result_hash=context.task171_result_hash,
+            task171_topology_id=context.topology_id,
+            task171_mesh_identity=context.mesh_identity,
+            physical_ownership_hash=context.physical_ownership_hash,
+            task025_result_hash=request.task025_result.result_hash,
+            task166_result_hash=request.task166_result.result_hash,
+            task029_result_hash=request.task029_result.result_hash,
+            task174_result_hash=request.task174_result.result_hash,
+            accepted_mesh_result_hash=accepted.mesh_result_hash,
+            accepted_subdivisions_per_interval=accepted.subdivisions,
+            headroom_subdivisions_per_interval=headroom.subdivisions,
+            total_duty_w=accepted.observables.total_duty_w,
+            tube_outlet_temperature_k=accepted.observables.tube_outlet_temperature_k,
+            shell_outlet_temperature_k=accepted.observables.shell_outlet_temperature_k,
+            tube_outlet_pressure_pa=request.task174_result.tube_outlet_pressure_pa,
+            shell_outlet_pressure_pa=request.task174_result.shell_outlet_pressure_pa,
+            wall_inner_min_k=accepted.observables.wall_inner_min_k,
+            wall_inner_max_k=accepted.observables.wall_inner_max_k,
+            wall_outer_min_k=accepted.observables.wall_outer_min_k,
+            wall_outer_max_k=accepted.observables.wall_outer_max_k,
+            minimum_approach_temperature_k=accepted.observables.minimum_approach_temperature_k,
+            energy_balance_residual_w=accepted.observables.energy_balance_residual_w,
+            terminal_boundary_residual_k=accepted.observables.terminal_boundary_residual_k,
+            terminal_boundary_residual_j_kg=accepted.observables.terminal_boundary_residual_j_kg,
+            mesh_levels=tuple(run.observables.model_dump(mode="json") for run in runs),
+            convergence_comparisons=tuple(item.model_dump(mode="json") for item in comparisons),
+            request_hash=request_hash,
+            provenance=provenance,
+            result_hash="pending",
+            result_id="pending",
+        )
+        digest = candidate_rating_result_hash(result)
+        result = result.model_copy(
+            update={"result_hash": digest, "result_id": f"urn:hxforge:task173:{digest}"}
+        )
+        if candidate_rating_result_hash(result) != result.result_hash:
+            raise _Stage3Failure("BLOCKED_CANDIDATE_RATING_RESULT_IDENTITY_REPLAY")
+        return result
+    except ValidationError as exc:
+        return _blocked(
+            "BLOCKED_TASK173_CANDIDATE_REQUEST_SCHEMA_INVALID", (str(exc),), request_hash
+        )
+    except _Stage3Failure as exc:
+        return _blocked(
+            exc.code,
+            tuple(exc.diagnostics),
+            request_hash,
+            failed_mesh=next(
+                (
+                    int(item.split("=", 1)[1])
+                    for item in exc.diagnostics
+                    if item.startswith("mesh_subdivisions=")
+                ),
+                None,
+            ),
+        )
+    except Exception as exc:
+        return _blocked(
+            "BLOCKED_TASK173_CANDIDATE_UNEXPECTED_RUNTIME_FAILURE",
+            (type(exc).__name__, str(exc)),
+            request_hash,
+        )
+    finally:
+        if token is not None:
+            _CANDIDATE_RATING_CONTEXT.reset(token)
+
+
 __all__ = [
     "CELL_ROOT_SOLVER_AUTHORITY",
     "CELL_ROOT_SOLVER_AUTHORITY_HASH",
@@ -2835,5 +3297,6 @@ __all__ = [
     "OUTER_BOUNDARY_SOLVER_AUTHORITY_HASH",
     "recompute_task173_request_hash",
     "recompute_task173_result_hash",
+    "validate_candidate_rating",
     "validate_request",
 ]

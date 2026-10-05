@@ -1,5 +1,9 @@
 """Fail-closed TASK174 orchestration tests; no hydraulic total is fabricated."""
 
+from decimal import Decimal, localcontext
+
+from hexagent.exchangers.shell_tube.bell_delaware.decimal_math import engineering_context
+from hexagent.exchangers.shell_tube.bell_delaware.models import Task166Result
 from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     BellEventRegionAllocation,
     Task174BlockedResult,
@@ -7,6 +11,9 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     Task174NativeOutputs,
     recompute_task174_result_hash,
     validate_request,
+)
+from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration.service import (
+    _native_bell_region_reconciliation_valid,
 )
 
 
@@ -101,3 +108,71 @@ def test_task174_fiv_diagnostic_mode_does_not_require_a_guessed_numeric_limit() 
     assert result.warnings == (
         "FIV is diagnostic-only; no numeric critical-velocity limit was guessed",
     )
+
+
+def _h1_bell_result() -> Task166Result:
+    central = Decimal("27.612207774183460206836230814703264766375478974330")
+    window = Decimal("630.07134795775369108954073760345441625294093406455")
+    inlet = Decimal("14.727938435732309429703959554309365007532140748327")
+    outlet = Decimal("14.727938435732309429703959554309365007532140748327")
+    with localcontext(engineering_context()):
+        end_zone = inlet + outlet
+        native_total = central + window + end_zone
+        legacy_flat_total = central + window + inlet + outlet
+    assert legacy_flat_total - native_total == Decimal("1E-47")
+    return Task166Result(
+        central_crossflow_contribution=central,
+        window_contribution=window,
+        entrance_zone_contribution=inlet,
+        exit_zone_contribution=outlet,
+        end_zone_pressure_drop=end_zone,
+        total_shell_pressure_drop=native_total,
+    )
+
+
+def test_task174_h1_grouped_reconciliation_matches_native_task166_reduction() -> None:
+    assert _native_bell_region_reconciliation_valid(_h1_bell_result()) is True
+
+
+def test_task174_blocks_a_tampered_native_end_zone_split() -> None:
+    result = _h1_bell_result()
+    with localcontext(engineering_context()):
+        tampered = Task166Result(
+            central_crossflow_contribution=result.central_crossflow_contribution,
+            window_contribution=result.window_contribution,
+            entrance_zone_contribution=result.entrance_zone_contribution,
+            exit_zone_contribution=result.exit_zone_contribution,
+            end_zone_pressure_drop=result.end_zone_pressure_drop + Decimal("1E-30"),
+            total_shell_pressure_drop=result.total_shell_pressure_drop,
+        )
+    assert _native_bell_region_reconciliation_valid(tampered) is False
+
+
+def test_task174_blocks_a_tampered_native_total() -> None:
+    result = _h1_bell_result()
+    with localcontext(engineering_context()):
+        tampered = Task166Result(
+            central_crossflow_contribution=result.central_crossflow_contribution,
+            window_contribution=result.window_contribution,
+            entrance_zone_contribution=result.entrance_zone_contribution,
+            exit_zone_contribution=result.exit_zone_contribution,
+            end_zone_pressure_drop=result.end_zone_pressure_drop,
+            total_shell_pressure_drop=result.total_shell_pressure_drop + Decimal("1E-30"),
+        )
+    assert _native_bell_region_reconciliation_valid(tampered) is False
+
+
+def test_task174_grouped_reconciliation_ignores_hostile_ambient_decimal_context() -> None:
+    valid = _h1_bell_result()
+    split_blocked = Task166Result(
+        central_crossflow_contribution=valid.central_crossflow_contribution,
+        window_contribution=valid.window_contribution,
+        entrance_zone_contribution=valid.entrance_zone_contribution,
+        exit_zone_contribution=valid.exit_zone_contribution,
+        end_zone_pressure_drop=valid.end_zone_pressure_drop + Decimal("1E-30"),
+        total_shell_pressure_drop=valid.total_shell_pressure_drop,
+    )
+    with localcontext() as hostile:
+        hostile.prec = 6
+        assert _native_bell_region_reconciliation_valid(valid) is True
+        assert _native_bell_region_reconciliation_valid(split_blocked) is False

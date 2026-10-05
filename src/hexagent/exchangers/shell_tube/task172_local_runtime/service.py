@@ -47,17 +47,19 @@ from .models import (
     MATERIAL_SOURCE_SHA256,
     PROFILE_ID,
     TASK172_IMPLEMENTATION_VERSION,
-    TASK172_REQUEST_SCHEMA,
     TASK172_RESULT_SCHEMA,
     TOTAL_PARALLEL_FLOW_AREA_M2,
     TUBE_ID_M,
     TUBE_OD_M,
     WALL_CONDUCTIVITY_W_M_K,
+    CandidateTask172LocalRequest,
     Task172BlockedResult,
     Task172LocalOutcome,
     Task172LocalRequest,
     Task172LocalResult,
 )
+
+Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
 
 _T_MIN = Decimal("298.15")
 _T_MAX = Decimal("300.00")
@@ -118,7 +120,7 @@ def _bell_geometry_projection(geometry: BellGeometry) -> dict[str, str | int | l
     return projected
 
 
-def _request_projection(request: Task172LocalRequest) -> dict[str, Any]:
+def _request_projection(request: Task172Request) -> dict[str, Any]:
     support = request.support
     tube = request.tube_bulk_state
     shell = request.shell_bulk_state
@@ -128,8 +130,8 @@ def _request_projection(request: Task172LocalRequest) -> dict[str, Any]:
     bell_geometry = task166.bell_geometry
     if bell_geometry is None:
         raise TypeError("validated TASK166 result must carry BellGeometry")
-    return {
-        "schema_version": TASK172_REQUEST_SCHEMA,
+    projected: dict[str, Any] = {
+        "schema_version": request.schema_version,
         "case_id": request.case_id,
         "case_revision_id": request.case_revision_id,
         "topology": request.topology.model_dump(mode="json"),
@@ -187,6 +189,29 @@ def _request_projection(request: Task172LocalRequest) -> dict[str, Any]:
         "tube_inside_fouling_m2_k_w": _decimal(request.tube_inside_fouling_m2_k_w),
         "shell_outside_fouling_m2_k_w": _decimal(request.shell_outside_fouling_m2_k_w),
     }
+    if type(request) is CandidateTask172LocalRequest:
+        binding = request.candidate_binding
+        task171 = binding.task171_result
+        task025 = binding.task025_result
+        projected["candidate_binding"] = {
+            "candidate_id": binding.candidate_id,
+            "candidate_hash": binding.candidate_hash,
+            "authority_package_id": binding.authority_package_id,
+            "authority_package_hash": binding.authority_package_hash,
+            "task172_candidate_authority_hash": binding.task172_candidate_authority_hash,
+            "jmu_transfer_authority_hash": binding.jmu_transfer_authority_hash,
+            "task171_topology_id": task171.topology_id,
+            "task171_result_hash": task171.result_hash,
+            "task171_mesh_identity": task171.mesh_identity,
+            "task171_physical_ownership_hash": task171.physical_ownership_hash,
+            "task025_result_id": task025.result_id,
+            "task025_result_hash": task025.result_hash,
+            "task166_result_id": binding.task166_result.result_id,
+            "task166_result_hash": binding.task166_result.result_hash,
+        }
+        projected["support"]["candidate_id"] = request.support.candidate_id
+        projected["support"]["candidate_hash"] = request.support.candidate_hash
+    return projected
 
 
 def _result_projection(fields: dict[str, Any]) -> dict[str, Any]:
@@ -214,36 +239,38 @@ def _result_projection(fields: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
-def recompute_task172_request_hash(request: Task172LocalRequest) -> str:
+def recompute_task172_request_hash(request: Task172Request) -> str:
     """Replay the exact canonical request identity without invoking producers."""
-    if type(request) is not Task172LocalRequest:
-        raise TypeError("request hash replay requires exact Task172LocalRequest")
+    if type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest):
+        raise TypeError("request hash replay requires an exact TASK172 request model")
     return canonical_sha256(_request_projection(request))
 
 
-def recompute_task172_support_id(request: Task172LocalRequest) -> str:
+def recompute_task172_support_id(request: Task172Request) -> str:
     """Replay the native TASK172 physical-support identity bound by a request."""
-    if type(request) is not Task172LocalRequest:
-        raise TypeError("support identity replay requires exact Task172LocalRequest")
+    if type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest):
+        raise TypeError("support identity replay requires an exact TASK172 request model")
     support = request.support
-    return canonical_sha256(
-        {
-            "topology_id": request.topology.topology_id,
-            "mesh_identity": request.topology.mesh_identity,
-            "physical_ownership_hash": request.topology.physical_ownership_hash,
-            "physical_segment_id": support.physical_segment_id,
-            "mesh_level_identity": support.mesh_level_identity,
-            "subdivisions_per_physical_interval_per_side": (
-                support.subdivisions_per_physical_interval_per_side
-            ),
-            "subdivision_index": support.subdivision_index,
-            "support_start_m": _decimal(support.support_start_m),
-            "support_end_m": _decimal(support.support_end_m),
-            "tube_cell_id": support.tube_cell_id,
-            "shell_cell_id": support.shell_cell_id,
-            "wall_interface_id": support.wall_interface_id,
-        }
-    )
+    projection: dict[str, Any] = {
+        "topology_id": request.topology.topology_id,
+        "mesh_identity": request.topology.mesh_identity,
+        "physical_ownership_hash": request.topology.physical_ownership_hash,
+        "physical_segment_id": support.physical_segment_id,
+        "mesh_level_identity": support.mesh_level_identity,
+        "subdivisions_per_physical_interval_per_side": (
+            support.subdivisions_per_physical_interval_per_side
+        ),
+        "subdivision_index": support.subdivision_index,
+        "support_start_m": _decimal(support.support_start_m),
+        "support_end_m": _decimal(support.support_end_m),
+        "tube_cell_id": support.tube_cell_id,
+        "shell_cell_id": support.shell_cell_id,
+        "wall_interface_id": support.wall_interface_id,
+    }
+    if type(request) is CandidateTask172LocalRequest:
+        projection["candidate_id"] = request.support.candidate_id
+        projection["candidate_hash"] = request.support.candidate_hash
+    return canonical_sha256(projection)
 
 
 def recompute_task172_result_hash(result: Task172LocalResult) -> str:
@@ -261,7 +288,7 @@ def recompute_task172_result_hash(result: Task172LocalResult) -> str:
 
 
 def recompute_task172_local_roundoff_bounds(
-    request: Task172LocalRequest,
+    request: Task172Request,
     result: Task172LocalResult,
 ) -> tuple[Decimal, Decimal, Decimal, Decimal]:
     """Replay accepted R98 residual bounds and the published wall-value ULP floor.
@@ -272,7 +299,10 @@ def recompute_task172_local_roundoff_bounds(
     representable spacing of the published values. This diagnostic replay
     does not alter TASK172 physics or result IDs.
     """
-    if type(request) is not Task172LocalRequest or type(result) is not Task172LocalResult:
+    if (
+        type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest)
+        or type(result) is not Task172LocalResult
+    ):
         raise TypeError("roundoff replay requires exact TASK172 request/result models")
     if (
         recompute_task172_request_hash(request) != result.request_hash
@@ -444,7 +474,7 @@ def _provider_state(provider: PropertyProvider, temperature: Decimal, pressure: 
 
 def _snapshot(
     provider: PropertyProvider,
-    request: Task172LocalRequest,
+    request: Task172Request,
     side: str,
     location_id: str,
     temperature: Decimal,
@@ -508,16 +538,23 @@ def _snapshot(
 
 
 def _tube_base_htc(
-    snapshot: PropertySnapshot, mass_flow: Decimal
+    request: Task172Request, snapshot: PropertySnapshot, mass_flow: Decimal
 ) -> tuple[Decimal, Decimal, Decimal, str, str]:
+    if type(request) is CandidateTask172LocalRequest:
+        task025 = request.candidate_binding.task025_result
+        parallel_area = task025.total_parallel_flow_area_m2
+        tube_inner_diameter = task025.hydraulic_diameter_m
+    else:
+        parallel_area = TOTAL_PARALLEL_FLOW_AREA_M2
+        tube_inner_diameter = TUBE_ID_M
     output = compute_single_phase(
         mass_flow,
         snapshot.density_kg_m3,
         snapshot.dynamic_viscosity_pa_s,
         snapshot.thermal_conductivity_w_m_k,
         snapshot.specific_heat_capacity_j_kg_k,
-        TOTAL_PARALLEL_FLOW_AREA_M2,
-        TUBE_ID_M,
+        parallel_area,
+        tube_inner_diameter,
         ThermalBoundaryCondition.CWT,
     )
     if output.flow_regime is not FlowRegime.TURBULENT:
@@ -536,7 +573,7 @@ def _tube_base_htc(
 
 
 def _shell_base_htc(
-    request: Task172LocalRequest,
+    request: Task172Request,
     snapshot: PropertySnapshot,
     mass_flow: Decimal,
 ) -> tuple[Decimal, Decimal, Decimal, Any]:
@@ -638,7 +675,7 @@ def _c_residual_bounds(
 
 
 def _eval_trial(
-    request: Task172LocalRequest,
+    request: Task172Request,
     provider: PropertyProvider,
     tube_bulk_snapshot: PropertySnapshot,
     shell_bulk_snapshot: PropertySnapshot,
@@ -744,7 +781,7 @@ def _eval_trial(
 
 
 def _build_valid_result(
-    request: Task172LocalRequest,
+    request: Task172Request,
     request_hash: str,
     support_id: str,
     tube_bulk_id: str,
@@ -851,7 +888,7 @@ def _build_valid_result(
 
 
 def _solve_once(
-    request: Task172LocalRequest,
+    request: Task172Request,
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
@@ -883,15 +920,24 @@ def _solve_once(
         request.shell_bulk_state.pressure_pa,
     )
     tube_h_base, tube_re, tube_pr, tube_corr_id, tube_corr_version = _tube_base_htc(
-        tube_bulk_snapshot, request.tube_mass_flow_kg_s
+        request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
     )
     shell_h_base, shell_re, shell_pr, _shell_calculation = _shell_base_htc(
         request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
     )
     try:
+        if type(request) is CandidateTask172LocalRequest:
+            tube_inner_diameter = request.candidate_binding.task025_result.hydraulic_diameter_m
+            bell_geometry = request.candidate_binding.task166_result.bell_geometry
+            if bell_geometry is None:
+                raise ValueError("candidate TASK166 Bell geometry is missing")
+            tube_outer_diameter = bell_geometry.tube_outer_diameter_m
+        else:
+            tube_inner_diameter = TUBE_ID_M
+            tube_outer_diameter = TUBE_OD_M
         wall_resistance_result = compute_wall_resistance(
-            TUBE_ID_M,
-            TUBE_OD_M,
+            tube_inner_diameter,
+            tube_outer_diameter,
             WALL_CONDUCTIVITY_W_M_K,
             support.inside_area_m2,
         )
@@ -1076,7 +1122,7 @@ def _solve_once(
 
 
 def _solve_attempt(
-    request: Task172LocalRequest,
+    request: Task172Request,
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
@@ -1096,7 +1142,7 @@ def _solve_attempt(
 
 
 def _fallback_result_replays_request(
-    request: Task172LocalRequest,
+    request: Task172Request,
     result: Task172LocalResult,
 ) -> bool:
     try:
@@ -1123,7 +1169,7 @@ def _fallback_result_replays_request(
         return False
 
 
-def _solve(request: Task172LocalRequest, provider: PropertyProvider) -> Task172LocalOutcome:
+def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalOutcome:
     """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
     primary = _solve_attempt(request, provider, method="trf")
     if type(primary) is Task172LocalResult:
@@ -1186,11 +1232,43 @@ def validate_request(raw_request: object, provider: PropertyProvider) -> Task172
         return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
 
 
+def validate_candidate_request(
+    raw_request: CandidateTask172LocalRequest | dict[str, Any],
+    provider: PropertyProvider,
+) -> Task172LocalOutcome:
+    """Run the same reviewed R94/R98 kernel on a separately bound candidate context."""
+    if type(raw_request) is CandidateTask172LocalRequest:
+        request = raw_request
+    elif type(raw_request) is dict:
+        try:
+            request = CandidateTask172LocalRequest.model_validate(raw_request, strict=True)
+        except ValidationError:
+            return _blocked("BLOCKED_INVALID_REQUEST_SCHEMA", "request", None)
+    else:
+        return _blocked("BLOCKED_INVALID_REQUEST_TYPE", "request", None)
+    try:
+        if type(provider) is not CoolPropProvider:
+            raise _RuntimeFailure(
+                "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider"
+            )
+        return _solve(request, provider)
+    except _RuntimeFailure as exc:
+        digest: str | None
+        try:
+            digest = canonical_sha256(_request_projection(request))
+        except Exception:
+            digest = None
+        return _blocked(exc.code, exc.field_path, digest)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
+
+
 __all__ = [
     "recompute_task172_blocked_result_hash",
     "recompute_task172_local_roundoff_bounds",
     "recompute_task172_request_hash",
     "recompute_task172_result_hash",
     "recompute_task172_support_id",
+    "validate_candidate_request",
     "validate_request",
 ]
