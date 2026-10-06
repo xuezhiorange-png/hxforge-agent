@@ -10,7 +10,7 @@ from dataclasses import replace
 from decimal import Decimal, localcontext
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import CoolProp
 import pytest
@@ -2392,6 +2392,267 @@ def test_shared_outer_solver_preserves_resource_exhaustion_diagnostic(
         service._solve_outer_boundary_from_trial(trial_at)
     assert caught.value.code == "BLOCKED_OUTER_BOUNDARY_RESOURCE_EXHAUSTION"
     assert caught.value.diagnostics == ("maximum_iterations=1",)
+
+
+def test_r2a_branch_classification_straddle_fails_closed() -> None:
+    left = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("10"))
+    right = _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", Decimal("10"))
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._assert_candidate_branch_invariance(left, right)
+    assert caught.value.code == "BLOCKED_TRANSIENT_OUTER_DECISION_QUANTIZATION_STRADDLE"
+
+
+def test_r2a_branch_terminal_tolerance_straddle_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    left = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("10"))
+    right = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("11"))
+    monkeypatch.setattr(
+        service,
+        "_terminal_tolerance_pass",
+        lambda run: run.shooting_enthalpy == Decimal("10"),
+    )
+    monkeypatch.setattr(
+        service,
+        "_midpoint_collapse_disposition",
+        lambda _run: ("RETURN_ACCEPTED_RUN", Decimal("1e-14")),
+    )
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._assert_candidate_branch_invariance(left, right)
+    assert caught.value.code == "BLOCKED_TRANSIENT_OUTER_TERMINAL_DECISION_QUANTIZATION_STRADDLE"
+
+
+def test_r2a_branch_midpoint_collapse_straddle_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    left = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("10"))
+    right = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("11"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+    monkeypatch.setattr(
+        service,
+        "_midpoint_collapse_disposition",
+        lambda run: (
+            "BLOCKED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED"
+            if run.shooting_enthalpy == Decimal("10")
+            else "PRECISION_FLOOR_UNRESOLVED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
+            Decimal("1e-14"),
+        ),
+    )
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._assert_candidate_branch_invariance(left, right)
+    assert caught.value.code == (
+        "BLOCKED_TRANSIENT_OUTER_PRECISION_FLOOR_DECISION_QUANTIZATION_STRADDLE"
+    )
+
+
+def test_r2a_branch_hard_blocker_is_propagated_without_decision() -> None:
+    left = _outer_trial_for_test("VALID_TRAJECTORY", Decimal("10"))
+    right = service._OuterTrial(
+        "HARD_BLOCKER", Decimal("10"), diagnostics=("BLOCKED_DOMAIN", "native detail")
+    )
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._assert_candidate_branch_invariance(left, right)
+    assert caught.value.code == "BLOCKED_DOMAIN"
+    assert caught.value.diagnostics == ("native detail",)
+
+
+@pytest.mark.parametrize(
+    ("mode", "selected_index"),
+    [("LEFT_BRANCH", 0), ("RIGHT_BRANCH", 1)],
+)
+def test_r2a_trigger_uses_the_actual_endpoint_evaluation(
+    monkeypatch: pytest.MonkeyPatch,
+    mode: Literal["LEFT_BRANCH", "RIGHT_BRANCH"],
+    selected_index: int,
+) -> None:
+    left_evaluation = SimpleNamespace(endpoint="left")
+    right_evaluation = SimpleNamespace(endpoint="right")
+    left = service._CellTrial(1.0, "VALID_CELL_EVALUATION", left_evaluation, Decimal("-1"))
+    right = service._CellTrial(
+        math.nextafter(1.0, math.inf),
+        "VALID_CELL_EVALUATION",
+        right_evaluation,
+        Decimal("1"),
+    )
+    event = {"event_hash": "e" * 64}
+    monkeypatch.setattr(service, "_candidate_provider_enclosure_event", lambda **_: event)
+    control = service._CandidateTransientControl(
+        mode=mode,
+        mesh_subdivisions=1,
+        outer_iteration=2,
+        shooting_enthalpy=Decimal("100000"),
+    )
+
+    selected = service._candidate_provider_floor_evaluation(
+        context=SimpleNamespace(request=SimpleNamespace(candidate_id="candidate-a")),
+        control=control,
+        support=SimpleNamespace(physical_segment_id="support-a"),
+        left=left,
+        right=right,
+        trials={left.q_w: left, right.q_w: right},
+    )
+
+    assert selected is (left_evaluation, right_evaluation)[selected_index]
+    assert control.triggered is True
+    assert control.events == [event]
+
+
+def test_r2a_nested_enclosure_fails_closed() -> None:
+    control = service._CandidateTransientControl(
+        mode="LEFT_BRANCH",
+        mesh_subdivisions=1,
+        outer_iteration=2,
+        shooting_enthalpy=Decimal("100000"),
+        triggered=True,
+    )
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._candidate_provider_floor_evaluation(
+            context=SimpleNamespace(request=SimpleNamespace(candidate_id="candidate-a")),
+            control=control,
+            support=SimpleNamespace(physical_segment_id="support-a"),
+            left=service._CellTrial(1.0, "VALID_CELL_EVALUATION"),
+            right=service._CellTrial(2.0, "VALID_CELL_EVALUATION"),
+            trials={},
+        )
+    assert caught.value.code == "BLOCKED_NESTED_PROVIDER_QUANTIZATION_ENCLOSURE_UNSUPPORTED"
+
+
+def test_r2a_accepted_path_provider_floor_fails_closed() -> None:
+    control = service._CandidateTransientControl(
+        mode="DISABLED",
+        mesh_subdivisions=1,
+        outer_iteration=2,
+        shooting_enthalpy=Decimal("100000"),
+    )
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._candidate_provider_floor_evaluation(
+            context=SimpleNamespace(request=SimpleNamespace(candidate_id="candidate-a")),
+            control=control,
+            support=SimpleNamespace(physical_segment_id="support-a"),
+            left=service._CellTrial(1.0, "VALID_CELL_EVALUATION"),
+            right=service._CellTrial(2.0, "VALID_CELL_EVALUATION"),
+            trials={},
+        )
+    assert caught.value.code == "BLOCKED_ACCEPTED_TRAJECTORY_PROVIDER_QUANTIZATION_UNRESOLVED"
+
+
+def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: True)
+    monkeypatch.setattr(
+        service,
+        "_midpoint_collapse_disposition",
+        lambda _run: ("RETURN_ACCEPTED_RUN", Decimal("1e-14")),
+    )
+    context = SimpleNamespace(
+        request=SimpleNamespace(
+            candidate_id="candidate-a",
+            candidate_hash="a" * 64,
+        ),
+        mesh_identity="task171-mesh",
+    )
+    control_flow_calls: list[bool] = []
+    native_trial_calls: list[str] = []
+    accepted_control_modes: list[str | None] = []
+
+    def mesh_run(enthalpy: Decimal, iteration: int) -> Any:
+        return service._MeshRun(
+            subdivisions=1,
+            faces_tube=(),
+            faces_shell=(),
+            cells=(),
+            observables=SimpleNamespace(
+                mesh_level_identity="mesh-id",
+                terminal_boundary_residual_k=Decimal("0"),
+                terminal_boundary_residual_j_kg=Decimal("0"),
+            ),
+            mesh_result_hash=f"mesh-{enthalpy}-{iteration}",
+            shooting_enthalpy=enthalpy,
+            bisection_iterations=iteration,
+        )
+
+    original_helper = service._solve_outer_boundary_from_trial
+
+    def counted_shared_helper(trial_at: Any) -> Any:
+        control_flow_calls.append(True)
+        return original_helper(trial_at)
+
+    def fake_outer_trial(
+        _subdivisions: int,
+        enthalpy: Decimal,
+        _provider: Any,
+        _authority: Any,
+        iteration: int,
+        _stats: Any = None,
+    ) -> service._OuterTrial:
+        control = service._CANDIDATE_TRANSIENT_CONTROL.get()
+        assert control is not None
+        native_trial_calls.append(control.mode)
+        if enthalpy == service.H_MIN_J_KG:
+            return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", enthalpy)
+        event = {
+            "candidate_id": "candidate-a",
+            "candidate_hash": "a" * 64,
+            "mesh_identity": "mesh-id",
+            "physical_support_id": "support-1",
+            "left_q_hex": "0x1.0p+0",
+            "right_q_hex": "0x1.0000000000001p+0",
+            "left_endpoint_request_hash": "1" * 64,
+            "right_endpoint_request_hash": "2" * 64,
+            "left_endpoint_result_hash": "3" * 64,
+            "right_endpoint_result_hash": "4" * 64,
+            "left_f_w": "-1",
+            "right_f_w": "1",
+            "representative_endpoint": "LEFT",
+        }
+        if control.mode == "DETECT":
+            raise service._ProviderQuantizationTrigger(event)
+        event.update(
+            {
+                "Q1_Q15": {f"Q{index}": True for index in range(1, 16)},
+                "event_hash": f"{control.mode}-event-hash",
+            }
+        )
+        control.events.append(event)
+        control.triggered = True
+        return service._OuterTrial(
+            "VALID_TRAJECTORY", enthalpy, mesh_run=mesh_run(enthalpy, iteration)
+        )
+
+    def fake_accepted_trajectory(
+        _subdivisions: int,
+        enthalpy: Decimal,
+        _provider: Any,
+        _authority: Any,
+        iteration: int,
+        _stats: Any = None,
+        _capture: bool = False,
+    ) -> Any:
+        control = service._CANDIDATE_TRANSIENT_CONTROL.get()
+        accepted_control_modes.append(control.mode if control is not None else None)
+        return mesh_run(enthalpy, iteration)
+
+    monkeypatch.setattr(service, "_solve_outer_boundary_from_trial", counted_shared_helper)
+    monkeypatch.setattr(service, "_outer_trial", fake_outer_trial)
+    monkeypatch.setattr(service, "_valid_trajectory", fake_accepted_trajectory)
+    token = service._CANDIDATE_RATING_CONTEXT.set(context)
+    try:
+        result = service._candidate_transient_outer_boundary(1, object(), object())
+    finally:
+        service._CANDIDATE_RATING_CONTEXT.reset(token)
+
+    assert control_flow_calls == [True]
+    assert native_trial_calls == ["DETECT", "DETECT", "LEFT_BRANCH", "RIGHT_BRANCH"]
+    assert accepted_control_modes == ["DISABLED"]
+    assert result.shooting_enthalpy == service.H_MAX_J_KG
+    assert result.transient_provider_enclosure_event_hashes == (
+        "LEFT_BRANCH-event-hash",
+        "RIGHT_BRANCH-event-hash",
+    )
+    assert len(result.outer_decision_certificate_hashes) == 1
 
 
 def test_accepted_mesh_replay_uses_fresh_full_search_stats_scope(

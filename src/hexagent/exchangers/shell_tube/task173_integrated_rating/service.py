@@ -6,13 +6,13 @@ import json
 import math
 from collections.abc import Callable
 from contextvars import ContextVar
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
 from pydantic import ValidationError
 
-from hexagent.canonical_json import canonical_sha256
+from hexagent.canonical_json import canonical_json_bytes, canonical_sha256
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
     CandidateLocalSupport,
     CandidateShellFlowAuthority,
@@ -89,6 +89,11 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.replay import (
     NativeReplayError,
     public_projection,
     replay_shell_flow_authority,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal import FlowRegime
+from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
+    check_pr_envelope,
+    select_regime,
 )
 from hexagent.properties.base import (
     FluidIdentifier,
@@ -752,6 +757,10 @@ class _MeshRun:
     shooting_enthalpy: Decimal
     bisection_iterations: int
     task172_numerical_hole_neighborhoods: tuple[dict[str, str], ...] = ()
+    transient_provider_enclosure_event_hashes: tuple[str, ...] = ()
+    outer_decision_certificate_hashes: tuple[str, ...] = ()
+    outer_decision_certificate_projections: tuple[str, ...] = ()
+    outer_decision_action_sequence: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -760,6 +769,24 @@ class _OuterTrial:
     enthalpy_j_kg: Decimal
     mesh_run: _MeshRun | None = None
     diagnostics: tuple[str, ...] = ()
+
+
+@dataclass
+class _CandidateTransientControl:
+    mode: Literal["DETECT", "LEFT_BRANCH", "RIGHT_BRANCH", "DISABLED"]
+    mesh_subdivisions: int
+    outer_iteration: int
+    shooting_enthalpy: Decimal
+    events: list[dict[str, Any]] = field(default_factory=list)
+    triggered: bool = False
+
+
+class _ProviderQuantizationTrigger(Exception):
+    """Eligible candidate-only provider-state exhaustion in a transient trial."""
+
+    def __init__(self, event: dict[str, Any]) -> None:
+        super().__init__("PROVIDER_QUANTIZATION_ENCLOSURE_TRIGGER")
+        self.event = event
 
 
 @dataclass(frozen=True)
@@ -777,6 +804,9 @@ class _CandidateRatingContext:
 
 _CANDIDATE_RATING_CONTEXT: ContextVar[_CandidateRatingContext | None] = ContextVar(
     "task173_candidate_rating_context", default=None
+)
+_CANDIDATE_TRANSIENT_CONTROL: ContextVar[_CandidateTransientControl | None] = ContextVar(
+    "task173_candidate_transient_control", default=None
 )
 
 
@@ -824,6 +854,323 @@ def _candidate_context(request: CandidateRatingRequest) -> _CandidateRatingConte
         shell_flow_path_id=shell_paths[0],
         interval_count=len(definition.intervals),
     )
+
+
+def _binary64_adjacent(left: float, right: float) -> bool:
+    if left == right:
+        return True
+    low, high = sorted((left, right))
+    return math.nextafter(low, high) == high
+
+
+def _provider_input_enthalpy(state: _ThermoState) -> str | None:
+    if state.snapshot.query_type != "PH":
+        return None
+    return state.snapshot.inputs.get("enthalpy_j_kg")
+
+
+def _candidate_provider_enclosure_event(
+    *,
+    context: _CandidateRatingContext,
+    control: _CandidateTransientControl,
+    support: Any,
+    left: _CellTrial,
+    right: _CellTrial,
+    trials: dict[float, _CellTrial],
+) -> dict[str, Any] | None:
+    """Build a production R2A event only when every frozen Q1-Q15 predicate holds."""
+    if (
+        left.classification != "VALID_CELL_EVALUATION"
+        or right.classification != "VALID_CELL_EVALUATION"
+        or left.evaluation is None
+        or right.evaluation is None
+        or left.residual is None
+        or right.residual is None
+    ):
+        return None
+    left_eval, right_eval = left.evaluation, right.evaluation
+    left_result, right_result = left_eval.task172_result, right_eval.task172_result
+    if type(left_result) is not Task172LocalResult or type(right_result) is not Task172LocalResult:
+        return None
+    left_request, right_request = left_eval.task172_request, right_eval.task172_request
+    if (
+        type(left_request) is not CandidateTask172LocalRequest
+        or type(right_request) is not CandidateTask172LocalRequest
+    ):
+        return None
+
+    state_pairs = (
+        ("tube_downstream_h", left_eval.tube_downstream, right_eval.tube_downstream),
+        ("shell_next_face_h", left_eval.shell_next_physical, right_eval.shell_next_physical),
+        ("tube_midpoint_h", left_eval.tube_local, right_eval.tube_local),
+        ("shell_midpoint_h", left_eval.shell_local, right_eval.shell_local),
+    )
+    coordinates: list[dict[str, Any]] = []
+    coordinate_checks: list[bool] = []
+    for name, left_state, right_state in state_pairs:
+        left_input = _provider_input_enthalpy(left_state)
+        right_input = _provider_input_enthalpy(right_state)
+        if left_input is None or right_input is None:
+            return None
+        left_float, right_float = float(left_input), float(right_input)
+        adjacent = _binary64_adjacent(left_float, right_float)
+        low, high = sorted((left_float, right_float))
+        no_interior = low == high or math.nextafter(low, high) == high
+        coordinates.append(
+            {
+                "name": name,
+                "left_decimal": left_input,
+                "right_decimal": right_input,
+                "left_hex": left_float.hex(),
+                "right_hex": right_float.hex(),
+                "identical": left_float == right_float,
+                "adjacent_or_identical": adjacent,
+                "no_representable_coordinate_between": no_interior,
+            }
+        )
+        coordinate_checks.append(adjacent and no_interior)
+
+    def property_identity(state: _ThermoState) -> bool:
+        snapshot = state.snapshot
+        return (
+            T_MIN_K <= _d(state.native.temperature_k) <= T_MAX_K
+            and _d(state.native.pressure_pa) == REFERENCE_PRESSURE_PA
+            and state.native.phase is PhaseRegion.LIQUID
+            and state.native.provenance.fluid_identifier == "HEOS::Water"
+            and snapshot.phase == "liquid"
+            and snapshot.backend == "HEOS::Water"
+            and snapshot.provider == "CoolProp"
+            and snapshot.provider_version == "8.0.0"
+            and snapshot.provider_git_revision == "ae81610e7d23efc57f9d051c8e70a4d66e87537f"
+            and snapshot.reference_state == "DEF"
+            and snapshot.query_type == "PH"
+        )
+
+    left_tube_re = left_result.tube_reynolds_number
+    left_tube_pr = left_result.tube_prandtl_number_bulk
+    right_tube_re = right_result.tube_reynolds_number
+    right_tube_pr = right_result.tube_prandtl_number_bulk
+    left_regime, left_corr, left_corr_version = select_regime(left_tube_re, left_tube_pr)
+    right_regime, right_corr, right_corr_version = select_regime(right_tube_re, right_tube_pr)
+    left_candidate = left_request.candidate_binding
+    right_candidate = right_request.candidate_binding
+    q_checks = {
+        "Q1": left_result.status == right_result.status == "VALIDATED"
+        and not left_result.blockers
+        and not right_result.blockers,
+        "Q2": left.residual < 0 < right.residual,
+        "Q3": abs(left.residual) > Decimal("1e-6") and abs(right.residual) > Decimal("1e-6"),
+        "Q4": not any(item.classification == "TASK172_NUMERICAL_HOLE" for item in trials.values()),
+        "Q5": not any(item.classification == "HARD_BLOCKER" for item in trials.values()),
+        "Q6": all(
+            property_identity(state)
+            for _, left_state, right_state in state_pairs
+            for state in (left_state, right_state)
+        ),
+        "Q7": left.q_w < right.q_w and math.nextafter(left.q_w, right.q_w) == right.q_w,
+        "Q8": all(coordinate_checks),
+        "Q9": all(item["no_representable_coordinate_between"] for item in coordinates),
+        "Q10": left_result.property_profile_id
+        == right_result.property_profile_id
+        == left_request.property_profile_id
+        == right_request.property_profile_id
+        and left_result.property_profile_canonical_hash
+        == right_result.property_profile_canonical_hash
+        and all(
+            left_state.snapshot.configuration_fingerprint
+            == right_state.snapshot.configuration_fingerprint
+            for _, left_state, right_state in state_pairs
+        ),
+        "Q11": left_result.tube_correlation_id == right_result.tube_correlation_id
+        and left_result.tube_correlation_version == right_result.tube_correlation_version
+        and left_result.shell_correlation_id
+        == right_result.shell_correlation_id
+        == "TASK166_BELL_DELAWARE_WITH_REVIEWED_LOCAL_JMU"
+        and left_result.shell_jmu_model_authority_canonical_hash
+        == right_result.shell_jmu_model_authority_canonical_hash,
+        "Q12": left_tube_re > Decimal("3000")
+        and left_tube_re < Decimal("5000000")
+        and right_tube_re > Decimal("3000")
+        and right_tube_re < Decimal("5000000")
+        and left_regime is right_regime is FlowRegime.TURBULENT
+        and check_pr_envelope(left_regime, left_tube_pr)
+        and check_pr_envelope(right_regime, right_tube_pr)
+        and left_corr == right_corr == left_result.tube_correlation_id
+        and left_corr_version == right_corr_version == left_result.tube_correlation_version,
+        "Q13": left_result.case_id == right_result.case_id == context.request.candidate_id
+        and left_result.case_revision_id == right_result.case_revision_id
+        and left_result.task171_result_hash
+        == right_result.task171_result_hash
+        == context.task171_result_hash
+        and left_request.case_id == right_request.case_id == context.request.candidate_id
+        and left_request.case_revision_id
+        == right_request.case_revision_id
+        == context.request.candidate_id
+        and left_request.topology.task171_result_hash
+        == right_request.topology.task171_result_hash
+        == context.task171_result_hash
+        and left_request.topology.topology_id
+        == right_request.topology.topology_id
+        == context.topology_id
+        and left_request.topology.mesh_identity
+        == right_request.topology.mesh_identity
+        == context.mesh_identity
+        and left_request.topology.physical_ownership_hash
+        == right_request.topology.physical_ownership_hash
+        == context.physical_ownership_hash
+        and left_result.topology_id == right_result.topology_id == context.topology_id
+        and left_result.physical_support_id
+        == right_result.physical_support_id
+        == support.physical_segment_id
+        and left_request.support.physical_segment_id
+        == right_request.support.physical_segment_id
+        == support.physical_segment_id
+        and left_request.support.mesh_level_identity
+        == right_request.support.mesh_level_identity
+        == support.mesh_level_identity
+        == _candidate_mesh_identity(context, control.mesh_subdivisions)
+        and left_result.physical_segment_id == right_result.physical_segment_id
+        and left_result.tube_cell_id == right_result.tube_cell_id == support.tube_cell_id
+        and left_result.shell_cell_id == right_result.shell_cell_id == support.shell_cell_id
+        and left_result.wall_interface_id
+        == right_result.wall_interface_id
+        == support.wall_interface_id
+        and left_request.support.wall_interface_id
+        == right_request.support.wall_interface_id
+        == support.wall_interface_id,
+        "Q14": left_result.numerical_profile_id == right_result.numerical_profile_id
+        and left_result.r94_model_profile_canonical_hash
+        == right_result.r94_model_profile_canonical_hash
+        and left_result.r98_overlay_canonical_hash == right_result.r98_overlay_canonical_hash
+        and left_result.selected_thermal_role_variant == right_result.selected_thermal_role_variant
+        and left_result.property_profile_canonical_hash
+        == right_result.property_profile_canonical_hash,
+        "Q15": recompute_task172_request_hash(left_request) == left_result.request_hash
+        and recompute_task172_request_hash(right_request) == right_result.request_hash
+        and recompute_task172_result_hash(left_result) == left_result.result_hash
+        and recompute_task172_result_hash(right_result) == right_result.result_hash
+        and left_eval.q_w == Decimal(str(left.q_w))
+        and right_eval.q_w == Decimal(str(right.q_w))
+        and left_candidate.candidate_id == right_candidate.candidate_id
+        and left_candidate.candidate_id == context.request.candidate_id
+        and left_candidate.candidate_hash == right_candidate.candidate_hash
+        and left_candidate.candidate_hash == context.request.candidate_hash
+        and left_candidate.authority_package_id == right_candidate.authority_package_id
+        and left_candidate.authority_package_id == context.request.authority_package_id
+        and left_candidate.authority_package_hash == right_candidate.authority_package_hash
+        and left_candidate.authority_package_hash == context.request.authority_package_hash
+        and left_candidate.task166_result.result_hash
+        == right_candidate.task166_result.result_hash
+        == context.request.task166_result.result_hash
+        and left_candidate.task171_result.result_hash
+        == right_candidate.task171_result.result_hash
+        == context.task171_result_hash,
+    }
+    if not all(q_checks.values()):
+        return None
+
+    with localcontext() as decimal_context:
+        decimal_context.prec = 80
+        provider_q_span = abs(
+            right_result.signed_q_hot_to_cold_w - left_result.signed_q_hot_to_cold_w
+        )
+        provider_twi_span = abs(
+            right_result.wall_temperature_inner_k - left_result.wall_temperature_inner_k
+        )
+        provider_two_span = abs(
+            right_result.wall_temperature_outer_k - left_result.wall_temperature_outer_k
+        )
+
+    projection: dict[str, Any] = {
+        "schema_version": "task173.r2a.transient-provider-enclosure-event.v1",
+        "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+        "authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+        "candidate_id": context.request.candidate_id,
+        "candidate_hash": context.request.candidate_hash,
+        "mesh_identity": _candidate_mesh_identity(context, control.mesh_subdivisions),
+        "mesh_subdivisions": control.mesh_subdivisions,
+        "shooting_enthalpy_j_kg": str(control.shooting_enthalpy),
+        "outer_iteration": control.outer_iteration,
+        "branch": control.mode,
+        "physical_support_id": support.physical_segment_id,
+        "tube_cell_id": support.tube_cell_id,
+        "shell_cell_id": support.shell_cell_id,
+        "wall_interface_id": support.wall_interface_id,
+        "left_q_w": repr(left.q_w),
+        "right_q_w": repr(right.q_w),
+        "left_q_hex": left.q_w.hex(),
+        "right_q_hex": right.q_w.hex(),
+        "left_f_w": str(left.residual),
+        "right_f_w": str(right.residual),
+        "left_endpoint_request_hash": left_result.request_hash,
+        "right_endpoint_request_hash": right_result.request_hash,
+        "left_endpoint_result_hash": left_result.result_hash,
+        "right_endpoint_result_hash": right_result.result_hash,
+        "left_endpoint_result_id": left_result.result_id,
+        "right_endpoint_result_id": right_result.result_id,
+        "provider_coordinates": coordinates,
+        "endpoint_request_projection_left": left_request.model_dump(mode="json"),
+        "endpoint_request_projection_right": right_request.model_dump(mode="json"),
+        "endpoint_result_projection_left": left_result.model_dump(mode="json"),
+        "endpoint_result_projection_right": right_result.model_dump(mode="json"),
+        "Q1_Q15": q_checks,
+        "representative_endpoint": "LEFT"
+        if (abs(left.residual), left.q_w) <= (abs(right.residual), right.q_w)
+        else "RIGHT",
+        "exact_point_root_found": False,
+        "provider_q_span_w": str(provider_q_span),
+        "provider_twi_span_k": str(provider_twi_span),
+        "provider_two_span_k": str(provider_two_span),
+        "used_in_final_physical_acceptance": False,
+    }
+    projection["event_hash"] = canonical_sha256(projection)
+    return projection
+
+
+def _candidate_provider_floor_evaluation(
+    *,
+    context: _CandidateRatingContext,
+    control: _CandidateTransientControl,
+    support: Any,
+    left: _CellTrial,
+    right: _CellTrial,
+    trials: dict[float, _CellTrial],
+) -> _CellEvaluation | None:
+    if control.mode == "DISABLED":
+        raise _Stage3Failure(
+            "BLOCKED_ACCEPTED_TRAJECTORY_PROVIDER_QUANTIZATION_UNRESOLVED",
+            f"physical_support_id={support.physical_segment_id}",
+            f"left_q_w={left.q_w}",
+            f"right_q_w={right.q_w}",
+        )
+    if control.triggered:
+        raise _Stage3Failure(
+            "BLOCKED_NESTED_PROVIDER_QUANTIZATION_ENCLOSURE_UNSUPPORTED",
+            f"candidate={context.request.candidate_id}",
+            f"branch={control.mode}",
+            f"outer_iteration={control.outer_iteration}",
+            f"support={support.physical_segment_id}",
+        )
+    event = _candidate_provider_enclosure_event(
+        context=context,
+        control=control,
+        support=support,
+        left=left,
+        right=right,
+        trials=trials,
+    )
+    if event is None:
+        return None
+    if control.mode == "DETECT":
+        raise _ProviderQuantizationTrigger(event)
+    if control.mode not in {"LEFT_BRANCH", "RIGHT_BRANCH"}:
+        raise _Stage3Failure("BLOCKED_CANDIDATE_TRANSIENT_CONTROL_MODE_INVALID", control.mode)
+    control.triggered = True
+    control.events.append(event)
+    selected = left if control.mode == "LEFT_BRANCH" else right
+    if selected.evaluation is None:
+        raise _Stage3Failure("BLOCKED_ENDPOINT_IDENTITY_REPLAY_MISMATCH")
+    return selected.evaluation
 
 
 def _candidate_mesh_identity(context: _CandidateRatingContext, subdivisions: int) -> str:
@@ -2044,6 +2391,19 @@ def _solve_cell(
             )
             if eligible_endpoint is not None and eligible_endpoint.evaluation is not None:
                 return eligible_endpoint.evaluation
+            transient_control = _CANDIDATE_TRANSIENT_CONTROL.get()
+            candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+            if transient_control is not None and candidate_context is not None:
+                endpoint_evaluation = _candidate_provider_floor_evaluation(
+                    context=candidate_context,
+                    control=transient_control,
+                    support=support,
+                    left=left,
+                    right=right,
+                    trials=trials,
+                )
+                if endpoint_evaluation is not None:
+                    return endpoint_evaluation
             raise _Stage3Failure(
                 "PRECISION_FLOOR_UNRESOLVED",
                 "CELL_ROOT_PRECISION_FLOOR_REACHED",
@@ -2690,6 +3050,396 @@ def _solve_outer_boundary_from_trial(
     )
 
 
+def _midpoint_collapse_disposition(run: _MeshRun) -> tuple[str, Decimal]:
+    temperature_floor = Decimal(
+        str(math.ulp(float(run.observables.terminal_boundary_residual_k + T_MIN_K)))
+    )
+    if _terminal_tolerance_pass(run):
+        return "RETURN_ACCEPTED_RUN", temperature_floor
+    if run.observables.terminal_boundary_residual_k - temperature_floor > TERMINAL_TOLERANCE_K:
+        return "BLOCKED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED", temperature_floor
+    return "PRECISION_FLOOR_UNRESOLVED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED", temperature_floor
+
+
+def _candidate_outer_action(trial: _OuterTrial) -> str:
+    if trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+        return "UPDATE_H_LOW"
+    if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
+        raise _Stage3Failure("BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID", trial.classification)
+    return (
+        "CANDIDATE_SHOOTING_ENTHALPY_SELECTED"
+        if _terminal_tolerance_pass(trial.mesh_run)
+        else "UPDATE_H_HIGH_CONTINUE"
+    )
+
+
+def _assert_candidate_branch_invariance(
+    left: _OuterTrial, right: _OuterTrial
+) -> tuple[bool | None, bool | None, str, str, Decimal | None, Decimal | None, str, str]:
+    if left.classification == "HARD_BLOCKER" or right.classification == "HARD_BLOCKER":
+        blocker = left if left.classification == "HARD_BLOCKER" else right
+        raise _Stage3Failure(*blocker.diagnostics)
+    if left.classification != right.classification:
+        raise _Stage3Failure(
+            "BLOCKED_TRANSIENT_OUTER_DECISION_QUANTIZATION_STRADDLE",
+            f"left={left.classification}",
+            f"right={right.classification}",
+        )
+    if left.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+        left_terminal = right_terminal = None
+        left_disposition = right_disposition = "NOT_APPLICABLE"
+        left_floor = right_floor = None
+    elif left.classification == "VALID_TRAJECTORY":
+        if left.mesh_run is None or right.mesh_run is None:
+            raise _Stage3Failure("BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID")
+        left_terminal = _terminal_tolerance_pass(left.mesh_run)
+        right_terminal = _terminal_tolerance_pass(right.mesh_run)
+        if left_terminal != right_terminal:
+            raise _Stage3Failure(
+                "BLOCKED_TRANSIENT_OUTER_TERMINAL_DECISION_QUANTIZATION_STRADDLE",
+                f"left={left_terminal}",
+                f"right={right_terminal}",
+            )
+        left_disposition, left_floor = _midpoint_collapse_disposition(left.mesh_run)
+        right_disposition, right_floor = _midpoint_collapse_disposition(right.mesh_run)
+        if left_disposition != right_disposition:
+            raise _Stage3Failure(
+                "BLOCKED_TRANSIENT_OUTER_PRECISION_FLOOR_DECISION_QUANTIZATION_STRADDLE",
+                f"left={left_disposition}",
+                f"right={right_disposition}",
+            )
+    else:
+        raise _Stage3Failure("BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID", left.classification)
+    left_action = _candidate_outer_action(left)
+    right_action = _candidate_outer_action(right)
+    if left_action != right_action:
+        raise _Stage3Failure(
+            "BLOCKED_TRANSIENT_OUTER_DECISION_QUANTIZATION_STRADDLE",
+            f"left_action={left_action}",
+            f"right_action={right_action}",
+        )
+    return (
+        left_terminal,
+        right_terminal,
+        left_disposition,
+        right_disposition,
+        left_floor,
+        right_floor,
+        left_action,
+        right_action,
+    )
+
+
+def _candidate_transient_outer_boundary(
+    subdivisions: int,
+    provider: PropertyProvider,
+    shell_authority: Any,
+    search_stats: _CellSearchStats | None = None,
+) -> _MeshRun:
+    """Use R2A endpoint branching, then return a fresh enclosure-free trajectory."""
+    context = _CANDIDATE_RATING_CONTEXT.get()
+    if context is None:
+        raise _Stage3Failure("BLOCKED_CANDIDATE_RATING_CONTEXT_MISSING")
+    event_hashes: list[str] = []
+    certificate_hashes: list[str] = []
+    certificate_projections: list[dict[str, Any]] = []
+    outer_actions: list[str] = []
+
+    def branch_trial(
+        enthalpy: Decimal, iteration: int, side: Literal["LEFT_BRANCH", "RIGHT_BRANCH"]
+    ) -> tuple[_OuterTrial, tuple[dict[str, Any], ...]]:
+        control = _CandidateTransientControl(
+            mode=side,
+            mesh_subdivisions=subdivisions,
+            outer_iteration=iteration,
+            shooting_enthalpy=enthalpy,
+        )
+        token = _CANDIDATE_TRANSIENT_CONTROL.set(control)
+        try:
+            trial = _outer_trial(
+                subdivisions,
+                enthalpy,
+                provider,
+                shell_authority,
+                iteration,
+                search_stats,
+            )
+        finally:
+            _CANDIDATE_TRANSIENT_CONTROL.reset(token)
+        return trial, tuple(control.events)
+
+    def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
+        detection = _CandidateTransientControl(
+            mode="DETECT",
+            mesh_subdivisions=subdivisions,
+            outer_iteration=iteration,
+            shooting_enthalpy=enthalpy,
+        )
+        token = _CANDIDATE_TRANSIENT_CONTROL.set(detection)
+        detected_event: dict[str, Any] | None = None
+        try:
+            native = _outer_trial(
+                subdivisions,
+                enthalpy,
+                provider,
+                shell_authority,
+                iteration,
+                search_stats,
+            )
+        except _ProviderQuantizationTrigger as trigger:
+            native = None
+            detected_event = trigger.event
+        finally:
+            _CANDIDATE_TRANSIENT_CONTROL.reset(token)
+        if native is not None:
+            if native.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                outer_actions.append("UPDATE_H_LOW")
+            elif native.classification == "VALID_TRAJECTORY":
+                outer_actions.append(_candidate_outer_action(native))
+            return native
+
+        left_trial, left_events = branch_trial(enthalpy, iteration, "LEFT_BRANCH")
+        right_trial, right_events = branch_trial(enthalpy, iteration, "RIGHT_BRANCH")
+        (
+            left_terminal,
+            right_terminal,
+            left_disposition,
+            right_disposition,
+            left_floor,
+            right_floor,
+            left_action,
+            right_action,
+        ) = _assert_candidate_branch_invariance(left_trial, right_trial)
+        if len(left_events) != 1 or len(right_events) != 1:
+            raise _Stage3Failure(
+                "BLOCKED_ENDPOINT_IDENTITY_REPLAY_MISMATCH",
+                f"left_event_count={len(left_events)}",
+                f"right_event_count={len(right_events)}",
+            )
+        if not all(all(event["Q1_Q15"].values()) for event in (*left_events, *right_events)):
+            raise _Stage3Failure("BLOCKED_PROVIDER_ENCLOSURE_Q_PREDICATE_FAILURE")
+
+        for branch_events in (left_events, right_events):
+            event_hashes.extend(event["event_hash"] for event in branch_events)
+        left_event, right_event = left_events[0], right_events[0]
+        if detected_event is None:
+            raise _Stage3Failure("BLOCKED_ENDPOINT_IDENTITY_REPLAY_MISMATCH")
+        replay_binding_fields = (
+            "candidate_id",
+            "candidate_hash",
+            "mesh_identity",
+            "physical_support_id",
+            "left_q_hex",
+            "right_q_hex",
+            "left_endpoint_request_hash",
+            "right_endpoint_request_hash",
+            "left_endpoint_result_hash",
+            "right_endpoint_result_hash",
+            "left_f_w",
+            "right_f_w",
+            "representative_endpoint",
+        )
+        if any(
+            any(
+                branch_event.get(field_name) != detected_event.get(field_name)
+                for field_name in replay_binding_fields
+            )
+            for branch_event in (left_event, right_event)
+        ):
+            raise _Stage3Failure(
+                "BLOCKED_ENDPOINT_IDENTITY_REPLAY_MISMATCH",
+                "detection_and_branch_endpoint_bindings_differ",
+            )
+        representative_endpoint = left_event["representative_endpoint"]
+        representative_trial = left_trial if representative_endpoint == "LEFT" else right_trial
+        outer_actions.append(left_action)
+        left_run = left_trial.mesh_run
+        right_run = right_trial.mesh_run
+        certificate_projection: dict[str, Any] = {
+            "schema_version": "task173.r2a.production-outer-decision-certificate.v1",
+            "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+            "authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+            "candidate_id": context.request.candidate_id,
+            "candidate_hash": context.request.candidate_hash,
+            "mesh_identity": _candidate_mesh_identity(context, subdivisions),
+            "mesh_subdivisions": subdivisions,
+            "shooting_enthalpy_j_kg": str(enthalpy),
+            "outer_iteration": iteration,
+            "trigger_support_id": left_event["physical_support_id"],
+            "left_endpoint_event_hashes": [left_event["event_hash"]],
+            "right_endpoint_event_hashes": [right_event["event_hash"]],
+            "left_branch_used_endpoint_request_hash": left_event["left_endpoint_request_hash"],
+            "left_branch_used_endpoint_result_hash": left_event["left_endpoint_result_hash"],
+            "right_branch_used_endpoint_request_hash": right_event["right_endpoint_request_hash"],
+            "right_branch_used_endpoint_result_hash": right_event["right_endpoint_result_hash"],
+            "left_event_left_endpoint_request_hash": left_event["left_endpoint_request_hash"],
+            "left_event_right_endpoint_request_hash": left_event["right_endpoint_request_hash"],
+            "right_event_left_endpoint_request_hash": right_event["left_endpoint_request_hash"],
+            "right_event_right_endpoint_request_hash": right_event["right_endpoint_request_hash"],
+            "left_event_left_endpoint_result_hash": left_event["left_endpoint_result_hash"],
+            "left_event_right_endpoint_result_hash": left_event["right_endpoint_result_hash"],
+            "right_event_left_endpoint_result_hash": right_event["left_endpoint_result_hash"],
+            "right_event_right_endpoint_result_hash": right_event["right_endpoint_result_hash"],
+            "left_continuation_hash": canonical_sha256(
+                {
+                    "classification": left_trial.classification,
+                    "mesh_result_hash": left_run.mesh_result_hash if left_run else None,
+                    "event_hashes": [event["event_hash"] for event in left_events],
+                    "fallback_disabled_after_trigger": True,
+                }
+            ),
+            "right_continuation_hash": canonical_sha256(
+                {
+                    "classification": right_trial.classification,
+                    "mesh_result_hash": right_run.mesh_result_hash if right_run else None,
+                    "event_hashes": [event["event_hash"] for event in right_events],
+                    "fallback_disabled_after_trigger": True,
+                }
+            ),
+            "left_outer_classification": left_trial.classification,
+            "right_outer_classification": right_trial.classification,
+            "left_terminal_residual_k": (
+                str(left_run.observables.terminal_boundary_residual_k) if left_run else None
+            ),
+            "right_terminal_residual_k": (
+                str(right_run.observables.terminal_boundary_residual_k) if right_run else None
+            ),
+            "left_terminal_residual_j_kg": (
+                str(left_run.observables.terminal_boundary_residual_j_kg) if left_run else None
+            ),
+            "right_terminal_residual_j_kg": (
+                str(right_run.observables.terminal_boundary_residual_j_kg) if right_run else None
+            ),
+            "left_terminal_tolerance_decision": left_terminal,
+            "right_terminal_tolerance_decision": right_terminal,
+            "left_outer_action": left_action,
+            "right_outer_action": right_action,
+            "left_midpoint_collapse_disposition": left_disposition,
+            "right_midpoint_collapse_disposition": right_disposition,
+            "left_temperature_ulp_floor_k": str(left_floor) if left_floor is not None else None,
+            "right_temperature_ulp_floor_k": str(right_floor) if right_floor is not None else None,
+            "midpoint_collapse_disposition_invariant": left_disposition == right_disposition,
+            "representative_branch_used_to_decide_outer_action": False,
+            "representative_endpoint_after_invariance": representative_endpoint,
+        }
+        certificate_projection["certificate_hash"] = canonical_sha256(certificate_projection)
+        certificate_hashes.append(certificate_projection["certificate_hash"])
+        certificate_projections.append(certificate_projection)
+        return representative_trial
+
+    selected = _solve_outer_boundary_from_trial(trial_at)
+    accepted_control = _CandidateTransientControl(
+        mode="DISABLED",
+        mesh_subdivisions=subdivisions,
+        outer_iteration=selected.bisection_iterations,
+        shooting_enthalpy=selected.shooting_enthalpy,
+    )
+    token = _CANDIDATE_TRANSIENT_CONTROL.set(accepted_control)
+    try:
+        accepted = _valid_trajectory(
+            subdivisions,
+            selected.shooting_enthalpy,
+            provider,
+            shell_authority,
+            selected.bisection_iterations,
+            search_stats,
+        )
+    finally:
+        _CANDIDATE_TRANSIENT_CONTROL.reset(token)
+    if not _terminal_tolerance_pass(accepted):
+        raise _Stage3Failure("BLOCKED_COUNTERCURRENT_TERMINAL_BOUNDARY_TOLERANCE")
+    return replace(
+        accepted,
+        transient_provider_enclosure_event_hashes=tuple(event_hashes),
+        outer_decision_certificate_hashes=tuple(certificate_hashes),
+        outer_decision_certificate_projections=(
+            canonical_json_bytes({"items": certificate_projections}).decode("utf-8"),
+        ),
+        outer_decision_action_sequence=tuple(outer_actions),
+    )
+
+
+def _candidate_accepted_trajectory_projection(
+    run: _MeshRun, context: _CandidateRatingContext
+) -> dict[str, Any]:
+    cells: list[dict[str, Any]] = []
+    for record in run.cells:
+        request = record.solution.task172_request
+        result = record.solution.task172_result
+        if (
+            type(request) is not CandidateTask172LocalRequest
+            or type(result) is not Task172LocalResult
+            or result.status != "VALIDATED"
+        ):
+            raise _Stage3Failure("BLOCKED_ACCEPTED_TRAJECTORY_TASK172_IDENTITY_REPLAY")
+        request_hash = recompute_task172_request_hash(request)
+        result_hash = recompute_task172_result_hash(result)
+        with localcontext() as decimal_context:
+            decimal_context.prec = 80
+            residual = record.solution.q_w - result.signed_q_hot_to_cold_w
+        if (
+            result.request_hash != request_hash
+            or result.result_hash != result_hash
+            or result.case_id != context.request.candidate_id
+            or result.case_revision_id != context.request.candidate_id
+            or result.task171_result_hash != context.task171_result_hash
+            or request.candidate_binding.candidate_id != context.request.candidate_id
+            or request.candidate_binding.candidate_hash != context.request.candidate_hash
+            or request.candidate_binding.authority_package_hash
+            != context.request.authority_package_hash
+            or abs(residual) > Decimal("1e-6")
+        ):
+            raise _Stage3Failure(
+                "BLOCKED_ACCEPTED_TRAJECTORY_TASK172_IDENTITY_REPLAY",
+                f"support={record.support.physical_segment_id}",
+                f"request_hash={request_hash}",
+                f"result_hash={result_hash}",
+                f"F_q_w={residual}",
+            )
+        cells.append(
+            {
+                "physical_support": record.support.model_dump(mode="json"),
+                "tube_upstream_face": record.tube_upstream_face.model_dump(mode="json"),
+                "tube_downstream_face": record.tube_downstream_face.model_dump(mode="json"),
+                "shell_physical_left_face": record.shell_physical_left_face.model_dump(mode="json"),
+                "shell_physical_right_face": record.shell_physical_right_face.model_dump(
+                    mode="json"
+                ),
+                "tube_local_state": record.solution.tube_local.snapshot.model_dump(mode="json"),
+                "shell_local_state": record.solution.shell_local.snapshot.model_dump(mode="json"),
+                "tube_state_receipt": record.tube_receipt.model_dump(mode="json"),
+                "shell_state_receipt": record.shell_receipt.model_dump(mode="json"),
+                "rated_cell_projection": record.rated_cell.model_dump(mode="json"),
+                "task172_request_projection": request.model_dump(mode="json"),
+                "task172_request_hash": request_hash,
+                "task172_result_projection": result.model_dump(mode="json"),
+                "task172_result_hash": result_hash,
+                "cell_closure_mode": "EXACT_VALID_POINT_ROOT",
+                "cell_root_residual_w": str(residual),
+                "tube_approach_k": str(record.tube_approach_k),
+                "shell_approach_k": str(record.shell_approach_k),
+            }
+        )
+    projection: dict[str, Any] = {
+        "schema_version": "task173.candidate-rating-accepted-trajectory.v1",
+        "candidate_id": context.request.candidate_id,
+        "candidate_hash": context.request.candidate_hash,
+        "mesh_subdivisions": run.subdivisions,
+        "mesh_identity": run.observables.mesh_level_identity,
+        "mesh_result_hash": run.mesh_result_hash,
+        "shooting_enthalpy_j_kg": str(run.shooting_enthalpy),
+        "outer_iteration_count": run.bisection_iterations,
+        "tube_faces": [face.model_dump(mode="json") for face in run.faces_tube],
+        "shell_faces": [face.model_dump(mode="json") for face in run.faces_shell],
+        "accepted_cells": cells,
+        "mesh_observables": run.observables.model_dump(mode="json"),
+        "numerical_hole_neighborhoods": list(run.task172_numerical_hole_neighborhoods),
+        "provider_enclosure_count_in_accepted_trajectory": 0,
+    }
+    projection["trajectory_hash"] = canonical_sha256(projection)
+    return projection
+
+
 def _classify_difference(
     difference: Decimal, floor: Decimal, threshold: Decimal
 ) -> Literal["PASS", "FAIL", "PRECISION_FLOOR_UNRESOLVED"]:
@@ -2814,12 +3564,21 @@ def _run_mesh_sequence(
     for subdivisions in REVIEWED_MESH_SEQUENCE:
         search_stats = _CellSearchStats()
         try:
-            run = _solve_outer_boundary(
-                subdivisions,
-                provider_factory(),
-                shell_authority,
-                search_stats,
-            )
+            candidate_context = _CANDIDATE_RATING_CONTEXT.get()
+            if candidate_context is None:
+                run = _solve_outer_boundary(
+                    subdivisions,
+                    provider_factory(),
+                    shell_authority,
+                    search_stats,
+                )
+            else:
+                run = _candidate_transient_outer_boundary(
+                    subdivisions,
+                    provider_factory(),
+                    shell_authority,
+                    search_stats,
+                )
         except _Stage3Failure as exc:
             search_summaries.append(
                 {
@@ -3154,7 +3913,7 @@ def validate_candidate_rating(
         accepted = runs[candidate_index]
         headroom = runs[headroom_index]
         replay_stats = _CellSearchStats()
-        deterministic_replay = _solve_outer_boundary(
+        deterministic_replay = _candidate_transient_outer_boundary(
             accepted.subdivisions,
             active_provider,
             context.shell_authority,
@@ -3169,10 +3928,21 @@ def validate_candidate_rating(
             accepted.observables.local_task172_result_hashes
             == deterministic_replay.observables.local_task172_result_hashes
         )
+        same_r2a_provenance = (
+            accepted.transient_provider_enclosure_event_hashes
+            == deterministic_replay.transient_provider_enclosure_event_hashes
+            and accepted.outer_decision_certificate_hashes
+            == deterministic_replay.outer_decision_certificate_hashes
+            and accepted.outer_decision_certificate_projections
+            == deterministic_replay.outer_decision_certificate_projections
+            and accepted.outer_decision_action_sequence
+            == deterministic_replay.outer_decision_action_sequence
+        )
         if (
             accepted.mesh_result_hash != deterministic_replay.mesh_result_hash
             or not same_face_ids
             or not same_local_ids
+            or not same_r2a_provenance
         ):
             raise _Stage3Failure("BLOCKED_TASK173_DETERMINISM_REPLAY_MISMATCH")
         if not _terminal_tolerance_pass(accepted):
@@ -3181,6 +3951,46 @@ def validate_candidate_rating(
             ENERGY_ACCEPTANCE_FLOOR_W, accepted.observables.duty_roundoff_floor_w
         ):
             raise _Stage3Failure("BLOCKED_WHOLE_EXCHANGER_ENERGY_BALANCE")
+        transient_event_hashes = tuple(
+            event_hash
+            for run in runs
+            for event_hash in run.transient_provider_enclosure_event_hashes
+        )
+        outer_certificate_hashes = tuple(
+            certificate_hash
+            for run in runs
+            for certificate_hash in run.outer_decision_certificate_hashes
+        )
+        outer_certificate_projection_sets = tuple(
+            projection_set
+            for run in runs
+            for projection_set in run.outer_decision_certificate_projections
+        )
+        accepted_trajectory_projection = _candidate_accepted_trajectory_projection(
+            accepted, context
+        )
+        mesh_ledger_projection: dict[str, Any] = {
+            "schema_version": "task173.candidate-rating-mesh-ledger.v1",
+            "candidate_id": request.candidate_id,
+            "candidate_hash": request.candidate_hash,
+            "mesh_levels": [run.observables.model_dump(mode="json") for run in runs],
+            "convergence_comparisons": [item.model_dump(mode="json") for item in comparisons],
+            "per_mesh_r2a_provenance": [
+                {
+                    "subdivisions_per_interval": run.subdivisions,
+                    "transient_provider_enclosure_event_hashes": list(
+                        run.transient_provider_enclosure_event_hashes
+                    ),
+                    "outer_decision_certificate_hashes": list(
+                        run.outer_decision_certificate_hashes
+                    ),
+                    "outer_decision_action_sequence": list(run.outer_decision_action_sequence),
+                    "accepted_trajectory_provider_enclosure_count": 0,
+                }
+                for run in runs
+            ],
+        }
+        mesh_ledger_projection["mesh_ledger_hash"] = canonical_sha256(mesh_ledger_projection)
         provenance = tuple(
             sorted(
                 (
@@ -3214,6 +4024,46 @@ def validate_candidate_rating(
                         request.task174_pressure_transfer_authority_hash,
                     ),
                     ("accepted_mesh_result_hash", accepted.mesh_result_hash),
+                    (
+                        "reviewed_r2a_authority_id",
+                        "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+                    ),
+                    (
+                        "reviewed_r2a_authority_hash",
+                        "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+                    ),
+                    ("transient_provider_enclosure_event_count", str(len(transient_event_hashes))),
+                    (
+                        "transient_provider_enclosure_event_hashes",
+                        json.dumps(transient_event_hashes, separators=(",", ":")),
+                    ),
+                    (
+                        "outer_decision_certificate_hashes",
+                        json.dumps(outer_certificate_hashes, separators=(",", ":")),
+                    ),
+                    (
+                        "outer_decision_certificate_projection_sets",
+                        canonical_json_bytes(
+                            {
+                                "items": [
+                                    json.loads(item) for item in outer_certificate_projection_sets
+                                ]
+                            }
+                        ).decode("utf-8"),
+                    ),
+                    (
+                        "accepted_trajectory_hash",
+                        accepted_trajectory_projection["trajectory_hash"],
+                    ),
+                    (
+                        "accepted_trajectory_projection",
+                        canonical_json_bytes(accepted_trajectory_projection).decode("utf-8"),
+                    ),
+                    ("mesh_ledger_hash", mesh_ledger_projection["mesh_ledger_hash"]),
+                    (
+                        "mesh_ledger_projection",
+                        canonical_json_bytes(mesh_ledger_projection).decode("utf-8"),
+                    ),
                     ("face_id_replay", str(same_face_ids).lower()),
                     ("local_task172_hash_replay", str(same_local_ids).lower()),
                 )

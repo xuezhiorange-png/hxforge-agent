@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import enum
 import itertools
+import json
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import Any, Final, Literal, cast
 
 from pydantic import ValidationError
 
-from hexagent.canonical_json import canonical_sha256
+from hexagent.canonical_json import canonical_json_bytes, canonical_sha256
 from hexagent.exchangers.shell_tube.bell_delaware.models import (
     Task166BlockedResult,
     Task166Result,
@@ -237,6 +238,7 @@ def _candidate_provenance(
     candidate: CandidateSpec, identities: tuple[tuple[str, str], ...], rating_hash: str | None
 ) -> tuple[str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]:
     nodes = [("requirement", "requirement-authority"), ("candidate", candidate.candidate_hash)]
+    r2a_identities = tuple((name, digest) for name, digest in identities if name.startswith("R2A_"))
     nodes.extend((name, digest) for name, digest in identities)
     if rating_hash is not None:
         nodes.append(("candidate-rating", rating_hash))
@@ -263,7 +265,11 @@ def _candidate_provenance(
         previous = name
     if rating_hash is not None:
         edges.append((previous, "candidate-rating"))
-        edges.append(("candidate-rating", "constraints"))
+        previous = "candidate-rating"
+        for name, _ in r2a_identities:
+            edges.append((previous, name))
+            previous = name
+        edges.append((previous, "constraints"))
     digest = canonical_sha256({"nodes": nodes, "edges": edges})
     return digest, tuple(nodes), tuple(edges)
 
@@ -1001,6 +1007,101 @@ def validate_sizing_request(
                     )
                 )
                 continue
+            rating_provenance = dict(rating_outcome.provenance)
+            event_hashes = json.loads(
+                rating_provenance["transient_provider_enclosure_event_hashes"]
+            )
+            certificate_hashes = json.loads(rating_provenance["outer_decision_certificate_hashes"])
+            certificate_projection_sets = json.loads(
+                rating_provenance["outer_decision_certificate_projection_sets"]
+            )
+            replayed_certificate_hashes: list[str] = []
+            for projection_set in certificate_projection_sets["items"]:
+                for certificate in projection_set["items"]:
+                    certificate_projection = dict(certificate)
+                    certificate_hash = certificate_projection.pop("certificate_hash", None)
+                    if (
+                        type(certificate_hash) is not str
+                        or canonical_sha256(certificate_projection) != certificate_hash
+                    ):
+                        raise RuntimeError("BLOCKED_R2A_CERTIFICATE_PREIMAGE_REPLAY")
+                    replayed_certificate_hashes.append(certificate_hash)
+            if replayed_certificate_hashes != certificate_hashes:
+                raise RuntimeError("BLOCKED_R2A_CERTIFICATE_HASH_SET_MISMATCH")
+            accepted_trajectory_projection = json.loads(
+                rating_provenance["accepted_trajectory_projection"]
+            )
+            accepted_trajectory_hash = accepted_trajectory_projection.pop("trajectory_hash", None)
+            if (
+                accepted_trajectory_hash != rating_provenance["accepted_trajectory_hash"]
+                or canonical_sha256(accepted_trajectory_projection) != accepted_trajectory_hash
+                or accepted_trajectory_projection["provider_enclosure_count_in_accepted_trajectory"]
+                != 0
+                or any(
+                    cell["cell_closure_mode"] != "EXACT_VALID_POINT_ROOT"
+                    for cell in accepted_trajectory_projection["accepted_cells"]
+                )
+            ):
+                raise RuntimeError("BLOCKED_ACCEPTED_TRAJECTORY_PROJECTION_REPLAY")
+            accepted_trajectory_projection["trajectory_hash"] = accepted_trajectory_hash
+            mesh_ledger_projection = json.loads(rating_provenance["mesh_ledger_projection"])
+            mesh_ledger_hash = mesh_ledger_projection.pop("mesh_ledger_hash", None)
+            if (
+                mesh_ledger_hash != rating_provenance["mesh_ledger_hash"]
+                or canonical_sha256(mesh_ledger_projection) != mesh_ledger_hash
+                or any(
+                    item["accepted_trajectory_provider_enclosure_count"] != 0
+                    for item in mesh_ledger_projection["per_mesh_r2a_provenance"]
+                )
+            ):
+                raise RuntimeError("BLOCKED_CANDIDATE_MESH_LEDGER_REPLAY")
+            mesh_ledger_projection["mesh_ledger_hash"] = mesh_ledger_hash
+            r2a_identity_pairs = [
+                ("R2A_AUTHORITY_ID", rating_provenance["reviewed_r2a_authority_id"]),
+                ("R2A_AUTHORITY_HASH", rating_provenance["reviewed_r2a_authority_hash"]),
+                (
+                    "R2A_EVENT_COUNT",
+                    rating_provenance["transient_provider_enclosure_event_count"],
+                ),
+                ("R2A_CERTIFICATE_COUNT", str(len(certificate_hashes))),
+            ]
+            for index, event_hash in enumerate(event_hashes, start=1):
+                r2a_identity_pairs.append((f"R2A_EVENT_{index:04d}", event_hash))
+            for index, certificate_hash in enumerate(certificate_hashes, start=1):
+                r2a_identity_pairs.append((f"R2A_CERTIFICATE_{index:04d}", certificate_hash))
+            r2a_identity_pairs.extend(
+                (
+                    ("R2A_CANDIDATE_RATING_REQUEST_HASH", rating_request_hash),
+                    (
+                        "R2A_CANDIDATE_RATING_REQUEST_PROJECTION",
+                        canonical_json_bytes(rating_request.model_dump(mode="json")).decode(
+                            "utf-8"
+                        ),
+                    ),
+                    ("R2A_CANDIDATE_RATING_RESULT_HASH", rating_outcome.result_hash),
+                    (
+                        "R2A_CANDIDATE_RATING_RESULT_PROJECTION",
+                        canonical_json_bytes(rating_outcome.model_dump(mode="json")).decode(
+                            "utf-8"
+                        ),
+                    ),
+                    (
+                        "R2A_CERTIFICATE_PROJECTION_SETS",
+                        rating_provenance["outer_decision_certificate_projection_sets"],
+                    ),
+                    ("R2A_ACCEPTED_TRAJECTORY_HASH", accepted_trajectory_hash),
+                    (
+                        "R2A_ACCEPTED_TRAJECTORY_PROJECTION",
+                        canonical_json_bytes(accepted_trajectory_projection).decode("utf-8"),
+                    ),
+                    ("R2A_MESH_LEDGER_HASH", mesh_ledger_hash),
+                    (
+                        "R2A_MESH_LEDGER_PROJECTION",
+                        canonical_json_bytes(mesh_ledger_projection).decode("utf-8"),
+                    ),
+                )
+            )
+            identities = identities + tuple(r2a_identity_pairs)
             rated_duty = rating_outcome.total_duty_w
             tube_dp = task174.modeled_total_tube_side_pressure_drop_pa
             shell_dp = task174.bell_total_shell_pressure_drop_pa
