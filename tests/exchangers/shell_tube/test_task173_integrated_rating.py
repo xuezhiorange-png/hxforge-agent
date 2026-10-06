@@ -2076,6 +2076,324 @@ def _fake_mesh_run(enthalpy: Decimal, residual_h: Decimal) -> Any:
     )
 
 
+def _outer_trial_for_test(
+    classification: str,
+    enthalpy: Decimal,
+    *,
+    residual_k: Decimal = Decimal("0"),
+    residual_h: Decimal = Decimal("0"),
+    diagnostics: tuple[str, ...] = (),
+) -> service._OuterTrial:
+    run = None
+    if classification == "VALID_TRAJECTORY":
+        run = SimpleNamespace(
+            shooting_enthalpy=enthalpy,
+            observables=SimpleNamespace(
+                terminal_boundary_residual_k=residual_k,
+                terminal_boundary_residual_j_kg=residual_h,
+            ),
+        )
+    return service._OuterTrial(classification, enthalpy, mesh_run=run, diagnostics=diagnostics)
+
+
+def test_shared_outer_solver_rejects_wrong_low_endpoint_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        return _outer_trial_for_test("VALID_TRAJECTORY", h)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_OUTER_LOW_ENDPOINT_NOT_INFEASIBLE"
+
+
+def test_shared_outer_solver_propagates_hard_blocker_at_low_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        return service._OuterTrial("HARD_BLOCKER", h, diagnostics=("BLOCKED_LOW", "detail"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_LOW"
+    assert caught.value.diagnostics == ("detail",)
+
+
+def test_shared_outer_solver_rejects_nonvalid_upper_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_OUTER_FEASIBLE_UPPER_ENDPOINT_NOT_FOUND"
+
+
+def test_shared_outer_solver_propagates_hard_blocker_at_upper_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return service._OuterTrial("HARD_BLOCKER", h, diagnostics=("BLOCKED_HIGH",))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_HIGH"
+
+
+def test_shared_outer_solver_rejects_negative_upper_residual(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=Decimal("-1e-12"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_OUTER_HIGH_ENDPOINT_RESIDUAL_NEGATIVE"
+
+
+def test_shared_outer_solver_returns_terminal_pass_at_upper_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: True)
+    expected = _fake_mesh_run(Decimal("100"), Decimal("0"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return service._OuterTrial("VALID_TRAJECTORY", h, mesh_run=expected)
+
+    assert service._solve_outer_boundary_from_trial(trial_at) is expected
+
+
+def test_shared_outer_solver_updates_low_then_selects_valid_midpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    calls: list[Decimal] = []
+    monkeypatch.setattr(
+        service,
+        "_terminal_tolerance_pass",
+        lambda run: run.shooting_enthalpy == Decimal("75"),
+    )
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        calls.append(h)
+        if h in (Decimal("0"), Decimal("50")):
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return service._OuterTrial("VALID_TRAJECTORY", h, mesh_run=_fake_mesh_run(h, Decimal("0")))
+
+    result = service._solve_outer_boundary_from_trial(trial_at)
+    assert result.shooting_enthalpy == Decimal("75")
+    assert calls == [Decimal("0"), Decimal("100"), Decimal("50"), Decimal("75")]
+
+
+def test_shared_outer_solver_updates_high_to_valid_midpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    expected = _fake_mesh_run(Decimal("50"), Decimal("0"))
+    high_run = _fake_mesh_run(Decimal("100"), Decimal("0.001"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda run: run is expected)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        mesh_run = high_run if h == service.H_MAX_J_KG else expected
+        return service._OuterTrial("VALID_TRAJECTORY", h, mesh_run=mesh_run)
+
+    assert service._solve_outer_boundary_from_trial(trial_at) is expected
+
+
+def test_shared_outer_solver_propagates_classification_order_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+    expected = service._Stage3Failure("BLOCKED_OUTER_FEASIBILITY_CLASSIFICATION_NONMONOTONIC")
+
+    def fail_classification_order(*_args: Any, **_kwargs: Any) -> None:
+        raise expected
+
+    monkeypatch.setattr(service, "_assert_outer_classification_order", fail_classification_order)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=Decimal("1e-5"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value is expected
+    assert caught.value.code == "BLOCKED_OUTER_FEASIBILITY_CLASSIFICATION_NONMONOTONIC"
+
+
+def test_shared_outer_solver_rejects_negative_valid_midpoint_residual(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        residual = Decimal("-1e-12") if h == Decimal("50") else Decimal("1e-5")
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=residual)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_VALID_TRAJECTORY_NEGATIVE_RESIDUAL"
+
+
+def test_shared_outer_solver_propagates_midpoint_hard_blocker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        if h == Decimal("50"):
+            return service._OuterTrial(
+                "HARD_BLOCKER", h, diagnostics=("BLOCKED_MIDPOINT", "native detail")
+            )
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=Decimal("1e-5"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_MIDPOINT"
+    assert caught.value.diagnostics == ("native detail",)
+
+
+def test_shared_outer_solver_rejects_invalid_midpoint_classification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        if h == Decimal("50"):
+            return service._OuterTrial("UNKNOWN_CLASSIFICATION", h)
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=Decimal("1e-5"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID"
+
+
+def test_shared_outer_solver_midpoint_collapse_rechecks_terminal_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    low = Decimal.from_float(1.0)
+    high = Decimal.from_float(math.nextafter(1.0, math.inf))
+    monkeypatch.setattr(service, "H_MIN_J_KG", low)
+    monkeypatch.setattr(service, "H_MAX_J_KG", high)
+    checks = iter((False, True))
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: next(checks))
+    expected = _fake_mesh_run(high, Decimal("2e-8"))
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == low:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return service._OuterTrial("VALID_TRAJECTORY", h, mesh_run=expected)
+
+    assert service._solve_outer_boundary_from_trial(trial_at) is expected
+
+
+@pytest.mark.parametrize(
+    ("residual_k", "expected_code", "expected_diagnostics"),
+    [
+        (
+            Decimal("2e-8"),
+            "BLOCKED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
+            ("terminal_residual_k=2E-8",),
+        ),
+        (
+            Decimal("1.00000000001e-8"),
+            "PRECISION_FLOOR_UNRESOLVED",
+            (
+                "OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
+                "terminal_residual_k=1.00000000001E-8",
+            ),
+        ),
+    ],
+)
+def test_shared_outer_solver_midpoint_collapse_preserves_precision_floor_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    residual_k: Decimal,
+    expected_code: str,
+    expected_diagnostics: tuple[str, ...],
+) -> None:
+    low = Decimal.from_float(1.0)
+    high = Decimal.from_float(math.nextafter(1.0, math.inf))
+    monkeypatch.setattr(service, "H_MIN_J_KG", low)
+    monkeypatch.setattr(service, "H_MAX_J_KG", high)
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+    expected = _fake_mesh_run(high, Decimal("0"))
+    expected.observables.terminal_boundary_residual_k = residual_k
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == low:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return service._OuterTrial("VALID_TRAJECTORY", h, mesh_run=expected)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == expected_code
+    assert caught.value.diagnostics == expected_diagnostics
+
+
+def test_shared_outer_solver_preserves_resource_exhaustion_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(service, "H_MIN_J_KG", Decimal("0"))
+    monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("100"))
+    monkeypatch.setattr(service, "MAX_OUTER_BISECTION_ITERATIONS", 1)
+    monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
+
+    def trial_at(h: Decimal, _iteration: int) -> service._OuterTrial:
+        if h == service.H_MIN_J_KG:
+            return _outer_trial_for_test("LOW_SIDE_DOMAIN_INFEASIBLE", h)
+        return _outer_trial_for_test("VALID_TRAJECTORY", h, residual_k=Decimal("1e-5"))
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_outer_boundary_from_trial(trial_at)
+    assert caught.value.code == "BLOCKED_OUTER_BOUNDARY_RESOURCE_EXHAUSTION"
+    assert caught.value.diagnostics == ("maximum_iterations=1",)
+
+
 def test_accepted_mesh_replay_uses_fresh_full_search_stats_scope(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

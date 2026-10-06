@@ -2607,6 +2607,14 @@ def _solve_outer_boundary(
             subdivisions, enthalpy, provider, shell_authority, iteration, search_stats
         )
 
+    return _solve_outer_boundary_from_trial(trial_at)
+
+
+def _solve_outer_boundary_from_trial(
+    trial_at: Callable[[Decimal, int], _OuterTrial],
+) -> _MeshRun:
+    """Run the production outer-boundary state machine with an injected trial evaluator."""
+
     h_low = H_MIN_J_KG
     h_high = H_MAX_J_KG
     low_trial = trial_at(h_low, 0)
