@@ -18,8 +18,12 @@ from pydantic import ValidationError
 
 from hexagent.exchangers.shell_tube import task173_integrated_rating as task173
 from hexagent.exchangers.shell_tube.task172_local_runtime import (
+    CandidateLocalSupport,
+    CandidateTask172LocalRequest,
+    CandidateTopologyBinding,
     Task172BlockedResult,
     Task172LocalRequest,
+    Task172LocalResult,
     build_local_support,
     recompute_task172_blocked_result_hash,
     recompute_task172_local_roundoff_bounds,
@@ -2495,6 +2499,153 @@ def test_r2a_trigger_uses_the_actual_endpoint_evaluation(
     assert selected is (left_evaluation, right_evaluation)[selected_index]
     assert control.triggered is True
     assert control.events == [event]
+
+
+def _captured_candidate_b_q13_inputs() -> dict[str, Any]:
+    evidence_path = (
+        Path(__file__).parents[3]
+        / "docs"
+        / "tasks"
+        / "evidence"
+        / "TASK-173-v0.7-full-sizing-candidate-rating-precision-floor-diagnostic-r2.json"
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    event = evidence["candidate_b"]["precision_floor"]["observer_event"]
+
+    def native_endpoint(side: Literal["left", "right"]) -> tuple[Any, Any]:
+        endpoint = event[side]
+        request_projection = endpoint["task172_request_projection"]
+        support_projection = dict(request_projection["support"])
+        for field_name in (
+            "physical_segment_start_m",
+            "physical_segment_end_m",
+            "support_start_m",
+            "support_end_m",
+            "inside_area_m2",
+            "outside_area_m2",
+        ):
+            support_projection[field_name] = Decimal(support_projection[field_name])
+        support = CandidateLocalSupport.model_construct(**support_projection)
+        topology = CandidateTopologyBinding.model_construct(**request_projection["topology"])
+        request = CandidateTask172LocalRequest.model_construct(
+            case_id=request_projection["case_id"],
+            case_revision_id=request_projection["case_revision_id"],
+            topology=topology,
+            support=support,
+        )
+        result = Task172LocalResult.model_construct(**endpoint["task172_result_projection"])
+        return request, result
+
+    left_request, left_result = native_endpoint("left")
+    right_request, right_result = native_endpoint("right")
+    context = SimpleNamespace(
+        request=SimpleNamespace(
+            candidate_id=event["candidate_id"],
+            candidate_hash=event["candidate_hash"],
+        ),
+        task171_result_hash=left_request.topology.task171_result_hash,
+        topology_id=left_request.topology.topology_id,
+        mesh_identity=left_request.topology.mesh_identity,
+        physical_ownership_hash=left_request.topology.physical_ownership_hash,
+    )
+    return {
+        "evidence": evidence,
+        "event": event,
+        "context": context,
+        "control": SimpleNamespace(mesh_subdivisions=event["mesh_subdivisions"]),
+        "support": left_request.support,
+        "left_request": left_request,
+        "right_request": right_request,
+        "left_result": left_result,
+        "right_result": right_result,
+    }
+
+
+def _candidate_b_q13_passes(inputs: dict[str, Any]) -> bool:
+    return service._candidate_provider_q13_identity_bound(
+        context=inputs["context"],
+        control=inputs["control"],
+        support=inputs["support"],
+        left_request=inputs["left_request"],
+        right_request=inputs["right_request"],
+        left_result=inputs["left_result"],
+        right_result=inputs["right_result"],
+    )
+
+
+def test_r2a_q13_replays_captured_candidate_b_support_hash_and_segment_uri() -> None:
+    inputs = _captured_candidate_b_q13_inputs()
+    event = inputs["event"]
+    original_q = event["Q1_Q15"]
+
+    assert event["candidate_id"] == "e152cca9-fd5d-59ca-9b46-1df574eee841"
+    assert event["all_false_qs"] == ["Q13"]
+    assert original_q["Q13"] is False
+    assert all(value for key, value in original_q.items() if key != "Q13")
+    assert inputs["left_result"].physical_support_id != inputs["support"].physical_segment_id
+    assert inputs["left_result"].physical_segment_id == inputs["support"].physical_segment_id
+    assert (
+        recompute_task172_support_id(inputs["left_request"])
+        == inputs["left_result"].physical_support_id
+    )
+    assert (
+        recompute_task172_support_id(inputs["right_request"])
+        == inputs["right_result"].physical_support_id
+    )
+    assert _candidate_b_q13_passes(inputs) is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "tampered_result_support_hash",
+        "tampered_result_segment_uri",
+        "tampered_request_support_hash",
+        "tampered_request_segment_uri",
+        "support_hash_mistaken_for_segment_uri",
+        "segment_uri_mistaken_for_support_hash",
+    ),
+)
+def test_r2a_q13_rejects_tampered_or_cross_domain_support_identity(
+    mutation: str,
+) -> None:
+    inputs = _captured_candidate_b_q13_inputs()
+    left_result = inputs["left_result"]
+    left_request = inputs["left_request"]
+    right_result = inputs["right_result"]
+    support = inputs["support"]
+    support_hash = recompute_task172_support_id(left_request)
+
+    if mutation == "tampered_result_support_hash":
+        inputs["left_result"] = left_result.model_copy(update={"physical_support_id": "f" * 64})
+    elif mutation == "tampered_result_segment_uri":
+        inputs["left_result"] = left_result.model_copy(
+            update={"physical_segment_id": "urn:hxforge:test:wrong-support"}
+        )
+    elif mutation == "tampered_request_support_hash":
+        changed_support = left_request.support.model_copy(
+            update={"support_end_m": left_request.support.support_end_m + Decimal("0.01")}
+        )
+        inputs["left_request"] = left_request.model_copy(update={"support": changed_support})
+    elif mutation == "tampered_request_segment_uri":
+        changed_support = left_request.support.model_copy(
+            update={"physical_segment_id": "urn:hxforge:test:wrong-support"}
+        )
+        inputs["left_request"] = left_request.model_copy(update={"support": changed_support})
+    elif mutation == "support_hash_mistaken_for_segment_uri":
+        inputs["left_result"] = left_result.model_copy(
+            update={"physical_support_id": support.physical_segment_id}
+        )
+        inputs["right_result"] = right_result.model_copy(
+            update={"physical_support_id": support.physical_segment_id}
+        )
+    else:
+        inputs["left_result"] = left_result.model_copy(update={"physical_segment_id": support_hash})
+        inputs["right_result"] = right_result.model_copy(
+            update={"physical_segment_id": support_hash}
+        )
+
+    assert _candidate_b_q13_passes(inputs) is False
 
 
 def test_r2a_nested_enclosure_fails_closed() -> None:

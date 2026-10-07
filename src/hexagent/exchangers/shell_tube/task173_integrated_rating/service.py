@@ -869,6 +869,65 @@ def _provider_input_enthalpy(state: _ThermoState) -> str | None:
     return state.snapshot.inputs.get("enthalpy_j_kg")
 
 
+def _candidate_provider_q13_identity_bound(
+    *,
+    context: _CandidateRatingContext,
+    control: _CandidateTransientControl,
+    support: CandidateLocalSupport,
+    left_request: CandidateTask172LocalRequest,
+    right_request: CandidateTask172LocalRequest,
+    left_result: Task172LocalResult,
+    right_result: Task172LocalResult,
+) -> bool:
+    """Bind Q13 support hashes and physical-segment URIs in their native domains."""
+    left_support_hash = recompute_task172_support_id(left_request)
+    right_support_hash = recompute_task172_support_id(right_request)
+    return (
+        left_result.case_id == right_result.case_id == context.request.candidate_id
+        and left_result.case_revision_id == right_result.case_revision_id
+        and left_result.task171_result_hash
+        == right_result.task171_result_hash
+        == context.task171_result_hash
+        and left_request.case_id == right_request.case_id == context.request.candidate_id
+        and left_request.case_revision_id
+        == right_request.case_revision_id
+        == context.request.candidate_id
+        and left_request.topology.task171_result_hash
+        == right_request.topology.task171_result_hash
+        == context.task171_result_hash
+        and left_request.topology.topology_id
+        == right_request.topology.topology_id
+        == context.topology_id
+        and left_request.topology.mesh_identity
+        == right_request.topology.mesh_identity
+        == context.mesh_identity
+        and left_request.topology.physical_ownership_hash
+        == right_request.topology.physical_ownership_hash
+        == context.physical_ownership_hash
+        and left_result.topology_id == right_result.topology_id == context.topology_id
+        and left_result.physical_support_id == left_support_hash
+        and right_result.physical_support_id == right_support_hash
+        and left_support_hash == right_support_hash
+        and left_result.physical_segment_id
+        == right_result.physical_segment_id
+        == left_request.support.physical_segment_id
+        == right_request.support.physical_segment_id
+        == support.physical_segment_id
+        and left_request.support.mesh_level_identity
+        == right_request.support.mesh_level_identity
+        == support.mesh_level_identity
+        == _candidate_mesh_identity(context, control.mesh_subdivisions)
+        and left_result.tube_cell_id == right_result.tube_cell_id == support.tube_cell_id
+        and left_result.shell_cell_id == right_result.shell_cell_id == support.shell_cell_id
+        and left_result.wall_interface_id
+        == right_result.wall_interface_id
+        == support.wall_interface_id
+        and left_request.support.wall_interface_id
+        == right_request.support.wall_interface_id
+        == support.wall_interface_id
+    )
+
+
 def _candidate_provider_enclosure_event(
     *,
     context: _CandidateRatingContext,
@@ -997,47 +1056,15 @@ def _candidate_provider_enclosure_event(
         and check_pr_envelope(right_regime, right_tube_pr)
         and left_corr == right_corr == left_result.tube_correlation_id
         and left_corr_version == right_corr_version == left_result.tube_correlation_version,
-        "Q13": left_result.case_id == right_result.case_id == context.request.candidate_id
-        and left_result.case_revision_id == right_result.case_revision_id
-        and left_result.task171_result_hash
-        == right_result.task171_result_hash
-        == context.task171_result_hash
-        and left_request.case_id == right_request.case_id == context.request.candidate_id
-        and left_request.case_revision_id
-        == right_request.case_revision_id
-        == context.request.candidate_id
-        and left_request.topology.task171_result_hash
-        == right_request.topology.task171_result_hash
-        == context.task171_result_hash
-        and left_request.topology.topology_id
-        == right_request.topology.topology_id
-        == context.topology_id
-        and left_request.topology.mesh_identity
-        == right_request.topology.mesh_identity
-        == context.mesh_identity
-        and left_request.topology.physical_ownership_hash
-        == right_request.topology.physical_ownership_hash
-        == context.physical_ownership_hash
-        and left_result.topology_id == right_result.topology_id == context.topology_id
-        and left_result.physical_support_id
-        == right_result.physical_support_id
-        == support.physical_segment_id
-        and left_request.support.physical_segment_id
-        == right_request.support.physical_segment_id
-        == support.physical_segment_id
-        and left_request.support.mesh_level_identity
-        == right_request.support.mesh_level_identity
-        == support.mesh_level_identity
-        == _candidate_mesh_identity(context, control.mesh_subdivisions)
-        and left_result.physical_segment_id == right_result.physical_segment_id
-        and left_result.tube_cell_id == right_result.tube_cell_id == support.tube_cell_id
-        and left_result.shell_cell_id == right_result.shell_cell_id == support.shell_cell_id
-        and left_result.wall_interface_id
-        == right_result.wall_interface_id
-        == support.wall_interface_id
-        and left_request.support.wall_interface_id
-        == right_request.support.wall_interface_id
-        == support.wall_interface_id,
+        "Q13": _candidate_provider_q13_identity_bound(
+            context=context,
+            control=control,
+            support=support,
+            left_request=left_request,
+            right_request=right_request,
+            left_result=left_result,
+            right_result=right_result,
+        ),
         "Q14": left_result.numerical_profile_id == right_result.numerical_profile_id
         and left_result.r94_model_profile_canonical_hash
         == right_result.r94_model_profile_canonical_hash
