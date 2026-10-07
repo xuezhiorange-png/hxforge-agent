@@ -251,7 +251,9 @@ def main() -> None:
         if record["candidate_rating_request_hash"] != request_hash:
             raise RuntimeError(f"execution request hash mismatch: {candidate_id}")
         if record["invocation_count"] != 1 or not record["invocation_completed"]:
-            raise RuntimeError(f"candidate invocation was not completed exactly once: {candidate_id}")
+            raise RuntimeError(
+                f"candidate invocation was not completed exactly once: {candidate_id}"
+            )
         if record["result_projection"]["request_hash"] != request_hash:
             raise RuntimeError(f"result/request binding mismatch: {candidate_id}")
         if record["result_projection"]["status"] != expected["status"]:
