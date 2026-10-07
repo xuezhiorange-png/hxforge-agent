@@ -90,6 +90,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.replay import (
     public_projection,
     replay_shell_flow_authority,
 )
+from hexagent.exchangers.shell_tube.tube_side.owned_enums import ReferencePlanePair
 from hexagent.exchangers.shell_tube.tube_side_thermal import FlowRegime
 from hexagent.exchangers.shell_tube.tube_side_thermal.nusselt_selector import (
     check_pr_envelope,
@@ -103,6 +104,18 @@ from hexagent.properties.base import (
     ReferenceStatePolicy,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
+
+
+def _candidate_json_fallback(value: Any) -> Any:
+    """Serialize the TASK-025 pair only at candidate-provenance boundaries."""
+    if type(value) is ReferencePlanePair:
+        return {
+            "__task173_type__": "ReferencePlanePair",
+            "start": value.start.value,
+            "end": value.end.value,
+        }
+    raise TypeError(f"unhandled candidate provenance JSON value: {type(value).__name__}")
+
 
 TUBE_INLET_T_K = Decimal("300")
 SHELL_INLET_T_K = Decimal("298.15")
@@ -1136,8 +1149,12 @@ def _candidate_provider_enclosure_event(
         "left_endpoint_result_id": left_result.result_id,
         "right_endpoint_result_id": right_result.result_id,
         "provider_coordinates": coordinates,
-        "endpoint_request_projection_left": left_request.model_dump(mode="json"),
-        "endpoint_request_projection_right": right_request.model_dump(mode="json"),
+        "endpoint_request_projection_left": left_request.model_dump(
+            mode="json", fallback=_candidate_json_fallback
+        ),
+        "endpoint_request_projection_right": right_request.model_dump(
+            mode="json", fallback=_candidate_json_fallback
+        ),
         "endpoint_result_projection_left": left_result.model_dump(mode="json"),
         "endpoint_result_projection_right": right_result.model_dump(mode="json"),
         "Q1_Q15": q_checks,
@@ -3437,7 +3454,9 @@ def _candidate_accepted_trajectory_projection(
                 "tube_state_receipt": record.tube_receipt.model_dump(mode="json"),
                 "shell_state_receipt": record.shell_receipt.model_dump(mode="json"),
                 "rated_cell_projection": record.rated_cell.model_dump(mode="json"),
-                "task172_request_projection": request.model_dump(mode="json"),
+                "task172_request_projection": request.model_dump(
+                    mode="json", fallback=_candidate_json_fallback
+                ),
                 "task172_request_hash": request_hash,
                 "task172_result_projection": result.model_dump(mode="json"),
                 "task172_result_hash": result_hash,

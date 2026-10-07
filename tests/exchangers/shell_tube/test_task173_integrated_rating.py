@@ -43,6 +43,12 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.replay import (
     NativeReplayError,
     replay_shell_flow_authority,
 )
+from hexagent.exchangers.shell_tube.tube_side.owned_enums import (
+    ReferencePlanePair,
+    ReferencePlaneToken,
+    canonical_heat_transfer_pair,
+    canonical_internal_flow_pair,
+)
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
 EVIDENCE_PATH = (
@@ -2646,6 +2652,307 @@ def test_r2a_q13_rejects_tampered_or_cross_domain_support_identity(
         )
 
     assert _candidate_b_q13_passes(inputs) is False
+
+
+@pytest.mark.parametrize(
+    ("pair", "start", "end"),
+    (
+        (
+            canonical_internal_flow_pair(),
+            "TUBE_INTERNAL_FLOW_START_PLANE",
+            "TUBE_INTERNAL_FLOW_END_PLANE",
+        ),
+        (
+            canonical_heat_transfer_pair(),
+            "TUBE_HEAT_TRANSFER_START_PLANE",
+            "TUBE_HEAT_TRANSFER_END_PLANE",
+        ),
+    ),
+)
+def test_candidate_json_fallback_uses_reviewed_reference_plane_pair_values(
+    pair: ReferencePlanePair, start: str, end: str
+) -> None:
+    assert service._candidate_json_fallback(pair) == {
+        "__task173_type__": "ReferencePlanePair",
+        "start": start,
+        "end": end,
+    }
+
+
+def test_candidate_json_fallback_rejects_unknown_objects() -> None:
+    with pytest.raises(TypeError, match="unhandled candidate provenance JSON value"):
+        service._candidate_json_fallback(object())
+
+
+def _restore_candidate_json_values(value: Any) -> Any:
+    if isinstance(value, dict) and value.get("__task173_type__") == "ReferencePlanePair":
+        return ReferencePlanePair(
+            ReferencePlaneToken(value["start"]), ReferencePlaneToken(value["end"])
+        )
+    if (
+        isinstance(value, dict)
+        and set(value) == {"kind", "start", "end"}
+        and value["kind"] in {"internal_flow", "heat_transfer"}
+    ):
+        return ReferencePlanePair(
+            ReferencePlaneToken(value["start"]), ReferencePlaneToken(value["end"])
+        )
+    if isinstance(value, dict):
+        return {key: _restore_candidate_json_values(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_restore_candidate_json_values(item) for item in value]
+    return value
+
+
+def _reviewed_pair_serialization_projection(value: Any) -> Any:
+    if (
+        isinstance(value, dict)
+        and set(value) == {"kind", "start", "end"}
+        and value["kind"] in {"internal_flow", "heat_transfer"}
+    ):
+        return {
+            "__task173_type__": "ReferencePlanePair",
+            "start": value["start"],
+            "end": value["end"],
+        }
+    if isinstance(value, dict):
+        return {key: _reviewed_pair_serialization_projection(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_reviewed_pair_serialization_projection(item) for item in value]
+    return value
+
+
+def _captured_candidate_b_full_endpoint(
+    side: Literal["left", "right"],
+) -> tuple[dict[str, Any], dict[str, Any], CandidateTask172LocalRequest, Task172LocalResult]:
+    evidence_path = (
+        Path(__file__).parents[3]
+        / "docs"
+        / "tasks"
+        / "evidence"
+        / "TASK-173-v0.7-full-sizing-candidate-rating-precision-floor-diagnostic-r2.json"
+    )
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    captured = evidence["candidate_b"]["precision_floor"]["observer_event"]
+    endpoint = captured[side]
+    request = CandidateTask172LocalRequest.model_validate(
+        _restore_candidate_json_values(endpoint["task172_request_projection"]), strict=False
+    )
+    result = Task172LocalResult.model_validate(endpoint["task172_result_projection"], strict=False)
+    return evidence, captured, request, result
+
+
+def test_candidate_task172_provenance_dump_preserves_native_request_identity() -> None:
+    _evidence, captured, request, _result = _captured_candidate_b_full_endpoint("left")
+    request_projection = request.model_dump(mode="json", fallback=service._candidate_json_fallback)
+    assert request_projection == _reviewed_pair_serialization_projection(
+        captured["left"]["task172_request_projection"]
+    )
+    assert (
+        service.recompute_task172_request_hash(request) == captured["left"]["task172_request_hash"]
+    )
+
+    def collect_pairs(value: Any) -> list[dict[str, Any]]:
+        if isinstance(value, dict):
+            if value.get("__task173_type__") == "ReferencePlanePair":
+                return [value]
+            return [pair for item in value.values() for pair in collect_pairs(item)]
+        if isinstance(value, list):
+            return [pair for item in value for pair in collect_pairs(item)]
+        return []
+
+    pair_projections = collect_pairs(request_projection)
+    assert pair_projections
+    assert all(set(pair) == {"__task173_type__", "start", "end"} for pair in pair_projections)
+
+
+def _captured_candidate_b_event_arguments() -> dict[str, Any]:
+    _evidence, captured, left_request, left_result = _captured_candidate_b_full_endpoint("left")
+    _evidence, _captured, right_request, right_result = _captured_candidate_b_full_endpoint("right")
+    property_context = captured["endpoint_property_context"]
+    fingerprint = property_context["left"]["configuration_fingerprint"]
+
+    def state(coordinate: dict[str, Any], side: Literal["left", "right"]) -> Any:
+        return SimpleNamespace(
+            native=SimpleNamespace(
+                temperature_k=299.0,
+                pressure_pa=101325.0,
+                phase=service.PhaseRegion.LIQUID,
+                provenance=SimpleNamespace(fluid_identifier="HEOS::Water"),
+            ),
+            snapshot=SimpleNamespace(
+                query_type="PH",
+                inputs={"enthalpy_j_kg": coordinate[f"{side}_decimal"]},
+                phase="liquid",
+                backend="HEOS::Water",
+                provider="CoolProp",
+                provider_version="8.0.0",
+                provider_git_revision="ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+                reference_state="DEF",
+                configuration_fingerprint=fingerprint,
+            ),
+        )
+
+    coordinates = {item["name"]: item for item in captured["provider_coordinates"]}
+
+    def evaluation(
+        request: CandidateTask172LocalRequest,
+        result: Task172LocalResult,
+        side: Literal["left", "right"],
+        q_w: float,
+    ) -> Any:
+        return service._CellEvaluation(
+            q_w=Decimal(str(q_w)),
+            tube_downstream=state(coordinates["tube_downstream_h"], side),
+            shell_next_physical=state(coordinates["shell_next_face_h"], side),
+            tube_local=state(coordinates["tube_midpoint_h"], side),
+            shell_local=state(coordinates["shell_midpoint_h"], side),
+            task172_request=request,
+            task172_result=result,
+        )
+
+    left_q = float.fromhex(captured["left"]["q_hex"])
+    right_q = float.fromhex(captured["right"]["q_hex"])
+    left = service._CellTrial(
+        q_w=left_q,
+        classification="VALID_CELL_EVALUATION",
+        evaluation=evaluation(left_request, left_result, "left", left_q),
+        residual=Decimal(captured["left"]["residual_w"]),
+    )
+    right = service._CellTrial(
+        q_w=right_q,
+        classification="VALID_CELL_EVALUATION",
+        evaluation=evaluation(right_request, right_result, "right", right_q),
+        residual=Decimal(captured["right"]["residual_w"]),
+    )
+    context = SimpleNamespace(
+        request=SimpleNamespace(
+            candidate_id=captured["candidate_id"],
+            candidate_hash=captured["candidate_hash"],
+            authority_package_id=left_request.candidate_binding.authority_package_id,
+            authority_package_hash=left_request.candidate_binding.authority_package_hash,
+            task166_result=left_request.candidate_binding.task166_result,
+        ),
+        task171_result_hash=property_context["context_task171_hash"],
+        topology_id=property_context["context_topology_id"],
+        mesh_identity=left_request.topology.mesh_identity,
+        physical_ownership_hash=property_context["context_physical_ownership_hash"],
+    )
+    control = service._CandidateTransientControl(
+        mode="DETECT",
+        mesh_subdivisions=captured["mesh_subdivisions"],
+        outer_iteration=captured["outer_iteration"],
+        shooting_enthalpy=Decimal("107000"),
+    )
+    return {
+        "context": context,
+        "control": control,
+        "support": left_request.support,
+        "left": left,
+        "right": right,
+        "trials": {left.q_w: left, right.q_w: right},
+        "captured": captured,
+        "left_request": left_request,
+        "right_request": right_request,
+    }
+
+
+def test_candidate_r2a_event_serialization_replays_captured_q13_endpoint_pair() -> None:
+    args = _captured_candidate_b_event_arguments()
+    first = service._candidate_provider_enclosure_event(
+        context=args["context"],
+        control=args["control"],
+        support=args["support"],
+        left=args["left"],
+        right=args["right"],
+        trials=args["trials"],
+    )
+    second = service._candidate_provider_enclosure_event(
+        context=args["context"],
+        control=args["control"],
+        support=args["support"],
+        left=args["left"],
+        right=args["right"],
+        trials=args["trials"],
+    )
+    assert first is not None
+    assert second is not None
+    assert first["Q1_Q15"] == {f"Q{index}": True for index in range(1, 16)}
+    assert first["event_hash"] == second["event_hash"]
+    assert service.canonical_json_bytes(first) == service.canonical_json_bytes(second)
+    assert first["endpoint_request_projection_left"] == _reviewed_pair_serialization_projection(
+        args["captured"]["left"]["task172_request_projection"]
+    )
+    assert first["endpoint_request_projection_right"] == _reviewed_pair_serialization_projection(
+        args["captured"]["right"]["task172_request_projection"]
+    )
+    for side in ("left", "right"):
+        restored = CandidateTask172LocalRequest.model_validate(
+            _restore_candidate_json_values(first[f"endpoint_request_projection_{side}"]),
+            strict=False,
+        )
+        assert (
+            service.recompute_task172_request_hash(restored)
+            == first[f"{side}_endpoint_request_hash"]
+        )
+
+
+def test_candidate_accepted_trajectory_request_projection_replays_pair_identity() -> None:
+    _evidence, captured, request, result = _captured_candidate_b_full_endpoint("left")
+    empty_projection = SimpleNamespace(model_dump=lambda **_kwargs: {})
+    record = SimpleNamespace(
+        solution=SimpleNamespace(
+            task172_request=request,
+            task172_result=result,
+            q_w=result.signed_q_hot_to_cold_w,
+            tube_local=SimpleNamespace(snapshot=empty_projection),
+            shell_local=SimpleNamespace(snapshot=empty_projection),
+        ),
+        support=request.support,
+        tube_upstream_face=empty_projection,
+        tube_downstream_face=empty_projection,
+        shell_physical_left_face=empty_projection,
+        shell_physical_right_face=empty_projection,
+        tube_receipt=empty_projection,
+        shell_receipt=empty_projection,
+        rated_cell=empty_projection,
+        tube_approach_k=Decimal("1"),
+        shell_approach_k=Decimal("1"),
+    )
+    context = SimpleNamespace(
+        request=SimpleNamespace(
+            candidate_id=captured["candidate_id"],
+            candidate_hash=captured["candidate_hash"],
+            authority_package_hash=request.candidate_binding.authority_package_hash,
+        ),
+        task171_result_hash=result.task171_result_hash,
+    )
+    run = SimpleNamespace(
+        cells=(record,),
+        subdivisions=request.support.subdivisions_per_physical_interval_per_side,
+        observables=SimpleNamespace(
+            mesh_level_identity=request.support.mesh_level_identity,
+            model_dump=lambda **_kwargs: {},
+        ),
+        mesh_result_hash="mesh-result-hash",
+        shooting_enthalpy=Decimal("107000"),
+        bisection_iterations=1,
+        faces_tube=(),
+        faces_shell=(),
+        task172_numerical_hole_neighborhoods=(),
+    )
+    projection = service._candidate_accepted_trajectory_projection(run, context)
+    request_projection = projection["accepted_cells"][0]["task172_request_projection"]
+    assert request_projection == _reviewed_pair_serialization_projection(
+        captured["left"]["task172_request_projection"]
+    )
+    restored = CandidateTask172LocalRequest.model_validate(
+        _restore_candidate_json_values(request_projection), strict=False
+    )
+    assert (
+        service.recompute_task172_request_hash(restored)
+        == projection["accepted_cells"][0]["task172_request_hash"]
+    )
 
 
 def test_r2a_nested_enclosure_fails_closed() -> None:
