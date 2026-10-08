@@ -26,16 +26,14 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating import (
 
 ROOT = Path(__file__).resolve().parents[3]
 EVIDENCE_PATH = ROOT / (
-    "docs/tasks/evidence/"
-    "TASK-173-v0.7-full-sizing-reference-plane-serialization-completion-r1.json"
+    "docs/tasks/evidence/TASK-173-v0.7-full-sizing-reference-plane-serialization-completion-r1.json"
 )
 EXECUTION_PATH = ROOT / (
     "docs/tasks/evidence/"
     "TASK-173-v0.7-full-sizing-reference-plane-serialization-candidate-ratings-r1.json"
 )
 REQUEST_RUNNER_PATH = ROOT / (
-    "docs/tasks/evidence/"
-    "TASK-173-v0.7-full-sizing-q13-correction-candidate-rating-run-r1.py"
+    "docs/tasks/evidence/TASK-173-v0.7-full-sizing-q13-correction-candidate-rating-run-r1.py"
 )
 RUNTIME_HEAD = "21386a88f8290538172e9389ed46f50c3697a426"
 RUNTIME_TREE = "ce61a818b82f908729d2bdf4553cc27012354952"
@@ -168,8 +166,7 @@ def _verify_success_projection(projection: dict[str, Any]) -> dict[str, Any]:
         if canonical_sha256(certificate_projection) != certificate_hash:
             raise RuntimeError("outer-decision certificate hash replay mismatch")
         if not (
-            certificate["left_outer_classification"]
-            == certificate["right_outer_classification"]
+            certificate["left_outer_classification"] == certificate["right_outer_classification"]
             and certificate["left_terminal_tolerance_decision"]
             == certificate["right_terminal_tolerance_decision"]
             and certificate["left_outer_action"] == certificate["right_outer_action"]
@@ -184,8 +181,7 @@ def _verify_success_projection(projection: dict[str, Any]) -> dict[str, Any]:
         raise RuntimeError("candidate mesh sequence mismatch")
     comparisons = result.convergence_comparisons
     comparison_map = {
-        (item["coarse_subdivisions"], item["fine_subdivisions"]): item
-        for item in comparisons
+        (item["coarse_subdivisions"], item["fine_subdivisions"]): item for item in comparisons
     }
     for pair in ((8, 16), (16, 32), (32, 64)):
         if comparison_map[pair]["overall_status"] != "PASS":
