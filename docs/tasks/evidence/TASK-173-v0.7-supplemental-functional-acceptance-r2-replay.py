@@ -17,6 +17,8 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates import service as 
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     candidate_space_id,
     discrete_authority_hash,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     request_hash as task168_request_hash,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import Task168Request
@@ -29,11 +31,8 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing.service import (
     sizing_request_hash,
 )
 
-
 ROOT = Path.cwd()
-EVIDENCE_PATH = Path(
-    "docs/tasks/evidence/TASK-173-v0.7-supplemental-functional-acceptance-r2.json"
-)
+EVIDENCE_PATH = Path("docs/tasks/evidence/TASK-173-v0.7-supplemental-functional-acceptance-r2.json")
 R2_QUALIFICATION_PATH = Path(
     "docs/tasks/evidence/TASK-173-v0.7-provider-quantization-transient-decision-enclosure-r2-qualification.py"
 )
@@ -46,15 +45,13 @@ def _reconstruct() -> tuple[dict[str, Any], Task173SizingRequest]:
     assert canonical_sha256(source_record) == recorded_source_hash
 
     r2 = runpy.run_path(str(ROOT / R2_QUALIFICATION_PATH), run_name="task173_r2_readonly")
-    base_request, task168_request, candidate_space_hash = r2["_r4_or_rebound_request"](
-        "H1"
-    )
+    base_request, task168_request, candidate_space_hash = r2["_r4_or_rebound_request"]("H1")
     expected = evidence["candidate_space"]
     assert candidate_space_hash == expected["task168_candidate_space_hash"]
     assert candidate_space_id(candidate_space_hash) == expected["candidate_space_id"]
-    assert task168_request_hash(task168_request) == evidence["sizing_request"][
-        "task168_request_hash"
-    ]
+    assert (
+        task168_request_hash(task168_request) == evidence["sizing_request"]["task168_request_hash"]
+    )
 
     authority_bindings = tuple(
         sorted(
@@ -67,38 +64,25 @@ def _reconstruct() -> tuple[dict[str, Any], Task173SizingRequest]:
     )
     recorded_requirement = dict(evidence["requirement_authority"])
     requirement_data = {
-        key: value
-        for key, value in recorded_requirement.items()
-        if key != "canonical_hash"
+        key: value for key, value in recorded_requirement.items() if key != "canonical_hash"
     }
-    requirement_data["required_duty_w"] = Decimal(
-        recorded_requirement["required_duty_w"]
-    )
-    requirement_data["max_tube_dp_pa"] = Decimal(
-        recorded_requirement["max_tube_dp_pa"]
-    )
-    requirement_data["max_shell_dp_pa"] = Decimal(
-        recorded_requirement["max_shell_dp_pa"]
-    )
+    requirement_data["required_duty_w"] = Decimal(recorded_requirement["required_duty_w"])
+    requirement_data["max_tube_dp_pa"] = Decimal(recorded_requirement["max_tube_dp_pa"])
+    requirement_data["max_shell_dp_pa"] = Decimal(recorded_requirement["max_shell_dp_pa"])
     requirement_data["evidence_refs"] = tuple(requirement_data["evidence_refs"])
     requirement_data["provenance_refs"] = tuple(requirement_data["provenance_refs"])
     requirement_data["allowed_construction_families"] = tuple(
         requirement_data["allowed_construction_families"]
     )
     requirement_data["discrete_candidate_authority_ids_and_hashes"] = tuple(
-        tuple(item)
-        for item in requirement_data["discrete_candidate_authority_ids_and_hashes"]
+        tuple(item) for item in requirement_data["discrete_candidate_authority_ids_and_hashes"]
     )
     assert requirement_data["discrete_candidate_authority_ids_and_hashes"] == authority_bindings
     requirement_data["canonical_hash"] = recorded_requirement["canonical_hash"]
     requirement = SizingRequirementAuthority(**requirement_data)
-    assert recompute_sizing_requirement_hash(requirement) == recorded_requirement[
-        "canonical_hash"
-    ]
+    assert recompute_sizing_requirement_hash(requirement) == recorded_requirement["canonical_hash"]
 
-    request_metadata = tuple(
-        tuple(item) for item in evidence["sizing_request"]["request_metadata"]
-    )
+    request_metadata = tuple(tuple(item) for item in evidence["sizing_request"]["request_metadata"])
     request = Task173SizingRequest(
         authority_package_id=base_request.authority_package_id,
         authority_package_hash=base_request.authority_package_hash,
@@ -129,9 +113,7 @@ def main() -> None:
     for ordinal, label in enumerate(("H1", "H2", "H3"), start=1):
         cut = Decimal(expected_cases[label][0])
         selected = tuple(
-            cut
-            if role == "BAFFLE_CUT"
-            else task168._sort_values(authority_map[role].values)[0]
+            cut if role == "BAFFLE_CUT" else task168._sort_values(authority_map[role].values)[0]
             for role in task168.DIMENSION_ORDER
             if role != "SHELL_GEOMETRY_ID"
         )
@@ -149,9 +131,10 @@ def main() -> None:
         rows.append((candidate.candidate_id, candidate.candidate_hash))
 
     assert len(rows) == candidate_space["candidate_count"] == 3
-    assert recompute_sizing_requirement_hash(request.requirement_authority) == evidence[
-        "requirement_authority"
-    ]["canonical_hash"]
+    assert (
+        recompute_sizing_requirement_hash(request.requirement_authority)
+        == evidence["requirement_authority"]["canonical_hash"]
+    )
     assert sizing_request_hash(request) == evidence["sizing_request"]["sizing_request_hash"]
     assert candidate_space["task168_candidate_space_hash"] == (
         "480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668"
