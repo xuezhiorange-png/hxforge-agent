@@ -1,0 +1,2783 @@
+{
+  "accepted_mesh_ledger_count": 0,
+  "blocker_class": "RATING_PRECISION_FLOOR_UNRESOLVED",
+  "candidate_A_full_rating_complete": false,
+  "candidate_B_full_rating_complete": false,
+  "candidate_count": 2,
+  "candidate_full_rating_completed_count": 0,
+  "candidate_rating_blocked_result_preimages_persisted": false,
+  "candidate_rating_invocation_count": 2,
+  "candidate_records": [
+    {
+      "accepted_mesh_identity": null,
+      "accepted_subdivisions_per_interval": null,
+      "blockers": [
+        "PRECISION_FLOOR_UNRESOLVED"
+      ],
+      "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+      "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+      "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+      "candidate_rating_result_hash": "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+      "candidate_rating_result_id": "urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+      "dimension_authority_hashes": [
+        [
+          "BAFFLE_COUNT",
+          "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+        ],
+        [
+          "BAFFLE_CUT",
+          "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+        ],
+        [
+          "CONSTRUCTION_FAMILY",
+          "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+        ],
+        [
+          "TUBE_LENGTH",
+          "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+        ],
+        [
+          "TUBE_PITCH",
+          "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+        ]
+      ],
+      "disposition": "BLOCKED",
+      "duty_constraint": null,
+      "headroom_subdivisions_per_interval": null,
+      "native_identities": [
+        [
+          "TASK020",
+          "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+        ],
+        [
+          "TASK021",
+          "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+        ],
+        [
+          "TASK022",
+          "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+        ],
+        [
+          "TASK024",
+          "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+        ],
+        [
+          "TASK025",
+          "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+        ],
+        [
+          "TASK031",
+          "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+        ],
+        [
+          "TASK032",
+          "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+        ],
+        [
+          "TASK029",
+          "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+        ],
+        [
+          "TASK166",
+          "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+        ],
+        [
+          "TASK171",
+          "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+        ],
+        [
+          "TASK174",
+          "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+        ]
+      ],
+      "provenance_hash": "6f3f5af4f054a9134fc5b6f1ad416a4fdca13e7e29eb08e1163b7180e9890a29",
+      "rank": null,
+      "ranking_score": null,
+      "rated_duty_w": null,
+      "selected_dimensions": [
+        [
+          "CONSTRUCTION_FAMILY",
+          "FIXED_TUBESHEET"
+        ],
+        [
+          "SHELL_GEOMETRY_ID",
+          "shell-1"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "0.01905"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "0.00165"
+        ],
+        [
+          "TUBE_LENGTH",
+          "6.0"
+        ],
+        [
+          "TUBE_PITCH",
+          "0.0254"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "LAYOUT_30_DEG"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "1"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "SINGLE_SEGMENTAL"
+        ],
+        [
+          "BAFFLE_CUT",
+          "0.215"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "1.2"
+        ],
+        [
+          "BAFFLE_COUNT",
+          "4"
+        ]
+      ],
+      "shell_dp_constraint": null,
+      "shell_dp_pa": null,
+      "stage": "TASK173_CANDIDATE_RATING",
+      "status": "BLOCKED",
+      "tube_dp_constraint": null,
+      "tube_dp_pa": null,
+      "warnings": []
+    },
+    {
+      "accepted_mesh_identity": null,
+      "accepted_subdivisions_per_interval": null,
+      "blockers": [
+        "PRECISION_FLOOR_UNRESOLVED"
+      ],
+      "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "candidate_rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+      "candidate_rating_result_hash": "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+      "candidate_rating_result_id": "urn:hxforge:task173:blocked:737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+      "dimension_authority_hashes": [
+        [
+          "BAFFLE_COUNT",
+          "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+        ],
+        [
+          "BAFFLE_CUT",
+          "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+        ],
+        [
+          "CONSTRUCTION_FAMILY",
+          "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+        ],
+        [
+          "TUBE_LENGTH",
+          "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+        ],
+        [
+          "TUBE_PITCH",
+          "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+        ]
+      ],
+      "disposition": "BLOCKED",
+      "duty_constraint": null,
+      "headroom_subdivisions_per_interval": null,
+      "native_identities": [
+        [
+          "TASK020",
+          "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+        ],
+        [
+          "TASK021",
+          "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+        ],
+        [
+          "TASK022",
+          "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+        ],
+        [
+          "TASK024",
+          "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+        ],
+        [
+          "TASK025",
+          "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+        ],
+        [
+          "TASK031",
+          "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+        ],
+        [
+          "TASK032",
+          "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+        ],
+        [
+          "TASK029",
+          "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+        ],
+        [
+          "TASK166",
+          "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+        ],
+        [
+          "TASK171",
+          "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+        ],
+        [
+          "TASK174",
+          "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+        ]
+      ],
+      "provenance_hash": "681fb2ebda560b42ab3f4e94f17c9f10ca449b0ebc242abebc4de41e60f6ad60",
+      "rank": null,
+      "ranking_score": null,
+      "rated_duty_w": null,
+      "selected_dimensions": [
+        [
+          "CONSTRUCTION_FAMILY",
+          "FIXED_TUBESHEET"
+        ],
+        [
+          "SHELL_GEOMETRY_ID",
+          "shell-1"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "0.01905"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "0.00165"
+        ],
+        [
+          "TUBE_LENGTH",
+          "6.0"
+        ],
+        [
+          "TUBE_PITCH",
+          "0.0254"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "LAYOUT_30_DEG"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "1"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "SINGLE_SEGMENTAL"
+        ],
+        [
+          "BAFFLE_CUT",
+          "0.220"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "1.2"
+        ],
+        [
+          "BAFFLE_COUNT",
+          "4"
+        ]
+      ],
+      "shell_dp_constraint": null,
+      "shell_dp_pa": null,
+      "stage": "TASK173_CANDIDATE_RATING",
+      "status": "BLOCKED",
+      "tube_dp_constraint": null,
+      "tube_dp_pa": null,
+      "warnings": []
+    }
+  ],
+  "canonical_identity_preimage_freeze": "PASS",
+  "completion_request_public_sizing_invocation_count": 1,
+  "completion_requirement_authority_hash": "fd480d84828da2e7c0a0d42ba649c8fc4d2aee146f4290528eeef667179b7e2d",
+  "completion_sizing_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+  "execution_return_record": {
+    "completion_request_public_sizing_invocation_count": 1,
+    "completion_sizing_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+    "execution_status": "RETURNED",
+    "historical_r4_public_sizing_invocation_count": 2,
+    "request_freeze_head": "75a795f676e8cc3b1d2e7e0f89377684c3a78650",
+    "returned_at_utc": "2026-10-07T00:16:32.086983+00:00",
+    "runtime_source_head": "b1da0536d34ff174c825e9862d7e29cf2d087785",
+    "schema_version": "task173.full-sizing-completion-execution-start.v1",
+    "sizing_result_hash": "ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+    "sizing_result_id": "urn:hxforge:task173-sizing:ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+    "sizing_result_projection": {
+      "alternative_candidate_ids": [],
+      "blocked_count": 2,
+      "candidate_count": 2,
+      "candidate_records": [
+        {
+          "accepted_mesh_identity": null,
+          "accepted_subdivisions_per_interval": null,
+          "blockers": [
+            "PRECISION_FLOOR_UNRESOLVED"
+          ],
+          "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+          "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+          "candidate_rating_result_hash": "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+          "candidate_rating_result_id": "urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+          "dimension_authority_hashes": [
+            [
+              "BAFFLE_COUNT",
+              "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+            ],
+            [
+              "BAFFLE_CUT",
+              "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+            ],
+            [
+              "CONSTRUCTION_FAMILY",
+              "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+            ],
+            [
+              "TUBE_LENGTH",
+              "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+            ],
+            [
+              "TUBE_PITCH",
+              "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+            ]
+          ],
+          "disposition": "BLOCKED",
+          "duty_constraint": null,
+          "headroom_subdivisions_per_interval": null,
+          "native_identities": [
+            [
+              "TASK020",
+              "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+            ],
+            [
+              "TASK021",
+              "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+            ],
+            [
+              "TASK022",
+              "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+            ],
+            [
+              "TASK024",
+              "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+            ],
+            [
+              "TASK025",
+              "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+            ],
+            [
+              "TASK031",
+              "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+            ],
+            [
+              "TASK032",
+              "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+            ],
+            [
+              "TASK029",
+              "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+            ],
+            [
+              "TASK166",
+              "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+            ],
+            [
+              "TASK171",
+              "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+            ],
+            [
+              "TASK174",
+              "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+            ]
+          ],
+          "provenance_hash": "6f3f5af4f054a9134fc5b6f1ad416a4fdca13e7e29eb08e1163b7180e9890a29",
+          "rank": null,
+          "ranking_score": null,
+          "rated_duty_w": null,
+          "selected_dimensions": [
+            [
+              "CONSTRUCTION_FAMILY",
+              "FIXED_TUBESHEET"
+            ],
+            [
+              "SHELL_GEOMETRY_ID",
+              "shell-1"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "0.01905"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "0.00165"
+            ],
+            [
+              "TUBE_LENGTH",
+              "6.0"
+            ],
+            [
+              "TUBE_PITCH",
+              "0.0254"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "LAYOUT_30_DEG"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "1"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "SINGLE_SEGMENTAL"
+            ],
+            [
+              "BAFFLE_CUT",
+              "0.215"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "1.2"
+            ],
+            [
+              "BAFFLE_COUNT",
+              "4"
+            ]
+          ],
+          "shell_dp_constraint": null,
+          "shell_dp_pa": null,
+          "stage": "TASK173_CANDIDATE_RATING",
+          "status": "BLOCKED",
+          "tube_dp_constraint": null,
+          "tube_dp_pa": null,
+          "warnings": []
+        },
+        {
+          "accepted_mesh_identity": null,
+          "accepted_subdivisions_per_interval": null,
+          "blockers": [
+            "PRECISION_FLOOR_UNRESOLVED"
+          ],
+          "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+          "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate_rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+          "candidate_rating_result_hash": "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+          "candidate_rating_result_id": "urn:hxforge:task173:blocked:737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+          "dimension_authority_hashes": [
+            [
+              "BAFFLE_COUNT",
+              "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+            ],
+            [
+              "BAFFLE_CUT",
+              "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+            ],
+            [
+              "CONSTRUCTION_FAMILY",
+              "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+            ],
+            [
+              "TUBE_LENGTH",
+              "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+            ],
+            [
+              "TUBE_PITCH",
+              "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+            ]
+          ],
+          "disposition": "BLOCKED",
+          "duty_constraint": null,
+          "headroom_subdivisions_per_interval": null,
+          "native_identities": [
+            [
+              "TASK020",
+              "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+            ],
+            [
+              "TASK021",
+              "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+            ],
+            [
+              "TASK022",
+              "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+            ],
+            [
+              "TASK024",
+              "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+            ],
+            [
+              "TASK025",
+              "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+            ],
+            [
+              "TASK031",
+              "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+            ],
+            [
+              "TASK032",
+              "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+            ],
+            [
+              "TASK029",
+              "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+            ],
+            [
+              "TASK166",
+              "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+            ],
+            [
+              "TASK171",
+              "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+            ],
+            [
+              "TASK174",
+              "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+            ]
+          ],
+          "provenance_hash": "681fb2ebda560b42ab3f4e94f17c9f10ca449b0ebc242abebc4de41e60f6ad60",
+          "rank": null,
+          "ranking_score": null,
+          "rated_duty_w": null,
+          "selected_dimensions": [
+            [
+              "CONSTRUCTION_FAMILY",
+              "FIXED_TUBESHEET"
+            ],
+            [
+              "SHELL_GEOMETRY_ID",
+              "shell-1"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "0.01905"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "0.00165"
+            ],
+            [
+              "TUBE_LENGTH",
+              "6.0"
+            ],
+            [
+              "TUBE_PITCH",
+              "0.0254"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "LAYOUT_30_DEG"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "1"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "SINGLE_SEGMENTAL"
+            ],
+            [
+              "BAFFLE_CUT",
+              "0.220"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "1.2"
+            ],
+            [
+              "BAFFLE_COUNT",
+              "4"
+            ]
+          ],
+          "shell_dp_constraint": null,
+          "shell_dp_pa": null,
+          "stage": "TASK173_CANDIDATE_RATING",
+          "status": "BLOCKED",
+          "tube_dp_constraint": null,
+          "tube_dp_pa": null,
+          "warnings": []
+        }
+      ],
+      "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+      "excluded_count": 2,
+      "exclusion_reason_codes": [
+        [
+          "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          [
+            "PRECISION_FLOOR_UNRESOLVED"
+          ]
+        ],
+        [
+          "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          [
+            "PRECISION_FLOOR_UNRESOLVED"
+          ]
+        ]
+      ],
+      "orphan_recommendation": false,
+      "pass_count": 0,
+      "provenance_cycle_count": 0,
+      "provenance_edges": [
+        [
+          "candidate-space",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+        ],
+        [
+          "candidate-space",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841"
+        ],
+        [
+          "candidate-space",
+          "ranking-policy"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+        ],
+        [
+          "ranking-policy",
+          "sizing-selection"
+        ],
+        [
+          "request",
+          "candidate-space"
+        ],
+        [
+          "request",
+          "ranking-policy"
+        ],
+        [
+          "request",
+          "requirement"
+        ],
+        [
+          "sizing-selection",
+          "sizing-result"
+        ]
+      ],
+      "provenance_nodes": [
+        [
+          "candidate-space",
+          "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+          "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+          "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+          "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+          "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+          "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+          "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+          "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+          "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+          "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+          "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+          "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+          "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+        ],
+        [
+          "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition",
+          "3fb45359b2b575114548916a22a778fcd6cfd7c5aa717f00fbdbe1ee675105a9"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+          "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+          "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+          "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+          "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+          "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+          "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+          "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+          "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+          "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+          "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+          "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+          "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+        ],
+        [
+          "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition",
+          "648b0ac4bd5f634b3c46436f70e7c0a2066ea822217d219087f27ef78855bb17"
+        ],
+        [
+          "ranking-policy",
+          "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+        ],
+        [
+          "request",
+          "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae"
+        ],
+        [
+          "requirement",
+          "fd480d84828da2e7c0a0d42ba649c8fc4d2aee146f4290528eeef667179b7e2d"
+        ],
+        [
+          "sizing-result",
+          "RESULT_PROJECTION_BOUND_BY_CANONICAL_RESULT_HASH"
+        ],
+        [
+          "sizing-selection",
+          "64a13adc31cbeec1080df5c5b0055462fb0de371488558bad9fc266ad9716e54"
+        ]
+      ],
+      "provenance_self_edge_count": 0,
+      "ranked_candidate_ids": [],
+      "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+      "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+      "ranking_trace": [],
+      "recommendable_count": 0,
+      "recommended_candidate_id": null,
+      "request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+      "result_hash": "ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+      "result_id": "urn:hxforge:task173-sizing:ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+      "schema_version": "task173.sizing-result.v1",
+      "selection_status": "NO_RECOMMENDABLE_CANDIDATE",
+      "stale_reference_binding": false,
+      "status": "VALIDATED",
+      "warn_count": 0
+    },
+    "sizing_result_type": "Task173SizingSuccessResult",
+    "sizing_status": "VALIDATED",
+    "started_at_utc": "2026-10-07T00:13:35.132133+00:00",
+    "total_recorded_task173_public_sizing_invocations": 3
+  },
+  "execution_start_record": {
+    "completion_request_public_sizing_invocation_count": 1,
+    "completion_sizing_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+    "execution_status": "STARTED",
+    "historical_r4_public_sizing_invocation_count": 2,
+    "request_freeze_head": "75a795f676e8cc3b1d2e7e0f89377684c3a78650",
+    "runtime_source_head": "b1da0536d34ff174c825e9862d7e29cf2d087785",
+    "schema_version": "task173.full-sizing-completion-execution-start.v1",
+    "started_at_utc": "2026-10-07T00:13:35.132133+00:00",
+    "total_recorded_task173_public_sizing_invocations": 3
+  },
+  "first_blocker": {
+    "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+    "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "candidate_rating_result_hash": "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+    "candidate_rating_result_id": "urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+    "code": "PRECISION_FLOOR_UNRESOLVED",
+    "diagnostic_scope": "Sizing ledger exposes the exact blocker code and result identity, but does not retain the inner Task173BlockedResult diagnostic preimage",
+    "stage": "TASK173_CANDIDATE_RATING"
+  },
+  "hard_constraints_evaluated": false,
+  "historical_r4_public_sizing_invocation_count": 2,
+  "merge_authorized": false,
+  "production_serialization_code_changed": false,
+  "r4_baffle_cut_authority_hash": "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7",
+  "ready_authorized": false,
+  "recommendable_candidate_count": 0,
+  "request_freeze_head": "75a795f676e8cc3b1d2e7e0f89377684c3a78650",
+  "result": "BLOCKED_TASK173_FULL_SIZING_IMPLEMENTATION",
+  "runtime_source_head": "b1da0536d34ff174c825e9862d7e29cf2d087785",
+  "schema_version": "task173.full-sizing-implementation-completion-attempt.v1",
+  "selection_status": "NO_RECOMMENDABLE_CANDIDATE",
+  "sizing_identity_canonical_preimage_replay": "PASS",
+  "sizing_result_hash": "ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+  "sizing_result_hash_replay": "PASS",
+  "sizing_result_id": "urn:hxforge:task173-sizing:ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+  "sizing_result_identity_canonical_json_sha256": "ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+  "sizing_result_identity_canonical_json_utf8": "{\"alternative_candidate_ids\":[],\"blocked_count\":2,\"candidate_count\":2,\"candidate_records\":[{\"accepted_mesh_identity\":null,\"accepted_subdivisions_per_interval\":null,\"blockers\":[\"PRECISION_FLOOR_UNRESOLVED\"],\"candidate_hash\":\"f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767\",\"candidate_id\":\"adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate_rating_request_hash\":\"1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7\",\"candidate_rating_result_hash\":\"acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb\",\"candidate_rating_result_id\":\"urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb\",\"dimension_authority_hashes\":[[\"BAFFLE_COUNT\",\"e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe\"],[\"BAFFLE_CUT\",\"ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7\"],[\"BAFFLE_SPACING\",\"bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84\"],[\"BAFFLE_TYPE\",\"19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b\"],[\"CONSTRUCTION_FAMILY\",\"1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88\"],[\"TUBE_LAYOUT\",\"a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b\"],[\"TUBE_LENGTH\",\"3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24\"],[\"TUBE_OUTER_DIAMETER\",\"6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998\"],[\"TUBE_PASS_COUNT\",\"9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a\"],[\"TUBE_PITCH\",\"1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae\"],[\"TUBE_WALL_THICKNESS\",\"7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9\"]],\"disposition\":\"BLOCKED\",\"duty_constraint\":null,\"headroom_subdivisions_per_interval\":null,\"native_identities\":[[\"TASK020\",\"95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298\"],[\"TASK021\",\"1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42\"],[\"TASK022\",\"9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594\"],[\"TASK024\",\"20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4\"],[\"TASK025\",\"7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02\"],[\"TASK031\",\"2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b\"],[\"TASK032\",\"ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a\"],[\"TASK029\",\"885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00\"],[\"TASK166\",\"c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a\"],[\"TASK171\",\"a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688\"],[\"TASK174\",\"9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228\"]],\"provenance_hash\":\"6f3f5af4f054a9134fc5b6f1ad416a4fdca13e7e29eb08e1163b7180e9890a29\",\"rank\":null,\"ranking_score\":null,\"rated_duty_w\":null,\"selected_dimensions\":[[\"CONSTRUCTION_FAMILY\",\"FIXED_TUBESHEET\"],[\"SHELL_GEOMETRY_ID\",\"shell-1\"],[\"TUBE_OUTER_DIAMETER\",\"0.01905\"],[\"TUBE_WALL_THICKNESS\",\"0.00165\"],[\"TUBE_LENGTH\",\"6.0\"],[\"TUBE_PITCH\",\"0.0254\"],[\"TUBE_LAYOUT\",\"LAYOUT_30_DEG\"],[\"TUBE_PASS_COUNT\",\"1\"],[\"BAFFLE_TYPE\",\"SINGLE_SEGMENTAL\"],[\"BAFFLE_CUT\",\"0.215\"],[\"BAFFLE_SPACING\",\"1.2\"],[\"BAFFLE_COUNT\",\"4\"]],\"shell_dp_constraint\":null,\"shell_dp_pa\":null,\"stage\":\"TASK173_CANDIDATE_RATING\",\"status\":\"BLOCKED\",\"tube_dp_constraint\":null,\"tube_dp_pa\":null,\"warnings\":[]},{\"accepted_mesh_identity\":null,\"accepted_subdivisions_per_interval\":null,\"blockers\":[\"PRECISION_FLOOR_UNRESOLVED\"],\"candidate_hash\":\"53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489\",\"candidate_id\":\"e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate_rating_request_hash\":\"56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8\",\"candidate_rating_result_hash\":\"737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f\",\"candidate_rating_result_id\":\"urn:hxforge:task173:blocked:737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f\",\"dimension_authority_hashes\":[[\"BAFFLE_COUNT\",\"e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe\"],[\"BAFFLE_CUT\",\"ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7\"],[\"BAFFLE_SPACING\",\"bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84\"],[\"BAFFLE_TYPE\",\"19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b\"],[\"CONSTRUCTION_FAMILY\",\"1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88\"],[\"TUBE_LAYOUT\",\"a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b\"],[\"TUBE_LENGTH\",\"3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24\"],[\"TUBE_OUTER_DIAMETER\",\"6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998\"],[\"TUBE_PASS_COUNT\",\"9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a\"],[\"TUBE_PITCH\",\"1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae\"],[\"TUBE_WALL_THICKNESS\",\"7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9\"]],\"disposition\":\"BLOCKED\",\"duty_constraint\":null,\"headroom_subdivisions_per_interval\":null,\"native_identities\":[[\"TASK020\",\"95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298\"],[\"TASK021\",\"058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5\"],[\"TASK022\",\"307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55\"],[\"TASK024\",\"9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15\"],[\"TASK025\",\"cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391\"],[\"TASK031\",\"f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80\"],[\"TASK032\",\"2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143\"],[\"TASK029\",\"9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0\"],[\"TASK166\",\"a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8\"],[\"TASK171\",\"6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63\"],[\"TASK174\",\"d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb\"]],\"provenance_hash\":\"681fb2ebda560b42ab3f4e94f17c9f10ca449b0ebc242abebc4de41e60f6ad60\",\"rank\":null,\"ranking_score\":null,\"rated_duty_w\":null,\"selected_dimensions\":[[\"CONSTRUCTION_FAMILY\",\"FIXED_TUBESHEET\"],[\"SHELL_GEOMETRY_ID\",\"shell-1\"],[\"TUBE_OUTER_DIAMETER\",\"0.01905\"],[\"TUBE_WALL_THICKNESS\",\"0.00165\"],[\"TUBE_LENGTH\",\"6.0\"],[\"TUBE_PITCH\",\"0.0254\"],[\"TUBE_LAYOUT\",\"LAYOUT_30_DEG\"],[\"TUBE_PASS_COUNT\",\"1\"],[\"BAFFLE_TYPE\",\"SINGLE_SEGMENTAL\"],[\"BAFFLE_CUT\",\"0.220\"],[\"BAFFLE_SPACING\",\"1.2\"],[\"BAFFLE_COUNT\",\"4\"]],\"shell_dp_constraint\":null,\"shell_dp_pa\":null,\"stage\":\"TASK173_CANDIDATE_RATING\",\"status\":\"BLOCKED\",\"tube_dp_constraint\":null,\"tube_dp_pa\":null,\"warnings\":[]}],\"candidate_space_hash\":\"aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea\",\"excluded_count\":2,\"exclusion_reason_codes\":[[\"adeab5b1-a339-5eb3-aa66-011ffe49bac0\",[\"PRECISION_FLOOR_UNRESOLVED\"]],[\"e152cca9-fd5d-59ca-9b46-1df574eee841\",[\"PRECISION_FLOOR_UNRESOLVED\"]]],\"orphan_recommendation\":false,\"pass_count\":0,\"provenance_cycle_count\":0,\"provenance_edges\":[[\"candidate-space\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\"],[\"candidate-space\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\"],[\"candidate-space\",\"ranking-policy\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\",\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\",\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING\"],[\"ranking-policy\",\"sizing-selection\"],[\"request\",\"candidate-space\"],[\"request\",\"ranking-policy\"],[\"request\",\"requirement\"],[\"sizing-selection\",\"sizing-result\"]],\"provenance_nodes\":[[\"candidate-space\",\"aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0\",\"f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020\",\"95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021\",\"1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022\",\"9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024\",\"20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025\",\"7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029\",\"885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031\",\"2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032\",\"ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166\",\"c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171\",\"a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING\",\"acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174\",\"9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228\"],[\"candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition\",\"3fb45359b2b575114548916a22a778fcd6cfd7c5aa717f00fbdbe1ee675105a9\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841\",\"53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020\",\"95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021\",\"058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022\",\"307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024\",\"9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025\",\"cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029\",\"9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031\",\"f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032\",\"2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166\",\"a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171\",\"6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING\",\"737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174\",\"d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb\"],[\"candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition\",\"648b0ac4bd5f634b3c46436f70e7c0a2066ea822217d219087f27ef78855bb17\"],[\"ranking-policy\",\"0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6\"],[\"request\",\"5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae\"],[\"requirement\",\"fd480d84828da2e7c0a0d42ba649c8fc4d2aee146f4290528eeef667179b7e2d\"],[\"sizing-result\",\"RESULT_PROJECTION_BOUND_BY_CANONICAL_RESULT_HASH\"],[\"sizing-selection\",\"64a13adc31cbeec1080df5c5b0055462fb0de371488558bad9fc266ad9716e54\"]],\"provenance_self_edge_count\":0,\"ranked_candidate_ids\":[],\"ranking_policy_hash\":\"0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6\",\"ranking_policy_id\":\"V07-T173-SIZING-RANKING-POLICY-R1\",\"ranking_trace\":[],\"recommendable_count\":0,\"recommended_candidate_id\":null,\"request_hash\":\"5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae\",\"schema_version\":\"task173.sizing-result.v1\",\"selection_status\":\"NO_RECOMMENDABLE_CANDIDATE\",\"stale_reference_binding\":false,\"status\":\"VALIDATED\",\"warn_count\":0}",
+  "sizing_result_identity_projection": {
+    "alternative_candidate_ids": [],
+    "blocked_count": 2,
+    "candidate_count": 2,
+    "candidate_records": [
+      {
+        "accepted_mesh_identity": null,
+        "accepted_subdivisions_per_interval": null,
+        "blockers": [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ],
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+        "candidate_rating_result_hash": "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+        "candidate_rating_result_id": "urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+        "dimension_authority_hashes": [
+          [
+            "BAFFLE_COUNT",
+            "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+          ],
+          [
+            "BAFFLE_CUT",
+            "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+          ],
+          [
+            "CONSTRUCTION_FAMILY",
+            "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+          ],
+          [
+            "TUBE_LENGTH",
+            "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+          ],
+          [
+            "TUBE_PITCH",
+            "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+          ]
+        ],
+        "disposition": "BLOCKED",
+        "duty_constraint": null,
+        "headroom_subdivisions_per_interval": null,
+        "native_identities": [
+          [
+            "TASK020",
+            "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+          ],
+          [
+            "TASK021",
+            "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+          ],
+          [
+            "TASK022",
+            "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+          ],
+          [
+            "TASK024",
+            "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+          ],
+          [
+            "TASK025",
+            "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+          ],
+          [
+            "TASK031",
+            "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+          ],
+          [
+            "TASK032",
+            "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+          ],
+          [
+            "TASK029",
+            "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+          ],
+          [
+            "TASK166",
+            "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+          ],
+          [
+            "TASK171",
+            "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+          ],
+          [
+            "TASK174",
+            "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+          ]
+        ],
+        "provenance_hash": "6f3f5af4f054a9134fc5b6f1ad416a4fdca13e7e29eb08e1163b7180e9890a29",
+        "rank": null,
+        "ranking_score": null,
+        "rated_duty_w": null,
+        "selected_dimensions": [
+          [
+            "CONSTRUCTION_FAMILY",
+            "FIXED_TUBESHEET"
+          ],
+          [
+            "SHELL_GEOMETRY_ID",
+            "shell-1"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "0.01905"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "0.00165"
+          ],
+          [
+            "TUBE_LENGTH",
+            "6.0"
+          ],
+          [
+            "TUBE_PITCH",
+            "0.0254"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "LAYOUT_30_DEG"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "1"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "SINGLE_SEGMENTAL"
+          ],
+          [
+            "BAFFLE_CUT",
+            "0.215"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "1.2"
+          ],
+          [
+            "BAFFLE_COUNT",
+            "4"
+          ]
+        ],
+        "shell_dp_constraint": null,
+        "shell_dp_pa": null,
+        "stage": "TASK173_CANDIDATE_RATING",
+        "status": "BLOCKED",
+        "tube_dp_constraint": null,
+        "tube_dp_pa": null,
+        "warnings": []
+      },
+      {
+        "accepted_mesh_identity": null,
+        "accepted_subdivisions_per_interval": null,
+        "blockers": [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ],
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate_rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "candidate_rating_result_hash": "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+        "candidate_rating_result_id": "urn:hxforge:task173:blocked:737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+        "dimension_authority_hashes": [
+          [
+            "BAFFLE_COUNT",
+            "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+          ],
+          [
+            "BAFFLE_CUT",
+            "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+          ],
+          [
+            "CONSTRUCTION_FAMILY",
+            "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+          ],
+          [
+            "TUBE_LENGTH",
+            "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+          ],
+          [
+            "TUBE_PITCH",
+            "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+          ]
+        ],
+        "disposition": "BLOCKED",
+        "duty_constraint": null,
+        "headroom_subdivisions_per_interval": null,
+        "native_identities": [
+          [
+            "TASK020",
+            "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+          ],
+          [
+            "TASK021",
+            "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+          ],
+          [
+            "TASK022",
+            "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+          ],
+          [
+            "TASK024",
+            "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+          ],
+          [
+            "TASK025",
+            "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+          ],
+          [
+            "TASK031",
+            "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+          ],
+          [
+            "TASK032",
+            "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+          ],
+          [
+            "TASK029",
+            "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+          ],
+          [
+            "TASK166",
+            "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+          ],
+          [
+            "TASK171",
+            "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+          ],
+          [
+            "TASK174",
+            "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+          ]
+        ],
+        "provenance_hash": "681fb2ebda560b42ab3f4e94f17c9f10ca449b0ebc242abebc4de41e60f6ad60",
+        "rank": null,
+        "ranking_score": null,
+        "rated_duty_w": null,
+        "selected_dimensions": [
+          [
+            "CONSTRUCTION_FAMILY",
+            "FIXED_TUBESHEET"
+          ],
+          [
+            "SHELL_GEOMETRY_ID",
+            "shell-1"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "0.01905"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "0.00165"
+          ],
+          [
+            "TUBE_LENGTH",
+            "6.0"
+          ],
+          [
+            "TUBE_PITCH",
+            "0.0254"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "LAYOUT_30_DEG"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "1"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "SINGLE_SEGMENTAL"
+          ],
+          [
+            "BAFFLE_CUT",
+            "0.220"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "1.2"
+          ],
+          [
+            "BAFFLE_COUNT",
+            "4"
+          ]
+        ],
+        "shell_dp_constraint": null,
+        "shell_dp_pa": null,
+        "stage": "TASK173_CANDIDATE_RATING",
+        "status": "BLOCKED",
+        "tube_dp_constraint": null,
+        "tube_dp_pa": null,
+        "warnings": []
+      }
+    ],
+    "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+    "excluded_count": 2,
+    "exclusion_reason_codes": [
+      [
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ]
+      ],
+      [
+        "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ]
+      ]
+    ],
+    "orphan_recommendation": false,
+    "pass_count": 0,
+    "provenance_cycle_count": 0,
+    "provenance_edges": [
+      [
+        "candidate-space",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      [
+        "candidate-space",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841"
+      ],
+      [
+        "candidate-space",
+        "ranking-policy"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+      ],
+      [
+        "ranking-policy",
+        "sizing-selection"
+      ],
+      [
+        "request",
+        "candidate-space"
+      ],
+      [
+        "request",
+        "ranking-policy"
+      ],
+      [
+        "request",
+        "requirement"
+      ],
+      [
+        "sizing-selection",
+        "sizing-result"
+      ]
+    ],
+    "provenance_nodes": [
+      [
+        "candidate-space",
+        "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+        "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+        "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+        "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+        "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+        "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+        "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition",
+        "3fb45359b2b575114548916a22a778fcd6cfd7c5aa717f00fbdbe1ee675105a9"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+        "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+        "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+        "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+        "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+        "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+        "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition",
+        "648b0ac4bd5f634b3c46436f70e7c0a2066ea822217d219087f27ef78855bb17"
+      ],
+      [
+        "ranking-policy",
+        "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+      ],
+      [
+        "request",
+        "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae"
+      ],
+      [
+        "requirement",
+        "fd480d84828da2e7c0a0d42ba649c8fc4d2aee146f4290528eeef667179b7e2d"
+      ],
+      [
+        "sizing-result",
+        "RESULT_PROJECTION_BOUND_BY_CANONICAL_RESULT_HASH"
+      ],
+      [
+        "sizing-selection",
+        "64a13adc31cbeec1080df5c5b0055462fb0de371488558bad9fc266ad9716e54"
+      ]
+    ],
+    "provenance_self_edge_count": 0,
+    "ranked_candidate_ids": [],
+    "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+    "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+    "ranking_trace": [],
+    "recommendable_count": 0,
+    "recommended_candidate_id": null,
+    "request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+    "schema_version": "task173.sizing-result.v1",
+    "selection_status": "NO_RECOMMENDABLE_CANDIDATE",
+    "stale_reference_binding": false,
+    "status": "VALIDATED",
+    "warn_count": 0
+  },
+  "sizing_result_projection": {
+    "alternative_candidate_ids": [],
+    "blocked_count": 2,
+    "candidate_count": 2,
+    "candidate_records": [
+      {
+        "accepted_mesh_identity": null,
+        "accepted_subdivisions_per_interval": null,
+        "blockers": [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ],
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+        "candidate_rating_result_hash": "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+        "candidate_rating_result_id": "urn:hxforge:task173:blocked:acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb",
+        "dimension_authority_hashes": [
+          [
+            "BAFFLE_COUNT",
+            "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+          ],
+          [
+            "BAFFLE_CUT",
+            "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+          ],
+          [
+            "CONSTRUCTION_FAMILY",
+            "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+          ],
+          [
+            "TUBE_LENGTH",
+            "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+          ],
+          [
+            "TUBE_PITCH",
+            "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+          ]
+        ],
+        "disposition": "BLOCKED",
+        "duty_constraint": null,
+        "headroom_subdivisions_per_interval": null,
+        "native_identities": [
+          [
+            "TASK020",
+            "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+          ],
+          [
+            "TASK021",
+            "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+          ],
+          [
+            "TASK022",
+            "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+          ],
+          [
+            "TASK024",
+            "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+          ],
+          [
+            "TASK025",
+            "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+          ],
+          [
+            "TASK031",
+            "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+          ],
+          [
+            "TASK032",
+            "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+          ],
+          [
+            "TASK029",
+            "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+          ],
+          [
+            "TASK166",
+            "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+          ],
+          [
+            "TASK171",
+            "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+          ],
+          [
+            "TASK174",
+            "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+          ]
+        ],
+        "provenance_hash": "6f3f5af4f054a9134fc5b6f1ad416a4fdca13e7e29eb08e1163b7180e9890a29",
+        "rank": null,
+        "ranking_score": null,
+        "rated_duty_w": null,
+        "selected_dimensions": [
+          [
+            "CONSTRUCTION_FAMILY",
+            "FIXED_TUBESHEET"
+          ],
+          [
+            "SHELL_GEOMETRY_ID",
+            "shell-1"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "0.01905"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "0.00165"
+          ],
+          [
+            "TUBE_LENGTH",
+            "6.0"
+          ],
+          [
+            "TUBE_PITCH",
+            "0.0254"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "LAYOUT_30_DEG"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "1"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "SINGLE_SEGMENTAL"
+          ],
+          [
+            "BAFFLE_CUT",
+            "0.215"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "1.2"
+          ],
+          [
+            "BAFFLE_COUNT",
+            "4"
+          ]
+        ],
+        "shell_dp_constraint": null,
+        "shell_dp_pa": null,
+        "stage": "TASK173_CANDIDATE_RATING",
+        "status": "BLOCKED",
+        "tube_dp_constraint": null,
+        "tube_dp_pa": null,
+        "warnings": []
+      },
+      {
+        "accepted_mesh_identity": null,
+        "accepted_subdivisions_per_interval": null,
+        "blockers": [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ],
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate_rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "candidate_rating_result_hash": "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+        "candidate_rating_result_id": "urn:hxforge:task173:blocked:737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f",
+        "dimension_authority_hashes": [
+          [
+            "BAFFLE_COUNT",
+            "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+          ],
+          [
+            "BAFFLE_CUT",
+            "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+          ],
+          [
+            "CONSTRUCTION_FAMILY",
+            "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+          ],
+          [
+            "TUBE_LENGTH",
+            "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+          ],
+          [
+            "TUBE_PITCH",
+            "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+          ]
+        ],
+        "disposition": "BLOCKED",
+        "duty_constraint": null,
+        "headroom_subdivisions_per_interval": null,
+        "native_identities": [
+          [
+            "TASK020",
+            "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+          ],
+          [
+            "TASK021",
+            "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+          ],
+          [
+            "TASK022",
+            "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+          ],
+          [
+            "TASK024",
+            "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+          ],
+          [
+            "TASK025",
+            "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+          ],
+          [
+            "TASK031",
+            "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+          ],
+          [
+            "TASK032",
+            "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+          ],
+          [
+            "TASK029",
+            "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+          ],
+          [
+            "TASK166",
+            "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+          ],
+          [
+            "TASK171",
+            "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+          ],
+          [
+            "TASK174",
+            "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+          ]
+        ],
+        "provenance_hash": "681fb2ebda560b42ab3f4e94f17c9f10ca449b0ebc242abebc4de41e60f6ad60",
+        "rank": null,
+        "ranking_score": null,
+        "rated_duty_w": null,
+        "selected_dimensions": [
+          [
+            "CONSTRUCTION_FAMILY",
+            "FIXED_TUBESHEET"
+          ],
+          [
+            "SHELL_GEOMETRY_ID",
+            "shell-1"
+          ],
+          [
+            "TUBE_OUTER_DIAMETER",
+            "0.01905"
+          ],
+          [
+            "TUBE_WALL_THICKNESS",
+            "0.00165"
+          ],
+          [
+            "TUBE_LENGTH",
+            "6.0"
+          ],
+          [
+            "TUBE_PITCH",
+            "0.0254"
+          ],
+          [
+            "TUBE_LAYOUT",
+            "LAYOUT_30_DEG"
+          ],
+          [
+            "TUBE_PASS_COUNT",
+            "1"
+          ],
+          [
+            "BAFFLE_TYPE",
+            "SINGLE_SEGMENTAL"
+          ],
+          [
+            "BAFFLE_CUT",
+            "0.220"
+          ],
+          [
+            "BAFFLE_SPACING",
+            "1.2"
+          ],
+          [
+            "BAFFLE_COUNT",
+            "4"
+          ]
+        ],
+        "shell_dp_constraint": null,
+        "shell_dp_pa": null,
+        "stage": "TASK173_CANDIDATE_RATING",
+        "status": "BLOCKED",
+        "tube_dp_constraint": null,
+        "tube_dp_pa": null,
+        "warnings": []
+      }
+    ],
+    "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+    "excluded_count": 2,
+    "exclusion_reason_codes": [
+      [
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ]
+      ],
+      [
+        "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        [
+          "PRECISION_FLOOR_UNRESOLVED"
+        ]
+      ]
+    ],
+    "orphan_recommendation": false,
+    "pass_count": 0,
+    "provenance_cycle_count": 0,
+    "provenance_edges": [
+      [
+        "candidate-space",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      [
+        "candidate-space",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841"
+      ],
+      [
+        "candidate-space",
+        "ranking-policy"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING"
+      ],
+      [
+        "ranking-policy",
+        "sizing-selection"
+      ],
+      [
+        "request",
+        "candidate-space"
+      ],
+      [
+        "request",
+        "ranking-policy"
+      ],
+      [
+        "request",
+        "requirement"
+      ],
+      [
+        "sizing-selection",
+        "sizing-result"
+      ]
+    ],
+    "provenance_nodes": [
+      [
+        "candidate-space",
+        "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK020",
+        "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK021",
+        "1897d56282b27148f3849c46ee825791cce1da80f8ea599a005c91bc0e31ea42"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK022",
+        "9e2a8b8f3f4b9c416ae4912d37ac1aef13df3f33c41fc4fdeac553628aa7e594"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK024",
+        "20d6f1aadec4ff16d12246c73e4a267071b154deb4caac16a03cf8c4637a61b4"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK025",
+        "7a6cf2516e3e0ad164598e870a48352a44e979dfbefb89c90146475d2bb01c02"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK029",
+        "885746701f07af5277b26f1b7d9cc487d1330855ad19dd2cf01e3f0001ae8f00"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK031",
+        "2eb3cd5a723c278db8966004409550b7ab7fdc541fd9a2f48ff6c0f2a14c167b"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK032",
+        "ae5dd3d3d8cf98a7028215ba6821fd71e5fcf8905e214cb5bc758c196671271a"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK166",
+        "c0ef1b26ec1d8b0d6100cde39d8c7ac95adb35d2248ae34055efacf1a68e9a1a"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK171",
+        "a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK173_RATING",
+        "acf8fd832d345a3fbc6e6fed218187ee3c98367955b3a060e01b246d42adbfbb"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:TASK174",
+        "9d804cc2bc20d868738ff63bf135da69ba23710a48d4fe149ac759d7d31e3228"
+      ],
+      [
+        "candidate:adeab5b1-a339-5eb3-aa66-011ffe49bac0:disposition",
+        "3fb45359b2b575114548916a22a778fcd6cfd7c5aa717f00fbdbe1ee675105a9"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK020",
+        "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK021",
+        "058d6fb4897346291d928bea239e9404ad30c925c33023745b136e1057dfded5"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK022",
+        "307bbb14bc602c1fcaab7286533c7370b911114347ffe574fcfb10e0e2fe8c55"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK024",
+        "9984dc17ba4b0735e71fbc64c025eb93cad972a0e1a0f86956b5cfe5ba374f15"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK025",
+        "cce609edcaf248a5c2806e0e7689531462e2e05c2b696fbf8af6bddb3a073391"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK029",
+        "9cc792e1f929213a76644d0df152fa2e1ffdff564bf4080eaf5d62938e30d0e0"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK031",
+        "f85bff4e972df094c3763a805c2a6aebe937f4fa6dedca126ecccb8331a7fd80"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK032",
+        "2156a0c61d35ec423011ad267330a665ef9df4189691f75f3db0872eacf44143"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK166",
+        "a7f0212b823f99b6db78132fd243c318cfe2ddbfb5a3cdaf0c0d0d50e53410c8"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK171",
+        "6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK173_RATING",
+        "737ed569590d1464f990566599281a2eb3d2d31d51bddf2fa472984c5a04203f"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:TASK174",
+        "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+      ],
+      [
+        "candidate:e152cca9-fd5d-59ca-9b46-1df574eee841:disposition",
+        "648b0ac4bd5f634b3c46436f70e7c0a2066ea822217d219087f27ef78855bb17"
+      ],
+      [
+        "ranking-policy",
+        "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+      ],
+      [
+        "request",
+        "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae"
+      ],
+      [
+        "requirement",
+        "fd480d84828da2e7c0a0d42ba649c8fc4d2aee146f4290528eeef667179b7e2d"
+      ],
+      [
+        "sizing-result",
+        "RESULT_PROJECTION_BOUND_BY_CANONICAL_RESULT_HASH"
+      ],
+      [
+        "sizing-selection",
+        "64a13adc31cbeec1080df5c5b0055462fb0de371488558bad9fc266ad9716e54"
+      ]
+    ],
+    "provenance_self_edge_count": 0,
+    "ranked_candidate_ids": [],
+    "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+    "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+    "ranking_trace": [],
+    "recommendable_count": 0,
+    "recommended_candidate_id": null,
+    "request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+    "result_hash": "ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+    "result_id": "urn:hxforge:task173-sizing:ad4a40c788992db33875b5489d6a7bb668b1616f15ffce6fd56e26ae30a54a33",
+    "schema_version": "task173.sizing-result.v1",
+    "selection_status": "NO_RECOMMENDABLE_CANDIDATE",
+    "stale_reference_binding": false,
+    "status": "VALIDATED",
+    "warn_count": 0
+  },
+  "sizing_result_type": "Task173SizingSuccessResult",
+  "sizing_status": "VALIDATED",
+  "strict_json_model_roundtrip_required": false,
+  "strict_native_python_request_validation": "PASS",
+  "task168_candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+  "task168_request_canonical_preimage_replay": "PASS",
+  "task168_request_hash": "813d04b67b46de45364072c13cb0a589e8e6861302a0f6a3334db8413c6afa20",
+  "task173_complete": false,
+  "task173_rating_complete": true,
+  "task173_sizing_complete": false,
+  "task175_release_acceptance_performed": false,
+  "total_recorded_task173_public_sizing_invocations": 3
+}

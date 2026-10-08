@@ -1,0 +1,121 @@
+{
+  "task_id": "TASK172_V0_7_R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDMENT_AND_R118C_ATTEMPT1_INCIDENT_R1",
+  "incident_id": "TASK172-R118C-ATTEMPT1-BLOCKED",
+  "result": "R118C_ATTEMPT1_BLOCKED_AND_SEQUENCE_VIOLATION_RECORDED",
+  "predecessor": {
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "head_sha": "b6a9181656b1034c3c0c328195ecc4198a919089",
+    "current_head_unchanged_for_incident_reconstruction": true,
+    "r118b_review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+    "r118b_effective_lifecycle": "REVIEWED_AUTHORITY",
+    "r118b_receipt_rewritten": false
+  },
+  "attempt1": {
+    "attempt": 1,
+    "result": "BLOCKED_R118C_TASK024_REVIEWED_PREFLIGHT_MISMATCH",
+    "authoritative": false,
+    "reusable": false,
+    "may_be_resumed": false,
+    "stop_after_attempt": true,
+    "blocking_field": "TASK024.cut_to_hole_margin_m",
+    "then_reviewed_exact_oracle_m": "0.00097256153674844976679141122274747436104176034035",
+    "observed_native_chain_value_m": "0.000972561537",
+    "native_minus_analytic_delta_m": "0.00000000000025155023320858877725252563895823965965"
+  },
+  "execution_log_availability": {
+    "separate_persisted_attempt1_log_artifact_present": false,
+    "desktop_thread_terminal_attached": false,
+    "stage_history_basis": "Prior R118-C execution context and its reported in-memory outcomes; volatile IDs and result hashes are not recoverable from a persisted attempt log.",
+    "volatile_audit_ids_reconstructed": false,
+    "native_output_ids_or_hashes_promoted": false
+  },
+  "stage_history": {
+    "TASK014": {
+      "in_memory_execution": "COMMITTED",
+      "lifecycle": ["revision_created", "revision_validated", "revision_committed"],
+      "committed_readback_reached": true,
+      "temporary_in_memory_repository": true,
+      "persisted": false
+    },
+    "TASK020": {
+      "in_memory_execution": "VALID",
+      "blocker_count": 0,
+      "standard_claim_status": "NO_STANDARD_CLAIM",
+      "persisted": false
+    },
+    "TASK021": {
+      "in_memory_execution": "VALID",
+      "position_count": 253,
+      "persisted": false
+    },
+    "TASK022": {
+      "in_memory_execution": "VALID",
+      "reviewed_preflight_values_reported": true,
+      "persisted": false
+    },
+    "TASK024": {
+      "in_memory_execution": "VALID",
+      "baffle_diameter_m": "0.497",
+      "baffle_hole_diameter_m": "0.02005",
+      "baffle_count": 4,
+      "center_sequence_m": ["1.2", "2.4", "3.6", "4.8"],
+      "then_reviewed_cut_margin_gate": "MISMATCH",
+      "persisted": false
+    },
+    "TASK025": {
+      "producer_invocation_occurred": true,
+      "exploratory_in_memory_producer_invocation_occurred": true,
+      "invocation_timing": "BEFORE_TASK024_REVIEW_GATE_DISPOSITION_WAS_FINALIZED",
+      "reported_return_class": "Task025ValidResult",
+      "result_persisted": false,
+      "result_admitted_as_authority": false,
+      "result_included_in_r118c_evidence": false,
+      "result_reusable": false,
+      "result_id_or_hash_recorded": false
+    }
+  },
+  "sequence_violation": {
+    "sequential_gate_violation": true,
+    "task025_called_before_task024_exact_margin_gate_pass": true,
+    "downstream_producer_invocation_before_gate_pass_count": 1,
+    "incident_acknowledgement": "The premature exploratory TASK025 invocation was a process violation; its output is discarded and may not be resumed or reused."
+  },
+  "persistence_boundary": {
+    "in_memory_native_execution_occurred": true,
+    "persisted_authority_materialization_occurred": false,
+    "repository_materialization_artifacts_created": false,
+    "r118c_receipt_created": false,
+    "r118c_registry_extension_created": false,
+    "commit_created": false,
+    "push_performed": false,
+    "r118c_success_extension_created": false
+  },
+  "clean_retry_boundary": {
+    "retry_authorized": false,
+    "retry_started": false,
+    "clean_in_memory_state_required": true,
+    "attempt1_objects_reusable": false,
+    "required_order": [
+      "TASK014_CREATE_DRAFT_VALIDATE_COMMIT",
+      "TASK020_CONFIGURATION_AND_GATE",
+      "TASK021_LAYOUT_AND_REVIEWED_COMPARISON_GATE",
+      "TASK022_BUNDLE_GEOMETRY_AND_REVIEWED_COMPARISON_GATE",
+      "TASK024_BAFFLE_GEOMETRY_AND_EXACT_NATIVE_MARGIN_GATE",
+      "TASK025_ONLY_AFTER_ALL_PRIOR_GATES_PASS"
+    ],
+    "downstream_producer_invocation_before_gate_pass_count_required": 0
+  },
+  "governance": {
+    "task171_executed": false,
+    "production_mesh_admission_performed": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668"
+}

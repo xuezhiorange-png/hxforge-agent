@@ -1,0 +1,102 @@
+{
+  "schema_version": "task172.r118c-r9.task020-configuration-evidence.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "attempt_number": 9,
+  "native_stage": "TASK020",
+  "native_snapshot": {
+    "request": {
+      "authority_mode": "INTERNAL_GENERIC",
+      "case_authority": {
+        "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+        "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+        "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+        "status": "committed"
+      },
+      "construction_family": "FIXED_TUBESHEET",
+      "equipment_family": "SHELL_AND_TUBE",
+      "evidence_refs": [
+        "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#task014-task020",
+        "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json#/candidate_inputs/TASK020"
+      ],
+      "front_head_token": "T172_FRONT",
+      "orientation": "HORIZONTAL",
+      "rear_head_token": "T172_REAR",
+      "requested_rule_pack_identity": null,
+      "schema_version": "task020.configuration-request.v1",
+      "shell_pass_count": 1,
+      "shell_token": "E",
+      "standard_system_id": null,
+      "tube_pass_count": 1
+    },
+    "result": {
+      "blockers": [],
+      "configuration": {
+        "authority_binding": {
+          "authority_mode": "INTERNAL_GENERIC",
+          "case_authority": {
+            "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+            "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+            "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+            "revision_status": "committed"
+          },
+          "case_authority_evidence_refs": [
+            "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md#task014-task020",
+            "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json#/candidate_inputs/TASK020"
+          ],
+          "evaluated_rule_pack_authority": null,
+          "standard_system_id": null
+        },
+        "authority_mode": "INTERNAL_GENERIC",
+        "blockers": [],
+        "case_authority": {
+          "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+          "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+          "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+          "revision_status": "committed"
+        },
+        "component_tokens": {
+          "front_head": "T172_FRONT",
+          "rear_head": "T172_REAR",
+          "shell": "E"
+        },
+        "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+        "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "construction_family": "FIXED_TUBESHEET",
+        "deferred_capabilities": [
+          "TUBE_LAYOUT_NOT_COMPUTABLE",
+          "SHELL_DIAMETER_NOT_COMPUTABLE",
+          "THERMAL_RATING_NOT_COMPUTABLE",
+          "PRESSURE_DROP_NOT_COMPUTABLE",
+          "THERMAL_EXPANSION_NOT_COMPUTABLE",
+          "MECHANICAL_BOUNDARY_NOT_COMPUTABLE",
+          "MATERIAL_SELECTION_NOT_COMPUTABLE",
+          "COST_NOT_COMPUTABLE",
+          "OPTIMIZATION_NOT_COMPUTABLE",
+          "REPORT_NOT_COMPUTABLE"
+        ],
+        "equipment_family": "SHELL_AND_TUBE",
+        "orientation": "HORIZONTAL",
+        "schema_version": "task020.configuration.v1",
+        "shell_pass_count": 1,
+        "standard_claim_status": "NO_STANDARD_CLAIM",
+        "tube_pass_count": 1,
+        "warnings": []
+      },
+      "deferred_capabilities": [
+        "TUBE_LAYOUT_NOT_COMPUTABLE",
+        "SHELL_DIAMETER_NOT_COMPUTABLE",
+        "THERMAL_RATING_NOT_COMPUTABLE",
+        "PRESSURE_DROP_NOT_COMPUTABLE",
+        "THERMAL_EXPANSION_NOT_COMPUTABLE",
+        "MECHANICAL_BOUNDARY_NOT_COMPUTABLE",
+        "MATERIAL_SELECTION_NOT_COMPUTABLE",
+        "COST_NOT_COMPUTABLE",
+        "OPTIMIZATION_NOT_COMPUTABLE",
+        "REPORT_NOT_COMPUTABLE"
+      ],
+      "status": "VALID",
+      "warnings": []
+    }
+  },
+  "canonical_hash": "0ead1bf29020140558471439fda6791dac6d24d0afb420170363a6ed96eb63dd"
+}

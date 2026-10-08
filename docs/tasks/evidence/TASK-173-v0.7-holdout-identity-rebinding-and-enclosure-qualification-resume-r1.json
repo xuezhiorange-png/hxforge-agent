@@ -1,0 +1,1320 @@
+{
+  "task_id": "STAGE3_TASK173_HOLDOUT_IDENTITY_REBINDING_AND_ENCLOSURE_QUALIFICATION_RESUME_R1",
+  "result": "BLOCKED_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_QUALIFICATION",
+  "preflight": {
+    "authorized_head": "5f6a6aa4669cc54764255820856436917aa047eb",
+    "remote_head": "5f6a6aa4669cc54764255820856436917aa047eb",
+    "pr_number": 283,
+    "pr_state": "OPEN",
+    "pr_draft": true,
+    "dirty_implementation_patch_sha256": "71aa09b716a457f510940d9020e4d3106fd390145cad99c6d3251eefb3a179e0",
+    "dirty_implementation_file_count": 10,
+    "dirty_implementation_staged": false,
+    "unrelated_untracked_handoff_touched": false,
+    "git_diff_check": "PASS"
+  },
+  "authority_package": {
+    "id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "accepted": true
+  },
+  "historical_selection": {
+    "qualification_ledger_hash": "aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+    "holdout_selection_hash": "f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+    "values_reselected": false,
+    "performance_output_used": false,
+    "old_candidate_hash_recovery_attempted": false,
+    "old_holdout_identities_replayable": false,
+    "old_holdout_identities_used_as_runtime_authority": false,
+    "holdouts": [
+      {"label": "H1", "cut_fraction": "0.225", "old_candidate_id": "7f00c8d1-6da6-5832-b4cc-8baec8b3795f", "old_candidate_hash": "2cd93f9b3b0d245ebeaa1399f8289efb9e41bbf5c28a24bfeb28b14ee6e4d249"},
+      {"label": "H2", "cut_fraction": "0.275", "old_candidate_id": "96219401-7261-579e-8419-63b1ab7f9d4e", "old_candidate_hash": "c2d8bef2f75801b9a560bc717f8776faea56bf19fbb1c0cadedebc9412a80f46"},
+      {"label": "H3", "cut_fraction": "0.350", "old_candidate_id": "cc7f25e1-d0fe-5bdb-b2b7-a9d9ec94173e", "old_candidate_hash": "e2915b5e4d33fd7a7e8732b85b5786cff56bb43e27419fae9fdbed4c6c1a66c7"}
+    ]
+  },
+  "rebind_authority": {
+    "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+    "authority_version": "1.0.0",
+    "dimension_role": "BAFFLE_CUT",
+    "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+    "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+    "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1",
+    "approval_status": "APPROVED",
+    "validation_only_scope": "APPROVED_FOR_IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+    "values": ["0.225", "0.275", "0.350"],
+    "evidence_refs": [
+      "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+      "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+      "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+      "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+      "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+    ],
+    "provenance_refs": [
+      "HOLDOUT_VALUES_RESELECTED=false",
+      "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+      "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+      "PERFORMANCE_OUTPUT_USED=false",
+      "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+    ],
+    "canonical_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+    "canonical_hash_projection": {
+      "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+      "authority_version": "1.0.0",
+      "dimension_role": "BAFFLE_CUT",
+      "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+      "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+      "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1",
+      "approval_status": "APPROVED",
+      "values": ["0.225", "0.275", "0.350"],
+      "evidence_refs": [
+        "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+        "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+        "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+        "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+        "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+      ],
+      "provenance_refs": [
+        "HOLDOUT_VALUES_RESELECTED=false",
+        "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+        "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+        "PERFORMANCE_OUTPUT_USED=false",
+        "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+      ]
+    },
+    "serialized_before_candidate_generation": true
+  },
+  "qualification": {
+    "candidate_space_id": "94acffe4-8346-5015-b020-60fbbcea3dfd",
+    "candidate_space_hash": "480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668",
+    "candidate_space_projection": {
+      "configuration": {
+        "authority_mode": "INTERNAL_GENERIC",
+        "binding_authority_mode": "INTERNAL_GENERIC",
+        "case_payload_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "case_revision_id": "task039-release-demo-001",
+        "configuration_hash": "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298",
+        "configuration_id": "559ce83b-4e4e-55ab-a913-8be103736600",
+        "construction_family": "FIXED_TUBESHEET",
+        "equipment_family": "SHELL_AND_TUBE",
+        "orientation": "HORIZONTAL",
+        "schema_version": "task020.configuration.v1",
+        "shell_pass_count": 1,
+        "standard_system_id": null,
+        "tube_pass_count": 1
+      },
+      "discrete_authority_hashes": [
+        [
+          "BAFFLE_COUNT",
+          "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+        ],
+        [
+          "BAFFLE_CUT",
+          "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+        ],
+        [
+          "CONSTRUCTION_FAMILY",
+          "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+        ],
+        [
+          "TUBE_LENGTH",
+          "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+        ],
+        [
+          "TUBE_PITCH",
+          "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+        ]
+      ],
+      "requirement_authority_hash": "949c2b70480b80b9444bb655c355fd1760c773ed345db69296f1c88a5595125b",
+      "shell_catalog_hash": "940c458d62f590a2135119cb49400327d83877ddc1cd6d6bd1407ebb0c39548e",
+      "shell_catalog_id": "task023-test-catalog",
+      "shell_catalog_version": "v1",
+      "source_definition_id": "TASK168-SOURCE-DEFINITION-ISSUE-263"
+    },
+    "candidate_space_identity_domain": "TASK168 canonical candidate-space projection; no thermal closure consumed",
+    "theoretical_candidate_count": 3,
+    "materialized_candidate_count": 3,
+    "identity_replay": "PASS",
+    "rebind_authority_projection_replay": "PASS",
+    "dimension_authorities": [
+      {
+        "canonical_hash": "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe",
+        "dimension_role": "BAFFLE_COUNT",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-baffle_count",
+          "authority_version": "v1",
+          "dimension_role": "BAFFLE_COUNT",
+          "evidence_refs": [
+            "evidence-baffle_count"
+          ],
+          "provenance_refs": [
+            "provenance-baffle_count"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            4
+          ]
+        }
+      },
+      {
+        "canonical_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+        "dimension_role": "BAFFLE_CUT",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+          "authority_version": "1.0.0",
+          "dimension_role": "BAFFLE_CUT",
+          "evidence_refs": [
+            "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+            "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+            "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+            "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+            "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+          ],
+          "provenance_refs": [
+            "HOLDOUT_VALUES_RESELECTED=false",
+            "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+            "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+            "PERFORMANCE_OUTPUT_USED=false",
+            "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+          ],
+          "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+          "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1",
+          "values": [
+            "0.225",
+            "0.275",
+            "0.350"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84",
+        "dimension_role": "BAFFLE_SPACING",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-baffle_spacing",
+          "authority_version": "v1",
+          "dimension_role": "BAFFLE_SPACING",
+          "evidence_refs": [
+            "evidence-baffle_spacing"
+          ],
+          "provenance_refs": [
+            "provenance-baffle_spacing"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "1.2"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b",
+        "dimension_role": "BAFFLE_TYPE",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-baffle_type",
+          "authority_version": "v1",
+          "dimension_role": "BAFFLE_TYPE",
+          "evidence_refs": [
+            "evidence-baffle_type"
+          ],
+          "provenance_refs": [
+            "provenance-baffle_type"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "SINGLE_SEGMENTAL"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88",
+        "dimension_role": "CONSTRUCTION_FAMILY",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-construction_family",
+          "authority_version": "v1",
+          "dimension_role": "CONSTRUCTION_FAMILY",
+          "evidence_refs": [
+            "evidence-construction_family"
+          ],
+          "provenance_refs": [
+            "provenance-construction_family"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "FIXED_TUBESHEET"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b",
+        "dimension_role": "TUBE_LAYOUT",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_layout",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_LAYOUT",
+          "evidence_refs": [
+            "evidence-tube_layout"
+          ],
+          "provenance_refs": [
+            "provenance-tube_layout"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "LAYOUT_30_DEG"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24",
+        "dimension_role": "TUBE_LENGTH",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_length",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_LENGTH",
+          "evidence_refs": [
+            "evidence-tube_length"
+          ],
+          "provenance_refs": [
+            "provenance-tube_length"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "6.0"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998",
+        "dimension_role": "TUBE_OUTER_DIAMETER",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_outer_diameter",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_OUTER_DIAMETER",
+          "evidence_refs": [
+            "evidence-tube_outer_diameter"
+          ],
+          "provenance_refs": [
+            "provenance-tube_outer_diameter"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "0.01905"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a",
+        "dimension_role": "TUBE_PASS_COUNT",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_pass_count",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_PASS_COUNT",
+          "evidence_refs": [
+            "evidence-tube_pass_count"
+          ],
+          "provenance_refs": [
+            "provenance-tube_pass_count"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            1
+          ]
+        }
+      },
+      {
+        "canonical_hash": "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae",
+        "dimension_role": "TUBE_PITCH",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_pitch",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_PITCH",
+          "evidence_refs": [
+            "evidence-tube_pitch"
+          ],
+          "provenance_refs": [
+            "provenance-tube_pitch"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "0.0254"
+          ]
+        }
+      },
+      {
+        "canonical_hash": "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9",
+        "dimension_role": "TUBE_WALL_THICKNESS",
+        "projection": {
+          "approval_status": "APPROVED",
+          "authority_id": "task168-tube_wall_thickness",
+          "authority_version": "v1",
+          "dimension_role": "TUBE_WALL_THICKNESS",
+          "evidence_refs": [
+            "evidence-tube_wall_thickness"
+          ],
+          "provenance_refs": [
+            "provenance-tube_wall_thickness"
+          ],
+          "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+          "source_id": "task168-project-snapshot",
+          "source_revision": "v1",
+          "values": [
+            "0.00165"
+          ]
+        }
+      }
+    ],
+    "holdouts": [
+      {
+        "candidate_hash": "bd0da145a592652e55a6fc8cd325a98d6f1cf349ed74b98e811d1343ce62ed54",
+        "candidate_id": "68a99368-a518-5482-b9df-4bc3357edea9",
+        "candidate_projection": {
+          "authority_bindings": [
+            [
+              "SHELL_GEOMETRY_ID",
+              "task023-test-catalog:shell-1:04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e"
+            ],
+            [
+              "CONSTRUCTION_FAMILY",
+              "task168-construction_family"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "task168-tube_outer_diameter"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "task168-tube_wall_thickness"
+            ],
+            [
+              "TUBE_LENGTH",
+              "task168-tube_length"
+            ],
+            [
+              "TUBE_PITCH",
+              "task168-tube_pitch"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "task168-tube_layout"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "task168-tube_pass_count"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "task168-baffle_type"
+            ],
+            [
+              "BAFFLE_CUT",
+              "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "task168-baffle_spacing"
+            ],
+            [
+              "BAFFLE_COUNT",
+              "task168-baffle_count"
+            ]
+          ],
+          "baffle_count": 4,
+          "baffle_cut_fraction": "0.225",
+          "baffle_spacing_m": "1.2",
+          "baffle_type": "SINGLE_SEGMENTAL",
+          "candidate_hash": "bd0da145a592652e55a6fc8cd325a98d6f1cf349ed74b98e811d1343ce62ed54",
+          "candidate_id": "68a99368-a518-5482-b9df-4bc3357edea9",
+          "case_authority_id": "task039-release-demo-001",
+          "construction_family": "FIXED_TUBESHEET",
+          "dimension_authority_bindings": [
+            {
+              "authority_id": "task168-construction_family",
+              "authority_version": "v1",
+              "canonical_hash": "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88",
+              "dimension_role": "CONSTRUCTION_FAMILY",
+              "evidence_refs": [
+                "evidence-construction_family"
+              ],
+              "provenance_refs": [
+                "provenance-construction_family"
+              ],
+              "selected_member": "FIXED_TUBESHEET",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_outer_diameter",
+              "authority_version": "v1",
+              "canonical_hash": "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998",
+              "dimension_role": "TUBE_OUTER_DIAMETER",
+              "evidence_refs": [
+                "evidence-tube_outer_diameter"
+              ],
+              "provenance_refs": [
+                "provenance-tube_outer_diameter"
+              ],
+              "selected_member": "0.01905",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_wall_thickness",
+              "authority_version": "v1",
+              "canonical_hash": "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9",
+              "dimension_role": "TUBE_WALL_THICKNESS",
+              "evidence_refs": [
+                "evidence-tube_wall_thickness"
+              ],
+              "provenance_refs": [
+                "provenance-tube_wall_thickness"
+              ],
+              "selected_member": "0.00165",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_length",
+              "authority_version": "v1",
+              "canonical_hash": "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24",
+              "dimension_role": "TUBE_LENGTH",
+              "evidence_refs": [
+                "evidence-tube_length"
+              ],
+              "provenance_refs": [
+                "provenance-tube_length"
+              ],
+              "selected_member": "6.0",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pitch",
+              "authority_version": "v1",
+              "canonical_hash": "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae",
+              "dimension_role": "TUBE_PITCH",
+              "evidence_refs": [
+                "evidence-tube_pitch"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pitch"
+              ],
+              "selected_member": "0.0254",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_layout",
+              "authority_version": "v1",
+              "canonical_hash": "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b",
+              "dimension_role": "TUBE_LAYOUT",
+              "evidence_refs": [
+                "evidence-tube_layout"
+              ],
+              "provenance_refs": [
+                "provenance-tube_layout"
+              ],
+              "selected_member": "LAYOUT_30_DEG",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pass_count",
+              "authority_version": "v1",
+              "canonical_hash": "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a",
+              "dimension_role": "TUBE_PASS_COUNT",
+              "evidence_refs": [
+                "evidence-tube_pass_count"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pass_count"
+              ],
+              "selected_member": 1,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_type",
+              "authority_version": "v1",
+              "canonical_hash": "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b",
+              "dimension_role": "BAFFLE_TYPE",
+              "evidence_refs": [
+                "evidence-baffle_type"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_type"
+              ],
+              "selected_member": "SINGLE_SEGMENTAL",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+              "authority_version": "1.0.0",
+              "canonical_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+              "dimension_role": "BAFFLE_CUT",
+              "evidence_refs": [
+                "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+                "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+                "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+                "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+                "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+              ],
+              "provenance_refs": [
+                "HOLDOUT_VALUES_RESELECTED=false",
+                "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+                "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+                "PERFORMANCE_OUTPUT_USED=false",
+                "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+              ],
+              "selected_member": "0.225",
+              "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+              "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1"
+            },
+            {
+              "authority_id": "task168-baffle_spacing",
+              "authority_version": "v1",
+              "canonical_hash": "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84",
+              "dimension_role": "BAFFLE_SPACING",
+              "evidence_refs": [
+                "evidence-baffle_spacing"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_spacing"
+              ],
+              "selected_member": "1.2",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_count",
+              "authority_version": "v1",
+              "canonical_hash": "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe",
+              "dimension_role": "BAFFLE_COUNT",
+              "evidence_refs": [
+                "evidence-baffle_count"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_count"
+              ],
+              "selected_member": 4,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            }
+          ],
+          "shell_geometry_id": "shell-1",
+          "shell_inside_diameter_m": "0.500",
+          "shell_record_hash": "04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e",
+          "tube_layout": "LAYOUT_30_DEG",
+          "tube_length_m": "6.0",
+          "tube_outer_diameter_m": "0.01905",
+          "tube_pass_count": 1,
+          "tube_pitch_m": "0.0254",
+          "tube_wall_thickness_m": "0.00165"
+        },
+        "cut_fraction": "0.225",
+        "identity_replay": "PASS",
+        "label": "H1",
+        "new_hash_differs_from_old": true,
+        "new_id_differs_from_old": true,
+        "old_candidate_hash": "2cd93f9b3b0d245ebeaa1399f8289efb9e41bbf5c28a24bfeb28b14ee6e4d249",
+        "old_candidate_id": "7f00c8d1-6da6-5832-b4cc-8baec8b3795f"
+      },
+      {
+        "candidate_hash": "a30d1b0c01dcd0607bdd46e720a3a278e6b90b265b6bd4f109eb2c1cae58d8c5",
+        "candidate_id": "aa70248a-9f76-542d-bc77-1e935b9c32d4",
+        "candidate_projection": {
+          "authority_bindings": [
+            [
+              "SHELL_GEOMETRY_ID",
+              "task023-test-catalog:shell-1:04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e"
+            ],
+            [
+              "CONSTRUCTION_FAMILY",
+              "task168-construction_family"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "task168-tube_outer_diameter"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "task168-tube_wall_thickness"
+            ],
+            [
+              "TUBE_LENGTH",
+              "task168-tube_length"
+            ],
+            [
+              "TUBE_PITCH",
+              "task168-tube_pitch"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "task168-tube_layout"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "task168-tube_pass_count"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "task168-baffle_type"
+            ],
+            [
+              "BAFFLE_CUT",
+              "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "task168-baffle_spacing"
+            ],
+            [
+              "BAFFLE_COUNT",
+              "task168-baffle_count"
+            ]
+          ],
+          "baffle_count": 4,
+          "baffle_cut_fraction": "0.275",
+          "baffle_spacing_m": "1.2",
+          "baffle_type": "SINGLE_SEGMENTAL",
+          "candidate_hash": "a30d1b0c01dcd0607bdd46e720a3a278e6b90b265b6bd4f109eb2c1cae58d8c5",
+          "candidate_id": "aa70248a-9f76-542d-bc77-1e935b9c32d4",
+          "case_authority_id": "task039-release-demo-001",
+          "construction_family": "FIXED_TUBESHEET",
+          "dimension_authority_bindings": [
+            {
+              "authority_id": "task168-construction_family",
+              "authority_version": "v1",
+              "canonical_hash": "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88",
+              "dimension_role": "CONSTRUCTION_FAMILY",
+              "evidence_refs": [
+                "evidence-construction_family"
+              ],
+              "provenance_refs": [
+                "provenance-construction_family"
+              ],
+              "selected_member": "FIXED_TUBESHEET",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_outer_diameter",
+              "authority_version": "v1",
+              "canonical_hash": "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998",
+              "dimension_role": "TUBE_OUTER_DIAMETER",
+              "evidence_refs": [
+                "evidence-tube_outer_diameter"
+              ],
+              "provenance_refs": [
+                "provenance-tube_outer_diameter"
+              ],
+              "selected_member": "0.01905",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_wall_thickness",
+              "authority_version": "v1",
+              "canonical_hash": "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9",
+              "dimension_role": "TUBE_WALL_THICKNESS",
+              "evidence_refs": [
+                "evidence-tube_wall_thickness"
+              ],
+              "provenance_refs": [
+                "provenance-tube_wall_thickness"
+              ],
+              "selected_member": "0.00165",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_length",
+              "authority_version": "v1",
+              "canonical_hash": "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24",
+              "dimension_role": "TUBE_LENGTH",
+              "evidence_refs": [
+                "evidence-tube_length"
+              ],
+              "provenance_refs": [
+                "provenance-tube_length"
+              ],
+              "selected_member": "6.0",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pitch",
+              "authority_version": "v1",
+              "canonical_hash": "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae",
+              "dimension_role": "TUBE_PITCH",
+              "evidence_refs": [
+                "evidence-tube_pitch"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pitch"
+              ],
+              "selected_member": "0.0254",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_layout",
+              "authority_version": "v1",
+              "canonical_hash": "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b",
+              "dimension_role": "TUBE_LAYOUT",
+              "evidence_refs": [
+                "evidence-tube_layout"
+              ],
+              "provenance_refs": [
+                "provenance-tube_layout"
+              ],
+              "selected_member": "LAYOUT_30_DEG",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pass_count",
+              "authority_version": "v1",
+              "canonical_hash": "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a",
+              "dimension_role": "TUBE_PASS_COUNT",
+              "evidence_refs": [
+                "evidence-tube_pass_count"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pass_count"
+              ],
+              "selected_member": 1,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_type",
+              "authority_version": "v1",
+              "canonical_hash": "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b",
+              "dimension_role": "BAFFLE_TYPE",
+              "evidence_refs": [
+                "evidence-baffle_type"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_type"
+              ],
+              "selected_member": "SINGLE_SEGMENTAL",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+              "authority_version": "1.0.0",
+              "canonical_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+              "dimension_role": "BAFFLE_CUT",
+              "evidence_refs": [
+                "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+                "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+                "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+                "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+                "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+              ],
+              "provenance_refs": [
+                "HOLDOUT_VALUES_RESELECTED=false",
+                "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+                "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+                "PERFORMANCE_OUTPUT_USED=false",
+                "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+              ],
+              "selected_member": "0.275",
+              "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+              "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1"
+            },
+            {
+              "authority_id": "task168-baffle_spacing",
+              "authority_version": "v1",
+              "canonical_hash": "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84",
+              "dimension_role": "BAFFLE_SPACING",
+              "evidence_refs": [
+                "evidence-baffle_spacing"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_spacing"
+              ],
+              "selected_member": "1.2",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_count",
+              "authority_version": "v1",
+              "canonical_hash": "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe",
+              "dimension_role": "BAFFLE_COUNT",
+              "evidence_refs": [
+                "evidence-baffle_count"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_count"
+              ],
+              "selected_member": 4,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            }
+          ],
+          "shell_geometry_id": "shell-1",
+          "shell_inside_diameter_m": "0.500",
+          "shell_record_hash": "04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e",
+          "tube_layout": "LAYOUT_30_DEG",
+          "tube_length_m": "6.0",
+          "tube_outer_diameter_m": "0.01905",
+          "tube_pass_count": 1,
+          "tube_pitch_m": "0.0254",
+          "tube_wall_thickness_m": "0.00165"
+        },
+        "cut_fraction": "0.275",
+        "identity_replay": "PASS",
+        "label": "H2",
+        "new_hash_differs_from_old": true,
+        "new_id_differs_from_old": true,
+        "old_candidate_hash": "c2d8bef2f75801b9a560bc717f8776faea56bf19fbb1c0cadedebc9412a80f46",
+        "old_candidate_id": "96219401-7261-579e-8419-63b1ab7f9d4e"
+      },
+      {
+        "candidate_hash": "b5bcf9258ff1cd455eab071a55cbdce7d8708391d1737e44d3dae2bccdaedb7e",
+        "candidate_id": "f3e14759-e05b-5088-bfb5-b6e16e918267",
+        "candidate_projection": {
+          "authority_bindings": [
+            [
+              "SHELL_GEOMETRY_ID",
+              "task023-test-catalog:shell-1:04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e"
+            ],
+            [
+              "CONSTRUCTION_FAMILY",
+              "task168-construction_family"
+            ],
+            [
+              "TUBE_OUTER_DIAMETER",
+              "task168-tube_outer_diameter"
+            ],
+            [
+              "TUBE_WALL_THICKNESS",
+              "task168-tube_wall_thickness"
+            ],
+            [
+              "TUBE_LENGTH",
+              "task168-tube_length"
+            ],
+            [
+              "TUBE_PITCH",
+              "task168-tube_pitch"
+            ],
+            [
+              "TUBE_LAYOUT",
+              "task168-tube_layout"
+            ],
+            [
+              "TUBE_PASS_COUNT",
+              "task168-tube_pass_count"
+            ],
+            [
+              "BAFFLE_TYPE",
+              "task168-baffle_type"
+            ],
+            [
+              "BAFFLE_CUT",
+              "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1"
+            ],
+            [
+              "BAFFLE_SPACING",
+              "task168-baffle_spacing"
+            ],
+            [
+              "BAFFLE_COUNT",
+              "task168-baffle_count"
+            ]
+          ],
+          "baffle_count": 4,
+          "baffle_cut_fraction": "0.350",
+          "baffle_spacing_m": "1.2",
+          "baffle_type": "SINGLE_SEGMENTAL",
+          "candidate_hash": "b5bcf9258ff1cd455eab071a55cbdce7d8708391d1737e44d3dae2bccdaedb7e",
+          "candidate_id": "f3e14759-e05b-5088-bfb5-b6e16e918267",
+          "case_authority_id": "task039-release-demo-001",
+          "construction_family": "FIXED_TUBESHEET",
+          "dimension_authority_bindings": [
+            {
+              "authority_id": "task168-construction_family",
+              "authority_version": "v1",
+              "canonical_hash": "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88",
+              "dimension_role": "CONSTRUCTION_FAMILY",
+              "evidence_refs": [
+                "evidence-construction_family"
+              ],
+              "provenance_refs": [
+                "provenance-construction_family"
+              ],
+              "selected_member": "FIXED_TUBESHEET",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_outer_diameter",
+              "authority_version": "v1",
+              "canonical_hash": "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998",
+              "dimension_role": "TUBE_OUTER_DIAMETER",
+              "evidence_refs": [
+                "evidence-tube_outer_diameter"
+              ],
+              "provenance_refs": [
+                "provenance-tube_outer_diameter"
+              ],
+              "selected_member": "0.01905",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_wall_thickness",
+              "authority_version": "v1",
+              "canonical_hash": "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9",
+              "dimension_role": "TUBE_WALL_THICKNESS",
+              "evidence_refs": [
+                "evidence-tube_wall_thickness"
+              ],
+              "provenance_refs": [
+                "provenance-tube_wall_thickness"
+              ],
+              "selected_member": "0.00165",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_length",
+              "authority_version": "v1",
+              "canonical_hash": "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24",
+              "dimension_role": "TUBE_LENGTH",
+              "evidence_refs": [
+                "evidence-tube_length"
+              ],
+              "provenance_refs": [
+                "provenance-tube_length"
+              ],
+              "selected_member": "6.0",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pitch",
+              "authority_version": "v1",
+              "canonical_hash": "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae",
+              "dimension_role": "TUBE_PITCH",
+              "evidence_refs": [
+                "evidence-tube_pitch"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pitch"
+              ],
+              "selected_member": "0.0254",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_layout",
+              "authority_version": "v1",
+              "canonical_hash": "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b",
+              "dimension_role": "TUBE_LAYOUT",
+              "evidence_refs": [
+                "evidence-tube_layout"
+              ],
+              "provenance_refs": [
+                "provenance-tube_layout"
+              ],
+              "selected_member": "LAYOUT_30_DEG",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-tube_pass_count",
+              "authority_version": "v1",
+              "canonical_hash": "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a",
+              "dimension_role": "TUBE_PASS_COUNT",
+              "evidence_refs": [
+                "evidence-tube_pass_count"
+              ],
+              "provenance_refs": [
+                "provenance-tube_pass_count"
+              ],
+              "selected_member": 1,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_type",
+              "authority_version": "v1",
+              "canonical_hash": "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b",
+              "dimension_role": "BAFFLE_TYPE",
+              "evidence_refs": [
+                "evidence-baffle_type"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_type"
+              ],
+              "selected_member": "SINGLE_SEGMENTAL",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+              "authority_version": "1.0.0",
+              "canonical_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+              "dimension_role": "BAFFLE_CUT",
+              "evidence_refs": [
+                "APPROVAL_SCOPE::IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+                "BLOCKED_QUALIFICATION_HEAD::5f6a6aa4669cc54764255820856436917aa047eb",
+                "HOLDOUT_SELECTION_SHA256::f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+                "QUALIFICATION_LEDGER_SHA256::aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+                "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json"
+              ],
+              "provenance_refs": [
+                "HOLDOUT_VALUES_RESELECTED=false",
+                "OLD_CANDIDATE_HASH_RECOVERY_ATTEMPTED=false",
+                "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+                "PERFORMANCE_OUTPUT_USED=false",
+                "SAME_PRESELECTED_GEOMETRY_VALUE_DIFFERENT_VALIDATION_AUTHORITY_IDENTITY"
+              ],
+              "selected_member": "0.350",
+              "source_class": "OWNER_APPROVED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "V07-T173-ATTEMPT4-FROZEN-HOLDOUT-SELECTION",
+              "source_revision": "HOLDOUT-SELECTION-F2DE04AE8CA31A0F-R1"
+            },
+            {
+              "authority_id": "task168-baffle_spacing",
+              "authority_version": "v1",
+              "canonical_hash": "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84",
+              "dimension_role": "BAFFLE_SPACING",
+              "evidence_refs": [
+                "evidence-baffle_spacing"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_spacing"
+              ],
+              "selected_member": "1.2",
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            },
+            {
+              "authority_id": "task168-baffle_count",
+              "authority_version": "v1",
+              "canonical_hash": "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe",
+              "dimension_role": "BAFFLE_COUNT",
+              "evidence_refs": [
+                "evidence-baffle_count"
+              ],
+              "provenance_refs": [
+                "provenance-baffle_count"
+              ],
+              "selected_member": 4,
+              "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+              "source_id": "task168-project-snapshot",
+              "source_revision": "v1"
+            }
+          ],
+          "shell_geometry_id": "shell-1",
+          "shell_inside_diameter_m": "0.500",
+          "shell_record_hash": "04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e",
+          "tube_layout": "LAYOUT_30_DEG",
+          "tube_length_m": "6.0",
+          "tube_outer_diameter_m": "0.01905",
+          "tube_pass_count": 1,
+          "tube_pitch_m": "0.0254",
+          "tube_wall_thickness_m": "0.00165"
+        },
+        "cut_fraction": "0.350",
+        "identity_replay": "PASS",
+        "label": "H3",
+        "new_hash_differs_from_old": true,
+        "new_id_differs_from_old": true,
+        "old_candidate_hash": "e2915b5e4d33fd7a7e8732b85b5786cff56bb43e27419fae9fdbed4c6c1a66c7",
+        "old_candidate_id": "cc7f25e1-d0fe-5bdb-b2b7-a9d9ec94173e"
+      }
+    ],
+    "first_blocker": {
+      "candidate_label": "H1",
+      "candidate_id": "68a99368-a518-5482-b9df-4bc3357edea9",
+      "candidate_hash": "bd0da145a592652e55a6fc8cd325a98d6f1cf349ed74b98e811d1343ce62ed54",
+      "cut_fraction": "0.225",
+      "stage": "TASK174_CANDIDATE_HYDRAULIC_CLOSURE",
+      "code": "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+      "task174_result_hash": "d571113080dc77b1e2d2f3cb3adaf988988e5fb5a87c8cc9f74e117a3f93169c",
+      "task029": {
+        "status": "VALIDATED_BY_TASK174_TUBE_COMPLETENESS_PREDICATE",
+        "result_id": "3f91be3b-ee51-55af-a895-afe92e254b6d",
+        "result_hash": "3302494a91e0d4a3c98b3e80543d13b0e28fc33e8c5c6e0b8e5bf055ab88bd71",
+        "modeled_total_tube_dp_pa": "8.878"
+      },
+      "bell": {
+        "task166_result_id": "5311eb46-6dda-5626-860c-ed53cc5333b7",
+        "task166_result_hash": "08e783c2405569924fbcc1a32f643eae8ad0277d5fe97b32aaaf0f56b12cd9d5",
+        "central_crossflow_pa": "27.612207774183460206836230814703264766375478974330",
+        "window_pa": "630.07134795775369108954073760345441625294093406455",
+        "inlet_end_zone_pa": "14.727938435732309429703959554309365007532140748327",
+        "outlet_end_zone_pa": "14.727938435732309429703959554309365007532140748327",
+        "exact_region_sum_pa": "687.13943260340177015578488752677641103438069453554",
+        "native_total_shell_dp_pa": "687.13943260340177015578488752677641103438069453553",
+        "exact_difference_pa": "1E-47",
+        "arithmetic_context": "engineering_context() used by TASK174 candidate event-ledger predicate",
+        "physical_event_count": 19,
+        "allocation_count": 19,
+        "event_ids_equal_allocation_ids": true,
+        "all_allocations_bind_candidate_task166_and_task024_native_geometry": true,
+        "native_task166_identity_valid": true,
+        "task174_exact_ledger_predicate": false
+      },
+      "task171": {
+        "status": "VALIDATED",
+        "topology_id": "urn:hxforge:task171:8c41be568cb899d07417420864a437929ef3c63633ac6205b6afea83efcb232e",
+        "result_hash": "8c41be568cb899d07417420864a437929ef3c63633ac6205b6afea83efcb232e",
+        "mesh_identity": "a9619ffe89e3a92d93f0c17e235764c79c3ba4532198a4389708191530584673",
+        "physical_ownership_hash": "997e8d6d40d2762b413561794ea58dff9739be2b13ae89b8b728098522ef8af7",
+        "event_count": 19
+      },
+      "native_geometry": {
+        "task020_configuration_id": "559ce83b-4e4e-55ab-a913-8be103736600",
+        "task020_configuration_hash": "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298",
+        "task021_layout_id": "c5355c87-57b4-5fe6-95f9-d220f8a86823",
+        "task021_layout_hash": "e9ef8e1b2f148a4cdd342602fdea0c1b4521d925c196658e69ea7a4e03637320",
+        "physical_tube_count": 253,
+        "tube_pass_count": 1,
+        "task022_geometry_id": "3b2fe990-74cb-59c2-982a-1b7c8300f682",
+        "task022_geometry_hash": "1db38324e0922e204185e1883d110675501d940d49979fdec226dd54975ed1f2",
+        "task024_geometry_id": "b22d37dd-c9f2-5688-9ca0-fac1c9a13e1a",
+        "task024_geometry_hash": "e329cf6772c8293a7fa911b9f337441e92736b3b8623ae2dd328eb0731d1fd8d",
+        "task025_result_id": "900b6c41-a2f9-5687-bdf4-32bc86797d40",
+        "task025_result_hash": "a677ebc6433ea93255559058b0993ea8cf12ba6218c8c010891034e751aa0e93",
+        "task025_hydraulic_diameter_m": "0.01575000",
+        "task025_parallel_flow_area_m2": "0.0492914415",
+        "task031_geometry_id": "2eb1f46a-5fec-5406-8357-f7f0e0efc42c",
+        "task031_geometry_hash": "1324b89026b186ba4099b0f4df7488726d284f534e346ada6575e65955b7f23a"
+      },
+      "c3_preflight": {
+        "flow_regime": "TURBULENT",
+        "reynolds_number": "4491.2103",
+        "prandtl_number": "5.8559",
+        "correlation_id": "tube_turbulent_gnielinski",
+        "pr_envelope": "PASS"
+      },
+      "bell_reconciliation_tolerance_changed": false
+    },
+    "holdout_resume": {
+      "holdout_values_reselected": false,
+      "old_hash_recovery_attempted": false,
+      "training_diagnostics_run": false,
+      "h1_structural_qualification": "PRE_RATING_PASS_TASK024_TASK025_TASK031_TASK166_TASK171_C3; TASK174_BLOCKED",
+      "h2_structural_qualification": "NOT_RUN_STOPPED_ON_H1_TASK174_BLOCKER",
+      "h3_structural_qualification": "NOT_RUN_STOPPED_ON_H1_TASK174_BLOCKER",
+      "training_n1_enclosure_qualification": "NOT_RUN_STOPPED_ON_H1_TASK174_BLOCKER",
+      "holdout_n1_enclosure_qualification": "NOT_RUN_STOPPED_ON_H1_TASK174_BLOCKER",
+      "reference_n1_diagnostic": "NOT_RUN_STOPPED_ON_H1_TASK174_BLOCKER",
+      "authority_candidate_issued": false,
+      "enclosure_authority_hash": null,
+      "uncertainty_propagation_replay": "NOT_RUN"
+    },
+    "result": "BLOCKED_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_QUALIFICATION",
+    "stop": true,
+    "next_gate": "OWNER_DIRECTION_REQUIRED_AFTER_REBOUND_H1_TASK174_BLOCKER"
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "point_root_tolerance_changed": false,
+    "task172_acceptance_changed": false,
+    "property_backend_changed": false,
+    "mesh_threshold_changed": false,
+    "resource_cap_changed": false,
+    "reference_rating_reexecuted": false,
+    "candidate_rating_executed": false,
+    "sizing_executed": false,
+    "production_mesh_reexecuted": false,
+    "task175_release_acceptance_performed": false
+  },
+  "commit": null,
+  "ci": null,
+  "next_gate": "OWNER_DIRECTION_REQUIRED_AFTER_REBOUND_H1_TASK174_BLOCKER",
+  "next_gate_executed": false,
+  "stop": true
+}
