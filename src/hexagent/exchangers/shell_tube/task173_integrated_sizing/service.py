@@ -39,6 +39,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating import (
     candidate_rating_result_hash,
     validate_candidate_rating,
 )
+from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+    service as task173_rating_service,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.candidate_materialization import (
     materialize_candidate_task171,
 )
@@ -121,6 +124,16 @@ def sizing_requirement_projection(authority: SizingRequirementAuthority) -> dict
 
 def recompute_sizing_requirement_hash(authority: SizingRequirementAuthority) -> str:
     return canonical_sha256(sizing_requirement_projection(authority))
+
+
+def _candidate_rating_request_json_projection(
+    request: CandidateRatingRequest,
+) -> dict[str, Any]:
+    """Serialize native-only values at the candidate provenance boundary."""
+    return request.model_dump(
+        mode="json",
+        fallback=task173_rating_service._candidate_json_fallback,
+    )
 
 
 def sizing_request_hash(request: Task173SizingRequest) -> str:
@@ -1074,9 +1087,9 @@ def validate_sizing_request(
                     ("R2A_CANDIDATE_RATING_REQUEST_HASH", rating_request_hash),
                     (
                         "R2A_CANDIDATE_RATING_REQUEST_PROJECTION",
-                        canonical_json_bytes(rating_request.model_dump(mode="json")).decode(
-                            "utf-8"
-                        ),
+                        canonical_json_bytes(
+                            _candidate_rating_request_json_projection(rating_request)
+                        ).decode("utf-8"),
                     ),
                     ("R2A_CANDIDATE_RATING_RESULT_HASH", rating_outcome.result_hash),
                     (

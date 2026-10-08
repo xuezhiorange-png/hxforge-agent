@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 from copy import deepcopy
 from dataclasses import replace
 from decimal import Decimal
@@ -11,8 +12,9 @@ from typing import Any
 
 import pytest
 from pydantic import ValidationError
+from pydantic_core import PydanticSerializationError
 
-from hexagent.canonical_json import canonical_sha256
+from hexagent.canonical_json import canonical_json_bytes, canonical_sha256
 from hexagent.exchangers.shell_tube.bell_delaware import canonical as task166_canonical
 from hexagent.exchangers.shell_tube.bell_delaware.models import Task166Result
 from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168
@@ -60,6 +62,10 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
 )
 from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     validate_candidate_request as validate_candidate_task174,
+)
+from hexagent.exchangers.shell_tube.tube_side.owned_enums import (
+    ReferencePlanePair,
+    ReferencePlaneToken,
 )
 from hexagent.release_demo.v0_4 import task039
 from tests.exchangers.shell_tube.test_task168_manufacturable_candidates import (
@@ -815,7 +821,73 @@ def test_candidate_task174_native_path_accepts_frozen_r2_authority_bindings() ->
         sizing_request_hash(request),
     )
     assert rating_request.request_metadata
-    assert candidate_rating_request_hash(rating_request)
+    frozen_rating_request_hash = candidate_rating_request_hash(rating_request)
+    assert frozen_rating_request_hash
+
+    # Reproduce the original integration failure on the same native request.
+    with pytest.raises(PydanticSerializationError, match="ReferencePlanePair"):
+        rating_request.model_dump(mode="json")
+
+    request_projection = sizing._candidate_rating_request_json_projection(rating_request)
+    request_projection_bytes = canonical_json_bytes(request_projection)
+    replayed_projection = json.loads(request_projection_bytes)
+    assert replayed_projection == request_projection
+    assert (
+        canonical_json_bytes(sizing._candidate_rating_request_json_projection(rating_request))
+        == request_projection_bytes
+    )
+    assert candidate_rating_request_hash(rating_request) == frozen_rating_request_hash
+
+    def collect_pair_projections(value: Any) -> list[dict[str, str]]:
+        if isinstance(value, dict):
+            if value.get("__task173_type__") == "ReferencePlanePair":
+                return [value]
+            return [pair for child in value.values() for pair in collect_pair_projections(child)]
+        if isinstance(value, list):
+            return [pair for child in value for pair in collect_pair_projections(child)]
+        return []
+
+    pair_projections = collect_pair_projections(request_projection)
+    task025_result = rating_request.task025_result
+    expected_pairs = (
+        task025_result.internal_flow_authority.start_plane,
+        task025_result.internal_flow_authority.end_plane,
+        task025_result.heat_transfer_authority.start_plane,
+        task025_result.heat_transfer_authority.end_plane,
+    )
+    assert all(type(pair) is ReferencePlanePair for pair in expected_pairs)
+    assert {
+        (pair["start"], pair["end"])
+        for pair in pair_projections
+        if pair.get("__task173_type__") == "ReferencePlanePair"
+    } >= {(pair.start.value, pair.end.value) for pair in expected_pairs}
+
+    def restore_pair_projections(value: Any) -> Any:
+        if isinstance(value, dict) and value.get("__task173_type__") == "ReferencePlanePair":
+            return ReferencePlanePair(
+                ReferencePlaneToken(value["start"]), ReferencePlaneToken(value["end"])
+            )
+        if isinstance(value, dict):
+            return {key: restore_pair_projections(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [restore_pair_projections(child) for child in value]
+        return value
+
+    def reproject_pairs(value: Any) -> Any:
+        if type(value) is ReferencePlanePair:
+            return rating_service._candidate_json_fallback(value)
+        if isinstance(value, dict):
+            return {key: reproject_pairs(child) for key, child in value.items()}
+        if isinstance(value, list):
+            return [reproject_pairs(child) for child in value]
+        return value
+
+    assert reproject_pairs(restore_pair_projections(replayed_projection)) == request_projection
+
+    unsupported_request = rating_request.model_copy(update={"task025_result": object()})
+    with pytest.raises(TypeError, match="unhandled candidate provenance JSON value"):
+        sizing._candidate_rating_request_json_projection(unsupported_request)
+
     rating_context = rating_service._candidate_context(rating_request)
     assert rating_context.shell_authority.task031_geometry is bundle.task031_geometry
     assert rating_context.shell_authority.task166_result is bundle.task166_result
