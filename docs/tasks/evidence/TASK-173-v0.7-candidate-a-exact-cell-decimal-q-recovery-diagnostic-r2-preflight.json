@@ -1,0 +1,66 @@
+{
+  "blocked_fixture_hash": "2c9d60c181467da464027cb75f0d4f2723ee1c3fe0b99b34293c3969e06ff757",
+  "canonical_evidence_hash": "c18ee5d397c2d0b081c99e0c613402c67681a07a471d7e84bbaec2865be28c84",
+  "checks": {
+    "CHECKPOINT_EXCEPTION_RECOVERY": "PASS",
+    "DECIMAL_PROBE_BLOCKED_RESULT_TEST": "PASS",
+    "OBSERVER_BLOCKED_RESULT_TEST": "PASS",
+    "OBSERVER_EXCEPTION_RECOVERY": "PASS",
+    "OBSERVER_VALID_RESULT_TEST": "PASS",
+    "PRODUCTION_CODE_CHANGED": "false",
+    "R1_FROZEN_IDENTITIES_PRESERVED": "PASS",
+    "UNKNOWN_TYPE_FAIL_CLOSED": "PASS"
+  },
+  "execution_start_head": "2348b977e71d8f88f4107fceab35392962f8aa92",
+  "fixture_request_hash": "14f5496a3d8312b5373b79728666a0524ae38cb6a6991cfc745c70ce64d053c9",
+  "fixture_result_hash": "d65595ab5c1ef9414e6204ef8ee2f439db50f10b26021382f78503dc1f96e18b",
+  "frozen_identity_facts": {
+    "blocked_result_hash": "daf0f61109676d50e9dac2c1d5ceb9afb206b232bc039fc0253f5b1ecdba774c",
+    "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "candidate_receipt_sha256": "80e4648a91d1da2798dc608252a1a67111f1248711b8595343ab8c0739705b42",
+    "completion_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+    "completion_request_replay": [
+      "STRICT_NATIVE_PYTHON_REQUEST_VALIDATION=PASS",
+      "R4_BAFFLE_CUT_AUTHORITY_REPLAY=PASS",
+      "TASK168_REQUEST_CANONICAL_PREIMAGE_REPLAY=PASS",
+      "TASK168_REQUEST_HASH_REPLAY=PASS",
+      "R4_NATIVE_TASK168_CANDIDATE_SPACE_REPLAY=PASS",
+      "R4_NATIVE_CANDIDATE_IDENTITIES_REPLAY=PASS",
+      "COMPLETION_REQUIREMENT_HASH_REPLAY=PASS",
+      "SIZING_IDENTITY_CANONICAL_PREIMAGE_REPLAY=PASS",
+      "COMPLETION_SIZING_REQUEST_HASH_REPLAY=PASS",
+      "ALL_COMPLETION_REQUEST_REPLAY_PASS=true"
+    ],
+    "legacy_r1_failure_replay": [
+      "DIAGNOSTIC_ATTEMPT_RECEIPT_HASH_REPLAY=PASS",
+      "EXACT_TARGET_CELL_EVIDENCE_REPLAY=NOT_ESTABLISHED",
+      "DECIMAL_Q_PROBE_COUNT=0"
+    ],
+    "r1_diagnostic_evidence_sha256": "c82affab1b16d11c7e8af07e183b70125b1adefba056a9ad4ca9f1ef73504237",
+    "reviewed_r2a_authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+    "runtime_binding": {
+      "bound_runtime_worktree_clean": true,
+      "current_head": "2348b977e71d8f88f4107fceab35392962f8aa92",
+      "current_tree": "f6b25dd9078f0637c14797089d6fd3354b26a3e1",
+      "runtime_paths_byte_identical": true,
+      "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+      "runtime_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952"
+    },
+    "task168_candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea"
+  },
+  "full_candidate_rating_invoked": false,
+  "numeric_solver_invoked": false,
+  "preflight_fixture_provenance": {
+    "blocked_result_fixture": "native Task172BlockedResult constructed without solver",
+    "numeric_solver_invoked": false,
+    "valid_request_factory": "tests.exchangers.shell_tube.test_task172_local_runtime._request",
+    "valid_result_model_type": "Task172LocalResult",
+    "valid_result_source": "committed R2A Task172 result projection; rebound only to the test-native request hash and rehashed with the native Task172 result hash function",
+    "valid_result_status": "VALIDATED"
+  },
+  "preflight_only": true,
+  "preflight_result": "PASS",
+  "public_sizing_invoked": false,
+  "schema_version": "task173.decimal-q-diagnostic-r2-preflight.v1",
+  "task_id": "STAGE3_TASK173_DECIMAL_DIAGNOSTIC_RUNNER_HARDENING_AND_CONDITIONAL_R2_EXECUTION"
+}
