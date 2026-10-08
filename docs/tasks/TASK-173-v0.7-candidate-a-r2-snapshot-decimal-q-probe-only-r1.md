@@ -79,14 +79,14 @@ Thus `WITHIN_R3_DETERMINISTIC_REQUEST_RESULT_REPLAY=PASS`, but `CROSS_R2_TO_R3_D
 | R3 artifact | Bytes | SHA-256 / canonical identity |
 |---|---:|---|
 | probe-only runner (`...r1.py`) | 78,436 | SHA-256 `266a274f5528733cac2279ceacfc1b7b1dd71af00fcc380055f77a8f708f92ef` |
-| standalone replay runner (`...r1-replay.py`) | 12,973 | SHA-256 `c9eacaec954249daddaad07b125ca1bc89ec352b7c997f195d8b13e81c637b79` |
+| standalone replay runner (`...r1-replay.py`) | 14,732 | SHA-256 `db50785f5d0c2be825ddc5171a04ce1cb564be3449d38a02600c7b8be980dc39` |
 | preflight receipt (`...preflight-r3.json`) | 1,832,241 | raw SHA-256 `40ce7915d950be3d036d9f7c4a44c162046dc8cd52fa42118accd741f1134cde`; canonical hash `61b90171fe32902244421b2cb36a42ccedec55f1a8c66467974b2be05f12b92a` |
 | probe execution receipt (`...r1.json`) | 15,785,230 | raw SHA-256 `1c325d57ddbd30282851d84a87aac358beae38fb146989d1d10c62119ebde8ac`; canonical hash `1e6b545eed5080b15b70143d33dc5f2fdd1e940e2d1298aab70bc6da6f441538` |
 | R3 checkpoint | 300,630 | SHA-256 `4a58fd20b67ae3b153eb68c94dff6eb9f57e69bff1bb288f8187e923f4ddfdb9` |
 | R3 append-only trace (912 events) | 18,810,685 | SHA-256 `a7b06777c05c73fc4be8cef053709356bed3b775c3c4dc53763c3959a4974ce4` |
 | standalone replay receipt (`...replay-r2.json`) | 6,766 | raw SHA-256 `a6cc2da4c2451c4e7826074a355e5253c3cce92d5ea663f4e0bcb642d52437a2`; canonical hash `47d8fc754131323cc63912a93b1bf1da3db8c593c5a6b007ecc56791214fcd06` |
 
-The final standalone replay revalidated the frozen completion request, raw R2 receipt hashes, all 749 target identities, original endpoints, all 65 probe request/result hashes, provider snapshot hashes, and R3 checkpoint/trace identity. It explicitly records the cross-run result discrepancy rather than conflating it with within-R3 stability.
+The final standalone replay revalidated the frozen completion request, raw R2 receipt hashes, all 749 target identities, original endpoints, all 65 probe request/result hashes, provider snapshot hashes, and R3 checkpoint/trace identity. It explicitly records the cross-run result discrepancy rather than conflating it with within-R3 stability. The receipt preserves its original replay HEAD (`bfe4566…`); the verifier accepts a later evidence-only descendant only after checking ancestry, frozen runtime tree, byte-identical bound runtime paths, and a clean bound worktree. This was exercised from HEAD `5674907629a1710adec5756ad374364dad0a4a7c` and reported `R3_EVIDENCE_DESCENDANT_RUNTIME_BINDING=PASS` without calling Task172.
 
 Reproduction of the evidence-only checks:
 

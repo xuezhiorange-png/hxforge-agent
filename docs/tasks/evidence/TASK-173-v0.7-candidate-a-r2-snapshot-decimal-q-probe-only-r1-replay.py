@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -242,17 +243,49 @@ def main() -> None:
     actual = _build_replay_receipt()
     if args.write_receipt:
         _write_once(REPLAY_RECEIPT_PATH, actual)
+        receipt_hash = actual["canonical_replay_receipt_hash"]
     else:
         expected = json.loads(REPLAY_RECEIPT_PATH.read_text(encoding="utf-8"))
         recorded_hash = expected.pop("canonical_replay_receipt_hash", None)
         if canonical_sha256(expected) != recorded_hash:
             raise RuntimeError("committed R3 replay receipt canonical hash mismatch")
-        expected["canonical_replay_receipt_hash"] = recorded_hash
-        if expected != actual:
+        recorded_head = expected["replay_head"]
+        verified_head = actual["replay_head"]
+        if recorded_head != actual["start_head"]:
+            raise RuntimeError("replay receipt is not anchored to the R3 execution HEAD")
+        ancestry = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", recorded_head, verified_head],
+            cwd=ROOT,
+            check=False,
+        )
+        if ancestry.returncode:
+            raise RuntimeError(
+                "current replay HEAD is not a descendant of the recorded replay HEAD"
+            )
+        recorded_binding = expected["runtime_source_binding"]
+        verified_binding = actual["runtime_source_binding"]
+        if (
+            verified_binding["runtime_source_head"] != recorded_binding["runtime_source_head"]
+            or verified_binding["runtime_source_tree"] != recorded_binding["runtime_source_tree"]
+            or not verified_binding["runtime_paths_byte_identical"]
+            or not verified_binding["bound_runtime_worktree_clean"]
+        ):
+            raise RuntimeError("evidence descendant runtime binding differs from replay receipt")
+        comparable = dict(actual)
+        comparable["replay_head"] = recorded_head
+        comparable_binding = dict(verified_binding)
+        comparable_binding["current_head"] = recorded_binding["current_head"]
+        comparable_binding["current_tree"] = recorded_binding["current_tree"]
+        comparable["runtime_source_binding"] = comparable_binding
+        comparable.pop("canonical_replay_receipt_hash", None)
+        if comparable != expected or canonical_sha256(comparable) != recorded_hash:
             raise RuntimeError("R3 replay receipt differs from regenerated replay")
+        receipt_hash = recorded_hash
     print("R2_SNAPSHOT_REHYDRATION=PASS")
     print("R3_EVIDENCE_REPLAY=PASS")
     print("ALL_COMPLETION_AND_PROBE_IDENTITIES_REPLAY=PASS")
+    print("R3_EVIDENCE_DESCENDANT_RUNTIME_BINDING=PASS")
+    print(f"REPLAY_VERIFIED_HEAD={actual['replay_head']}")
     print(f"DECIMAL_Q_PROBE_COUNT={actual['execution_summary']['decimal_q_probe_count']}")
     print(f"NEW_TASK172_VALIDATION_COUNT={actual['execution_summary']['task172_validation_count']}")
     print(f"MIN_ABS_F_W={actual['execution_summary']['min_abs_f_w']}")
@@ -268,7 +301,7 @@ def main() -> None:
         f"{actual['same_request_r2_right_vs_r3_probe']['classification']}"
     )
     print(f"REPLAY_RECEIPT={REPLAY_RECEIPT_PATH.relative_to(ROOT)}")
-    print(f"REPLAY_RECEIPT_HASH={actual['canonical_replay_receipt_hash']}")
+    print(f"REPLAY_RECEIPT_HASH={receipt_hash}")
 
 
 if __name__ == "__main__":
