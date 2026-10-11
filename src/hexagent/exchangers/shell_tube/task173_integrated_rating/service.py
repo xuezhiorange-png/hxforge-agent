@@ -65,6 +65,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     PRODUCTION_MESH_PROFILE_AUTHORITY_ID,
     REFERENCE_PRESSURE_PA,
     REVIEWED_MESH_SEQUENCE,
+    TASK173_COOLPROP_CACHE_SIZE,
     T_MAX_K,
     T_MIN_K,
     TERMINAL_TOLERANCE_K,
@@ -104,6 +105,21 @@ from hexagent.properties.base import (
     ReferenceStatePolicy,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
+
+
+def default_task173_coolprop_provider() -> CoolPropProvider:
+    """Shared CoolProp instance policy for TASK173 mesh / rating workloads."""
+    return CoolPropProvider(cache_size=TASK173_COOLPROP_CACHE_SIZE)
+
+
+def _mesh_sequence_provider_factory(
+    provider: PropertyProvider | None,
+) -> Callable[[], PropertyProvider]:
+    """Reuse one default provider across the reviewed mesh sequence (cache warmth)."""
+    if provider is not None:
+        return lambda: provider
+    shared = default_task173_coolprop_provider()
+    return lambda: shared
 
 
 def _candidate_json_fallback(value: Any) -> Any:
@@ -3876,7 +3892,7 @@ def validate_request(
         request_hash = recompute_task173_request_hash(parsed)
         shell_authority, task174, replay = _validate_reference_input(parsed)
         runs, comparisons, candidate_index, headroom_index = _run_mesh_sequence(
-            (lambda: provider) if provider is not None else CoolPropProvider,
+            _mesh_sequence_provider_factory(provider),
             shell_authority,
         )
         if candidate_index is None or headroom_index is None:
@@ -3950,7 +3966,9 @@ def validate_candidate_rating(
         token = _CANDIDATE_RATING_CONTEXT.set(context)
         if provider is not None and type(provider) is not CoolPropProvider:
             raise _Stage3Failure("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH")
-        active_provider = provider if provider is not None else CoolPropProvider()
+        active_provider = (
+            provider if provider is not None else default_task173_coolprop_provider()
+        )
         runs, comparisons, candidate_index, headroom_index = _run_mesh_sequence(
             lambda: active_provider, context.shell_authority
         )

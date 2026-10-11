@@ -21,6 +21,10 @@ ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID: Final = (
 )
 PRODUCTION_MESH_PROFILE_AUTHORITY_ID: Final = "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1"
 REVIEWED_MESH_SEQUENCE = (1, 2, 4, 8, 16, 32, 64)
+
+# Execution-only: larger LRU retains repeated CoolProp states across mesh / cell work.
+# Does not alter query semantics or accepted numerical results.
+TASK173_COOLPROP_CACHE_SIZE = 2048
 H_MIN_J_KG = Decimal("104920.11980926784")
 H_MAX_J_KG = Decimal("112654.89965462626")
 T_MIN_K = Decimal("298.15")

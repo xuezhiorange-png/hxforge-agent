@@ -1,0 +1,12 @@
+{
+  "task_id": "V07_TASK173_SIZING_PERFORMANCE_RECOVERY_R1",
+  "label": "optimized-v2",
+  "timeout_s": 30.0,
+  "benchmark_script": "/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py",
+  "started_at_utc": "20261011T232624Z",
+  "status": "PASS",
+  "wall_seconds": 32.561335090000284,
+  "returncode": 0,
+  "raw_result_path": "/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-optimized-v2-20261011T232624Z.json",
+  "raw_result_sha256": "5b174ae478ef0394e8aeedc965c8f6143baecd90c478ec91a5d2fc36d44cf205"
+}

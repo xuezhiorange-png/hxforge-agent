@@ -1,0 +1,49 @@
+{
+  "attempt3_final_result": "NONE \u2014 user-terminated Mac Attempt 3; not numerical evidence",
+  "ended_at_epoch_s": 1791761217.0454397,
+  "environment": {
+    "coolprop": "8.0.0",
+    "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "samples": [
+    {
+      "baseline": {
+        "cache_hits": 26,
+        "cache_misses": 18,
+        "pattern": "new CoolPropProvider(cache_size=256) per mesh step",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "wall_seconds": 0.3304709730000468
+      },
+      "engineering_hash_match": true,
+      "mesh_steps": 7,
+      "optimized": {
+        "cache_hits": 290,
+        "cache_misses": 18,
+        "pattern": "shared provider via _mesh_sequence_provider_factory (cache_size=2048)",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "wall_seconds": 0.24348094500055595
+      },
+      "scenario": "task172_validate_request_x_mesh_steps",
+      "speedup_ratio": 1.3572765334851655
+    },
+    {
+      "cache_hits": 0,
+      "cache_max_size": 2048,
+      "cache_misses": 0,
+      "cache_size": 0,
+      "replay_status": "PASS",
+      "scenario": "task173_native_shell_flow_replay",
+      "wall_seconds": 0.13876916699882713
+    },
+    {
+      "notes": "Thread still running at budget; no numerical failure inferred",
+      "scenario": "task173_solve_outer_boundary_subdivisions_1",
+      "status": "TIMEOUT",
+      "timeout_budget_s": 29.23893404006958,
+      "wall_seconds": 29.25357945399992
+    }
+  ],
+  "task_id": "V07_TASK173_SIZING_PERFORMANCE_RECOVERY_R1",
+  "total_wall_seconds": 30.017791509628296
+}
