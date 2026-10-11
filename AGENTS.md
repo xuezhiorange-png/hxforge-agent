@@ -5,11 +5,12 @@ This repository contains engineering calculation software. Treat every numerical
 ## Mandatory workflow
 
 1. Read `docs/MASTER_DEVELOPMENT_SPEC.md`.
-2. Work from one GitHub Issue.
-3. State the files, assumptions and test plan before editing.
-4. Add or update tests before changing an engineering equation.
-5. Run all quality gates before requesting review.
-6. Never change golden results without an explicit explanation.
+2. For Cursor Cloud runs: read `docs/CURSOR_CLOUD_PERSISTENCE.md`, append `docs/HXFORGE_RESULT_INDEX.jsonl` after push, return the delivery block in §六.
+3. Work from one GitHub Issue.
+4. State the files, assumptions and test plan before editing.
+5. Add or update tests before changing an engineering equation.
+6. Run all quality gates before requesting review.
+7. Never change golden results without an explicit explanation.
 
 ## Engineering constraints
 
