@@ -1,0 +1,111 @@
+{
+  "attempt3_final_result": "NONE",
+  "r1_impact": {
+    "candidate_rating_validate_candidate_rating": {
+      "after_r1": "same sharing; default cache_size 256\u21922048 via default_task173_coolprop_provider",
+      "before_r1": "single active_provider + lambda factory (already shared per rating call)",
+      "r1_behavior_change": "cache_capacity_only"
+    },
+    "reference_rating_validate_request": {
+      "after_r1": "_mesh_sequence_provider_factory \u2192 one shared default provider per call",
+      "before_r1": "provider_factory=CoolPropProvider \u2192 new instance per mesh step",
+      "r1_behavior_change": true
+    }
+  },
+  "sections": [
+    {
+      "budget_s": 60.0,
+      "cache_size": 2048,
+      "call_counters": {
+        "_candidate_transient_outer_boundary": 3
+      },
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "coolprop_cache": {
+        "cumulative_cache_entries": 0,
+        "cumulative_cache_hits": 0,
+        "cumulative_cache_misses": 0,
+        "provider_instance_count": 1
+      },
+      "cprofile_top": null,
+      "diagnostic_wall_seconds": 0.0006138839999039192,
+      "error": "_Stage3Failure: BLOCKED_CANDIDATE_RATING_CONTEXT_MISSING",
+      "notes": "TIMEOUT means diagnostic budget exhausted, not BLOCKED/FAIL engineering outcome",
+      "path": "candidate_rating._candidate_transient_outer_boundary",
+      "peak_tracemalloc_bytes": null,
+      "rating_solve_completed": false,
+      "request_build_wall_seconds": 1.9346966140001314,
+      "status": "FAIL",
+      "task172_local_evaluation_count": 0,
+      "task172_numerical_hole_count": 0,
+      "task173_sizing_complete": false
+    },
+    {
+      "cumulative_cache_method": "sum(cache_info) over provider instances created in run",
+      "peak_tracemalloc_bytes": {
+        "cache_2048": null,
+        "cache_256": null
+      },
+      "samples": [
+        {
+          "budget_s": 25.0,
+          "cache_size": 256,
+          "call_counters": {
+            "_candidate_transient_outer_boundary": 2
+          },
+          "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "coolprop_cache": {
+            "cumulative_cache_entries": 0,
+            "cumulative_cache_hits": 0,
+            "cumulative_cache_misses": 0,
+            "provider_instance_count": 1
+          },
+          "cprofile_top": null,
+          "diagnostic_wall_seconds": 0.0006574369999725604,
+          "error": "_Stage3Failure: BLOCKED_CANDIDATE_RATING_CONTEXT_MISSING",
+          "notes": "TIMEOUT means diagnostic budget exhausted, not BLOCKED/FAIL engineering outcome",
+          "path": "candidate_rating._candidate_transient_outer_boundary",
+          "peak_tracemalloc_bytes": null,
+          "rating_solve_completed": false,
+          "request_build_wall_seconds": 1.6531306779997976,
+          "status": "FAIL",
+          "task172_local_evaluation_count": 0,
+          "task172_numerical_hole_count": 0,
+          "task173_sizing_complete": false
+        },
+        {
+          "budget_s": 25.0,
+          "cache_size": 2048,
+          "call_counters": {
+            "_candidate_transient_outer_boundary": 1
+          },
+          "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "coolprop_cache": {
+            "cumulative_cache_entries": 0,
+            "cumulative_cache_hits": 0,
+            "cumulative_cache_misses": 0,
+            "provider_instance_count": 1
+          },
+          "cprofile_top": null,
+          "diagnostic_wall_seconds": 0.0006242439994821325,
+          "error": "_Stage3Failure: BLOCKED_CANDIDATE_RATING_CONTEXT_MISSING",
+          "notes": "TIMEOUT means diagnostic budget exhausted, not BLOCKED/FAIL engineering outcome",
+          "path": "candidate_rating._candidate_transient_outer_boundary",
+          "peak_tracemalloc_bytes": null,
+          "rating_solve_completed": false,
+          "request_build_wall_seconds": 1.783355240999299,
+          "status": "FAIL",
+          "task172_local_evaluation_count": 0,
+          "task172_numerical_hole_count": 0,
+          "task173_sizing_complete": false
+        }
+      ],
+      "scenario": "candidate_b_n1_cache_compare",
+      "task172_evaluations_per_wall_second": {
+        "cache_2048": 0.0,
+        "cache_256": 0.0
+      }
+    }
+  ],
+  "task_id": "V07_TASK173_REALPATH_PERFORMANCE_R2",
+  "total_wall_seconds": 7.8826868534088135
+}

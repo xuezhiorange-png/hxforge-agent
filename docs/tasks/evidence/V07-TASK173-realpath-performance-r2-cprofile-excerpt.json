@@ -1,0 +1,13 @@
+{
+  "sample": "candidate_b_n1_cache_2048_budget_20s",
+  "status": "FAIL",
+  "task172_local_evaluation_count": 122,
+  "hotspot_summary": "cumulative time under _candidate_transient_outer_boundary flows through _solve_cell/_cell_evaluation into task172 validate_candidate_request._solve",
+  "cprofile_top_raw": [
+    "1    0.000    0.000   20.006   20.006 task173_integrated_rating/service.py:3193(_candidate_transient_outer_boundary)",
+    "10    0.004    0.000   19.847    1.985 task173_integrated_rating/service.py:1932(_solve_cell)",
+    "122    0.009    0.000   19.838    0.163 task173_integrated_rating/service.py:1827(_cell_evaluation)",
+    "122    0.000    0.000   11.794    0.097 task172_local_runtime/service.py:1235(validate_candidate_request)",
+    "122    0.000    0.000   11.794    0.097 task172_local_runtime/service.py:1172(_solve)"
+  ]
+}

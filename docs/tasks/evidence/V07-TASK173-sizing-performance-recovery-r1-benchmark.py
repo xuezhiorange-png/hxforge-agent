@@ -28,6 +28,21 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.replay import (
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
+
+def cumulative_coolprop_cache_stats(providers: list[CoolPropProvider]) -> dict[str, int]:
+    hits = misses = size = 0
+    for provider in providers:
+        info = provider.cache_info()
+        hits += info.hits
+        misses += info.misses
+        size += info.size
+    return {
+        "cumulative_cache_hits": hits,
+        "cumulative_cache_misses": misses,
+        "cumulative_cache_entries": size,
+        "provider_instance_count": len(providers),
+    }
+
 ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -67,35 +82,36 @@ def benchmark_task172_mesh_provider_pattern() -> dict[str, Any]:
     request = _load_task172_request()
     mesh_steps = len(REVIEWED_MESH_SEQUENCE)
 
-    def per_mesh_fresh() -> tuple[float, str, Any]:
+    def per_mesh_fresh() -> tuple[float, str, dict[str, int]]:
         hashes: list[str] = []
+        providers: list[CoolPropProvider] = []
         t0 = time.perf_counter()
-        last_info = None
         for _ in REVIEWED_MESH_SEQUENCE:
             provider = CoolPropProvider(cache_size=256)
+            providers.append(provider)
             outcome = validate_request(request, provider)
             hashes.append(_task172_hash(outcome))
-            last_info = provider.cache_info()
         elapsed = time.perf_counter() - t0
         assert all(h == hashes[0] for h in hashes)
-        return elapsed, hashes[0], last_info
+        return elapsed, hashes[0], cumulative_coolprop_cache_stats(providers)
 
-    def shared_mesh_factory() -> tuple[float, str, Any]:
+    def shared_mesh_factory() -> tuple[float, str, dict[str, int]]:
         factory = task173_service._mesh_sequence_provider_factory(None)
         hashes: list[str] = []
+        providers: list[CoolPropProvider] = []
         t0 = time.perf_counter()
-        last_info = None
         for _ in REVIEWED_MESH_SEQUENCE:
             provider = factory()
+            if provider not in providers:
+                providers.append(provider)
             outcome = validate_request(request, provider)
             hashes.append(_task172_hash(outcome))
-            last_info = provider.cache_info()
         elapsed = time.perf_counter() - t0
         assert all(h == hashes[0] for h in hashes)
-        return elapsed, hashes[0], last_info
+        return elapsed, hashes[0], cumulative_coolprop_cache_stats(providers)
 
-    before_s, before_hash, before_info = per_mesh_fresh()
-    after_s, after_hash, after_info = shared_mesh_factory()
+    before_s, before_hash, before_cache = per_mesh_fresh()
+    after_s, after_hash, after_cache = shared_mesh_factory()
     speedup = before_s / after_s if after_s > 0 else None
     return {
         "scenario": "task172_validate_request_x_mesh_steps",
@@ -104,15 +120,13 @@ def benchmark_task172_mesh_provider_pattern() -> dict[str, Any]:
             "pattern": "new CoolPropProvider(cache_size=256) per mesh step",
             "wall_seconds": before_s,
             "result_hash": before_hash,
-            "cache_hits": before_info.hits if before_info else None,
-            "cache_misses": before_info.misses if before_info else None,
+            "coolprop_cache_cumulative": before_cache,
         },
         "optimized": {
             "pattern": f"shared provider via _mesh_sequence_provider_factory (cache_size={TASK173_COOLPROP_CACHE_SIZE})",
             "wall_seconds": after_s,
             "result_hash": after_hash,
-            "cache_hits": after_info.hits if after_info else None,
-            "cache_misses": after_info.misses if after_info else None,
+            "coolprop_cache_cumulative": after_cache,
         },
         "engineering_hash_match": before_hash == after_hash,
         "speedup_ratio": speedup,
