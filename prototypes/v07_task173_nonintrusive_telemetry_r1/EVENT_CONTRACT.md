@@ -115,5 +115,10 @@ Must be emitted **after** the numerical step completes (or fails), never alterin
 - `candidates_started`, `candidates_finished`
 - `mesh_levels_observed`, `outer_iterations_observed`
 - `wall_elapsed_s`, `abnormal_termination`: bool
+- `log_integrity_status`: `COMPLETE` \| `INCOMPLETE` \| `CORRUPT` \| `EMPTY`
+- `suitable_for_compute_evidence`: bool — **false** unless the log is complete *and* the run did not terminate abnormally
+- `missing_sequence_gaps`, `conflicting_duplicate_sequences`, `mixed_telemetry_run_ids`, `integrity_warnings`
+
+Strict `load_events` / `recover_from_log` raise on corrupt JSON. Tolerant `load_events_tolerant` / `recover_from_log_tolerant` skip bad lines but never mark an incomplete log as suitable compute evidence.
 
 Summaries are **never** hashed into engineering results.

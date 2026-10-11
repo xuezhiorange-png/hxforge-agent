@@ -28,6 +28,33 @@ class TelemetryWritePolicy:
     max_jsonl_lines: int = 2_000_000
     os_sample_min_interval_s: float = 5.0
 
+    def __post_init__(self) -> None:
+        if self.recovery_every_n_events < 1:
+            raise ValueError("recovery_every_n_events must be >= 1")
+        if self.task172_detail_every_n < 1:
+            raise ValueError("task172_detail_every_n must be >= 1")
+        if self.max_jsonl_lines < 1:
+            raise ValueError("max_jsonl_lines must be >= 1")
+        if self.os_sample_min_interval_s < 0:
+            raise ValueError("os_sample_min_interval_s must be >= 0")
+
+
+LogIntegrityStatus = Literal["COMPLETE", "INCOMPLETE", "CORRUPT", "EMPTY"]
+
+
+@dataclass(frozen=True)
+class LogIntegrityReport:
+    status: LogIntegrityStatus
+    suitable_for_compute_evidence: bool
+    telemetry_run_ids: tuple[str, ...]
+    mixed_telemetry_run_ids: bool
+    missing_sequence_gaps: tuple[int, ...]
+    conflicting_duplicate_sequences: tuple[int, ...]
+    harmless_duplicate_sequences: tuple[int, ...]
+    warnings: tuple[str, ...]
+    event_count: int
+    max_sequence: int
+
 
 @dataclass
 class MockComputeReceipt:
@@ -138,7 +165,8 @@ class TelemetryWriter:
     ) -> None:
         self._ctx = ctx
         self._monotonic = monotonic_fn
-        self._policy = policy or TelemetryWritePolicy()
+        resolved = policy or TelemetryWritePolicy()
+        self._policy = resolved
         self._log_handle: TextIO | None = None
         self._lines_written = 0
         self._task172_since_last_detail = 0
@@ -303,14 +331,123 @@ def load_events(log_path: Path) -> list[dict[str, Any]]:
     return events
 
 
+def _event_fingerprint(event: dict[str, Any]) -> str:
+    return json.dumps(event, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def analyze_log_integrity(
+    events: list[dict[str, Any]],
+    *,
+    warnings: list[str] | None = None,
+) -> LogIntegrityReport:
+    """Classify telemetry log completeness; never implies solver correctness."""
+    warn = list(warnings or [])
+    if not events:
+        return LogIntegrityReport(
+            status="EMPTY",
+            suitable_for_compute_evidence=False,
+            telemetry_run_ids=(),
+            mixed_telemetry_run_ids=False,
+            missing_sequence_gaps=(),
+            conflicting_duplicate_sequences=(),
+            harmless_duplicate_sequences=(),
+            warnings=tuple(warn),
+            event_count=0,
+            max_sequence=0,
+        )
+
+    run_ids: set[str] = set()
+    sequences: list[int] = []
+    corrupt = False
+    for event in events:
+        if event.get("schema_version") != SCHEMA_VERSION:
+            corrupt = True
+            warn.append("unsupported_schema_version")
+            continue
+        rid = event.get("telemetry_run_id")
+        if type(rid) is str:
+            run_ids.add(rid)
+        seq = event.get("sequence")
+        if type(seq) is not int or seq < 1:
+            corrupt = True
+            warn.append("invalid_sequence_value")
+            continue
+        sequences.append(seq)
+
+    mixed = len(run_ids) > 1
+    if mixed:
+        warn.append("mixed_telemetry_run_id")
+
+    missing_gaps: list[int] = []
+    if sequences:
+        seq_set = set(sequences)
+        max_seq = max(sequences)
+        for expected in range(1, max_seq + 1):
+            if expected not in seq_set:
+                missing_gaps.append(expected)
+
+    conflicting: list[int] = []
+    harmless_dup: list[int] = []
+    by_seq: dict[int, list[str]] = {}
+    for event in events:
+        seq = event.get("sequence")
+        if type(seq) is not int:
+            continue
+        fp = _event_fingerprint(event)
+        by_seq.setdefault(seq, []).append(fp)
+    for seq, fingerprints in by_seq.items():
+        if len(fingerprints) < 2:
+            continue
+        if len(set(fingerprints)) > 1:
+            if seq not in conflicting:
+                conflicting.append(seq)
+            warn.append(f"conflicting_duplicate_sequence:{seq}")
+        else:
+            harmless_dup.append(seq)
+            warn.append(f"harmless_duplicate_sequence:{seq}")
+
+    for w in warn:
+        if w.startswith("skip_corrupt_line:"):
+            corrupt = True
+        elif w.startswith("conflicting_duplicate_sequence:"):
+            try:
+                seq_num = int(w.rsplit(":", 1)[-1])
+            except ValueError:
+                continue
+            if seq_num not in conflicting:
+                conflicting.append(seq_num)
+
+    if corrupt:
+        status: LogIntegrityStatus = "CORRUPT"
+    elif missing_gaps or conflicting or mixed:
+        status = "INCOMPLETE"
+    else:
+        status = "COMPLETE"
+
+    suitable = status == "COMPLETE" and not warn
+    return LogIntegrityReport(
+        status=status,
+        suitable_for_compute_evidence=suitable,
+        telemetry_run_ids=tuple(sorted(run_ids)),
+        mixed_telemetry_run_ids=mixed,
+        missing_sequence_gaps=tuple(missing_gaps),
+        conflicting_duplicate_sequences=tuple(conflicting),
+        harmless_duplicate_sequences=tuple(harmless_dup),
+        warnings=tuple(warn),
+        event_count=len(events),
+        max_sequence=max(sequences) if sequences else 0,
+    )
+
+
 def load_events_tolerant(
     log_path: Path,
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], LogIntegrityReport]:
     """Load JSONL skipping blank/corrupt lines; dedupe by sequence (keep last)."""
     if not log_path.is_file():
-        return [], []
+        empty = analyze_log_integrity([], warnings=["log_file_missing"])
+        return [], ["log_file_missing"], empty
     warnings: list[str] = []
-    by_sequence: dict[int, dict[str, Any]] = {}
+    raw_by_sequence: dict[int, list[dict[str, Any]]] = {}
     for line_no, line in enumerate(log_path.read_text(encoding="utf-8").splitlines(), start=1):
         if not line.strip():
             continue
@@ -323,22 +460,78 @@ def load_events_tolerant(
         if type(seq) is not int:
             warnings.append(f"skip_missing_sequence:{line_no}")
             continue
-        if seq in by_sequence:
-            warnings.append(f"duplicate_sequence:{seq}")
-        by_sequence[seq] = event
-    return [by_sequence[k] for k in sorted(by_sequence)], warnings
+        raw_by_sequence.setdefault(seq, []).append(event)
+
+    by_sequence: dict[int, dict[str, Any]] = {}
+    for seq, versions in raw_by_sequence.items():
+        fingerprints = {_event_fingerprint(item) for item in versions}
+        if len(fingerprints) > 1:
+            warnings.append(f"conflicting_duplicate_sequence:{seq}")
+        by_sequence[seq] = versions[-1]
+
+    events = [by_sequence[k] for k in sorted(by_sequence)]
+    integrity = analyze_log_integrity(events, warnings=warnings)
+    return events, warnings, integrity
+
+
+def _apply_compute_evidence_gate(summary: dict[str, Any]) -> None:
+    """Incomplete or abnormal logs are never suitable as complete compute evidence."""
+    if summary.get("abnormal_termination"):
+        summary["suitable_for_compute_evidence"] = False
+
+
+def _integrity_projection(report: LogIntegrityReport) -> dict[str, Any]:
+    return {
+        "log_integrity_status": report.status,
+        "suitable_for_compute_evidence": report.suitable_for_compute_evidence,
+        "mixed_telemetry_run_ids": report.mixed_telemetry_run_ids,
+        "telemetry_run_ids": list(report.telemetry_run_ids),
+        "missing_sequence_gaps": list(report.missing_sequence_gaps),
+        "conflicting_duplicate_sequences": list(report.conflicting_duplicate_sequences),
+        "harmless_duplicate_sequences": list(report.harmless_duplicate_sequences),
+        "integrity_warnings": list(report.warnings),
+    }
 
 
 def recover_from_log(log_path: Path, recovery_path: Path | None = None) -> dict[str, Any]:
-    """Rebuild aggregator state from JSONL; optionally cross-check recovery file."""
+    """Strict rebuild from JSONL (raises on corrupt JSON)."""
     events = load_events(log_path)
+    integrity = analyze_log_integrity(events)
     summary = aggregate_events(events)
+    summary.update(_integrity_projection(integrity))
     if recovery_path is not None and recovery_path.is_file():
         recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
         summary["recovered_from_sequence"] = recovery.get("last_durable_sequence")
         summary["recovery_file_cumulative_task172"] = recovery.get("cumulative_task172")
     else:
         summary["recovered_from_sequence"] = events[-1]["sequence"] if events else 0
+    _apply_compute_evidence_gate(summary)
+    return summary
+
+
+def recover_from_log_tolerant(log_path: Path, recovery_path: Path | None = None) -> dict[str, Any]:
+    """Best-effort rebuild; marks incomplete logs as unsuitable for compute evidence."""
+    events, _load_warnings, integrity = load_events_tolerant(log_path)
+    summary = aggregate_events(events) if events else {
+        "schema_version": SCHEMA_VERSION,
+        "telemetry_run_id": None,
+        "counts_by_event_type": {},
+        "candidates_started": 0,
+        "candidates_finished": 0,
+        "mesh_levels_observed": [],
+        "outer_iterations_observed": [],
+        "cumulative_task172_max": 0,
+        "wall_elapsed_s": 0.0,
+        "abnormal_termination": False,
+    }
+    summary.update(_integrity_projection(integrity))
+    if recovery_path is not None and recovery_path.is_file():
+        recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+        summary["recovered_from_sequence"] = recovery.get("last_durable_sequence")
+        summary["recovery_file_cumulative_task172"] = recovery.get("cumulative_task172")
+    else:
+        summary["recovered_from_sequence"] = integrity.max_sequence
+    _apply_compute_evidence_gate(summary)
     return summary
 
 
@@ -392,8 +585,21 @@ def aggregate_events(events: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def write_summary(ctx: TelemetryRunContext, events: list[dict[str, Any]]) -> Path:
+    integrity = analyze_log_integrity(events)
     summary = aggregate_events(events)
     summary["recovered_from_sequence"] = events[-1]["sequence"] if events else 0
+    summary.update(_integrity_projection(integrity))
+    _apply_compute_evidence_gate(summary)
     path = ctx.summary_path()
     path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     return path
+
+
+def emit_telemetry_safe(writer: TelemetryWriter | None, **kwargs: Any) -> None:
+    """Never let telemetry failures alter caller control flow."""
+    if writer is None:
+        return
+    try:
+        writer.emit(**kwargs)
+    except (OSError, TelemetryLogCapacityExceeded, ValueError):
+        return
