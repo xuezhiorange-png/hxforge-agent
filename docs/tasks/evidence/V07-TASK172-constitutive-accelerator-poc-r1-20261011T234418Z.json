@@ -1,0 +1,372 @@
+{
+  "actual_hotspot_hypothesis": "TRF jac=2-point generates near-unique (q,Twi,Two) trials; duplicate _eval_trial keys are rare (~1 per solve in this sample).",
+  "after_seconds_total": 0.14753972250127845,
+  "aggregate_speedup": 1.0379322422764832,
+  "authority_change_required": false,
+  "baseline_solver": "task172_local_runtime.validate_* \u2192 production._solve (TRF/Dogbox)",
+  "before_seconds_total": 0.15313623500060203,
+  "cases": [
+    {
+      "baseline": {
+        "eval_trial_calls_last": 21,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.0386465590008811,
+        "wall_seconds_samples": [
+          0.04517151900108729,
+          0.032121599000674905
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "signed_q_hot_to_cold_w": "23123.38278012617",
+        "wall_inner_k": "298.8200080826924",
+        "wall_outer_k": "298.6553006286871"
+      },
+      "case_index": 0,
+      "case_kind": "reference_fixture",
+      "eval_reduction_ratio": 0.04761904761904767,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 1,
+          "production_eval_calls": 20,
+          "trial_invocations": 21,
+          "unique_eval_keys": 20,
+          "wall_seconds": 0.030565979999664705
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03682502250012476,
+        "wall_seconds_samples": [
+          0.04306850899956771,
+          0.030581536000681808
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "signed_q_hot_to_cold_w": "23123.38278012617",
+        "wall_inner_k": "298.8200080826924",
+        "wall_outer_k": "298.6553006286871"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 1.049464640537563
+    },
+    {
+      "baseline": {
+        "eval_trial_calls_last": 17,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03225659750023624,
+        "wall_seconds_samples": [
+          0.03841268799988029,
+          0.026100507000592188
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "cb7ffea994a6c7308df0cc95ffda683c25d1c8c2a97191ea7b05c2ff14c25d95",
+        "signed_q_hot_to_cold_w": "12447.277803223982",
+        "wall_inner_k": "298.8600968077422",
+        "wall_outer_k": "298.7714350640968"
+      },
+      "case_index": 1,
+      "case_kind": "reference_fixture",
+      "eval_reduction_ratio": 0.05882352941176472,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 1,
+          "production_eval_calls": 16,
+          "trial_invocations": 17,
+          "unique_eval_keys": 16,
+          "wall_seconds": 0.025227292999261408
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03142058600042219,
+        "wall_seconds_samples": [
+          0.03760228700048174,
+          0.025238885000362643
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "cb7ffea994a6c7308df0cc95ffda683c25d1c8c2a97191ea7b05c2ff14c25d95",
+        "signed_q_hot_to_cold_w": "12447.277803223982",
+        "wall_inner_k": "298.8600968077422",
+        "wall_outer_k": "298.7714350640968"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 1.026607126289841
+    },
+    {
+      "baseline": {
+        "eval_trial_calls_last": 17,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03304372499951569,
+        "wall_seconds_samples": [
+          0.03941594799835002,
+          0.026671502000681357
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "1db04cf6018ed6c989ec84bd8ad179d889752b529ef5367cd066fc50e3944961",
+        "signed_q_hot_to_cold_w": "11561.691390135002",
+        "wall_inner_k": "298.82000808268504",
+        "wall_outer_k": "298.65530062869027"
+      },
+      "case_index": 2,
+      "case_kind": "reference_fixture",
+      "eval_reduction_ratio": 0.05882352941176472,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 1,
+          "production_eval_calls": 16,
+          "trial_invocations": 17,
+          "unique_eval_keys": 16,
+          "wall_seconds": 0.026197118000709452
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.032151264500498655,
+        "wall_seconds_samples": [
+          0.03809279100096319,
+          0.026209738000034122
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "1db04cf6018ed6c989ec84bd8ad179d889752b529ef5367cd066fc50e3944961",
+        "signed_q_hot_to_cold_w": "11561.691390135002",
+        "wall_inner_k": "298.82000808268504",
+        "wall_outer_k": "298.65530062869027"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 1.027758177256238
+    },
+    {
+      "baseline": {
+        "eval_trial_calls_last": 21,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03959297300025355,
+        "wall_seconds_samples": [
+          0.04704330800086609,
+          0.03214263799964101
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "bb5492c6aea7f6778f4b01633cbf27ac47a1d7404a64b133906b47bc9749baf2",
+        "signed_q_hot_to_cold_w": "19123.12133097365",
+        "wall_inner_k": "299.0246979605143",
+        "wall_outer_k": "298.88848429934677"
+      },
+      "case_index": 3,
+      "case_kind": "candidate_b_harvested",
+      "eval_reduction_ratio": 0.04761904761904767,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 1,
+          "production_eval_calls": 20,
+          "trial_invocations": 21,
+          "unique_eval_keys": 20,
+          "wall_seconds": 0.030558393000319484
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.03753406900068512,
+        "wall_seconds_samples": [
+          0.044495562000520295,
+          0.03057257600084995
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "bb5492c6aea7f6778f4b01633cbf27ac47a1d7404a64b133906b47bc9749baf2",
+        "signed_q_hot_to_cold_w": "19123.12133097365",
+        "wall_inner_k": "299.0246979605143",
+        "wall_outer_k": "298.88848429934677"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 1.0548542711830908
+    },
+    {
+      "baseline": {
+        "eval_trial_calls_last": 1,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.004832412500036298,
+        "wall_seconds_samples": [
+          0.005118963999848347,
+          0.0045458610002242494
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "30d63bbbe937479213fc50ee40a603063a02b0558e0d80b7bc0453c4a5961ec8",
+        "signed_q_hot_to_cold_w": "0.0",
+        "wall_inner_k": "300.0",
+        "wall_outer_k": "300.0"
+      },
+      "case_index": 4,
+      "case_kind": "candidate_b_harvested",
+      "eval_reduction_ratio": 0.0,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 0,
+          "production_eval_calls": 1,
+          "trial_invocations": 1,
+          "unique_eval_keys": 1,
+          "wall_seconds": 0.00448158700055501
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.004783739000231435,
+        "wall_seconds_samples": [
+          0.0050785690000338946,
+          0.0044889090004289756
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "30d63bbbe937479213fc50ee40a603063a02b0558e0d80b7bc0453c4a5961ec8",
+        "signed_q_hot_to_cold_w": "0.0",
+        "wall_inner_k": "300.0",
+        "wall_outer_k": "300.0"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 1.0101747816514464
+    },
+    {
+      "baseline": {
+        "eval_trial_calls_last": 1,
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.004763967999679153,
+        "wall_seconds_samples": [
+          0.005212591999224969,
+          0.0043153440001333365
+        ]
+      },
+      "baseline_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "19bdc45f1c39469f848262eade822d8a4c1716e6436e9869315111a9ec5f9726",
+        "signed_q_hot_to_cold_w": "0.0",
+        "wall_inner_k": "300.0",
+        "wall_outer_k": "300.0"
+      },
+      "case_index": 5,
+      "case_kind": "candidate_b_harvested",
+      "eval_reduction_ratio": 0.0,
+      "experimental": {
+        "eval_trial_stats": {
+          "cache_hits": 0,
+          "production_eval_calls": 1,
+          "trial_invocations": 1,
+          "unique_eval_keys": 1,
+          "wall_seconds": 0.00439029799963464
+        },
+        "outcome_type": "Task172LocalResult",
+        "wall_seconds_mean": 0.004825041499316285,
+        "wall_seconds_samples": [
+          0.005252629000096931,
+          0.004397453998535639
+        ]
+      },
+      "experimental_outcome_identity": {
+        "kind": "validated",
+        "result_hash": "19bdc45f1c39469f848262eade822d8a4c1716e6436e9869315111a9ec5f9726",
+        "signed_q_hot_to_cold_w": "0.0",
+        "wall_inner_k": "300.0",
+        "wall_outer_k": "300.0"
+      },
+      "numerical_comparison": {
+        "authority_change_required": false,
+        "baseline_type": "Task172LocalResult",
+        "experimental_type": "Task172LocalResult",
+        "residual_acceptance_match": true,
+        "result_hash_parity": true,
+        "same_outcome_type": true,
+        "signed_q_delta": 0.0,
+        "solver_status_match": true,
+        "wall_temperature_delta": {
+          "wall_inner_k": 0.0,
+          "wall_outer_k": 0.0
+        }
+      },
+      "speedup": 0.9873423887347319
+    }
+  ],
+  "experimental_solver": "production._solve + memoized _eval_trial (POC only)",
+  "harvested_candidate_b_count": 8,
+  "notes": "Experimental module is not wired to production Task173. Hash parity True only when memoization is transparent to numerics.",
+  "result": "POC_COMPLETE_HASH_PARITY_NO_SIGNIFICANT_SPEEDUP",
+  "result_hash_parity_all": true,
+  "source_head_sha": "ce3046e05a11f8b255109546ba8a63c86f537619",
+  "speedup_rnd_target": 2.0,
+  "speedup_rnd_target_met": false,
+  "task_id": "V07_TASK172_CONSTITUTIVE_ACCELERATOR_POC_R1",
+  "test_case_count": 6,
+  "unmet_engineering_equivalence_conditions": [
+    "2x R&D speedup goal not met for memoized _eval_trial alone",
+    "Not integrated into production Task173; no full Candidate B rating replay"
+  ]
+}
