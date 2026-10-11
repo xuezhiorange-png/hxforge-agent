@@ -26,10 +26,12 @@ from telemetry import (
     TelemetryWriter,
     aggregate_events,
     analyze_log_integrity,
+    emit_telemetry_safe,
     load_events,
     load_events_tolerant,
     recover_from_log,
     recover_from_log_tolerant,
+    write_summary_safe,
 )
 
 
@@ -46,7 +48,12 @@ def test_jsonl_append_and_monotonic_sequence() -> None:
         assert len(events) == 2
         integrity = analyze_log_integrity(events)
         assert integrity.status == "COMPLETE"
-        assert integrity.suitable_for_compute_evidence is True
+        summary = aggregate_events(events)
+        assert summary["session_end_completed"] is False
+        recovered = recover_from_log(ctx.log_path)
+        assert recovered["log_sequence_complete"] is True
+        assert recovered["session_end_completed"] is False
+        assert recovered["suitable_for_compute_evidence"] is False
 
 
 def test_task172_batching_reduces_lines() -> None:
@@ -198,6 +205,107 @@ def test_telemetry_not_in_engineering_hash_scope() -> None:
     projection_keys = set(Task173SizingRequest.model_fields.keys())
     forbidden = {"telemetry_run_id", "progress_events", "task173_telemetry_path"}
     assert forbidden.isdisjoint(projection_keys)
+
+
+def test_sequence_complete_without_session_end_not_evidence() -> None:
+    events = [
+        {
+            "schema_version": SCHEMA_VERSION,
+            "telemetry_run_id": "r",
+            "sequence": 1,
+            "event_type": "session_start",
+            "elapsed_monotonic_s": 0.0,
+            "payload": {},
+        },
+        {
+            "schema_version": SCHEMA_VERSION,
+            "telemetry_run_id": "r",
+            "sequence": 2,
+            "event_type": "session_end",
+            "elapsed_monotonic_s": 1.0,
+            "payload": {"status": "aborted"},
+        },
+    ]
+    integrity = analyze_log_integrity(events)
+    assert integrity.status == "COMPLETE"
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "t.jsonl"
+        for event in events:
+            with log.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event) + "\n")
+        recovered = recover_from_log(log)
+    assert recovered["log_sequence_complete"] is True
+    assert recovered["session_end_completed"] is False
+    assert recovered["suitable_for_compute_evidence"] is False
+
+
+def test_mock_solve_unchanged_on_json_typeerror() -> None:
+    baseline = compute_mock_candidate_rating(
+        MockSolveInputs((1, 2, 4), 7, 2, 3, False)
+    )
+
+    def poison_factory(ctx: TelemetryRunContext) -> TelemetryWriter:
+        writer = TelemetryWriter(ctx, time.monotonic)
+        original_emit = writer.emit
+
+        def emit_with_bad_json(*args, **kwargs):  # type: ignore[no-untyped-def]
+            if kwargs.get("event_type") == "mesh_started":
+                kwargs = {**kwargs, "payload": {"bad": object()}}
+            return original_emit(*args, **kwargs)
+
+        writer.emit = emit_with_bad_json  # type: ignore[method-assign]
+        return writer
+
+    with tempfile.TemporaryDirectory() as tmp:
+        result = simulate_rating_like_run(Path(tmp), writer_factory=poison_factory)
+    assert result["mock_solve_matches_expected"] is True
+    assert result["mock_compute_result_hash"] == baseline.candidate_rating_result_hash
+
+
+def test_mock_solve_unchanged_when_write_summary_fails() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        with patch("telemetry.write_summary", side_effect=OSError("summary disk error")):
+            result = simulate_rating_like_run(Path(tmp))
+    assert result["mock_solve_matches_expected"] is True
+    assert result["mode"] == "completed"
+
+
+def test_emit_telemetry_safe_does_not_swallow_keyboard_interrupt() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = TelemetryRunContext.create(Path(tmp), "84c5f38", time.monotonic())
+        writer = TelemetryWriter(ctx, time.monotonic)
+
+        def interrupt_emit(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise KeyboardInterrupt
+
+        writer.emit = interrupt_emit  # type: ignore[method-assign]
+        with pytest.raises(KeyboardInterrupt):
+            emit_telemetry_safe(
+                writer,
+                source="solver_internal",
+                event_type="session_start",
+                payload={},
+            )
+
+
+def test_write_summary_safe_returns_none_on_failure() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        ctx = TelemetryRunContext.create(Path(tmp), "84c5f38", time.monotonic())
+        writer = TelemetryWriter(ctx, time.monotonic)
+        writer.emit(
+            source="solver_internal",
+            event_type="session_start",
+            payload={},
+        )
+        writer.emit(
+            source="solver_internal",
+            event_type="session_end",
+            payload={"status": "completed"},
+        )
+        writer.close()
+        events = load_events(ctx.log_path)
+        with patch("telemetry.write_summary", side_effect=TypeError("encode")):
+            assert write_summary_safe(ctx, events) is None
 
 
 def test_conflicting_duplicate_sequence() -> None:

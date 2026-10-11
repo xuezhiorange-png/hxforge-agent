@@ -20,7 +20,7 @@ from telemetry import (
     load_events,
     recover_from_log,
     recover_from_log_tolerant,
-    write_summary,
+    write_summary_safe,
 )
 
 BASELINE_GIT = "84c5f38b74fd26eacefee260af7be26c12cb2e31"
@@ -101,7 +101,7 @@ def simulate_rating_like_run(
             return
         try:
             writer.record_task172_evaluations(count, **correlation)
-        except (OSError, TelemetryLogCapacityExceeded, ValueError):
+        except (OSError, TelemetryLogCapacityExceeded, ValueError, TypeError):
             return
 
     def flush_task172(**correlation: Any) -> None:
@@ -109,7 +109,7 @@ def simulate_rating_like_run(
             return
         try:
             writer.flush_task172_progress(**correlation)
-        except (OSError, TelemetryLogCapacityExceeded, ValueError):
+        except (OSError, TelemetryLogCapacityExceeded, ValueError, TypeError):
             return
 
     emit(
@@ -224,7 +224,7 @@ def simulate_rating_like_run(
                 actual_solve = compute_mock_candidate_rating(solve_inputs)
                 events = load_events(ctx.log_path) if ctx.log_path.is_file() else []
                 if events:
-                    write_summary(ctx, events)
+                    write_summary_safe(ctx, events)
                 recovered = recover_from_log_tolerant(ctx.log_path, ctx.recovery_path)
                 return {
                     "mode": "aborted",
@@ -260,7 +260,7 @@ def simulate_rating_like_run(
         writer.close()
     actual_solve = compute_mock_candidate_rating(solve_inputs)
     events = load_events(ctx.log_path)
-    summary_path = write_summary(ctx, events)
+    summary_path = write_summary_safe(ctx, events)
     recovered = recover_from_log(ctx.log_path, ctx.recovery_path)
     return {
         "mode": "completed",
@@ -269,7 +269,7 @@ def simulate_rating_like_run(
         "mock_solve_matches_expected": actual_solve == expected_solve,
         "expected_frozen_success_hash": MOCK_CANDIDATE_B_SUCCESS_RESULT_HASH,
         "log_path": str(ctx.log_path),
-        "summary_path": str(summary_path),
+        "summary_path": str(summary_path) if summary_path is not None else str(ctx.summary_path()),
         "recovery_path": str(ctx.recovery_path),
         "event_count": len(events),
         "recovered": recovered,

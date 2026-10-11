@@ -116,7 +116,9 @@ Must be emitted **after** the numerical step completes (or fails), never alterin
 - `mesh_levels_observed`, `outer_iterations_observed`
 - `wall_elapsed_s`, `abnormal_termination`: bool
 - `log_integrity_status`: `COMPLETE` \| `INCOMPLETE` \| `CORRUPT` \| `EMPTY`
-- `suitable_for_compute_evidence`: bool — **false** unless the log is complete *and* the run did not terminate abnormally
+- `log_sequence_complete`: bool — JSONL `sequence` continuity with no integrity warnings
+- `session_end_completed`: bool — at least one `session_end` with `payload.status` = `completed`
+- `suitable_for_compute_evidence`: bool — **false** unless `log_sequence_complete` and `session_end_completed` and not `abnormal_termination`
 - `missing_sequence_gaps`, `conflicting_duplicate_sequences`, `mixed_telemetry_run_ids`, `integrity_warnings`
 
 Strict `load_events` / `recover_from_log` raise on corrupt JSON. Tolerant `load_events_tolerant` / `recover_from_log_tolerant` skip bad lines but never mark an incomplete log as suitable compute evidence.

@@ -424,10 +424,11 @@ def analyze_log_integrity(
     else:
         status = "COMPLETE"
 
-    suitable = status == "COMPLETE" and not warn
+    # Sequence / record integrity only — not solver session completion (see _apply_compute_evidence_gate).
+    log_sequence_complete = status == "COMPLETE" and not warn
     return LogIntegrityReport(
         status=status,
-        suitable_for_compute_evidence=suitable,
+        suitable_for_compute_evidence=log_sequence_complete,
         telemetry_run_ids=tuple(sorted(run_ids)),
         mixed_telemetry_run_ids=mixed,
         missing_sequence_gaps=tuple(missing_gaps),
@@ -474,16 +475,29 @@ def load_events_tolerant(
     return events, warnings, integrity
 
 
+def _session_end_completed(events: list[dict[str, Any]]) -> bool:
+    for event in events:
+        if event.get("event_type") != "session_end":
+            continue
+        if event.get("payload", {}).get("status") == "completed":
+            return True
+    return False
+
+
 def _apply_compute_evidence_gate(summary: dict[str, Any]) -> None:
-    """Incomplete or abnormal logs are never suitable as complete compute evidence."""
-    if summary.get("abnormal_termination"):
-        summary["suitable_for_compute_evidence"] = False
+    """Requires intact JSONL sequence, normal session end, and no abnormal termination."""
+    log_ok = bool(summary.get("log_sequence_complete"))
+    session_ok = bool(summary.get("session_end_completed"))
+    abnormal = bool(summary.get("abnormal_termination"))
+    summary["suitable_for_compute_evidence"] = log_ok and session_ok and not abnormal
 
 
 def _integrity_projection(report: LogIntegrityReport) -> dict[str, Any]:
+    log_sequence_complete = report.suitable_for_compute_evidence
     return {
         "log_integrity_status": report.status,
-        "suitable_for_compute_evidence": report.suitable_for_compute_evidence,
+        "log_sequence_complete": log_sequence_complete,
+        "suitable_for_compute_evidence": False,
         "mixed_telemetry_run_ids": report.mixed_telemetry_run_ids,
         "telemetry_run_ids": list(report.telemetry_run_ids),
         "missing_sequence_gaps": list(report.missing_sequence_gaps),
@@ -498,6 +512,7 @@ def recover_from_log(log_path: Path, recovery_path: Path | None = None) -> dict[
     events = load_events(log_path)
     integrity = analyze_log_integrity(events)
     summary = aggregate_events(events)
+    summary["session_end_completed"] = _session_end_completed(events)
     summary.update(_integrity_projection(integrity))
     if recovery_path is not None and recovery_path.is_file():
         recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
@@ -523,7 +538,9 @@ def recover_from_log_tolerant(log_path: Path, recovery_path: Path | None = None)
         "cumulative_task172_max": 0,
         "wall_elapsed_s": 0.0,
         "abnormal_termination": False,
+        "session_end_completed": False,
     }
+    summary["session_end_completed"] = _session_end_completed(events)
     summary.update(_integrity_projection(integrity))
     if recovery_path is not None and recovery_path.is_file():
         recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
@@ -581,6 +598,7 @@ def aggregate_events(events: list[dict[str, Any]]) -> dict[str, Any]:
         "cumulative_task172_max": cumulative_task172_max,
         "wall_elapsed_s": wall_elapsed,
         "abnormal_termination": abnormal,
+        "session_end_completed": _session_end_completed(events),
     }
 
 
@@ -595,11 +613,19 @@ def write_summary(ctx: TelemetryRunContext, events: list[dict[str, Any]]) -> Pat
     return path
 
 
+def write_summary_safe(ctx: TelemetryRunContext, events: list[dict[str, Any]]) -> Path | None:
+    """Telemetry-only; failures must not affect solver control flow."""
+    try:
+        return write_summary(ctx, events)
+    except (OSError, TypeError, ValueError):
+        return None
+
+
 def emit_telemetry_safe(writer: TelemetryWriter | None, **kwargs: Any) -> None:
-    """Never let telemetry failures alter caller control flow."""
+    """Never let telemetry failures alter caller control flow (not BaseException)."""
     if writer is None:
         return
     try:
         writer.emit(**kwargs)
-    except (OSError, TelemetryLogCapacityExceeded, ValueError):
+    except (OSError, TelemetryLogCapacityExceeded, ValueError, TypeError):
         return
