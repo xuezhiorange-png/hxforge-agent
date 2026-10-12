@@ -1,0 +1,288 @@
+{
+  "schema_version": "task173.v0.7.full-rating-sizing-closeout.r1",
+  "task_id": "STAGE3_TASK173_FULL_RATING_AND_SIZING_SOLVER_CLOSEOUT_R1",
+  "mode": "TASK173_FULL_CAPABILITY_CLOSEOUT_IMPLEMENT_IF_AUTHORIZED_ELSE_FAIL_CLOSED",
+  "result": "BLOCKED_TASK173_FULL_SIZING_AUTHORITY_INCOMPLETE",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "authorized_source_head": "355df02f55107cdae4902ec825eae7648b2f76d8",
+    "predecessor_task": "STAGE3_TASK173_PRODUCTION_MESH_REEXECUTION_FROM_N1_AFTER_REPLAY_CORRECTION",
+    "predecessor_result": "PASS_TASK173_PRODUCTION_MESH_REEXECUTION_AFTER_REPLAY_CORRECTION",
+    "predecessor_evidence_canonical_hash": "9bdca85bcad6f897bb9de1f144082d34e2c2fe7c7883a4d9b8b9645983d12308",
+    "closeout_head": "BOUND_BY_EVIDENCE_COMMIT"
+  },
+  "task173_status": {
+    "rating_complete": true,
+    "rating_scope": "ACCEPTED_V07_REFERENCE_CASE_ONLY",
+    "sizing_complete": false,
+    "complete": false,
+    "sizing_public_mode_present": false
+  },
+  "reference_rating": {
+    "status": "VALIDATED",
+    "result_type": "Task173SuccessResult",
+    "request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "result_hash": "fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "result_id": "urn:hxforge:task173:fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "identity_preserved": true,
+    "total_duty_w": "52345.60023831155286",
+    "accepted_subdivisions_per_interval": 32,
+    "headroom_subdivisions_per_interval": 64,
+    "accepted_mesh_deterministic_replay": "PASS",
+    "source_receipt": "docs/tasks/TASK-172-v0.7-stage3-production-mesh-reexecution-after-replay-correction-r4.md",
+    "source_evidence_canonical_hash": "cdabfa3e114b1e2a7ea7d02e32af1c80e7e2cfceecf576e9162a80202f11faf5",
+    "sizing_execution_status": "NOT_APPLICABLE_CURRENT_REFERENCE_CASE",
+    "rating_reexecuted_in_this_closeout": false
+  },
+  "candidate_authority_availability": {
+    "candidate_bound_task171_authority_available": false,
+    "candidate_bound_task172_authority_available": false,
+    "candidate_bound_task174_authority_available": false,
+    "candidate_generalized_task173_rating_authority_available": false,
+    "v07_sizing_requirement_authority_available": false,
+    "v07_sizing_ranking_policy_authority_available": false
+  },
+  "capability_audit": [
+    {
+      "item": "A_PUBLIC_V07_RATING_REQUEST_RESULT",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": true,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/task173_integrated_rating/models.py", "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py", "docs/tasks/TASK-172-v0.7-stage3-production-mesh-reexecution-after-replay-correction-r4.md"],
+      "authority_or_reason": "Reviewed fixed-geometry reference Rating and accepted exact result identity; this does not authorize generalized candidate inputs."
+    },
+    {
+      "item": "B_PUBLIC_V07_SIZING_REQUEST_RESULT",
+      "implemented": false,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/task173_integrated_rating/models.py", "src/hexagent/exchangers/shell_tube/task173_integrated_rating/__init__.py"],
+      "authority_or_reason": "No public Sizing request/result; current success result explicitly says NOT_APPLICABLE_CURRENT_REFERENCE_CASE."
+    },
+    {
+      "item": "C_MANUFACTURABLE_CANDIDATE_ENUMERATION",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": true,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py"],
+      "authority_or_reason": "TASK168_AUTHORITY_ISSUE_263 / task168.v1; v0.6 discrete enumeration semantics only, expressly reusable by this task; not v0.7 thermal evaluation or final Rating."
+    },
+    {
+      "item": "D_CANDIDATE_NATIVE_TASK020_021_022_024_MATERIALIZATION",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": true,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "src/hexagent/exchangers/shell_tube/manufacturable_candidates/service.py", "tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py"],
+      "authority_or_reason": "TASK168_AUTHORITY_ISSUE_263 candidate-specific producer materialization semantics are reusable only as authorized; they do not establish Task171/172/174 candidate closure."
+    },
+    {
+      "item": "E_CANDIDATE_TASK171_TOPOLOGY_MATERIALIZATION",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/segmented_thermal_state_topology/native.py", "docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md", "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md", "docs/tasks/TASK-172-v0.7-r119d-case-bound-task171-native-materialization-r1.md", "docs/tasks/TASK-172-v0.7-r119e-case-bound-task171-native-materialization-independent-review-r1.md"],
+      "authority_or_reason": "R4 IDs V07-T171-TOPOLOGY-R4-V1, V07-T171-CELL-COMPARTMENT-R4-V1, V07-T171-CONSERVATION-R4-V1 are reviewed only within the narrow entry topology; R119-D/E accept one case-bound Definition and native IDs, not candidate-space materialization authority. R4 reviewed document SHA256 ecf01cb2b019a7b43a4dd6241890893fb4238a0a11dec4a1c4e91d780c9e08ca."
+    },
+    {
+      "item": "F_CANDIDATE_TASK172_LOCAL_THERMAL_CLOSURE",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/task172_local_runtime/models.py", "docs/tasks/TASK-172-v0.7-stage3-task172-dogbox-r3-independent-review.md", "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-independent-review.json"],
+      "authority_or_reason": "Reviewed numerical overlay V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3 / 9a226f98de9dc40025fd4e26f83ce22f29df0b6ba10542ac282cc97f739b4b6b is solver-path-only; strict request/domain and accepted native geometry remain reference-case bound."
+    },
+    {
+      "item": "G_CANDIDATE_TASK174_HYDRAULIC_CLOSURE",
+      "implemented": false,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/models.py", "docs/tasks/TASK-172-v0.7-stage2-task172-runtime-and-task174-hydraulics-r1.md", "docs/tasks/evidence/TASK-172-stage2-task172-runtime-and-task174-hydraulics-r1.json"],
+      "authority_or_reason": "Orchestration exists but Stage-2 result is STAGE2_PARTIAL_TASK172_COMPLETE_TASK174_BLOCKED with closure=false and three unresolved authority scopes; request pins reference case/topology/geometry."
+    },
+    {
+      "item": "H_FULL_TASK173_RATING",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": true,
+      "case_bound_only": true,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py", "docs/tasks/TASK-172-v0.7-stage3-production-mesh-reexecution-after-replay-correction-r4.md"],
+      "authority_or_reason": "Full accepted production mesh and deterministic replay exist for the fixed reference case only."
+    },
+    {
+      "item": "I_HARD_DUTY_CONSTRAINT",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md"],
+      "authority_or_reason": "Constraint machinery exists under v0.6 requirement semantics; no source-bound v0.7 Sizing requirement supplies required duty and exact predicate."
+    },
+    {
+      "item": "J_MAX_TUBE_DP_CONSTRAINT",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "docs/tasks/TASK-172-v0.7-stage2-task172-runtime-and-task174-hydraulics-r1.md"],
+      "authority_or_reason": "v0.6 constraint machinery exists, but no complete v0.7 candidate hydraulic result or source-bound maximum is authorized."
+    },
+    {
+      "item": "K_MAX_SHELL_DP_CONSTRAINT",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "docs/tasks/TASK-172-v0.7-stage2-task172-runtime-and-task174-hydraulics-r1.md"],
+      "authority_or_reason": "v0.6 constraint machinery exists; v0.7 Bell aggregation/pressure coupling remains blocked and no v0.7 maximum is bound."
+    },
+    {
+      "item": "L_REQUIRED_SCREENING_CONSTRAINTS",
+      "implemented": false,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/engineering_screening/", "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/models.py", "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md"],
+      "authority_or_reason": "Screening components exist, but the required v0.7 candidate screen set/limits are not bound; Task174 FIV mode is diagnostic-only."
+    },
+    {
+      "item": "M_PASS_WARN_BLOCKED_RETENTION",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": true,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-168-manufacturable-candidate-generation-and-sizing.md", "tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py"],
+      "authority_or_reason": "TASK168 v0.6 semantics are explicitly reusable for status retention only; this does not make incomplete v0.7 candidate records recommendable."
+    },
+    {
+      "item": "N_DETERMINISTIC_RANKING",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md", "tests/exchangers/shell_tube/test_task169_selection_release.py"],
+      "authority_or_reason": "Only HXFORGE-V06-TASK169-RANKING-POLICY / 142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8 is approved; no explicit v0.7 transfer or reviewed v0.7 policy exists."
+    },
+    {
+      "item": "O_RECOMMENDATION_AND_ALTERNATIVES",
+      "implemented": true,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md", "src/hexagent/exchangers/shell_tube/selection_release/"],
+      "authority_or_reason": "Implemented under TASK169 v0.6 ranking identity; no v0.7 policy authorizes objective values, warning penalty, Top-N, ranking and recommendation semantics."
+    },
+    {
+      "item": "P_SIZING_CANONICAL_IDENTITY_AND_REPLAY",
+      "implemented": false,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": false,
+      "source_paths": ["src/hexagent/exchangers/shell_tube/manufacturable_candidates/", "src/hexagent/exchangers/shell_tube/selection_release/", "src/hexagent/exchangers/shell_tube/task173_integrated_rating/"],
+      "authority_or_reason": "Sub-component hashes/replays exist, but no reviewed v0.7 Sizing request, candidate Rating vector, ranking-policy binding and Sizing result identity are materialized."
+    },
+    {
+      "item": "Q_COMPLETE_V07_SIZING_PROVENANCE",
+      "implemented": false,
+      "reviewed_authority_available_for_v07_scope": false,
+      "case_bound_only": true,
+      "source_paths": ["docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md", "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md"],
+      "authority_or_reason": "Existing component provenance exists, but candidate-specific producers through full Rating, constraints, v0.7 ranking and recommendation have no closed acyclic chain; current integrated execution is a single reference case."
+    }
+  ],
+  "authority_gap_ledger": [
+    {
+      "blocker_id": "GAP_CANDIDATE_BOUND_TASK171",
+      "missing_authority": "Reviewed candidate-specific geometry-to-TASK171 topology, physical ownership, state and event mapping for each admitted generated geometry.",
+      "current_case_bound_source": ["docs/tasks/TASK-170-v0.7-task171-entry-authority-r4.md", "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md", "docs/tasks/TASK-172-v0.7-r119d-case-bound-task171-native-materialization-r1.md", "docs/tasks/TASK-172-v0.7-r119e-case-bound-task171-native-materialization-independent-review-r1.md"],
+      "why_reference_case_authority_cannot_transfer": "R4 reviews a narrow topology/interface and retains limitations; R119-D/E independently accept one case-bound effective Definition and exact geometry identities, not a generated candidate-space materialization mapping.",
+      "affected_component": "TASK171 candidate topology, state, cell, compartment, and physical geometry identity binding.",
+      "minimum_authority_needed": "Reviewed candidate-specific binding and fail-closed admission semantics for the supported topology domain, using each candidate's actual native producer IDs/hashes.",
+      "existing_reusable_components": ["R4 reviewed topology interface", "TASK168 v0.6 native geometry producer materialization semantics, only as permitted by this task"]
+    },
+    {
+      "blocker_id": "GAP_CANDIDATE_BOUND_TASK172",
+      "missing_authority": "Candidate-bound v0.7 thermal/property/material/domain authority for changed geometries and Sizing operating requirements.",
+      "current_case_bound_source": ["src/hexagent/exchangers/shell_tube/task172_local_runtime/models.py", "docs/tasks/TASK-172-v0.7-stage3-task172-dogbox-r3-independent-review.md"],
+      "why_reference_case_authority_cannot_transfer": "Strict request bindings pin the reference case/revision, property profile, accepted geometry, flow, wall and state domain. Reviewed R3 only changes the numerical path after a replay-valid residual-acceptance blocker.",
+      "affected_component": "Every candidate's TASK172 local heat-transfer and wall-temperature closure.",
+      "minimum_authority_needed": "Reviewed candidate-bound inputs, property/material domains, local state and constitutive applicability; preserve original R98 and reviewed numerical controls.",
+      "existing_reusable_components": ["Reference-case Task172 runtime", "Reviewed R3 fail-only dogbox overlay within its current scope"]
+    },
+    {
+      "blocker_id": "GAP_CANDIDATE_BOUND_TASK174",
+      "missing_authority": "Complete candidate-specific tube/shell hydraulic closure, pressure coupling, Bell aggregation and required operability authority.",
+      "current_case_bound_source": ["src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/models.py", "docs/tasks/TASK-172-v0.7-stage2-task172-runtime-and-task174-hydraulics-r1.md", "docs/tasks/evidence/TASK-172-stage2-task172-runtime-and-task174-hydraulics-r1.json"],
+      "why_reference_case_authority_cannot_transfer": "The API pins the reference case, topology, mesh, ownership and configuration. The reviewed Stage-2 outcome keeps TASK174 closure false with three missing scopes: tube boundary/component coverage, physical-event-to-Bell-region allocation/aggregation, and pressure-state/property coupling.",
+      "affected_component": "Candidate tube/shell DP, screening inputs and hard DP constraints.",
+      "minimum_authority_needed": "Reviewed component/exclusion coverage, candidate-specific Bell event/region aggregation, pressure/property state binding and validated result materialization for each generated geometry.",
+      "existing_reusable_components": ["Task174 typed orchestration and fail-closed checks; missing DP may not be zero-filled"]
+    },
+    {
+      "blocker_id": "GAP_TASK173_CANDIDATE_GENERALIZED_RATING",
+      "missing_authority": "Reviewed public v0.7 candidate-bound full Rating request/result semantics.",
+      "current_case_bound_source": ["src/hexagent/exchangers/shell_tube/task173_integrated_rating/models.py", "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md"],
+      "why_reference_case_authority_cannot_transfer": "Public request mode is RATING_FIXED_GEOMETRY with a Literal reference case revision and a case-bound TASK174 result; TASK170 R5 says TASK173 entry authority is incomplete. The accepted Rating cannot serve as arbitrary candidate output.",
+      "affected_component": "Full Rating of every structurally admitted candidate and its request/result replay.",
+      "minimum_authority_needed": "A separately reviewed candidate-bound Rating/Sizing request mode binding each fresh upstream identity and requiring the full reviewed v0.7 solver and candidate-applicable mesh/replay.",
+      "existing_reusable_components": ["Existing strict public reference Rating API and exact frozen reference result; preserve without loosening validation"]
+    },
+    {
+      "blocker_id": "GAP_V07_SIZING_REQUIREMENT_AUTHORITY",
+      "missing_authority": "Source-bound v0.7 requirements and exact candidate hard predicates, including required duty, tube/shell DP maxima and mandatory screening.",
+      "current_case_bound_source": ["docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md", "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-bundle-r1.md", "docs/tasks/TASK-172-v0.7-stage3-production-mesh-reexecution-after-replay-correction-r4.md"],
+      "why_reference_case_authority_cannot_transfer": "TASK170 defines responsibilities and release evidence; it does not supply this batch's reviewed numeric candidate requirements. The reference Rating computes duty and marks Sizing not applicable; it binds no required duty or candidate DP maxima.",
+      "affected_component": "Sizing request admission, hard duty/DP/screening constraints and candidate recommendability.",
+      "minimum_authority_needed": "Reviewed requirement identity/hash binding case and streams, operating inputs, duty, DP maxima, required screens, supported families/dimension authorities, limits and exact predicates.",
+      "existing_reusable_components": ["TASK168 v0.6 requirement-binding model as a structural pattern only; no anonymous values or defaults"]
+    },
+    {
+      "blocker_id": "GAP_V07_SIZING_RANKING_POLICY",
+      "missing_authority": "A reviewed v0.7 ranking policy identity and canonical hash defining objectives, weights, scales, warning penalty, tie-break and Top-N.",
+      "current_case_bound_source": ["docs/tasks/TASK-169-selection-integration-golden-release-acceptance.md", "docs/tasks/TASK-170-v0.7-scope-source-golden-freeze.md"],
+      "why_reference_case_authority_cannot_transfer": "TASK169 approves only HXFORGE-V06-TASK169-RANKING-POLICY (hash 142d58764a886a658bc24d1734b2be900843baa62c28dba849926b10a1f2fdc8). TASK170 requires policy identity and an exact v0.7 ranking trace but supplies no v0.7 policy values or explicit v0.6 transfer.",
+      "affected_component": "Deterministic ordering, recommendation, alternatives, exclusions and Sizing result identity.",
+      "minimum_authority_needed": "Owner-approved and independently reviewed v0.7 policy ID/hash freezing exact metrics/directions/weights/scales, Decimal arithmetic, warning penalty, tie break, Top-N and trace semantics.",
+      "existing_reusable_components": ["TASK169 selection engine/trace mechanics after explicit v0.7 policy binding; v0.6 policy identity itself is not reused"]
+    }
+  ],
+  "critical_decision": {
+    "candidate_bound_task171_authority_available": false,
+    "candidate_bound_task172_authority_available": false,
+    "candidate_bound_task174_authority_available": false,
+    "candidate_generalized_task173_rating_authority_available": false,
+    "v07_sizing_requirement_authority_available": false,
+    "v07_sizing_ranking_policy_authority_available": false,
+    "task168_enumeration_reused": false,
+    "task168_v06_thermal_closure_used_as_v07_final_rating": false,
+    "branch_a_implementation_authorized": false,
+    "branch_b_fail_closed": true
+  },
+  "boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "task172_changed": false,
+    "task173_rating_changed": false,
+    "production_mesh_reexecuted": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "OWNER_DIRECTION_REQUIRED_FOR_TASK173_SIZING_AUTHORITY_CLOSURE",
+    "next_gate_executed": false,
+    "stop": true
+  },
+  "validation": {
+    "focused_task171": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "focused_task172": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "focused_task173": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "focused_task174": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "task168_regressions": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "task169_selection_regressions": "PASS; included in focused group run, 221 passed, 2 skipped across six required modules",
+    "full_shell_tube": "PASS; full tests/exchangers/shell_tube suite included in combined shell-tube and HTTP/API run, combined result 2293 passed, 4 skipped",
+    "http_api": "PASS; tests/integration/test_api.py, 21 passed; also included in combined full run",
+    "ruff": "PASS; uv run --locked ruff check .",
+    "format": "PASS; uv run --locked ruff format --check .; 777 files already formatted",
+    "mypy": "PASS; CI scope, 450 source files",
+    "manifest_d_equals_m": "PASS; D==M, 259 discovered and 259 manifested",
+    "pip_audit": "PASS; no known vulnerabilities; unpublished local package not found on PyPI and skipped",
+    "uv_lock_check": "PASS; uv lock --check",
+    "uv_sync_locked_all_extras": "PASS; uv sync --locked --all-extras, 71 packages checked",
+    "git_diff_check": "PASS; git diff --check",
+    "duplicate_key_audit": "PASS; changed closeout evidence JSON contains no duplicate keys"
+  },
+  "canonical_hash": "ca6b37c400b1e15dbe0cbf5e15e45ce38303178952c35955caabc91070ed43f4"
+}
