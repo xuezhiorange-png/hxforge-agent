@@ -17,6 +17,7 @@ from prototypes.v07_fast_solver_architecture_r1.mesh_march import fast_valid_tra
 
 OUTER_BOUNDARY_AUTHORITY_ID = "V07-FAST-SOLVER-OUTER-BOUNDARY-R3"
 OUTER_BOUNDARY_AUTHORITY_ID_R4 = "V07-FAST-SOLVER-N2-OUTER-BOUNDARY-R4"
+OUTER_BOUNDARY_AUTHORITY_ID_R5 = "V07-FAST-SOLVER-N4-MESH-CONVERGENCE-R5"
 
 
 class OuterBudgetExceeded(Exception):
