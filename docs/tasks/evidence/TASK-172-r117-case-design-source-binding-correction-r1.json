@@ -1,0 +1,95 @@
+{
+  "schema_version": "task172.r117-case-design-source-binding-correction.r1",
+  "task_id": "TASK172_V0_7_R117_CASE_DESIGN_SOURCE_BINDING_CORRECTION_R1",
+  "short_name": "R117-CORRECTION-R1",
+  "mode": "R117_MACHINE_READABLE_SOURCE_BINDING_CORRECTION_ONLY",
+  "result": "R117_CASE_DESIGN_SOURCE_BINDING_CORRECTED",
+  "pr_number": 283,
+  "pr_state": "OPEN_DRAFT",
+  "authorized_predecessor_head": "4909599ed963469111eae6f5f2bbf9acc7381d09",
+  "finding": {
+    "artifact": "docs/tasks/evidence/TASK-172-project-engineering-reference-case-design-r1.json",
+    "json_pointer": "$.inputs_by_native_stage[stage=TASK022].inputs[field=maximum_position_count].source_id",
+    "finding": "TASK022.maximum_position_count referenced a non-authoritative ID.",
+    "old_source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-R1",
+    "new_source_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+    "value": 10000,
+    "classification": "BOUND_FROM_REVIEWED_AUTHORITY",
+    "value_changed": false,
+    "engineering_semantics_changed": false,
+    "authority_scope_changed": false,
+    "correction_kind": "PROVENANCE_LINKAGE_ONLY"
+  },
+  "r116_review_binding_replayed": {
+    "review_receipt_id": "V07-T172-INTERNAL-GEOMETRY-AUTHORITY-REVIEW-R116",
+    "document_sha256": "057b4788d60f9284813b57368f059f768487efa663fa0cb577af143a1a79a222",
+    "evidence_file_sha256": "a9b07629825e30c49879509ec09fbdc072481cf5524667dd9a0be61908a916d9",
+    "evidence_canonical_hash": "282fbab992b0e0c6a48e2b9624884900c2ab96f8c49733c868904611a502c9f5",
+    "extension_canonical_hash": "8683ac0bcfef0babed1d9e55da91b6938a25526d9e1634ac6b83dad1312b1285",
+    "pre_r117_registry_root_canonical_hash": "23a500779b7087d1a4bdc77087b7f7115b647fc8762f4146db4aeb6397130d99",
+    "review_result": "PASS",
+    "effective_lifecycle": "REVIEWED_AUTHORITY",
+    "reviewed_values_frozen": true
+  },
+  "pre_correction_identity": {
+    "case_design_file_sha256": "e04e025a918abf7fc08c7e5acb9b9d773222eed0281a30a5f4b4e74a1514d3a9",
+    "case_design_canonical_hash": "fa0c660cef237103a5ca93066107f37b7067bd14abd4207428fa7bd32753c616",
+    "r117_evidence_file_sha256": "b8b25bae2885b10f47da6ecc937071dabea361c82135a738eed95034e39c6d69",
+    "r117_evidence_canonical_hash": "cd9ec00e355a14dc99b3dedbc29f58ae8e896295dffe9f0087c699ce9e6c21f7",
+    "r117_extension_canonical_hash": "1034e5fa0b7843dfca31a4a6f1c9701ebdaa70b91bc51cb3a3f100f7915c2c92",
+    "registry_root_canonical_hash": "4aa35c34f592ae69b58b3b385f969faad43003cb17210c0d1e2b88b0fbbe47fc"
+  },
+  "corrected_case_design_identity": {
+    "case_design_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1",
+    "case_design_path": "docs/tasks/evidence/TASK-172-project-engineering-reference-case-design-r1.json",
+    "case_design_file_sha256": "04524496a53506b54b31df45da43c49374ce32ea3b8a7bd36aa418210496a989",
+    "case_design_canonical_hash": "563e76ef594006a205759484f17c141f3daee969d2691baf9bb472d138f848d9"
+  },
+  "correction_document": {
+    "path": "docs/tasks/TASK-172-v0.7-r117-case-design-source-binding-correction-r1.md",
+    "sha256": "7e9e1dbbe051ca4dcd7bd70b7137ceeb4d41178289b9064d2cc96d92e7bb0f83"
+  },
+  "runtime_snapshots_unchanged": {
+    "tube_catalog_record_hash": "e98cd8639bc2e1bfcfbd2664bbd4779cbf5983b9e06ca5540178bf49d5ee524d",
+    "tube_runtime_snapshot_hash": "ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2",
+    "layout_runtime_snapshot_hash": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319",
+    "bundle_runtime_snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8",
+    "approval_provenance_sidecar_canonical_hash": "2dfdb450f202ebc145063c60c6c648258f4fe76a074715197ba88e647e306bb2"
+  },
+  "validation": {
+    "predecessor_head_replay": true,
+    "r116_identity_replay": true,
+    "case_design_json_parse": true,
+    "case_design_canonical_replay": true,
+    "bound_authority_source_resolution": true,
+    "unknown_source_binding_count": 0,
+    "invalid_reviewed_authority_reference_count": 0,
+    "r117_reviewed_values_unchanged": true,
+    "runtime_snapshots_unchanged": true,
+    "r1_r116_historical_payloads_immutable": true,
+    "case_materialized": false,
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "task025_area_length_executed": false,
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "reference_policy_resolution_valid": false,
+    "real_case_mesh_admissible": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "correction_final_head_local_full_regression_status": "NOT_EXECUTED"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "task172_implementation_started": false,
+    "r118_started": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "no_step_implies_the_next": true,
+    "stop": true
+  },
+  "canonical_hash": "c1537ef3d9f2fed43c7db8b912e03452d5ad9400dab78f3286860298c4112057"
+}

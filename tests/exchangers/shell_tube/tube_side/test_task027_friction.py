@@ -494,6 +494,20 @@ class TestT027Re4000Turbulent:
         assert f_d < Decimal("0.100")
 
 
+class TestT027Stage2CaseReynoldsRegime:
+    """Stage-2 owner case replay must respect the frozen Re gap."""
+
+    def test_r1_ten_kg_s_case_remains_in_unsupported_transition_gap(self) -> None:
+        re = Decimal("3742.6752442462145")
+        assert classify_reynolds(re) == "gap"
+        assert validate_reynolds(re)[0].code == BlockerCode.BL_T027_UNSUPPORTED_REYNOLDS_REGIME
+
+    def test_r2_twelve_kg_s_case_is_in_frozen_turbulent_regime(self) -> None:
+        re = Decimal("4491.210293095457")
+        assert classify_reynolds(re) == "turbulent"
+        assert validate_reynolds(re) == []
+
+
 class TestT027ReTurbulentInterior:
     """T027_RE_TURBULENT_INTERIOR — Re=10000 (turbulent interior, smooth pipe)."""
 
