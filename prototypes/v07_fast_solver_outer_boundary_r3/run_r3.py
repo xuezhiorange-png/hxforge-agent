@@ -10,7 +10,6 @@ import json
 import multiprocessing as mp
 import sys
 import time
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +21,6 @@ if str(ROOT) not in sys.path:
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
 from hexagent.properties.coolprop_provider import CoolPropProvider
-
 from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
     OUTER_BOUNDARY_AUTHORITY_ID,
     observables_summary,
@@ -113,7 +111,11 @@ def run_bounded(subdivisions: int, budget_s: float) -> dict[str, Any]:
             return async_result.get(timeout=budget_s + 5.0)
         except mp.TimeoutError:
             pool.terminate()
-            return {"status": "TIMEOUT", "reason": "worker_join_timeout", "subdivisions": subdivisions}
+            return {
+                "status": "TIMEOUT",
+                "reason": "worker_join_timeout",
+                "subdivisions": subdivisions,
+            }
 
 
 def main() -> None:

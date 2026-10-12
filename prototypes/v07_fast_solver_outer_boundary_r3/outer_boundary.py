@@ -12,8 +12,6 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     TERMINAL_TOLERANCE_K,
 )
 from hexagent.properties.base import PropertyProvider
-from hexagent.properties.coolprop_provider import CoolPropProvider
-
 from prototypes.v07_fast_solver_architecture_r1.mesh_march import fast_valid_trajectory
 
 OUTER_BOUNDARY_AUTHORITY_ID = "V07-FAST-SOLVER-OUTER-BOUNDARY-R3"
@@ -209,7 +207,7 @@ def solve_fast_outer_boundary(
             status=status,
             shooting_enthalpy_j_kg=None,
             mesh_run=None,
-            mesh_stats_last=last_mesh_stats,
+            mesh_stats_last=None,
             stats=stats,
             blocked_code=code,
             blocked_diagnostics=exc.diagnostics,
@@ -221,7 +219,7 @@ def solve_fast_outer_boundary(
         status="TERMINAL_ACCEPTED" if accepted else "BLOCKED",
         shooting_enthalpy_j_kg=str(run.shooting_enthalpy),
         mesh_run=run,
-        mesh_stats_last=last_mesh_stats,
+        mesh_stats_last=None,
         stats=stats,
         blocked_code=None if accepted else "BLOCKED_COUNTERCURRENT_TERMINAL_BOUNDARY_TOLERANCE",
     )
