@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.task172_local_runtime.models import mesh_level_identity
@@ -16,11 +16,8 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     MeshObservables,
 )
 from hexagent.properties.base import PropertyProvider
-from prototypes.v07_fast_solver_architecture_r1.coupled_cell import (
-    FAST_CELL_AUTHORITY_ID,
-    CoupledCellStats,
-    solve_coupled_cell,
-)
+from prototypes.v07_fast_solver_architecture_r1 import coupled_cell as coupled_r2
+from prototypes.v07_fast_solver_architecture_r1 import coupled_cell_r1_baseline as coupled_r1
 
 
 @dataclass
@@ -30,8 +27,12 @@ class FastMeshStats:
     coupled_fallback_count: int = 0
     total_eval_trial_calls: int = 0
     total_least_squares_nfev: int = 0
-    per_cell: list[CoupledCellStats] = field(default_factory=list)
-    authority_id: str = FAST_CELL_AUTHORITY_ID
+    experimental_total_production_task172_calls: int = 0
+    experimental_total_production_cell_root_calls: int = 0
+    cell_receipts: list[dict[str, Any]] = field(default_factory=list)
+    per_cell: list[Any] = field(default_factory=list)
+    authority_id: str = ""
+    cell_solver_variant: str = ""
 
 
 def fast_valid_trajectory(
@@ -40,10 +41,24 @@ def fast_valid_trajectory(
     provider: PropertyProvider,
     shell_authority: Any,
     outer_iterations: int = 0,
+    *,
+    cell_solver: Literal["r1", "r2"] = "r2",
 ) -> tuple[Any, FastMeshStats]:
     """Production-equivalent mesh topology with coupled cell closure."""
     t0 = time.perf_counter()
-    mesh_stats = FastMeshStats()
+    mesh_stats = FastMeshStats(
+        cell_solver_variant=cell_solver,
+        authority_id=(
+            coupled_r2.FAST_CELL_AUTHORITY_ID
+            if cell_solver == "r2"
+            else coupled_r1.FAST_CELL_AUTHORITY_ID
+        ),
+    )
+    if cell_solver == "r2":
+        solve_cell = coupled_r2.solve_coupled_cell
+    else:
+        solve_cell = coupled_r1.solve_coupled_cell
+    warm_start: coupled_r2.WarmStart | None = None
     candidate_context = t173._CANDIDATE_RATING_CONTEXT.get()
     hole_neighborhoods: list[dict[str, str]] = []
     mesh_id = (
@@ -94,21 +109,57 @@ def fast_valid_trajectory(
                 if candidate_context is not None
                 else t173.build_local_support(interval_index, subdivisions, subdivision_index)
             )
-            cell_stat = CoupledCellStats()
-            solution = solve_coupled_cell(
-                support=support,
-                tube_upstream=tube_face_thermo,
-                shell_physical_left=shell_face_thermo,
-                provider=provider,
-                shell_authority=shell_authority,
-                stats=cell_stat,
-            )
+            if cell_solver == "r2":
+                cell_stat = coupled_r2.CoupledCellStats()
+            else:
+                cell_stat = coupled_r1.CoupledCellStats()
+            if cell_solver == "r2":
+                solution = solve_cell(
+                    support=support,
+                    tube_upstream=tube_face_thermo,
+                    shell_physical_left=shell_face_thermo,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    stats=cell_stat,
+                    warm_start=warm_start,
+                )
+            else:
+                solution = solve_cell(
+                    support=support,
+                    tube_upstream=tube_face_thermo,
+                    shell_physical_left=shell_face_thermo,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    stats=cell_stat,
+                )
             mesh_stats.per_cell.append(cell_stat)
             mesh_stats.cell_count += 1
-            if cell_stat.fallback_to_production_cell_root:
+            fallback = (
+                cell_stat.coupled_solver_status == "FALLBACK_PRODUCTION_CELL_ROOT"
+                if cell_solver == "r2"
+                else cell_stat.fallback_to_production_cell_root
+            )
+            if fallback:
                 mesh_stats.coupled_fallback_count += 1
             mesh_stats.total_eval_trial_calls += cell_stat.eval_trial_calls
             mesh_stats.total_least_squares_nfev += cell_stat.least_squares_nfev
+            if cell_solver == "r2":
+                mesh_stats.experimental_total_production_task172_calls += (
+                    cell_stat.production_task172_calls
+                )
+                mesh_stats.experimental_total_production_cell_root_calls += (
+                    cell_stat.production_cell_root_calls
+                )
+                mesh_stats.cell_receipts.append(cell_stat.to_receipt())
+                warm_start = (
+                    float(solution.task172_result.signed_q_hot_to_cold_w),
+                    float(solution.task172_result.wall_temperature_inner_k),
+                    float(solution.task172_result.wall_temperature_outer_k),
+                )
+            else:
+                mesh_stats.experimental_total_production_task172_calls += (
+                    1 if not fallback else 0
+                )
             coordinate = support.support_end_m
             face_index = len(tube_faces)
             tube_right = t173._face_state(

@@ -1,4 +1,9 @@
-# Authority candidate: V07-FAST-SOLVER-COUPLED-CELL-R1
+# Authority candidate: V07-FAST-SOLVER-COUPLED-CELL-R2
+
+Supersedes R1 candidate for cell-closure experiments. R1 snapshot kept in
+`coupled_cell_r1_baseline.py` for regression comparisons.
+
+# Prior: V07-FAST-SOLVER-COUPLED-CELL-R1
 
 ## Scope
 
