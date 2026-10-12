@@ -1,0 +1,78 @@
+{
+  "schema_version": "task172.r118c-r9.runtime-authority-binding-evaluation.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "attempt_number": 9,
+  "verification_layers": [
+    "ARTIFACT_FILE_IDENTITY",
+    "NATIVE_SNAPSHOT_PAYLOAD_IDENTITY",
+    "EXTERNAL_GOVERNANCE_AUTHORITY_BINDING"
+  ],
+  "runtime_authority_bindings": {
+    "governance_binding": {
+      "approval_sidecar_external_canonical_hash": "2dfdb450f202ebc145063c60c6c648258f4fe76a074715197ba88e647e306bb2",
+      "approval_sidecar_file_sha256": "3992da07decfa09cf8db86f559738e80d97ca4de2ce6bef8a38fb47a0575a82c",
+      "approval_sidecar_path": "docs/tasks/evidence/TASK-172-r117-runtime-authority-approval-provenance-r1.json",
+      "authority_binding_count": 3,
+      "evidence_path": "docs/tasks/evidence/TASK-172-runtime-authority-materialization-and-project-engineering-case-design-r1.json",
+      "harness_binding_separate_from_native_payload": true,
+      "raw_sidecar_canonical_hash_field": "",
+      "registry_extension_key": "r117_extension.runtime_authority_materialization",
+      "snapshot_payload_mutation_count": 0,
+      "three_way_binding_pass": true,
+      "three_way_bindings": {
+        "shell_bundle_rule": {
+          "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+          "evidence_binding_pass": true,
+          "registry_binding_pass": true,
+          "sidecar_binding_pass": true,
+          "snapshot_file_sha256": "df743b8f91b2242ba808fc2ecb8731214a94cdc2f8f8f2430b1a54bf12e07c38",
+          "snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8",
+          "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-shell-bundle-rule-runtime-snapshot-r1.json"
+        },
+        "tube_geometry": {
+          "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+          "evidence_binding_pass": true,
+          "registry_binding_pass": true,
+          "sidecar_binding_pass": true,
+          "snapshot_file_sha256": "f833d19caa3faeab2771b93e9b16e90c2b60368f04d4b59b94f53139bf7241f0",
+          "snapshot_hash": "ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2",
+          "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-runtime-snapshot-r1.json"
+        },
+        "tube_layout_rule": {
+          "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+          "evidence_binding_pass": true,
+          "registry_binding_pass": true,
+          "sidecar_binding_pass": true,
+          "snapshot_file_sha256": "54f0ec95eba4a5fb4f534850166d0fba470dab643adb704317235109665f7f96",
+          "snapshot_hash": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319",
+          "snapshot_path": "docs/tasks/evidence/TASK-172-r117-approved-tube-layout-rule-runtime-snapshot-r1.json"
+        }
+      }
+    },
+    "shell_bundle_rule": {
+      "actual_file_sha256": "df743b8f91b2242ba808fc2ecb8731214a94cdc2f8f8f2430b1a54bf12e07c38",
+      "authority_id": "V07-T172-INTERNAL-SHELL-BUNDLE-GEOMETRY-RULE-R1",
+      "file_sha256": "df743b8f91b2242ba808fc2ecb8731214a94cdc2f8f8f2430b1a54bf12e07c38",
+      "path": "docs/tasks/evidence/TASK-172-r117-approved-shell-bundle-rule-runtime-snapshot-r1.json",
+      "snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8"
+    },
+    "tube_geometry": {
+      "actual_file_sha256": "f833d19caa3faeab2771b93e9b16e90c2b60368f04d4b59b94f53139bf7241f0",
+      "authority_id": "V07-T172-INTERNAL-TUBE-GEOMETRY-R1",
+      "file_sha256": "f833d19caa3faeab2771b93e9b16e90c2b60368f04d4b59b94f53139bf7241f0",
+      "path": "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-runtime-snapshot-r1.json",
+      "snapshot_hash": "ad70e011946ce47e81fdfd5abe7b6376beeb4f4f438bc83e92a703d6f9ee23e2"
+    },
+    "tube_layout_rule": {
+      "actual_file_sha256": "54f0ec95eba4a5fb4f534850166d0fba470dab643adb704317235109665f7f96",
+      "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+      "file_sha256": "54f0ec95eba4a5fb4f534850166d0fba470dab643adb704317235109665f7f96",
+      "path": "docs/tasks/evidence/TASK-172-r117-approved-tube-layout-rule-runtime-snapshot-r1.json",
+      "snapshot_hash": "a4f7383fc5cd865592a766be245aae0ba063136970e905d56681314cac600319"
+    }
+  },
+  "snapshot_payload_mutation_count": 0,
+  "harness_authority_binding_separate_from_native_payload": true,
+  "three_way_binding_pass": true,
+  "canonical_hash": "06d7b4042252adc3a52e0f3cd1e55abb6f298e21fc060ed81b2100faa328e4b8"
+}
