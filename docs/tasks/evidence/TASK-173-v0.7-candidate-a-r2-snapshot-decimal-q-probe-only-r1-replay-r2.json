@@ -1,0 +1,141 @@
+{
+  "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+  "canonical_replay_receipt_hash": "47d8fc754131323cc63912a93b1bf1da3db8c593c5a6b007ecc56791214fcd06",
+  "checks": {
+    "candidate_space_changed": "false",
+    "completion_request_replay": "PASS",
+    "frozen_completion_request_changed": "false",
+    "numerical_tolerance_changed": "false",
+    "original_endpoint_identity_replay": "PASS",
+    "probe_request_result_hash_replay": "PASS",
+    "production_code_changed": "false",
+    "provider_snapshot_hash_replay": "PASS",
+    "r2_snapshot_rehydration": "PASS",
+    "r2a_authority_changed": "false",
+    "runtime_source_binding": "PASS",
+    "task172_contract_changed": "false",
+    "validation_budget": "PASS"
+  },
+  "completion_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+  "completion_request_replay_script": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-full-sizing-completion-request-r1-replay.py",
+    "raw_bytes": 22401,
+    "sha256": "ae61d83f6864037a76855651b516e8461b5f4efb46b5c05e95fa9fb685ca0d12"
+  },
+  "execution_summary": {
+    "budget_units_including_two_saved_endpoint_identity_replays": 67,
+    "cross_run_deterministic_result_identity": "FAIL",
+    "decimal_q_probe_count": 65,
+    "distinct_probe_request_hash_count": 1,
+    "distinct_probe_request_hashes": [
+      "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072"
+    ],
+    "distinct_probe_result_hash_count": 1,
+    "distinct_probe_result_hashes": [
+      "7e0512079ac5f28765f5685ff9ba761d56e0db277698b25ae6c26dc9984b8acc"
+    ],
+    "full_n32_reconstruction_executed": false,
+    "min_abs_f_w": "0.00001519025221096600773744285107",
+    "point_root_recovered": false,
+    "provider_ph_signature_count": 1,
+    "provider_plateau_classification": "SINGLE_PH_INPUT_SIGNATURE_ACROSS_BOUNDED_GRID",
+    "public_full_rating_reexecuted": false,
+    "public_sizing_reexecuted": false,
+    "root_repeat_validation": "NOT_APPLICABLE_NO_ROOT",
+    "task172_result_discontinuity_classification": "NO_TASK172_RESULT_DISCONTINUITY_OBSERVED_IN_BOUNDED_PROBES",
+    "task172_validation_count": 65,
+    "validated_probe_count": 65,
+    "validation_budget_cap": 140,
+    "within_probe_same_request_result_identity_replay": "PASS"
+  },
+  "original_endpoint_request_result_hashes": [
+    {
+      "F_native_decimal_context_w": "-0.0000053178744",
+      "request_hash": "4fa675e1a36bd49c67957d2ed0a9dbef808529ffef7f2bdc6b51153da421c754",
+      "result_hash": "748819390174c8a2fa88f980b5073366817cce9d158c8bf9c56c52dd66e07ee9",
+      "side": "LEFT"
+    },
+    {
+      "F_native_decimal_context_w": "0.00001519025227",
+      "request_hash": "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072",
+      "result_hash": "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573",
+      "side": "RIGHT"
+    }
+  ],
+  "r1_probe_helper": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r1.py",
+    "raw_bytes": 125423,
+    "sha256": "9edcf2c700885aa8bb3ad70d195d09b97d36fd09bb5f959625470fcca28999d8"
+  },
+  "r2_raw_artifacts": {
+    "checkpoint": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r2-execution/checkpoint.json",
+      "preserved_read_only": true,
+      "raw_bytes": 471036749,
+      "sha256": "87f0391c4ae26008a6bfe93c6e7a1f1657e1925658550dbd0ca55da96e9f138f"
+    },
+    "execution": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r2.json",
+      "preserved_read_only": true,
+      "raw_bytes": 471057121,
+      "sha256": "59e4e8218f61551ae00421ebcc88cf4ea8870cadd5bbca22420caa9c8930c6fe"
+    },
+    "trace": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r2-execution/trace.jsonl",
+      "preserved_read_only": true,
+      "raw_bytes": 311208673,
+      "sha256": "e8c719c48842ecb5369a63a375c5004af81152c260c07dbc96a218c9113d1618"
+    }
+  },
+  "r2_replay_script": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r2-replay.py",
+    "raw_bytes": 21305,
+    "sha256": "2bd0474e1dd1abe887dac1ec8f0559303f8167260c9e2b423a4f630b101464ff"
+  },
+  "r3_execution_evidence": {
+    "canonical_hash": "1e6b545eed5080b15b70143d33dc5f2fdd1e940e2d1298aab70bc6da6f441538",
+    "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-r2-snapshot-decimal-q-probe-only-r1.json",
+    "raw_bytes": 15785230,
+    "sha256": "1c325d57ddbd30282851d84a87aac358beae38fb146989d1d10c62119ebde8ac"
+  },
+  "r3_preflight": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-r2-snapshot-decimal-q-probe-only-r1-preflight-r3.json",
+    "raw_bytes": 1832241,
+    "sha256": "40ce7915d950be3d036d9f7c4a44c162046dc8cd52fa42118accd741f1134cde"
+  },
+  "replay_head": "bfe4566229e7f70b234f6d1dcf9874cea4b1068f",
+  "result": "NOT_FOUND_IN_BOUNDED_PROBES",
+  "runner_sha256_at_replay": "266a274f5528733cac2279ceacfc1b7b1dd71af00fcc380055f77a8f708f92ef",
+  "runtime_source_binding": {
+    "bound_runtime_worktree_clean": true,
+    "current_head": "bfe4566229e7f70b234f6d1dcf9874cea4b1068f",
+    "current_tree": "4e3be90aaa10318495c91df2d15ccf806ee45985",
+    "runtime_paths_byte_identical": true,
+    "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+    "runtime_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952"
+  },
+  "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+  "runtime_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952",
+  "same_request_r2_right_vs_r3_probe": {
+    "classification": "SAME_REQUEST_DIFFERENT_RESULT_IDENTITY_ACROSS_R2_R3",
+    "provider_ph_input_signature_equal": true,
+    "r3_probe_request_hash": "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072",
+    "r3_probe_result_hash": "7e0512079ac5f28765f5685ff9ba761d56e0db277698b25ae6c26dc9984b8acc",
+    "request_hash_equal": true,
+    "request_projection_exact_equal": true,
+    "result_preimage_equal": false,
+    "result_projection_diff_fields": [
+      "result_hash",
+      "result_id",
+      "shell_htc_w_m2_k",
+      "shell_j_mu",
+      "tube_htc_w_m2_k"
+    ],
+    "saved_right_request_hash": "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072",
+    "saved_right_result_hash": "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573"
+  },
+  "schema_version": "task173.r2-snapshot-decimal-q-probe-replay.v1",
+  "start_head": "bfe4566229e7f70b234f6d1dcf9874cea4b1068f",
+  "task168_candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+  "task_id": "STAGE3_TASK173_CANDIDATE_A_R2_SNAPSHOT_DECIMAL_Q_PROBE_ONLY_RECOVERY_R1"
+}

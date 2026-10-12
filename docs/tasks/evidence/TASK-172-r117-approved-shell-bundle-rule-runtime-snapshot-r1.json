@@ -1,0 +1,38 @@
+{
+  "schema_version": "task022.shell-bundle-rule-authority.v1",
+  "profile_id": "hxforge.shell_tube.shell_bundle_geometry.v1",
+  "authority_mode": "INTERNAL_GENERIC",
+  "rule_id": "V07-T172-SHELL-BUNDLE-INTERNAL-R1",
+  "rule_version": "R1",
+  "rule_artifact_canonical_hash": "5c292c427993808af0d42847c188fb9bd778a17615728e8f1ba8610e0d2d7282",
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "license_evidence": {
+    "form": "project_internal_authority",
+    "value": "project_internal_authority",
+    "authority_class": "PROJECT_INTERNAL_ENGINEERING_RULE",
+    "standard_claim_status": "NO_STANDARD_CLAIM",
+    "external_standard_content_used": false,
+    "restricted_source_content_used": false,
+    "vendor_proprietary_content_used": false
+  },
+  "approval_status": "approved",
+  "provenance_edge_ids": [
+    "R115-EDGE-BUNDLE-OWNER-DESIGN",
+    "R115-EDGE-BUNDLE-TASK012-LICENSE",
+    "R115-EDGE-BUNDLE-TASK022-SCHEMA"
+  ],
+  "evidence_refs": [
+    "docs/tasks/TASK-012-standards-rule-pack-license-boundary.md#rule-artifact-fields",
+    "docs/tasks/TASK-022-shell-and-bundle-geometry.md#permitted-authority-strategy",
+    "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md#task-022-bundle-geometry-rule",
+    "docs/tasks/evidence/TASK-172-internal-shell-bundle-rule-authority-r1.json#/rule"
+  ],
+  "rule_pack_identity": null,
+  "allowed_shell_authority_modes": [
+    "CALLER_SUPPLIED_EXPLICIT"
+  ],
+  "minimum_bundle_peripheral_allowance_m": "0.00635",
+  "minimum_radial_clearance_m": "0.00635",
+  "maximum_position_count": 10000,
+  "snapshot_hash": "cb3bd64b809a3460a0e205650927585a61b46713bb565d45b480387fd7702df8"
+}
