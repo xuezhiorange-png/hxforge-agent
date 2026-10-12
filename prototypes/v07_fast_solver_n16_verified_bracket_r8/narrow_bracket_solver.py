@@ -20,6 +20,7 @@ from prototypes.v07_fast_solver_outer_continuation_n16_r7.outer_continuation imp
 )
 
 OUTER_VERIFIED_BRACKET_AUTHORITY_ID = "V07-FAST-SOLVER-N16-VERIFIED-BRACKET-R8"
+OUTER_N32_CONVERGENCE_AUTHORITY_ID = "V07-FAST-SOLVER-N32-CONVERGENCE-R9"
 
 
 class BracketRevalidationFailed(Exception):
@@ -33,10 +34,11 @@ def solve_verified_narrow_bracket_outer_boundary(
     *,
     h_low_j_kg: str,
     h_high_j_kg: str,
+    authority_id: str = OUTER_VERIFIED_BRACKET_AUTHORITY_ID,
     deadline_monotonic: float | None = None,
     on_trial_receipt: Callable[..., None] | None = None,
 ) -> tuple[FastOuterBoundaryResult, dict[str, Any]]:
-    stats = FastOuterBoundaryStats(authority_id=OUTER_VERIFIED_BRACKET_AUTHORITY_ID)
+    stats = FastOuterBoundaryStats(authority_id=authority_id)
     revalidation: dict[str, Any] = {
         "low_endpoint_revalidated": False,
         "high_endpoint_revalidated": False,
