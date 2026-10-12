@@ -1,0 +1,39 @@
+{
+  "schema_version": "task173.supplemental-functional-acceptance-review-erratum.v1",
+  "erratum_id": "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2-INDEPENDENT-REVIEW-R1-ERRATUM-1",
+  "base_review_commit": "fd725fafb005014e82bcd24526524fb0bc58a315",
+  "scope": "CORRECT_ONE_MALFORMED_AUTHORITY_HASH_AND_REPLAY_FILE_HASH_ONLY",
+  "original_review_verdict_retained": "PASS",
+  "corrected_identity": {
+    "name": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "incorrect_original_receipt_value": "750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9",
+    "incorrect_value_hex_length": 63,
+    "authoritative_hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "authoritative_hash_hex_length": 64,
+    "source_evidence": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-sizing-authority-closure-package-r2.json",
+      "field": "authority_package_hash",
+      "git_blob": "f682e84584b4f651cd0143c040d755d1a7fa4297",
+      "sha256": "db3136f58dbfd7d0d3f681adf00f394880648a60737a40955478ae0825538a73"
+    },
+    "cross_check_source": {
+      "path": "docs/tasks/TASK-173-v0.7-sizing-authority-closure-package-r2.md",
+      "field": "AUTHORITY_PACKAGE_CANONICAL_HASH",
+      "git_blob": "114692d1fad7e992d30ada1b0c0bcf20edf4c101",
+      "sha256": "047c0b17f6a1ca94d9035d84a7ea36d9a204394351c92f5f5e9b6af2e2c9b2fa"
+    }
+  },
+  "replay_file_hash_correction": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-supplemental-functional-acceptance-r2-replay.py",
+    "sha256_before_format_only_change": "69a1438d0340beb997849ce48148c6bd8acb511ef0b9495d524c02ba6e038f38",
+    "sha256_after_format_only_change": "0527379c37d5b03f124fda52c12fa7b420c8043c8732f69c395d6897e5d15685",
+    "ruff_rule": "I001",
+    "ruff_format_check": "PASS",
+    "format_only_change": true,
+    "semantics_changed": false
+  },
+  "review_correction_status": "PENDING_NARROW_INDEPENDENT_REVIEW",
+  "production_code_changed": false,
+  "tests_changed": false,
+  "rating_or_sizing_executed": false
+}

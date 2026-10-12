@@ -1,0 +1,4 @@
+{"case":"baseline-1","recorded_at_utc":"2026-10-08T08:06:03.885020+00:00","request_hash":"b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072","sequence":1,"state":"CALL_AUTHORIZED_AND_STARTING"}
+{"case":"baseline-2","recorded_at_utc":"2026-10-08T08:06:05.873816+00:00","request_hash":"b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072","sequence":2,"state":"CALL_AUTHORIZED_AND_STARTING"}
+{"case":"precision100-1","recorded_at_utc":"2026-10-08T08:06:07.665741+00:00","request_hash":"b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072","sequence":3,"state":"CALL_AUTHORIZED_AND_STARTING"}
+{"case":"precision100-2","recorded_at_utc":"2026-10-08T08:06:09.465741+00:00","request_hash":"b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072","sequence":4,"state":"CALL_AUTHORIZED_AND_STARTING"}
