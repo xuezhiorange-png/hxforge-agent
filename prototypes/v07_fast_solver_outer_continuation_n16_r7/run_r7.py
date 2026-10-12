@@ -53,9 +53,7 @@ CANDIDATE_B_ID = "e152cca9-fd5d-59ca-9b46-1df574eee841"
 R5_EVIDENCE = (
     ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-n4-mesh-convergence-r5-20261012T140705Z.json"
 )
-R6_EVIDENCE = (
-    ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-20261012T145033Z.json"
-)
+R6_EVIDENCE = ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-20261012T145033Z.json"
 TOTAL_BUDGET_S = 1200.0
 N4_VALIDATION_BUDGET_S = 400.0
 N16_WORKER_BUDGET_S = 900.0
@@ -137,9 +135,10 @@ class _TrialPushBatcher:
         with self.trials_jsonl.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
         self._since_push += 1
-        if self._since_push >= TRIAL_PUSH_EVERY or (
-            time.monotonic() - self._last_push
-        ) >= TRIAL_PUSH_MAX_INTERVAL_S:
+        if (
+            self._since_push >= TRIAL_PUSH_EVERY
+            or (time.monotonic() - self._last_push) >= TRIAL_PUSH_MAX_INTERVAL_S
+        ):
             _git_push_files(
                 f"R7 outer trial receipts through {receipt.trial_index}",
                 [self.trials_jsonl],
@@ -178,33 +177,20 @@ def _validate_n4_continuation(
     new_trials = result.stats.outer_trial_count
     old_trials = int(baseline["outer_trial_count"])
     shooting_ok = (
-        abs(
-            Decimal(result.shooting_enthalpy_j_kg)
-            - Decimal(baseline["shooting_enthalpy_j_kg"])
-        )
+        abs(Decimal(result.shooting_enthalpy_j_kg) - Decimal(baseline["shooting_enthalpy_j_kg"]))
         <= SHOOTING_ABS_TOL_J_KG
     )
-    duty_delta = abs(
-        Decimal(obs.get("duty_w", "0")) - Decimal(baseline["duty_w"])
-    )
+    duty_delta = abs(Decimal(obs.get("duty_w", "0")) - Decimal(baseline["duty_w"]))
     terminal_ok = obs.get("terminal_tolerance_pass") == "True"
-    exact_mesh_hash_match = (
-        obs.get("experimental_mesh_result_hash") == baseline["mesh_hash"]
-    )
+    exact_mesh_hash_match = obs.get("experimental_mesh_result_hash") == baseline["mesh_hash"]
     numerical_comparison_within_tolerance = (
         shooting_ok and duty_delta <= DUTY_ABS_TOL_W and terminal_ok
     )
     worker_s = result.stats.worker_wall_seconds
     speedup_hist = baseline_wall / worker_s if worker_s else 0
-    speedup_std = (
-        standard_wall / worker_s
-        if worker_s and standard_wall
-        else 0
-    )
+    speedup_std = standard_wall / worker_s if worker_s and standard_wall else 0
     trial_reduction = old_trials / new_trials if new_trials else 0
-    faster_than_standard = (
-        standard_trials is not None and new_trials <= standard_trials
-    )
+    faster_than_standard = standard_trials is not None and new_trials <= standard_trials
     validated = (
         result.status == "TERMINAL_ACCEPTED"
         and shooting_ok
@@ -468,9 +454,7 @@ def main() -> None:
                 "headroom_subdivisions": rolling.headroom_subdivisions,
                 "mesh_candidate_identified": rolling.mesh_candidate_identified,
                 "headroom_status": rolling.headroom_status,
-                "consecutive_passing_pair_indices": list(
-                    rolling.consecutive_passing_pair_indices
-                ),
+                "consecutive_passing_pair_indices": list(rolling.consecutive_passing_pair_indices),
                 "comparison_history": list(rolling.comparison_history),
             },
             "n8_n16_mesh_comparison": n8_n16,

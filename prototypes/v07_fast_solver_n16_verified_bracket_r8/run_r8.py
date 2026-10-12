@@ -47,9 +47,7 @@ TASK_ID = "V07_FAST_SOLVER_N16_VERIFIED_BRACKET_R8"
 SOURCE_SHA = "86cf9583eb3f417d66f3f0c6e7603db2504fa43b"
 BRANCH = "cursor/v07-fast-solver-n16-verified-bracket-r8-1201"
 CANDIDATE_B_ID = "e152cca9-fd5d-59ca-9b46-1df574eee841"
-R6_EVIDENCE = (
-    ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-20261012T145033Z.json"
-)
+R6_EVIDENCE = ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-20261012T145033Z.json"
 TOTAL_BUDGET_S = 480.0
 N16_WORKER_BUDGET_S = 420.0
 WORKER_JOIN_GRACE_S = 15.0
@@ -129,9 +127,10 @@ class _TrialPushBatcher:
         with self.trials_jsonl.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
         self._since_push += 1
-        if self._since_push >= TRIAL_PUSH_EVERY or (
-            time.monotonic() - self._last_push
-        ) >= TRIAL_PUSH_MAX_INTERVAL_S:
+        if (
+            self._since_push >= TRIAL_PUSH_EVERY
+            or (time.monotonic() - self._last_push) >= TRIAL_PUSH_MAX_INTERVAL_S
+        ):
             _git_push_files(
                 f"R8 trial receipts through {receipt.trial_index}",
                 [self.trials_jsonl],
@@ -214,9 +213,7 @@ def main() -> None:
         "fix": "exact_mesh_hash_match and numerical_comparison_within_tolerance separated",
         "experimental_authority_status": "CANDIDATE",
     }
-    correction_path = (
-        ROOT / "docs/tasks/evidence/V07-R7-hash-status-correction-r8-20261012.json"
-    )
+    correction_path = ROOT / "docs/tasks/evidence/V07-R7-hash-status-correction-r8-20261012.json"
     correction_path.write_text(json.dumps(correction, indent=2, sort_keys=True), encoding="utf-8")
 
     ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -311,9 +308,7 @@ def main() -> None:
             [compare_mesh_pair(n8_run, n16_run_mesh)],
         )
         rolling_status = (
-            "MESH_CANDIDATE_IDENTIFIED"
-            if rolling.mesh_candidate_identified
-            else "NOT_IDENTIFIED"
+            "MESH_CANDIDATE_IDENTIFIED" if rolling.mesh_candidate_identified else "NOT_IDENTIFIED"
         )
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
     else:

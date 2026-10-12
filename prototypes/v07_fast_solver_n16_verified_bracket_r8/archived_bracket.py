@@ -15,8 +15,7 @@ R7_TRIALS_JSONL = (
 )
 R7_SOURCE_COMMIT = "86cf9583eb3f417d66f3f0c6e7603db2504fa43b"
 R7_RESULT_JSON = (
-    ROOT
-    / "docs/tasks/evidence/V07-FAST-SOLVER-outer-continuation-n16-r7-20261012T155035Z.json"
+    ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-outer-continuation-n16-r7-20261012T155035Z.json"
 )
 LOW_TRIAL_INDEX = 21
 HIGH_TRIAL_INDEX = 25

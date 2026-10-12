@@ -20,9 +20,7 @@ def _hash_flags(
     duty_actual: str,
     terminal_ok: bool,
 ) -> tuple[bool, bool]:
-    shooting_ok = (
-        abs(Decimal(shooting_actual) - Decimal(shooting_ref)) <= SHOOTING_ABS_TOL_J_KG
-    )
+    shooting_ok = abs(Decimal(shooting_actual) - Decimal(shooting_ref)) <= SHOOTING_ABS_TOL_J_KG
     duty_delta = abs(Decimal(duty_actual) - Decimal(duty_ref))
     exact_mesh_hash_match = obs_hash == baseline_hash
     numerical_comparison_within_tolerance = (
