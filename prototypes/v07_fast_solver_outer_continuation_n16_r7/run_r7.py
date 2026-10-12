@@ -188,9 +188,12 @@ def _validate_n4_continuation(
         Decimal(obs.get("duty_w", "0")) - Decimal(baseline["duty_w"])
     )
     terminal_ok = obs.get("terminal_tolerance_pass") == "True"
-    hash_ok = obs.get("experimental_mesh_result_hash") == baseline["mesh_hash"]
-    if not hash_ok and shooting_ok and terminal_ok:
-        hash_ok = duty_delta <= DUTY_ABS_TOL_W
+    exact_mesh_hash_match = (
+        obs.get("experimental_mesh_result_hash") == baseline["mesh_hash"]
+    )
+    numerical_comparison_within_tolerance = (
+        shooting_ok and duty_delta <= DUTY_ABS_TOL_W and terminal_ok
+    )
     worker_s = result.stats.worker_wall_seconds
     speedup_hist = baseline_wall / worker_s if worker_s else 0
     speedup_std = (
@@ -206,15 +209,17 @@ def _validate_n4_continuation(
         result.status == "TERMINAL_ACCEPTED"
         and shooting_ok
         and duty_delta <= DUTY_ABS_TOL_W
-        and hash_ok
-        and terminal_ok
+        and numerical_comparison_within_tolerance
         and faster_than_standard
     )
     return {
         "validated": validated,
         "shooting_enthalpy_match": shooting_ok,
         "duty_delta_w": str(duty_delta),
-        "mesh_hash_match": hash_ok,
+        "exact_mesh_hash_match": exact_mesh_hash_match,
+        "numerical_comparison_within_tolerance": numerical_comparison_within_tolerance,
+        "mesh_hash_match": exact_mesh_hash_match,
+        "experimental_authority_status": "CANDIDATE",
         "terminal_tolerance_pass": terminal_ok,
         "new_outer_trial_count": new_trials,
         "baseline_outer_trial_count": old_trials,
