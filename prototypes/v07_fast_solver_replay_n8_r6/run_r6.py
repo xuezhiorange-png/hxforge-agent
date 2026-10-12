@@ -201,23 +201,39 @@ def run_n8_bounded(budget_s: float, trials_jsonl: Path) -> dict[str, Any]:
 
 
 def _convergence_sequence(mesh_runs: dict[str, t173._MeshRun]) -> dict[str, Any]:
+    from prototypes.v07_fast_solver_outer_continuation_n16_r7.rolling_mesh_selector import (
+        evaluate_rolling_mesh_convergence,
+    )
+
     n1_n2 = comparison_payload(compare_mesh_pair(mesh_runs["n1"], mesh_runs["n2"]))
     n2_n4 = comparison_payload(compare_mesh_pair(mesh_runs["n2"], mesh_runs["n4"]))
+    seq = [1, 2, 4]
+    comparisons = [
+        compare_mesh_pair(mesh_runs["n1"], mesh_runs["n2"]),
+        compare_mesh_pair(mesh_runs["n2"], mesh_runs["n4"]),
+    ]
     n4_n8: dict[str, Any] | None = None
     if "n8" in mesh_runs:
         n4_n8 = comparison_payload(compare_mesh_pair(mesh_runs["n4"], mesh_runs["n8"]))
-    two_pass = (
-        n1_n2.get("overall_status") == "PASS"
-        and n2_n4.get("overall_status") == "PASS"
+        seq.append(8)
+        comparisons.append(compare_mesh_pair(mesh_runs["n4"], mesh_runs["n8"]))
+    rolling = evaluate_rolling_mesh_convergence(seq, comparisons)
+    candidate_status = (
+        "MESH_CANDIDATE_IDENTIFIED"
+        if rolling.mesh_candidate_identified
+        else "NOT_IDENTIFIED"
     )
-    three_pass = two_pass and n4_n8 is not None and n4_n8.get("overall_status") == "PASS"
-    candidate_status = "MESH_CANDIDATE_IDENTIFIED" if three_pass else "NOT_IDENTIFIED"
     return {
         "n1_n2_mesh_comparison": n1_n2,
         "n2_n4_mesh_comparison": n2_n4,
         "n4_n8_mesh_comparison": n4_n8,
         "convergence_candidate_status": candidate_status,
-        "headroom_status": "NOT_EXECUTED",
+        "rolling_evaluation": {
+            "candidate_subdivisions": rolling.candidate_subdivisions,
+            "headroom_subdivisions": rolling.headroom_subdivisions,
+            "headroom_status": rolling.headroom_status,
+        },
+        "headroom_status": rolling.headroom_status,
     }
 
 
