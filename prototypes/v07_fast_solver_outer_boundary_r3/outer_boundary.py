@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal
@@ -15,6 +16,11 @@ from hexagent.properties.base import PropertyProvider
 from prototypes.v07_fast_solver_architecture_r1.mesh_march import fast_valid_trajectory
 
 OUTER_BOUNDARY_AUTHORITY_ID = "V07-FAST-SOLVER-OUTER-BOUNDARY-R3"
+OUTER_BOUNDARY_AUTHORITY_ID_R4 = "V07-FAST-SOLVER-N2-OUTER-BOUNDARY-R4"
+
+
+class OuterBudgetExceeded(Exception):
+    """Raised when an outer-boundary wall-clock budget is exceeded (fail-closed)."""
 
 
 @dataclass
@@ -56,9 +62,13 @@ class FastOuterBoundaryStats:
     mesh_march_count: int = 0
     total_eval_trial_calls: int = 0
     experimental_total_production_task172_calls: int = 0
-    total_wall_seconds: float = 0.0
+    worker_wall_seconds: float = 0.0
+    outer_trial_wall_seconds_sum: float = 0.0
+    mesh_march_wall_seconds_sum: float = 0.0
     trial_receipts: list[OuterTrialReceipt] = field(default_factory=list)
     bisection_iterations: int = 0
+    last_accepted_mesh_run: Any | None = None
+    last_accepted_shooting_enthalpy_j_kg: str | None = None
 
 
 @dataclass
@@ -85,6 +95,7 @@ def _classify_fast_trial(
     shell_authority: Any,
     iteration: int,
     boundary_stats: FastOuterBoundaryStats,
+    on_trial_receipt: Callable[[OuterTrialReceipt], None] | None = None,
 ) -> t173._OuterTrial:
     t0 = time.perf_counter()
     boundary_stats.outer_trial_count += 1
@@ -138,6 +149,8 @@ def _classify_fast_trial(
         else:
             receipt.classification = "VALID_TRAJECTORY"
             trial = t173._OuterTrial("VALID_TRAJECTORY", enthalpy_j_kg, mesh_run=run)
+            boundary_stats.last_accepted_mesh_run = run
+            boundary_stats.last_accepted_shooting_enthalpy_j_kg = str(enthalpy_j_kg)
         return trial
     except t173._LowSideDomainInfeasible:
         receipt.classification = "LOW_SIDE_DOMAIN_INFEASIBLE"
@@ -161,18 +174,26 @@ def _classify_fast_trial(
     finally:
         receipt.wall_seconds = time.perf_counter() - t0
         boundary_stats.trial_receipts.append(receipt)
-        boundary_stats.total_wall_seconds += receipt.wall_seconds
+        boundary_stats.outer_trial_wall_seconds_sum += receipt.wall_seconds
+        boundary_stats.mesh_march_wall_seconds_sum += receipt.mesh_march_seconds
+        if on_trial_receipt is not None:
+            on_trial_receipt(receipt)
 
 
 def solve_fast_outer_boundary(
     subdivisions: int,
     provider: PropertyProvider,
     shell_authority: Any,
+    *,
+    deadline_monotonic: float | None = None,
+    on_trial_receipt: Callable[[OuterTrialReceipt], None] | None = None,
 ) -> FastOuterBoundaryResult:
     """Run production outer bisection with R2 mesh trials (experimental authority)."""
     stats = FastOuterBoundaryStats()
 
     def trial_at(enthalpy: Decimal, iteration: int) -> t173._OuterTrial:
+        if deadline_monotonic is not None and time.perf_counter() >= deadline_monotonic:
+            raise OuterBudgetExceeded("outer_boundary_deadline")
         trial = _classify_fast_trial(
             subdivisions,
             enthalpy,
@@ -180,6 +201,7 @@ def solve_fast_outer_boundary(
             shell_authority,
             iteration,
             stats,
+            on_trial_receipt=on_trial_receipt,
         )
         stats.bisection_iterations = max(stats.bisection_iterations, iteration)
         return trial
@@ -187,6 +209,18 @@ def solve_fast_outer_boundary(
     t0 = time.perf_counter()
     try:
         run = t173._solve_outer_boundary_from_trial(trial_at)
+    except OuterBudgetExceeded:
+        stats.worker_wall_seconds = time.perf_counter() - t0
+        partial_run = stats.last_accepted_mesh_run
+        return FastOuterBoundaryResult(
+            status="TIMEOUT",
+            shooting_enthalpy_j_kg=stats.last_accepted_shooting_enthalpy_j_kg,
+            mesh_run=partial_run,
+            mesh_stats_last=None,
+            stats=stats,
+            blocked_code="OUTER_BOUNDARY_WALL_CLOCK_EXCEEDED",
+            blocked_diagnostics=("partial_last_valid_trial_preserved",),
+        )
     except t173._Stage3Failure as exc:
         code = exc.code if exc.args else "BLOCKED_STAGE3_FAILURE"
         status: Literal[
@@ -202,18 +236,18 @@ def solve_fast_outer_boundary(
             status = "RESOURCE_EXHAUSTION"
         else:
             status = "BLOCKED"
-        stats.total_wall_seconds += time.perf_counter() - t0
+        stats.worker_wall_seconds = time.perf_counter() - t0
         return FastOuterBoundaryResult(
             status=status,
-            shooting_enthalpy_j_kg=None,
-            mesh_run=None,
+            shooting_enthalpy_j_kg=stats.last_accepted_shooting_enthalpy_j_kg,
+            mesh_run=stats.last_accepted_mesh_run,
             mesh_stats_last=None,
             stats=stats,
             blocked_code=code,
             blocked_diagnostics=exc.diagnostics,
         )
 
-    stats.total_wall_seconds += time.perf_counter() - t0
+    stats.worker_wall_seconds = time.perf_counter() - t0
     accepted = t173._terminal_tolerance_pass(run)
     return FastOuterBoundaryResult(
         status="TERMINAL_ACCEPTED" if accepted else "BLOCKED",

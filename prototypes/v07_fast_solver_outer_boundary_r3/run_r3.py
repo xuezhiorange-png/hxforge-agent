@@ -92,7 +92,9 @@ def _result_payload(result: Any, subdivisions: int, rating_request: Any) -> dict
             result.stats.experimental_total_production_task172_calls
         ),
         "bisection_iterations": result.stats.bisection_iterations,
-        "total_wall_seconds": result.stats.total_wall_seconds,
+        "worker_wall_seconds": result.stats.worker_wall_seconds,
+        "outer_trial_wall_seconds_sum": result.stats.outer_trial_wall_seconds_sum,
+        "mesh_march_wall_seconds_sum": result.stats.mesh_march_wall_seconds_sum,
         "trial_receipts": [r.to_dict() for r in result.stats.trial_receipts],
         "authority_id": OUTER_BOUNDARY_AUTHORITY_ID,
         "candidate_id": rating_request.candidate_id,
