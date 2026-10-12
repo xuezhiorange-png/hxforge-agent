@@ -263,6 +263,7 @@ def _mesh_convergence_section(
             n1_hist["shooting_enthalpy_j_kg"],
             provider,
             context.shell_authority,
+            outer_iterations=int(n1_hist["bisection_iterations"]),
             expected_mesh_hash=n1_hist["observables"]["experimental_mesh_result_hash"],
             source_label=str(R3_EVIDENCE),
         )
@@ -272,6 +273,7 @@ def _mesh_convergence_section(
             n2_hist["shooting_enthalpy_j_kg"],
             provider,
             context.shell_authority,
+            outer_iterations=int(n2_hist["bisection_iterations"]),
             expected_mesh_hash=n2_obs["experimental_mesh_result_hash"],
             source_label=str(R4_EVIDENCE),
         )
@@ -286,6 +288,7 @@ def _mesh_convergence_section(
                 n4_h,
                 provider,
                 context.shell_authority,
+                outer_iterations=int(n4_body["bisection_iterations"]),
                 expected_mesh_hash=expected,
                 source_label="n4_outer_boundary_accepted",
             )

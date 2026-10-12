@@ -26,6 +26,7 @@ def replay_mesh_at_enthalpy(
     provider: PropertyProvider,
     shell_authority: Any,
     *,
+    outer_iterations: int,
     expected_mesh_hash: str | None,
     source_label: str,
 ) -> tuple[t173._MeshRun, dict[str, Any]]:
@@ -35,7 +36,7 @@ def replay_mesh_at_enthalpy(
         enthalpy,
         provider,
         shell_authority,
-        outer_iterations=0,
+        outer_iterations=outer_iterations,
         cell_solver="r2",
     )
     terminal_ok = t173._terminal_tolerance_pass(run)
@@ -48,6 +49,7 @@ def replay_mesh_at_enthalpy(
         "subdivisions": subdivisions,
         "source_label": source_label,
         "shooting_enthalpy_j_kg": shooting_enthalpy_j_kg,
+        "outer_iterations": outer_iterations,
         "status": status,
         "terminal_tolerance_pass": terminal_ok,
         "expected_mesh_hash": expected_mesh_hash,
