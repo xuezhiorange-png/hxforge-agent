@@ -1,0 +1,549 @@
+{
+  "schema_version": "task172.result-identity-portability-adjudication.v1",
+  "task_id": "STAGE3_TASK172_RESULT_IDENTITY_AND_NUMERICAL_PORTABILITY_CONTRACT_ADJUDICATION_R1",
+  "mode": "AUTHORITY_CONTRACT_ADJUDICATION_ONLY",
+  "result": "PASS_PLATFORM_NATIVE_IDENTITY_CONTRACT",
+  "pr": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true
+  },
+  "source": {
+    "authorized_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+    "observed_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+    "worktree_clean_at_preflight": true,
+    "candidate_harness_boundary": [
+      "tests/",
+      "tests/exchangers/shell_tube/fixtures/",
+      "docs/tasks/"
+    ],
+    "production_source_changed_since_candidate_source": false,
+    "dependencies_changed_since_candidate_source": false,
+    "uv_lock_changed_since_candidate_source": false,
+    "workflows_changed_since_candidate_source": false
+  },
+  "authorities": {
+    "r94_solver_profile_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+    "r98_overlay_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+    "r98_c_round": "1.0",
+    "r94_changed": false,
+    "r98_changed": false,
+    "constitutive_equations_changed": false,
+    "property_domain_changed": false,
+    "task173_root_equation_changed": false,
+    "r3_authority_changed": false,
+    "zero_q_authority_changed": false,
+    "production_mesh_policy_changed": false
+  },
+  "authority_trace": [
+    {
+      "source": "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-bundle-r1.md",
+      "lines": "80-83",
+      "finding": "R94 reviewed profile is reused; deterministic initialization, reviewed profile, residuals, scaling, acceptance, and fail-closed behavior are bound."
+    },
+    {
+      "source": "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
+      "lines": "594-600",
+      "finding": "DETERMINISM_REQUIREMENT is DETERMINISTIC_DIRECT_INITIALIZATION_AND_REPLAYABLE_REVIEWED_PROFILE; no cross-platform byte-identity clause."
+    },
+    {
+      "source": "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-independent-review-r1.md",
+      "lines": "7-13",
+      "finding": "External independent review accepts the bundle and Stage-1 boundary; it adds no global cross-platform result-hash requirement."
+    },
+    {
+      "source": "docs/tasks/TASK-172-v0.7-stage2-task172-runtime-and-task174-hydraulics-r1.md",
+      "lines": "14-20",
+      "finding": "Strict request, canonical valid result or typed blocker, and deterministic support/mesh/cell/wall identity replay are required; no all-platform exact hash promise."
+    },
+    {
+      "source": "docs/tasks/TASK-172-v0.7-quantitative-numerical-profile-coverage-and-roundoff-robustness-r92a.md",
+      "lines": "31-41,80-95",
+      "finding": "Same selected-output hashes were observed for a fixed test matrix across tested Python runtimes; these are fixture observations, not universal bounds."
+    },
+    {
+      "source": "docs/tasks/TASK-172-v0.7-stage3-task172-numerical-hole-tolerant-cell-root-resolution-r1.md",
+      "lines": "14-20",
+      "finding": "Historical n=2 native classification is explicitly non-portable: local residual-acceptance block versus Linux valid result; the allowance concerns this numerical classification boundary only."
+    },
+    {
+      "source": "docs/tasks/TASK-172-v0.7-stage3-tmax-tp-output-boundary-portability-adjudication-r1.md",
+      "lines": "5-13,23-29,35-42",
+      "finding": "Same approved TP state can retain slightly different provider enthalpy and property snapshot hash across macOS/Linux; provider output is retained and H_MAX is a PH-input coordinate bound."
+    },
+    {
+      "source": "src/hexagent/exchangers/shell_tube/task172_local_runtime/service.py",
+      "lines": "116-184,187-209,244-252,761-842",
+      "finding": "Request hash binds engineering request projection. Result hash binds schema, request hash, and native result projection; result ID is derived from result hash."
+    },
+    {
+      "source": "tests/exchangers/shell_tube/test_task172_local_runtime.py",
+      "lines": "252-264",
+      "finding": "Two same-environment executions must produce identical model JSON, request/result hashes, and result ID; request and result hash replay are asserted."
+    },
+    {
+      "source": "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py",
+      "lines": "1265-1282,2553-2572",
+      "finding": "TASK173 validates each native result against its own request/result/support/cell/wall identities and repeats accepted mesh locally, comparing result hashes and face IDs."
+    },
+    {
+      "source": "src/hexagent/exchangers/shell_tube/task173_integrated_rating/replay.py",
+      "lines": "52,218-250",
+      "finding": "One exact expected Task172 hash protects a serialized Stage-2 reference artifact replay, not every live cross-platform integrated cell."
+    }
+  ],
+  "determinism_adjudication": {
+    "preexisting_requirement": "DETERMINISTIC_DIRECT_INITIALIZATION_AND_REPLAYABLE_REVIEWED_PROFILE",
+    "same_frozen_environment_exact_replay_required": true,
+    "cross_platform_exact_result_identity_preexisting_requirement": false,
+    "same_environment_local_determinism": "PASS; local candidate replay evidence and exact result hash/ID replay",
+    "same_environment_linux_determinism": "PASS; exact-head CI executes the same-environment byte-identical Task172 replay test and candidate result identity replay",
+    "interpretation": "Deterministic initialization and reviewed-profile replay are exact within a fixed execution environment; they do not promise bitwise identity across OS/Python/SciPy/native-library combinations."
+  },
+  "result_identity_adjudication": {
+    "classification": "PLATFORM_NATIVE_RESULT_IDENTITY",
+    "content_addressed": true,
+    "request_hash_is_outer_result_hash_binding": true,
+    "result_id_format": "urn:hxforge:task172:<result_hash>",
+    "explicit_execution_environment_fingerprint_in_result_projection": false,
+    "global_cross_platform_identity": false,
+    "execution_environment_qualified_identity": false,
+    "meaning": "The hash identifies the exact canonical native result content bound to a request. Equal projections can share a hash across platforms; differing provider or numerical outputs produce different hashes without violating an unstated global identity rule."
+  },
+  "result_hash_projection": {
+    "formula": "canonical_sha256({schema_version, request_hash, result: _result_projection(fields)})",
+    "inner_projection_omitted_fields": [
+      "schema_version",
+      "status",
+      "request_hash",
+      "result_hash",
+      "result_id",
+      "warnings",
+      "blockers"
+    ],
+    "platform_sensitive_fields": [
+      "tube_property_snapshot_identity",
+      "shell_property_snapshot_identity",
+      "tube_wall_property_snapshot_identity",
+      "shell_wall_property_snapshot_identity",
+      "signed_q_hot_to_cold_w",
+      "wall_temperature_inner_k",
+      "wall_temperature_outer_k",
+      "tube_htc_w_m2_k",
+      "shell_htc_w_m2_k",
+      "inner_film_resistance_k_w",
+      "wall_resistance_k_w",
+      "outer_film_resistance_k_w",
+      "residual_vector_w",
+      "solver_status",
+      "solver_nfev",
+      "residual_callback_count",
+      "tube_reynolds_number",
+      "tube_prandtl_number_bulk",
+      "shell_reynolds_number",
+      "shell_prandtl_number",
+      "shell_j_mu"
+    ],
+    "field_classification": {
+      "engineering_input_identity": [
+        "case_id",
+        "case_revision_id",
+        "topology_id",
+        "task171_result_hash",
+        "task171_mesh_identity",
+        "physical_ownership_hash",
+        "definition_projection_hash",
+        "selected_thermal_role_variant",
+        "thermal_role_selection_authority_id",
+        "physical_support_id",
+        "physical_segment_id",
+        "mesh_level_identity",
+        "subdivisions_per_physical_interval_per_side",
+        "subdivision_index",
+        "tube_cell_id",
+        "shell_cell_id",
+        "wall_interface_id",
+        "tube_bulk_temperature_k",
+        "shell_bulk_temperature_k",
+        "property_profile_id",
+        "property_profile_canonical_hash",
+        "r94_model_profile_canonical_hash",
+        "r98_overlay_canonical_hash",
+        "stage1_authority_evidence_canonical_hash",
+        "shell_jmu_model_authority_canonical_hash",
+        "material_source_sha256",
+        "clean_wall_authority_hash",
+        "cylindrical_mapping_hash",
+        "tube_correlation_id",
+        "tube_correlation_version",
+        "shell_correlation_id"
+      ],
+      "native_provider_output": [
+        "tube_property_snapshot_identity",
+        "shell_property_snapshot_identity",
+        "tube_wall_property_snapshot_identity",
+        "shell_wall_property_snapshot_identity"
+      ],
+      "numerical_solution_output": [
+        "signed_q_hot_to_cold_w",
+        "wall_temperature_inner_k",
+        "wall_temperature_outer_k",
+        "tube_htc_w_m2_k",
+        "shell_htc_w_m2_k",
+        "inner_film_resistance_k_w",
+        "wall_resistance_k_w",
+        "outer_film_resistance_k_w",
+        "residual_vector_w",
+        "tube_reynolds_number",
+        "tube_prandtl_number_bulk",
+        "shell_reynolds_number",
+        "shell_prandtl_number",
+        "shell_j_mu"
+      ],
+      "solver_trace_output": [
+        "solver_status",
+        "solver_nfev",
+        "residual_callback_count"
+      ],
+      "expected_canonical_invariants": [
+        "request_hash",
+        "case/revision/topology/support and physical ownership projections",
+        "R94/R98/property-profile/correlation/wall authority IDs and hashes",
+        "implementation_version",
+        "numerical_profile_id",
+        "provenance_refs",
+        "same-environment result projection/hash/result ID replay"
+      ]
+    },
+    "important_non_fields": {
+      "operating_system": "not projected",
+      "python_version": "not projected",
+      "scipy_version": "not projected",
+      "native_library_build": "not projected"
+    }
+  },
+  "property_snapshot_precedent": {
+    "coolprop_version": "8.0.0",
+    "same_reference_state_and_input_coordinates": true,
+    "tmax_mac_enthalpy_j_kg": "112654.89965462626",
+    "tmax_linux_enthalpy_j_kg": "112654.89965464505",
+    "tmax_linux_minus_frozen_hmax_j_kg": "1.879E-8",
+    "snapshot_hashes_differ": true,
+    "provider_output_clipping_authorized": false,
+    "property_snapshot_hash_cross_platform_exactness_required": false,
+    "result_hash_consequence": "A result hash that commits to retained property snapshot identities cannot also be expected to remain globally byte-identical when those approved provider outputs differ."
+  },
+  "native_classification_precedent": {
+    "historical_n2_classification_portable": false,
+    "local_observation": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "linux_py311_py312_observation": "VALID_Task172LocalResult",
+    "native_solver_classification_cross_platform_exactness_required": false,
+    "permitted_scope": "Only environment-sensitive residual-acceptance versus valid classifications documented by the R2 portability adjudication; all non-residual blockers and identity failures remain hard."
+  },
+  "cross_platform_matrix": [
+    {
+      "environment": "LOCAL_MACOS",
+      "python": "3.14.5",
+      "platform": "macOS ARM64",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "candidate_source": "committed predecessor local candidate characterization",
+      "corpus_size": 68,
+      "baseline_valid": 68,
+      "fallback_on_baseline_valid": 0,
+      "baseline_hashes_preserved": 68,
+      "local_reference_result_hash_matches": 68,
+      "runtime_report_hash": "5bf6bd399ca763154ae19b433a6a2f9fe2fc432df3f22b3512dd2b8469a65d84"
+    },
+    {
+      "environment": "PR_HEAD_PY311",
+      "python": "3.11.16",
+      "platform": "Linux x86_64 glibc 2.39",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "workflow_run": 36965219941,
+      "workflow_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+      "junit_sha256": "a5a877b5ffdfd598e4c858e842ddda6ec296908f7df04a495757677461db57ee",
+      "candidate_report_payload_sha256": "94121297d43587785bc2c68266ecb71b5d0b0b3d92ce5536722a90ffe846279c",
+      "corpus_size": 68,
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes": 2,
+      "fallback_on_baseline_valid": 0,
+      "baseline_hashes_preserved": 66,
+      "blocked_rows_recovered_under_original_r98": 2,
+      "local_reference_result_hash_matches": 0
+    },
+    {
+      "environment": "PR_HEAD_PY312",
+      "python": "3.12.14",
+      "platform": "Linux x86_64 glibc 2.39",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "workflow_run": 36965219941,
+      "workflow_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+      "junit_sha256": "a075b2cc8c5380a316dafd702b1e1c2d384bdc0f56434ae211c53e904b34909b",
+      "candidate_report_payload_sha256": "1e8570a873ad5bdb01ca530690882b37f5ee3eadc8d38aca2a03ed6ee8853471",
+      "corpus_size": 68,
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes": 2,
+      "fallback_on_baseline_valid": 0,
+      "baseline_hashes_preserved": 66,
+      "blocked_rows_recovered_under_original_r98": 2,
+      "local_reference_result_hash_matches": 0
+    },
+    {
+      "environment": "MERGE_REF_PY311",
+      "python": "3.11.16",
+      "platform": "Linux x86_64 glibc 2.39",
+      "scipy": "1.17.1",
+      "coolprop": "8.0.0",
+      "workflow_run": 36965219941,
+      "workflow_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+      "junit_sha256": "af94889ff3bb7cb8c4d2f3a71d11938f862613a1b59c80547217355ac559a322",
+      "candidate_report_payload_sha256": "b077ea783fd32938dbef523e2275521b6872d94e54aa2c5fb39d2aa06bbc338e",
+      "corpus_size": 68,
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes": 2,
+      "fallback_on_baseline_valid": 0,
+      "baseline_hashes_preserved": 66,
+      "blocked_rows_recovered_under_original_r98": 2,
+      "local_reference_result_hash_matches": 0
+    },
+    {
+      "environment": "MERGE_REF_PY312",
+      "python": "3.12.14",
+      "platform": "Linux x86_64 glibc 2.39",
+      "scipy": "1.18.0",
+      "coolprop": "8.0.0",
+      "workflow_run": 36965219941,
+      "workflow_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+      "junit_sha256": "23034bb493cd9bd5d9648a0a22f210dde39658965d11a380cf8e45641bb9296f",
+      "candidate_report_payload_sha256": "8d82a221ab30c988ed6e93bddfae0a4e7d55331936f816e2d61bf1c9ff42c414",
+      "corpus_size": 68,
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes": 2,
+      "fallback_on_baseline_valid": 0,
+      "baseline_hashes_preserved": 66,
+      "blocked_rows_recovered_under_original_r98": 2,
+      "local_reference_result_hash_matches": 0
+    }
+  ],
+  "sixty_eight_request_comparison": {
+    "corpus_size": 68,
+    "request_hash_match_count": 68,
+    "engineering_request_and_authority_projection_match_count": 68,
+    "physical_input_projection_match_count": 68,
+    "support_projection_exact_via_canonical_request_hash_count": 68,
+    "derived_support_id_independent_column_comparison": "NOT_RETAINED_FOR_ALL_68_ROWS",
+    "property_snapshot_identity_match_count": 0,
+    "property_snapshot_identity_comparison_denominator": 272,
+    "property_snapshot_hash_match_count": "UNAVAILABLE_LOCAL_FIXTURE_DOES_NOT_RETAIN_RAW_SNAPSHOT_HASH_ARRAY",
+    "exact_result_hash_match_count": 0,
+    "final_validation_status_match_count": 68,
+    "final_status": "VALIDATED",
+    "final_r98_pass_count": 68,
+    "q_sign_match_count": 68,
+    "physical_ordering_match_count": 68,
+    "same_final_solver_status_string_count": 59,
+    "same_nfev_count": 68,
+    "same_callback_count": 66,
+    "maximum_absolute_q_delta_w": "3.8335201679728925E-10",
+    "maximum_relative_q_delta": "2.581475744081614E-13",
+    "maximum_absolute_twi_delta_k": "1.1368683772161603E-13",
+    "maximum_absolute_two_delta_k": "1.7053025658242404E-13",
+    "maximum_absolute_residual_delta_w": "1.0447820386616513E-9",
+    "maximum_absolute_htc_delta": "UNAVAILABLE_LOCAL_FIXTURE_DOES_NOT_RETAIN_HTC",
+    "reynolds_prandtl_jmu_deltas": "UNAVAILABLE_LOCAL_FIXTURE_DOES_NOT_RETAIN_FIELDS",
+    "local_solver_path_counts": {
+      "r94_trf": 68,
+      "fallback": 0
+    },
+    "linux_candidate_path_counts": {
+      "r94_trf": 66,
+      "dogbox_after_residual_acceptance_hole": 2
+    },
+    "linux_result_hash_vectors_identical_across_pr_merge_python_matrix": true,
+    "semantic_portability": "MATCHED_ON_RECORDED_FINAL_STATUS_R98_Q_DIRECTION_AND_PHYSICAL_ORDER",
+    "bitwise_result_identity": "DIVERGED_0_OF_68"
+  },
+  "six_n32_targets": {
+    "final_semantic_match_count": 6,
+    "final_result_hash_match_count": 0,
+    "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "local_candidate": "VALIDATED_BY_TEST_ONLY_DOGBOX_FALLBACK",
+    "linux_baseline": "VALID_TASK172_RESULT",
+    "linux_fallback_invoked": false,
+    "r98_pass": "6/6",
+    "heat_flow_sign_match": "6/6",
+    "physical_ordering_match": "6/6",
+    "local_twi_two_deltas": "UNAVAILABLE_LOCAL_TARGET_SUMMARY_DID_NOT_RETAIN_WALL_TEMPERATURES",
+    "targets": [
+      {
+        "request_hash": "91c13f7949d32d90de13f95b14b2fc521f822c13f009ea6d132f965936cbb75f",
+        "local_q_w": "279.6428084422918",
+        "local_f_q_w": "12846.8783324861082",
+        "linux_q_w": "279.64280844231325",
+        "linux_f_q_w": "12846.87833248608675",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      },
+      {
+        "request_hash": "946e8d83c8052f3c1db6f8aa31793f2b0b1523f7e392a1fa9e1da675daadde85",
+        "local_q_w": "278.4621115308888",
+        "local_f_q_w": "11960.2358512375112",
+        "linux_q_w": "278.4621115308767",
+        "linux_f_q_w": "11960.2358512375233",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      },
+      {
+        "request_hash": "0b1a138aa86081e91b23d814fd9309c14ae0d8087bdff230b41ca1cf9dfb9d9a",
+        "local_q_w": "282.8367069664459",
+        "local_f_q_w": "-1.0836735327719",
+        "linux_q_w": "282.8367069664438",
+        "linux_f_q_w": "-1.0836735327698",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      },
+      {
+        "request_hash": "5fd98bd16cf306447b5ba359f44078d4dedca27d861d5573a0cafc4eeab2d0d3",
+        "local_q_w": "282.8351020677846",
+        "local_f_q_w": "0.12406592682116",
+        "linux_q_w": "282.83510206779323",
+        "linux_f_q_w": "0.12406592681253",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      },
+      {
+        "request_hash": "3ffebffa5aaf4957cd4d743e8530885795831d29328b5a2fc63e55287d08720d",
+        "local_q_w": "281.7082529109981",
+        "local_f_q_w": "-281.7082529109981",
+        "linux_q_w": "281.70825291103137",
+        "linux_f_q_w": "-281.70825291103137",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      },
+      {
+        "request_hash": "a52cda0abab920f9fd3a853e0ba3f3fa4289c38c88768bcda054377af08b70ec",
+        "local_q_w": "279.2674742343681",
+        "local_f_q_w": "1555.6336815674819",
+        "linux_q_w": "279.2674742343595",
+        "linux_f_q_w": "1555.6336815674905",
+        "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "linux_baseline": "VALID_TASK172_RESULT",
+        "final_semantics_match": true
+      }
+    ]
+  },
+  "historical_n16_upper_endpoint": {
+    "request_hash": "22be7911da59d0cfd54d922142570ad9f15b2dca2aeb36f415a9d3859ab16970",
+    "local_candidate_f_q_w": "-592.2898790517881",
+    "linux_native_f_q_w": "-592.2898790517623",
+    "shell_capacity_binding": true,
+    "upper_endpoint_valid_in_both_final_paths": true,
+    "existing_valid_upper_low_side_semantics_match": true,
+    "n16_final_physical_classification_match": true,
+    "r3_authority_changed": false
+  },
+  "downstream_task173_contract": {
+    "live_task172_hash_is_replayed_against_its_own_result": true,
+    "support_cell_wall_identity_replayed": true,
+    "accepted_mesh_replay_compares_local_mesh_and_task172_hashes": true,
+    "frozen_expected_hash_for_all_live_task172_cells": false,
+    "production_mesh_admission_compares_result_ids_across_platforms": false,
+    "pinned_stage2_reference_hash_scope": "ONE_SERIALIZED_NATIVE_REFERENCE_PAYLOAD_AND_REPLAY",
+    "task173_requires_cross_platform_task172_result_hash_match": false,
+    "cross_platform_hash_divergence_does_not_by_itself_break_task173_contract": true
+  },
+  "portability_contract_candidates": {
+    "contract_a_bitwise_global_identity": {
+      "preexisting_authority_support": false,
+      "conflicts_with_retained_property_snapshot_precedent": true,
+      "recommended": false
+    },
+    "contract_b_environment_local_exact_replay": {
+      "required": true,
+      "same_environment_same_request_exact_hash_replay": true,
+      "recommended": true
+    },
+    "contract_c_engineering_semantic_portability": {
+      "recommended_for_cross_platform_comparison": true,
+      "requirements": [
+        "Exact canonical engineering request and authority identity",
+        "Native valid Task172 result in each environment",
+        "Original R98 residual acceptance passes independently in each environment",
+        "Same approved heat-flow direction, physical wall ordering, property domain/profile, and correlations",
+        "Numerical output envelope must be prospectively frozen by reviewed authority; observed extrema here are characterization only",
+        "Keep exact native result hash/ID as provenance; do not normalize, round, clip, or omit native outputs"
+      ]
+    },
+    "contract_d_dual_identity_model": {
+      "needed_now": false,
+      "implemented": false,
+      "schema_change_authorized": false
+    }
+  },
+  "adjudication": {
+    "cross_platform_exact_result_identity_preexisting_requirement": false,
+    "property_snapshot_hash_cross_platform_exactness_required": false,
+    "native_solver_classification_cross_platform_exactness_required": false,
+    "task172_result_hash_scope": "PLATFORM_NATIVE_RESULT_IDENTITY",
+    "adjudicated_portability_contract": "CONTRACT_B_ENVIRONMENT_LOCAL_EXACT_REPLAY_PLUS_CONTRACT_C_ENGINEERING_SEMANTIC_PORTABILITY",
+    "current_0_of_68_hash_mismatch_is_authority_violation": false,
+    "dogbox_authority_accepted": false,
+    "correction_implemented": false,
+    "recommended_next_gate": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_REASSESSMENT_UNDER_ADJUDICATED_PORTABILITY_CONTRACT_R1"
+  },
+  "change_boundary": {
+    "adjudication_files_added_to_worktree": [
+      "docs/tasks/TASK-172-v0.7-stage3-task172-result-identity-and-numerical-portability-contract-adjudication-r1.md",
+      "docs/tasks/evidence/TASK-172-stage3-task172-result-identity-and-numerical-portability-contract-adjudication-r1.json"
+    ],
+    "production_code_changed": false,
+    "tests_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "task173_root_logic_changed": false,
+    "production_mesh_policy_changed": false,
+    "production_mesh_reexecuted": false,
+    "task175_release_acceptance_performed": false,
+    "commit_created": false,
+    "push_performed": false,
+    "pr_metadata_changed": false
+  },
+  "validation": {
+    "exact_head_ci_run": 36965219941,
+    "exact_head_ci_head_sha": "8d8666826f222f052270ec7fa5d2e8111c853969",
+    "exact_head_ci_result": "SUCCESS",
+    "ci_total_jobs": 50,
+    "ci_success": 45,
+    "ci_skipped": 5,
+    "ci_failed": 0,
+    "ci_cancelled": 0,
+    "final_gate": "SUCCESS",
+    "ci_artifact_matrix": "FOUR_PR_HEAD_AND_MERGE_REF_PYTHON_3.11_AND_3.12_REPORTS_READ_FROM_RUN_36965219941",
+    "new_adjudication_local_tests": "NOT_RUN; no runtime or test changes",
+    "exact_head_ci_includes_new_uncommitted_evidence_docs": false,
+    "evidence_json_validation": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "lifecycle": {
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_REASSESSMENT_UNDER_ADJUDICATED_PORTABILITY_CONTRACT_R1",
+    "stop": true
+  },
+  "canonical_hash": "d9c44837a38bc66a6372e32b3d7a5dfba7a8a09ca049dc29dab06fa968b3d7b2"
+}

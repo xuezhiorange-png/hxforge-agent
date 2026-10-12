@@ -1621,7 +1621,9 @@ class _ExecutionBundle:
     task022_geometry: object | None = None
     task024_result: object | None = None
     task024_geometry: object | None = None
+    task024_request: object | None = None
     task025_result: object | None = None
+    task025_request: object | None = None
     task026_result: object | None = None
     task031_geometry: object | None = None
     task032_flow_state: object | None = None
@@ -2155,6 +2157,8 @@ def _task024_payload(
     configuration: ShellAndTubeConfiguration,
     layout: object,
     shell_geometry: object,
+    *,
+    preserve_template_orientation_sequence: bool = False,
 ) -> dict[str, object]:
     payload = _template_mapping(
         authority.task024_request_template,
@@ -2228,9 +2232,27 @@ def _task024_payload(
             "task024_request_template.design_authority.orientation_sequence",
             "a sequence-shaped TASK-024 design template is required",
         )
-    design_map["orientation_sequence"] = [
-        BaffleOrientation.TOP for _ in range(candidate.baffle_count)
-    ]
+    if preserve_template_orientation_sequence:
+        if len(orientations) != candidate.baffle_count:
+            raise _StageFailure(
+                CandidateStage.BAFFLE_GEOMETRY,
+                BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
+                "task024_request_template.design_authority.orientation_sequence",
+                "candidate baffle count must match its source-bound orientation sequence",
+            )
+        try:
+            design_map["orientation_sequence"] = [BaffleOrientation(item) for item in orientations]
+        except ValueError as exc:
+            raise _StageFailure(
+                CandidateStage.BAFFLE_GEOMETRY,
+                BlockerCode.CANDIDATE_GEOMETRY_INVALID,
+                "task024_request_template.design_authority.orientation_sequence",
+                "source-bound baffle orientation is not accepted by TASK-024",
+            ) from exc
+    else:
+        design_map["orientation_sequence"] = [
+            BaffleOrientation.TOP for _ in range(candidate.baffle_count)
+        ]
     design_map["spacing_sequence_m"] = list(spacing)
     design_map["authority_hash"] = _task024_authority_hash(design_map)
     return payload
@@ -2929,6 +2951,10 @@ def _execute_candidate_chain(
     request: Task168Request,
     candidate: CandidateSpec,
     record: ShellGeometryRecord,
+    *,
+    include_legacy_task162: bool = True,
+    include_legacy_task168_rating_dependencies: bool = True,
+    preserve_baffle_orientation_sequence: bool = False,
 ) -> tuple[_ExecutionBundle, _StageFailure | None, CandidateStage | None]:
     authority = request.evaluation_input_authority
     bundle = _ExecutionBundle()
@@ -2999,18 +3025,19 @@ def _execute_candidate_chain(
         )
         native_geometry = bundle.task022_geometry
 
+        task024_request = _task024_payload(
+            authority,
+            candidate,
+            configuration,
+            layout,
+            native_geometry,
+            preserve_template_orientation_sequence=preserve_baffle_orientation_sequence,
+        )
+        bundle.task024_request = task024_request
         baffle_outcome = step(
             CandidateStage.BAFFLE_GEOMETRY,
             "task024",
-            lambda: validate_task024(
-                _task024_payload(
-                    authority,
-                    candidate,
-                    configuration,
-                    layout,
-                    native_geometry,
-                )
-            ),
+            lambda: validate_task024(task024_request),
         )
         bundle.task024_geometry = _result_payload(
             baffle_outcome,
@@ -3020,19 +3047,19 @@ def _execute_candidate_chain(
         )
         bundle.task024_result = baffle_outcome
 
+        task025_request = _task025_payload(
+            authority.task025_request_template,
+            candidate,
+            configuration,
+            layout,
+            CandidateStage.TUBE_SIDE,
+            "evaluation_input_authority.task025_request_template",
+        )
+        bundle.task025_request = task025_request
         task025_outcome = step(
             CandidateStage.TUBE_SIDE,
             "task025",
-            lambda: evaluate_task025(
-                _task025_payload(
-                    authority.task025_request_template,
-                    candidate,
-                    configuration,
-                    layout,
-                    CandidateStage.TUBE_SIDE,
-                    "evaluation_input_authority.task025_request_template",
-                )
-            ),
+            lambda: evaluate_task025(task025_request),
         )
         if type(task025_outcome) is not Task025ValidResult:
             raise _StageFailure(
@@ -3105,46 +3132,49 @@ def _execute_candidate_chain(
             flow = _result_payload(
                 result032, ("flow_state",), CandidateStage.SHELL_SIDE_BELL, "task032"
             )
-            request033 = _task033_payload(
-                authority,
-                result032,
-                request032,
-                configuration,
-                layout,
-            )
-            result033 = validate_task033(request033)
-            heat = _result_payload(
-                result033, ("heat_transfer",), CandidateStage.SHELL_SIDE_BELL, "task033"
-            )
-            request034 = _task034_payload(
-                authority,
-                request031,
-                result031,
-                result032,
-                result033,
-                request033,
-                configuration,
-                layout,
-                bundle.task024_geometry,
-            )
-            result034 = validate_task034(request034)
-            pressure = _result_payload(
-                result034, ("pressure_drop",), CandidateStage.SHELL_SIDE_BELL, "task034"
-            )
-            request035 = _task035_payload(
-                authority,
-                result031,
-                result032,
-                result033,
-                result034,
-                configuration,
-                layout,
-            )
-            result035 = validate_task035(request035)
-            result035_payload = _result_payload(
-                result035, ("success_result",), CandidateStage.SHELL_SIDE_BELL, "task035"
-            )
-            del snapshot, flow, heat, pressure
+            result033 = result034 = result035_payload = None
+            if include_legacy_task168_rating_dependencies:
+                request033 = _task033_payload(
+                    authority,
+                    result032,
+                    request032,
+                    configuration,
+                    layout,
+                )
+                result033 = validate_task033(request033)
+                heat = _result_payload(
+                    result033, ("heat_transfer",), CandidateStage.SHELL_SIDE_BELL, "task033"
+                )
+                request034 = _task034_payload(
+                    authority,
+                    request031,
+                    result031,
+                    result032,
+                    result033,
+                    request033,
+                    configuration,
+                    layout,
+                    bundle.task024_geometry,
+                )
+                result034 = validate_task034(request034)
+                pressure = _result_payload(
+                    result034, ("pressure_drop",), CandidateStage.SHELL_SIDE_BELL, "task034"
+                )
+                request035 = _task035_payload(
+                    authority,
+                    result031,
+                    result032,
+                    result033,
+                    result034,
+                    configuration,
+                    layout,
+                )
+                result035 = validate_task035(request035)
+                result035_payload = _result_payload(
+                    result035, ("success_result",), CandidateStage.SHELL_SIDE_BELL, "task035"
+                )
+                del heat, pressure
+            del snapshot, flow
             return (
                 request031,
                 result031,
@@ -3208,36 +3238,39 @@ def _execute_candidate_chain(
                 "task166.identity",
             )
 
-        if type(authority.task037_request) is not type(None):
-            result037_outcome = step(
-                CandidateStage.OVERALL_RESISTANCE,
-                "task037",
-                lambda: evaluate_task037(
-                    cast(Any, authority.task037_request),
-                    layout,
-                    bundle.task025_result,
-                ),
-            )
-            bundle.task037_result = _result_payload(
-                result037_outcome,
-                ("success_result",),
-                CandidateStage.OVERALL_RESISTANCE,
-                "task037",
-            )
-        else:
-            raise _StageFailure(
-                CandidateStage.OVERALL_RESISTANCE,
-                BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
-                "evaluation_input_authority.task037_request",
-            )
-        if type(
-            bundle.task037_result
-        ) is not Task037SuccessResult or not verify_task037_success_identity(bundle.task037_result):
-            raise _StageFailure(
-                CandidateStage.OVERALL_RESISTANCE,
-                BlockerCode.OVERALL_RESISTANCE_REPLAY_FAILED,
-                "task037.result",
-            )
+        if include_legacy_task168_rating_dependencies:
+            if type(authority.task037_request) is not type(None):
+                result037_outcome = step(
+                    CandidateStage.OVERALL_RESISTANCE,
+                    "task037",
+                    lambda: evaluate_task037(
+                        cast(Any, authority.task037_request),
+                        layout,
+                        bundle.task025_result,
+                    ),
+                )
+                bundle.task037_result = _result_payload(
+                    result037_outcome,
+                    ("success_result",),
+                    CandidateStage.OVERALL_RESISTANCE,
+                    "task037",
+                )
+            else:
+                raise _StageFailure(
+                    CandidateStage.OVERALL_RESISTANCE,
+                    BlockerCode.EVALUATION_AUTHORITY_REQUIRED,
+                    "evaluation_input_authority.task037_request",
+                )
+            if type(
+                bundle.task037_result
+            ) is not Task037SuccessResult or not verify_task037_success_identity(
+                bundle.task037_result
+            ):
+                raise _StageFailure(
+                    CandidateStage.OVERALL_RESISTANCE,
+                    BlockerCode.OVERALL_RESISTANCE_REPLAY_FAILED,
+                    "task037.result",
+                )
 
         def run_task038() -> object:
             binding = authority.task038_service_binding_authority
@@ -3295,7 +3328,8 @@ def _execute_candidate_chain(
                 )
             return result038
 
-        bundle.task038_result = step(CandidateStage.UA, "task038", run_task038)
+        if include_legacy_task168_rating_dependencies:
+            bundle.task038_result = step(CandidateStage.UA, "task038", run_task038)
 
         def run_task162() -> tuple[Task162Result, Task162SuccessReplayEvidence]:
             if (
@@ -3397,12 +3431,13 @@ def _execute_candidate_chain(
                 )
             return result, evidence
 
-        thermal, replay = cast(
-            tuple[Task162Result, Task162SuccessReplayEvidence],
-            step(CandidateStage.THERMAL_CLOSURE, "task162", run_task162),
-        )
-        bundle.task162_result = thermal
-        bundle.task162_replay_evidence = replay
+        if include_legacy_task162:
+            thermal, replay = cast(
+                tuple[Task162Result, Task162SuccessReplayEvidence],
+                step(CandidateStage.THERMAL_CLOSURE, "task162", run_task162),
+            )
+            bundle.task162_result = thermal
+            bundle.task162_replay_evidence = replay
 
         def run_task029() -> object:
             if (
