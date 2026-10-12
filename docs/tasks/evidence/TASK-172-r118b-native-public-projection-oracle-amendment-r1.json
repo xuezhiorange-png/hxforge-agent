@@ -1,0 +1,229 @@
+{
+  "schema_version": "task172.r118b.native-public-projection-oracle-amendment.r1",
+  "task_id": "TASK172_V0_7_R118B_NATIVE_PUBLIC_PROJECTION_ORACLE_AMENDMENT_AND_R118C_ATTEMPT2_INCIDENT_R1",
+  "result": "R118B_NATIVE_PUBLIC_PROJECTION_ORACLES_AMENDED_AND_R118C_ATTEMPT2_RECORDED",
+  "predecessor": {
+    "repository": "xuezhiorange-png/hxforge-agent",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "head_sha": "fb3a5ea5dc32653d55b7b275717d56df9e963af0",
+    "exact_head_ci": {
+      "run_id": 36288843849,
+      "status": "completed",
+      "conclusion": "success",
+      "total_jobs": 50,
+      "success": 45,
+      "skipped": 5,
+      "failed": 0,
+      "cancelled": 0,
+      "final_gate": "success"
+    }
+  },
+  "predecessor_identity_replay": {
+    "r118b_review_evidence_canonical_hash": "604b6162561be3fdb93b8047500ba40c24f866cc8464f77fac82694aeb99f4c9",
+    "r118b_extension_canonical_hash": "5e0cdf6c7e0be245eff82f80a2738867a769a7baf25fb6d2efa4d46c176a2581",
+    "quantization_amendment_evidence_canonical_hash": "d1bb31697a0efa61299b402333adeec2f54292cd0b1f45e88927a21f0f0f1226",
+    "quantization_amendment_extension_canonical_hash": "d0fd2ba8cb37891bf1c8491b9279fcc8bc8186f722f79d5bb3e809f1e443f6a7",
+    "attempt1_incident_evidence_canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668",
+    "attempt1_incident_extension_canonical_hash": "d9079d7301c10fc9e16460eed1119b65d556fcbd68341c8fa5fc4d7e3a01940a",
+    "pre_amendment_registry_root_canonical_hash": "4584c25c9514443f299e8f1aefccdd376fba6ba1f77fc6fe5089b0b4ef5437d3",
+    "result": "PASS"
+  },
+  "authority": {
+    "bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+    "review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+    "review_result": "PASS",
+    "effective_lifecycle": "REVIEWED_AUTHORITY",
+    "numeric_engineering_value_change_count": 0,
+    "authority_scope_change": false,
+    "scope_widening": false
+  },
+  "comparison_rule": {
+    "native_output_exact_oracle_rule": "AN EXACT ORACLE FOR A NATIVE OUTPUT MUST BE GENERATED THROUGH THAT PRODUCER'S ACTUAL PUBLIC/CANONICAL PROJECTION CONTRACT. INPUT SOURCE LEXICAL FORM, INTERMEDIATE DECIMAL SCALE, AND PRE-PROJECTION HIGHER-PRECISION VALUES MUST NOT BE USED AS OUTPUT-LEXEME ORACLES.",
+    "string": "EXACT_CANONICAL_LEXICAL_EQUALITY",
+    "enum_or_token": "EXACT_TOKEN_EQUALITY",
+    "integer": "EXACT_INTEGER_EQUALITY",
+    "hash_or_id": "EXACT_STRING_EQUALITY",
+    "decimal_native_object": "EXACT_DECIMAL_EQUALITY",
+    "float": "ONLY_IF_NATIVE_CONTRACT_DEFINES_FLOAT_SEMANTICS",
+    "tolerance": "NONE",
+    "cross_stage_rule": "WHEN_A_DOWNSTREAM_NATIVE_OUTPUT_DEPENDS_ON_AN_UPSTREAM_PUBLIC_QUANTIZED_VALUE, THE EXACT EXPECTATION MUST BE DERIVED FROM THE UPSTREAM NATIVE PUBLIC PROJECTION."
+  },
+  "task021": {
+    "coordinate_quantum_m": "0.000000000001",
+    "decimal_precision": 50,
+    "rounding": "ROUND_HALF_EVEN",
+    "quantization_resolution_is_fixed": true,
+    "public_trailing_zero_scale_is_fixed": false,
+    "public_lexeme_is_minimal_canonical_decimal": true,
+    "projection": "quantized_decimal_string -> decimal_string; insignificant trailing zeroes stripped",
+    "limiting_position": {
+      "position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "u": -3,
+      "v": -6,
+      "pre_projection_x_m": "-0.1524",
+      "post_quantization_decimal_x_m": "-0.152400000000",
+      "expected_public_x_m": "-0.1524",
+      "pre_projection_y_m": "-0.13198227153674844976679141122274747436104176034035",
+      "expected_public_y_m": "-0.131982271537"
+    },
+    "attempt2_actual_x_m": "-0.1524",
+    "then_expected_x_m": "-0.152400000000",
+    "numeric_values_equal": true,
+    "canonical_lexemes_equal": false,
+    "comparison": "EXACT_CANONICAL_LEXICAL_EQUALITY",
+    "tolerance": "NONE"
+  },
+  "task022": {
+    "projection": "reuses TASK021 decimal_string; insignificant trailing zeroes stripped",
+    "reviewed_input_lexemes": {
+      "shell_inside_diameter_m": "0.500",
+      "bundle_peripheral_allowance_m": "0.010",
+      "required_minimum_radial_clearance_m": "0.010"
+    },
+    "exact_native_output_lexemes": {
+      "shell_inside_diameter_m": "0.5",
+      "bundle_peripheral_allowance_m": "0.01",
+      "required_minimum_radial_clearance_m": "0.01"
+    },
+    "engineering_value_changed": false,
+    "long_value_oracle_replay": "PASS_PURE_DECIMAL_REPLAY",
+    "exact_native_values": {
+      "bare_tube_bundle_diameter_m": "0.43486592081130829065079429561196969724856074243842",
+      "bundle_outer_envelope_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+      "shell_to_bundle_radial_clearance_m": "0.02256703959434585467460285219401515137571962878079",
+      "radial_clearance_margin_m": "0.01256703959434585467460285219401515137571962878079",
+      "shell_to_bundle_diametral_clearance_m": "0.04513407918869170934920570438803030275143925756158",
+      "position_count": 253
+    }
+  },
+  "task024": {
+    "projection": "quantize 1e-12 -> scale-preserving canonical_decimal_string",
+    "exact_public_geometry": {
+      "baffle_diameter_m": "0.497000000000",
+      "baffle_hole_diameter_m": "0.020050000000",
+      "baffle_hole_radius_m": "0.010025000000",
+      "chord_offset_from_center_m": "0.120984710000",
+      "baffle_center_sequence_m": [
+        "1.200000000000",
+        "2.400000000000",
+        "3.600000000000",
+        "4.800000000000"
+      ]
+    },
+    "limiting_classification": {
+      "position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "center_x_m": "-0.1524",
+      "center_y_m": "-0.131982271537",
+      "signed_window_distance_m": "0.010997561537",
+      "baffle_hole_radius_m": "0.010025",
+      "cut_boundary_margin_m": "0.000972561537"
+    },
+    "pre_native_analytic_cut_margin_m": "0.00097256153674844976679141122274747436104176034035",
+    "public_quantization_replay": "PASS_PURE_DECIMAL_REPLAY",
+    "tolerance": "NONE"
+  },
+  "task025": {
+    "numeric_native_type": "Decimal",
+    "comparison": "EXACT_DECIMAL_EQUALITY",
+    "hash_projection": "native hash_dag projects Decimal members as str(value); no fixed lexical oracle",
+    "reviewed_length_m": "Decimal(\"6\")",
+    "internal_flow_length_hash": "90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35",
+    "heat_transfer_length_hash": "e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da",
+    "future_pressure_drop_length_m_expected": null,
+    "expected_result_type": "Task025ValidResult"
+  },
+  "oracle_matrix": {
+    "path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-matrix-r1.json",
+    "file_sha256": "a176ac61a8bdacf9698156f94747315242b9990510d5e71f4be0a5374e1745f6",
+    "canonical_hash": "654c4d30163fa573b4dc717189eb8870233b9ecc9b46965b4ba73eaa00b41947",
+    "native_gate_field_count": 87,
+    "unresolved_native_gate_oracle_count": 0,
+    "hand_formatted_native_oracle_count": 0
+  },
+  "attempt2": {
+    "number": 2,
+    "result": "BLOCKED_R118C_R2_TASK021_NATIVE_PROJECTION_MISMATCH",
+    "authoritative": false,
+    "reusable": false,
+    "may_be_resumed": false,
+    "sequence_violation": false,
+    "downstream_producer_invocation_before_gate_pass_count": 0,
+    "in_memory_native_execution_occurred": true,
+    "persisted_authority_materialization_occurred": false,
+    "stage_history": {
+      "task014": "PASS_IN_MEMORY_DISCARDED",
+      "task020": "VALID_IN_MEMORY_DISCARDED",
+      "task021": "VALID_IN_MEMORY_253_POSITIONS_DISCARDED",
+      "task022": "NOT_INVOKED",
+      "task024": "NOT_INVOKED",
+      "task025": "NOT_INVOKED",
+      "run_b": "NOT_EXECUTED"
+    },
+    "success_artifacts_created": false,
+    "success_registry_extension_created": false,
+    "commit_created": false,
+    "repository_files_changed": false,
+    "volatile_ids_or_hashes_promoted": false,
+    "all_objects_discarded": true
+  },
+  "validation": {
+    "predecessor_head_replay": "PASS",
+    "r118b_review_receipt_replay": "PASS",
+    "quantization_amendment_replay": "PASS",
+    "attempt1_incident_replay": "PASS",
+    "task021_canonical_lexical_replay": "PASS",
+    "task022_canonical_lexical_replay": "PASS",
+    "task022_long_value_oracle_replay": "PASS",
+    "task024_public_quantization_replay": "PASS",
+    "unresolved_native_gate_oracle_count": 0,
+    "hand_formatted_native_oracle_count": 0,
+    "native_materialization_producer_invocation_count": 0,
+    "engineering_values_unchanged": "PASS",
+    "historical_immutability": "PASS",
+    "registry_append_only": "PASS",
+    "new_duplicate_json_keys": 0
+  },
+  "static_validation": {
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS",
+    "mypy_ci_scope": "PASS",
+    "manifest_d_equals_m": "PASS_DISCOVERED_256_MANIFEST_256",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_PACKAGE_SKIPPED",
+    "exact_final_head_ci": "REQUIRED_AFTER_FINAL_COMMIT"
+  },
+  "governance": {
+    "production_code_changed": false,
+    "native_materialization_producer_invocation_count": 0,
+    "r118c_r3_started": false,
+    "r118c_r3_retry_authorized": false,
+    "task171_executed": false,
+    "production_mesh_admission_performed": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "artifacts": {
+    "amendment_document_path": "docs/tasks/TASK-172-v0.7-r118b-native-public-projection-oracle-amendment-r1.md",
+    "amendment_evidence_path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-amendment-r1.json",
+    "attempt2_incident_document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt2-blocked-incident-r1.md",
+    "attempt2_incident_evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt2-blocked-incident-r1.json",
+    "matrix_path": "docs/tasks/evidence/TASK-172-r118b-native-public-projection-oracle-matrix-r1.json"
+  },
+  "immutability": {
+    "r1_r118b_historical_payloads_immutable": true,
+    "previous_amendment_rewritten": false,
+    "attempt1_incident_rewritten": false,
+    "registry_preexisting_duplicate_keys": 2,
+    "new_duplicate_json_keys": 0,
+    "append_only": true
+  },
+  "canonical_hash": "a01bdc446922c489f5b530681d871c6597c18ac7cf169f1d7cbbd7d84bfdf9a1"
+}
