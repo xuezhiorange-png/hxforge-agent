@@ -73,9 +73,6 @@ def establish_verified_bracket(
     stats = FastOuterBoundaryStats(authority_id=authority_id)
     expansions = 0
     probes: list[dict[str, Any]] = []
-    last_low_trial = None
-    last_high_trial = None
-
     while expansions <= MAX_BRACKET_EXPANSIONS:
         if deadline_monotonic is not None and time.perf_counter() >= deadline_monotonic:
             raise BracketEstablishmentFailed("deadline during bracket establishment")
@@ -88,7 +85,6 @@ def establish_verified_bracket(
             stats,
             on_trial_receipt=on_trial_receipt,
         )
-        last_low_trial = low_trial
         low_cls = low_trial.classification
         high_trial = _classify_fast_trial(
             subdivisions,
@@ -99,7 +95,6 @@ def establish_verified_bracket(
             stats,
             on_trial_receipt=on_trial_receipt,
         )
-        last_high_trial = high_trial
         high_cls = high_trial.classification
         probes.append(
             {

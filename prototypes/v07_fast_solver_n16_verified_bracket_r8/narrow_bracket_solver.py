@@ -78,7 +78,9 @@ def solve_verified_narrow_bracket_outer_boundary(
     try:
         if same_run_endpoints is not None:
             if rating_request_hash is None or run_session_id is None:
-                raise BracketRevalidationFailed("reuse requires rating_request_hash and run_session_id")
+                raise BracketRevalidationFailed(
+                    "reuse requires rating_request_hash and run_session_id"
+                )
             try:
                 same_run_endpoints.assert_matches_solve_context(
                     run_session_id=run_session_id,

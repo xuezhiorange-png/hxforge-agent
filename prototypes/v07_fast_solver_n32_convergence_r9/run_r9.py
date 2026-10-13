@@ -45,12 +45,12 @@ from prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver im
     solve_verified_narrow_bracket_outer_boundary,
 )
 from prototypes.v07_fast_solver_n32_convergence_r9.n32_bracket import BracketEstablishmentFailed
-from prototypes.v07_fast_solver_verified_bracket.mesh_extrapolation_bracket import (
-    establish_verified_bracket,
-)
 from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
     OuterTrialReceipt,
     observables_summary,
+)
+from prototypes.v07_fast_solver_verified_bracket.mesh_extrapolation_bracket import (
+    establish_verified_bracket,
 )
 
 TASK_ID = "V07_FAST_SOLVER_N32_CONVERGENCE_R9"

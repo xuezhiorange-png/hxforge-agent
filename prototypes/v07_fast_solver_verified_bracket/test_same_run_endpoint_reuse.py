@@ -5,8 +5,6 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
 from prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver import (
     solve_verified_narrow_bracket_outer_boundary,
@@ -43,29 +41,31 @@ def test_reuse_skips_endpoint_classify_calls() -> None:
         calls.append(enthalpy)
         return _high_trial()
 
-    with patch(
-        "prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver._classify_fast_trial",
-        side_effect=fake_classify,
-    ):
-        with patch(
+    with (
+        patch(
+            "prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver._classify_fast_trial",
+            side_effect=fake_classify,
+        ),
+        patch(
             "prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver._solve_bisection_on_bracket",
             return_value=_high_trial().mesh_run,
-        ):
-            with patch(
-                "prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver.t173._terminal_tolerance_pass",
-                return_value=True,
-            ):
-                result, rev = solve_verified_narrow_bracket_outer_boundary(
-                    8,
-                    provider=MagicMock(),
-                    shell_authority=MagicMock(),
-                    h_low_j_kg="1",
-                    h_high_j_kg="2",
-                    authority_id="AUTH",
-                    rating_request_hash="rh",
-                    same_run_endpoints=endpoints,
-                    run_session_id="sess-1",
-                )
+        ),
+        patch(
+            "prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver.t173._terminal_tolerance_pass",
+            return_value=True,
+        ),
+    ):
+        result, rev = solve_verified_narrow_bracket_outer_boundary(
+            8,
+            provider=MagicMock(),
+            shell_authority=MagicMock(),
+            h_low_j_kg="1",
+            h_high_j_kg="2",
+            authority_id="AUTH",
+            rating_request_hash="rh",
+            same_run_endpoints=endpoints,
+            run_session_id="sess-1",
+        )
     assert rev["duplicate_endpoint_solves_removed"] is True
     assert Decimal("1") not in calls
     assert Decimal("2") not in calls

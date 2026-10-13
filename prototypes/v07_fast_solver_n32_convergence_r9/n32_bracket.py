@@ -10,6 +10,8 @@ from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import OuterTri
 from prototypes.v07_fast_solver_verified_bracket.mesh_extrapolation_bracket import (
     BracketEstablishmentFailed,
     establish_verified_bracket,
+)
+from prototypes.v07_fast_solver_verified_bracket.mesh_extrapolation_bracket import (
     propose_search_bounds as propose_n32_search_bounds,
 )
 
