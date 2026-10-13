@@ -30,4 +30,3 @@ def test_n4_hash_reporting_exact_vs_numerical() -> None:
     }
     assert report["exact_mesh_hash_match"] is False
     assert report["numerical_comparison_within_tolerance"] is True
-

@@ -18,6 +18,11 @@ from prototypes.v07_fast_solver_evidence_gate.trusted_constants import (
     R8_RESULT_JSON_REL,
     R8_RESULT_SHA256,
     R8_TASK_ID,
+    R9_RESULT_COMMIT,
+    R9_RESULT_JSON_GIT_BLOB,
+    R9_RESULT_JSON_REL,
+    R9_RESULT_SHA256,
+    R9_TASK_ID,
     RATING_REQUEST_HASH,
 )
 
@@ -66,5 +71,29 @@ def verify_and_load_r8_n16_result_body() -> dict[str, Any]:
     return {
         "source_commit": R8_RESULT_COMMIT,
         "evidence_path": R8_RESULT_JSON_REL,
+        "result_body": body,
+    }
+
+
+def verify_and_load_r9_n32_result_body() -> dict[str, Any]:
+    path = ROOT / R9_RESULT_JSON_REL
+    verify_pinned_file(
+        path,
+        expected_sha256=R9_RESULT_SHA256,
+        expected_git_blob=R9_RESULT_JSON_GIT_BLOB,
+    )
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("task_id") != R9_TASK_ID:
+        raise ValueError("R9 task_id mismatch")
+    if data.get("result") != "N32_OUTER_BOUNDARY_TERMINAL_ACCEPTED":
+        raise ValueError("R9 result not terminal accepted")
+    body = data.get("n32_run", {}).get("result", {})
+    if body.get("outer_boundary_status") != "TERMINAL_ACCEPTED":
+        raise ValueError("R9 n32 outer status mismatch")
+    if body.get("rating_request_hash") != RATING_REQUEST_HASH:
+        raise ValueError("R9 rating_request_hash mismatch")
+    return {
+        "source_commit": R9_RESULT_COMMIT,
+        "evidence_path": R9_RESULT_JSON_REL,
         "result_body": body,
     }

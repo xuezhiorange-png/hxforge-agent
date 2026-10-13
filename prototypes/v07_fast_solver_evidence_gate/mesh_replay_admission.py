@@ -9,6 +9,7 @@ from hexagent.properties.base import PropertyProvider
 from prototypes.v07_fast_solver_evidence_gate.prior_mesh_evidence import (
     verify_and_load_r6_n8_result_body,
     verify_and_load_r8_n16_result_body,
+    verify_and_load_r9_n32_result_body,
 )
 from prototypes.v07_fast_solver_replay_n8_r6.strict_replay import strict_replay_level
 
@@ -64,6 +65,32 @@ def admit_n16_replay(
     mesh_run = replay.pop("_mesh_run")
     return {
         "subdivisions": 16,
+        "hash_parity": _parity_label(replay),
+        "replay": {k: v for k, v in replay.items()},
+        "mesh_run": mesh_run,
+        "evidence_source_commit": loaded["source_commit"],
+    }
+
+
+def admit_n32_replay(
+    provider: PropertyProvider,
+    shell_authority: Any,
+    *,
+    rating_request_hash: str,
+) -> dict[str, Any]:
+    loaded = verify_and_load_r9_n32_result_body()
+    path = ROOT / loaded["evidence_path"]
+    replay = strict_replay_level(
+        32,
+        loaded["result_body"],
+        path,
+        provider,
+        shell_authority,
+        rating_request_hash=rating_request_hash,
+    )
+    mesh_run = replay.pop("_mesh_run")
+    return {
+        "subdivisions": 32,
         "hash_parity": _parity_label(replay),
         "replay": {k: v for k, v in replay.items()},
         "mesh_run": mesh_run,

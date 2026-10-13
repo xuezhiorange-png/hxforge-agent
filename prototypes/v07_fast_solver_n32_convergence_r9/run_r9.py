@@ -11,6 +11,7 @@ import multiprocessing as mp
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -43,9 +44,9 @@ from prototypes.v07_fast_solver_n16_verified_bracket_r8.narrow_bracket_solver im
     OUTER_N32_CONVERGENCE_AUTHORITY_ID,
     solve_verified_narrow_bracket_outer_boundary,
 )
-from prototypes.v07_fast_solver_n32_convergence_r9.n32_bracket import (
-    BracketEstablishmentFailed,
-    establish_n32_verified_bracket,
+from prototypes.v07_fast_solver_n32_convergence_r9.n32_bracket import BracketEstablishmentFailed
+from prototypes.v07_fast_solver_verified_bracket.mesh_extrapolation_bracket import (
+    establish_verified_bracket,
 )
 from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
     OuterTrialReceipt,
@@ -157,21 +158,26 @@ def _n32_worker(payload: dict[str, Any]) -> dict[str, Any]:
     provider = CoolPropProvider(cache_size=2048)
     h8 = payload["h8_j_kg"]
     h16 = payload["h16_j_kg"]
+    run_session_id = str(uuid.uuid4())
+    rating_hash = t173.candidate_rating_request_hash(rating_request)
     t0 = time.perf_counter()
     bracket_meta: dict[str, Any] | None = None
     h_low = h_high = ""
     try:
         est_batcher = _TrialPushBatcher(trials_jsonl, "bracket_establishment")
-        h_low, h_high, bracket_meta = establish_n32_verified_bracket(
+        endpoints, bracket_meta = establish_verified_bracket(
             32,
             provider,
             context.shell_authority,
-            h8_j_kg=h8,
-            h16_j_kg=h16,
+            h_coarse_j_kg=h8,
+            h_fine_j_kg=h16,
             authority_id=OUTER_N32_CONVERGENCE_AUTHORITY_ID,
+            rating_request_hash=rating_hash,
+            run_session_id=run_session_id,
             deadline_monotonic=deadline,
             on_trial_receipt=est_batcher.on_receipt,
         )
+        h_low, h_high = endpoints.h_low_j_kg, endpoints.h_high_j_kg
         solve_batcher = _TrialPushBatcher(trials_jsonl, "narrow_bracket_solve")
         result, revalidation = solve_verified_narrow_bracket_outer_boundary(
             32,
@@ -180,6 +186,9 @@ def _n32_worker(payload: dict[str, Any]) -> dict[str, Any]:
             h_low_j_kg=h_low,
             h_high_j_kg=h_high,
             authority_id=OUTER_N32_CONVERGENCE_AUTHORITY_ID,
+            rating_request_hash=rating_hash,
+            same_run_endpoints=endpoints,
+            run_session_id=run_session_id,
             deadline_monotonic=deadline,
             on_trial_receipt=solve_batcher.on_receipt,
         )

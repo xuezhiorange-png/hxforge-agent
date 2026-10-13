@@ -18,9 +18,13 @@ from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
 from prototypes.v07_fast_solver_outer_continuation_n16_r7.outer_continuation import (
     _solve_bisection_on_bracket,
 )
+from prototypes.v07_fast_solver_verified_bracket.same_run_endpoints import (
+    SameRunBracketEndpoints,
+)
 
 OUTER_VERIFIED_BRACKET_AUTHORITY_ID = "V07-FAST-SOLVER-N16-VERIFIED-BRACKET-R8"
 OUTER_N32_CONVERGENCE_AUTHORITY_ID = "V07-FAST-SOLVER-N32-CONVERGENCE-R9"
+OUTER_N64_HEADROOM_AUTHORITY_ID = "V07-FAST-SOLVER-N64-HEADROOM-R10"
 
 
 class BracketRevalidationFailed(Exception):
@@ -35,6 +39,9 @@ def solve_verified_narrow_bracket_outer_boundary(
     h_low_j_kg: str,
     h_high_j_kg: str,
     authority_id: str = OUTER_VERIFIED_BRACKET_AUTHORITY_ID,
+    rating_request_hash: str | None = None,
+    same_run_endpoints: SameRunBracketEndpoints | None = None,
+    run_session_id: str | None = None,
     deadline_monotonic: float | None = None,
     on_trial_receipt: Callable[..., None] | None = None,
 ) -> tuple[FastOuterBoundaryResult, dict[str, Any]]:
@@ -43,6 +50,8 @@ def solve_verified_narrow_bracket_outer_boundary(
         "low_endpoint_revalidated": False,
         "high_endpoint_revalidated": False,
         "true_narrow_bracket_used": False,
+        "same_run_endpoint_reuse": False,
+        "duplicate_endpoint_solves_removed": False,
     }
 
     def trial_at(enthalpy: Decimal, iteration: int) -> t173._OuterTrial:
@@ -67,26 +76,49 @@ def solve_verified_narrow_bracket_outer_boundary(
 
     t0 = time.perf_counter()
     try:
-        low_trial = trial_at(h_low, 0)
-        if low_trial.classification == "HARD_BLOCKER":
-            code = low_trial.diagnostics[0] if low_trial.diagnostics else "HARD_BLOCKER"
-            raise BracketRevalidationFailed(code)
-        if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
-            raise BracketRevalidationFailed(
-                f"low endpoint classification={low_trial.classification}"
-            )
-        revalidation["low_endpoint_revalidated"] = True
+        if same_run_endpoints is not None:
+            if rating_request_hash is None or run_session_id is None:
+                raise BracketRevalidationFailed("reuse requires rating_request_hash and run_session_id")
+            try:
+                same_run_endpoints.assert_matches_solve_context(
+                    run_session_id=run_session_id,
+                    authority_id=authority_id,
+                    subdivisions=subdivisions,
+                    rating_request_hash=rating_request_hash,
+                    h_low_j_kg=h_low_j_kg,
+                    h_high_j_kg=h_high_j_kg,
+                )
+                same_run_endpoints.validate_physics()
+            except ValueError as exc:
+                raise BracketRevalidationFailed(str(exc)) from exc
+            low_trial = same_run_endpoints.low_trial
+            high_trial = same_run_endpoints.high_trial
+            revalidation["same_run_endpoint_reuse"] = True
+            revalidation["duplicate_endpoint_solves_removed"] = True
+            revalidation["endpoint_receipt_hashes"] = same_run_endpoints.endpoint_receipt_hashes()
+        else:
+            low_trial = trial_at(h_low, 0)
+            if low_trial.classification == "HARD_BLOCKER":
+                code = low_trial.diagnostics[0] if low_trial.diagnostics else "HARD_BLOCKER"
+                raise BracketRevalidationFailed(code)
+            if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
+                raise BracketRevalidationFailed(
+                    f"low endpoint classification={low_trial.classification}"
+                )
+            high_trial = trial_at(h_high, 0)
+            if high_trial.classification == "HARD_BLOCKER":
+                raise BracketRevalidationFailed(
+                    high_trial.diagnostics[0] if high_trial.diagnostics else "HARD_BLOCKER"
+                )
+            if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
+                raise BracketRevalidationFailed(
+                    f"high endpoint classification={high_trial.classification}"
+                )
 
-        high_trial = trial_at(h_high, 0)
-        if high_trial.classification == "HARD_BLOCKER":
-            raise BracketRevalidationFailed(
-                high_trial.diagnostics[0] if high_trial.diagnostics else "HARD_BLOCKER"
-            )
-        if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
-            raise BracketRevalidationFailed(
-                f"high endpoint classification={high_trial.classification}"
-            )
+        revalidation["low_endpoint_revalidated"] = True
         high_run = high_trial.mesh_run
+        if high_run is None:
+            raise BracketRevalidationFailed("high endpoint missing mesh_run")
         if (
             high_run.observables.terminal_boundary_residual_j_kg < 0
             or high_run.observables.terminal_boundary_residual_k < 0
