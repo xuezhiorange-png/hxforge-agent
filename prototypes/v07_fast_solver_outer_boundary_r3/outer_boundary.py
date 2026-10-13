@@ -137,10 +137,7 @@ def _classify_fast_trial(
         receipt.experimental_task172_calls = mesh_stats.experimental_total_production_task172_calls
         receipt.experimental_eval_trial_calls = mesh_stats.total_eval_trial_calls
         receipt.coupled_fallback_count = mesh_stats.coupled_fallback_count
-        if (
-            obs.terminal_boundary_residual_j_kg < 0
-            or obs.terminal_boundary_residual_k < 0
-        ):
+        if obs.terminal_boundary_residual_j_kg < 0 or obs.terminal_boundary_residual_k < 0:
             receipt.classification = "HARD_BLOCKER"
             receipt.failure_code = "BLOCKED_NEGATIVE_TERMINAL_RESIDUAL"
             trial = t173._OuterTrial(

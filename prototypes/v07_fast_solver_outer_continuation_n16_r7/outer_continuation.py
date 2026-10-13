@@ -24,6 +24,8 @@ from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
 )
 
 OUTER_CONTINUATION_AUTHORITY_ID = "V07-FAST-SOLVER-OUTER-CONTINUATION-N16-R7"
+
+
 def _solve_bisection_on_bracket(
     trial_at: Callable[[Decimal, int], t173._OuterTrial],
     h_low: Decimal,
@@ -40,11 +42,7 @@ def _solve_bisection_on_bracket(
     while iterations < MAX_OUTER_BISECTION_ITERATIONS:
         with localcontext() as context:
             context.prec = 80
-            if (
-                not used_hint
-                and first_mid_hint is not None
-                and h_low < first_mid_hint < h_high
-            ):
+            if not used_hint and first_mid_hint is not None and h_low < first_mid_hint < h_high:
                 h_mid = first_mid_hint
                 used_hint = True
             else:

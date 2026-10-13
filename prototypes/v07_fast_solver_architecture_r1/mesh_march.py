@@ -157,9 +157,7 @@ def fast_valid_trajectory(
                     float(solution.task172_result.wall_temperature_outer_k),
                 )
             else:
-                mesh_stats.experimental_total_production_task172_calls += (
-                    1 if not fallback else 0
-                )
+                mesh_stats.experimental_total_production_task172_calls += 1 if not fallback else 0
             coordinate = support.support_end_m
             face_index = len(tube_faces)
             tube_right = t173._face_state(

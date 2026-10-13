@@ -231,8 +231,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT
-        / "docs/tasks/evidence/V07-TASK172-TASK173-fast-solver-architecture-r1.json",
+        default=ROOT / "docs/tasks/evidence/V07-TASK172-TASK173-fast-solver-architecture-r1.json",
     )
     args = parser.parse_args()
     payload = run_benchmark()

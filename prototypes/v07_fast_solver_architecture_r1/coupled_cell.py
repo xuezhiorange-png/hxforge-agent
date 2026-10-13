@@ -263,9 +263,7 @@ def solve_coupled_cell(
     )
     cell_stats.fallback_seconds = time.perf_counter() - fallback_t0
     cell_stats.production_cell_root_calls = 1
-    cell_stats.production_task172_calls = (
-        search_stats.task172_local_evaluation_count - before_evals
-    )
+    cell_stats.production_task172_calls = search_stats.task172_local_evaluation_count - before_evals
     _fill_outcome_identity(cell_stats, evaluation)
     return evaluation
 

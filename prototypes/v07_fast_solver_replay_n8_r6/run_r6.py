@@ -219,9 +219,7 @@ def _convergence_sequence(mesh_runs: dict[str, t173._MeshRun]) -> dict[str, Any]
         comparisons.append(compare_mesh_pair(mesh_runs["n4"], mesh_runs["n8"]))
     rolling = evaluate_rolling_mesh_convergence(seq, comparisons)
     candidate_status = (
-        "MESH_CANDIDATE_IDENTIFIED"
-        if rolling.mesh_candidate_identified
-        else "NOT_IDENTIFIED"
+        "MESH_CANDIDATE_IDENTIFIED" if rolling.mesh_candidate_identified else "NOT_IDENTIFIED"
     )
     return {
         "n1_n2_mesh_comparison": n1_n2,
@@ -249,9 +247,7 @@ def main() -> None:
         raise SystemExit("REMOTE_PERSISTENCE_UNAVAILABLE")
 
     ts = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    out = args.output or (
-        ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-{ts}.json"
-    )
+    out = args.output or (ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-replay-n8-r6-{ts}.json")
     trials_jsonl = out.with_suffix(".trials.jsonl")
     trials_jsonl.write_text("", encoding="utf-8")
     stage = out.with_suffix(".stage.json")
@@ -313,9 +309,7 @@ def main() -> None:
                 provider2,
                 context.shell_authority,
                 outer_iterations=bisection,
-                expected_mesh_hash=n8_body["observables_summary"][
-                    "experimental_mesh_result_hash"
-                ],
+                expected_mesh_hash=n8_body["observables_summary"]["experimental_mesh_result_hash"],
                 source_label="n8_outer_accepted",
             )
             mesh_runs["n8"] = n8_run_mesh

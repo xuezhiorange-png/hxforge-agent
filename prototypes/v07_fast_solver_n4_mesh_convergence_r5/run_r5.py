@@ -39,9 +39,7 @@ TASK_ID = "V07_FAST_SOLVER_N4_MESH_CONVERGENCE_R5"
 SOURCE_SHA = "7b954f6e86bf5ab2db5c206adfe977942c2782ad"
 BRANCH = "cursor/v07-fast-solver-n4-mesh-convergence-r5-1201"
 CANDIDATE_B_ID = "e152cca9-fd5d-59ca-9b46-1df574eee841"
-R3_EVIDENCE = (
-    ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-outer-boundary-r3-20261012T122052Z.json"
-)
+R3_EVIDENCE = ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-outer-boundary-r3-20261012T122052Z.json"
 R4_EVIDENCE = (
     ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-n2-outer-boundary-r4-20261012T134805Z.json"
 )

@@ -95,12 +95,8 @@ def evaluate_rolling_mesh_convergence(
                 headroom_status = "FAIL"
             break
 
-    candidate_n = (
-        subdivisions_sequence[candidate_index] if candidate_index is not None else None
-    )
-    headroom_n = (
-        subdivisions_sequence[headroom_index] if headroom_index is not None else None
-    )
+    candidate_n = subdivisions_sequence[candidate_index] if candidate_index is not None else None
+    headroom_n = subdivisions_sequence[headroom_index] if headroom_index is not None else None
     identified = candidate_index is not None and headroom_index is not None
 
     return RollingMeshEvaluation(

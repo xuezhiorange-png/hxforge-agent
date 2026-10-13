@@ -226,9 +226,7 @@ def strict_replay_all(
         rating_request_hash=rating_request_hash,
     )
     all_pass = (
-        n1["hash_parity"] == "PASS"
-        and n2["hash_parity"] == "PASS"
-        and n4["hash_parity"] == "PASS"
+        n1["hash_parity"] == "PASS" and n2["hash_parity"] == "PASS" and n4["hash_parity"] == "PASS"
     )
     return {
         "n1_replay": {k: v for k, v in n1.items() if k != "_mesh_run"},

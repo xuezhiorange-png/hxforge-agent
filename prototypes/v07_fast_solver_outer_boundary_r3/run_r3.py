@@ -57,9 +57,7 @@ def _solve_worker(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         if time.perf_counter() > deadline:
             return {"status": "TIMEOUT", "reason": "budget_before_start"}
-        result = solve_fast_outer_boundary(
-            subdivisions, provider, context.shell_authority
-        )
+        result = solve_fast_outer_boundary(subdivisions, provider, context.shell_authority)
         if time.perf_counter() > deadline:
             return {
                 "status": "TIMEOUT",

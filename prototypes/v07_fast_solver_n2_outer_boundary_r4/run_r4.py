@@ -33,9 +33,7 @@ from prototypes.v07_fast_solver_outer_boundary_r3.outer_boundary import (
 TASK_ID = "V07_FAST_SOLVER_N2_OUTER_BOUNDARY_R4"
 SOURCE_SHA = "17a1579099da7166755a238b202c884b4ae2bba6"
 CANDIDATE_B_ID = "e152cca9-fd5d-59ca-9b46-1df574eee841"
-R3_EVIDENCE = (
-    ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-outer-boundary-r3-20261012T122052Z.json"
-)
+R3_EVIDENCE = ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-outer-boundary-r3-20261012T122052Z.json"
 N2_WORKER_BUDGET_S = 360.0
 TOTAL_BUDGET_S = 420.0
 WORKER_JOIN_GRACE_S = 15.0

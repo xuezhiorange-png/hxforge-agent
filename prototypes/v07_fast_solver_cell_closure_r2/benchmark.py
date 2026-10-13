@@ -160,9 +160,7 @@ def _mesh_case(
             "experimental_total_eval_trial_calls": (
                 fast_stats.total_eval_trial_calls if fast_stats else None
             ),
-            "coupled_fallback_count": (
-                fast_stats.coupled_fallback_count if fast_stats else None
-            ),
+            "coupled_fallback_count": (fast_stats.coupled_fallback_count if fast_stats else None),
             "fallback_reason_histogram": fallback_reasons,
             "cell_receipts": fast_stats.cell_receipts if fast_stats else None,
             "observables": _observables(fast_run) if fast_run else None,
@@ -216,14 +214,10 @@ def run_benchmark() -> dict[str, Any]:
     r2_n2 = mean(speedups(r2_cases, 2))
     r2_n4 = mean(speedups(r2_cases, 4))
     n2_fb = max(
-        c["fast_solver"]["coupled_fallback_count"] or 0
-        for c in r2_cases
-        if c["subdivisions"] == 2
+        c["fast_solver"]["coupled_fallback_count"] or 0 for c in r2_cases if c["subdivisions"] == 2
     )
     n4_fb = max(
-        c["fast_solver"]["coupled_fallback_count"] or 0
-        for c in r2_cases
-        if c["subdivisions"] == 4
+        c["fast_solver"]["coupled_fallback_count"] or 0 for c in r2_cases if c["subdivisions"] == 4
     )
     rnd_ok = (
         r2_n2 is not None
@@ -278,8 +272,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT
-        / "docs/tasks/evidence/V07-FAST-SOLVER-cell-closure-r2.json",
+        default=ROOT / "docs/tasks/evidence/V07-FAST-SOLVER-cell-closure-r2.json",
     )
     args = parser.parse_args()
     payload = run_benchmark()
