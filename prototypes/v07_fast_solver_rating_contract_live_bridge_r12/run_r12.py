@@ -56,9 +56,7 @@ def _git_push_files(message: str, paths: list[Path]) -> str | None:
         return None
     try:
         subprocess.run(["git", "add", *rel_paths], cwd=ROOT, check=True, capture_output=True)
-        subprocess.run(
-            ["git", "commit", "-m", message], cwd=ROOT, check=True, capture_output=True
-        )
+        subprocess.run(["git", "commit", "-m", message], cwd=ROOT, check=True, capture_output=True)
         subprocess.run(["git", "push", "origin", BRANCH], cwd=ROOT, check=True, capture_output=True)
         rev = subprocess.run(
             ["git", "rev-parse", "HEAD"],

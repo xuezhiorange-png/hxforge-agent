@@ -53,9 +53,7 @@ FROZEN_RUNNER = (
 
 
 def experimental_rating_result_hash(result: ExperimentalCandidateRatingResult) -> str:
-    return canonical_sha256(
-        result.model_dump(mode="json", exclude={"result_hash", "result_id"})
-    )
+    return canonical_sha256(result.model_dump(mode="json", exclude={"result_hash", "result_id"}))
 
 
 def experimental_rating_result_id(result_hash: str) -> str:

@@ -1,0 +1,48 @@
+{
+  "attempt3_final_result": "NONE \u2014 user-terminated Mac Attempt 3; not numerical evidence",
+  "ended_at_epoch_s": 1791761175.2659404,
+  "environment": {
+    "coolprop": "8.0.0",
+    "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+    "python": "3.12.3"
+  },
+  "samples": [
+    {
+      "baseline": {
+        "cache_hits": 26,
+        "cache_misses": 18,
+        "pattern": "new CoolPropProvider(cache_size=256) per mesh step",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "wall_seconds": 0.3246142769985454
+      },
+      "engineering_hash_match": true,
+      "mesh_steps": 7,
+      "optimized": {
+        "cache_hits": 290,
+        "cache_misses": 18,
+        "pattern": "shared provider via _mesh_sequence_provider_factory (cache_size=2048)",
+        "result_hash": "5ffd1a689243116448d19be0fcfc38f388b61a9d6412336eea3550a1e943acb5",
+        "wall_seconds": 0.2378187110007275
+      },
+      "scenario": "task172_validate_request_x_mesh_steps",
+      "speedup_ratio": 1.3649652528709249
+    },
+    {
+      "cache_hits": 0,
+      "cache_max_size": 2048,
+      "cache_misses": 0,
+      "cache_size": 0,
+      "replay_status": "PASS",
+      "scenario": "task173_native_shell_flow_replay",
+      "wall_seconds": 0.13458211500073958
+    },
+    {
+      "error": "AttributeError: Can't pickle local object 'benchmark_task173_outer_boundary_subdivisions_1.<locals>._worker'",
+      "scenario": "task173_solve_outer_boundary_subdivisions_1",
+      "status": "FAIL",
+      "wall_seconds": 0.016058780000093975
+    }
+  ],
+  "task_id": "V07_TASK173_SIZING_PERFORMANCE_RECOVERY_R1",
+  "total_wall_seconds": 0.7782843112945557
+}

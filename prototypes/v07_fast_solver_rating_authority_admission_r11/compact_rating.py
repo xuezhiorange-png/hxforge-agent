@@ -70,9 +70,7 @@ class ExperimentalCompactCandidateRating(StrictModel):
 
 
 def compact_rating_hash(compact: ExperimentalCompactCandidateRating) -> str:
-    return canonical_sha256(
-        compact.model_dump(mode="json", exclude={"compact_result_hash"})
-    )
+    return canonical_sha256(compact.model_dump(mode="json", exclude={"compact_result_hash"}))
 
 
 def build_compact_from_full(
