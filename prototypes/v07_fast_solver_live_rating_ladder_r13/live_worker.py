@@ -68,6 +68,9 @@ def _worker_entry(queue: mp.Queue, payload: dict[str, Any]) -> None:
                 "shooting_enthalpy_for_rehydrate": (
                     str(run.shooting_enthalpy) if run is not None else None
                 ),
+                "outer_iterations_for_rehydrate": (
+                    int(run.bisection_iterations) if run is not None else 0
+                ),
             }
             queue.put(receipt)
         finally:
@@ -126,6 +129,7 @@ def rehydrate_mesh_run_for_compare(
     request: CandidateRatingRequest,
     shooting_enthalpy_j_kg: str,
     mesh_n: int,
+    outer_iterations: int = 0,
 ) -> Any:
     """Rebuild mesh run at live-discovered shooting enthalpy for mesh comparison."""
     from prototypes.v07_fast_solver_architecture_r1.mesh_march import fast_valid_trajectory
@@ -139,7 +143,7 @@ def rehydrate_mesh_run_for_compare(
             Decimal(shooting_enthalpy_j_kg),
             provider,
             context.shell_authority,
-            0,
+            outer_iterations,
             cell_solver="r2",
         )
         return run

@@ -176,7 +176,8 @@ def experimental_rate_candidate_live(
                 blocked_code="MISSING_SHOOTING_ENTHALPY",
                 total_wall_seconds=time.perf_counter() - wall_t0,
             )
-        run = rehydrate_mesh_run_for_compare(request, shooting, mesh_n)
+        outer_iters = int(receipt.get("outer_iterations_for_rehydrate", 0))
+        run = rehydrate_mesh_run_for_compare(request, shooting, mesh_n, outer_iters)
         if run.mesh_result_hash != receipt.get("mesh_result_hash"):
             return LiveRatingOrchestratorOutcome(
                 status="BLOCKED",

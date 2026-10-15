@@ -117,9 +117,7 @@ def test_task174_binding_rejects_bad_hash(
         )
     bad = req_raw.model_copy(
         update={
-            "task174_result": req_raw.task174_result.model_copy(
-                update={"result_hash": "0" * 64}
-            )
+            "task174_result": req_raw.task174_result.model_copy(update={"result_hash": "0" * 64})
         }
     )
     assert verify_task174_binding(bad) is False
