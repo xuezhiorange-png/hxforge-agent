@@ -1,0 +1,359 @@
+{
+  "schema_version": "task172.r119a.case-bound-task171-definition-authority-candidate.v1",
+  "task_id": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+  "short_name": "R119-A",
+  "mode": "CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_ONLY",
+  "result": "CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_COMPLETED",
+  "candidate_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "authority_package_id": "V07-T172-R119A-CASE-BOUND-TASK171-DEFINITION-AUTHORITY-R1",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pr_number": 283,
+  "pr_expected_state": "OPEN_DRAFT",
+  "predecessor_head_sha": "a96f9aeff4cb2c94824cdaece4d2062fc967ccc4",
+  "r118d_review": {
+    "review_result": "PASS",
+    "evidence_canonical_hash": "3a35df823adc4cfc2d6be8c1f56704d5b835e670f2848f6c380f5e368410353d",
+    "extension_canonical_hash": "e463e41b4fa2844ba3296ef53e7c9369d4e3cc2b4bac13e686c451be05f4be25",
+    "pre_r119a_registry_root_canonical_hash": "241f38ca663229333c15c7639d72ac52cf46ebdcabb234018245711a2918b359"
+  },
+  "accepted_case_identity": {
+    "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "task014_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1"
+  },
+  "accepted_native_identity_chain": {
+    "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "TASK014": {
+      "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "status": "committed",
+      "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+      "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+      "audit_event_types": [
+        "revision_created",
+        "revision_validated",
+        "revision_committed"
+      ],
+      "case_root_status": "active",
+      "case_root_first_revision_id_matches": true
+    },
+    "TASK020": {
+      "status": "VALID",
+      "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "standard_claim_status": "NO_STANDARD_CLAIM",
+      "committed_TASK014_revision_binding_matches": true
+    },
+    "TASK021": {
+      "status": "VALID",
+      "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+      "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "position_count": 253,
+      "physical_tube_count": 253,
+      "limiting_position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "limiting_position_x_m": "-0.1524",
+      "limiting_position_y_m": "-0.131982271537",
+      "TASK020_binding_matches": true
+    },
+    "TASK022": {
+      "status": "VALID",
+      "bundle_geometry_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "bundle_geometry_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "shell_inside_diameter_m": "0.5",
+      "bare_tube_bundle_diameter_m": "0.43486592081130829065079429561196969724856074243842",
+      "bundle_outer_envelope_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+      "shell_to_bundle_radial_clearance_m": "0.02256703959434585467460285219401515137571962878079",
+      "radial_clearance_margin_m": "0.01256703959434585467460285219401515137571962878079",
+      "TASK020_TASK021_bindings_match": true
+    },
+    "TASK024": {
+      "status": "VALID",
+      "baffle_geometry_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "baffle_geometry_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "baffle_diameter_m": "0.497000000000",
+      "baffle_hole_diameter_m": "0.020050000000",
+      "baffle_center_sequence_m": [
+        "1.200000000000",
+        "2.400000000000",
+        "3.600000000000",
+        "4.800000000000"
+      ],
+      "limiting_cut_boundary_margin_m": "0.000972561537",
+      "TASK020_TASK021_TASK022_bindings_match": true
+    },
+    "TASK025": {
+      "native_result_type": "Task025ValidResult",
+      "result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "request_hash": "ee0625273153d7a487f141fc153464d9e94132f5e280ad5e257b45473fcb84b8",
+      "hydraulic_authority_hash": "2fb039ad6bc5a398ec75911c5b05b36e889d7d37a307ea424c4c7a15884365e5",
+      "active_position_count": 253,
+      "inactive_position_count": 0,
+      "active_position_ids_equal_TASK021_order": true,
+      "engineering_decimal_outputs": {
+        "single_tube_flow_area_m2": "0.0001948278",
+        "total_parallel_flow_area_m2": "0.0492914415",
+        "flow_cross_section_wetted_perimeter_m": "0.04948008",
+        "total_flow_cross_section_wetted_perimeter_m": "12.51846133",
+        "hydraulic_diameter_m": "0.01575000",
+        "internal_volume_m3": "0.295748648836",
+        "internal_heat_transfer_surface_area_m2": "75.1107679584",
+        "future_pressure_drop_length_m": null
+      }
+    }
+  },
+  "task171_reviewed_profile": {
+    "profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "implementation_version": "task171.v1",
+    "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+    "authority_ids": [
+      "V07-T171-TOPOLOGY-R4-V1",
+      "V07-T171-CELL-COMPARTMENT-R4-V1",
+      "V07-T171-CONSERVATION-R4-V1"
+    ],
+    "envelope": {
+      "steady_state": true,
+      "single_phase": true,
+      "newtonian": true,
+      "construction_family": "FIXED_TUBESHEET",
+      "shell_type": "E",
+      "shell_pass_count": 1,
+      "tube_pass_count": 1,
+      "tube_path": "STRAIGHT_THROUGH",
+      "flow_arrangement": "COUNTERCURRENT"
+    }
+  },
+  "candidate_authorities": {
+    "authority_package_id": "V07-T172-R119A-CASE-BOUND-TASK171-DEFINITION-AUTHORITY-R1",
+    "flow_path_mapping_authority_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+    "physical_compartment_mapping_authority_id": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+    "area_ownership_authority_id": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+    "length_ownership_authority_id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+    "mesh_authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING"
+  },
+  "physical_mapping": {
+    "axial_start_m": "0",
+    "baffle_centers_native_m": [
+      "1.200000000000",
+      "2.400000000000",
+      "3.600000000000",
+      "4.800000000000"
+    ],
+    "axial_end_m": "6",
+    "physical_boundaries_m": [
+      "0",
+      "1.2",
+      "2.4",
+      "3.6",
+      "4.8",
+      "6"
+    ],
+    "physical_interval_count": 5,
+    "physical_intervals": [
+      {
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+        "start_m": "0",
+        "end_m": "1.2",
+        "interval_length_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008"
+      },
+      {
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+        "start_m": "1.2",
+        "end_m": "2.4",
+        "interval_length_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008"
+      },
+      {
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+        "start_m": "2.4",
+        "end_m": "3.6",
+        "interval_length_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008"
+      },
+      {
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+        "start_m": "3.6",
+        "end_m": "4.8",
+        "interval_length_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008"
+      },
+      {
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+        "start_m": "4.8",
+        "end_m": "6",
+        "interval_length_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008"
+      }
+    ],
+    "same_input_same_physical_segment_ids": true,
+    "physical_segment_identity_rule": "existing deterministic segment ID suffix equals canonical_sha256({case_id,TASK024 geometry hash,start_m,end_m}); exact suffix replay is recorded in this candidate"
+  },
+  "flow_mapping": {
+    "flow_path_count": 2,
+    "tube_flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+    "shell_flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+    "active_tube_position_count": 253,
+    "tube_membership_matches_task025": true,
+    "shell_tube_position_ids": [],
+    "side_direction_mapping_status": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "selected_thermal_role_variant": "UNBOUND",
+    "thermal_role_selection_authority_id": "UNBOUND",
+    "hot_stream_path_id": "UNBOUND",
+    "cold_stream_path_id": "UNBOUND",
+    "fluid_identity_bound": false
+  },
+  "area_ownership": {
+    "total_inside_area_m2": "75.1107679584",
+    "task037_outer_to_inner_area_ratio": "1.209523809523810",
+    "total_outside_area_m2": "90.848262197302892909889504",
+    "rule_class": "PROJECT_INTERNAL_DERIVED_MAPPING_CANDIDATE",
+    "standard_claim_status": "NO_STANDARD_CLAIM",
+    "area_total_closure": "PASS"
+  },
+  "length_ownership": {
+    "total_heat_transfer_length_m": "6",
+    "interval_length_m": [
+      "1.2",
+      "1.2",
+      "1.2",
+      "1.2",
+      "1.2"
+    ],
+    "length_total_closure": "PASS"
+  },
+  "mesh_candidate": {
+    "policy": "EXPLICIT_PROJECT_CANDIDATE_NOT_DEFAULT",
+    "mesh_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "tube_path_cell_count": 5,
+    "shell_path_cell_count": 5,
+    "total_cell_count": 10,
+    "wall_interface_count": 5,
+    "production_mesh_admission": false
+  },
+  "events": {
+    "physical_event_count": 19,
+    "producer_status": "UNRESOLVED",
+    "source_relation_role": "STRUCTURAL_REFERENCE_ONLY"
+  },
+  "role_variants": {
+    "variant_a_id": "TUBE_HOT_SHELL_COLD",
+    "variant_b_id": "TUBE_COLD_SHELL_HOT",
+    "both_present": true,
+    "non_role_difference_count": 0,
+    "selected_variant": "UNBOUND",
+    "strict_model_validation_per_variant": true
+  },
+  "static_compatibility_audit": {
+    "model_construction": "PASS",
+    "pydantic_strict_model_validation": "PASS",
+    "required_native_boundaries_present": true,
+    "extra_physical_boundaries": 0,
+    "path_count": 2,
+    "side_set": [
+      "SHELL",
+      "TUBE"
+    ],
+    "role_set_per_variant": [
+      "COLD",
+      "HOT"
+    ],
+    "physical_interval_count": 5,
+    "total_cell_count": 10,
+    "wall_interface_count": 5,
+    "physical_event_count": 19,
+    "tube_position_membership_count": 253,
+    "area_total_closure": "PASS",
+    "length_total_closure": "PASS",
+    "known_task171_hard_predicate_mismatch_count": 0,
+    "task171_native_producer_invocation_count": 0,
+    "physical_segment_id_canonical_replay": "PASS",
+    "path_travel_and_connectivity": "PASS",
+    "wall_cell_support_partition": "PASS",
+    "event_support_and_segment_incidence": "PASS",
+    "structural_state_location_ownership": "PASS",
+    "same_input_same_physical_segment_ids": true,
+    "role_variant_non_role_difference_count": 0,
+    "physical_compartment_id_canonical_replay": "PASS",
+    "physical_event_id_canonical_replay": "PASS",
+    "same_input_same_physical_compartment_ids": true,
+    "same_input_same_flow_path_ids": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+    "document_sha256": "74e1a648c7d668426558493d662161e0abeda96e8415e4857961696f7dff6a46",
+    "evidence_files": {
+      "flow": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-flow-path-mapping-candidate-r1.json",
+        "file_sha256": "c3e075f912e45ff8246d7f9902b342a4edc81c33fa40f90462d8cbeee63a9408",
+        "canonical_hash": "c728a589460f9667bc38700700ffde670ff59042f021c66228b91b4567a8c61d"
+      },
+      "comp": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-physical-compartment-mapping-candidate-r1.json",
+        "file_sha256": "03f3aed7525f2cebaae3b4697ec0d255c77ee59a7a2fa32b723e566e7261839d",
+        "canonical_hash": "57dcc49b31dafcb47178286247ec5bdb55d304b6e805162ada843d7db41c45b0"
+      },
+      "area": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-area-ownership-candidate-r1.json",
+        "file_sha256": "5a254de747695a46f63fa20dab704a0573d8edc18d4db83da50d735b817ca0e5",
+        "canonical_hash": "ab5c9ede1064ee0c17d7d07ab5cf3f4a8326b53bbf08935d125fedefe7939c98"
+      },
+      "length": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-length-ownership-candidate-r1.json",
+        "file_sha256": "22c6a0069dc525d7cce9d78a9c7c2362313a727b60d6c352673157f4fb0ac543",
+        "canonical_hash": "eb9924e25bb68393642d4fa0e573fb58875bc0320d284e327f334acf0c8aa60b"
+      },
+      "mesh": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-mesh-authority-candidate-r1.json",
+        "file_sha256": "512d7c759696ff74d81f0dd7130dc705c4154c92296a80ac4d430e8a627bb4ec",
+        "canonical_hash": "7e1b9134deed8e4e9071195a312b1f053d43cef43c997e0421fc4e0d9ca62456"
+      },
+      "identity": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-task171-native-identity-binding-r1.json",
+        "file_sha256": "0af775c4f7c5631c7c19475dcdc5c6f1cabea484140db093025b8878b407303b",
+        "canonical_hash": "8fa35eaf694439ee5d5375e45bc1b7df753af2982910350531d0e9fe241235e4"
+      },
+      "variant_a": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json",
+        "file_sha256": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+        "canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc"
+      },
+      "variant_b": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-b-r1.json",
+        "file_sha256": "a6a418787cb6857e580387519bdd04260e8ff944dfb3a8b17947204d63c424e7",
+        "canonical_hash": "85f0199bb3beef1ba297736126cd08ba059391ba9e13a30bea9e1a15111a00fe"
+      }
+    }
+  },
+  "governance": {
+    "r119a_candidate_present": true,
+    "r119a_independent_review_complete": false,
+    "task171_executed": false,
+    "topology_authority_id": "UNBOUND",
+    "flow_path_mapping_id": "UNBOUND",
+    "physical_compartment_map_id": "UNBOUND",
+    "area_ownership_map_id": "UNBOUND",
+    "length_ownership_map_id": "UNBOUND",
+    "hot_stream_path_id": "UNBOUND",
+    "cold_stream_path_id": "UNBOUND",
+    "selected_thermal_role_variant": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "real_case_mesh_admissible": false,
+    "production_mesh_admission_enabled": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "next_gate": "R119B_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+  "stop": true,
+  "canonical_hash": "a39be0a73fcd59ca2b338f0077a46ba962c42b5229fdded07dc7958c090ada3e"
+}

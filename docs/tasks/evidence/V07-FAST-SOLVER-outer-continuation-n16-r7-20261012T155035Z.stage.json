@@ -1,0 +1,6 @@
+{
+  "command": "python prototypes/v07_fast_solver_outer_continuation_n16_r7/run_r7.py",
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "task_id": "V07_FAST_SOLVER_OUTER_CONTINUATION_N16_R7",
+  "total_budget_s": 1200.0
+}
