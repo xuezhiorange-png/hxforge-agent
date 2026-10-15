@@ -49,7 +49,8 @@ def admit_prior_stage(
     digest = file_sha256(path)
     if digest != pin.expected_sha256:
         raise ValueError(
-            f"EVIDENCE_HASH_MISMATCH mesh_n={pin.mesh_n} expected={pin.expected_sha256} actual={digest}"
+            "EVIDENCE_HASH_MISMATCH "
+            f"mesh_n={pin.mesh_n} expected={pin.expected_sha256} actual={digest}"
         )
     receipt = load_stage_receipt(path)
     if receipt.get("mesh_n") != pin.mesh_n:
