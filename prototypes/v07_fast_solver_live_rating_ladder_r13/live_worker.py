@@ -88,7 +88,7 @@ def run_live_mesh_worker(
     ctx = mp.get_context("spawn")
     queue: mp.Queue = ctx.Queue()
     payload = {
-        "request": request.model_dump(mode="json"),
+        "request": request.model_dump(mode="python"),
         "subdivisions": mesh_n,
         "budget_s": budget_s,
     }
