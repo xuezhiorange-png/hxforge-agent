@@ -1,0 +1,42 @@
+{
+  "acceptance": {
+    "accepted_cell_count_verified": true,
+    "compact_result_hash": "5229c58110b633114132501829fb942a2ac76591ca999e0a190c0782a26e8041",
+    "compact_result_hash_parity": "PASS",
+    "compact_result_hash_recomputed": "5229c58110b633114132501829fb942a2ac76591ca999e0a190c0782a26e8041",
+    "full_trajectory_fail_closed": true,
+    "r11_artifact_roundtrip_pass": true,
+    "r11_ci_format_fixed": false,
+    "r11_result_hash_parity": "PASS",
+    "ruff_format_check": {
+      "pass": false,
+      "stderr": "",
+      "stdout": "Would reformat: \u001b[1mprototypes/v07_fast_solver_rating_contract_live_bridge_r12/test_r11_destructive.py\u001b[0m\n1 file would be reformatted, 870 files already formatted\n"
+    },
+    "wall_extrema_recomputed": true
+  },
+  "arbitrary_candidate_full_rating_verified": false,
+  "fail_closed_pytest": {
+    "cell_count": true,
+    "trajectory": true,
+    "wall_extrema": true
+  },
+  "live_mesh_stage_persistence_pass": true,
+  "live_n1_n2_comparison": null,
+  "live_n1_status": "BLOCKED",
+  "live_n2_status": "UNKNOWN",
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T041546Z.live-orchestrator.json",
+  "live_rating_orchestrator_implemented": true,
+  "live_request_authority_gate": true,
+  "live_worker_hard_timeout_implemented": true,
+  "numerical_authority_status": "CANDIDATE",
+  "production_integration": false,
+  "r12_acceptance_flags_corrected": true,
+  "r12_format_fixed": false,
+  "real_geometry_summary_implemented": true,
+  "result": "R13_BLOCKED",
+  "source_head_sha": "df32bf2de95c937b588ed5589d00c100ac8ef7a9",
+  "stage_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-stages-20261015T041546Z",
+  "task_id": "V07_FAST_SOLVER_LIVE_RATING_LADDER_R13",
+  "total_runner_wall_seconds": 232.6421819669995
+}
