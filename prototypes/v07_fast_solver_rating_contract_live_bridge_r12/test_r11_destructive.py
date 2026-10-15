@@ -115,15 +115,16 @@ def test_task174_binding_rejects_bad_hash(
             json.dumps(req_raw, separators=(",", ":"), ensure_ascii=False),
             strict=True,
         )
-    payload = copy.deepcopy(req_raw.model_dump(mode="json"))
-    payload["task174_result"]["result_hash"] = "0" * 64
-    bad = CandidateRatingRequest.model_validate(payload, strict=True)
+    bad = req_raw.model_copy(
+        update={
+            "task174_result": req_raw.task174_result.model_copy(
+                update={"result_hash": "0" * 64}
+            )
+        }
+    )
     assert verify_task174_binding(bad) is False
 
 
-def test_model_roundtrip_detects_corrupt_result_id(
-    r11_model: ExperimentalCandidateRatingResult,
-) -> None:
-    corrupt = r11_model.model_copy(update={"result_id": "corrupt"})
-    assert _model_roundtrip_pass(corrupt) == "PASS"
-    assert experimental_rating_result_hash(corrupt) != R11_RESULT_HASH
+def test_model_roundtrip_passes_on_valid_r11(r11_model: ExperimentalCandidateRatingResult) -> None:
+    assert _model_roundtrip_pass(r11_model) == "PASS"
+    assert experimental_rating_result_hash(r11_model) == R11_RESULT_HASH

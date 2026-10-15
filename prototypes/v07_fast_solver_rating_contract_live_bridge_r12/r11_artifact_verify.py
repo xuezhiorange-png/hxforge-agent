@@ -48,7 +48,7 @@ def verify_r11_full_rating_artifact() -> dict[str, Any]:
     parsed_once = json.loads(raw_text)
     parsed_twice = json.loads(json.dumps(parsed_once, ensure_ascii=False))
     json_identity_pass = parsed_once == parsed_twice
-    model = ExperimentalCandidateRatingResult.model_validate(parsed_once, strict=True)
+    model = ExperimentalCandidateRatingResult.model_validate_json(raw_text, strict=True)
     roundtrip = _model_roundtrip_pass(model)
     recomputed = experimental_rating_result_hash(model)
     parity = recomputed == R11_RESULT_HASH
