@@ -15,6 +15,9 @@ from prototypes.v07_fast_solver_live_rating_ladder_r13.live_worker import (
     rehydrate_mesh_run_for_compare,
     run_live_mesh_worker,
 )
+from prototypes.v07_fast_solver_live_rating_ladder_r13.request_snapshot import (
+    verify_request_identity,
+)
 from prototypes.v07_fast_solver_live_rating_ladder_r13.stage_persistence import (
     write_stage_receipt,
 )
@@ -98,6 +101,7 @@ def experimental_rate_candidate_live(
 ) -> LiveRatingOrchestratorOutcome | ExperimentalRatingBlocked:
     try:
         request_hash = _validate_live_request(request)
+        verify_request_identity(request)
     except ValueError as exc:
         return ExperimentalRatingBlocked(
             status="BLOCKED",
