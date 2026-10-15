@@ -1,0 +1,275 @@
+{
+  "schema_version": "1.0",
+  "task_id": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_REASSESSMENT_UNDER_ADJUDICATED_PORTABILITY_CONTRACT_R1",
+  "mode": "FINAL_TASK172_NUMERICAL_AUTHORITY_CANDIDATE_REASSESSMENT_ONLY",
+  "result": "PASS_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_CANDIDATE_PENDING_INDEPENDENT_REVIEW",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "predecessor_head": "dc2eac0cf39d73645cab170673dbfdd6ed065886",
+    "characterization_head": "86849841a5314f6ee82eebc117ece8f969829e06"
+  },
+  "predecessor_evidence": {
+    "dogbox_characterization_hash": "15f43a15896081839a6607b7bf45c4834b3273a55c704ba8835eb8ea2edf9e58",
+    "identity_contract_hash": "d9c44837a38bc66a6372e32b3d7a5dfba7a8a09ca049dc29dab06fa968b3d7b2",
+    "dogbox_portability_head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+    "dogbox_portability_exact_head_ci_run": 36965219941,
+    "dogbox_portability_result": "BLOCKED_PORTABILITY",
+    "identity_contract_head": "dc2eac0cf39d73645cab170673dbfdd6ed065886",
+    "identity_contract_exact_head_ci_run": 36973198114,
+    "identity_contract_exact_head_ci_result": "SUCCESS",
+    "identity_contract_adjudication_result": "PASS_PLATFORM_NATIVE_IDENTITY_CONTRACT",
+    "characterization_exact_head_ci_run": 36962301921,
+    "characterization_exact_head_ci_result": "SUCCESS",
+    "characterization_exact_head_ci_head": "86849841a5314f6ee82eebc117ece8f969829e06"
+  },
+  "lineage_reuse": {
+    "reused_predecessor_characterization": true,
+    "recharacterization_performed": false,
+    "candidate_relevant_task172_source_changed_since_characterization": false,
+    "candidate_harness_changed_since_characterization": false,
+    "three_candidate_fixtures_changed_since_characterization": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "dependency_lock_changed": false,
+    "workflows_changed": false,
+    "authority_registry_changed": false,
+    "intervening_commit_count": 2,
+    "intervening_changes": "Only the two platform-native identity-contract adjudication evidence documents; no candidate-relevant runtime, harness, fixture, authority, dependency, lock, workflow, or registry drift."
+  },
+  "adjudicated_portability_contract": {
+    "result_identity_scope": "PLATFORM_NATIVE_RESULT_IDENTITY",
+    "contract": "CONTRACT_B_ENVIRONMENT_LOCAL_EXACT_REPLAY_PLUS_CONTRACT_C_ENGINEERING_SEMANTIC_PORTABILITY",
+    "cross_platform_exact_result_hash_required": false,
+    "same_environment_exact_replay_required": true,
+    "engineering_semantic_portability_required": true,
+    "cross_platform_hash_divergence_breaks_task173": false
+  },
+  "frozen_authorities": {
+    "r94_solver_profile_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+    "r98_overlay_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+    "r98_c_round": "1.0",
+    "r3_endpoint_authority_changed": false,
+    "zero_q_authority_changed": false,
+    "task173_root_equation_changed": false,
+    "production_mesh_policy_changed": false
+  },
+  "proposed_authority": {
+    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R1",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "accepted": false,
+    "architecture": "FAIL_ONLY_ORIGINAL_SEED_DOGBOX_FALLBACK",
+    "scope": "Narrow fallback overlay on unchanged R94; not a global dogbox profile and not an R94 replacement.",
+    "primary": {
+      "authority": "R94_UNCHANGED",
+      "method": "TRF",
+      "loss": "linear",
+      "ftol": "1e-6",
+      "xtol": "1e-12",
+      "gtol": "1e-12",
+      "jacobian": "2-point",
+      "diff_step": "1e-5",
+      "max_nfev": 6,
+      "callback_cap": 24,
+      "tr_solver": "exact",
+      "initialization": "CURRENT_R94_DETERMINISTIC_SEED",
+      "x_scale": "CURRENT_R94",
+      "residual_scaling": "CURRENT_R94"
+    },
+    "fallback_trigger": {
+      "code": "REPLAY_VALID_BLOCKED_RESIDUAL_ACCEPTANCE_ONLY",
+      "conditions": [
+        "R94 primary solver normally completes and reaches the existing residual-acceptance check.",
+        "The request identity and request-hash replay are valid.",
+        "The typed blocked result is exactly BLOCKED_RESIDUAL_ACCEPTANCE.",
+        "The blocked-result hash replay passes.",
+        "No other hard blocker is present; residual acceptance is the sole failure."
+      ],
+      "non_residual_or_identity_blockers_trigger_fallback": false
+    },
+    "fallback": {
+      "method": "DOGBOX",
+      "initialization": "ORIGINAL_R94_DETERMINISTIC_SEED",
+      "primary_final_iterate_used_as_seed": false,
+      "max_nfev": 6,
+      "callback_cap": 24,
+      "other_controls": "Same as R94 candidate characterization; no equations, provider, request inputs, correlations, wall model, or R98 changes."
+    },
+    "acceptance_and_fail_closed": {
+      "must_materialize_valid_task172_local_result_projection": true,
+      "must_pass_original_r98_bounds": true,
+      "request_result_hash_and_id_replay_required": true,
+      "support_cell_wall_and_property_snapshot_identity_replay_required": true,
+      "negative_heat_rate_or_physical_ordering_failure_accepted": false,
+      "fallback_solver_failure_nonconvergence_resource_or_domain_blocker_accepted": false,
+      "diagnostic_last_iterate_accepted": false,
+      "failure_after_fallback": "Fail closed; no partial valid result and no residual/sign derived from blocked diagnostics."
+    },
+    "bypass": {
+      "baseline_valid_r94_result_invokes_fallback": false,
+      "baseline_valid_returns_original_result_unchanged": true,
+      "non_residual_blocker_invokes_fallback": false,
+      "invalid_request_or_blocked_hash_invokes_fallback": false
+    },
+    "portability": {
+      "same_environment_exact_replay_required": true,
+      "cross_platform_exact_result_hash_required": false,
+      "cross_platform_engineering_semantic_portability_required": true,
+      "semantic_invariants": [
+        "Final Task172 result is VALIDATED and passes the unchanged original R98 bounds.",
+        "Heat-transfer direction/sign is preserved.",
+        "Physical wall ordering is valid and preserved.",
+        "Property domain, property identities, constitutive equations, correlations, and engineering authority are unchanged."
+      ],
+      "rounding_quantization_clipping_or_tolerance_hash_used": false
+    },
+    "resource_budget": {
+      "primary_max_nfev": 6,
+      "primary_callback_cap": 24,
+      "fallback_max_nfev": 6,
+      "fallback_callback_cap": 24,
+      "theoretical_max_nfev_per_request": 12,
+      "theoretical_callback_cap_per_request": 48,
+      "bounded": true,
+      "global_minimum_budget_proven": false
+    },
+    "r94_equations_initialization_and_baseline_controls_changed": false,
+    "r98_changed": false,
+    "c_round_changed": false,
+    "constitutive_equations_changed": false,
+    "property_domain_changed": false
+  },
+  "candidate_outcomes": {
+    "n32_target_count": 6,
+    "local_baseline_residual_holes": "6/6",
+    "local_fallback_recovery_under_original_r98": "6/6",
+    "linux_py311_target_baseline_valid_fallback_bypassed": "6/6",
+    "linux_py312_target_baseline_valid_fallback_bypassed": "6/6",
+    "target_final_status_validated": "6/6",
+    "target_final_r98_pass": "6/6",
+    "target_q_sign_match": "6/6",
+    "target_physical_ordering_pass": "6/6",
+    "target_property_domain_pass": "6/6",
+    "target_engineering_authority_match": "6/6",
+    "target_final_semantic_match": "6/6",
+    "local_total_fallback_nfev": 23,
+    "local_total_fallback_callbacks": 92,
+    "corpus_size": 68,
+    "corpus_composition": {
+      "predecessor_n16": 13,
+      "fresh_n8": 25,
+      "fresh_n16": 25,
+      "n32_outer_iteration_23": 5
+    },
+    "local": {
+      "final_validated": "68/68",
+      "original_r98_pass": "68/68",
+      "baseline_valid": 68,
+      "fallback_invocations_on_baseline_valid": 0,
+      "baseline_native_result_identities_preserved": "68/68"
+    },
+    "linux_python311": {
+      "final_validated": "68/68",
+      "original_r98_pass": "68/68",
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes_recovered": 2,
+      "fallback_invocations_on_baseline_valid": 0,
+      "baseline_native_result_identities_preserved": "66/66",
+      "candidate_rows_validated": "68/68"
+    },
+    "linux_python312": {
+      "final_validated": "68/68",
+      "original_r98_pass": "68/68",
+      "baseline_valid": 66,
+      "baseline_residual_acceptance_holes_recovered": 2,
+      "fallback_invocations_on_baseline_valid": 0,
+      "baseline_native_result_identities_preserved": "66/66",
+      "candidate_rows_validated": "68/68"
+    },
+    "non_residual_guard_case_count": 7,
+    "non_residual_blockers_preserved": true,
+    "fallback_invoked_for_non_residual_blockers": 0,
+    "invalid_blocked_identity_and_hash_fallback_invocations": 0,
+    "baseline_valid_original_object_bypassed": true,
+    "same_environment_local_exact_replay": true,
+    "same_environment_linux_py311_exact_replay": true,
+    "same_environment_linux_py312_exact_replay": true,
+    "cross_platform_result_hash_equality_required": false,
+    "cross_platform_engineering_semantic_portability": "PASS"
+  },
+  "historical_n16_upper_endpoint": {
+    "request_hash": "22be7911da59d0cfd54d922142570ad9f15b2dca2aeb36f415a9d3859ab16970",
+    "local_baseline": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "local_fallback_valid": true,
+    "local_f_q_w": "-592.2898790517881",
+    "linux_baseline_valid_fallback_bypassed": true,
+    "linux_f_q_w": "-592.2898790517623",
+    "final_semantic_match": true,
+    "existing_valid_upper_shell_capacity_low_side_semantics": "APPLIES_BOTH_ENVIRONMENTS",
+    "r3_authority_changed": false
+  },
+  "lineage_authority_conclusion": {
+    "prior_blocked_portability_label_superseded_by": "PASS_PLATFORM_NATIVE_IDENTITY_CONTRACT",
+    "cross_platform_hash_mismatch_is_a_blocker": false,
+    "proposed_authority_candidate_sufficient_for_independent_review": true,
+    "proposed_authority_accepted": false,
+    "independent_review_performed": false
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed_in_this_reassessment": false,
+    "fixtures_changed_in_this_reassessment": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "registry_changed": false,
+    "numerical_characterization_repeated": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "validation_reuse": {
+    "candidate_characterization_local_and_ci_validation": "PASS; reused from exact candidate evidence lineage, not rerun as a new characterization campaign.",
+    "candidate_matrix_exact_head_ci_run": 36962301921,
+    "identity_contract_exact_head_ci_run": 36973198114,
+    "current_source_head_exact_head_ci_run": 36973198114,
+    "current_source_head_exact_head_ci": "SUCCESS; 50 jobs, 45 success, 5 skipped, 0 failed, 0 cancelled; max shard telemetry 457/540 seconds.",
+    "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "urllib3": "2.8.0",
+    "requests": "2.34.2"
+  },
+  "reassessment_local_validation": {
+    "focused_task172_task173_modules": "PASS; candidate characterization matrix test intentionally not rerun.",
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS; 777 files",
+    "mypy_ci_scope": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; 259/259",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS; 71 packages",
+    "pip_audit": "PASS; no known vulnerabilities; unpublished local package skipped.",
+    "duplicate_key_audit_new_evidence": "PASS; zero duplicate keys.",
+    "git_diff_check": "PASS",
+    "full_shell_tube_and_http_api_local": "NOT_REPEATED_IN_AUTHORITY_REASSESSMENT; source-head exact-head CI passed and evidence-head exact-head CI is required.",
+    "uv_lock_sha256_unchanged": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "urllib3": "2.8.0",
+    "requests": "2.34.2"
+  },
+  "lifecycle": {
+    "authority_accepted": false,
+    "correction_implemented": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_INDEPENDENT_REVIEW_R1",
+    "next_gate_executed": false,
+    "stop": true
+  },
+  "proposed_authority_canonical_hash": "e72efc573a39710584bd342a6287655056525b3dc38e3e81bca100844b4f81f0",
+  "canonical_hash": "1e8b01c007b7b44abe9d7b12415ba95c54146b0ad7cf47eaf965e2a7e1ad3c9e"
+}

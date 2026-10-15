@@ -1,0 +1,90 @@
+{
+  "ladder_continuation_status": "MESH_COMPARISON_FAIL_CONTINUE",
+  "live_full_rating_completed": false,
+  "live_n16": {
+    "bracket_meta": {
+      "endpoint_audit": {
+        "authority_id": "V07-FAST-SOLVER-LIVE-N16-CONTINUATION-R16",
+        "h_high_j_kg": "107515.3150649851646941138059",
+        "h_low_j_kg": "107515.0133216322277654904873",
+        "high_classification": "VALID_TRAJECTORY",
+        "high_endpoint_mesh_hash": "19cf9d2be113f3254fa500b344c424a27167a3e764fcf0fb60c5880451ceb993",
+        "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "low_endpoint_mesh_hash": null,
+        "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "run_session_id": "3d85120b-f377-410a-b938-4e42f3f59c25",
+        "subdivisions": 16
+      },
+      "establishment_probes": [
+        {
+          "expansion": 0,
+          "h_high": "107515.3150649851646941138059",
+          "h_low": "107515.0133216322277654904873",
+          "high_classification": "VALID_TRAJECTORY",
+          "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE"
+        }
+      ],
+      "expansions_used": 0,
+      "extrapolated_center": "107515.1641933086962298021466",
+      "h_coarse_j_kg": "107515.23962914693046195797622203826904296875",
+      "h_fine_j_kg": "107515.2019112278133458800613880157470703125",
+      "initial_span": "0.1508716764684643116593360901",
+      "mesh_delta_fine_minus_coarse": "-0.03771791911711607791483402252",
+      "outer_trials_for_establishment": 2,
+      "proposed_high_j_kg": "107515.3150649851646941138059",
+      "proposed_low_j_kg": "107515.0133216322277654904873"
+    },
+    "outer_status": "TERMINAL_ACCEPTED",
+    "outer_trial_count": 5,
+    "revalidation": {
+      "duplicate_endpoint_solves_removed": true,
+      "endpoint_receipt_hashes": {
+        "high_endpoint_mesh_hash": "19cf9d2be113f3254fa500b344c424a27167a3e764fcf0fb60c5880451ceb993",
+        "low_endpoint_mesh_hash": null
+      },
+      "high_endpoint_revalidated": true,
+      "low_endpoint_revalidated": true,
+      "same_run_endpoint_reuse": true,
+      "true_narrow_bracket_used": true
+    },
+    "shooting_enthalpy_j_kg": "107515.19248174803406686058271875",
+    "worker_seconds": 200.17820162599673
+  },
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n16-continuation-r16-20261015T141846Z.live-orchestrator.json",
+  "n16_mesh_hash_replay": "PASS",
+  "n8_n16_comparison": {
+    "coarse_subdivisions": 8,
+    "duty_difference_w": "0.1885084374036",
+    "duty_metric": "0.000003632032277381273217797525670",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.074175468754719589822126282E-12",
+    "duty_precision_floor_w": "2.1145639484150682435E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 16,
+    "interval_duty_differences_w": [
+      "0.0581399650668",
+      "0.0463455725247",
+      "0.0362364575786",
+      "0.0275869149180",
+      "0.0201995273155"
+    ],
+    "overall_status": "PASS",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.0062367439595",
+      "T_wall_inner_min": "0.00413996111893",
+      "T_wall_outer_max": "0.00599637067565",
+      "T_wall_outer_min": "0.00398371494174"
+    },
+    "wall_precision_floor_k": "3.4895899984756992E-13",
+    "wall_status": "PASS"
+  },
+  "numerical_authority_status": "CANDIDATE",
+  "pr299_state": "DRAFT_UNCHANGED",
+  "production_integration": false,
+  "result": "R16_LIVE_N16_EXECUTED",
+  "source_head_sha": "5f127dc462a0a2d2a42fe687b771a3bc6fe0a2dd",
+  "task_id": "V07_FAST_SOLVER_LIVE_N16_CONTINUATION_R16",
+  "total_runner_wall_seconds": 467.65479574899655,
+  "trials_jsonl_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n16-r16-stages-20261015T141846Z/live-n16-outer-trials.jsonl"
+}

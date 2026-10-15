@@ -1,0 +1,163 @@
+{
+  "schema_version": "task173.provider-quantization-enclosure-hash-replay-contract-recovery.v1",
+  "task_id": "STAGE3_TASK173_PROVIDER_QUANTIZATION_ENCLOSURE_HASH_REPLAY_CONTRACT_RECOVERY_R1",
+  "result": "PASS_PROVIDER_QUANTIZATION_ENCLOSURE_HASH_REPLAY_CONTRACT_RECOVERY",
+  "pr": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true,
+    "authorized_source_head": "0be1d8d596787bf3af57d90676b69cfb22dab454"
+  },
+  "parent_authority": {
+    "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+    "canonical_hash": "c95b5bf23b15a9c93b6ef47c3ad2043708bef9ae66429116855a4306f8102ab2",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "authority_accepted": false,
+    "hash_changed": false
+  },
+  "previous_review": {
+    "result": "BLOCKED_INDEPENDENT_REVIEW_ARTIFACT_INTEGRITY",
+    "file_integrity": "PASS",
+    "exact_artifacts_passed": "35/35",
+    "authority_hash_replay": "PASS",
+    "declared_matrix_hash": "92cb9fa0a65041199f67ebe588b460bcef868c64fdd6044e990f4309b6af8840",
+    "reviewer_direct_matrix_hash": "acade14b5227cbf6149e2bfbb521a8709b3f2465e1068e4672d759dc6fea8d0c",
+    "event_hash_replay": "BLOCKED_PROJECTION_RULE_NOT_PRESERVED"
+  },
+  "preserved_parent_implementation": {
+    "tracked_dirty_patch_sha256": "b5408a1e7cf62456cd36e6c3cb95e52d79838103e23ab68139b8b6006de21555",
+    "tracked_changed_file_count": 11,
+    "staged_parent_implementation": false,
+    "committed_parent_implementation": false
+  },
+  "recovered_artifacts": {
+    "diagnostic_runner": {
+      "path": "/tmp/task173_n1_diagnostic_runner.py",
+      "sha256": "14dbbdb324e38bb1bf5d034f6ccf04637967d629354da763e02248dc04b5adfb",
+      "recovered": true,
+      "sha256_match": true,
+      "role": "Generates and emits qualification records; contains no qualification-matrix or enclosure-event hash assignment."
+    },
+    "raw_qualification_artifact": {
+      "path": "/tmp/task173_provider_quantization_n1_matrix_task166_version_replay.log",
+      "sha256": "1e0ba509a895595137494df3fba1ee02747455412090b61eedfc34b1346f940d",
+      "recovered": true,
+      "sha256_match": true
+    },
+    "receipt_builder": {
+      "path": "/tmp/task173_build_enclosure_receipt.py",
+      "sha256": "863fbcabbd757db3a1ec87b549fbf08b703c317239f9a814134e42dd71f287e4",
+      "recovered": true,
+      "role": "Exact contemporaneous source of event, qualification-matrix, and authority hash assignments; inspected but not executed because it writes the immutable original evidence."
+    },
+    "pre_rating_capture": {
+      "path": "/tmp/task173_enclosure_candidate_preflight_r1.jsonl",
+      "sha256": "07b0da1ecccea57093fd094da9ac93ef4716fcd5749bf8ff83a466fdeeb94851",
+      "sha256_matches_committed_matrix": true
+    },
+    "committed_qualification_evidence": {
+      "source_head": "0be1d8d596787bf3af57d90676b69cfb22dab454",
+      "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+      "git_blob_sha": "8c2279ad7b2530959b7d96f6b80505d6faf9d4a7",
+      "raw_sha256": "7ecbde014bc5ecb48d002fee3a66b9a165a89373e765a0864ebed92d9fd24b8c",
+      "byte_length": 820144
+    },
+    "canonical_json_utility": {
+      "source_head": "0be1d8d596787bf3af57d90676b69cfb22dab454",
+      "path": "src/hexagent/canonical_json.py",
+      "git_blob_sha": "8fcbcfdf376b0756766102ce5013defd7e1cbef0",
+      "raw_sha256": "ef964066780b5c662e553d5c86f5a52f7070c460dfae288993e3a8a156b5a2b6",
+      "locked_rfc8785_version": "0.1.4"
+    }
+  },
+  "hash_replay_contract": {
+    "schema_version": "task173.canonical-hash-replay-contract.v1",
+    "matrix_projection_version": "DIRECT_EMBEDDED_MATRIX_OBJECT_V1",
+    "matrix_hash_domain": "NONE",
+    "matrix_included_paths": [
+      "qualification.qualification_matrix (the entire embedded object)",
+      "qualification.qualification_matrix.all_trigger_events[*].quantization_enclosure_hash (included as matrix data)"
+    ],
+    "matrix_excluded_paths": [
+      "qualification.qualification_matrix_canonical_hash (sibling field; outside the matrix object)",
+      "all evidence fields outside qualification.qualification_matrix"
+    ],
+    "matrix_self_hash_exclusion": "The declared matrix hash is not embedded in the matrix preimage; there is no in-object matrix self-hash field. Per-event hashes remain included.",
+    "matrix_algorithm": "canonical_sha256(evidence['qualification']['qualification_matrix'])",
+    "matrix_canonical_hash": "92cb9fa0a65041199f67ebe588b460bcef868c64fdd6044e990f4309b6af8840",
+    "matrix_hash_replay": "PASS",
+    "event_projection_version": "FULL_EVENT_PREINSERTION_OBJECT_V1",
+    "event_hash_domain": "NONE",
+    "event_included_paths": [
+      "The complete event mapping, including every nested member, as constructed immediately before its hash field is assigned."
+    ],
+    "event_excluded_paths": [
+      "all_trigger_events[*].quantization_enclosure_hash (root self-hash field removed for replay)"
+    ],
+    "event_self_hash_exclusion": "The receipt builder computes canonical_sha256(event) before inserting quantization_enclosure_hash; replay removes that one root field and hashes the remaining complete event.",
+    "event_algorithm": "canonical_sha256(event_without_root_quantization_enclosure_hash)",
+    "event_hash_replay_count": 8,
+    "event_hash_replay_pass_count": 8,
+    "event_hashes": [
+      "8d90538c68e50c0fea4a8e778ad2eed3717f313002a5cc77ea183eaa348dc372",
+      "0e3747bafd71aa64ac4636583e9792a97c6b10a2d160b583a463778e94875264",
+      "0d02ac649288aed1bae8d538407a53d2be3b31723721d5a5bc17d475b2d0a90a",
+      "23c628ec5844f0e22afd23f2101852ab016ab939c207cdf9bff31bace95492ba",
+      "7dc5cc80392ec4f03c96e353b602e321689e433a39401259a6288ef3258dd99f",
+      "9c6937bc7241e781746275ce6f3368313074a3cf3eab9dfb259d2605162fedc4",
+      "2a8a1eabc32bd24c49991d1688daa62f48f66c351dea2e40fffed8a7e6b52410",
+      "01d83e4423fd2a57af72def1d5796e05bdd07936edfc8fe3b6a668a63f90103d"
+    ],
+    "authority_hash_algorithm": "canonical_sha256(evidence['authority_candidate']['projection'])",
+    "authority_hash_replay": "PASS",
+    "canonical_json_semantics": {
+      "implementation": "hexagent.canonical_json.canonical_sha256 -> canonical_json_bytes -> rfc8785.dumps",
+      "hash": "SHA-256 over canonical JSON bytes; no separate domain prefix",
+      "recursive_excluded_keys": [
+        "canonical_hash",
+        "mutable_review_comments"
+      ],
+      "string_semantics": "NFC normalization for every string key and value",
+      "number_semantics": "RFC 8785/JCS JSON number serialization; non-finite floats rejected",
+      "mapping_semantics": "RFC 8785 canonical object-key ordering",
+      "locked_dependency": "rfc8785==0.1.4",
+      "implementation_source_sha256": "ef964066780b5c662e553d5c86f5a52f7070c460dfae288993e3a8a156b5a2b6"
+    }
+  },
+  "reviewer_direct_hash_explanation": {
+    "reported_hash": "acade14b5227cbf6149e2bfbb521a8709b3f2465e1068e4672d759dc6fea8d0c",
+    "reproduced": true,
+    "matching_expression": "sha256(json.dumps(matrix, sort_keys=True, separators=(',', ':')).encode()).hexdigest()",
+    "stdlib_json_default_ensure_ascii": true,
+    "matches_pinned_repository_canonical_json": false,
+    "interpretation": "This explains the hash difference. The previous packet did not specify that serializer, so the reviewer is not characterized as wrong; the recovered original contract is the pinned repository canonical_sha256 helper."
+  },
+  "replay_script": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-provider-quantization-enclosure-hash-replay-r1.py",
+    "sha256": "0fb641c78c1358d4af7cc3b1cd99c860652a114ce01e5bea5fac39470fef6196",
+    "input": "The committed qualification evidence JSON in the same directory",
+    "external_files_required": false,
+    "network_required": false,
+    "outputs_authority_matrix_and_all_eight_event_hashes": true
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "parent_implementation_staged": false,
+    "parent_implementation_committed": false,
+    "parent_authority_projection_changed": false,
+    "enclosure_numerical_semantics_changed": false,
+    "task172_changed": false,
+    "task174_changed": false,
+    "property_backend_changed": false,
+    "point_root_tolerance_changed": false,
+    "mesh_thresholds_changed": false,
+    "sizing_resumed": false,
+    "task175_release_acceptance_performed": false
+  },
+  "next_gate": "STAGE3_TASK173_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_INDEPENDENT_REVIEW_R1_RETRY_AFTER_HASH_CONTRACT_RECOVERY",
+  "next_gate_executed": false,
+  "ready_authorized": false,
+  "merge_authorized": false,
+  "stop": true
+}
