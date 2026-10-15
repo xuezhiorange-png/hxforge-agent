@@ -72,32 +72,23 @@ def _load_candidate_b_request() -> Any:
 
 
 def _run_fail_closed_pytest() -> dict[str, bool]:
-    tests = [
-        (
-            "trajectory",
-            "prototypes/v07_fast_solver_rating_contract_live_bridge_r12/"
-            "test_fail_closed.py::test_trajectory_projection_failure_blocks",
-        ),
-        (
-            "cell_count",
-            "prototypes/v07_fast_solver_rating_contract_live_bridge_r12/"
-            "test_fail_closed.py::test_cell_count_failure_blocks",
-        ),
-        (
-            "wall_extrema",
-            "prototypes/v07_fast_solver_rating_contract_live_bridge_r12/"
-            "test_fail_closed.py::test_wall_extrema_failure_blocks",
-        ),
-    ]
-    out: dict[str, bool] = {}
-    for key, node in tests:
-        proc = subprocess.run(
-            ["uv", "run", "pytest", node, "-q"],
-            cwd=ROOT,
-            capture_output=True,
-        )
-        out[key] = proc.returncode == 0
-    return out
+    proc = subprocess.run(
+        [
+            "uv",
+            "run",
+            "pytest",
+            "prototypes/v07_fast_solver_rating_contract_live_bridge_r12/test_fail_closed.py",
+            "-q",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    ok = proc.returncode == 0
+    return {
+        "trajectory": ok,
+        "cell_count": ok,
+        "wall_extrema": ok,
+    }
 
 
 def _ci_lint_pass() -> bool:

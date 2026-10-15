@@ -20,7 +20,7 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.verification impo
 
 
 def _worker_entry(queue: mp.Queue, payload: dict[str, Any]) -> None:
-    request = CandidateRatingRequest.model_validate(payload["request"])
+    request = CandidateRatingRequest.model_validate(payload["request"], strict=True)
     subdivisions = int(payload["subdivisions"])
     budget_s = float(payload["budget_s"])
     context = t173._candidate_context(request)
