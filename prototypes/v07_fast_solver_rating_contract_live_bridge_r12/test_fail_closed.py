@@ -27,11 +27,11 @@ def cached_replay_pair() -> tuple[dict, dict]:
         R9_RESULT_JSON_REL,
         R10_RESULT_JSON_REL,
     )
-    from prototypes.v07_fast_solver_rating_authority_admission_r11.evidence_chain import (
-        verify_candidate_b_evidence_chain,
-    )
     from prototypes.v07_fast_solver_rating_authority_admission_r11 import (
         experimental_rate_candidate as rate_mod,
+    )
+    from prototypes.v07_fast_solver_rating_authority_admission_r11.evidence_chain import (
+        verify_candidate_b_evidence_chain,
     )
 
     chain = verify_candidate_b_evidence_chain()
