@@ -20,7 +20,7 @@ ROOT = pytest.importorskip("pathlib").Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture(scope="module")
-def cached_replay_pair() -> tuple[dict, dict]:
+def cached_replay_pair() -> tuple[dict, object, dict, object]:
     """One strict replay pair for fast fail-closed injection (module-scoped)."""
     from hexagent.properties.coolprop_provider import CoolPropProvider
     from prototypes.v07_fast_solver_evidence_gate.trusted_constants import (
@@ -59,7 +59,9 @@ def cached_replay_pair() -> tuple[dict, dict]:
         )
     finally:
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
-    return n32, n64
+    n32_run = n32.pop("_mesh_run")
+    n64_run = n64.pop("_mesh_run")
+    return n32, n32_run, n64, n64_run
 
 
 def _replay_stub(
@@ -70,20 +72,24 @@ def _replay_stub(
     shell_authority: object,
     *,
     rating_request_hash: str,
-    cached_replay_pair: tuple[dict, dict],
+    cached_replay_pair: tuple[dict, object, dict, object],
 ) -> dict:
-    n32, n64 = cached_replay_pair
-    return n32 if subdivisions == 32 else n64
+    n32_meta, n32_run, n64_meta, n64_run = cached_replay_pair
+    if subdivisions == 32:
+        return {**n32_meta, "_mesh_run": n32_run}
+    return {**n64_meta, "_mesh_run": n64_run}
 
 
-def _make_replay_fn(cached_replay_pair: tuple[dict, dict]):
+def _make_replay_fn(cached_replay_pair: tuple[dict, object, dict, object]):
     def _fn(*args: object, **kwargs: object) -> dict:
         return _replay_stub(*args, **kwargs, cached_replay_pair=cached_replay_pair)
 
     return _fn
 
 
-def test_trajectory_projection_failure_blocks(cached_replay_pair: tuple[dict, dict]) -> None:
+def test_trajectory_projection_failure_blocks(
+    cached_replay_pair: tuple[dict, object, dict, object],
+) -> None:
     stub = _make_replay_fn(cached_replay_pair)
     patch_target = (
         "prototypes.v07_fast_solver_rating_authority_admission_r11"
@@ -98,7 +104,9 @@ def test_trajectory_projection_failure_blocks(cached_replay_pair: tuple[dict, di
     assert outcome.blocked_code == "ACCEPTED_TRAJECTORY_PROJECTION_FAILED"
 
 
-def test_cell_count_failure_blocks(cached_replay_pair: tuple[dict, dict]) -> None:
+def test_cell_count_failure_blocks(
+    cached_replay_pair: tuple[dict, object, dict, object],
+) -> None:
     stub = _make_replay_fn(cached_replay_pair)
     with patch(
         (
@@ -112,7 +120,9 @@ def test_cell_count_failure_blocks(cached_replay_pair: tuple[dict, dict]) -> Non
     assert outcome.blocked_code == "ACCEPTED_CELL_COUNT_MISMATCH"
 
 
-def test_wall_extrema_failure_blocks(cached_replay_pair: tuple[dict, dict]) -> None:
+def test_wall_extrema_failure_blocks(
+    cached_replay_pair: tuple[dict, object, dict, object],
+) -> None:
     stub = _make_replay_fn(cached_replay_pair)
     with patch(
         (
