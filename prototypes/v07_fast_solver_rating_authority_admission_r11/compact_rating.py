@@ -13,8 +13,12 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_mode
     ExecutionMode,
     ExperimentalCandidateRatingResult,
 )
+from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
+    GeometrySummary,
+    geometry_summary_from_request,
+)
 
-COMPACT_RATING_SCHEMA = "task173.experimental-candidate-rating-compact.v1"
+COMPACT_RATING_SCHEMA = "task173.experimental-candidate-rating-compact.v2"
 
 
 class StrictModel(BaseModel):
@@ -28,7 +32,7 @@ class FullTrajectoryArtifactRef(StrictModel):
 
 
 class ExperimentalCompactCandidateRating(StrictModel):
-    schema_version: Literal["task173.experimental-candidate-rating-compact.v1"] = (
+    schema_version: Literal["task173.experimental-candidate-rating-compact.v2"] = (
         COMPACT_RATING_SCHEMA
     )
     status: Literal["CANDIDATE_UNAPPROVED"]
@@ -39,7 +43,7 @@ class ExperimentalCompactCandidateRating(StrictModel):
     candidate_id: str
     candidate_hash: str
     rating_request_hash: str
-    geometry_summary: str
+    geometry_summary: GeometrySummary
     accepted_mesh_n: int
     headroom_mesh_n: int
     accepted_mesh_result_hash: str
@@ -78,7 +82,7 @@ def build_compact_from_full(
     *,
     trajectory_artifact_path: str,
     trajectory_file_sha256: str,
-    geometry_summary: str = "Task171 topology + CandidateRatingRequest binding",
+    geometry_summary: GeometrySummary,
 ) -> ExperimentalCompactCandidateRating:
     artifact = FullTrajectoryArtifactRef(
         path=trajectory_artifact_path,
@@ -125,3 +129,12 @@ def build_compact_from_full(
     )
     ch = compact_rating_hash(base)
     return base.model_copy(update={"compact_result_hash": ch})
+
+
+__all__ = [
+    "ExperimentalCompactCandidateRating",
+    "GeometrySummary",
+    "build_compact_from_full",
+    "compact_rating_hash",
+    "geometry_summary_from_request",
+]

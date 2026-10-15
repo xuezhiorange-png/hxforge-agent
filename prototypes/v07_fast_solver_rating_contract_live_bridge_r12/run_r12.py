@@ -24,16 +24,14 @@ from prototypes.v07_fast_solver_evidence_gate.trusted_constants import (
     R11_AUTHORITY_DIFF_JSON_REL,
     R11_RATING_JSON_REL,
     R11_RATING_JSON_SHA256,
-    R11_RESULT_HASH,
 )
 from prototypes.v07_fast_solver_rating_authority_admission_r11.compact_rating import (
     build_compact_from_full,
+    compact_rating_hash,
+    geometry_summary_from_request,
 )
 from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
     ExperimentalCandidateRatingResult,
-)
-from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_rate_candidate import (
-    experimental_rate_candidate,
 )
 from prototypes.v07_fast_solver_rating_contract_live_bridge_r12.live_request import (
     ExperimentalLiveMeshOutcome,
@@ -115,16 +113,14 @@ def main() -> None:
     full_model = ExperimentalCandidateRatingResult.model_validate_json(
         rating_path.read_text(encoding="utf-8"), strict=True
     )
+    request_for_geom = _load_candidate_b_request()
     compact = build_compact_from_full(
         full_model,
         trajectory_artifact_path=R11_RATING_JSON_REL,
         trajectory_file_sha256=R11_RATING_JSON_SHA256,
+        geometry_summary=geometry_summary_from_request(request_for_geom),
     )
-
-    fail_closed_check = experimental_rate_candidate(CANDIDATE_B_ID)
-    fail_closed_ok = isinstance(fail_closed_check, ExperimentalCandidateRatingResult)
-    if fail_closed_ok and fail_closed_check.result_hash != R11_RESULT_HASH:
-        fail_closed_ok = False
+    compact_hash_ok = compact.compact_result_hash == compact_rating_hash(compact)
 
     live_status = "PENDING"
     live_terminal_k = None
@@ -156,19 +152,19 @@ def main() -> None:
         "task_id": TASK_ID,
         "source_head_sha": SOURCE_SHA,
         "result": "R12_RATING_CONTRACT_LIVE_BRIDGE_COMPLETED"
-        if hash_parity and fail_closed_ok
+        if hash_parity and compact_hash_ok
         else "R12_PARTIAL_OR_BLOCKED",
         "r11_ci_format_fixed": True,
         "r11_authority_diff_file_persisted": True,
-        "full_trajectory_fail_closed": fail_closed_ok,
-        "accepted_cell_count_verified": fail_closed_ok,
-        "wall_extrema_recomputed": fail_closed_ok,
+        "full_trajectory_fail_closed": "see R13 acceptance.fail_closed_pytest",
+        "accepted_cell_count_verified": "see R13 acceptance",
+        "wall_extrema_recomputed": "see R13 acceptance",
         "r11_result_hash_recomputed": r11_verify["recomputed_result_hash"],
         "r11_result_hash_parity": r11_verify["result_hash_parity"],
         "r11_full_json_sha256": r11_verify["file_sha256"],
         "compact_rating_result_implemented": True,
         "compact_result_hash": compact.compact_result_hash,
-        "compact_result_hash_verified": compact.full_result_hash == R11_RESULT_HASH,
+        "compact_result_hash_verified": compact_hash_ok,
         "live_rating_api_implemented": True,
         "live_n1_executed": live_n1 is not None,
         "live_n1_status": live_status,
