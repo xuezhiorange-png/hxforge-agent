@@ -1,0 +1,1972 @@
+{
+  "schema_version": "task172.stage3.n32-lower-endpoint-hole-adjudication.v1",
+  "task_id": "TASK172_V0_7_STAGE3_N32_LOWER_ENDPOINT_HOLE_DIAGNOSTIC_CAPTURE_AND_SEMANTIC_ADJUDICATION_R1",
+  "mode": "OBSERVABILITY_ONLY_AND_TARGETED_N32_FAILURE_REPLAY",
+  "result": "PASS_DIAGNOSTIC_AND_SEMANTIC_ADJUDICATION_ONLY",
+  "predecessor_head": "c3eb36960461ccee031413d22903a0256bb8bb19",
+  "predecessor_exact_head_ci": {
+    "run": 36881473480,
+    "head_sha": "c3eb36960461ccee031413d22903a0256bb8bb19",
+    "result": "SUCCESS",
+    "total_jobs": 50,
+    "success": 45,
+    "skipped": 5,
+    "failed": 0,
+    "cancelled": 0,
+    "final_gate": "SUCCESS"
+  },
+  "preflight": {
+    "authorized_head": "c3eb36960461ccee031413d22903a0256bb8bb19",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "worktree_clean_before_diagnostic": true,
+    "runtime_source_changed_since_execution_source": false,
+    "tests_changed_since_execution_source": false,
+    "uv_lock_changed_since_execution_source": false,
+    "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "lower_endpoint_hole_is_currently_r3_non_applicable": true,
+    "authorities": {
+      "cell_root_authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3",
+      "cell_root_authority_hash": "eafe8bc53769d1648ac2f918045cececfd3870d618ff6273c523fe185a6683ef",
+      "endpoint_classification_authority_id": "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1",
+      "endpoint_classification_authority_hash": "60c8fe2957c5906704b796a779b88845ddb3e59934d8576c93e0589ea2084f74",
+      "zero_q_authority_id": "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1",
+      "zero_q_authority_hash": "81903b49fcf6c9e41ff8f296da921e25ca116727b846e01f9e07e257dd4531fd",
+      "local_state_reconstruction_authority_id": "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2",
+      "local_state_reconstruction_authority_hash": "9abef953ce251628b73370f08337efbe7938ed33509a2a99c878eade2bb8b366"
+    }
+  },
+  "target_identity": {
+    "mesh_subdivisions": 32,
+    "outer_iteration": 23,
+    "shooting_enthalpy_j_kg": "107537.399699021494920675754547119140625",
+    "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "physical_support_index": [
+      3,
+      32,
+      5
+    ],
+    "physical_support_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+    "tube_cell_id": "urn:hxforge:task172:real-case-cell-tube:04bdeecd1549457f1e1a539a94d0b6a9f0c570e3b843f067d7892c5e68c47faf",
+    "shell_cell_id": "urn:hxforge:task172:real-case-cell-shell:c16d22fa3d3797f89994da1c188b04734c258e350fb2b862474e743bcaf5972b",
+    "wall_interface_id": "urn:hxforge:task172:real-case-wall-interface:98cc0b6104ceed405534bb54b10ef717c4b64375e16901c5923809d8260dba9b",
+    "axial_interval_m": [
+      "4.9875",
+      "5.0250"
+    ],
+    "mesh_level_identity": "d71dd9e0214eae5cad868b459f08cb50e29395be21a322b3176181f5d39b4da9",
+    "tube_upstream_state_id": null,
+    "tube_upstream_state_id_status": "NO_SEPARATE_THERMO_STATE_ID_FIELD_IN_MODEL; SNAPSHOT_HASH_IS_STATE_IDENTITY",
+    "tube_upstream_state_hash": "d33f3cdbe5bf71de8f701faa353e0235a8d2a066c2155b473c88fae8cf65378f",
+    "tube_upstream_property_snapshot_hash": "d33f3cdbe5bf71de8f701faa353e0235a8d2a066c2155b473c88fae8cf65378f",
+    "shell_physical_left_state_id": null,
+    "shell_physical_left_state_id_status": "NO_SEPARATE_THERMO_STATE_ID_FIELD_IN_MODEL; SNAPSHOT_HASH_IS_STATE_IDENTITY",
+    "shell_physical_left_state_hash": "b6a3f90532d577f12be82e874463d3938a1fa3ace8724d5586c7ce17ae4e682d",
+    "shell_physical_left_property_snapshot_hash": "b6a3f90532d577f12be82e874463d3938a1fa3ace8724d5586c7ce17ae4e682d",
+    "tube_upstream_state": {
+      "enthalpy_j_kg": "108904.4002236374",
+      "phase": "liquid",
+      "pressure_pa": "101325.0",
+      "snapshot": {
+        "backend": "HEOS::Water",
+        "conductivity_w_m_k": "0.6080634930374693",
+        "configuration_fingerprint": "8d37dea32044ee8d",
+        "cp_j_kg_k": "4180.94520528658",
+        "density_kg_m3": "996.7988832138886",
+        "enthalpy_j_kg": "108904.4002236374",
+        "entropy_j_kg_k": "380.5416744446197",
+        "inputs": {
+          "enthalpy_j_kg": "108904.4002236374",
+          "pressure_pa": "101325.0"
+        },
+        "phase": "liquid",
+        "pressure_pa": "101325.0",
+        "provider": "CoolProp",
+        "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "provider_version": "8.0.0",
+        "query_type": "PH",
+        "reference_state": "DEF",
+        "temperature_k": "299.10292032837447",
+        "viscosity_pa_s": "0.0008710306463577177"
+      },
+      "snapshot_hash": "d33f3cdbe5bf71de8f701faa353e0235a8d2a066c2155b473c88fae8cf65378f",
+      "temperature_k": "299.10292032837447"
+    },
+    "shell_physical_left_state": {
+      "enthalpy_j_kg": "105287.10004042821",
+      "phase": "liquid",
+      "pressure_pa": "101325.0",
+      "snapshot": {
+        "backend": "HEOS::Water",
+        "conductivity_w_m_k": "0.606659545601816",
+        "configuration_fingerprint": "8d37dea32044ee8d",
+        "cp_j_kg_k": "4181.279101189624",
+        "density_kg_m3": "997.0250852432945",
+        "enthalpy_j_kg": "105287.10004042821",
+        "entropy_j_kg_k": "368.43031870256095",
+        "inputs": {
+          "enthalpy_j_kg": "105287.10004042821",
+          "pressure_pa": "101325.0"
+        },
+        "phase": "liquid",
+        "pressure_pa": "101325.0",
+        "provider": "CoolProp",
+        "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "provider_version": "8.0.0",
+        "query_type": "PH",
+        "reference_state": "DEF",
+        "temperature_k": "298.23776708036274",
+        "viscosity_pa_s": "0.0008882454484151597"
+      },
+      "snapshot_hash": "b6a3f90532d577f12be82e874463d3938a1fa3ace8724d5586c7ce17ae4e682d",
+      "temperature_k": "298.23776708036274"
+    }
+  },
+  "production_failure_replay": {
+    "public_blocker_code": "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+    "outer_trial_classification": "HARD_BLOCKER",
+    "endpoint_side": "LOWER_ENDPOINT",
+    "physical_lower_q_w": "0.0",
+    "physical_upper_q_w": "7339.6046232074",
+    "tube_capacity_w": "47811.36497243472",
+    "shell_capacity_w": "7339.60462320740",
+    "capacity_binding_side_at_upper_endpoint": "SHELL",
+    "production_recovery_levels": 12,
+    "sign_pair_found": false,
+    "eligible_root_found": false,
+    "partial_mesh_returned": false,
+    "mesh_level_execution_complete": false,
+    "full_outer_solver_replay_terminal_event": {
+      "iteration": 23,
+      "shooting_enthalpy_j_kg": "107537.399699021494920675754547119140625",
+      "classification": "HARD_BLOCKER",
+      "task172_cell_evaluation_attempts_delta": 4617,
+      "diagnostics": [
+        "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+        "endpoint_side=LOWER_ENDPOINT",
+        "recovery_levels_executed=12",
+        "valid_recovery_sample_count=11",
+        "sign_pair_found=false",
+        "eligible_root_found=false",
+        "maximum_hole_dyadic_levels=12"
+      ],
+      "capture_status": "BLOCKER_LINE_EMITTED; INITIAL_TEMP_HARNESS_JSON_FINALIZER_FAILED_AFTER_THE_TRIAL_DUE_UNINITIALIZED_OUTPUT_VARIABLE; DIRECT_CAPTURE_REPLAYS_FOLLOWED"
+    },
+    "diagnostic_instrumentation_equivalence": {
+      "capture_on_vs_off_failed_trial_projection_identical": true,
+      "failed_cell_q_sequence_identical": true,
+      "failed_cell_q_sequence_count": 14,
+      "production_task172_attempt_count_capture_on": 4617,
+      "production_task172_attempt_count_capture_off": 4617,
+      "production_task172_request_result_sequence_sha256_capture_on": "d92e06c09c02e7e207b1714f5f500727223290ef38a95bb025aacc28d8a3cafb",
+      "production_task172_request_result_sequence_sha256_capture_off": "d92e06c09c02e7e207b1714f5f500727223290ef38a95bb025aacc28d8a3cafb",
+      "capture_on_and_off_equal": true,
+      "extended_probes_added_to_production": false,
+      "extended_probes_task172_calls": 12,
+      "extended_probes_phase": "EXTENDED_DIAGNOSTIC"
+    }
+  },
+  "q0_task172_hole": {
+    "q_trial_w": "0.0",
+    "task172_request_id": null,
+    "task172_request_id_status": "REQUEST_ID_NOT_MODELLED",
+    "task172_request_hash": "3ffebffa5aaf4957cd4d743e8530885795831d29328b5a2fc63e55287d08720d",
+    "request_hash_replay_passed": true,
+    "task172_result_type": "Task172BlockedResult",
+    "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "task172_blocked_result_id": null,
+    "task172_blocked_result_id_status": "BLOCKED_RESULT_ID_NOT_MODELLED",
+    "blocked_result_hash": "779109c08d8885c7e85b1ece0bdd0b7fb7e9f5d00a7818e5b95c8b282e2402e5",
+    "blocked_result_hash_replay_passed": true,
+    "task172_request_payload": {
+      "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2",
+      "clean_wall_authority_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+      "cylindrical_mapping_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+      "material_source_sha256": "eda6e84f95c4cc2a46bb8c902cf066c4f51b9108d951d5490222cb365219ac48",
+      "property_profile_canonical_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "r94_model_profile_canonical_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+      "r98_overlay_canonical_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+      "schema_version": "task172.local-constitutive-request.v1",
+      "shell_bulk_state": {
+        "pressure_pa": "101325",
+        "temperature_k": "298.23776708036274"
+      },
+      "shell_flow_authority": {
+        "task031_geometry": {
+          "blockers": [],
+          "central_crossflow_flow_area_m2": "0.150000000000000000000000",
+          "central_inter_baffle_spacing_m": "1.200000000000",
+          "deferred_capabilities": [
+            "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+            "PER_COMPARTMENT_CROSSFLOW_AREA_SET_NOT_COMPUTABLE",
+            "MINIMUM_ADMITTED_FLOW_AREA_NOT_COMPUTABLE",
+            "INLET_REGION_FLOW_AREA_NOT_COMPUTABLE",
+            "OUTLET_REGION_FLOW_AREA_NOT_COMPUTABLE",
+            "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+            "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+            "SHELL_SIDE_FLOW_STATE_NOT_COMPUTABLE",
+            "SHELL_SIDE_HEAT_TRANSFER_SCREENING_NOT_COMPUTABLE",
+            "SHELL_SIDE_PRESSURE_DROP_SCREENING_NOT_COMPUTABLE",
+            "BELL_DELAWARE_NOT_COMPUTABLE",
+            "OVERALL_U_NOT_COMPUTABLE",
+            "UA_NOT_COMPUTABLE",
+            "LMTD_NOT_COMPUTABLE",
+            "HEAT_DUTY_NOT_COMPUTABLE",
+            "OUTLET_TEMPERATURES_NOT_COMPUTABLE",
+            "FULL_EXCHANGER_RATING_NOT_COMPUTABLE"
+          ],
+          "engineering_authority_hash": "1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989",
+          "engineering_authority_id": "urn:hxforge:task031:engineering-authority:v1:1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989",
+          "flow_region_identity": "CENTRAL_CROSSFLOW_SCREENING",
+          "formula_a_id": "TASK031_CF_AREA_KERN_SCREENING_INTCHOPN_EQ55_56_V1",
+          "formula_b_id": "TASK031_DE_KERN_SCREENING_INTCHOPN_EQ51_BRANCH_V1",
+          "geometry_hash": "1dc32d501ee1ba283e4d2bb5eab2f2f5ffc81e464fd6f254ff13b02ceb01519e",
+          "geometry_id": "82b051f6-d8f6-5bbb-b46f-76609b9f8cca",
+          "pattern_family": "TRIANGULAR",
+          "provenance": [
+            [
+              "task_id",
+              "TASK031"
+            ],
+            [
+              "design_contract_path",
+              "docs/tasks/TASK-031-shell-and-tube-shell-side-flow-path-hydraulic-geometry.md"
+            ],
+            [
+              "task020_configuration_id",
+              "96637b2b-3583-5fdd-8645-bb2b5526996a"
+            ],
+            [
+              "task020_configuration_hash",
+              "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125"
+            ],
+            [
+              "task021_layout_id",
+              "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+            ],
+            [
+              "task021_layout_hash",
+              "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550"
+            ],
+            [
+              "task022_geometry_id",
+              "cbacec31-31fa-5e14-aa1b-be05e04b96dc"
+            ],
+            [
+              "task022_geometry_hash",
+              "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4"
+            ],
+            [
+              "task024_geometry_id",
+              "279ed479-378d-5ea5-b2f0-8926133bf4dd"
+            ],
+            [
+              "task024_geometry_hash",
+              "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+            ],
+            [
+              "engineering_authority_profile_id",
+              "TASK031_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_V1_FORMULA_AUTHORITY"
+            ],
+            [
+              "engineering_authority_hash",
+              "1cb5cf1ff9f28fb2dec074f6458473e60d0866c744fbd97501e41d68b5837989"
+            ],
+            [
+              "formula_a_id",
+              "TASK031_CF_AREA_KERN_SCREENING_INTCHOPN_EQ55_56_V1"
+            ],
+            [
+              "formula_b_id",
+              "TASK031_DE_KERN_SCREENING_INTCHOPN_EQ51_BRANCH_V1"
+            ],
+            [
+              "source_authority_freeze_issue",
+              181
+            ],
+            [
+              "source_authority_freeze_comment_id",
+              "5311936966"
+            ],
+            [
+              "source_ids",
+              [
+                "SRC-INTECHOPEN-100450-KHARAJI-2021",
+                "SRC-NPTEL-103103027-MOD1",
+                "SRC-NPTEL-103103032-LEC35",
+                "SRC-OU-CHE-DESIGN-2018-KERN"
+              ]
+            ],
+            [
+              "pattern_family",
+              "TRIANGULAR"
+            ],
+            [
+              "flow_region_identity",
+              "CENTRAL_CROSSFLOW_SCREENING"
+            ],
+            [
+              "software_version",
+              "task031.minimal-compute-v1"
+            ],
+            [
+              "git_commit",
+              "832f0474be4fc2270476af453fafad553d5915b3"
+            ],
+            [
+              "request_hash",
+              "688c13a7d9022338fba1787be6a0a0867bd3e37e1bac2528fcae101cb66adb58"
+            ],
+            [
+              "warnings",
+              [
+                {
+                  "code": "SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "central_crossflow_screening_geometry_only"
+                },
+                {
+                  "code": "SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "flow_state_thermal_pressure_drop_deferred"
+                },
+                {
+                  "code": "SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "formula_authority_screening_model_only"
+                },
+                {
+                  "code": "SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "leakage_bypass_corrections_excluded"
+                },
+                {
+                  "code": "SSHG_MINIMUM_AREA_SELECTION_DEFERRED",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "minimum_area_selection_deferred"
+                },
+                {
+                  "code": "SSHG_NO_FULL_EXCHANGER_RATING_CLAIM",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "no_full_exchanger_rating_claim"
+                },
+                {
+                  "code": "SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED",
+                  "details": [],
+                  "evidence_refs": [],
+                  "field_path": null,
+                  "message_key": "window_inlet_outlet_flow_areas_deferred"
+                }
+              ]
+            ],
+            [
+              "deferred_capabilities",
+              [
+                "WINDOW_FLOW_AREA_NOT_COMPUTABLE",
+                "PER_COMPARTMENT_CROSSFLOW_AREA_SET_NOT_COMPUTABLE",
+                "MINIMUM_ADMITTED_FLOW_AREA_NOT_COMPUTABLE",
+                "INLET_REGION_FLOW_AREA_NOT_COMPUTABLE",
+                "OUTLET_REGION_FLOW_AREA_NOT_COMPUTABLE",
+                "LEAKAGE_FLOW_AREA_NOT_COMPUTABLE",
+                "BYPASS_FLOW_AREA_NOT_COMPUTABLE",
+                "SHELL_SIDE_FLOW_STATE_NOT_COMPUTABLE",
+                "SHELL_SIDE_HEAT_TRANSFER_SCREENING_NOT_COMPUTABLE",
+                "SHELL_SIDE_PRESSURE_DROP_SCREENING_NOT_COMPUTABLE",
+                "BELL_DELAWARE_NOT_COMPUTABLE",
+                "OVERALL_U_NOT_COMPUTABLE",
+                "UA_NOT_COMPUTABLE",
+                "LMTD_NOT_COMPUTABLE",
+                "HEAT_DUTY_NOT_COMPUTABLE",
+                "OUTLET_TEMPERATURES_NOT_COMPUTABLE",
+                "FULL_EXCHANGER_RATING_NOT_COMPUTABLE"
+              ]
+            ],
+            [
+              "provenance_hash",
+              "128044520ec2d2b0035545931e5fb96f4873ae38d102aa2caedfe003beafc5b8"
+            ]
+          ],
+          "request_hash": "688c13a7d9022338fba1787be6a0a0867bd3e37e1bac2528fcae101cb66adb58",
+          "schema_version": "task031.shell-side-hydraulic-geometry.v1",
+          "shell_side_equivalent_hydraulic_diameter_m": "0.018293343850",
+          "task020_configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+          "task020_configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+          "task021_layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+          "task021_layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+          "task022_geometry_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+          "task022_geometry_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+          "task024_geometry_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+          "task024_geometry_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+          "warnings": [
+            {
+              "code": "SSHG_CENTRAL_CROSSFLOW_SCREENING_GEOMETRY_ONLY",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "central_crossflow_screening_geometry_only"
+            },
+            {
+              "code": "SSHG_FLOW_STATE_THERMAL_PRESSURE_DROP_DEFERRED",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "flow_state_thermal_pressure_drop_deferred"
+            },
+            {
+              "code": "SSHG_FORMULA_AUTHORITY_SCREENING_MODEL_ONLY",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "formula_authority_screening_model_only"
+            },
+            {
+              "code": "SSHG_LEAKAGE_BYPASS_CORRECTIONS_EXCLUDED",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "leakage_bypass_corrections_excluded"
+            },
+            {
+              "code": "SSHG_MINIMUM_AREA_SELECTION_DEFERRED",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "minimum_area_selection_deferred"
+            },
+            {
+              "code": "SSHG_NO_FULL_EXCHANGER_RATING_CLAIM",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "no_full_exchanger_rating_claim"
+            },
+            {
+              "code": "SSHG_WINDOW_INLET_OUTLET_FLOW_AREAS_DEFERRED",
+              "details": [],
+              "evidence_refs": [],
+              "field_path": null,
+              "message_key": "window_inlet_outlet_flow_areas_deferred"
+            }
+          ]
+        },
+        "task166_result": {
+          "applicability": {
+            "checks": [
+              {
+                "check_id": "TASK020_CONFIGURATION_ACCEPTED",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "TUBE_LAYOUT_ACCEPTED",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "SHELL_BUNDLE_GEOMETRY_ACCEPTED",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "BAFFLE_GEOMETRY_ACCEPTED",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "SHELL_SIDE_FLOW_STATE_ACCEPTED",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "BELL_SOURCE_APPLICABLE",
+                "evidence_refs": [],
+                "status": "PASS"
+              },
+              {
+                "check_id": "NUMERICAL_DOMAIN_VALID",
+                "evidence_refs": [],
+                "status": "PASS"
+              }
+            ],
+            "status": "APPLICABLE"
+          },
+          "baffle_evidence": [
+            [
+              "schema_version",
+              "task024.baffle-geometry.v1"
+            ],
+            [
+              "result_id",
+              "279ed479-378d-5ea5-b2f0-8926133bf4dd"
+            ],
+            [
+              "result_hash",
+              "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+            ],
+            [
+              "request_hash",
+              "d12a16e116e30088b37701b4a57d8b1207b2b856636133ad2a82242ae16ddfbc"
+            ],
+            [
+              "geometry_id",
+              "279ed479-378d-5ea5-b2f0-8926133bf4dd"
+            ],
+            [
+              "geometry_hash",
+              "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+            ]
+          ],
+          "bell_geometry": {
+            "baffle_count": 4,
+            "baffle_cut_fraction": "0.25657",
+            "bundle_bypass_area_m2": "0.054160895026430051219046845268",
+            "bundle_outer_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+            "bypass_area_ratio": "0.37537439807623835616347399430294209377274144921510",
+            "central_baffle_spacing_m": "1.2",
+            "central_crossflow_flow_area_m2": "0.14428500000000000000000000000000000000000000000000",
+            "central_crossflow_tube_rows": "11.066810932698077867287374297612336564165045189213",
+            "effective_tube_pitch_m": "0.0254",
+            "gross_window_flow_area_m2": "0.039815157825294370606048084933556159497233515454845",
+            "inlet_baffle_spacing_m": "1.2",
+            "layout_angle": "LAYOUT_30_DEG",
+            "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+            "leakage_area_ratio": "0.055831326916592566453392381096747770595119257578698",
+            "outlet_baffle_spacing_m": "1.2",
+            "pure_crossflow_tube_fraction": "0.67224292093475172814414223313275582030784286103766",
+            "shell_inside_diameter_m": "0.5",
+            "shell_leakage_fraction": "0.19358722902162380224725557108928772924742638987782",
+            "shell_to_baffle_diametral_clearance_m": "0.003",
+            "shell_to_baffle_leakage_area_m2": "0.0015594657354182911803893230500002804340802075313800",
+            "shell_to_bundle_diametral_clearance_m": "0.04513407918869170934920570439",
+            "source_formula_ids": [
+              "GONCALVES_2019_EQ3_EQ4",
+              "GONCALVES_2019_EQ5_EQ35"
+            ],
+            "theta_ctl_rad": "1.9562915610376467009312355674438954639963166049199",
+            "theta_ds_rad": "2.1246100127308099958870919665582579441804520484036",
+            "total_crossflow_tube_rows": "72.826546235866622779254268481206015529813969558655",
+            "total_leakage_area_m2": "0.0080556230041605584507277197065442520803167820797425",
+            "tube_count": "253",
+            "tube_outer_diameter_m": "0.01905",
+            "tube_pitch_m": "0.0254",
+            "tube_to_baffle_hole_diametral_clearance_m": "0.001",
+            "tube_to_baffle_leakage_area_m2": "0.0064961572687422672703383966565439716462365745483625",
+            "window_flow_area_m2": "0.027997743906225088813846663381964345226376142210217",
+            "window_hydraulic_diameter_m": "0.037175436751838663697501728166842285474419222010525",
+            "window_tube_area_m2": "0.011817413919069281792201421551591814270857373244628",
+            "window_tube_count": "41.461270501753906389766007508706388731057878078736",
+            "window_tube_fraction": "0.16387853953262413592792888343362208984607856948117",
+            "window_tube_rows": "3.4984983144752466885634793986288665417977487225183"
+          },
+          "blockers": [],
+          "central_crossflow_contribution": "32.992464635993103996510123237517870360514323245930",
+          "completeness": {
+            "present_fields": [
+              "ideal_crossflow_heat_transfer_coefficient",
+              "Jc",
+              "Jl",
+              "Jb",
+              "Js",
+              "Jr",
+              "corrected_shell_side_heat_transfer_coefficient",
+              "ideal_crossflow_pressure_drop",
+              "crossflow_pressure_drop",
+              "window_pressure_drop",
+              "end_zone_pressure_drop",
+              "central_crossflow_contribution",
+              "window_contribution",
+              "entrance_zone_contribution",
+              "exit_zone_contribution",
+              "Rl",
+              "Rb",
+              "Rs",
+              "total_shell_pressure_drop",
+              "bell_geometry",
+              "factor_evidence",
+              "applicability",
+              "provenance"
+            ],
+            "required_fields": [
+              "ideal_crossflow_heat_transfer_coefficient",
+              "Jc",
+              "Jl",
+              "Jb",
+              "Js",
+              "Jr",
+              "corrected_shell_side_heat_transfer_coefficient",
+              "ideal_crossflow_pressure_drop",
+              "crossflow_pressure_drop",
+              "window_pressure_drop",
+              "end_zone_pressure_drop",
+              "central_crossflow_contribution",
+              "window_contribution",
+              "entrance_zone_contribution",
+              "exit_zone_contribution",
+              "Rl",
+              "Rb",
+              "Rs",
+              "total_shell_pressure_drop",
+              "bell_geometry",
+              "factor_evidence",
+              "applicability",
+              "provenance"
+            ],
+            "status": "COMPLETE"
+          },
+          "corrected_shell_side_heat_transfer_coefficient": "1481.0011916237197070118736913425565890962662031771",
+          "crossflow_pressure_drop": "32.992464635993103996510123237517870360514323245930",
+          "end_zone_pressure_drop": "37.716240615812359210096618518136317816801432273484",
+          "entrance_zone_contribution": "18.858120307906179605048309259068158908400716136742",
+          "exit_zone_contribution": "18.858120307906179605048309259068158908400716136742",
+          "factor_evidence": [
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Jc",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "baffle_cut_fraction",
+                  "0.25657"
+                ],
+                [
+                  "pure_crossflow_tube_fraction",
+                  "0.67224292093475172814414223313275582030784286103766"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "1.0340149030730212442637824078555841906216468599471"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Jl",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "leakage_area_ratio",
+                  "0.055831326916592566453392381096747770595119257578698"
+                ],
+                [
+                  "shell_leakage_fraction",
+                  "0.19358722902162380224725557108928772924742638987782"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "0.92542702848533444853447289045995805444331889076365"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Jb",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "bypass_area_ratio",
+                  "0.37537439807623835616347399430294209377274144921510"
+                ],
+                [
+                  "c_bh",
+                  "1.25"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "0.62549121271238507229895992835467324244329543217965"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Js",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "baffle_count",
+                  "4"
+                ],
+                [
+                  "central_spacing",
+                  "1.2"
+                ],
+                [
+                  "inlet_spacing",
+                  "1.2"
+                ],
+                [
+                  "n1",
+                  "0.6"
+                ],
+                [
+                  "outlet_spacing",
+                  "1.2"
+                ],
+                [
+                  "reynolds",
+                  "2740.5066"
+                ]
+              ],
+              "source_id": "SRC-SAIF-TARIQ-2025-JMES-UNEQUAL-BAFFLE-SPACING-JS",
+              "source_location": "JMES 19(4) (2025), section 2.1.3, equation 21, p.10882",
+              "value": "1"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Jr",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "reynolds",
+                  "2740.5066"
+                ],
+                [
+                  "total_crossflow_tube_rows",
+                  "72.826546235866622779254268481206015529813969558655"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "1"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Rl",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "leakage_area_ratio",
+                  "0.055831326916592566453392381096747770595119257578698"
+                ],
+                [
+                  "shell_leakage_fraction",
+                  "0.19358722902162380224725557108928772924742638987782"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "0.76752463278951683732468405835996867695737523649146"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Rb",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "bypass_area_ratio",
+                  "0.37537439807623835616347399430294209377274144921510"
+                ],
+                [
+                  "c_bp",
+                  "3.7"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "0.24935311043821067581589158336650424950939776388663"
+            },
+            {
+              "applicability": [
+                "TASK166_FIXED_GEOMETRY_BELL_DELAWARE"
+              ],
+              "factor_id": "Rs",
+              "factor_version": "v1",
+              "input_projection": [
+                [
+                  "central_spacing",
+                  "1.2"
+                ],
+                [
+                  "inlet_spacing",
+                  "1.2"
+                ],
+                [
+                  "n",
+                  "0.2"
+                ],
+                [
+                  "outlet_spacing",
+                  "1.2"
+                ],
+                [
+                  "reynolds",
+                  "2740.5066"
+                ]
+              ],
+              "source_id": "SRC-AICHE-GONCALVES-COSTA-BAGAJEWICZ-2019-BELL-DELAWARE",
+              "source_location": "AIChE Journal 65(8), e16602 (2019), equations 36--73",
+              "value": "2.0000000000000000000000000000000000000000000000000"
+            }
+          ],
+          "heat_transfer_a1": "0.321",
+          "heat_transfer_a2": "-0.388",
+          "heat_transfer_a3": "1.450",
+          "heat_transfer_a4": "0.519",
+          "heat_transfer_parameter_row_identity": "LAYOUT_30_DEG:RE_1000_TO_LT_10000",
+          "heat_transfer_parameter_source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+          "ideal_crossflow_heat_transfer_coefficient": "2474.3732807537276571030025512345999656702134155439",
+          "ideal_crossflow_pressure_drop": "57.462748198643770109110467208232521351612006612251",
+          "implementation_software_version": "task166.bell-delaware-impl-v1",
+          "j_b": "0.62549121271238507229895992835467324244329543217965",
+          "j_c": "1.0340149030730212442637824078555841906216468599471",
+          "j_l": "0.92542702848533444853447289045995805444331889076365",
+          "j_r": "1",
+          "j_s": "1",
+          "pressure_drop_b1": "0.486",
+          "pressure_drop_b2": "-0.152",
+          "pressure_drop_b3": "7.00",
+          "pressure_drop_b4": "0.500",
+          "pressure_drop_parameter_row_identity": "LAYOUT_30_DEG:RE_1000_TO_LT_10000",
+          "pressure_drop_parameter_source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+          "provenance": {
+            "cycle_count": 0,
+            "edges": [
+              {
+                "relation": "AUTHORIZES",
+                "source_node_id": "TASK166_SOURCE_AUTHORITY",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "TASK020_CONFIGURATION",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "TUBE_LAYOUT",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "SHELL_BUNDLE_GEOMETRY",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "BAFFLE_GEOMETRY",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "TASK032_FLOW_STATE",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "AUTHORIZES",
+                "source_node_id": "TASK032_SOURCE_AUTHORITY",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "BELL_METHOD_ORIGIN_SOURCE",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "DEFINES",
+                "source_node_id": "GONCALVES_PRIMARY_SOURCE",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "JAMIL_PARAMETER_SOURCE",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "SUPPLIES",
+                "source_node_id": "SAIF_TARIQ_JS_SOURCE",
+                "target_node_id": "TASK166_CALCULATION_RUN"
+              },
+              {
+                "relation": "PRODUCES",
+                "source_node_id": "TASK166_CALCULATION_RUN",
+                "target_node_id": "TASK166_RESULT"
+              }
+            ],
+            "graph_hash": "17fa331d549237a9622cef4f94e24864733b5acde54faaf550b6c11c66d0cfbe",
+            "nodes": [
+              {
+                "node_id": "TASK166_SOURCE_AUTHORITY",
+                "payload_hash": "9c48e071aa9dc4e104742e414c83008b2debf4911cfb2ed052cfbea1821cab9d"
+              },
+              {
+                "node_id": "TASK020_CONFIGURATION",
+                "payload_hash": "8007b2841153b04d17d3916e7029988432dc19f282d616bcbe69b7a06436228a"
+              },
+              {
+                "node_id": "TUBE_LAYOUT",
+                "payload_hash": "20d19d01416fb1e213fc0b0424e03757c958e7e098379e15b26f8c38597949eb"
+              },
+              {
+                "node_id": "SHELL_BUNDLE_GEOMETRY",
+                "payload_hash": "2dd5cb2ca9cbe65722e80e44b4f9fef47c9de83b42ff6448efc259e3ae5d4a15"
+              },
+              {
+                "node_id": "BAFFLE_GEOMETRY",
+                "payload_hash": "d6efddec7f2cb1a574114df5ef567e6bfc5c74cab70fabdee1bcf3c805efde6f"
+              },
+              {
+                "node_id": "TASK032_FLOW_STATE",
+                "payload_hash": "bd857bc23c820e62cc591f29b9533402a2e15c917549016f7ce661eac33d0140"
+              },
+              {
+                "node_id": "TASK032_SOURCE_AUTHORITY",
+                "payload_hash": "ff439107e7b12a8a4f8af6f8903dd9b8c30391e624d8944667e2c0a89a2a352c"
+              },
+              {
+                "node_id": "BELL_METHOD_ORIGIN_SOURCE",
+                "payload_hash": "3bc743924955fb4c8cdbf851450fc84ff8975438473a86949631ef6b2c407319"
+              },
+              {
+                "node_id": "GONCALVES_PRIMARY_SOURCE",
+                "payload_hash": "ef9cd511c1f1981e3d20e2fe8f98c4b9515e6cad41c4b537d8b8909e0d3630e6"
+              },
+              {
+                "node_id": "JAMIL_PARAMETER_SOURCE",
+                "payload_hash": "47c22717863b6b44486f506f4c0564ce880d75c00fbbd8977dd2b9a9ddb5177c"
+              },
+              {
+                "node_id": "SAIF_TARIQ_JS_SOURCE",
+                "payload_hash": "637c686685ed3414dc1d6e254f49a19f6781841ed75cc669efb5f14e75faeec6"
+              },
+              {
+                "node_id": "TASK166_CALCULATION_RUN",
+                "payload_hash": "33d3b8c143da5230a7b52c028725e5049750b1b5118b10b099ce7711ce245c6c"
+              },
+              {
+                "node_id": "TASK166_RESULT",
+                "payload_hash": "sha256:a42aee19a2fbb77d1666e4b7170b86e3a9e036f992ef8030a9c2ecf1928c151d"
+              }
+            ],
+            "self_edge_count": 0
+          },
+          "provenance_semantic_inputs": [
+            [
+              "source_authority_payload_hash",
+              "9c48e071aa9dc4e104742e414c83008b2debf4911cfb2ed052cfbea1821cab9d"
+            ],
+            [
+              "task020_configuration_payload_hash",
+              "8007b2841153b04d17d3916e7029988432dc19f282d616bcbe69b7a06436228a"
+            ],
+            [
+              "tube_layout_payload_hash",
+              "20d19d01416fb1e213fc0b0424e03757c958e7e098379e15b26f8c38597949eb"
+            ],
+            [
+              "shell_bundle_geometry_payload_hash",
+              "2dd5cb2ca9cbe65722e80e44b4f9fef47c9de83b42ff6448efc259e3ae5d4a15"
+            ],
+            [
+              "baffle_geometry_payload_hash",
+              "d6efddec7f2cb1a574114df5ef567e6bfc5c74cab70fabdee1bcf3c805efde6f"
+            ],
+            [
+              "task032_flow_state_payload_hash",
+              "bd857bc23c820e62cc591f29b9533402a2e15c917549016f7ce661eac33d0140"
+            ],
+            [
+              "task032_source_authority_payload_hash",
+              "ff439107e7b12a8a4f8af6f8903dd9b8c30391e624d8944667e2c0a89a2a352c"
+            ],
+            [
+              "method_origin_source_payload_hash",
+              "3bc743924955fb4c8cdbf851450fc84ff8975438473a86949631ef6b2c407319"
+            ],
+            [
+              "primary_source_payload_hash",
+              "ef9cd511c1f1981e3d20e2fe8f98c4b9515e6cad41c4b537d8b8909e0d3630e6"
+            ],
+            [
+              "jamil_source_payload_hash",
+              "47c22717863b6b44486f506f4c0564ce880d75c00fbbd8977dd2b9a9ddb5177c"
+            ],
+            [
+              "saif_tariq_source_payload_hash",
+              "637c686685ed3414dc1d6e254f49a19f6781841ed75cc669efb5f14e75faeec6"
+            ],
+            [
+              "calculation_run_payload_hash",
+              "33d3b8c143da5230a7b52c028725e5049750b1b5118b10b099ce7711ce245c6c"
+            ]
+          ],
+          "r_b": "0.24935311043821067581589158336650424950939776388663",
+          "r_l": "0.76752463278951683732468405835996867695737523649146",
+          "r_s": "2.0000000000000000000000000000000000000000000000000",
+          "request_hash": "1083b8fbaef93ef2370b63364b3fd9e40f2ba0e98d2c8dd1b852f2da158967c2",
+          "result_hash": "a42aee19a2fbb77d1666e4b7170b86e3a9e036f992ef8030a9c2ecf1928c151d",
+          "result_id": "ad4745b7-fa18-519f-99c2-e76b12bb23dc",
+          "schema_version": "task166.bell-delaware-result.v1",
+          "shell_bundle_evidence": [
+            [
+              "schema_version",
+              "task022.shell-bundle-geometry.v1"
+            ],
+            [
+              "result_id",
+              "cbacec31-31fa-5e14-aa1b-be05e04b96dc"
+            ],
+            [
+              "result_hash",
+              "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4"
+            ],
+            [
+              "request_hash",
+              "d28b6a3fed60f471fdb95536cf6bf28c1919e6858feec90cf55d8c5d555f5ef4"
+            ],
+            [
+              "geometry_id",
+              "cbacec31-31fa-5e14-aa1b-be05e04b96dc"
+            ],
+            [
+              "geometry_hash",
+              "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4"
+            ]
+          ],
+          "shell_side_flow_evidence": [
+            [
+              "schema_version",
+              "task032.shell-side-flow-state.v1"
+            ],
+            [
+              "profile_id",
+              "hxforge.shell_tube.shell_side_flow_state.v1"
+            ],
+            [
+              "result_id",
+              "8a43b528-acca-5388-8f82-cd85e53b820e"
+            ],
+            [
+              "result_hash",
+              "58e47124f94d14ece0f1c93a0bb5510b7dda52bfbc60b9f650fbf72c1eb232d2"
+            ],
+            [
+              "request_hash",
+              "942c339c85a585d51be5a6431b17ae3f4064d2ae9d6166a51cdf4651e444e13e"
+            ],
+            [
+              "property_snapshot_hash",
+              "7d7cea33d847b821b455339b537850869ee953038e874d7aa27da2a895628337"
+            ],
+            [
+              "engineering_authority_id",
+              "urn:hxforge:task032:engineering-authority:v1:92581bfe2e235faa265f05fd56a0c0660eef2ba39da287cfee76c133ffb3ab46"
+            ],
+            [
+              "engineering_authority_hash",
+              "92581bfe2e235faa265f05fd56a0c0660eef2ba39da287cfee76c133ffb3ab46"
+            ],
+            [
+              "shell_side_case_id",
+              "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1"
+            ],
+            [
+              "shell_side_stream_id",
+              "urn:hxforge:r119a:stream:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed"
+            ],
+            [
+              "shell_side_fluid_id",
+              "PURE_ORDINARY_WATER"
+            ]
+          ],
+          "shell_side_hydraulic_evidence": [
+            [
+              "schema_version",
+              "task031.shell-side-hydraulic-geometry.v1"
+            ],
+            [
+              "result_id",
+              "82b051f6-d8f6-5bbb-b46f-76609b9f8cca"
+            ],
+            [
+              "result_hash",
+              "1dc32d501ee1ba283e4d2bb5eab2f2f5ffc81e464fd6f254ff13b02ceb01519e"
+            ],
+            [
+              "request_hash",
+              "688c13a7d9022338fba1787be6a0a0867bd3e37e1bac2528fcae101cb66adb58"
+            ],
+            [
+              "geometry_id",
+              "82b051f6-d8f6-5bbb-b46f-76609b9f8cca"
+            ],
+            [
+              "geometry_hash",
+              "1dc32d501ee1ba283e4d2bb5eab2f2f5ffc81e464fd6f254ff13b02ceb01519e"
+            ]
+          ],
+          "source_definition_id": "TASK165_R3_BELL_DELAWARE_SOURCE_AUTHORITY_V1",
+          "task020_evidence": [
+            [
+              "schema_version",
+              "task020.configuration.v1"
+            ],
+            [
+              "result_id",
+              "96637b2b-3583-5fdd-8645-bb2b5526996a"
+            ],
+            [
+              "result_hash",
+              "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125"
+            ],
+            [
+              "configuration_id",
+              "96637b2b-3583-5fdd-8645-bb2b5526996a"
+            ],
+            [
+              "configuration_hash",
+              "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125"
+            ]
+          ],
+          "task166_version": "1.0",
+          "total_shell_pressure_drop": "695.60879452416523317091096372842532069004685992373",
+          "tube_layout_evidence": [
+            [
+              "schema_version",
+              "task021.tube-layout.v1"
+            ],
+            [
+              "result_id",
+              "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+            ],
+            [
+              "result_hash",
+              "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550"
+            ],
+            [
+              "request_hash",
+              "91d326b044874d44ee790f00e7373bf06169db3ef5f8b234d47448251ffba232"
+            ]
+          ],
+          "warnings": [],
+          "window_contribution": "624.90008927235976996430422197277113251273110440432",
+          "window_pressure_drop": "624.90008927235976996430422197277113251273110440432"
+        }
+      },
+      "shell_jmu_model_authority_canonical_hash": "ea6041287c407afe735148e12866f02026d23ba6e9c881ba22c076c032b5cac6",
+      "shell_mass_flow_kg_s": "20",
+      "shell_outside_fouling_m2_k_w": "0",
+      "stage1_authority_evidence_canonical_hash": "60d1270c52ea226df28634003b4beaf6a8d006915d6454fe7e55dfaaca8771c1",
+      "support": {
+        "inside_area_m2": "0.4694422997400",
+        "mesh_level_identity": "d71dd9e0214eae5cad868b459f08cb50e29395be21a322b3176181f5d39b4da9",
+        "outside_area_m2": "0.567801638733143080686809400",
+        "physical_segment_end_m": "6.0",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+        "physical_segment_start_m": "4.8",
+        "shell_cell_id": "urn:hxforge:task172:real-case-cell-shell:c16d22fa3d3797f89994da1c188b04734c258e350fb2b862474e743bcaf5972b",
+        "subdivision_index": 5,
+        "subdivisions_per_physical_interval_per_side": 32,
+        "support_end_m": "5.0250",
+        "support_start_m": "4.9875",
+        "tube_cell_id": "urn:hxforge:task172:real-case-cell-tube:04bdeecd1549457f1e1a539a94d0b6a9f0c570e3b843f067d7892c5e68c47faf",
+        "wall_interface_id": "urn:hxforge:task172:real-case-wall-interface:98cc0b6104ceed405534bb54b10ef717c4b64375e16901c5923809d8260dba9b"
+      },
+      "topology": {
+        "definition_projection_hash": "342c1865b8292050c472b6be822a5f86ba00b0cab5e654554d7f16458603d55c",
+        "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+        "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+        "production_mesh_profile_authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+        "selected_variant": "TUBE_HOT_SHELL_COLD",
+        "shell_flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+        "shell_role": "COLD",
+        "structural_mesh_authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+        "task171_result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+        "thermal_role_selection_authority_id": "V07-T172-R119C-THERMAL-ROLE-SELECTION-R1",
+        "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+        "tube_flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+        "tube_role": "HOT"
+      },
+      "tube_bulk_state": {
+        "pressure_pa": "101325",
+        "temperature_k": "299.10292032837447"
+      },
+      "tube_inside_fouling_m2_k_w": "0",
+      "tube_mass_flow_kg_s": "12"
+    },
+    "task172_blocked_result_payload": {
+      "blocked_result_hash": "779109c08d8885c7e85b1ece0bdd0b7fb7e9f5d00a7818e5b95c8b282e2402e5",
+      "blockers": [
+        "BLOCKED_RESIDUAL_ACCEPTANCE"
+      ],
+      "diagnostic_last_iterate": [
+        "281.7082529110318",
+        "298.6363865174448",
+        "298.5721752216517",
+        "7.713651939411648e-11",
+        "-7.185008144006133e-11",
+        "-6.821210263296962e-12",
+        "6.892011134130622e-11",
+        "4.990048251837775e-10",
+        "9.605630928740495e-11"
+      ],
+      "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+      "field_path": "281.7082529110318;298.6363865174448;298.5721752216517;7.713651939411648e-11;-7.185008144006133e-11;-6.821210263296962e-12;6.892011134130622e-11;4.990048251837775e-10;9.605630928740495e-11",
+      "request_hash": "3ffebffa5aaf4957cd4d743e8530885795831d29328b5a2fc63e55287d08720d",
+      "schema_version": "task172.local-constitutive-blocked.v1",
+      "status": "BLOCKED",
+      "warnings": []
+    },
+    "diagnostic_last_iterate_used_for_production_decision": false,
+    "blocked_result_used_for_residual_sign": false,
+    "blocked_result_used_as_physical_result": false,
+    "available_solver_diagnostics": {
+      "vector_field_order_from_task172_source": [
+        "internal_q_diagnostic_w",
+        "wall_inner_temperature_k",
+        "wall_outer_temperature_k",
+        "inner_film_residual_w",
+        "wall_residual_w",
+        "outer_film_residual_w",
+        "inner_film_acceptance_bound_w",
+        "wall_acceptance_bound_w",
+        "outer_film_acceptance_bound_w"
+      ],
+      "diagnostic_last_iterate": [
+        "281.7082529110318",
+        "298.6363865174448",
+        "298.5721752216517",
+        "7.713651939411648e-11",
+        "-7.185008144006133e-11",
+        "-6.821210263296962e-12",
+        "6.892011134130622e-11",
+        "4.990048251837775e-10",
+        "9.605630928740495e-11"
+      ],
+      "inner_film_residual_exceeds_bound": true,
+      "wall_residual_within_bound": true,
+      "outer_film_residual_within_bound": true,
+      "native_solver_status_field": "NOT_EXPOSED_BY_TASK172_BLOCKED_RESULT",
+      "solver_success_precondition_passed_by_source_control_flow": true,
+      "actual_nfev": null,
+      "actual_callback_count": null,
+      "configured_method": "scipy.optimize.least_squares(method=trf)",
+      "configured_max_nfev": 6,
+      "configured_callback_cap": 24,
+      "ftol": "1e-6",
+      "xtol": "1e-12",
+      "gtol": "1e-12",
+      "jac": "2-point",
+      "diff_step": "1e-5",
+      "r98_c_round": "1.0",
+      "residual_acceptance_policy_changed": false
+    },
+    "zero_q_identity_contract": {
+      "exact_zero_branch_triggered": true,
+      "new_ph_reconstruction_at_q0": false,
+      "tube_thermodynamic_state_reused": true,
+      "shell_thermodynamic_state_reused": true,
+      "property_snapshot_identity_preserved": true,
+      "reuse_checks": [
+        {
+          "same_snapshot_object": true,
+          "same_thermo_hash": true,
+          "same_thermo_object": true,
+          "snapshot_hash": "d33f3cdbe5bf71de8f701faa353e0235a8d2a066c2155b473c88fae8cf65378f"
+        },
+        {
+          "same_snapshot_object": true,
+          "same_thermo_hash": true,
+          "same_thermo_object": true,
+          "snapshot_hash": "b6a3f90532d577f12be82e874463d3938a1fa3ace8724d5586c7ce17ae4e682d"
+        }
+      ],
+      "face_identity_context_distinct": {
+        "different_face_hashes": true,
+        "different_face_ids": true,
+        "face_a_id": "urn:hxforge:task173:face:c386a4f7e96fad2c6f64d34df19b5280333bc3c669602ea4bde2bca87d053a01",
+        "face_b_id": "urn:hxforge:task173:face:526e6eb0cc1c808de01e658b616782e46057238cd3564baf4c60853c6b863913",
+        "same_thermodynamic_state_hash": true
+      },
+      "zero_q_state_portability_status": "PASS",
+      "task172_constitutive_result_status": "BLOCKED_RESIDUAL_ACCEPTANCE"
+    },
+    "two_independent_replays": {
+      "capture_on_run_a_output_sha256": "40486fe3dfa494c713c60082132dc0fba2acce614019340c9307ee0380dd7af7",
+      "capture_on_run_b_output_sha256": "40486fe3dfa494c713c60082132dc0fba2acce614019340c9307ee0380dd7af7",
+      "capture_on_outputs_byte_identical": true,
+      "same_q0_request_hash": true,
+      "same_q0_blocked_result_hash": true,
+      "same_12_level_probe_sequence": true,
+      "same_valid_result_hashes_and_residuals": true,
+      "same_failed_cell_identity": true,
+      "same_blocker_classification": true,
+      "same_full_production_task172_sequence_digest": true,
+      "capture_on_vs_off_projection_identical": true
+    }
+  },
+  "original_12_level_recovery_trajectory": {
+    "endpoint_q0_classification": "TASK172_NUMERICAL_HOLE",
+    "endpoint_q0_failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "levels": [
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "3392.97462431357696",
+        "hole_edge_after_q_w": "0.0",
+        "hole_edge_before_q_w": "0.0",
+        "level": 1,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "3669.8023116037",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "5547e301267ebbe86bfaff51bc69852628e1f32ceb1dcc60826a62097349d910",
+        "task172_result_hash": "e33b019bf45abecacfeea44af294b66d19b675f4871d79cdbe0854c186bdce11",
+        "valid_anchor_after_f_q_w": "3392.97462431357696",
+        "valid_anchor_after_q_w": "3669.8023116037",
+        "valid_anchor_after_task172_result_hash": "e33b019bf45abecacfeea44af294b66d19b675f4871d79cdbe0854c186bdce11",
+        "valid_anchor_before_f_q_w": "7067.65353289010485",
+        "valid_anchor_before_q_w": "7339.6046232074",
+        "valid_anchor_before_task172_result_hash": "6d269768cbb7e33ea48efa5c6a0bbe2a18f55fb965186b3fe1731d58306a873e"
+      },
+      {
+        "blocked_result_hash": "4448f5c9416ff7118ffd7509cb0af0615e7f4949cf7e44d8504d47bda47142d9",
+        "eligible_root_found": false,
+        "f_q_w": null,
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "0.0",
+        "level": 2,
+        "probe_classification": "TASK172_NUMERICAL_HOLE",
+        "probe_q_w": "1834.90115580185",
+        "residual_sign": null,
+        "sign_pair_found": false,
+        "task172_request_hash": "a52cda0abab920f9fd3a853e0ba3f3fa4289c38c88768bcda054377af08b70ec",
+        "task172_result_hash": null,
+        "valid_anchor_after_f_q_w": "3392.97462431357696",
+        "valid_anchor_after_q_w": "3669.8023116037",
+        "valid_anchor_after_task172_result_hash": "e33b019bf45abecacfeea44af294b66d19b675f4871d79cdbe0854c186bdce11",
+        "valid_anchor_before_f_q_w": "3392.97462431357696",
+        "valid_anchor_before_q_w": "3669.8023116037",
+        "valid_anchor_before_task172_result_hash": "e33b019bf45abecacfeea44af294b66d19b675f4871d79cdbe0854c186bdce11"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "2474.3042770039457",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 3,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "2752.351733702775",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "88ab96bd6f54a774d22aceaf93e30088518002ef5b4b5679481bc8660d70064f",
+        "task172_result_hash": "007b2e4a29f5df997ddc2a1f79ee897b356653d4d6060e0cd811f8098eb0a085",
+        "valid_anchor_after_f_q_w": "2474.3042770039457",
+        "valid_anchor_after_q_w": "2752.351733702775",
+        "valid_anchor_after_task172_result_hash": "007b2e4a29f5df997ddc2a1f79ee897b356653d4d6060e0cd811f8098eb0a085",
+        "valid_anchor_before_f_q_w": "3392.97462431357696",
+        "valid_anchor_before_q_w": "3669.8023116037",
+        "valid_anchor_before_task172_result_hash": "e33b019bf45abecacfeea44af294b66d19b675f4871d79cdbe0854c186bdce11"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "2014.96901028650003",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 4,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "2293.6264447523126",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "60d0c5e7aba9d6d80459669e83f201a2c9d12272354a8501e96eec3cecca53d5",
+        "task172_result_hash": "7f94f2ff08ffde8558e4fae3051e3d217eba8f5355045742e2a945ebbece75ad",
+        "valid_anchor_after_f_q_w": "2014.96901028650003",
+        "valid_anchor_after_q_w": "2293.6264447523126",
+        "valid_anchor_after_task172_result_hash": "7f94f2ff08ffde8558e4fae3051e3d217eba8f5355045742e2a945ebbece75ad",
+        "valid_anchor_before_f_q_w": "2474.3042770039457",
+        "valid_anchor_before_q_w": "2752.351733702775",
+        "valid_anchor_before_task172_result_hash": "007b2e4a29f5df997ddc2a1f79ee897b356653d4d6060e0cd811f8098eb0a085"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1785.3013536762801",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 5,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "2064.2638002770814",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "022649870c7580ea54fcba98967b582eb04672a49b83d058a3c3ed828a514c54",
+        "task172_result_hash": "fab1544eb48752cb01236fa01e4b82c41e4a877101b3654882d577c24aa9ae24",
+        "valid_anchor_after_f_q_w": "1785.3013536762801",
+        "valid_anchor_after_q_w": "2064.2638002770814",
+        "valid_anchor_after_task172_result_hash": "fab1544eb48752cb01236fa01e4b82c41e4a877101b3654882d577c24aa9ae24",
+        "valid_anchor_before_f_q_w": "2014.96901028650003",
+        "valid_anchor_before_q_w": "2293.6264447523126",
+        "valid_anchor_before_task172_result_hash": "7f94f2ff08ffde8558e4fae3051e3d217eba8f5355045742e2a945ebbece75ad"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1670.4675196358667",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 6,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1949.5824780394657",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "82140794b6e803f200bc9e786a8f169187ff807202ed0af06b77f3ee0bdcc4f9",
+        "task172_result_hash": "e97a940d2f95cb803a6256ee8110a062686bbbf261ac492c4389e5b490e1ebf5",
+        "valid_anchor_after_f_q_w": "1670.4675196358667",
+        "valid_anchor_after_q_w": "1949.5824780394657",
+        "valid_anchor_after_task172_result_hash": "e97a940d2f95cb803a6256ee8110a062686bbbf261ac492c4389e5b490e1ebf5",
+        "valid_anchor_before_f_q_w": "1785.3013536762801",
+        "valid_anchor_before_q_w": "2064.2638002770814",
+        "valid_anchor_before_task172_result_hash": "fab1544eb48752cb01236fa01e4b82c41e4a877101b3654882d577c24aa9ae24"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1613.05060104345724",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 7,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1892.241816920658",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "9f61f89277ee66227cc7b700e8d43c2f8edc935f4adda162fe36ad85d090b7c2",
+        "task172_result_hash": "48e01423b529ab556cd1d5d1cc2037c3ce714c2d5852721d9ce16becbfd93109",
+        "valid_anchor_after_f_q_w": "1613.05060104345724",
+        "valid_anchor_after_q_w": "1892.241816920658",
+        "valid_anchor_after_task172_result_hash": "48e01423b529ab556cd1d5d1cc2037c3ce714c2d5852721d9ce16becbfd93109",
+        "valid_anchor_before_f_q_w": "1670.4675196358667",
+        "valid_anchor_before_q_w": "1949.5824780394657",
+        "valid_anchor_before_task172_result_hash": "e97a940d2f95cb803a6256ee8110a062686bbbf261ac492c4389e5b490e1ebf5"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1584.34214147934527",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 8,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1863.571486361254",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "62b30a828b18fcb9d6f4a3b1f6a74efea852b6689cf4adbdc8319b0917f0e128",
+        "task172_result_hash": "afd96cebc45f4a67bbcbcbc3076e947366f263a2f2707b9c1a52a8953a4963d1",
+        "valid_anchor_after_f_q_w": "1584.34214147934527",
+        "valid_anchor_after_q_w": "1863.571486361254",
+        "valid_anchor_after_task172_result_hash": "afd96cebc45f4a67bbcbcbc3076e947366f263a2f2707b9c1a52a8953a4963d1",
+        "valid_anchor_before_f_q_w": "1613.05060104345724",
+        "valid_anchor_before_q_w": "1892.241816920658",
+        "valid_anchor_before_task172_result_hash": "48e01423b529ab556cd1d5d1cc2037c3ce714c2d5852721d9ce16becbfd93109"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1569.9879116132287",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 9,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1849.236321081552",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "48a237846d2e6be7d16a9e99a0570194d58034710f5026dd81f3a9cf71c10c84",
+        "task172_result_hash": "3b54016f8148fd40c2d45644af11d7f3b4a76d2800f0162d5afe07ebe8e3cd87",
+        "valid_anchor_after_f_q_w": "1569.9879116132287",
+        "valid_anchor_after_q_w": "1849.236321081552",
+        "valid_anchor_after_task172_result_hash": "3b54016f8148fd40c2d45644af11d7f3b4a76d2800f0162d5afe07ebe8e3cd87",
+        "valid_anchor_before_f_q_w": "1584.34214147934527",
+        "valid_anchor_before_q_w": "1863.571486361254",
+        "valid_anchor_before_task172_result_hash": "afd96cebc45f4a67bbcbcbc3076e947366f263a2f2707b9c1a52a8953a4963d1"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1562.8107965659082",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 10,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1842.068738441701",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "6e1773c1f225beb76f84cf689e579881cc42a9aef067d9a35c66709e4bfbffc2",
+        "task172_result_hash": "8704349fad488fc3806577a0f8a393922d439eaeb02379c00957dc568b574a12",
+        "valid_anchor_after_f_q_w": "1562.8107965659082",
+        "valid_anchor_after_q_w": "1842.068738441701",
+        "valid_anchor_after_task172_result_hash": "8704349fad488fc3806577a0f8a393922d439eaeb02379c00957dc568b574a12",
+        "valid_anchor_before_f_q_w": "1569.9879116132287",
+        "valid_anchor_before_q_w": "1849.236321081552",
+        "valid_anchor_before_task172_result_hash": "3b54016f8148fd40c2d45644af11d7f3b4a76d2800f0162d5afe07ebe8e3cd87"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1559.2222391029376",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 11,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1838.4849471217756",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "dc8d44feb0345f47e9044de0426c4183714c4733d0817e034bf5cb1b6f6b79fc",
+        "task172_result_hash": "3e1698b7ec2e5ec686302ac537616cb8f9136ea57e7d414eb94c38a8724bd165",
+        "valid_anchor_after_f_q_w": "1559.2222391029376",
+        "valid_anchor_after_q_w": "1838.4849471217756",
+        "valid_anchor_after_task172_result_hash": "3e1698b7ec2e5ec686302ac537616cb8f9136ea57e7d414eb94c38a8724bd165",
+        "valid_anchor_before_f_q_w": "1562.8107965659082",
+        "valid_anchor_before_q_w": "1842.068738441701",
+        "valid_anchor_before_task172_result_hash": "8704349fad488fc3806577a0f8a393922d439eaeb02379c00957dc568b574a12"
+      },
+      {
+        "blocked_result_hash": null,
+        "eligible_root_found": false,
+        "f_q_w": "1557.4279603272873",
+        "hole_edge_after_q_w": "1834.90115580185",
+        "hole_edge_before_q_w": "1834.90115580185",
+        "level": 12,
+        "probe_classification": "VALID_CELL_EVALUATION",
+        "probe_q_w": "1836.693051461813",
+        "residual_sign": "POSITIVE",
+        "sign_pair_found": false,
+        "task172_request_hash": "fd454098b86b650902c0229220352612d04186a24a91bc52ba073f726cc47a96",
+        "task172_result_hash": "fcd90cec67f512bdc062a32389ca65487bba8521984d9f790ba3810b850a2f13",
+        "valid_anchor_after_f_q_w": "1557.4279603272873",
+        "valid_anchor_after_q_w": "1836.693051461813",
+        "valid_anchor_after_task172_result_hash": "fcd90cec67f512bdc062a32389ca65487bba8521984d9f790ba3810b850a2f13",
+        "valid_anchor_before_f_q_w": "1559.2222391029376",
+        "valid_anchor_before_q_w": "1838.4849471217756",
+        "valid_anchor_before_task172_result_hash": "3e1698b7ec2e5ec686302ac537616cb8f9136ea57e7d414eb94c38a8724bd165"
+      }
+    ],
+    "valid_recovery_sample_count": 11,
+    "hole_recovery_sample_count": 1,
+    "all_valid_recovery_residuals_positive": true,
+    "all_valid_recovery_residuals_negative": false,
+    "mixed_valid_recovery_residual_signs": false,
+    "valid_residual_sign_sequence": [
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE",
+      "POSITIVE"
+    ],
+    "sign_pair_found": false,
+    "eligible_root_found": false,
+    "blocked_samples_have_null_f_and_sign": true,
+    "blocked_diagnostic_last_iterate_used": false
+  },
+  "extended_diagnostic_only_trajectory": {
+    "levels": [
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "probes": [
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1835.7971036318315",
+        "f_q_w": "1556.5308209623287",
+        "level": 13,
+        "physical_result": true,
+        "q_w": "1835.7971036318315",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2662826695028",
+        "task172_request_hash": "1ecf522bcde271b2593e819ce78d0bd32314448646510a45671b87471c5fb3d0",
+        "task172_result_hash": "921333f87685cc261900fdb44e8ab14bdb3c27c202bdee32bcdfce611c5cc8dd"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1835.3491297168407",
+        "f_q_w": "1556.0822512340724",
+        "level": 14,
+        "physical_result": true,
+        "q_w": "1835.3491297168407",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2668784827683",
+        "task172_request_hash": "7b9e08f6f97496f98a9f51f0e46c4d6f04d1a43550898abe42e680d315784aca",
+        "task172_result_hash": "5ca6c4c795fc4c679ae071486fd29a7cbb0c93e9e200736b49f39f200b841589"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1835.1251427593454",
+        "f_q_w": "1555.85796637135535",
+        "level": 15,
+        "physical_result": true,
+        "q_w": "1835.1251427593454",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.26717638799005",
+        "task172_request_hash": "aee5e2f05c64a90f01b87109eaae8a8c105ddc6bb10291bb6c1f39db3b244c96",
+        "task172_result_hash": "5d2ed7ab649a9b3de0f3ab1fa126ac3cfd803b7bf41c3d48a56866e77d5da76f"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1835.0131492805976",
+        "f_q_w": "1555.7458239613367",
+        "level": 16,
+        "physical_result": true,
+        "q_w": "1835.0131492805976",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2673253192609",
+        "task172_request_hash": "6e609ed59e2940807c8a0e879aeda6344f97bb845d0d81ddd60aff921392488b",
+        "task172_result_hash": "2bfa0ac3955f47573d070913e6465cc022f1291efc404952f7dc2188bd799f75"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.9571525412239",
+        "f_q_w": "1555.6897527896756",
+        "level": 17,
+        "physical_result": true,
+        "q_w": "1834.9571525412239",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2673997515483",
+        "task172_request_hash": "010d9e9f79b0c5d87b989edfcc49cdd5e335095184bcbf9fad1eaaecd5aeb01a",
+        "task172_result_hash": "6c46788e6a7c16e928a052a87cbd3d25b29eed9cfe0ca7e6e5d7acf5691de78a"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.929154171537",
+        "f_q_w": "1555.6617171914039",
+        "level": 18,
+        "physical_result": true,
+        "q_w": "1834.929154171537",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2674369801331",
+        "task172_request_hash": "d272ee7966a13c622972f838a6de2357036fe532552d1e8e047b37432d9f9ff1",
+        "task172_result_hash": "f7b3ee2a97d89e919028a3f571f98fb07bb4ec402ebcc9505b819b175ba179b9"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.9151549866936",
+        "f_q_w": "1555.64769946237964",
+        "level": 19,
+        "physical_result": true,
+        "q_w": "1834.9151549866936",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.26745552431396",
+        "task172_request_hash": "37b19f09ceb8e29b64534869b4883645b56236d69a8804ab8c9df177be97e801",
+        "task172_result_hash": "72dce66b9941b2c9920ae6740df03d18eb6fbbffa5c5409e6931bbeeb013f637"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.908155394272",
+        "f_q_w": "1555.640690522881",
+        "level": 20,
+        "physical_result": true,
+        "q_w": "1834.908155394272",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.267464871391",
+        "task172_request_hash": "d6399ada27d759aff86d65cabde40b6a758ff1955e7e77f36c3f0b91073987d4",
+        "task172_result_hash": "7704102729a88eb17dea795205dacad10457402d5b40dbd2c19f8b2fdc1d661c"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.904655598061",
+        "f_q_w": "1555.6371860450784",
+        "level": 21,
+        "physical_result": true,
+        "q_w": "1834.904655598061",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2674695529826",
+        "task172_request_hash": "d6494d7e73604aaff24f93285407e80986893915cd82661a9fa8c78693723e5a",
+        "task172_result_hash": "68c5daa5a2e8965393208b54c78c3143ce7811e3890d56f585e2d3d35647c2e1"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.9029056999557",
+        "f_q_w": "1555.6354338324789",
+        "level": 22,
+        "physical_result": true,
+        "q_w": "1834.9029056999557",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2674718674768",
+        "task172_request_hash": "4ce4abd4601afc3ccd88ab40da68d805130173c090933b5017a9dfedf33cf646",
+        "task172_result_hash": "22a4da619004a1eecb6288bd5fa764705603bdceff0a9c9ad800694ba2ba1268"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.902030750903",
+        "f_q_w": "1555.6345576282749",
+        "level": 23,
+        "physical_result": true,
+        "q_w": "1834.902030750903",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.2674731226281",
+        "task172_request_hash": "468ec23ea11756dea5538a6f287dd366321156222c6e2823a7dae78ceeec79df",
+        "task172_result_hash": "b6f4e0abdbcd44375d1346c0436fe3c90e62c1d1405059de624ddcf550870287"
+      },
+      {
+        "classification": "VALID_CELL_EVALUATION",
+        "diagnostic_only": true,
+        "distance_to_q0_w": "1834.9015932763764",
+        "f_q_w": "1555.63411961002926",
+        "level": 24,
+        "physical_result": true,
+        "q_w": "1834.9015932763764",
+        "residual_sign": "POSITIVE",
+        "signed_q_hot_to_cold_w": "279.26747366634714",
+        "task172_request_hash": "d1095dcff990da54115e1124b16d41c4948c4a54162357c25b49ab083ae38bbb",
+        "task172_result_hash": "79e3302bcff46764a4b88659b3769218dacf6c0b0a5aadc577410aa7831a221f"
+      }
+    ],
+    "non_production": true,
+    "production_depth_unchanged": 12,
+    "valid_count": 12,
+    "hole_count": 0,
+    "other_blocker_count": 0,
+    "first_valid_sign_pair_level": null,
+    "all_valid_residuals_positive": true,
+    "one_sided_limit_target": {
+      "classification": "SECOND_INTERIOR_NUMERICAL_HOLE_BOUNDARY_NOT_PHYSICAL_Q0",
+      "hole_edge_q_w": "1834.90115580185",
+      "valid_side": "q > hole_edge_q_w",
+      "fit": "F(q)=L+a*(q-hole_edge_q_w), using only valid Task172LocalResult values",
+      "limit_estimates_w": {
+        "last_2": "1555.633681591783820248571751",
+        "last_3": "1555.633681507927209937857065",
+        "last_4": "1555.633681534707614542388914",
+        "last_5": "1555.633681545956053948806351",
+        "last_6": "1555.633681554302478245829906"
+      },
+      "limit_min_w": "1555.633681507927209937857065",
+      "limit_max_w": "1555.633681591783820248571751",
+      "limit_spread_w": "8.3856610310714686E-8",
+      "trend": "APPROACHING_FINITE_POSITIVE_LIMIT_AT_INTERIOR_HOLE_EDGE",
+      "q0_one_sided_limit_established": false,
+      "limit_is_diagnostic_only": true,
+      "limit_used_for_production_decision": false
+    },
+    "unsampled_interval": {
+      "lower_q_w": "0.0",
+      "upper_q_w": "1834.90115580185",
+      "valid_point_count": 0,
+      "semantic_consequence": "NO_EVIDENCE_FOR_Q0_RIGHT_NEIGHBORHOOD_OR_CONTINUOUS_POSITIVE_Q_HOLE_REGION"
+    },
+    "sign_change_observed": false,
+    "eligible_root_observed": false,
+    "global_mathematical_root_nonexistence_proven": false
+  },
+  "evaluation_count_accounting": {
+    "target_outer_trial": {
+      "task172_total_evaluation_attempts": 4617,
+      "task172_valid_cell_evaluations": 4611,
+      "task172_numerical_holes": 6,
+      "task172_numerical_holes_by_code": {
+        "BLOCKED_RESIDUAL_ACCEPTANCE": 6
+      },
+      "task172_low_side_domain_infeasible_trials": 0,
+      "task172_hard_blocker_trials": 0,
+      "other_nonvalid_trials": 0,
+      "other_classification_counts": {},
+      "derived_non_hole_count": 4611,
+      "authoritative_valid_count": 4611,
+      "authoritative_valid_count_basis": "ALL_PRODUCTION_TASK172_RETURNS_CLASSIFIED_EXACTLY_AS_VALID_RESULT_OR_BLOCKED_RESIDUAL_ACCEPTANCE_HOLE",
+      "task172_production_sequence_sha256": "d92e06c09c02e7e207b1714f5f500727223290ef38a95bb025aacc28d8a3cafb",
+      "extended_diagnostic_calls_excluded": 12
+    },
+    "predecessor_full_mesh_aggregate": {
+      "task172_total_evaluation_attempts": 121654,
+      "task172_numerical_holes": 159,
+      "derived_non_hole_count": 121495,
+      "valid_count_reported_by_capture": 0,
+      "low_side_count": "UNAVAILABLE_FROM_PREDECESSOR_AGGREGATE",
+      "hard_blocker_count": "UNAVAILABLE_FROM_PREDECESSOR_AGGREGATE",
+      "other_nonvalid_count": "UNAVAILABLE_FROM_PREDECESSOR_AGGREGATE",
+      "authoritative_valid_count": null,
+      "reason": "121654-159=121495 IS ARITHMETICALLY_DERIVED_ONLY; PREDECESSOR DID NOT PROVIDE EXHAUSTIVE PER-CLASS COUNTS"
+    }
+  },
+  "semantic_adjudication": {
+    "classification": "G_MULTIHOLE_WITH_UNSAMPLED_LOW_Q_GAP",
+    "definition": "q=0 and q=1834.90115580185 W are replay-valid residual-acceptance holes; all sampled valid points are above the second hole and have positive F; the interval (0,1834.90115580185) has no valid samples, so neither q0-only behavior nor a finite positive-q hole neighborhood or q0 one-sided limit is established.",
+    "direct_q0_failure_mechanism": "TASK172_BLOCKED_RESIDUAL_ACCEPTANCE; INNER_FILM_RESIDUAL_EXCEEDS_R98_BOUND_WHILE_WALL_AND_OUTER_RESIDUALS_PASS",
+    "zero_q_portability_contract_status": "PASS",
+    "task172_constitutive_status_at_q0": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "production_q0_F_defined": false,
+    "production_q0_residual_sign_defined": false,
+    "valid_production_recovery_signs": "POSITIVE_ONLY",
+    "sign_pair_observed": false,
+    "eligible_root_observed": false,
+    "r3_lower_endpoint_authority_applicable": false,
+    "extrapolated_limit_used_as_physical_result": false,
+    "global_mathematical_root_nonexistence_proven": false
+  },
+  "correction_option_assessment": {
+    "recommended_option": "OPTION_4_TASK172_Q0_LOCAL_NUMERICAL_CORRECTION_AUTHORITY",
+    "recommended_next_gate": "STAGE3_TASK172_LOCAL_RESIDUAL_ACCEPTANCE_NUMERICAL_CORRECTION_AUTHORITY_ADJUDICATION_R1",
+    "options": {
+      "OPTION_1_NO_CHANGE_FAIL_CLOSED": {
+        "physical_acceptance_changed": false,
+        "task172_acceptance_changed": false,
+        "r98_changed": false,
+        "root_equation_changed": false,
+        "blocked_diagnostic_used_for_sign": false,
+        "property_domain_expanded": false,
+        "resource_budget_changed": false,
+        "portability_risk": "LOW",
+        "n16_upper_authority_impact": "NONE",
+        "minimum_scope": "Retain blocker and no result until a valid root bracket exists.",
+        "assessment": "Safest immediate behavior, but does not recover this target cell."
+      },
+      "OPTION_2_LOWER_ENDPOINT_CLASSIFICATION_AUTHORITY": {
+        "physical_acceptance_changed": true,
+        "task172_acceptance_changed": false,
+        "r98_changed": false,
+        "root_equation_changed": false,
+        "blocked_diagnostic_used_for_sign": "WOULD_RISK_FALSE_IF_USED_TO_INFER_SIGN; FORBIDDEN",
+        "property_domain_expanded": false,
+        "resource_budget_changed": false,
+        "portability_risk": "HIGH",
+        "n16_upper_authority_impact": "MUST_REMAIN_UNCHANGED_AND_NOT_SYMMETRICALLY_COPIED",
+        "minimum_scope": "Would need a separate lower-endpoint physical classification authority supported by valid-point evidence; current evidence is insufficient.",
+        "assessment": "Not recommended; missing q0 sign and unprobed gap prevent physical infeasibility conclusion."
+      },
+      "OPTION_3_CELL_ROOT_RECOVERY_DEPTH_OR_SEARCH_CONTRACT_CHANGE": {
+        "physical_acceptance_changed": false,
+        "task172_acceptance_changed": false,
+        "r98_changed": false,
+        "root_equation_changed": false,
+        "blocked_diagnostic_used_for_sign": false,
+        "property_domain_expanded": false,
+        "resource_budget_changed": "YES_IF_DEPTH_OR_EVALUATION_CAP_INCREASED; REQUIRES_NEW_AUTHORITY",
+        "portability_risk": "MEDIUM_TO_HIGH",
+        "n16_upper_authority_impact": "R3_CLASSIFICATION_UNCHANGED; SEARCH_CHANGE_MUST_BE_COMMONLY_REVIEWED",
+        "minimum_scope": "A bounded, deterministic multi-hole search would need separate authority; levels 13-24 on the current side do not sample the lower-q gap.",
+        "assessment": "Not yet sufficient as a depth-only change; the observed extension converges to the second hole edge, not q0."
+      },
+      "OPTION_4_TASK172_Q0_LOCAL_NUMERICAL_CORRECTION_AUTHORITY": {
+        "physical_acceptance_changed": false,
+        "task172_acceptance_changed": "NO_IF_SOLVER_ACCURACY_IS_IMPROVED_WITH_EXISTING_RESIDUAL_BOUNDS; MUST_NOT_RELAX_ACCEPTANCE",
+        "r98_changed": false,
+        "root_equation_changed": false,
+        "blocked_diagnostic_used_for_sign": false,
+        "property_domain_expanded": false,
+        "resource_budget_changed": "POSSIBLE_INTERNAL_SOLVER_CONTROL_CHANGE; MUST_BE_EXPLICITLY_REVIEWED",
+        "portability_risk": "MEDIUM; REPLAY ACROSS PYTHON 3.11/3.12/LOCAL REQUIRED",
+        "n16_upper_authority_impact": "R3 CLASSIFICATION RULE UNCHANGED; TASK172 VALID OUTPUT MAY CHANGE ONLY THROUGH REPLAYED SOLVER BEHAVIOR",
+        "minimum_scope": "Adjudicate a TASK172 numerical-solver correction that seeks accepted residual accuracy under the exact existing R98 bounds; no epsilon, C_round change, or last-iterate acceptance.",
+        "assessment": "Recommended next authority adjudication because the q0 result itself is residual-acceptance blocked and zero-q state identity already passes."
+      },
+      "OPTION_5_OTHER_EVIDENCE_SUPPORTED_CORRECTION": {
+        "physical_acceptance_changed": false,
+        "task172_acceptance_changed": false,
+        "r98_changed": false,
+        "root_equation_changed": false,
+        "blocked_diagnostic_used_for_sign": false,
+        "property_domain_expanded": false,
+        "resource_budget_changed": "UNRESOLVED",
+        "portability_risk": "UNRESOLVED",
+        "n16_upper_authority_impact": "MUST_REMAIN_UNCHANGED",
+        "minimum_scope": "No alternative correction currently has stronger support than an R98-preserving local numerical correction.",
+        "assessment": "No separate alternative recommended."
+      }
+    }
+  },
+  "predecessor_aggregate_count_correction": {
+    "previous_total": 121654,
+    "previous_holes": 159,
+    "derived_non_hole_count": 121495,
+    "authoritative_valid_count": null,
+    "reason": "Do not promote a subtraction to valid count without exhaustive nonvalid class counts."
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "workflows_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "cell_root_production_search_depth_changed": false,
+    "production_mesh_policy_changed": false,
+    "production_mesh_sequence_reexecuted": false,
+    "n32_targeted_diagnostic_replay_performed": true,
+    "task173_production_result_created": false,
+    "task173_result_id": null,
+    "task173_result_hash": null,
+    "correction_implemented": false,
+    "task175_release_acceptance_performed": false,
+    "authority_registry_changed": false,
+    "authority_registry_reason": "Historical registry JSON formatting and duplicate-key history were preserved byte-for-byte; this task records its standalone evidence without rewriting the registry."
+  },
+  "validation": {
+    "focused_task173": "PASS",
+    "full_shell_tube": "PASS",
+    "http_api_regression": "PASS",
+    "ruff": "PASS",
+    "format": "PASS",
+    "mypy_ci_scope": "PASS",
+    "manifest_d_equals_m": "PASS",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES; heat-exchanger-design-agent package skipped as unavailable from PyPI",
+    "duplicate_key_drift": "NO_NEW_DUPLICATE_KEYS; EXISTING DUPLICATES RETAINED IN TWO HISTORICAL FILES",
+    "git_diff_check": "PASS",
+    "exact_head_ci_record_location": "PR_METADATA_AND_CI_RECEIPT_AFTER_EVIDENCE_COMMIT",
+    "exact_head_ci": "REQUIRED_AFTER_EVIDENCE_COMMIT",
+    "urllib3_version": "2.8.0",
+    "requests_version": "2.34.2",
+    "uv_lock_changed": false
+  },
+  "lifecycle": {
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "STAGE3_TASK172_LOCAL_RESIDUAL_ACCEPTANCE_NUMERICAL_CORRECTION_AUTHORITY_ADJUDICATION_R1",
+    "stop": true
+  },
+  "canonical_hash": "11dd5de167eb6c40a184bb945763fc3a11cbd60d0a6b4e2c99100406854fb624"
+}

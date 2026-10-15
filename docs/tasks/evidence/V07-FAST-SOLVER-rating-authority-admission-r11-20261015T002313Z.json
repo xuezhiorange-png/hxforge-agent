@@ -1,0 +1,70 @@
+{
+  "accepted_mesh_n": 32,
+  "authority_diff_path": "docs/tasks/evidence/V07-FAST-SOLVER-rating-authority-admission-r11-20261015T002313Z.authority-diff.json",
+  "authority_differences": [
+    {
+      "experimental": "CANDIDATE_UNAPPROVED",
+      "field": "status",
+      "production": "VALIDATED",
+      "reason": "Fast Solver mesh path is experimental; not production Task173 rating authority"
+    },
+    {
+      "experimental": "task173.experimental-candidate-rating-result.v1",
+      "field": "result_schema",
+      "production": "task173.candidate-rating-result.v1",
+      "reason": "Independent experimental result hash domain"
+    },
+    {
+      "experimental": "V07 Fast Solver narrow-bracket / continuation (CANDIDATE)",
+      "field": "outer_boundary_solver",
+      "production": "_candidate_transient_outer_boundary + R2A certificates",
+      "reason": "No production outer R2A provider enclosure replay on experimental path"
+    },
+    {
+      "experimental": "FROZEN_EVIDENCE_REPLAY at accepted n=32 and headroom n=64 only",
+      "field": "mesh_sequence_execution",
+      "production": "_run_mesh_sequence live n=1..headroom",
+      "reason": "R11 does not re-run full outer boundary ladder"
+    },
+    {
+      "experimental": "Strict mesh hash replay at frozen shooting enthalpy; no R2A hash parity",
+      "field": "determinism_replay",
+      "production": "BLOCKED_TASK173_DETERMINISM_REPLAY_MISMATCH gate on transient replay",
+      "reason": "Experimental trajectory lacks production transient certificate bundle"
+    },
+    {
+      "experimental": "Fast coupled cell R2 (experimental authority)",
+      "field": "cell_root_authority",
+      "production": "CELL_ROOT_SOLVER_AUTHORITY_ID production cell root + R2A",
+      "reason": "Cell closure audited with production F(q) tolerance but different solver path"
+    },
+    {
+      "experimental": "experimental_rating_result_hash(ExperimentalCandidateRatingResult)",
+      "field": "candidate_rating_result_hash",
+      "production": "candidate_rating_result_hash(CandidateRatingSuccessResult)",
+      "reason": "Must not alias production result hash"
+    }
+  ],
+  "candidate_b_rating_completed": true,
+  "duty_w": "51901.40600197205393",
+  "energy_balance_pass": true,
+  "experimental_rating_api_implemented": true,
+  "full_rating_result_hash": "c8846bb514e002bb2f56ccc46461d0cb1cfb95ca52a3e298edf49070eb075c2f",
+  "headroom_mesh_n": 64,
+  "live_general_candidate_rating_verified": false,
+  "mesh_sequence_gate": "PASS",
+  "numerical_authority_status": "CANDIDATE",
+  "production_integration": false,
+  "rating_json_path": "docs/tasks/evidence/V07-FAST-SOLVER-rating-authority-admission-r11-20261015T002313Z.rating.json",
+  "result": "CANDIDATE_B_EXPERIMENTAL_RATING_COMPLETED",
+  "shell_outlet_k": "298.77065344182176",
+  "shell_outlet_pressure_pa": "100630.75453904706492679622678089600415842876485654",
+  "source_head_sha": "8f08bbc7384ecde9c3702ee6fe45ea1e063e8f40",
+  "strict_replay_pass": true,
+  "task172_cell_closure_verified": true,
+  "task_id": "V07_FAST_SOLVER_RATING_AUTHORITY_ADMISSION_R11",
+  "total_runner_wall_seconds": 221.1290980039994,
+  "tube_outlet_k": "298.96548387899463",
+  "tube_outlet_pressure_pa": "101316.122",
+  "wall_temperature_extrema_verified": true
+}
