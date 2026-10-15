@@ -84,15 +84,11 @@ def test_orchestrator_headroom_candidate_n32_n64() -> None:
 
     live_calls: list[int] = []
 
-    def mock_live_worker(
-        _snapshot: Path, *, mesh_n: int, **_kw: object
-    ) -> dict[str, object]:
+    def mock_live_worker(_snapshot: Path, *, mesh_n: int, **_kw: object) -> dict[str, object]:
         live_calls.append(mesh_n)
         return _stage(mesh_n, request_hash)
 
-    pins = tuple(
-        PriorStagePin(n, f"fake/n{n}.json", "0" * 64) for n in (1, 2, 4)
-    )
+    pins = tuple(PriorStagePin(n, f"fake/n{n}.json", "0" * 64) for n in (1, 2, 4))
     outcome = run_live_ladder_continuation(
         request,
         root=ROOT,

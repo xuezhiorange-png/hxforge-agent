@@ -396,9 +396,7 @@ def run_live_ladder_continuation(
         mesh_chain.append(mesh_n)
         rolling.record_mesh_accepted(mesh_n)
         if stage_dir is not None:
-            artifacts.append(
-                write_stage_receipt(stage_dir, mesh_n, receipt, repo_root=root)
-            )
+            artifacts.append(write_stage_receipt(stage_dir, mesh_n, receipt, repo_root=root))
         if receipt.get("worker_status") == "TIMEOUT":
             return LiveContinuationOutcome(
                 status="TIMEOUT",
