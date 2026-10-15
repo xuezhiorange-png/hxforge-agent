@@ -47,9 +47,22 @@ DEFAULT_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     PriorStagePin(2, f"{R13_STAGE_DIR_REL}/live-mesh-n2-receipt.json", R13_N2_STAGE_SHA256),
 )
 
+R15_STAGE_DIR_REL = "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-r15-stages-20261015T075153Z"
+R15_N8_STAGE_SHA256 = "89ef7d54c3df0d4e7eca9089b3c33e0ecff42acaaed541c98af80bb23c083718"
+R15_SNAPSHOT_DIR_REL = "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-r15-snapshot-20261015T075153Z"
+R15_SNAPSHOT_CONTENT_SHA256 = "9e59a4606e794b4968e541bef42b66a85766ed6d189bf78aaf2425f167daff57"
+R15_N8_MESH_HASH = "6de283cf8249b228db00a7404c4c5fc0bab08c61c6c2ee2a4cbfd145433fcb9c"
+R15_N8_SHOOTING_ENTHALPY = "107515.2019112278133458800613880157470703125"
+R15_N8_OUTER_ITERATIONS = 27
+
 R15_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     *DEFAULT_PRIOR_PINS,
     PriorStagePin(4, f"{R14_STAGE_DIR_REL}/live-mesh-n4-receipt.json", R14_N4_STAGE_SHA256),
+)
+
+R16_PRIOR_PINS: tuple[PriorStagePin, ...] = (
+    *R15_PRIOR_PINS,
+    PriorStagePin(8, f"{R15_STAGE_DIR_REL}/live-mesh-n8-receipt.json", R15_N8_STAGE_SHA256),
 )
 
 
@@ -84,6 +97,10 @@ def admit_prior_stage(
         raise ValueError("prior stage not TERMINAL_ACCEPTED")
     if not receipt.get("terminal_tolerance_pass"):
         raise ValueError("prior stage terminal_tolerance_pass false")
+    if not receipt.get("cell_closure_pass"):
+        raise ValueError("prior stage cell_closure_pass false")
+    if not receipt.get("energy_balance_pass"):
+        raise ValueError("prior stage energy_balance_pass false")
     if pin.mesh_n == 4:
         if receipt.get("mesh_result_hash") != R14_N4_MESH_HASH:
             raise ValueError("R14 n4 mesh_result_hash mismatch")
@@ -91,6 +108,13 @@ def admit_prior_stage(
             raise ValueError("R14 n4 shooting enthalpy mismatch")
         if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R14_N4_OUTER_ITERATIONS:
             raise ValueError("R14 n4 outer iterations mismatch")
+    if pin.mesh_n == 8:
+        if receipt.get("mesh_result_hash") != R15_N8_MESH_HASH:
+            raise ValueError("R15 n8 mesh_result_hash mismatch")
+        if receipt.get("shooting_enthalpy_for_rehydrate") != R15_N8_SHOOTING_ENTHALPY:
+            raise ValueError("R15 n8 shooting enthalpy mismatch")
+        if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R15_N8_OUTER_ITERATIONS:
+            raise ValueError("R15 n8 outer iterations mismatch")
     receipt["prior_stage_status"] = "VERIFIED_PRIOR_LIVE_STAGE"
     receipt["stage_receipt_rel_path"] = pin.rel_path
     receipt["stage_receipt_sha256"] = digest
@@ -116,6 +140,24 @@ def admit_pinned_r14_snapshot(root: Path, *, candidate_id: str, rating_request_h
     body = {k: v for k, v in snapshot.items() if k != "snapshot_sha256"}
     if snapshot_content_digest(body) != R14_SNAPSHOT_CONTENT_SHA256:
         raise ValueError("R14 snapshot content SHA256 mismatch")
+    if snapshot.get("candidate_id") != candidate_id:
+        raise ValueError("snapshot candidate_id mismatch")
+    if snapshot.get("rating_request_hash") != rating_request_hash:
+        raise ValueError("snapshot rating_request_hash mismatch")
+    return str(path.relative_to(root))
+
+
+def admit_pinned_r15_snapshot(root: Path, *, candidate_id: str, rating_request_hash: str) -> str:
+    safe_id = candidate_id.replace("/", "_")
+    pattern = f"live-rating-request-{safe_id}-{rating_request_hash[:16]}.json"
+    path = root / R15_SNAPSHOT_DIR_REL / pattern
+    if not path.is_file():
+        raise FileNotFoundError(str(path.relative_to(root)))
+    snapshot = json.loads(path.read_text(encoding="utf-8"))
+    verify_snapshot_integrity(snapshot)
+    body = {k: v for k, v in snapshot.items() if k != "snapshot_sha256"}
+    if snapshot_content_digest(body) != R15_SNAPSHOT_CONTENT_SHA256:
+        raise ValueError("R15 snapshot content SHA256 mismatch")
     if snapshot.get("candidate_id") != candidate_id:
         raise ValueError("snapshot candidate_id mismatch")
     if snapshot.get("rating_request_hash") != rating_request_hash:

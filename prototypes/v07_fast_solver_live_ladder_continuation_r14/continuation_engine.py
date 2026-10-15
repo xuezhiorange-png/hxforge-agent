@@ -219,6 +219,7 @@ def run_live_ladder_continuation(
             outer_iterations=int(receipt.get("outer_iterations_for_rehydrate", 0)),
             expected_mesh_hash=receipt.get("mesh_result_hash"),
             rating_request_hash=request_hash,
+            expected_candidate_id=request.candidate_id,
             budget_s=budget,
         )
         if worker.get("status") == "TIMEOUT":
@@ -262,12 +263,22 @@ def run_live_ladder_continuation(
                 "mesh_n": coarse_n,
                 "shooting_enthalpy_j_kg": coarse_receipt["shooting_enthalpy_for_rehydrate"],
                 "outer_iterations": int(coarse_receipt.get("outer_iterations_for_rehydrate", 0)),
+                "expected_mesh_hash": coarse_receipt.get("mesh_result_hash"),
+                "terminal_tolerance_pass": coarse_receipt.get("terminal_tolerance_pass"),
+                "cell_closure_pass": coarse_receipt.get("cell_closure_pass"),
+                "energy_balance_pass": coarse_receipt.get("energy_balance_pass"),
             },
             fine={
                 "mesh_n": fine_n,
                 "shooting_enthalpy_j_kg": fine_receipt["shooting_enthalpy_for_rehydrate"],
                 "outer_iterations": int(fine_receipt.get("outer_iterations_for_rehydrate", 0)),
+                "expected_mesh_hash": fine_receipt.get("mesh_result_hash"),
+                "terminal_tolerance_pass": fine_receipt.get("terminal_tolerance_pass"),
+                "cell_closure_pass": fine_receipt.get("cell_closure_pass"),
+                "energy_balance_pass": fine_receipt.get("energy_balance_pass"),
             },
+            expected_request_hash=request_hash,
+            expected_candidate_id=request.candidate_id,
             budget_s=budget,
         )
         if worker.get("status") == "TIMEOUT":
