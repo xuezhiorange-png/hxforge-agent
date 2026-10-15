@@ -12,7 +12,13 @@ def stage_receipt_path(stage_dir: Path, mesh_n: int) -> Path:
     return stage_dir / f"live-mesh-n{mesh_n}-receipt.json"
 
 
-def write_stage_receipt(stage_dir: Path, mesh_n: int, receipt: dict[str, Any]) -> dict[str, str]:
+def write_stage_receipt(
+    stage_dir: Path,
+    mesh_n: int,
+    receipt: dict[str, Any],
+    *,
+    repo_root: Path | None = None,
+) -> dict[str, str]:
     stage_dir.mkdir(parents=True, exist_ok=True)
     path = stage_receipt_path(stage_dir, mesh_n)
     body = {
@@ -22,7 +28,8 @@ def write_stage_receipt(stage_dir: Path, mesh_n: int, receipt: dict[str, Any]) -
     }
     path.write_text(json.dumps(body, indent=2, sort_keys=True), encoding="utf-8")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    return {"path": str(path), "sha256": digest}
+    rel_path = str(path.relative_to(repo_root)) if repo_root is not None else str(path)
+    return {"path": rel_path, "sha256": digest}
 
 
 def load_stage_receipt(path: Path) -> dict[str, Any]:

@@ -28,6 +28,15 @@ NUMERICAL_AUTHORITY_ID = "V07-FAST-SOLVER-RATING-AUTHORITY-ADMISSION-R11"
 PROPERTY_PROVIDER_ID = "CoolPropProvider"
 
 
+def snapshot_filename(candidate_id: str, rating_request_hash: str) -> str:
+    safe_id = candidate_id.replace("/", "_")
+    return f"live-rating-request-{safe_id}-{rating_request_hash[:16]}.json"
+
+
+def snapshot_relpath(snapshot_dir_rel: str, candidate_id: str, rating_request_hash: str) -> str:
+    return f"{snapshot_dir_rel}/{snapshot_filename(candidate_id, rating_request_hash)}"
+
+
 def _execution_environment_id() -> str:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],

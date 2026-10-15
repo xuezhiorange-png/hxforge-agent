@@ -42,7 +42,7 @@ def test_fail_pass_pass_headroom_fail() -> None:
     state.record_comparison(_cmp("FAIL"))
     state.check_headroom_after_new_mesh(8)
     assert state.ladder_status == "BLOCKED"
-    assert state.blocked_code == "HEADROOM_COMPARISON_FAILED"
+    assert state.blocked_code == "MESH_NOT_CONVERGED"
 
 
 def test_no_consecutive_pass_pair() -> None:

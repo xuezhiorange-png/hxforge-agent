@@ -78,7 +78,7 @@ class RollingMeshState:
             self.ladder_status = "HEADROOM_PASS"
         else:
             self.ladder_status = "BLOCKED"
-            self.blocked_code = "HEADROOM_COMPARISON_FAILED"
+            self.blocked_code = "MESH_NOT_CONVERGED"
             self.blocked_diagnostics = (
                 f"candidate_n={candidate_n}",
                 f"headroom_n={headroom_mesh_n}",
@@ -87,3 +87,13 @@ class RollingMeshState:
                     f"{self.comparisons[-1].get('overall_status') if self.comparisons else 'NONE'}"
                 ),
             )
+
+    def after_comparison_recorded(self, fine_mesh_n: int) -> bool:
+        """Apply headroom transition when production index matches. Returns True if blocked."""
+        if self.candidate_index is None:
+            return False
+        expected_headroom_index = self.candidate_index + REQUIRED_LATER_HEADROOM_LEVELS
+        if len(self.runs_mesh_n) - 1 == expected_headroom_index:
+            self.check_headroom_after_new_mesh(fine_mesh_n)
+            return self.ladder_status == "BLOCKED"
+        return False
