@@ -4,18 +4,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from decimal import Decimal, localcontext
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
-from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
-    CandidateTask172LocalRequest,
-    Task172LocalResult,
-)
-from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
-    recompute_task172_request_hash,
-    recompute_task172_result_hash,
-)
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     CandidateRatingRequest,
@@ -43,6 +36,14 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_mode
     ExperimentalCandidateRatingResult,
     ExperimentalRatingBlocked,
 )
+from prototypes.v07_fast_solver_rating_authority_admission_r11.verification import (
+    build_accepted_trajectory_projection,
+    verify_accepted_cell_count,
+    verify_cell_closure,
+    verify_energy_balance,
+    verify_task174_binding,
+    verify_wall_extrema_from_cells,
+)
 from prototypes.v07_fast_solver_replay_n8_r6.strict_replay import strict_replay_level
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,7 +53,9 @@ FROZEN_RUNNER = (
 
 
 def experimental_rating_result_hash(result: ExperimentalCandidateRatingResult) -> str:
-    return canonical_sha256(result.model_dump(mode="json", exclude={"result_hash", "result_id"}))
+    return canonical_sha256(
+        result.model_dump(mode="json", exclude={"result_hash", "result_id"})
+    )
 
 
 def experimental_rating_result_id(result_hash: str) -> str:
@@ -61,7 +64,7 @@ def experimental_rating_result_id(result_hash: str) -> str:
 
 def _load_frozen_candidate_request(candidate_id: str) -> CandidateRatingRequest:
     if candidate_id != CANDIDATE_B_ID:
-        raise ValueError("only frozen Candidate B is admitted in R11")
+        raise ValueError("only frozen Candidate B is admitted in R11 frozen replay")
     spec = importlib.util.spec_from_file_location("q13", FROZEN_RUNNER)
     if spec is None or spec.loader is None:
         raise RuntimeError("frozen candidate runner missing")
@@ -74,48 +77,20 @@ def _load_frozen_candidate_request(candidate_id: str) -> CandidateRatingRequest:
     return rating_request
 
 
-def _verify_cell_closure(run: t173._MeshRun, context: t173._CandidateRatingContext) -> bool:
-    for record in run.cells:
-        request = record.solution.task172_request
-        result = record.solution.task172_result
-        if (
-            type(request) is not CandidateTask172LocalRequest
-            or type(result) is not Task172LocalResult
-            or result.status != "VALIDATED"
-        ):
-            return False
-        request_hash = recompute_task172_request_hash(request)
-        result_hash = recompute_task172_result_hash(result)
-        with localcontext() as decimal_context:
-            decimal_context.prec = 80
-            residual = record.solution.q_w - result.signed_q_hot_to_cold_w
-        if (
-            result.request_hash != request_hash
-            or result.result_hash != result_hash
-            or abs(residual) > Decimal("1e-6")
-        ):
-            return False
-    return True
-
-
-def _energy_balance_pass(run: t173._MeshRun) -> bool:
-    obs = run.observables
-    return obs.energy_balance_residual_w <= max(
-        t173.ENERGY_ACCEPTANCE_FLOOR_W, obs.duty_roundoff_floor_w
-    )
-
-
 def experimental_rate_candidate(
     candidate_id: str,
     *,
     execution_mode: ExecutionMode = "FROZEN_EVIDENCE_REPLAY",
     provider: CoolPropProvider | None = None,
+    _replay_fn: Callable[..., dict[str, Any]] | None = None,
 ) -> ExperimentalCandidateRatingResult | ExperimentalRatingBlocked:
     if execution_mode != "FROZEN_EVIDENCE_REPLAY":
         return ExperimentalRatingBlocked(
             status="BLOCKED",
-            blocked_code="LIVE_NUMERICAL_SOLVE_NOT_IMPLEMENTED",
-            blocked_diagnostics=("only FROZEN_EVIDENCE_REPLAY is in scope for R11",),
+            blocked_code="USE_experimental_rate_candidate_request_FOR_LIVE",
+            blocked_diagnostics=(
+                "LIVE_NUMERICAL_SOLVE is implemented via experimental_rate_candidate_request",
+            ),
             execution_mode=execution_mode,
         )
     try:
@@ -126,6 +101,8 @@ def experimental_rate_candidate(
             raise ValueError("rating request hash mismatch vs frozen evidence chain")
         if request.candidate_id != candidate_id:
             raise ValueError("candidate_id mismatch")
+        if not verify_task174_binding(request):
+            raise ValueError("task174 binding verification failed")
     except (ValueError, FileNotFoundError, RuntimeError) as exc:
         return ExperimentalRatingBlocked(
             status="BLOCKED",
@@ -137,12 +114,13 @@ def experimental_rate_candidate(
     context = t173._candidate_context(request)
     token = t173._CANDIDATE_RATING_CONTEXT.set(context)
     active_provider = provider or CoolPropProvider(cache_size=2048)
+    replay = _replay_fn or strict_replay_level
     try:
         n32_body = chain["r9_n32_body"]
         n64_body = chain["r10_n64_body"]
         r9_path = ROOT / R9_RESULT_JSON_REL
         r10_path = ROOT / R10_RESULT_JSON_REL
-        n32_replay = strict_replay_level(
+        n32_replay = replay(
             32,
             n32_body,
             r9_path,
@@ -150,7 +128,7 @@ def experimental_rate_candidate(
             context.shell_authority,
             rating_request_hash=request_hash,
         )
-        n64_replay = strict_replay_level(
+        n64_replay = replay(
             64,
             n64_body,
             r10_path,
@@ -183,6 +161,18 @@ def experimental_rate_candidate(
             )
         accepted = n32_run
         headroom = n64_run
+        accepted_n = 32
+        headroom_n = 64
+        if not verify_accepted_cell_count(accepted, context, accepted_n):
+            return ExperimentalRatingBlocked(
+                status="BLOCKED",
+                blocked_code="ACCEPTED_CELL_COUNT_MISMATCH",
+                blocked_diagnostics=(
+                    f"expected={context.interval_count * accepted_n}",
+                    f"actual={len(accepted.cells)}",
+                ),
+                execution_mode=execution_mode,
+            )
         if not t173._terminal_tolerance_pass(accepted) or not t173._terminal_tolerance_pass(
             headroom
         ):
@@ -191,29 +181,30 @@ def experimental_rate_candidate(
                 blocked_code="TERMINAL_TOLERANCE_FAILED",
                 execution_mode=execution_mode,
             )
-        cell_ok = _verify_cell_closure(accepted, context)
-        energy_ok = _energy_balance_pass(accepted)
-        if not cell_ok or not energy_ok:
+        cell_ok = verify_cell_closure(accepted)
+        energy_ok = verify_energy_balance(accepted)
+        wall_ok = verify_wall_extrema_from_cells(accepted)
+        if not cell_ok or not energy_ok or not wall_ok:
             return ExperimentalRatingBlocked(
                 status="BLOCKED",
-                blocked_code="CELL_OR_ENERGY_VERIFICATION_FAILED",
+                blocked_code="CELL_ENERGY_OR_WALL_VERIFICATION_FAILED",
                 blocked_diagnostics=(
                     f"task172_cell_closure={cell_ok}",
                     f"energy_balance={energy_ok}",
+                    f"wall_extrema={wall_ok}",
                 ),
                 execution_mode=execution_mode,
             )
         try:
-            trajectory = t173._candidate_accepted_trajectory_projection(accepted, context)
-            trajectory_mode: str = "PRODUCTION_PROJECTION_COMPATIBLE"
+            trajectory = build_accepted_trajectory_projection(accepted, context)
+            trajectory_mode = "PRODUCTION_PROJECTION_COMPATIBLE"
         except t173._Stage3Failure as exc:
-            trajectory = {
-                "schema_version": "task173.experimental-fast-accepted-trajectory.v1",
-                "projection_error": str(exc),
-                "mesh_result_hash": accepted.mesh_result_hash,
-                "cell_count": len(accepted.cells),
-            }
-            trajectory_mode = "EXPERIMENTAL_FALLBACK_SUMMARY"
+            return ExperimentalRatingBlocked(
+                status="BLOCKED",
+                blocked_code="ACCEPTED_TRAJECTORY_PROJECTION_FAILED",
+                blocked_diagnostics=(str(exc),),
+                execution_mode=execution_mode,
+            )
 
         obs = accepted.observables
         tube_in = accepted.faces_tube[0].temperature_k
@@ -242,8 +233,8 @@ def experimental_rate_candidate(
             candidate_id=request.candidate_id,
             candidate_hash=request.candidate_hash,
             rating_request_hash=request_hash,
-            accepted_mesh_n=32,
-            headroom_mesh_n=64,
+            accepted_mesh_n=accepted_n,
+            headroom_mesh_n=headroom_n,
             accepted_mesh_result_hash=accepted.mesh_result_hash,
             headroom_mesh_result_hash=headroom.mesh_result_hash,
             total_duty_w=obs.total_duty_w,
@@ -264,7 +255,7 @@ def experimental_rate_candidate(
             mesh_sequence_gate="PASS",
             strict_replay_pass=True,
             task172_cell_closure_verified=cell_ok,
-            wall_temperature_extrema_verified=True,
+            wall_temperature_extrema_verified=wall_ok,
             energy_balance_pass=energy_ok,
             mesh_convergence_comparisons=(
                 chain["n16_n32_comparison"],
