@@ -1,0 +1,1371 @@
+{
+  "schema_version": "task172.r118c-r9.request-shape-evaluation.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "attempt_number": 9,
+  "request_shape_gate_count_per_run": 5,
+  "request_shape_gate_fail_count": 0,
+  "field_check_failure_count": 0,
+  "checks": [
+    {
+      "run": "A",
+      "stage": "TASK020",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK020",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK020",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK020",
+      "actual_type": "NoneType",
+      "expected_type": "NoneType",
+      "field_path": "request.requested_rule_pack_identity",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK020",
+      "actual_type": "INTERNAL_GENERIC",
+      "expected_type": "INTERNAL_GENERIC",
+      "field_path": "request.authority_mode",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.tube_geometry",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.layout_rule_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.placement_envelope",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.exclusion_zones",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "NoneType",
+      "expected_type": "NoneType",
+      "field_path": "request.u_tube_pairing_plan",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.placement_envelope.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.placement_envelope.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.tube_geometry.source_binding",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.provenance_edge_ids",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.provenance_edge_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_origin_modes",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_origin_modes[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_axis_orientations",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_axis_orientations[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_exclusion_zone_types",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_exclusion_zone_types[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.tube_layout",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.geometry_rule_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.caller_supplied_shell",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.provenance_edge_ids",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.provenance_edge_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.allowed_shell_authority_modes",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.allowed_shell_authority_modes[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.caller_supplied_shell.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.caller_supplied_shell.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.bundle_peripheral_allowance_evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.bundle_peripheral_allowance_evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.minimum_clearance_evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.minimum_clearance_evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.tube_layout",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "ShellBundleGeometry",
+      "expected_type": "ShellBundleGeometry",
+      "field_path": "request.shell_bundle_geometry",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.axial_span",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.design_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.axial_span.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.axial_span.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "sorted duplicate-free nonempty list[str]",
+      "field_path": "request.axial_span.evidence_refs.sorted_unique_nonempty",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "BaffleType",
+      "expected_type": "BaffleType",
+      "field_path": "request.design_authority.baffle_type",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "int",
+      "expected_type": "exact int, not bool",
+      "field_path": "request.design_authority.baffle_count",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.spacing_sequence_m",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.orientation_sequence",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[0]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[1]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[2]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[3]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.design_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.task020_configuration",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.task021_layout",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "InternalFlowLengthAuthority",
+      "expected_type": "InternalFlowLengthAuthority",
+      "field_path": "request.internal_flow_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "HeatTransferLengthAuthority",
+      "expected_type": "HeatTransferLengthAuthority",
+      "field_path": "request.heat_transfer_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "Task025HydraulicParticipationAuthority",
+      "expected_type": "Task025HydraulicParticipationAuthority",
+      "field_path": "request.hydraulic_participation_authority",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "FlowPathMode",
+      "expected_type": "FlowPathMode",
+      "field_path": "request.flow_path_mode",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "HydraulicAuthorityMode",
+      "expected_type": "HydraulicAuthorityMode",
+      "field_path": "request.hydraulic_authority_mode",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.all_layout_position_ids",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.all_layout_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.active_position_ids",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.active_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.inactive_position_ids",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.inactive_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "A",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "str",
+      "field_path": "participation.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK020",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK020",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK020",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK020",
+      "actual_type": "NoneType",
+      "expected_type": "NoneType",
+      "field_path": "request.requested_rule_pack_identity",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK020",
+      "actual_type": "INTERNAL_GENERIC",
+      "expected_type": "INTERNAL_GENERIC",
+      "field_path": "request.authority_mode",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.tube_geometry",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.layout_rule_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.placement_envelope",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.exclusion_zones",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "NoneType",
+      "expected_type": "NoneType",
+      "field_path": "request.u_tube_pairing_plan",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.placement_envelope.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.placement_envelope.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.tube_geometry.source_binding",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.provenance_edge_ids",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.provenance_edge_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_origin_modes",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_origin_modes[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_axis_orientations",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_axis_orientations[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.layout_rule_authority.allowed_exclusion_zone_types",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK021",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.layout_rule_authority.allowed_exclusion_zone_types[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.tube_layout",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.geometry_rule_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.caller_supplied_shell",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.provenance_edge_ids",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.provenance_edge_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.geometry_rule_authority.allowed_shell_authority_modes",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.geometry_rule_authority.allowed_shell_authority_modes[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.caller_supplied_shell.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.caller_supplied_shell.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.bundle_peripheral_allowance_evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.bundle_peripheral_allowance_evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.minimum_clearance_evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.minimum_clearance_evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK022",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.configuration",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.tube_layout",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "ShellBundleGeometry",
+      "expected_type": "ShellBundleGeometry",
+      "field_path": "request.shell_bundle_geometry",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.axial_span",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request.design_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.axial_span.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.axial_span.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "sorted duplicate-free nonempty list[str]",
+      "field_path": "request.axial_span.evidence_refs.sorted_unique_nonempty",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "BaffleType",
+      "expected_type": "BaffleType",
+      "field_path": "request.design_authority.baffle_type",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "int",
+      "expected_type": "exact int, not bool",
+      "field_path": "request.design_authority.baffle_count",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.spacing_sequence_m",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.orientation_sequence",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[0]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[1]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[2]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "BaffleOrientation",
+      "expected_type": "BaffleOrientation",
+      "field_path": "request.design_authority.orientation_sequence[3]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.design_authority.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.design_authority.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "list",
+      "expected_type": "list",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK024",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "dict",
+      "expected_type": "dict",
+      "field_path": "request",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "request.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "str[]",
+      "expected_type": "str",
+      "field_path": "request.evidence_refs[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "ShellAndTubeConfiguration",
+      "expected_type": "ShellAndTubeConfiguration",
+      "field_path": "request.task020_configuration",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "TubeLayout",
+      "expected_type": "TubeLayout",
+      "field_path": "request.task021_layout",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "InternalFlowLengthAuthority",
+      "expected_type": "InternalFlowLengthAuthority",
+      "field_path": "request.internal_flow_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "HeatTransferLengthAuthority",
+      "expected_type": "HeatTransferLengthAuthority",
+      "field_path": "request.heat_transfer_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "Task025HydraulicParticipationAuthority",
+      "expected_type": "Task025HydraulicParticipationAuthority",
+      "field_path": "request.hydraulic_participation_authority",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "FlowPathMode",
+      "expected_type": "FlowPathMode",
+      "field_path": "request.flow_path_mode",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "HydraulicAuthorityMode",
+      "expected_type": "HydraulicAuthorityMode",
+      "field_path": "request.hydraulic_authority_mode",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.all_layout_position_ids",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.all_layout_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.active_position_ids",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.active_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.inactive_position_ids",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "nonempty str",
+      "field_path": "participation.inactive_position_ids[*]",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple",
+      "expected_type": "tuple",
+      "field_path": "participation.evidence_refs",
+      "pass": true
+    },
+    {
+      "run": "B",
+      "stage": "TASK025",
+      "actual_type": "tuple[str]",
+      "expected_type": "str",
+      "field_path": "participation.evidence_refs[*]",
+      "pass": true
+    }
+  ],
+  "canonical_hash": "7ca17c51cf908ab834fb84f431d8b8e2bf4f019136b1f573975ade954361a190"
+}

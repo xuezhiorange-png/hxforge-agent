@@ -1,0 +1,160 @@
+{
+  "schema_version": "security.dependency-remediation.urllib3-2.8.0.r1",
+  "task_id": "SECURITY_DEPENDENCY_REMEDIATION_URLLIB3_2_8_0_R1",
+  "mode": "TARGETED_TRANSITIVE_SECURITY_LOCK_REMEDIATION",
+  "predecessor_head": "c0193c2e4d77caea13d763b7fb1b13900a9b49fa",
+  "predecessor_ci": {
+    "run_id": 36846190581,
+    "head_sha": "c0193c2e4d77caea13d763b7fb1b13900a9b49fa",
+    "result": "FAILURE",
+    "total_jobs": 50,
+    "success": 41,
+    "skipped": 7,
+    "failed": 2,
+    "cancelled": 0,
+    "failed_jobs": [
+      "lint: pip-audit known urllib3 vulnerabilities",
+      "final-gate: consequence of lint failure"
+    ]
+  },
+  "dependency_role": {
+    "urllib3_is_direct_project_dependency": false,
+    "urllib3_is_transitive_dependency": true,
+    "dependency_path": "requests -> urllib3",
+    "pyproject_changed": false
+  },
+  "old_lock_state": {
+    "urllib3_version": "2.7.0",
+    "requests_version": "2.34.2",
+    "reported_findings": [
+      "CVE-2026-97687",
+      "CVE-2026-97688",
+      "CVE-2026-97689"
+    ],
+    "fix_version": "2.8.0"
+  },
+  "new_lock_state": {
+    "urllib3_version": "2.8.0",
+    "requests_version": "2.34.2"
+  },
+  "lock_diff_summary": {
+    "changed_package_version_count": 1,
+    "changed_package_versions": [
+      {
+        "package": "urllib3",
+        "from": "2.7.0",
+        "to": "2.8.0"
+      }
+    ],
+    "urllib3_source_and_wheel_metadata_refreshed": true,
+    "unrelated_package_version_changes": 0,
+    "requests_version_changed": false,
+    "upgrade_command": "uv lock --upgrade-package urllib3==2.8.0"
+  },
+  "security_findings_before": {
+    "pip_audit": "FAIL",
+    "urllib3_version": "2.7.0",
+    "cves": [
+      "CVE-2026-97687",
+      "CVE-2026-97688",
+      "CVE-2026-97689"
+    ]
+  },
+  "security_findings_after": {
+    "pip_audit": "PASS",
+    "known_vulnerabilities_found": false,
+    "resolved_cves": {
+      "CVE-2026-97687": true,
+      "CVE-2026-97688": true,
+      "CVE-2026-97689": true
+    },
+    "non_pypi_project_distribution": {
+      "package": "heat-exchanger-design-agent",
+      "version": "0.6.0",
+      "status": "SKIPPED_NOT_AVAILABLE_ON_PYPI",
+      "is_vulnerability_finding": false
+    }
+  },
+  "installed_versions": {
+    "urllib3": "2.8.0",
+    "requests": "2.34.2",
+    "requests_depends_on_urllib3": true
+  },
+  "stage3_authority_invariance": {
+    "local_state_reconstruction_authority": {
+      "id": "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2",
+      "canonical_hash": "9abef953ce251628b73370f08337efbe7938ed33509a2a99c878eade2bb8b366"
+    },
+    "zero_q_state_identity_portability_authority": {
+      "id": "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1",
+      "canonical_hash": "81903b49fcf6c9e41ff8f296da921e25ca116727b846e01f9e07e257dd4531fd"
+    },
+    "cell_root_solver_authority": {
+      "id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3",
+      "canonical_hash": "eafe8bc53769d1648ac2f918045cececfd3870d618ff6273c523fe185a6683ef"
+    },
+    "endpoint_hole_classification_authority": {
+      "id": "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1",
+      "canonical_hash": "60c8fe2957c5906704b796a779b88845ddb3e59934d8576c93e0589ea2084f74"
+    },
+    "stage3_authority_hashes_changed": false
+  },
+  "local_validation": {
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS",
+    "installed_urllib3": "2.8.0",
+    "installed_requests": "2.34.2",
+    "pip_audit": "PASS; no known vulnerabilities; local non-PyPI project distribution skipped",
+    "focused_task173": "PASS; 53 passed; 8.46 seconds; local CPython 3.14.5 macOS",
+    "full_shell_tube_suite": "PASS; 2250 passed; 4 skipped; 30.21 seconds; local CPython 3.14.5 macOS",
+    "http_api_regression": "PASS; 21 passed; 1.10 seconds; local CPython 3.14.5 macOS",
+    "ruff": "PASS",
+    "ruff_format_check": "PASS; 777 files already formatted",
+    "mypy_ci_scope": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; discovered=259; manifest=259",
+    "git_diff_check": "PASS"
+  },
+  "ci_runtime_matrix": {
+    "maximum_acceptable_test_step_runtime_seconds": 540,
+    "required_candidate_environments": [
+      "PR_HEAD_PY311",
+      "PR_HEAD_PY312",
+      "MERGE_REF_PY311",
+      "MERGE_REF_PY312"
+    ],
+    "measurements_at_candidate_commit": "PENDING_EXACT_HEAD_CI",
+    "candidate_exact_head_ci_required_after_push": true,
+    "each_required_shard_must_succeed": true,
+    "each_required_shard_runtime_must_be_at_most_540_seconds": true,
+    "workflow_or_timeout_changed": false,
+    "final_run_and_runtime_receipt_location": "PR metadata and final task receipt"
+  },
+  "change_boundary": {
+    "uv_lock_changed": true,
+    "pyproject_changed": false,
+    "source_changed": false,
+    "tests_changed": false,
+    "workflows_changed": false,
+    "dependencies_architecture_changed": false,
+    "zero_q_production_logic_changed": false,
+    "r3_classification_logic_changed": false,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "production_mesh_policy_changed": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false
+  },
+  "lifecycle": {
+    "result_at_evidence_commit": "CANDIDATE_PENDING_EXACT_HEAD_CI",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate_after_all_success": "STAGE3_PRODUCTION_MESH_REEXECUTION_FROM_N1_AFTER_R3_ZERO_Q_AND_SECURITY_CLOSURE",
+    "stop": true
+  },
+  "canonical_hash": "e42fd9bc95a233dac2cba2ad8692746ae9fd2bbac9c3ab014d8b570c3c2badf4"
+}

@@ -1,0 +1,210 @@
+{
+  "task_id": "STAGE3_TASK173_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_AUTHORITY_R1",
+  "mode": "PROVIDER_QUANTIZATION_SET_VALUED_CELL_CLOSURE_AUTHORITY_QUALIFICATION",
+  "result": "BLOCKED_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_AUTHORITY_QUALIFICATION",
+  "pr": {
+    "number": 283,
+    "state": "OPEN",
+    "draft": true,
+    "head_before_evidence_commit": "978ba0a10512f3d405eb02ebfd56bd1ae2d6bcae"
+  },
+  "predecessor": {
+    "task_id": "STAGE3_TASK173_CELL_ROOT_PRECISION_FLOOR_ADJUDICATION_R1",
+    "result": "BLOCKED_CELL_ROOT_PROPERTY_PROVIDER_QUANTIZATION_GAP",
+    "evidence_file": "docs/tasks/evidence/TASK-173-v0.7-cell-root-precision-floor-adjudication-r1.json",
+    "evidence_file_sha256": "8df90d3d1998219cb570f260dadd5676ee8a7be5f44dde1f1452cc5433416f8c"
+  },
+  "authority_package": {
+    "id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "accepted": true
+  },
+  "preflight": {
+    "head": "978ba0a10512f3d405eb02ebfd56bd1ae2d6bcae",
+    "pr_head": "978ba0a10512f3d405eb02ebfd56bd1ae2d6bcae",
+    "pr_open_draft": true,
+    "tracked_worktree_has_only_parent_implementation_changes": true,
+    "tracked_parent_implementation_file_count": 10,
+    "git_diff_check": "PASS",
+    "untracked_handoff_modified": false,
+    "untracked_handoff_deleted": false,
+    "untracked_handoff_staged": false
+  },
+  "implementation_snapshot": {
+    "base_head": "b1f89c9df9c06ee7d7f513cfad7f0ba8f65e0768",
+    "dirty_patch_comparison_head": "978ba0a10512f3d405eb02ebfd56bd1ae2d6bcae",
+    "patch_sha256": "71aa09b716a457f510940d9020e4d3106fd390145cad99c6d3251eefb3a179e0",
+    "changed_file_count": 10,
+    "changed_files": [
+      "src/hexagent/exchangers/shell_tube/manufacturable_candidates/models.py",
+      "src/hexagent/exchangers/shell_tube/manufacturable_candidates/service.py",
+      "src/hexagent/exchangers/shell_tube/task172_local_runtime/__init__.py",
+      "src/hexagent/exchangers/shell_tube/task172_local_runtime/models.py",
+      "src/hexagent/exchangers/shell_tube/task172_local_runtime/service.py",
+      "src/hexagent/exchangers/shell_tube/task173_integrated_rating/__init__.py",
+      "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py",
+      "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/__init__.py",
+      "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/models.py",
+      "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/service.py"
+    ],
+    "patch_unchanged_from_parent_implementation_snapshot": true,
+    "current_gate_production_code_changed": false,
+    "current_gate_tests_changed": false,
+    "current_gate_implementation_files_staged": false,
+    "base_diff_contains_previously_committed_adjudication_receipt": true
+  },
+  "frozen_contract": {
+    "cell_root_authority_id": "V07-T173-VALID-POINT-CELL-ROOT-R3",
+    "equation": "F(q)=q-q_TASK172(q)",
+    "point_root_acceptance": "VALID_TASK172_RESULT_AND_ABS_F_LE_1E-6_W",
+    "cell_point_root_tolerance_w": "0.000001",
+    "maximum_root_bisection_iterations": 128,
+    "maximum_task172_evaluations_per_cell": 512,
+    "maximum_hole_recovery_levels": 12,
+    "maximum_recovery_brackets": 15,
+    "point_root_tolerance_changed": false,
+    "task172_acceptance_changed": false,
+    "property_backend_changed": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "c_round_changed": false,
+    "mesh_threshold_changed": false,
+    "resource_caps_changed": false
+  },
+  "frozen_attempt4_training_candidates": [
+    {
+      "label": "TRAIN_A",
+      "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+      "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+      "rating_request_hash": "77ba78058f7e2f0d0befcc4fc1042fe179a79aadddc009666e4748ad00101334",
+      "cut_fraction": "0.215",
+      "q_left_w": "12234.634520032956",
+      "q_right_w": "12234.634520032958",
+      "f_left_w": "-0.000001027091",
+      "f_right_w": "0.000001594071",
+      "task172_q_left_w": "12234.634521060047",
+      "task172_q_right_w": "12234.634518438887",
+      "task172_output_jump_w": "0.000002621160",
+      "adjacent_binary64": true,
+      "decimal_eligible_root_in_predecessor": false,
+      "this_gate_replayed": false,
+      "this_gate_disposition": "NOT_REPLAYED_BECAUSE_HOLDOUT_IDENTITY_GATE_BLOCKED"
+    },
+    {
+      "label": "TRAIN_B",
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+      "rating_request_hash": "8771099ae4fdfa553d2d092e41e366fcb36b1b30f16822c9f0277b9a6394066e",
+      "cut_fraction": "0.220",
+      "q_left_w": "12277.427019616665",
+      "q_right_w": "12277.427019616667",
+      "f_left_w": "-0.000001063978",
+      "f_right_w": "0.000001550765",
+      "task172_q_left_w": "12277.427020680643",
+      "task172_q_right_w": "12277.427018065902",
+      "task172_output_jump_w": "0.000002614741",
+      "adjacent_binary64": true,
+      "decimal_eligible_root_in_predecessor": false,
+      "this_gate_replayed": false,
+      "this_gate_disposition": "NOT_REPLAYED_BECAUSE_HOLDOUT_IDENTITY_GATE_BLOCKED"
+    }
+  ],
+  "holdout_selection": {
+    "source_receipt_path": "docs/tasks/evidence/TASK-173-v0.7-full-sizing-implementation-r1.json",
+    "source_receipt_sha256": "6dba15bdca81e4ae436281362dd5613cd21f14162ef1357cc6596651182a682c",
+    "qualification_ledger_hash": "aeac45600d17c811b4e873e4d3bf3a3085a1741ad1888837641b993cfa19980c",
+    "qualified_cut_count": 16,
+    "selection_rule": "Exclude 0.215 and 0.220; H1 lowest remaining, H2 nearest-rank median remaining, H3 highest remaining; structural ledger only.",
+    "performance_output_used": false,
+    "selection_hash": "f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+    "holdouts": [
+      {
+        "label": "H1",
+        "cut_fraction": "0.225",
+        "ledger_candidate_id": "7f00c8d1-6da6-5832-b4cc-8baec8b3795f",
+        "ledger_candidate_hash": "2cd93f9b3b0d245ebeaa1399f8289efb9e41bbf5c28a24bfeb28b14ee6e4d249",
+        "status": "BLOCKED_EXACT_CANDIDATE_AUTHORITY_REPLAY_INPUTS_NOT_PRESERVED"
+      },
+      {
+        "label": "H2",
+        "cut_fraction": "0.275",
+        "ledger_candidate_id": "96219401-7261-579e-8419-63b1ab7f9d4e",
+        "ledger_candidate_hash": "c2d8bef2f75801b9a560bc717f8776faea56bf19fbb1c0cadedebc9412a80f46",
+        "status": "NOT_RUN_AFTER_H1_IDENTITY_BLOCKER"
+      },
+      {
+        "label": "H3",
+        "cut_fraction": "0.350",
+        "ledger_candidate_id": "cc7f25e1-d0fe-5bdb-b2b7-a9d9ec94173e",
+        "ledger_candidate_hash": "e2915b5e4d33fd7a7e8732b85b5786cff56bb43e27419fae9fdbed4c6c1a66c7",
+        "status": "NOT_RUN_AFTER_H1_IDENTITY_BLOCKER"
+      }
+    ],
+    "reconstructible_input_status": {
+      "cut_values_and_candidate_id_hash_rows_present": true,
+      "full_31_value_qualification_discrete_authority_projection_present": false,
+      "qualification_discrete_authority_canonical_hash_present": false,
+      "candidate_dimension_authority_bindings_present": false,
+      "two-value_r4_validation_authority_hash_present_but_not_applicable_to_holdouts": "ca0c7ada4f744390418d6a133df13a3c4b75a176ba3fab56b447a459a749e4d7",
+      "exact_candidate_hash_replay_possible_from_preserved_inputs": false
+    }
+  },
+  "discarded_non_authoritative_probe": {
+    "performed": true,
+    "geometry_cut_fraction": "0.225",
+    "temporary_candidate_id": "8520db6a-a0dc-5570-b013-65c365a91fc1",
+    "temporary_candidate_hash": "8ead13239329624fe5f2f8173a12fda912ab7cc3ac884d2bc5a8a4e2db76576f",
+    "temporary_authority_source_revision": "FROZEN_DIAGNOSTIC",
+    "ledger_candidate_id": "7f00c8d1-6da6-5832-b4cc-8baec8b3795f",
+    "ledger_candidate_hash": "2cd93f9b3b0d245ebeaa1399f8289efb9e41bbf5c28a24bfeb28b14ee6e4d249",
+    "identity_match": false,
+    "task174_status": "BLOCKED",
+    "task174_result_hash": "96f0dbc810262428594057ee1a6f8eb49c6867c4d12517b88997541d6691ec27",
+    "task174_blocker_code": "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+    "detail": "Candidate Bell region sum was 687.13943260340177015578488752677641103438069453554 Pa; native TASK166 total was 687.13943260340177015578488752677641103438069453553 Pa; difference 1E-47 Pa. Event identity, exact-once allocation, native geometry identity, and allocation result-hash checks passed. The probe is not admissible as H1 because its candidate authority projection and identity differ from the frozen ledger.",
+    "used_for_authority_evaluation": false
+  },
+  "qualification": {
+    "result": "BLOCKED_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_AUTHORITY_QUALIFICATION",
+    "first_blocker_stage": "HOLDOUT_CANDIDATE_IDENTITY_REPLAY",
+    "first_blocker_code": "BLOCKED_HOLDOUT_CANDIDATE_AUTHORITY_PROJECTION_NOT_PRESERVED",
+    "details": "The immutable Attempt-4 local qualification receipt preserves H1/H2/H3 candidate IDs and hashes but omits the discrete authority object/hash and dimension-authority binding projection needed to rematerialize those exact CandidateSpec identities. Reconstructing a temporary authority changed the candidate ID/hash. Fail closed; do not run TASK172 or Rating under a substitute identity.",
+    "training_n1_trajectories_completed": 0,
+    "holdout_n1_trajectories_completed": 0,
+    "quantization_enclosure_count": 0,
+    "uncertainty_propagation_replay": "NOT_RUN",
+    "reference_n1_quantization_enclosure_trigger_count": "NOT_RUN_AFTER_QUALIFICATION_BLOCKER",
+    "authority_candidate_issued": false,
+    "authority_canonical_hash": null
+  },
+  "change_boundary": {
+    "production_code_changed_by_this_gate": false,
+    "tests_changed_by_this_gate": false,
+    "candidate_space_changed": false,
+    "candidate_identity_substituted_for_qualification": false,
+    "point_root_tolerance_changed": false,
+    "task172_acceptance_changed": false,
+    "property_backend_changed": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "mesh_threshold_changed": false,
+    "resource_cap_changed": false,
+    "reference_rating_reexecuted": false,
+    "production_mesh_reexecuted": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "evidence_commit": {
+    "allowed_paths": [
+      "docs/tasks/TASK-173-v0.7-cell-root-provider-quantization-enclosure-authority-r1.md",
+      "docs/tasks/evidence/TASK-173-v0.7-cell-root-provider-quantization-enclosure-authority-r1.json"
+    ],
+    "implementation_files_staged": false,
+    "push_and_exact_head_ci_required": true,
+    "ci_runtime_budget_seconds": 540
+  },
+  "next_gate": "OWNER_DIRECTION_REQUIRED_FOR_HOLDOUT_QUALIFICATION_IDENTITY_RECONSTRUCTION",
+  "next_gate_executed": false,
+  "stop": true
+}

@@ -1,0 +1,68 @@
+{
+  "schema_version": "task172.r118c.attempt2-blocked-incident.r1",
+  "task_id": "TASK172_V0_7_R118B_NATIVE_PUBLIC_PROJECTION_ORACLE_AMENDMENT_AND_R118C_ATTEMPT2_INCIDENT_R1",
+  "attempt": 2,
+  "result": "BLOCKED_R118C_R2_TASK021_NATIVE_PROJECTION_MISMATCH",
+  "authoritative": false,
+  "reusable": false,
+  "may_be_resumed": false,
+  "sequence_violation": false,
+  "predecessor_head_sha": "fb3a5ea5dc32653d55b7b275717d56df9e963af0",
+  "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+  "effective_lifecycle": "REVIEWED_AUTHORITY",
+  "blocker": {
+    "stage": "TASK021",
+    "field": "limiting_position.x_m",
+    "actual_native_public_lexeme": "-0.1524",
+    "then_expected_lexeme": "-0.152400000000",
+    "numeric_values_equal": true,
+    "canonical_lexemes_equal": false,
+    "root_cause": "EXPECTED_VALUE_WAS_POST_QUANTIZATION_DECIMAL_SCALE_NOT_FINAL_CANONICAL_PUBLIC_LEXEME",
+    "comparison_mode": "EXACT_CANONICAL_LEXICAL_EQUALITY",
+    "tolerance": "NONE"
+  },
+  "stage_history": {
+    "task014": "PASS_IN_MEMORY_DISCARDED",
+    "task020": "VALID_IN_MEMORY_DISCARDED",
+    "task021": "VALID_IN_MEMORY_253_POSITIONS_DISCARDED",
+    "task022": "NOT_INVOKED",
+    "task024": "NOT_INVOKED",
+    "task025": "NOT_INVOKED",
+    "run_b": "NOT_EXECUTED"
+  },
+  "sequencing": {
+    "downstream_producer_invocation_before_gate_pass_count": 0,
+    "sequence_violation": false,
+    "stopped_at_failed_task021_oracle_gate": true
+  },
+  "persistence": {
+    "in_memory_native_execution_occurred": true,
+    "persisted_authority_materialization_occurred": false,
+    "success_artifacts_created": false,
+    "success_registry_extension_created": false,
+    "commit_created_by_attempt2": false,
+    "repository_files_changed_by_attempt2": false,
+    "volatile_ids_or_hashes_promoted": false,
+    "native_objects_discarded": true
+  },
+  "overlay": {
+    "corrected_task021_expected_public_x_m": "-0.1524",
+    "corrected_task021_expected_public_y_m": "-0.131982271537",
+    "previous_amendment_historical_payload_rewritten": false,
+    "previous_task021_public_x_lexeme_superseded_by_this_overlay": true
+  },
+  "governance": {
+    "r118c_r3_started": false,
+    "r118c_r3_retry_authorized": false,
+    "task171_executed": false,
+    "production_mesh_admission_performed": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "canonical_hash": "21561b2c8d6adeeb0d84136d057c5897cefc53c373dae4513ba6538fd91d587d"
+}
