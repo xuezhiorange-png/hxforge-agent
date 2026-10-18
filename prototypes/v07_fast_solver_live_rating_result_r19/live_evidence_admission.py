@@ -9,6 +9,7 @@ from typing import Any
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     CandidateRatingRequest,
 )
+from prototypes.v07_fast_solver_evidence_gate.trusted_constants import CANDIDATE_B_ID
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.comparison_history_admission import (
     admit_prior_comparison_history,
     build_rolling_state_from_admitted_history,
@@ -55,6 +56,9 @@ def admit_full_live_mesh_evidence(
     *,
     candidate_id: str,
 ) -> LiveMeshEvidenceChain:
+    if candidate_id != CANDIDATE_B_ID:
+        raise LiveEvidenceAdmissionError("CANDIDATE_ID_NOT_ADMITTED", candidate_id)
+
     trials_path = root / R18_TRIALS_JSONL_REL
     if not trials_path.is_file():
         raise LiveEvidenceAdmissionError("R18_TRIALS_JSONL_MISSING", R18_TRIALS_JSONL_REL)
