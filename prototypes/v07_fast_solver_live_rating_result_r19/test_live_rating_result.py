@@ -59,7 +59,10 @@ def test_tampered_mesh_hash_blocks_rating() -> None:
     )
     outcome = experimental_rate_candidate_live_result(tampered, root=ROOT)
     assert isinstance(outcome, ExperimentalRatingBlocked)
-    assert outcome.blocked_code == "MESH_HASH_REPLAY_MISMATCH"
+    assert outcome.blocked_code in (
+        "CALLER_MESH_STAGE_TAMPER_BLOCKED",
+        "MESH_HASH_REPLAY_MISMATCH",
+    )
 
 
 def test_wrong_candidate_id_blocks_admission() -> None:

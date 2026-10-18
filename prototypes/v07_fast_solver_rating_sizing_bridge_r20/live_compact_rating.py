@@ -151,11 +151,22 @@ def build_live_compact_from_full(
     return base.model_copy(update={"compact_result_hash": digest})
 
 
+def _compact_engineering_projection(
+    compact: LiveCompactCandidateRating,
+) -> dict[str, object]:
+    """Controlled engineering fields bound to full rating (excludes compact_result_hash)."""
+    return compact.model_dump(
+        mode="json",
+        exclude={"compact_result_hash"},
+    )
+
+
 def verify_live_compact_against_full(
     compact: LiveCompactCandidateRating,
     full: ExperimentalCandidateRatingResult,
     *,
     full_file_sha256: str,
+    geometry_summary: GeometrySummary,
 ) -> None:
     if compact.compact_result_hash != live_compact_rating_hash(compact):
         raise LiveCompactAuthorityError("COMPACT_HASH_REPLAY_MISMATCH")
@@ -175,3 +186,14 @@ def verify_live_compact_against_full(
         raise LiveCompactAuthorityError("COMPACT_CANDIDATE_IDENTITY_MISMATCH")
     if compact.rating_request_hash != full.rating_request_hash:
         raise LiveCompactAuthorityError("COMPACT_REQUEST_HASH_MISMATCH")
+
+    expected = build_live_compact_from_full(
+        full,
+        trajectory_artifact_path=compact.full_trajectory_artifact.path,
+        trajectory_file_sha256=full_file_sha256,
+        geometry_summary=geometry_summary,
+    )
+    expected_projection = _compact_engineering_projection(expected)
+    actual_projection = _compact_engineering_projection(compact)
+    if actual_projection != expected_projection:
+        raise LiveCompactAuthorityError("COMPACT_FULL_ENGINEERING_PARITY_MISMATCH")

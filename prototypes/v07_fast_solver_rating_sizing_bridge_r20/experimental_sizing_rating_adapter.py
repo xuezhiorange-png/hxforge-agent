@@ -17,8 +17,8 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot im
 from prototypes.v07_fast_solver_live_rating_result_r19.live_result_hash import (
     LIVE_RATING_RESULT_R19_AUTHORITY_ID,
 )
-from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
-    ExperimentalCandidateRatingResult,
+from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
+    geometry_summary_from_request,
 )
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
     LiveCompactAuthorityError,
@@ -26,9 +26,10 @@ from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating imp
     live_compact_rating_hash,
     verify_live_compact_against_full,
 )
-from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import (
-    audit_r19_full_live_rating_file,
-    file_sha256,
+from prototypes.v07_fast_solver_rating_sizing_bridge_r20.pinned_r19_full_gate import (
+    PinnedR19FullGateError,
+    assert_compact_matches_pinned_r19_full,
+    load_and_verify_pinned_r19_full,
 )
 
 
@@ -104,27 +105,27 @@ def experimental_sizing_rating_adapter(
     if compact.mesh_sequence_gate != "PASS" or not compact.strict_replay_pass:
         return _blocked("MESH_CONVERGENCE_GATE_FAILED")
 
-    full_path = root / compact.full_trajectory_artifact.path
-    if not full_path.is_file():
-        return _blocked("FULL_TRAJECTORY_FILE_MISSING", compact.full_trajectory_artifact.path)
-
-    full_sha = file_sha256(full_path)
-    if full_sha != compact.full_trajectory_artifact.file_sha256:
-        return _blocked("FULL_FILE_SHA256_MISMATCH")
+    try:
+        full, audit, full_sha = load_and_verify_pinned_r19_full(root)
+        assert_compact_matches_pinned_r19_full(compact, audit)
+    except PinnedR19FullGateError as exc:
+        return _blocked("SIZING_ADAPTER_PINNED_FULL_GATE_FAILED", exc.code, *exc.diagnostics)
 
     try:
-        full = ExperimentalCandidateRatingResult.model_validate_json(
-            full_path.read_text(encoding="utf-8"),
-            strict=True,
+        snapshot_rel = dict(full.provenance).get("snapshot_rel_path")
+        if not snapshot_rel:
+            return _blocked("FULL_MISSING_SNAPSHOT_PROVENANCE")
+        request = load_request_from_snapshot_file(root / snapshot_rel)
+        geom = geometry_summary_from_request(request)
+        verify_live_compact_against_full(
+            compact,
+            full,
+            full_file_sha256=full_sha,
+            geometry_summary=geom,
         )
-        verify_live_compact_against_full(compact, full, full_file_sha256=full_sha)
     except (LiveCompactAuthorityError, ValueError) as exc:
         return _blocked("COMPACT_FULL_AUTHORITY_INCONSISTENT", str(exc))
 
-    snapshot_rel = dict(full.provenance).get("snapshot_rel_path")
-    if not snapshot_rel:
-        return _blocked("FULL_MISSING_SNAPSHOT_PROVENANCE")
-    request = load_request_from_snapshot_file(root / snapshot_rel)
     if request.candidate_id != compact.candidate_id:
         return _blocked("SNAPSHOT_CANDIDATE_ID_MISMATCH")
     if request.task174_result.result_hash != compact.task174_result_hash:
@@ -135,7 +136,10 @@ def experimental_sizing_rating_adapter(
     task174 = request.task174_result
     tube_dp = task174.modeled_total_tube_side_pressure_drop_pa
     shell_dp = task174.bell_total_shell_pressure_drop_pa
-    duty_pass = compact.total_duty_w >= requirement.required_duty_w
+    rated_duty = full.total_duty_w
+    if rated_duty != compact.total_duty_w:
+        return _blocked("COMPACT_DUTY_NOT_BOUND_TO_PINNED_FULL")
+    duty_pass = rated_duty >= requirement.required_duty_w
     tube_pass = tube_dp <= requirement.max_tube_dp_pa
     shell_pass = shell_dp <= requirement.max_shell_dp_pa
     blockers = tuple(
@@ -168,7 +172,7 @@ def experimental_sizing_rating_adapter(
         candidate_id=compact.candidate_id,
         candidate_hash=compact.candidate_hash,
         geometry_task171_topology_id=compact.geometry_summary.task171_topology_id,
-        rated_duty_w=compact.total_duty_w,
+        rated_duty_w=rated_duty,
         tube_dp_pa=tube_dp,
         shell_dp_pa=shell_dp,
         minimum_approach_temperature_k=compact.minimum_approach_temperature_k,
@@ -213,9 +217,6 @@ def authority_open_items() -> tuple[dict[str, Any], ...]:
 def load_verified_live_compact_from_r19_audit(
     root: Path,
 ) -> tuple[LiveCompactCandidateRating, dict[str, Any]]:
-    from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
-        geometry_summary_from_request,
-    )
     from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
         build_live_compact_from_full,
     )
@@ -223,23 +224,22 @@ def load_verified_live_compact_from_r19_audit(
         R19_FULL_JSON_REL,
     )
 
-    audit = audit_r19_full_live_rating_file(root)
-    full_path = root / audit["full_rel_path"]
-    full = ExperimentalCandidateRatingResult.model_validate_json(
-        full_path.read_text(encoding="utf-8"),
-        strict=True,
-    )
+    full, audit, full_sha = load_and_verify_pinned_r19_full(root)
     snapshot_rel = dict(full.provenance).get("snapshot_rel_path")
     if not snapshot_rel:
         raise LiveCompactAuthorityError("FULL_MISSING_SNAPSHOT_PROVENANCE")
     request = load_request_from_snapshot_file(root / snapshot_rel)
     geom = geometry_summary_from_request(request)
-    full_sha = file_sha256(root / R19_FULL_JSON_REL)
     compact = build_live_compact_from_full(
         full,
         trajectory_artifact_path=R19_FULL_JSON_REL,
         trajectory_file_sha256=full_sha,
         geometry_summary=geom,
     )
-    verify_live_compact_against_full(compact, full, full_file_sha256=full_sha)
+    verify_live_compact_against_full(
+        compact,
+        full,
+        full_file_sha256=full_sha,
+        geometry_summary=geom,
+    )
     return compact, audit

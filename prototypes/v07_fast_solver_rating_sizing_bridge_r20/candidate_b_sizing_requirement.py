@@ -8,11 +8,11 @@ from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     SizingRequirementAuthority,
 )
-
-_EXPERIMENTAL_REQUIREMENT_ID = "V07-R20-CANDIDATE-B-LIVE-RATING-ADAPTER-REQ-R1"
-_PLACEHOLDER_CANDIDATE_SPACE_HASH = (
-    "0000000000000000000000000000000000000000000000000000000000000000"
+from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_pinned_identity import (
+    EXPERIMENTAL_CANDIDATE_SPACE_PLACEHOLDER,
 )
+
+_EXPERIMENTAL_REQUIREMENT_ID = "V07-R20-CANDIDATE-B-LIVE-RATING-ADAPTER-REQ-R1-EXPERIMENTAL"
 
 
 def candidate_b_experimental_sizing_requirement() -> SizingRequirementAuthority:
@@ -35,7 +35,10 @@ def candidate_b_experimental_sizing_requirement() -> SizingRequirementAuthority:
         "allowed_construction_families": ("FIXED_TUBESHEET",),
         "required_screening_policy_id": "V07-T173-SIZING-MANDATORY-SCREENING-R1",
         "discrete_candidate_authority_ids_and_hashes": (
-            ("V07-T168-CANDIDATE-SPACE-R2", _PLACEHOLDER_CANDIDATE_SPACE_HASH),
+            (
+                "V07-T168-CANDIDATE-SPACE-EXPERIMENTAL-PLACEHOLDER-R20A",
+                EXPERIMENTAL_CANDIDATE_SPACE_PLACEHOLDER,
+            ),
         ),
     }
     scalar_keys = ("required_duty_w", "max_tube_dp_pa", "max_shell_dp_pa")

@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
+    candidate_rating_request_hash,
+)
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.comparison_history_admission import (
     comparison_canonical_sha256,
 )
@@ -60,52 +64,113 @@ def _validate_mesh_comparison_chain(
     return None
 
 
-def _evidence_fingerprint(chain: LiveMeshEvidenceChain) -> tuple:
-    cmp_hashes = tuple(comparison_canonical_sha256(c) for c in chain.mesh_comparisons)
-    return (
-        chain.rating_request_hash,
-        chain.snapshot_rel_path,
-        chain.ladder_status,
-        chain.headroom_status,
-        cmp_hashes,
-        chain.evidence_chain_hashes,
-    )
+def _stage_canonical(stage: dict) -> str:
+    return json.dumps(stage, sort_keys=True, separators=(",", ":"))
+
+
+def _mesh_stages_fingerprint(stages: tuple[dict, ...]) -> tuple[str, ...]:
+    return tuple(_stage_canonical(s) for s in stages)
+
+
+def _caller_vs_trusted_tamper_check(
+    evidence: LiveMeshEvidenceChain,
+    trusted: LiveMeshEvidenceChain,
+) -> ExperimentalRatingBlocked | None:
+    if evidence.snapshot_rel_path != trusted.snapshot_rel_path:
+        return _blocked(
+            "CALLER_REQUEST_TAMPER_BLOCKED",
+            "snapshot_rel_path",
+            evidence.snapshot_rel_path,
+            trusted.snapshot_rel_path,
+        )
+    if evidence.rating_request_hash != trusted.rating_request_hash:
+        return _blocked(
+            "CALLER_REQUEST_TAMPER_BLOCKED",
+            "rating_request_hash",
+            evidence.rating_request_hash,
+            trusted.rating_request_hash,
+        )
+    caller_req_hash = candidate_rating_request_hash(evidence.request)
+    trusted_req_hash = candidate_rating_request_hash(trusted.request)
+    if caller_req_hash != trusted_req_hash:
+        return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "request_hash_replay")
+    if evidence.request.candidate_id != trusted.request.candidate_id:
+        return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "candidate_id")
+    if evidence.request.candidate_hash != trusted.request.candidate_hash:
+        return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "candidate_hash")
+
+    if not verify_task174_binding(evidence.request):
+        return _blocked("CALLER_TASK174_BINDING_TAMPER_BLOCKED", "caller_request")
+    if evidence.request.task174_result.result_hash != trusted.request.task174_result.result_hash:
+        return _blocked(
+            "CALLER_TASK174_BINDING_TAMPER_BLOCKED",
+            evidence.request.task174_result.result_hash,
+            trusted.request.task174_result.result_hash,
+        )
+
+    if _mesh_stages_fingerprint(evidence.mesh_stages) != _mesh_stages_fingerprint(
+        trusted.mesh_stages
+    ):
+        return _blocked("CALLER_MESH_STAGE_TAMPER_BLOCKED")
+
+    if len(evidence.mesh_comparisons) != len(trusted.mesh_comparisons):
+        return _blocked("CALLER_MESH_COMPARISON_TAMPER_BLOCKED", "count_mismatch")
+    for index, (caller_cmp, trusted_cmp) in enumerate(
+        zip(evidence.mesh_comparisons, trusted.mesh_comparisons, strict=True)
+    ):
+        if comparison_canonical_sha256(caller_cmp) != comparison_canonical_sha256(trusted_cmp):
+            return _blocked("CALLER_MESH_COMPARISON_TAMPER_BLOCKED", f"index={index}")
+
+    if evidence.ladder_status != trusted.ladder_status:
+        return _blocked(
+            "CALLER_HEADROOM_EVIDENCE_TAMPER_BLOCKED",
+            "ladder_status",
+            evidence.ladder_status,
+            trusted.ladder_status,
+        )
+    if evidence.headroom_status != trusted.headroom_status:
+        return _blocked(
+            "CALLER_HEADROOM_EVIDENCE_TAMPER_BLOCKED",
+            "headroom_status",
+            evidence.headroom_status,
+            trusted.headroom_status,
+        )
+
+    if evidence.evidence_chain_hashes != trusted.evidence_chain_hashes:
+        return _blocked("CALLER_MESH_COMPARISON_TAMPER_BLOCKED", "evidence_chain_hashes")
+
+    return None
 
 
 def enforce_live_rating_authority_gates(
     root: Path,
     evidence: LiveMeshEvidenceChain,
 ) -> tuple[LiveMeshEvidenceChain, ExperimentalRatingBlocked | None]:
-    """Re-admit pinned evidence from disk; reject tampered caller-supplied chains."""
+    """Re-admit pinned evidence from disk; reject caller tampering with explicit codes."""
     try:
-        refreshed = admit_full_live_mesh_evidence(
+        trusted = admit_full_live_mesh_evidence(
             root,
             candidate_id=evidence.request.candidate_id,
         )
     except LiveEvidenceAdmissionError as exc:
         return evidence, _blocked(exc.code, *exc.diagnostics)
 
-    if _evidence_fingerprint(evidence) != _evidence_fingerprint(refreshed):
-        return refreshed, _blocked("LIVE_EVIDENCE_CHAIN_TAMPER_DETECTED")
+    tamper = _caller_vs_trusted_tamper_check(evidence, trusted)
+    if tamper is not None:
+        return evidence, tamper
 
-    chain_err = _validate_mesh_comparison_chain(refreshed.mesh_comparisons)
+    chain_err = _validate_mesh_comparison_chain(trusted.mesh_comparisons)
     if chain_err is not None:
-        return refreshed, chain_err
+        return evidence, chain_err
 
-    if refreshed.ladder_status != "HEADROOM_PASS" or refreshed.headroom_status != "PASS":
-        return refreshed, _blocked(
+    if trusted.ladder_status != "HEADROOM_PASS" or trusted.headroom_status != "PASS":
+        return evidence, _blocked(
             "LADDER_OR_HEADROOM_STATUS_INVALID",
-            refreshed.ladder_status,
-            refreshed.headroom_status,
+            trusted.ladder_status,
+            trusted.headroom_status,
         )
 
-    if not verify_task174_binding(refreshed.request):
-        return refreshed, _blocked("TASK174_BINDING_GATE_FAILED")
+    if not verify_task174_binding(trusted.request):
+        return evidence, _blocked("TASK174_BINDING_GATE_FAILED")
 
-    if refreshed.request.candidate_id != evidence.request.candidate_id:
-        return refreshed, _blocked("CANDIDATE_ID_MISMATCH")
-
-    if refreshed.rating_request_hash != evidence.rating_request_hash:
-        return refreshed, _blocked("RATING_REQUEST_HASH_MISMATCH")
-
-    return refreshed, None
+    return evidence, None

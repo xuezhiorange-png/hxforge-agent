@@ -92,7 +92,7 @@ def test_gate_blocks_tampered_historical_pass() -> None:
     )
     _, blocked = enforce_live_rating_authority_gates(ROOT, tampered)
     assert blocked is not None
-    assert blocked.blocked_code == "LIVE_EVIDENCE_CHAIN_TAMPER_DETECTED"
+    assert blocked.blocked_code == "CALLER_MESH_COMPARISON_TAMPER_BLOCKED"
 
 
 def test_gate_blocks_spoofed_ladder_status_without_chain_support() -> None:
@@ -109,7 +109,7 @@ def test_gate_blocks_spoofed_ladder_status_without_chain_support() -> None:
     )
     _, blocked = enforce_live_rating_authority_gates(ROOT, spoofed)
     assert blocked is not None
-    assert blocked.blocked_code == "LIVE_EVIDENCE_CHAIN_TAMPER_DETECTED"
+    assert blocked.blocked_code == "CALLER_HEADROOM_EVIDENCE_TAMPER_BLOCKED"
 
 
 def test_sizing_adapter_blocks_wrong_compact_authority() -> None:
