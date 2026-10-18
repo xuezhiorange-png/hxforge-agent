@@ -9,7 +9,7 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -43,7 +43,7 @@ def main() -> None:
         check=True,
     )
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_dir = args.output_dir or (
         ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-r21a-gate-supplement-{stamp}"
     )
@@ -51,7 +51,9 @@ def main() -> None:
     envelope: dict[str, Any] = {
         "task_id": TASK_ID,
         "base_head": BASE_HEAD,
-        "final_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "final_head": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
         "phase": "A",
         "gate_tests": "PASS",
         "wall_seconds": time.perf_counter() - wall_t0,

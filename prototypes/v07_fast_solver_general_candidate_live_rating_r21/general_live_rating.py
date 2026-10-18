@@ -224,7 +224,10 @@ def _finalize_from_continuation(
                 ),
                 execution_mode="LIVE_NUMERICAL_SOLVE",
             )
-        if not t173._terminal_tolerance_pass(accepted) or not t173._terminal_tolerance_pass(headroom):
+        terminal_ok = t173._terminal_tolerance_pass(accepted) and t173._terminal_tolerance_pass(
+            headroom
+        )
+        if not terminal_ok:
             return ExperimentalRatingBlocked(
                 status="BLOCKED",
                 blocked_code="TERMINAL_TOLERANCE_FAILED",

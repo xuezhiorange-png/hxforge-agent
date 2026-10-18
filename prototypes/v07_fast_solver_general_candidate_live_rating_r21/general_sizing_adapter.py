@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
 from pathlib import Path
 
 from hexagent.canonical_json import canonical_sha256
@@ -14,6 +13,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
 )
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
     load_request_from_snapshot_file,
+)
+from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
+    ExperimentalCandidateRatingResult,
 )
 from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
     geometry_summary_from_request,
@@ -30,9 +32,6 @@ from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating imp
     verify_live_compact_against_full,
 )
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import file_sha256
-from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
-    ExperimentalCandidateRatingResult,
-)
 
 
 def _blocked(code: str, *diag: str) -> ExperimentalSizingAdapterBlocked:

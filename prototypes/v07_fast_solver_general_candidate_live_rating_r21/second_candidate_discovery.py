@@ -101,9 +101,11 @@ def discover_second_candidate() -> SecondCandidateDiscovery:
 
     _candidate, request = requests[SECOND_CANDIDATE_ID]
     rating_hash = candidate_rating_request_hash(request)
+    distinct = "PASS" if request.candidate_id != CANDIDATE_B_ID else "FAIL"
+    hash_ok = "PASS" if request.candidate_hash == EXPECTED_SECOND_CANDIDATE_HASH else "FAIL"
     checks: list[tuple[str, str]] = [
-        ("candidate_id_distinct_from_b", "PASS" if request.candidate_id != CANDIDATE_B_ID else "FAIL"),
-        ("candidate_hash_pinned", "PASS" if request.candidate_hash == EXPECTED_SECOND_CANDIDATE_HASH else "FAIL"),
+        ("candidate_id_distinct_from_b", distinct),
+        ("candidate_hash_pinned", hash_ok),
         (
             "rating_request_hash_pinned",
             "PASS" if rating_hash == EXPECTED_SECOND_RATING_REQUEST_HASH else "FAIL",

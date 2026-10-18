@@ -9,7 +9,7 @@ import json
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +19,9 @@ if str(ROOT) not in sys.path:
 
 # ruff: noqa: E402
 
+from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+    second_candidate_discovery as second_candidate,
+)
 from prototypes.v07_fast_solver_general_candidate_live_rating_r21.general_live_rating import (
     GeneralLiveRatingBudget,
     experimental_rate_general_candidate_live,
@@ -26,12 +29,7 @@ from prototypes.v07_fast_solver_general_candidate_live_rating_r21.general_live_r
 from prototypes.v07_fast_solver_general_candidate_live_rating_r21.general_sizing_adapter import (
     experimental_general_sizing_rating_adapter,
 )
-from prototypes.v07_fast_solver_general_candidate_live_rating_r21.second_candidate_discovery import (
-    discover_second_candidate,
-    load_second_candidate_rating_request,
-)
 from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
-    ExperimentalCandidateRatingResult,
     ExperimentalRatingBlocked,
 )
 from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
@@ -76,11 +74,13 @@ def main() -> None:
 
     _run_phase_a_tests()
 
-    discovery = discover_second_candidate()
+    discovery = second_candidate.discover_second_candidate()
     receipt: dict[str, Any] = {
         "task_id": TASK_ID,
         "base_head": BASE_HEAD,
-        "final_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "final_head": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
         "phase_a_gate_tests": "PASS",
         "second_candidate_discovery": discovery.__dict__,
         "multi_candidate_sizing_verified": False,
@@ -102,15 +102,17 @@ def main() -> None:
         _write_receipt(receipt, args.output_dir, wall_t0)
         return
 
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     evidence_dir = args.output_dir or (
         ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-live-rating-r21-{stamp}"
     )
     evidence_dir.mkdir(parents=True, exist_ok=True)
     stage_dir = evidence_dir / "stages"
     snapshot_dir = evidence_dir / "snapshots"
-    request = load_second_candidate_rating_request()
-    source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    request = second_candidate.load_second_candidate_rating_request()
+    source_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
 
     outcome = experimental_rate_general_candidate_live(
         request,
@@ -161,7 +163,6 @@ def main() -> None:
         full_rel_path=full_rel,
     )
 
-    obs = outcome
     receipt.update(
         {
             "general_live_rating_verified": True,
@@ -195,8 +196,9 @@ def main() -> None:
 
 def _write_receipt(receipt: dict[str, Any], out_dir: Path | None, wall_t0: float) -> None:
     receipt["wall_seconds"] = time.perf_counter() - wall_t0
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    directory = out_dir or (ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-live-r21-{stamp}")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    default_dir = ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-live-r21-{stamp}"
+    directory = out_dir or default_dir
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"V07-FAST-SOLVER-general-candidate-live-r21-{stamp}.json"
     payload = json.dumps(receipt, sort_keys=True, indent=2) + "\n"
