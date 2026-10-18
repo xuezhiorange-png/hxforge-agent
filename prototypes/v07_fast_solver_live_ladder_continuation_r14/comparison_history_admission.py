@@ -80,9 +80,7 @@ R17_ORCHESTRATOR_SHA256 = "402f875fa71e382e61611bfa476d3fda7daee8b1bb37eb9cf05f8
 R17_RESULT_COMMIT = "fa36cf7cf0ae2ed47bd30946a51123585fab959e"
 R17_RESULT_SHA256_ORIGINAL = "938a1155d6ef04482fddf376abe00fe71a4b539599e5940681e1017d195d6006"
 
-R18_RESULT_PATH = (
-    "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z.json"
-)
+R18_RESULT_PATH = "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z.json"
 R18_ORCHESTRATOR_PATH = (
     "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z"
     ".live-orchestrator.json"
