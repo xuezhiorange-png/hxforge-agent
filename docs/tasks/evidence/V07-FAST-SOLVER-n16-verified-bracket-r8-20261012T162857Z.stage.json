@@ -1,0 +1,53 @@
+{
+  "archived_bracket": {
+    "archived_high_record": {
+      "classification": "VALID_TRAJECTORY",
+      "coupled_fallback_count": 7,
+      "experimental_eval_trial_calls": 2187,
+      "experimental_mesh_result_hash": "1e8b56fcf40d43535316dfb4c82426c2fc9eacccbfd63180b1885e0edfb657b3",
+      "experimental_task172_calls": 313,
+      "failure_code": null,
+      "mesh_march_seconds": 44.47513587300273,
+      "record_kind": "outer_trial_receipt",
+      "shooting_enthalpy_j_kg": "107515.19263049100232798527164437274450392578728497028350830078125",
+      "task_id": "V07_FAST_SOLVER_OUTER_CONTINUATION_N16_R7",
+      "terminal_residual_j_kg": "0.00024286193",
+      "terminal_residual_k": "5.8092E-8",
+      "trial_index": 25,
+      "wall_seconds": 44.475318557997525
+    },
+    "archived_high_shooting_enthalpy_j_kg": "107515.19263049100232798527164437274450392578728497028350830078125",
+    "archived_high_terminal_residual_k": "5.8092E-8",
+    "archived_high_trial_index": 25,
+    "archived_low_record": {
+      "classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+      "coupled_fallback_count": null,
+      "experimental_eval_trial_calls": null,
+      "experimental_mesh_result_hash": null,
+      "experimental_task172_calls": null,
+      "failure_code": null,
+      "mesh_march_seconds": 0.0,
+      "record_kind": "outer_trial_receipt",
+      "shooting_enthalpy_j_kg": "107515.1920117752149267922856614632109995000064373016357421875",
+      "task_id": "V07_FAST_SOLVER_OUTER_CONTINUATION_N16_R7",
+      "terminal_residual_j_kg": null,
+      "terminal_residual_k": null,
+      "trial_index": 21,
+      "wall_seconds": 44.200368451998656
+    },
+    "archived_low_shooting_enthalpy_j_kg": "107515.1920117752149267922856614632109995000064373016357421875",
+    "archived_low_trial_index": 21,
+    "candidate_b_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "r7_result_json_sha256": "96da43ccb398576c792a584993e1ce6e7e570b46adf446969ca602cbafe6b136",
+    "r7_source_commit": "86cf9583eb3f417d66f3f0c6e7603db2504fa43b",
+    "r7_task_id": "V07_FAST_SOLVER_OUTER_CONTINUATION_N16_R7",
+    "r7_trials_jsonl_path": "docs/tasks/evidence/V07-FAST-SOLVER-outer-continuation-n16-r7-20261012T155035Z.trials.jsonl",
+    "r7_trials_jsonl_sha256": "40e00449ba1bb3b9b07d3f16c04b24810be67cbe85141689339d2ca719eb1881",
+    "rating_request_hash_expected": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+    "subdivisions": 16
+  },
+  "command": "python prototypes/v07_fast_solver_n16_verified_bracket_r8/run_r8.py",
+  "global_deadline_s": 480.0,
+  "n16_worker_budget_s": 420.0,
+  "task_id": "V07_FAST_SOLVER_N16_VERIFIED_BRACKET_R8"
+}

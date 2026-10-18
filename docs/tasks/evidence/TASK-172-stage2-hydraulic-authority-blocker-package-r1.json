@@ -1,0 +1,43 @@
+{
+  "schema_version": "task172.stage2-hydraulic-authority-blocker-package.v1",
+  "task_id": "TASK172_V0_7_STAGE2_TASK172_RUNTIME_AND_TASK174_HYDRAULICS_R1",
+  "result": "TASK174_AUTHORITY_BLOCKED",
+  "task174_runtime_api_implemented": true,
+  "task174_closure": false,
+  "task172_local_runtime_implementation": true,
+  "fiv_requirement_mode": "DIAGNOSTIC_SCREENING_ONLY",
+  "blocker_count": 3,
+  "blockers": [
+    {
+      "code": "TUBE_DP_BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+      "scope": "TUBE_SIDE_TASK029_PATH",
+      "required_component_types": ["ENTRANCE", "EXIT", "CHANNEL_HEAD", "NOZZLE", "CONTRACTION", "EXPANSION"],
+      "required_evidence": "For each type, a source-bound native TASK028 result with authority and reference-plane binding, or an explicit reviewed physical-absence exclusion; then a complete native TASK029 result.",
+      "consumer": "TASK029 completeness partition and TASK174 tube-total publication guard",
+      "result_status": "BLOCKED_INCOMPLETE_MODELED_BOUNDARY",
+      "forbidden_repairs": ["invent K", "implicit K=0", "publish partial total"]
+    },
+    {
+      "code": "SHELL_DP_BLOCKED_PHYSICAL_EVENT_AND_PRESSURE_STATE_BINDING",
+      "scope": "SHELL_SIDE_TASK034_BELL_AGGREGATION",
+      "required_evidence": "Reviewed one-to-one allocation of all 19 TASK171 physical events/compartments to Bell pressure regions, plus a complete source-bound native TASK034 result with accepted TASK031/TASK020 identity lineage.",
+      "consumer": "TASK034/TASK166 event-owned shell pressure aggregation",
+      "result_status": "BLOCKED_INCOMPLETE_PHYSICAL_EVENT_AGGREGATION",
+      "forbidden_repairs": ["multiply physical events by numerical cells", "duplicate Bell corrections", "publish unallocated total"]
+    },
+    {
+      "code": "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+      "scope": "CASE_PRESSURE_PATH",
+      "required_evidence": "Reviewed pressure-state coupling authority and exact support/location pressure-to-property-snapshot bindings within 100000–101325 Pa.",
+      "consumer": "TASK172 property provider and pressure-dependent TASK027/TASK034 inputs",
+      "result_status": "BLOCKED_PROPERTY_PRESSURE_COUPLING_AUTHORITY",
+      "forbidden_repairs": ["pressure clamping", "out-of-domain extrapolation", "unreviewed pressure iteration"]
+    }
+  ],
+  "unresolved_governance": {
+    "fiv_numeric_limit_authority_missing": true,
+    "fiv_numeric_limit_not_guessed": true,
+    "fiv_is_a_stage2_blocker": false
+  },
+  "canonical_hash": "5a201e438e9f380a726f6a8fe9c9bf01474b0a1785497ebd950679e9b722b5af"
+}

@@ -1,0 +1,10 @@
+{
+  "command": "python prototypes/v07_fast_solver_n64_headroom_r10/run_r10.py",
+  "global_deadline_s": 1800.0,
+  "h16_shooting_enthalpy_j_kg": "107515.1924758120554776870251486453611278193420730531215667724609375",
+  "h32_shooting_enthalpy_j_kg": "107515.1901169581160106387660875",
+  "n64_worker_budget_s": 1500.0,
+  "preflight_budget_s": 480.0,
+  "source_head_sha": "417499bfeff406ca0d419cd763a89b543fec59e5",
+  "task_id": "V07_FAST_SOLVER_N64_HEADROOM_R10"
+}

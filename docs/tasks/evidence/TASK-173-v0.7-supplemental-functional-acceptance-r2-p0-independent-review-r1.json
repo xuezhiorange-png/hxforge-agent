@@ -1,0 +1,45 @@
+{
+  "schema_version": "task173.supplemental-functional-acceptance-p0-review.v1",
+  "review_id": "V07-T173-SUPPLEMENTAL-CONTROLLED-EXECUTION-P0-REVIEW-R1",
+  "review_decision": "PASS",
+  "review_scope": "P0_HASH_ERRATUM_AND_REPLAY_FORMAT_ONLY",
+  "base_review_commit": "fd725fafb005014e82bcd24526524fb0bc58a315",
+  "reviewer_context": "SEPARATE_INDEPENDENT_REVIEW_THREAD",
+  "reviewer": "Codex independent reviewer",
+  "reviewer_id": "01a11b68-c30f-78c0-9033-56ecf040dfda",
+  "blocking_findings": 0,
+  "rating_or_sizing_executed": false,
+  "historical_review_receipt_preserved": true,
+  "authority_hash_erratum": {
+    "historical_value_preserved": "750c1f76953f46b63de90f2c21302160746e8904fc61227538397e69b8501a9",
+    "historical_value_length": 63,
+    "correct_value": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "correct_value_length": 64,
+    "source_cross_check": "PASS",
+    "canonical_package_projection_replay": "PASS",
+    "supersedes_only_malformed_field": true
+  },
+  "replay_script_correction": {
+    "path": "docs/tasks/evidence/TASK-173-v0.7-supplemental-functional-acceptance-r2-replay.py",
+    "sha256_before": "69a1438d0340beb997849ce48148c6bd8acb511ef0b9495d524c02ba6e038f38",
+    "sha256_after": "0527379c37d5b03f124fda52c12fa7b420c8043c8732f69c395d6897e5d15685",
+    "ruff_i001": "PASS",
+    "ruff_format_check": "PASS",
+    "import_bindings_unchanged": true,
+    "non_import_ast_unchanged": true,
+    "non_solving_replay": "PASS"
+  },
+  "reviewed_erratum_files": [
+    {
+      "path": "docs/tasks/TASK-173-v0.7-supplemental-functional-acceptance-r2-independent-review-r1-erratum-1.md",
+      "sha256": "f6f879476ebc619083d15b888b82efdecf0fa0954b5ffa51933f577f602909e3"
+    },
+    {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-supplemental-functional-acceptance-r2-independent-review-r1-erratum-1.json",
+      "sha256": "b79c358bb3053c07e6360138cc6768eab0c39c0db8711049ec714a133fd323db"
+    }
+  ],
+  "numerical_policy_changed": false,
+  "frozen_inputs_changed": false,
+  "execution_authorized_by_review": false
+}

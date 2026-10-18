@@ -1,0 +1,226 @@
+{
+  "task_id": "STAGE3_TASK173_SIZING_RESIDUAL_PHYSICAL_SOURCE_AUTHORITY_CLOSURE_R1",
+  "mode": "DUAL_RESIDUAL_SOURCE_CLOSURE_AND_UMBRELLA_PACKAGE_REISSUE_IF_PASS",
+  "result": "BLOCKED_SIZING_RESIDUAL_PHYSICAL_SOURCE_AUTHORITY",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "url": "https://github.com/xuezhiorange-png/hxforge-agent/pull/283",
+    "branch": "docs/v0-7-task172-internal-geometry-authority-r115",
+    "preflight_head": "698b543e1b41b4c7099cb9ac2a028b25a28c5b00"
+  },
+  "predecessor": {
+    "head": "698b543e1b41b4c7099cb9ac2a028b25a28c5b00",
+    "task": "STAGE3_TASK173_FULL_RATING_AND_SIZING_SOLVER_CLOSEOUT_R1",
+    "result": "BLOCKED_TASK173_FULL_SIZING_AUTHORITY_INCOMPLETE",
+    "evidence_canonical_hash": "ca6b37c400b1e15dbe0cbf5e15e45ce38303178952c35955caabc91070ed43f4"
+  },
+  "owner_reported_prior_package": {
+    "evidence_canonical_hash": "22c8b55e50eb259136658105ec2c42a74b02b84a3f238ac7716b9294902db0a5",
+    "status": "NOT_COMMITTED_LOCAL_EVIDENCE_INPUT_ONLY",
+    "treated_as_remote_authority": false
+  },
+  "preflight": {
+    "remote_head_expected_unchanged": true,
+    "local_head_matches_authorized_source": true,
+    "remote_head_matches_authorized_source": true,
+    "tracked_worktree_clean_before_receipt": true,
+    "preexisting_untracked_files_preserved_unmodified": [
+      "docs/tasks/HANDOFF-TASK172-result-identity-and-numerical-portability-contract-r1.md",
+      "docs/tasks/TASK-173-v0.7-sizing-authority-closure-package-r1.md",
+      "docs/tasks/evidence/TASK-173-v0.7-sizing-authority-closure-package-r1.json"
+    ]
+  },
+  "reference_rating": {
+    "complete": true,
+    "scope": "ACCEPTED_V07_REFERENCE_CASE_ONLY",
+    "request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "result_hash": "fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "result_id": "urn:hxforge:task173:fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "identity_changed": false,
+    "reexecuted": false
+  },
+  "scope": {
+    "residual_gaps_only": [
+      "TASK172_CANDIDATE_JMU_GEOMETRY_AND_LOCAL_STATE_TRANSFER",
+      "TASK174_CANDIDATE_HYDRAULIC_CLOSURE_TRANSFER"
+    ],
+    "other_four_sizing_gaps_reaudited": false,
+    "numerical_experiment_performed": false,
+    "candidate_rating_executed": false,
+    "production_mesh_reexecuted": false,
+    "sizing_executed": false,
+    "task175_release_acceptance_performed": false,
+    "production_code_changed": false,
+    "tests_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "authority_registry_changed": false
+  },
+  "jmu_lane": {
+    "residual_gap_id": "TASK172_CANDIDATE_JMU_GEOMETRY_AND_LOCAL_STATE_TRANSFER",
+    "result": "BLOCKED_TRANSFER_DOMAIN_NOT_ESTABLISHED",
+    "jmu_geometry_variation_observed": true,
+    "jmu_same_bell_delaware_model_observed": true,
+    "candidate_transfer_domain_closed": false,
+    "candidate_transfer_authority_id": "NOT_ISSUED",
+    "candidate_transfer_authority_hash": "NOT_ISSUED",
+    "equation_or_exponent_reopened": false,
+    "project_local_state_semantics_changed": false,
+    "task166_applicability_used_as_automatic_jmu_proof": false,
+    "sources": [
+      {
+        "source_id": "SRC-ECM-JAMIL-GORAYA-SHAHZAD-ZUBAIR-2020-BELL-DELAWARE-PARAMETERS",
+        "formal_identity": "Jamil, Goraya, Shahzad and Zubair, Exergoeconomic optimization of a shell-and-tube heat exchanger, Energy Conversion and Management 226 (2020), article 113462, DOI 10.1016/j.enconman.2020.113462",
+        "publisher_or_repository": "Northumbria University Research Portal accepted author manuscript",
+        "source_role": "PEER_REVIEWED_SECONDARY_METHOD_SOURCE",
+        "rights_or_review_status": "CC BY-NC-ND per institutional portal; review only; body not copied into repository",
+        "acquisition_path": "https://nrl.northumbria.ac.uk/id/eprint/45157/1/sthx.pdf",
+        "body_sha256_previous_acquisition_record": "a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+        "body_sha256_reverified_this_task": false,
+        "body_sha_reverification_note": "Exact acquired bytes were absent locally; current direct TLS download failed. Full article was inspected at the same official repository URL. The prior recorded body hash is preserved without claiming a new byte-level verification.",
+        "page_count_pdf": 59,
+        "exact_locations": [
+          "Section 2.1, PDF pages 8-9: liquid-phase segmental-baffle STHX and Table 2 baseline geometry and service",
+          "Section 2.2.2, PDF page 11, Equation 6: J_mu is a factor in the Bell-Delaware shell heat-transfer product",
+          "Section 3.4.2, PDF pages 32-33: baffle count varied from 2 to 15 with Bell-Delaware heat-transfer and pressure outputs",
+          "Section 3.5 and Table 7, PDF pages 38-39: optimization geometry variables and bounds; text says optimization is performed for all three methods including Bell-Delaware"
+        ],
+        "transfer_observation": "The same J_mu-containing Bell-Delaware model is used across some explicitly varied geometry in the article; this does not establish the complete project candidate geometry/local-support intersection."
+      },
+      {
+        "source_id": "FETTAKA-THIBAULT-GUPTA-2013-DOI-10.1016-J-IJHEATMASSTRANSFER-2012-12-047",
+        "formal_identity": "Fettaka, Thibault and Gupta, Design of shell-and-tube heat exchangers using multiobjective optimization, International Journal of Heat and Mass Transfer 60 (2013), 343-354, DOI 10.1016/j.ijheatmasstransfer.2012.12.047",
+        "source_role": "BIBLIOGRAPHIC_ONLY",
+        "rights_or_review_status": "Bibliographic and abstract/ScienceDirect excerpt only in this gate; complete lawful reviewable body not acquired",
+        "exact_locations": [],
+        "used_to_close_transfer": false,
+        "note": "Abstract-level geometry statements are not treated as sufficient J_mu transfer evidence."
+      },
+      {
+        "source_id": "PROJECT-JAMIL-THOME-TRANSFER-RECORDS",
+        "formal_identity": "Existing committed TASK172 Jamil/Thome active J_mu transfer and segment-local localization records",
+        "source_role": "PROJECT_TRANSFER_AUTHORITY_CONTEXT",
+        "exact_locations": [
+          "docs/tasks/TASK-172-v0.7-shell-wall-correction-jamil-thome-active-jmu-transfer-authority-r1.md, sections 4-6",
+          "docs/tasks/TASK-172-v0.7-jmu-segment-local-bulk-state-transfer-convention-r1.md, sections 2-5"
+        ],
+        "used_for": "Preserve existing J_mu and local-state semantics; not evidence that those semantics automatically transfer to changed candidate geometry."
+      }
+    ],
+    "geometry_transfer_matrix": [
+      {"row":"SHELL_FAMILY","source_id":"JAMIL-2020","source_location":"§2.1, PDF p.8","source_value_or_range":"Segmental-baffle STHX; E-shell designation not stated","variable_or_fixed":"fixed/unspecified","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"CONSTRUCTION_FAMILY","source_id":"JAMIL-2020","source_location":"§2.1 and Table 2, PDF pp.8-9","source_value_or_range":"Mechanical construction family not stated","variable_or_fixed":"fixed/unspecified","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"SHELL_PASS_COUNT","source_id":"JAMIL-2020","source_location":"§2.1/Table 2 and §3.5","source_value_or_range":"No shell-pass count stated","variable_or_fixed":"fixed/unspecified","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"TUBE_PASS_COUNT","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF pp.38-39","source_value_or_range":"Baseline 2; optimization bounds 1-8","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"BAFFLE_FAMILY","source_id":"JAMIL-2020","source_location":"§2.1, PDF p.8","source_value_or_range":"Segmental baffles","variable_or_fixed":"fixed context","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"BAFFLE_SPACING","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 0.356 m; optimization bounds 0.05-0.5 m","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"BAFFLE_CUT","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 25%; optimization bounds 0.20-0.35","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"BAFFLE_COUNT","source_id":"JAMIL-2020","source_location":"§3.4.2, PDF pp.32-33","source_value_or_range":"2-15","variable_or_fixed":"variable in parametric study","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"TUBE_LAYOUT","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 30 degrees; bounds 30-90 degrees","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"TUBE_PITCH","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9","source_value_or_range":"0.025 m","variable_or_fixed":"fixed context; not an optimization variable","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"TUBE_OD","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 0.020 m; bounds 0.015-0.051 m","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"TUBE_ID_OR_WALL","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9","source_value_or_range":"Baseline ID 0.016 m and OD 0.020 m; no ID/wall-thickness range stated","variable_or_fixed":"fixed context","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"TUBE_LENGTH","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9","source_value_or_range":"4.83 m","variable_or_fixed":"fixed context; not listed in this study's Table 7 variables","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"TUBE_COUNT","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 918; bounds 900-2000","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"SHELL_DIAMETER","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9; §3.5/Table 7, PDF p.39","source_value_or_range":"Baseline 0.894 m; bounds 0.1-1.5 m","variable_or_fixed":"variable in optimization","jmu_active_in_same_model":"YES_BELL_DELAWARE_MODEL","transfer_status":"SOURCE_SUPPORTED_VARIABLE_DOMAIN"},
+      {"row":"RE_S","source_id":"JAMIL-2020","source_location":"§2.2.2 and §3.4.1","source_value_or_range":"Shell Reynolds is used; shell flow study 1-50 kg/s; no J_mu-specific Re interval stated","variable_or_fixed":"operating variable studied; J_mu range unspecified","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"PR_S","source_id":"JAMIL-2020","source_location":"§2.2.2, PDF p.11","source_value_or_range":"Pr appears in ideal-bank coefficient; no J_mu-specific Pr range","variable_or_fixed":"not bounded for J_mu","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"MU_BULK_OVER_MU_WALL","source_id":"JAMIL-2020","source_location":"§2.2.2, PDF p.11, Eq.6","source_value_or_range":"Bulk/wall viscosity factor; no numeric ratio interval stated","variable_or_fixed":"state-dependent; range not stated","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"TEMPERATURE","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9","source_value_or_range":"Shell-water inlet/outlet 95/40 degC baseline; no J_mu temperature envelope stated","variable_or_fixed":"fixed baseline context","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"PRESSURE","source_id":"JAMIL-2020","source_location":"Table 2, PDF p.9","source_value_or_range":"Allowable operating pressure listed as 100 kPa; no J_mu property-evaluation pressure rule","variable_or_fixed":"semantics/range not stated","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"NOT_STATED"},
+      {"row":"FLUID","source_id":"JAMIL-2020","source_location":"§2.1 and Table 2, PDF pp.8-9","source_value_or_range":"Water on shell and tube sides; purity/backend unspecified","variable_or_fixed":"fixed context","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"},
+      {"row":"PHASE","source_id":"JAMIL-2020","source_location":"§2.1, PDF p.8","source_value_or_range":"Liquid-phase exchanger","variable_or_fixed":"fixed context","jmu_active_in_same_model":"YES_STUDY_MODEL_ONLY","transfer_status":"SOURCE_SUPPORTED_FIXED_CONTEXT"}
+    ],
+    "matrix_sha256": "e34ef8010e1a6650ccb088fcf5b11baebbe312fc2d00f9eda44e75f433c6da92"
+  },
+  "task174_lane": {
+    "residual_gap_id": "TASK174_CANDIDATE_HYDRAULIC_CLOSURE_TRANSFER",
+    "result": "BLOCKED_CANDIDATE_PRESSURE_COUPLING_TRANSFER_UNAUTHORIZED",
+    "reference_case_closure_replayed": true,
+    "stage2_evidence_path": "docs/tasks/evidence/TASK-172-stage2-task029-zero-component-replay-correction-r1.json",
+    "stage2_evidence_canonical_hash": "778f0417f82e59a2a3d5b04f344bc052a473a486454cbfba138b6d26a261041d",
+    "validated_reference_task174_result_hash": "e8ce04e6e48120ff8d655c16a4aa07a1ddd32f8bc22afbc1bb750291a35dae0e",
+    "task029_reference_case_completeness": "PASS",
+    "task029_candidate_completeness_transfer": "NOT_AUTHORIZED",
+    "task029_candidate_physical_absence_rule_bound": false,
+    "bell_region_mapping_reference_case": "EXACT_ONCE",
+    "bell_region_mapping_candidate_transfer": "NOT_AUTHORIZED",
+    "bell_event_coverage_rule_bound": "REFERENCE_CASE_ONLY",
+    "pressure_coupling": {
+      "authority_id": "V07-T174-REFERENCE-PRESSURE-COUPLING-R1",
+      "mode": "ONE_WAY_FROZEN_REFERENCE_PRESSURE",
+      "reference_pressure_pa": "101325",
+      "exact_reference_snapshots_required": true,
+      "pressure_iteration": false,
+      "clamping": false,
+      "extrapolation": false,
+      "candidate_geometry_independence_authority_found": false,
+      "transfer_status": "BLOCKED_REFERENCE_CASE_ONLY"
+    },
+    "task174_candidate_hydraulic_transfer_closed": false,
+    "task174_candidate_transfer_authority_id": "NOT_ISSUED",
+    "task174_candidate_transfer_authority_hash": "NOT_ISSUED",
+    "code_bindings": [
+      {
+        "path": "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/models.py",
+        "locations": ["lines 39-41", "lines 150-159"],
+        "observation": "Pressure-coupling authority is a Literal bound to V07-T174-REFERENCE-PRESSURE-COUPLING-R1."
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/service.py",
+        "locations": ["lines 489-504", "lines 527-543"],
+        "observation": "Runtime requires that exact authority and its pressure bindings, computes reference pressure minus native DP, and applies the reviewed 100000..101325 Pa outlet-domain guard; no candidate transfer statement is encoded."
+      }
+    ]
+  },
+  "unresolved_gap_ledger": [
+    {
+      "unresolved_lane": "TASK172_CANDIDATE_JMU_GEOMETRY_AND_LOCAL_STATE_TRANSFER",
+      "missing_source_or_transfer_authority": "Finite, source-backed J_mu candidate geometry/local-support envelope whose intersection with fixed-tubesheet E-shell/one-shell-pass topology, Task166 admitted domain, current property/material domain and approved candidate discrete domain is explicitly evaluable.",
+      "sources_searched": [
+        "Full Jamil et al. 2020 Northumbria accepted manuscript, prior body SHA256 a20bcda2adcc45d8d07bb27458a55f07a3c13886f4276775b214f1b7a377d970",
+        "Existing committed Jamil/Thome active-J_mu transfer record",
+        "Existing committed segment-local J_mu convention",
+        "Existing TASK166 and water/property profile authority records",
+        "Fettaka et al. 2013 DOI record/abstract only; not used as full-body authority"
+      ],
+      "why_existing_source_is_insufficient": "Jamil shows a J_mu-containing Bell-Delaware implementation across some geometry changes, but leaves the exact project shell/construction/pass context and the project candidate physical-support/local-state transfer unbound. The authority package requires a finite intersecting source domain; it cannot be manufactured by inheriting Task166 applicability or assuming unspecified rows.",
+      "minimum_additional_source_needed": "A legally reviewable hash-bound source or explicitly reviewed project-transfer authority identifying the matching shell/construction/topology context, finite candidate geometry roles/ranges, and the local-support state transfer predicate. Values outside that intersection must remain blocked."
+    },
+    {
+      "unresolved_lane": "TASK174_CANDIDATE_HYDRAULIC_CLOSURE_TRANSFER",
+      "missing_source_or_transfer_authority": "Reviewed pressure/property coupling transfer from the exact R2 reference geometry to changed candidate-native geometry and candidate pressure/property snapshots.",
+      "sources_searched": [
+        "Stage-2 TASK029/TASK174 reference-case closeout document and machine evidence",
+        "Committed TASK174 consolidated hydraulic authority blocker package",
+        "Current TASK174 strict request model and runtime pressure-coupling checks",
+        "Existing Stage-1 pressure/property-domain authority"
+      ],
+      "why_existing_source_is_insufficient": "The validated authority is named REFERENCE-PRESSURE-COUPLING-R1 and binds exact 101325 Pa reference snapshots and exact reference geometry. The pressure domain guard is not a geometry-independent coupling authorization; candidate-native component exclusions and Bell event allocations also do not follow from the reference instance.",
+      "minimum_additional_source_needed": "An explicitly reviewed source/project authority permitting the candidate one-way pressure path and exact candidate pressure/property snapshot producer or binding rule within the same water/service and 100000..101325 Pa domain, with candidate-native TASK029 and Bell-event identities preserved."
+    }
+  ],
+  "authority_package": {
+    "issued": false,
+    "package_id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "canonical_hash": "NOT_ISSUED_RESIDUAL_SOURCE_GAPS",
+    "lifecycle": "NOT_ISSUED",
+    "accepted": false,
+    "subauthority_hashes_issued": false,
+    "residual_source_gap_count": 2
+  },
+  "final_state": {
+    "task173_rating_complete": true,
+    "task173_sizing_complete": false,
+    "task173_complete": false,
+    "task175_release_acceptance_performed": false,
+    "next_gate": "OWNER_DIRECTION_REQUIRED_FOR_SPECIFIC_RESIDUAL_SOURCE",
+    "next_gate_executed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "canonical_hash": "a362e37a61b8c67abc915a455b03f378d1d844af4454d3f417d69132b05ce4ab"
+}
