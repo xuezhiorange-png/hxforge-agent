@@ -24,11 +24,11 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.bounded_workers imp
     run_bounded_compare,
     run_bounded_rehydrate,
 )
-from prototypes.v07_fast_solver_live_ladder_continuation_r14.rehydrate_gate import (
-    require_bounded_rehydrate_ok,
-)
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.continuation_engine import (
     LiveContinuationOutcome,
+)
+from prototypes.v07_fast_solver_live_ladder_continuation_r14.rehydrate_gate import (
+    require_bounded_rehydrate_ok,
 )
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
     build_request_snapshot,
