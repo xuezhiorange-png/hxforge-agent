@@ -280,7 +280,7 @@ def main() -> None:
                 },
                 expected_request_hash=RATING_REQUEST_HASH,
                 expected_candidate_id=CANDIDATE_B_ID,
-                budget_s=min(240.0, deadline - time.perf_counter()),
+                budget_s=min(320.0, deadline - time.perf_counter()),
             )
             timing["compare_wall_seconds"] += time.perf_counter() - t_cmp
             if cmp_worker.get("status") == "OK":

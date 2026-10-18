@@ -1,8 +1,8 @@
 {
-  "experimental_mesh_sequence_gate": "NOT_EXECUTED",
+  "experimental_mesh_sequence_gate": "PASS",
   "headroom_n": 64,
-  "headroom_status": "NOT_EXECUTED",
-  "ladder_continuation_status": "MESH_CANDIDATE_IDENTIFIED",
+  "headroom_status": "PASS",
+  "ladder_continuation_status": "HEADROOM_PASS",
   "live_full_rating_completed": false,
   "live_n64": {
     "bisection_iterations": 5,
@@ -53,7 +53,38 @@
   },
   "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z.live-orchestrator.json",
   "mesh_candidate_n": 32,
-  "n32_n64_comparison": null,
+  "n32_n64_compare_amendment": {
+    "compare_elapsed_s": 269.38840323399927,
+    "compare_status": "OK",
+    "reason": "INITIAL_RUN_COMPARE_BUDGET_240S_INSUFFICIENT"
+  },
+  "n32_n64_comparison": {
+    "coarse_subdivisions": 32,
+    "duty_difference_w": "0.01178076749703",
+    "duty_metric": "2.269835910362376216440258145E-7",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.074192534063715623468700060E-12",
+    "duty_precision_floor_w": "2.11456320533220562108E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 64,
+    "interval_duty_differences_w": [
+      "0.00363520326263",
+      "0.00289666748489",
+      "0.00226342116685",
+      "0.00172434819571",
+      "0.00126112738695"
+    ],
+    "overall_status": "PASS",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.0015688262864",
+      "T_wall_inner_min": "0.00102923142987",
+      "T_wall_outer_max": "0.0015083916812",
+      "T_wall_outer_min": "0.00099035260763"
+    },
+    "wall_precision_floor_k": "3.4896235851925719E-13",
+    "wall_status": "PASS"
+  },
   "n64_mesh_hash_replay": "PASS",
   "numerical_authority_status": "CANDIDATE",
   "prior_comparison_hash_admission": true,
