@@ -21,9 +21,7 @@ def physical_trial_totals(
 
 def apply_physical_trial_fields(receipt: dict[str, Any]) -> dict[str, Any]:
     totals = physical_trial_totals(
-        bracket_establishment_trial_count=int(
-            receipt.get("bracket_establishment_trial_count", 0)
-        ),
+        bracket_establishment_trial_count=int(receipt.get("bracket_establishment_trial_count", 0)),
         narrow_solve_trial_count=int(receipt.get("narrow_solve_trial_count", 0)),
     )
     out = dict(receipt)

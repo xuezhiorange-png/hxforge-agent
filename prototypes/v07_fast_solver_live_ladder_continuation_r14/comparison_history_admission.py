@@ -60,9 +60,7 @@ R16_ORCHESTRATOR_SHA256 = "9c7589c7f9c6680253f428613d0e3738f1f2a3a8b36151db53ef6
 R16_RESULT_SHA256 = "3b5d2eb4183e247a15436d7906a6641825c98f61719827dcf2cef8164186bad2"
 R16_RESULT_COMMIT = "7f26b466bc8eabc95334163c2442b85610a71265"
 
-R13_RESULT_PATH = (
-    "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z.json"
-)
+R13_RESULT_PATH = "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z.json"
 R13_ORCHESTRATOR_PATH = (
     "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z"
     ".live-orchestrator.json"
@@ -70,9 +68,7 @@ R13_ORCHESTRATOR_PATH = (
 R13_ORCHESTRATOR_SHA256 = "7c7895ab3363473df6d66becd0b0f1d85ece5302f32f0177e7ead4f20a83a50b"
 R13_RESULT_COMMIT = "53617eaec29a0e9bc698179a6afe7030c878dc83"
 
-R17_RESULT_PATH = (
-    "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z.json"
-)
+R17_RESULT_PATH = "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z.json"
 R17_ORCHESTRATOR_PATH = (
     "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z"
     ".live-orchestrator.json"
@@ -166,6 +162,7 @@ COMPARISON_SOURCE_PINS: tuple[ComparisonSourcePin, ...] = (
         4,
     ),
 )
+
 
 def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
