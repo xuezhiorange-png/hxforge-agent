@@ -12,7 +12,6 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models i
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.comparison_history_admission import (
     admit_prior_comparison_history,
     build_rolling_state_from_admitted_history,
-    require_candidate_identified_before_headroom,
 )
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
     load_request_from_snapshot_file,
