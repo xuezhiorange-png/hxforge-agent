@@ -25,7 +25,9 @@ R14_ORCHESTRATOR_PATH = (
 )
 R14_RESULT_SHA256 = "5f952d2f02929b18ffa90ba22e79adf087b326dd2399d44e1a96eb2e216a2781"
 
-R15_RESULT_PATH = "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-continuation-r15-20261015T075153Z.json"
+R15_RESULT_PATH = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-continuation-r15-20261015T075153Z.json"
+)
 R15_ORCHESTRATOR_PATH = (
     "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-continuation-r15-20261015T075153Z"
     ".live-orchestrator.json"

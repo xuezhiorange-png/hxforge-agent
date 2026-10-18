@@ -254,7 +254,11 @@ def run_live_bracket_worker(
     process.start()
     child_conn.close()
     if trial_push_monitor is not None:
-        trial_push_monitor.wait_while_process_alive(process, budget_s=budget_s, grace_s=join_grace_s)
+        trial_push_monitor.wait_while_process_alive(
+            process,
+            budget_s=budget_s,
+            grace_s=join_grace_s,
+        )
     else:
         process.join(timeout=budget_s + join_grace_s)
     if process.is_alive():

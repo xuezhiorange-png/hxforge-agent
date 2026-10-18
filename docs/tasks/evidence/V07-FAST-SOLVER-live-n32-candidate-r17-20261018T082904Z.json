@@ -2,7 +2,7 @@
   "arbitrary_candidate_full_rating_verified": false,
   "headroom_n": 64,
   "headroom_status": "NOT_EXECUTED",
-  "ladder_continuation_status": "MESH_COMPARISON_PASS",
+  "ladder_continuation_status": "MESH_CANDIDATE_IDENTIFIED",
   "live_full_rating_completed": false,
   "live_n32": {
     "bracket_establishment_trial_count": 2,
@@ -51,8 +51,39 @@
     "terminal_boundary_residual_k": "4.4968E-9"
   },
   "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z.live-orchestrator.json",
-  "mesh_candidate_n": null,
-  "n16_n32_comparison": null,
+  "mesh_candidate_n": 32,
+  "n16_n32_compare_amendment": {
+    "compare_elapsed_s": 129.21812483499525,
+    "compare_status": "OK",
+    "reason": "INITIAL_RUN_COMPARE_BUDGET_120S_INSUFFICIENT"
+  },
+  "n16_n32_comparison": {
+    "coarse_subdivisions": 16,
+    "duty_difference_w": "0.04712741654754",
+    "duty_metric": "9.080172861166060960339662314E-7",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.074190096238486934420733207E-12",
+    "duty_precision_floor_w": "2.1145638601271754931E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 32,
+    "interval_duty_differences_w": [
+      "0.01453515229318",
+      "0.01158549281016",
+      "0.00905968663820",
+      "0.00689613112699",
+      "0.00505095367901"
+    ],
+    "overall_status": "PASS",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.0031312072550",
+      "T_wall_inner_min": "0.00206229204446",
+      "T_wall_outer_max": "0.00301056630715",
+      "T_wall_outer_min": "0.00198441299944"
+    },
+    "wall_precision_floor_k": "3.4896124112666376E-13",
+    "wall_status": "PASS"
+  },
   "n32_mesh_hash_replay": "PASS",
   "numerical_authority_status": "CANDIDATE",
   "prior_comparison_history_admitted": true,
@@ -73,5 +104,5 @@
   },
   "total_runner_wall_seconds": 1050.260199848999,
   "trials_jsonl_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-r17-stages-20261018T082904Z/live-n32-outer-trials.jsonl",
-  "two_consecutive_passing_pairs": false
+  "two_consecutive_passing_pairs": true
 }

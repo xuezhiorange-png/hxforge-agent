@@ -2,7 +2,7 @@
   "blocked_code": null,
   "blocked_diagnostics": [],
   "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
-  "ladder_continuation_status": "MESH_COMPARISON_PASS",
+  "ladder_continuation_status": "MESH_CANDIDATE_IDENTIFIED",
   "mesh_comparisons": [
     {
       "admission": {
@@ -130,6 +130,33 @@
         "T_wall_outer_min": "0.00398371494174"
       },
       "wall_precision_floor_k": "3.4895899984756992E-13",
+      "wall_status": "PASS"
+    },
+    {
+      "coarse_subdivisions": 16,
+      "duty_difference_w": "0.04712741654754",
+      "duty_metric": "9.080172861166060960339662314E-7",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.074190096238486934420733207E-12",
+      "duty_precision_floor_w": "2.1145638601271754931E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 32,
+      "interval_duty_differences_w": [
+        "0.01453515229318",
+        "0.01158549281016",
+        "0.00905968663820",
+        "0.00689613112699",
+        "0.00505095367901"
+      ],
+      "overall_status": "PASS",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.0031312072550",
+        "T_wall_inner_min": "0.00206229204446",
+        "T_wall_outer_max": "0.00301056630715",
+        "T_wall_outer_min": "0.00198441299944"
+      },
+      "wall_precision_floor_k": "3.4896124112666376E-13",
       "wall_status": "PASS"
     }
   ],

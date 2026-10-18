@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 
 def git_push_paths(
@@ -61,7 +61,11 @@ class TrialJsonlPushMonitor:
         self._push_count = 0
         self._last_remote_sha: str | None = None
         if push_fn is None:
-            push_fn = lambda msg, paths: git_push_paths(root, branch, msg, paths)
+
+            def _default_push(msg: str, paths: list[Path]) -> str | None:
+                return git_push_paths(root, branch, msg, paths)
+
+            push_fn = _default_push
         self._push_fn = push_fn
 
     @property

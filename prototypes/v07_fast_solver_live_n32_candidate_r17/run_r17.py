@@ -255,7 +255,7 @@ def main() -> None:
                 },
                 expected_request_hash=RATING_REQUEST_HASH,
                 expected_candidate_id=CANDIDATE_B_ID,
-                budget_s=min(120.0, deadline - time.perf_counter()),
+                budget_s=min(200.0, deadline - time.perf_counter()),
             )
             timing["compare_wall_seconds"] = time.perf_counter() - t_cmp
             if cmp_worker.get("status") == "OK":
@@ -330,7 +330,9 @@ def main() -> None:
             "duty_w": n32_receipt.get("total_duty_w"),
             "terminal_boundary_residual_k": n32_receipt.get("terminal_boundary_residual_k"),
             "energy_balance_residual_w": n32_receipt.get("energy_balance_residual_w"),
-            "bracket_establishment_trial_count": n32_receipt.get("bracket_establishment_trial_count"),
+            "bracket_establishment_trial_count": n32_receipt.get(
+                "bracket_establishment_trial_count"
+            ),
             "narrow_solve_trial_count": n32_receipt.get("narrow_solve_trial_count"),
             "outer_trial_count": n32_receipt.get("outer_trial_count"),
             "bracket_meta": bracket_meta,
