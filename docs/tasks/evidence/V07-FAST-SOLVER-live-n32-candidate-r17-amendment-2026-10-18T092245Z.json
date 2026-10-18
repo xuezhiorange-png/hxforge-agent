@@ -1,0 +1,19 @@
+{
+  "amendment_kind": "N16_N32_COMPARE_AND_TRIAL_COUNT",
+  "code_head_sha_at_reconcile": "fa36cf7cf0ae2ed47bd30946a51123585fab959e",
+  "independent_compare_overall_status": "PASS",
+  "independent_compare_status": "OK",
+  "n16_n32_comparison_canonical_sha256": "a43abe3828faea74d787c5932e0af16dcc6e2a134c7960dc2b7ecaeb0adcb796",
+  "original_result_commit": "52ab519e7cb6819f8df9779578cfc2d48da9b789",
+  "original_result_sha256": "938a1155d6ef04482fddf376abe00fe71a4b539599e5940681e1017d195d6006",
+  "recorded_at_utc": "2026-10-18T09:22:45Z",
+  "revised_result_commit": "fa36cf7cf0ae2ed47bd30946a51123585fab959e",
+  "revised_result_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z.json",
+  "revised_result_sha256": "9a2da6a40a49e7325a34e153f1ddcb2f0cd99fca9af7d78b17472a39341a3b78",
+  "task_id": "V07_FAST_SOLVER_LIVE_N32_CANDIDATE_R17",
+  "trial_counts": {
+    "bracket_establishment_trial_count": 2,
+    "narrow_solve_trial_count": 5,
+    "total_physical_trial_count": 7
+  }
+}
