@@ -1,0 +1,201 @@
+{
+  "schema_version": "task173.supplemental-functional-acceptance-evidence.v1",
+  "supplemental_acceptance_id": "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2",
+  "status": "FROZEN_INPUT_PROPOSAL_PENDING_INDEPENDENT_REVIEW",
+  "source_record": {
+    "schema_version": "task173.supplemental-test-input-source.v1",
+    "supplemental_acceptance_id": "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2",
+    "source_id": "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2-INPUT-SOURCE",
+    "source_version": "R1",
+    "task_id": "V07_TASK173_SUPPLEMENTAL_FUNCTIONAL_ACCEPTANCE_R2",
+    "source_class": "OWNER_DIRECTED_IMPLEMENTATION_VALIDATION_ONLY",
+    "source_purpose": "IMPLEMENTATION_VALIDATION_ONLY",
+    "engineering_design_authority": false,
+    "golden_authority": false,
+    "release_authority": false,
+    "requirement_values": {
+      "required_duty_w": "10000",
+      "max_tube_dp_pa": "1200",
+      "max_shell_dp_pa": "1200"
+    },
+    "directive_basis": "Exact requirements are specified by the current task directive before any supplemental Rating; the values reuse Completion R1 numeric inputs under a new source and requirement identity.",
+    "owner_direction_status": "EXPLICIT_IN_CURRENT_TASK_DIRECTIVE",
+    "independent_review_status": "PENDING_BEFORE_EXECUTION",
+    "old_completion_requirement_hash_reused": false,
+    "canonical_hash": "be6fc9a2e705264fb252ffc4956c58f25ee4d6820b9a12c0519de0693196c1db"
+  },
+  "authorities": {
+    "sizing_package_id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "sizing_package_hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "r2a_authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+    "r2a_authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+    "r2a_effective_lifecycle": "REVIEWED_AUTHORITY",
+    "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+    "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+    "candidate_rating_authority_hash": "a5536ba8e93dcf9a94f26a8c5274672494dd53b9391a9dad60553067967f49aa"
+  },
+  "candidate_space": {
+    "candidate_space_id": "94acffe4-8346-5015-b020-60fbbcea3dfd",
+    "task168_candidate_space_hash": "480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668",
+    "candidate_space_source": "docs/tasks/evidence/TASK-173-v0.7-holdout-identity-rebinding-and-enclosure-qualification-resume-r1.json",
+    "discrete_authority_id": "V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1",
+    "discrete_authority_hash": "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af",
+    "discrete_authority_approval_status": "APPROVED",
+    "scope": "IMPLEMENTATION_VALIDATION_ONLY_NOT_GOLDEN_NOT_RELEASE_NOT_BUSINESS_REQUIREMENT",
+    "selection_hash": "f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da",
+    "selection_order": ["H1", "H2", "H3"],
+    "performance_output_used_for_selection": false,
+    "candidate_count": 3,
+    "shared_geometry": {
+      "case_authority_id": "task039-release-demo-001",
+      "shell_geometry_id": "shell-1",
+      "shell_record_hash": "04924d0eda99881792f95bbbb1bb0e48e98aa08662ec3de39fcb97b5c23d4c5e",
+      "shell_inside_diameter_m": "0.500",
+      "construction_family": "FIXED_TUBESHEET",
+      "tube_outer_diameter_m": "0.01905",
+      "tube_wall_thickness_m": "0.00165",
+      "tube_length_m": "6.0",
+      "tube_pitch_m": "0.0254",
+      "tube_layout": "LAYOUT_30_DEG",
+      "tube_pass_count": 1,
+      "baffle_type": "SINGLE_SEGMENTAL",
+      "baffle_count": 4,
+      "baffle_spacing_m": "1.2"
+    },
+    "candidates": [
+      {
+        "ordinal": 1,
+        "prior_label": "H1",
+        "candidate_id": "68a99368-a518-5482-b9df-4bc3357edea9",
+        "candidate_hash": "bd0da145a592652e55a6fc8cd325a98d6f1cf349ed74b98e811d1343ce62ed54",
+        "baffle_cut_fraction": "0.225",
+        "expected_runtime_classification": "NOT_PREASSIGNED"
+      },
+      {
+        "ordinal": 2,
+        "prior_label": "H2",
+        "candidate_id": "aa70248a-9f76-542d-bc77-1e935b9c32d4",
+        "candidate_hash": "a30d1b0c01dcd0607bdd46e720a3a278e6b90b265b6bd4f109eb2c1cae58d8c5",
+        "baffle_cut_fraction": "0.275",
+        "expected_runtime_classification": "NOT_PREASSIGNED"
+      },
+      {
+        "ordinal": 3,
+        "prior_label": "H3",
+        "candidate_id": "f3e14759-e05b-5088-bfb5-b6e16e918267",
+        "candidate_hash": "b5bcf9258ff1cd455eab071a55cbdce7d8708391d1737e44d3dae2bccdaedb7e",
+        "baffle_cut_fraction": "0.350",
+        "expected_runtime_classification": "NOT_PREASSIGNED"
+      }
+    ]
+  },
+  "requirement_authority": {
+    "requirement_id": "TASK173-SIZING-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2",
+    "authority_version": "R2",
+    "source_class": "OWNER_APPROVED_PROJECT_DEFINED_IMPLEMENTATION_VALIDATION",
+    "source_id": "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2-INPUT-SOURCE",
+    "source_revision": "FROZEN_BEFORE_FIRST_SUPPLEMENTAL_RATING",
+    "approval_status": "APPROVED",
+    "evidence_refs": [
+      "OWNER_DIRECTION:V07_TASK173_SUPPLEMENTAL_FUNCTIONAL_ACCEPTANCE_R2",
+      "SUPPLEMENTAL_INPUT_SOURCE_RECORD_SHA256::be6fc9a2e705264fb252ffc4956c58f25ee4d6820b9a12c0519de0693196c1db",
+      "TASK168_CANDIDATE_SPACE_HASH::480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668",
+      "R2_SIZING_AUTHORITY_PACKAGE_HASH::750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9"
+    ],
+    "provenance_refs": [
+      "IMPLEMENTATION_VALIDATION_ONLY_NOT_ENGINEERING_DESIGN_AUTHORITY",
+      "NOT_GOLDEN_AUTHORITY",
+      "NOT_RELEASE_AUTHORITY",
+      "NO_PERFORMANCE_BASED_CANDIDATE_RESELECTION"
+    ],
+    "required_duty_w": "10000",
+    "max_tube_dp_pa": "1200",
+    "max_shell_dp_pa": "1200",
+    "allowed_construction_families": ["FIXED_TUBESHEET"],
+    "required_screening_policy_id": "V07-T173-SIZING-MANDATORY-SCREENING-R1",
+    "discrete_candidate_authority_ids_and_hashes": [
+      ["V07-T173-PROVIDER-QUANTIZATION-HOLDOUT-REBIND-R1", "ccdf7bd85e06b00c4b73cf4a21e7236d7aa313da27ea33eb98dec260c4e686af"],
+      ["task168-baffle_count", "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"],
+      ["task168-baffle_spacing", "bc2a7e9f768d061585838bd8afcd6dcc5c25d284ac4ee35c772e189a9269ee84"],
+      ["task168-baffle_type", "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"],
+      ["task168-construction_family", "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"],
+      ["task168-tube_layout", "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"],
+      ["task168-tube_length", "3b04d00722675e1e15d831b73c22e47859b6fbc0cc9622cc10cb1beff3ec4e24"],
+      ["task168-tube_outer_diameter", "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"],
+      ["task168-tube_pass_count", "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"],
+      ["task168-tube_pitch", "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"],
+      ["task168-tube_wall_thickness", "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"]
+    ],
+    "canonical_hash": "8dd46475acbdfd46caf3e6a6bddc89a74ba707beb21735f713d482e7bd19696e"
+  },
+  "sizing_request": {
+    "schema_version": "task173.sizing-request.v1",
+    "authority_package_id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "authority_package_hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "sizing_scope_projection_hash": "7072db59a1f80609b0d502de7dc61a8d047d9cbe302c40b717a39f443440570b",
+    "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+    "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+    "request_metadata": [
+      ["authority_use", "SUPPLEMENTAL_FUNCTIONAL_ACCEPTANCE_ONLY"],
+      ["golden", "false"],
+      ["release_authority", "false"],
+      ["supplemental_acceptance_id", "V07-T173-SUPPLEMENTAL-FUNCTIONAL-ACCEPTANCE-R2"],
+      ["candidate_space_id", "94acffe4-8346-5015-b020-60fbbcea3dfd"],
+      ["candidate_space_hash", "480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668"],
+      ["holdout_selection_hash", "f2de04ae8ca31a0f42c3cbfa57a135416d5607c5e6963442576c6e6da50450da"],
+      ["reviewed_r2a_authority_id", "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A"],
+      ["reviewed_r2a_authority_hash", "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e"],
+      ["selection_order", "H1,H2,H3"]
+    ],
+    "requirement_authority_hash": "8dd46475acbdfd46caf3e6a6bddc89a74ba707beb21735f713d482e7bd19696e",
+    "task168_request_hash": "f62cc16652d10d504678b2ed9248ee2f3a71b810af577f75f82903fcc7191187",
+    "candidate_space_hash": "480e3249300d4b4a0668815cd18ebb7ed6fb5cf507c073449c9a509526eea668",
+    "sizing_request_hash": "e5b085d238b2b1d9d7bcf23873c3ef04650135785fa4e6be1598aed3b8a9ab1e"
+  },
+  "acceptance": {
+    "classification_preassigned": false,
+    "candidate_execution_count_per_authorized_run": 1,
+    "full_rating_requirements": [
+      "production_mesh_convergence_and_headroom",
+      "terminal_and_energy_closure",
+      "all_accepted_cells_exact_valid_point_roots",
+      "accepted_trajectory_provider_enclosure_count_zero",
+      "R2A_event_and_certificate_identity_replay",
+      "deterministic_rating_result_replay"
+    ],
+    "hard_constraints_after_successful_rating_only": {
+      "duty_operator": ">=",
+      "required_duty_w": "10000",
+      "tube_dp_operator": "<=",
+      "max_tube_dp_pa": "1200",
+      "shell_dp_operator": "<=",
+      "max_shell_dp_pa": "1200",
+      "comparison": "exact_decimal_no_epsilon_no_predecision_rounding"
+    },
+    "blocked_rating_policy": "preserve_full_result_and_failure_identity; do_not_evaluate_constraints_or_rank",
+    "ranking_policy": {
+      "top_n": 3,
+      "warn_penalty": 10,
+      "objective": "shell_dp_pa",
+      "direction": "MINIMIZE",
+      "weight": "1",
+      "scale": "100",
+      "decimal_precision": 50,
+      "rounding": "ROUND_HALF_EVEN",
+      "tie_break": "candidate_hash_utf8_ascending"
+    },
+    "functional_core_pass": "at_least_one_recommendable_and_at_least_one_successfully_rated_hard-constraint-rejected_candidate; valid ranking recommendation exclusion provenance and identity replay",
+    "alternatives_coverage_target": "at_least_two_recommendable_candidates_for_nonempty_alternatives",
+    "golden_g05_covered": false
+  },
+  "review": {
+    "owner_direction_present": true,
+    "independent_review_status": "PENDING",
+    "preexecution_input_identities_frozen": true,
+    "preexecution_freeze_complete": false,
+    "controlled_production_execution_eligible": false,
+    "rating_executed": false,
+    "sizing_executed": false,
+    "task175_executed": false
+  }
+}

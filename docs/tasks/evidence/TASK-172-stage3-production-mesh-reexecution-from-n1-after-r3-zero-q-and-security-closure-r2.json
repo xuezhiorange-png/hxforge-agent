@@ -1,0 +1,849 @@
+{
+  "schema_version": "task172.stage3-production-mesh-reexecution.v1",
+  "task_id": "TASK172_V0_7_STAGE3_PRODUCTION_MESH_REEXECUTION_FROM_N1_AFTER_R3_ZERO_Q_AND_SECURITY_CLOSURE_R2",
+  "mode": "STAGE3_PRODUCTION_MESH_EXECUTION_ONLY",
+  "result": "BLOCKED",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "execution_source_head": "0fb5450cba5b5bb60cf9ca2fbba6ec7787aca576",
+  "predecessor_security": {
+    "task_id": "SECURITY_DEPENDENCY_REMEDIATION_URLLIB3_2_8_0_R1",
+    "result": "PASS",
+    "exact_head_ci_run": 36850933946,
+    "exact_head_ci_result": "SUCCESS",
+    "exact_head_ci_head_sha": "0fb5450cba5b5bb60cf9ca2fbba6ec7787aca576",
+    "urllib3_version": "2.8.0",
+    "requests_version": "2.34.2",
+    "uv_lock_changed": false,
+    "pip_audit": "PASS"
+  },
+  "authority_chain": {
+    "task171": {
+      "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "topology_authority_id": "V07-T171-TOPOLOGY-R4-V1",
+      "cell_compartment_authority_id": "V07-T171-CELL-COMPARTMENT-R4-V1",
+      "conservation_authority_id": "V07-T171-CONSERVATION-R4-V1",
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7"
+    },
+    "task031": {
+      "geometry_id": "82b051f6-d8f6-5bbb-b46f-76609b9f8cca",
+      "geometry_hash": "1dc32d501ee1ba283e4d2bb5eab2f2f5ffc81e464fd6f254ff13b02ceb01519e",
+      "request_hash": "688c13a7d9022338fba1787be6a0a0867bd3e37e1bac2528fcae101cb66adb58"
+    },
+    "task032": {
+      "result_id": "8a43b528-acca-5388-8f82-cd85e53b820e",
+      "result_hash": "58e47124f94d14ece0f1c93a0bb5510b7dda52bfbc60b9f650fbf72c1eb232d2",
+      "request_hash": "942c339c85a585d51be5a6431b17ae3f4064d2ae9d6166a51cdf4651e444e13e"
+    },
+    "task166": {
+      "result_id": "ad4745b7-fa18-519f-99c2-e76b12bb23dc",
+      "result_hash": "a42aee19a2fbb77d1666e4b7170b86e3a9e036f992ef8030a9c2ecf1928c151d",
+      "request_hash": "1083b8fbaef93ef2370b63364b3fd9e40f2ba0e98d2c8dd1b852f2da158967c2"
+    },
+    "task174": {
+      "result_id": "urn:hxforge:task174:ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419",
+      "result_hash": "ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419"
+    },
+    "cell_root": {
+      "authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3",
+      "authority_hash": "eafe8bc53769d1648ac2f918045cececfd3870d618ff6273c523fe185a6683ef",
+      "method": "VALID_POINT_ONLY_LOCAL_DYADIC_BRACKET_REFINEMENT",
+      "max_hole_search_levels": 12,
+      "max_hole_recovery_brackets_per_cell": 15,
+      "max_hole_recovery_probes_per_cell": 360,
+      "max_cell_root_bisection_iterations": 128,
+      "max_cell_task172_evaluations": 512,
+      "worst_case_authorized_evaluations": 491,
+      "cell_residual_acceptance_w": "1e-6"
+    },
+    "endpoint_classification": {
+      "authority_id": "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1",
+      "authority_hash": "60c8fe2957c5906704b796a779b88845ddb3e59934d8576c93e0589ea2084f74"
+    },
+    "zero_q": {
+      "authority_id": "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1",
+      "authority_hash": "81903b49fcf6c9e41ff8f296da921e25ca116727b846e01f9e07e257dd4531fd"
+    },
+    "local_state_reconstruction": {
+      "authority_id": "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2",
+      "authority_hash": "9abef953ce251628b73370f08337efbe7938ed33509a2a99c878eade2bb8b366"
+    },
+    "production_mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1"
+  },
+  "frozen_policy": {
+    "mesh_sequence": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64
+    ],
+    "tube_cells_per_interval": 5,
+    "shell_cells_per_interval": 5,
+    "numerical_cells_per_interval": 10,
+    "wall_interfaces_per_interval": 5,
+    "duty_relative_threshold": "0.01",
+    "near_zero_duty_absolute_threshold_w": "0.01",
+    "wall_extrema_absolute_threshold_k": "0.01",
+    "required_consecutive_passing_pairs": 2,
+    "required_later_headroom_levels": 1,
+    "maximum_subdivisions_per_interval": 64,
+    "latest_acceptable_candidate_subdivisions": 32,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "r98_c_round": "1.0",
+    "thresholds_or_resource_limits_changed": false
+  },
+  "execution": {
+    "fresh_run_from_n1": true,
+    "prior_r1_mesh_values_reused": false,
+    "cached_or_fixture_result_promoted": false,
+    "task173_public_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "provider_reinitialized_per_mesh_level": true,
+    "environment": {
+      "python": "3.14.5",
+      "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+      "coolprop": "8.0.0",
+      "requests": "2.34.2",
+      "urllib3": "2.8.0"
+    },
+    "attempted_mesh_levels": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32
+    ],
+    "completed_mesh_levels": [
+      1,
+      2,
+      4,
+      8,
+      16
+    ],
+    "failed_mesh_levels": [
+      32
+    ],
+    "not_run_mesh_levels": [
+      64
+    ],
+    "stop_at_first_authoritative_blocker": true,
+    "no_partial_mesh_promoted": true
+  },
+  "mesh_execution": [
+    {
+      "subdivisions_per_interval": 1,
+      "execution_state": "COMPLETE",
+      "mesh_level_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "classification": "VALID_TRAJECTORY",
+      "cell_counts": {
+        "tube": 5,
+        "shell": 5,
+        "total": 10,
+        "wall_interfaces": 5
+      },
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "mesh_rating_result_hash": "8bab91b8d330ece6ec93d17a763c65564e2cddbcfaeb5fe65f01c61b58080f08",
+      "mesh_rating_result_id": "NOT_EMITTED_BY_MESH_LEVEL_RUNNER",
+      "accepted_shooting_enthalpy_j_kg": "107538.2306458140842204885184764862060546875",
+      "outer_solver_iteration_count": 27,
+      "elapsed_seconds": 157.31904545798898,
+      "observables": {
+        "subdivisions_per_interval": 1,
+        "mesh_level_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+        "tube_cell_count": 5,
+        "shell_cell_count": 5,
+        "total_numerical_cell_count": 10,
+        "wall_interface_count": 5,
+        "total_duty_w": "52362.216168039979",
+        "interval_duty_w": [
+          "12347.39656143347",
+          "11324.9801301599",
+          "10391.620296648718",
+          "9538.905484893043",
+          "8759.313694904848"
+        ],
+        "tube_outlet_temperature_k": "298.9562992655684",
+        "shell_outlet_temperature_k": "298.7761641216321",
+        "wall_inner_min_k": "298.5898027909208",
+        "wall_inner_max_k": "299.2464365127666",
+        "wall_outer_min_k": "298.5274103515744",
+        "wall_outer_max_k": "299.1584862214705",
+        "minimum_approach_temperature_k": "0.8062992588553",
+        "hot_energy_loss_w": "52362.21616804008",
+        "cold_energy_gain_w": "52362.21616804020",
+        "wall_duty_sum_w": "52362.216168039979",
+        "energy_balance_residual_w": "2.21E-10",
+        "terminal_boundary_residual_k": "6.7131E-9",
+        "terminal_boundary_residual_j_kg": "0.00002814423",
+        "duty_roundoff_floor_w": "1.063403208095617171E-7",
+        "wall_temperature_roundoff_floor_k": "1.7542530015199722E-13",
+        "task172_local_evaluation_count": 4222,
+        "task172_numerical_hole_count": 0,
+        "task172_numerical_hole_counts_by_code": {},
+        "task172_numerical_hole_neighborhoods": [],
+        "rating_result_hash": "8bab91b8d330ece6ec93d17a763c65564e2cddbcfaeb5fe65f01c61b58080f08"
+      },
+      "task172_statistics": {
+        "evaluation_count": 4222,
+        "maximum_cell_evaluation_count_observed": "UNAVAILABLE_FROM_LEVEL_AGGREGATE_CAPTURE",
+        "valid_evaluation_count_derived": 4222,
+        "valid_evaluation_count_reported_by_run_capture": 0,
+        "numerical_hole_count": 0,
+        "numerical_hole_counts_by_code": {},
+        "hole_recovery_bracket_count_reported": 0,
+        "hole_recovery_probe_count_reported": 0,
+        "maximum_hole_recovery_depth_observed": 0,
+        "counter_capture_note": "Aggregate recovery bracket/probe counters were emitted as zero despite nonzero numerical holes; values are preserved as reported, not inferred."
+      },
+      "task172_cell_identity_count": 5,
+      "task172_cell_identity_manifest_sha256": "4c8eedd1027204d604c7eada9a7224dfc2d2e9e33c65fa9bd3c99346afe6d4a0",
+      "task172_result_hash_manifest_sha256": "60f8155e309e2ff74ddc65c057acff4ca25eb3ca7240deb86d5cad8f100c1c50",
+      "hole_neighborhood_capture_status": "NONE_EMITTED"
+    },
+    {
+      "subdivisions_per_interval": 2,
+      "execution_state": "COMPLETE",
+      "mesh_level_identity": "0310082d4d83365d229317dbcfd17ee90e2158abd5bc99da5db7743ad9925645",
+      "classification": "VALID_TRAJECTORY",
+      "cell_counts": {
+        "tube": 10,
+        "shell": 10,
+        "total": 20,
+        "wall_interfaces": 10
+      },
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "mesh_rating_result_hash": "8d4ed430447d795f3813c271bcd355519e815357cd39fc8d802fd2aa2460aa8d",
+      "mesh_rating_result_id": "NOT_EMITTED_BY_MESH_LEVEL_RUNNER",
+      "accepted_shooting_enthalpy_j_kg": "107537.606816212185394600927829742431640625",
+      "outer_solver_iteration_count": 26,
+      "elapsed_seconds": 328.989495124988,
+      "observables": {
+        "subdivisions_per_interval": 2,
+        "mesh_level_identity": "0310082d4d83365d229317dbcfd17ee90e2158abd5bc99da5db7743ad9925645",
+        "tube_cell_count": 10,
+        "shell_cell_count": 10,
+        "total_numerical_cell_count": 20,
+        "wall_interface_count": 10,
+        "total_duty_w": "52349.7395172012105",
+        "interval_duty_w": [
+          "12343.5174057830685",
+          "11321.901528796523",
+          "10389.225784831995",
+          "9537.094710898721",
+          "8758.000086890903"
+        ],
+        "tube_outlet_temperature_k": "298.9565479431746",
+        "shell_outlet_temperature_k": "298.776014918398",
+        "wall_inner_min_k": "298.55483886929727",
+        "wall_inner_max_k": "299.2938706331475",
+        "wall_outer_min_k": "298.4937819912769",
+        "wall_outer_max_k": "299.20404449243773",
+        "minimum_approach_temperature_k": "0.8065479357611",
+        "hot_energy_loss_w": "52349.73951720156",
+        "cold_energy_gain_w": "52349.73951720100",
+        "wall_duty_sum_w": "52349.7395172012105",
+        "energy_balance_residual_w": "5.6E-10",
+        "terminal_boundary_residual_k": "7.4135E-9",
+        "terminal_boundary_residual_j_kg": "0.00003108429",
+        "duty_roundoff_floor_w": "1.063410458388512047E-7",
+        "wall_temperature_roundoff_floor_k": "1.754379573086011E-13",
+        "task172_local_evaluation_count": 8514,
+        "task172_numerical_hole_count": 18,
+        "task172_numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 18
+        },
+        "task172_numerical_hole_neighborhoods": [],
+        "rating_result_hash": "8d4ed430447d795f3813c271bcd355519e815357cd39fc8d802fd2aa2460aa8d"
+      },
+      "task172_statistics": {
+        "evaluation_count": 8514,
+        "maximum_cell_evaluation_count_observed": "UNAVAILABLE_FROM_LEVEL_AGGREGATE_CAPTURE",
+        "valid_evaluation_count_derived": 8496,
+        "valid_evaluation_count_reported_by_run_capture": 0,
+        "numerical_hole_count": 18,
+        "numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 18
+        },
+        "hole_recovery_bracket_count_reported": 0,
+        "hole_recovery_probe_count_reported": 0,
+        "maximum_hole_recovery_depth_observed": 1,
+        "counter_capture_note": "Aggregate recovery bracket/probe counters were emitted as zero despite nonzero numerical holes; values are preserved as reported, not inferred."
+      },
+      "task172_cell_identity_count": 10,
+      "task172_cell_identity_manifest_sha256": "f9d27712261528a4097ccc0801c11b807ad4a41328b24267e7a3d7be2196a739",
+      "task172_result_hash_manifest_sha256": "6918b4e2de3ae2a1b7bb3c73fd684fe4ae8493a1aaacfbebfd50e08064176c82",
+      "hole_neighborhood_capture_status": "NONE_EMITTED"
+    },
+    {
+      "subdivisions_per_interval": 4,
+      "execution_state": "COMPLETE",
+      "mesh_level_identity": "20383fc1b28648da59f32e74d2f5164d27a3da2b2fc4d03a4c08dcc5a4ad9be5",
+      "classification": "VALID_TRAJECTORY",
+      "cell_counts": {
+        "tube": 20,
+        "shell": 20,
+        "total": 40,
+        "wall_interfaces": 20
+      },
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "mesh_rating_result_hash": "2531cc30957a88cdc3d88f0e1fcc3cde971eda772b3feb8dc2f22d691006934e",
+      "mesh_rating_result_id": "NOT_EMITTED_BY_MESH_LEVEL_RUNNER",
+      "accepted_shooting_enthalpy_j_kg": "107537.45095966176180341266095638275146484375",
+      "outer_solver_iteration_count": 28,
+      "elapsed_seconds": 714.1794947090093,
+      "observables": {
+        "subdivisions_per_interval": 4,
+        "mesh_level_identity": "20383fc1b28648da59f32e74d2f5164d27a3da2b2fc4d03a4c08dcc5a4ad9be5",
+        "tube_cell_count": 20,
+        "shell_cell_count": 20,
+        "total_numerical_cell_count": 40,
+        "wall_interface_count": 20,
+        "total_duty_w": "52346.6228439931748",
+        "interval_duty_w": [
+          "12342.5485361085202",
+          "11321.1325457681776",
+          "10388.6276130344277",
+          "9536.6423070381951",
+          "8757.6718420438542"
+        ],
+        "tube_outlet_temperature_k": "298.95661006281233",
+        "shell_outlet_temperature_k": "298.7759776414382",
+        "wall_inner_min_k": "298.5378859955716",
+        "wall_inner_max_k": "299.31837998257555",
+        "wall_outer_min_k": "298.47747960204094",
+        "wall_outer_max_k": "299.22758758524856",
+        "minimum_approach_temperature_k": "0.80661006084543",
+        "hot_energy_loss_w": "52346.62284399312",
+        "cold_energy_gain_w": "52346.62284399320",
+        "wall_duty_sum_w": "52346.6228439931748",
+        "energy_balance_residual_w": "8E-11",
+        "terminal_boundary_residual_k": "1.9669E-9",
+        "terminal_boundary_residual_j_kg": "0.00000819426",
+        "duty_roundoff_floor_w": "1.063407020635533571E-7",
+        "wall_temperature_roundoff_floor_k": "1.7544410678839364E-13",
+        "task172_local_evaluation_count": 18586,
+        "task172_numerical_hole_count": 34,
+        "task172_numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 34
+        },
+        "task172_numerical_hole_neighborhoods": [
+          {
+            "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+            "hole_q_trial_w": "2220.9702363795213",
+            "left_f_q_w": "2.4834235265188",
+            "left_task172_result_hash": "e154ec39fe345a91b33c57c5a86530e94594a57c038bc0fcab64468abafe6cd9",
+            "left_valid_q_w": "2214.6246071327228",
+            "physical_support_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+            "right_f_q_w": "15.309647639729",
+            "right_task172_result_hash": "afb8b33467009ec5ebefd5a0cc7f52b9fa594ebce627cd36eb5557967823f191",
+            "right_valid_q_w": "2227.31586562632"
+          }
+        ],
+        "rating_result_hash": "2531cc30957a88cdc3d88f0e1fcc3cde971eda772b3feb8dc2f22d691006934e"
+      },
+      "task172_statistics": {
+        "evaluation_count": 18586,
+        "maximum_cell_evaluation_count_observed": "UNAVAILABLE_FROM_LEVEL_AGGREGATE_CAPTURE",
+        "valid_evaluation_count_derived": 18552,
+        "valid_evaluation_count_reported_by_run_capture": 0,
+        "numerical_hole_count": 34,
+        "numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 34
+        },
+        "hole_recovery_bracket_count_reported": 0,
+        "hole_recovery_probe_count_reported": 0,
+        "maximum_hole_recovery_depth_observed": 3,
+        "counter_capture_note": "Aggregate recovery bracket/probe counters were emitted as zero despite nonzero numerical holes; values are preserved as reported, not inferred."
+      },
+      "task172_cell_identity_count": 20,
+      "task172_cell_identity_manifest_sha256": "55b4f641fcdf9aac3612a68cb7730aff6604428bac60cafb5578deb405ce0456",
+      "task172_result_hash_manifest_sha256": "bdbd413edf8de134d4a54a7a7099fc9c8c8a1e13b7a5467a83e6849c785b1120",
+      "hole_neighborhood_capture_status": "SAMPLED_ONLY"
+    },
+    {
+      "subdivisions_per_interval": 8,
+      "execution_state": "COMPLETE",
+      "mesh_level_identity": "dc15334e9c99c47871438e6b341c61252e8f273dac1fede35de30e7911539458",
+      "classification": "VALID_TRAJECTORY",
+      "cell_counts": {
+        "tube": 40,
+        "shell": 40,
+        "total": 80,
+        "wall_interfaces": 40
+      },
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "mesh_rating_result_hash": "561401a65c5dde4fde9bead320bb5d7ef8e646f7b4ce1217aa36127afc4fca16",
+      "mesh_rating_result_id": "NOT_EMITTED_BY_MESH_LEVEL_RUNNER",
+      "accepted_shooting_enthalpy_j_kg": "107537.41200272773098527871072292327880859375",
+      "outer_solver_iteration_count": 28,
+      "elapsed_seconds": 1402.3959712920187,
+      "observables": {
+        "subdivisions_per_interval": 8,
+        "mesh_level_identity": "dc15334e9c99c47871438e6b341c61252e8f273dac1fede35de30e7911539458",
+        "tube_cell_count": 40,
+        "shell_cell_count": 40,
+        "total_numerical_cell_count": 80,
+        "wall_interface_count": 40,
+        "total_duty_w": "52345.8438142056468",
+        "interval_duty_w": [
+          "12342.3063724199345",
+          "11320.9403367115289",
+          "10388.4780961580391",
+          "9536.5292234438463",
+          "8757.5897854722980"
+        ],
+        "tube_outlet_temperature_k": "298.95662559013135",
+        "shell_outlet_temperature_k": "298.7759683239742",
+        "wall_inner_min_k": "298.5295376264141",
+        "wall_inner_max_k": "299.3308395884031",
+        "wall_outer_min_k": "298.46945231878885",
+        "wall_outer_max_k": "299.2395566950424",
+        "minimum_approach_temperature_k": "0.80662558946540",
+        "hot_energy_loss_w": "52345.84381420596",
+        "cold_energy_gain_w": "52345.84381420500",
+        "wall_duty_sum_w": "52345.8438142056468",
+        "energy_balance_residual_w": "9.6E-10",
+        "terminal_boundary_residual_k": "6.6595E-10",
+        "terminal_boundary_residual_j_kg": "0.00000274963",
+        "duty_roundoff_floor_w": "1.0634068333295440951E-7",
+        "wall_temperature_roundoff_floor_k": "1.7544713812346705E-13",
+        "task172_local_evaluation_count": 37372,
+        "task172_numerical_hole_count": 51,
+        "task172_numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 51
+        },
+        "task172_numerical_hole_neighborhoods": [
+          {
+            "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+            "hole_q_trial_w": "1429.0713551283375",
+            "left_f_q_w": "67.4010690582415",
+            "left_task172_result_hash": "0c5af32cf16e1ca14f7cc6c64036243bf53430229bde230a7c70b9cd3dd716ef",
+            "left_valid_q_w": "1190.8927959402813",
+            "physical_support_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+            "right_f_q_w": "546.2928103465033",
+            "right_task172_result_hash": "78d07f5f90b0c3c95040ff14ba14f873b1cf8e05b5cb8bb574e5c5f0e2da76ad",
+            "right_valid_q_w": "1667.2499143163936"
+          }
+        ],
+        "rating_result_hash": "561401a65c5dde4fde9bead320bb5d7ef8e646f7b4ce1217aa36127afc4fca16"
+      },
+      "task172_statistics": {
+        "evaluation_count": 37372,
+        "maximum_cell_evaluation_count_observed": "UNAVAILABLE_FROM_LEVEL_AGGREGATE_CAPTURE",
+        "valid_evaluation_count_derived": 37321,
+        "valid_evaluation_count_reported_by_run_capture": 0,
+        "numerical_hole_count": 51,
+        "numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 51
+        },
+        "hole_recovery_bracket_count_reported": 0,
+        "hole_recovery_probe_count_reported": 0,
+        "maximum_hole_recovery_depth_observed": 3,
+        "counter_capture_note": "Aggregate recovery bracket/probe counters were emitted as zero despite nonzero numerical holes; values are preserved as reported, not inferred."
+      },
+      "task172_cell_identity_count": 40,
+      "task172_cell_identity_manifest_sha256": "a13518da1b62e123aaef5b8c80ea3a4416587edb715c2da0b6aed7c7100939cc",
+      "task172_result_hash_manifest_sha256": "b51ffe9fcb8a034325f3f5c2b761c2841cc0800ad270b5b11bab2e8cc0b0df20",
+      "hole_neighborhood_capture_status": "SAMPLED_ONLY"
+    },
+    {
+      "subdivisions_per_interval": 16,
+      "execution_state": "COMPLETE",
+      "mesh_level_identity": "c7cf7f75ccc837e8d375ff78242e6a7e51c74d463be0d0be51488c99ecbfa44a",
+      "classification": "VALID_TRAJECTORY",
+      "cell_counts": {
+        "tube": 80,
+        "shell": 80,
+        "total": 160,
+        "wall_interfaces": 80
+      },
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "mesh_rating_result_hash": "6fe33e2b1b1584e15803f53aee5712894171da00e99493a15f376b606b40dfc8",
+      "mesh_rating_result_id": "NOT_EMITTED_BY_MESH_LEVEL_RUNNER",
+      "accepted_shooting_enthalpy_j_kg": "107537.40226349422328074522316455841064453125",
+      "outer_solver_iteration_count": 28,
+      "elapsed_seconds": 3057.565042291011,
+      "observables": {
+        "subdivisions_per_interval": 16,
+        "mesh_level_identity": "c7cf7f75ccc837e8d375ff78242e6a7e51c74d463be0d0be51488c99ecbfa44a",
+        "tube_cell_count": 80,
+        "shell_cell_count": 80,
+        "total_numerical_cell_count": 160,
+        "wall_interface_count": 80,
+        "total_duty_w": "52345.6490766926279",
+        "interval_duty_w": [
+          "12342.2458371659644",
+          "11320.8922872600734",
+          "10388.4407181080308",
+          "9536.5009575942335",
+          "8757.5692765643258"
+        ],
+        "tube_outlet_temperature_k": "298.95662947138504",
+        "shell_outlet_temperature_k": "298.7759659946122",
+        "wall_inner_min_k": "298.5253949540725",
+        "wall_inner_max_k": "299.33712151906025",
+        "wall_outer_min_k": "298.4654691704589",
+        "wall_outer_max_k": "299.24559149866536",
+        "minimum_approach_temperature_k": "0.80662947130599",
+        "hot_energy_loss_w": "52345.64907669240",
+        "cold_energy_gain_w": "52345.64907669240",
+        "wall_duty_sum_w": "52345.6490766926279",
+        "energy_balance_residual_w": "2.279E-10",
+        "terminal_boundary_residual_k": "7.905E-11",
+        "terminal_boundary_residual_j_kg": "3.9176E-7",
+        "duty_roundoff_floor_w": "1.0634074588119222072E-7",
+        "wall_temperature_roundoff_floor_k": "1.7544864310161813E-13",
+        "task172_local_evaluation_count": 74798,
+        "task172_numerical_hole_count": 100,
+        "task172_numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 100
+        },
+        "task172_numerical_hole_neighborhoods": [
+          {
+            "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+            "hole_q_trial_w": "557.2192492557349",
+            "left_f_q_w": "-0.4344654492763",
+            "left_task172_result_hash": "892165a764edf97b1c1f74af1ec27dd1692b1d745fd9f832116f00e79b537c25",
+            "left_valid_q_w": "557.0209505905193",
+            "physical_support_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+            "right_f_q_w": "0.1620126716462",
+            "right_task172_result_hash": "58504f97f158d70d49e17af5b02343ece037e933bd66c6c23ca6052f9db5f22",
+            "right_valid_q_w": "557.615846586166"
+          },
+          {
+            "failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+            "hole_q_trial_w": "557.4175479209505",
+            "left_f_q_w": "-0.4344654492763",
+            "left_task172_result_hash": "892165a764edf97b1c1f74af1ec27dd1692b1d745fd9f832116f00e79b537c25",
+            "left_valid_q_w": "557.0209505905193",
+            "physical_support_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+            "right_f_q_w": "0.1620126716462",
+            "right_task172_result_hash": "58504f97f158d70d49e17af5b02343ece037e933bd66c6c23ca6052f9db5f22",
+            "right_valid_q_w": "557.615846586166"
+          }
+        ],
+        "rating_result_hash": "6fe33e2b1b1584e15803f53aee5712894171da00e99493a15f376b606b40dfc8"
+      },
+      "task172_statistics": {
+        "evaluation_count": 74798,
+        "maximum_cell_evaluation_count_observed": "UNAVAILABLE_FROM_LEVEL_AGGREGATE_CAPTURE",
+        "valid_evaluation_count_derived": 74698,
+        "valid_evaluation_count_reported_by_run_capture": 0,
+        "numerical_hole_count": 100,
+        "numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 100
+        },
+        "hole_recovery_bracket_count_reported": 0,
+        "hole_recovery_probe_count_reported": 0,
+        "maximum_hole_recovery_depth_observed": 12,
+        "counter_capture_note": "Aggregate recovery bracket/probe counters were emitted as zero despite nonzero numerical holes; values are preserved as reported, not inferred."
+      },
+      "task172_cell_identity_count": 80,
+      "task172_cell_identity_manifest_sha256": "f849ada632ad3d9c9da7b4f32d4d572f9e2275a00952c103ddc376ec4af98455",
+      "task172_result_hash_manifest_sha256": "75f3bc49ae512c4fc2d12d96e37ba07db92470aaa620e63cd7bea4d6ffa9bb2d",
+      "hole_neighborhood_capture_status": "SAMPLED_ONLY"
+    },
+    {
+      "subdivisions_per_interval": 32,
+      "execution_state": "FAILED_BEFORE_MESH_COMPLETION",
+      "expected_profile_counts_not_completed": {
+        "tube_cells": 160,
+        "shell_cells": 160,
+        "total_numerical_cells": 320,
+        "wall_interfaces": 160
+      },
+      "classification": "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+      "blocker_result_id": "urn:hxforge:task173:blocked:591e4ff362f4957568d6c82bce1ce7d5a097ff176ca79c7fe7c8ab4ad2e37727",
+      "blocker_result_hash": "591e4ff362f4957568d6c82bce1ce7d5a097ff176ca79c7fe7c8ab4ad2e37727",
+      "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "task172_failure_diagnostics": {
+        "endpoint_side": "LOWER_ENDPOINT",
+        "recovery_levels_executed": 12,
+        "valid_recovery_sample_count": 11,
+        "sign_pair_found": false,
+        "eligible_root_found": false,
+        "maximum_hole_dyadic_levels": 12,
+        "task172_evaluation_count": 121654,
+        "task172_valid_evaluation_count_reported_by_capture": 0,
+        "task172_valid_evaluation_count_derived": 121495,
+        "task172_numerical_hole_count": 159,
+        "task172_numerical_hole_counts_by_code": {
+          "BLOCKED_RESIDUAL_ACCEPTANCE": 159
+        },
+        "hole_recovery_bracket_count_reported_by_capture": 0,
+        "hole_recovery_probe_count_reported_by_capture": 0,
+        "maximum_hole_recovery_depth_observed": 12,
+        "counter_capture_note": "Aggregate valid/bracket/probe counters emitted as zero are retained as reported; derived valid count is evaluation_count minus residual-acceptance hole count. Probe/bracket counts are not inferred."
+      },
+      "unavailable_diagnostics": {
+        "physical_support_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "tube_cell_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "shell_cell_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "wall_interface_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "outer_iteration": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "shooting_enthalpy_j_kg": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "left_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "right_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "left_f_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "right_f_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+        "failed_physical_support_and_cell_ids": "The returned public blocked result exposed the failure code and bounded recovery summary, but not the private failed-cell identity/q bracket; captured runner output was truncated before any richer structured event."
+      },
+      "partial_mesh_authoritative_result": false
+    }
+  ],
+  "mesh_comparisons": [
+    {
+      "coarse_subdivisions": 1,
+      "duty_difference_w": "12.4766508387685",
+      "duty_metric": "0.0002382758361244419736063372369",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.061733482896891006874299897E-12",
+      "duty_precision_floor_w": "2.126813666484129218E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 2,
+      "interval_duty_differences_w": [
+        "3.8791556504015",
+        "3.078601363377",
+        "2.394511816723",
+        "1.810773994322",
+        "1.313608013945"
+      ],
+      "overall_status": "FAIL",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.0474341203809",
+        "T_wall_inner_min": "0.03496392162353",
+        "T_wall_outer_max": "0.04555827096723",
+        "T_wall_outer_min": "0.0336283602975"
+      },
+      "wall_precision_floor_k": "3.5086325746059832E-13",
+      "wall_status": "FAIL"
+    },
+    {
+      "coarse_subdivisions": 2,
+      "duty_difference_w": "3.1166732080357",
+      "duty_metric": "0.00005953560107040486025234071468",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.062708809325040717167190712E-12",
+      "duty_precision_floor_w": "2.126817479024045618E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 4,
+      "interval_duty_differences_w": [
+        "0.9688696745483",
+        "0.7689830283454",
+        "0.5981717975673",
+        "0.4524038605259",
+        "0.3282448470488"
+      ],
+      "overall_status": "FAIL",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.02450934942805",
+        "T_wall_inner_min": "0.01695287372567",
+        "T_wall_outer_max": "0.02354309281083",
+        "T_wall_outer_min": "0.01630238923596"
+      },
+      "wall_precision_floor_k": "3.5088206409699474E-13",
+      "wall_status": "FAIL"
+    },
+    {
+      "coarse_subdivisions": 4,
+      "duty_difference_w": "0.7790297875280",
+      "duty_metric": "0.00001488214034073822616483620898",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.062943774431346332028701768E-12",
+      "duty_precision_floor_w": "2.1268138539650776661E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 8,
+      "interval_duty_differences_w": [
+        "0.2421636885857",
+        "0.1922090566487",
+        "0.1495168763886",
+        "0.1130835943488",
+        "0.0820565715562"
+      ],
+      "overall_status": "FAIL",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.01245960582755",
+        "T_wall_inner_min": "0.0083483691575",
+        "T_wall_outer_max": "0.01196910979384",
+        "T_wall_outer_min": "0.00802728325209"
+      },
+      "wall_precision_floor_k": "3.5089124491186069E-13",
+      "wall_status": "FAIL"
+    },
+    {
+      "coarse_subdivisions": 8,
+      "duty_difference_w": "0.1947375130189",
+      "duty_metric": "0.000003720209644725452219476434207",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.063005077710276878743164972E-12",
+      "duty_precision_floor_w": "2.1268142921414663023E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 16,
+      "interval_duty_differences_w": [
+        "0.0605352539701",
+        "0.0480494514555",
+        "0.0373780500083",
+        "0.0282658496128",
+        "0.0205089079722"
+      ],
+      "overall_status": "PASS",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.00628193065715",
+        "T_wall_inner_min": "0.0041426723416",
+        "T_wall_outer_max": "0.00603480362296",
+        "T_wall_outer_min": "0.00398314832995"
+      },
+      "wall_precision_floor_k": "3.5089578122508518E-13",
+      "wall_status": "PASS"
+    }
+  ],
+  "candidate_detection": {
+    "comparison_statuses": [
+      "1->2:FAIL",
+      "2->4:FAIL",
+      "4->8:FAIL",
+      "8->16:PASS"
+    ],
+    "duty_statuses": [
+      "1->2:PASS",
+      "2->4:PASS",
+      "4->8:PASS",
+      "8->16:PASS"
+    ],
+    "wall_statuses": [
+      "1->2:FAIL",
+      "2->4:FAIL",
+      "4->8:FAIL",
+      "8->16:PASS"
+    ],
+    "consecutive_passing_pair_count": 1,
+    "earliest_candidate_subdivisions": null,
+    "candidate_admitted": false,
+    "explanation": "Only 8->16 passes overall; frozen policy requires two consecutive passing pairs before the candidate and an actually completed later headroom level."
+  },
+  "headroom_evaluation": {
+    "required_later_headroom_levels": 1,
+    "headroom_level": null,
+    "headroom_result": "NOT_RUN_BECAUSE_N32_FAILED",
+    "passed": false
+  },
+  "production_mesh_admission": {
+    "real_case_mesh_admissible": false,
+    "accepted_subdivisions_per_interval": null,
+    "accepted_total_numerical_cell_count": null,
+    "accepted_wall_interface_count": null,
+    "task173_production_result_id": "UNAVAILABLE",
+    "task173_production_result_hash": "UNAVAILABLE",
+    "task173_production_result_request_hash": "UNAVAILABLE",
+    "reason": "No mesh candidate met the two-consecutive-pair plus later-headroom rule; n=32 failed before completion, so n=64 was not run."
+  },
+  "task173_blocked_result": {
+    "status": "BLOCKED",
+    "request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "result_id": "urn:hxforge:task173:blocked:591e4ff362f4957568d6c82bce1ce7d5a097ff176ca79c7fe7c8ab4ad2e37727",
+    "result_hash": "591e4ff362f4957568d6c82bce1ce7d5a097ff176ca79c7fe7c8ab4ad2e37727",
+    "blocker_code": "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+    "blocked_result_used_for_residual_sign": false,
+    "blocked_result_used_as_physical_result": false,
+    "diagnostic_last_iterate_used": false,
+    "diagnostics": {
+      "endpoint_side": "LOWER_ENDPOINT",
+      "recovery_levels_executed": 12,
+      "valid_recovery_sample_count": 11,
+      "sign_pair_found": false,
+      "eligible_root_found": false,
+      "maximum_hole_dyadic_levels": 12,
+      "task172_evaluation_count": 121654,
+      "task172_valid_evaluation_count_reported_by_capture": 0,
+      "task172_valid_evaluation_count_derived": 121495,
+      "task172_numerical_hole_count": 159,
+      "task172_numerical_hole_counts_by_code": {
+        "BLOCKED_RESIDUAL_ACCEPTANCE": 159
+      },
+      "hole_recovery_bracket_count_reported_by_capture": 0,
+      "hole_recovery_probe_count_reported_by_capture": 0,
+      "maximum_hole_recovery_depth_observed": 12,
+      "counter_capture_note": "Aggregate valid/bracket/probe counters emitted as zero are retained as reported; derived valid count is evaluation_count minus residual-acceptance hole count. Probe/bracket counts are not inferred."
+    },
+    "unavailable_diagnostics": {
+      "physical_support_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "blocker_stage": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "search_phase": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "tube_cell_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "shell_cell_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "wall_interface_id": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "outer_iteration": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "shooting_enthalpy_j_kg": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "left_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "right_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "left_f_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "right_f_q_w": "UNAVAILABLE_FROM_RETURNED_TASK173_BLOCKED_RESULT",
+      "failed_physical_support_and_cell_ids": "The returned public blocked result exposed the failure code and bounded recovery summary, but not the private failed-cell identity/q bracket; captured runner output was truncated before any richer structured event."
+    },
+    "production_task173_result_id": "UNAVAILABLE",
+    "production_task173_result_hash": "UNAVAILABLE"
+  },
+  "historical_n16_target_path": {
+    "was_part_of_fresh_n16_mesh_execution": true,
+    "exact_outer_iteration_target_subtrial_receipt_available": false,
+    "target_specific_classification": "UNAVAILABLE_FROM_CAPTURE",
+    "reason": "The current execution captured completed n=16 mesh observables and aggregate Task173BlockedResult diagnostics, but not every outer trial/subcell receipt; no history was copied into current-run evidence."
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "workflows_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "production_mesh_policy_changed": false,
+    "frozen_authority_definitions_changed": false,
+    "evidence_only_commit": true
+  },
+  "validation": {
+    "focused_task173": "PASS",
+    "full_shell_tube": "PASS_WITH_3_SKIPPED",
+    "http_api_regression": "PASS_21_TESTS",
+    "ruff": "PASS",
+    "format_check": "PASS",
+    "mypy_ci_scope": "PASS_450_FILES",
+    "manifest_d_equals_m": "PASS_259_OF_259",
+    "duplicate_key_drift_audit": "PASS_NO_NEW_DUPLICATE_KEYS; evidence has none; registry baseline and current file both retain 2 pre-existing duplicate canonical_hash keys",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS_71_PACKAGES",
+    "pip_audit": "PASS; one local project package not found on PyPI was skipped",
+    "git_diff_check": "PASS",
+    "uv_lock_unchanged": true,
+    "locked_requests": "2.34.2",
+    "locked_urllib3": "2.8.0"
+  },
+  "post_commit_exact_head_ci": {
+    "status": "REQUIRED_AFTER_EVIDENCE_COMMIT",
+    "head_sha": "PENDING",
+    "run_id": "PENDING",
+    "result": "PENDING",
+    "recording_location": "PR_TRACEABILITY_COMMENT_ONLY"
+  },
+  "lifecycle": {
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate": "STAGE3_N32_LOWER_ENDPOINT_VALID_POINT_BRACKET_UNRESOLVED_DIAGNOSTIC_AND_CORRECTION_REASSESSMENT",
+    "stop": true
+  },
+  "canonical_hash": "0c8a9ee9203e91c0fcd371d166bf26fd0477df1fd13c0048028f900697662ceb"
+}

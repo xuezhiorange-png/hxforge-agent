@@ -1,0 +1,28 @@
+{
+  "blocked_code": "WORKER_EMPTY_RECEIPT",
+  "blocked_diagnostics": [],
+  "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+  "experimental_rating_authority_id": "V07-FAST-SOLVER-RATING-AUTHORITY-ADMISSION-R11",
+  "mesh_comparisons": [],
+  "mesh_stages": [
+    {
+      "blocked_code": "WORKER_EMPTY_RECEIPT",
+      "mesh_n": 1,
+      "stage_status": "BLOCKED",
+      "worker_status": "BLOCKED"
+    }
+  ],
+  "numerical_authority_status": "CANDIDATE",
+  "orchestrator_authority_id": "V07-FAST-SOLVER-LIVE-RATING-LADDER-R13",
+  "production_integration": false,
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "schema_version": "task173.experimental-live-rating-orchestrator-outcome.v1",
+  "stage_artifacts": [
+    {
+      "path": "/workspace/docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-stages-20261015T041546Z/live-mesh-n1-receipt.json",
+      "sha256": "defa6c334a06f677951e9865f428b7b70646670104de86c9ced1303b74a2745b"
+    }
+  ],
+  "status": "BLOCKED",
+  "total_wall_seconds": 2.5067918739950983
+}

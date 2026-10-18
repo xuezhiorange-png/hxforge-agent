@@ -1,0 +1,7 @@
+{
+  "corrects_task": "V07_FAST_SOLVER_OUTER_CONTINUATION_N16_R7",
+  "experimental_authority_status": "CANDIDATE",
+  "fix": "exact_mesh_hash_match and numerical_comparison_within_tolerance separated",
+  "issue": "mesh_hash_match was set true when only numerical tolerance matched",
+  "task_id": "V07_R7_HASH_STATUS_CORRECTION_R8"
+}
