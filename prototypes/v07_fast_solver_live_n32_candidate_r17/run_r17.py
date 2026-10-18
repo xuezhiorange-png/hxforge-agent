@@ -335,10 +335,14 @@ def main() -> None:
             "outer_trial_count": n32_receipt.get("outer_trial_count"),
             "bracket_meta": bracket_meta,
             "n32_bracket_established": True,
-            "n32_low_endpoint_verified": bracket_meta.get("low_side_classification")
-            == "LOW_SIDE_DOMAIN_INFEASIBLE",
-            "n32_high_endpoint_verified": bracket_meta.get("high_side_classification")
-            == "VALID_TRAJECTORY",
+            "n32_low_endpoint_verified": (
+                bracket_meta.get("endpoint_audit", {}).get("low_classification")
+                == "LOW_SIDE_DOMAIN_INFEASIBLE"
+            ),
+            "n32_high_endpoint_verified": (
+                bracket_meta.get("endpoint_audit", {}).get("high_classification")
+                == "VALID_TRAJECTORY"
+            ),
             "same_run_endpoint_reuse": n32_receipt.get("same_run_endpoint_reuse"),
         }
 
