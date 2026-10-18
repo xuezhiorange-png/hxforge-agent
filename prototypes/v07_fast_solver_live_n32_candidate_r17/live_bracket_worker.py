@@ -124,8 +124,8 @@ def _worker_entry(conn: mp.connection.Connection, payload: dict[str, Any]) -> No
                 on_trial_receipt=on_trial,
             )
             narrow_wall_seconds = time.perf_counter() - t_narrow
-            total_trials = int(result.stats.outer_trial_count)
-            narrow_trial_count = max(0, total_trials - bracket_trial_count)
+            narrow_trial_count = int(result.stats.outer_trial_count)
+            total_trials = bracket_trial_count + narrow_trial_count
             full_worker_wall_seconds = time.perf_counter() - t0
 
             trial_writer.flush()
@@ -146,6 +146,7 @@ def _worker_entry(conn: mp.connection.Connection, payload: dict[str, Any]) -> No
                     "narrow_solve_wall_seconds": narrow_wall_seconds,
                     "bracket_establishment_trial_count": bracket_trial_count,
                     "narrow_solve_trial_count": narrow_trial_count,
+                    "total_physical_trial_count": total_trials,
                     "outer_trial_count": total_trials,
                     "terminal_boundary_residual_k": (
                         str(obs.terminal_boundary_residual_k) if obs is not None else None

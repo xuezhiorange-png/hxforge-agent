@@ -75,9 +75,24 @@ R16_N16_SHOOTING_ENTHALPY = "107515.19248174803406686058271875"
 R16_N16_OUTER_ITERATIONS = 5
 R16_RESULT_SHA256 = "3b5d2eb4183e247a15436d7906a6641825c98f61719827dcf2cef8164186bad2"
 
+R17_STAGE_DIR_REL = "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-r17-stages-20261018T082904Z"
+R17_N32_STAGE_SHA256 = "a09f68b968acbd973ab47d1ac51b5dbf7d390ea7e59d61ce97a25c6ec959d22f"
+R17_SNAPSHOT_DIR_REL = "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-r17-snapshot-20261018T082904Z"
+R17_SNAPSHOT_CONTENT_SHA256 = "ee8573f22a8fd73ae0120d4c257735b51d03f56a3dc9ee4fa6002687f59c7e3b"
+R17_SNAPSHOT_FILE_SHA256 = "94d9e6b68247a9bb9243afde1ca1e118ce68c465140ae54fc85f57a9fa830693"
+R17_N32_MESH_HASH = "42fa6dfaadbee5d35c20714fe56af8b1c1c33e7e70597994b8c2e5dcc0502838"
+R17_N32_SHOOTING_ENTHALPY = "107515.19012437808924710571300625"
+R17_N32_OUTER_ITERATIONS = 5
+R17_RESULT_SHA256 = "9a2da6a40a49e7325a34e153f1ddcb2f0cd99fca9af7d78b17472a39341a3b78"
+
 R17_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     *R16_PRIOR_PINS,
     PriorStagePin(16, f"{R16_STAGE_DIR_REL}/live-mesh-n16-receipt.json", R16_N16_STAGE_SHA256),
+)
+
+R18_PRIOR_PINS: tuple[PriorStagePin, ...] = (
+    *R17_PRIOR_PINS,
+    PriorStagePin(32, f"{R17_STAGE_DIR_REL}/live-mesh-n32-receipt.json", R17_N32_STAGE_SHA256),
 )
 
 
@@ -137,6 +152,13 @@ def admit_prior_stage(
             raise ValueError("R16 n16 shooting enthalpy mismatch")
         if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R16_N16_OUTER_ITERATIONS:
             raise ValueError("R16 n16 outer iterations mismatch")
+    if pin.mesh_n == 32:
+        if receipt.get("mesh_result_hash") != R17_N32_MESH_HASH:
+            raise ValueError("R17 n32 mesh_result_hash mismatch")
+        if receipt.get("shooting_enthalpy_for_rehydrate") != R17_N32_SHOOTING_ENTHALPY:
+            raise ValueError("R17 n32 shooting enthalpy mismatch")
+        if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R17_N32_OUTER_ITERATIONS:
+            raise ValueError("R17 n32 outer iterations mismatch")
     receipt["prior_stage_status"] = "VERIFIED_PRIOR_LIVE_STAGE"
     receipt["stage_receipt_rel_path"] = pin.rel_path
     receipt["stage_receipt_sha256"] = digest
@@ -201,6 +223,27 @@ def admit_pinned_r16_snapshot(root: Path, *, candidate_id: str, rating_request_h
     body = {k: v for k, v in snapshot.items() if k != "snapshot_sha256"}
     if snapshot_content_digest(body) != R16_SNAPSHOT_CONTENT_SHA256:
         raise ValueError("R16 snapshot content SHA256 mismatch")
+    if snapshot.get("candidate_id") != candidate_id:
+        raise ValueError("snapshot candidate_id mismatch")
+    if snapshot.get("rating_request_hash") != rating_request_hash:
+        raise ValueError("snapshot rating_request_hash mismatch")
+    return str(path.relative_to(root))
+
+
+def admit_pinned_r17_snapshot(root: Path, *, candidate_id: str, rating_request_hash: str) -> str:
+    safe_id = candidate_id.replace("/", "_")
+    pattern = f"live-rating-request-{safe_id}-{rating_request_hash[:16]}.json"
+    path = root / R17_SNAPSHOT_DIR_REL / pattern
+    if not path.is_file():
+        raise FileNotFoundError(str(path.relative_to(root)))
+    file_digest = file_sha256(path)
+    if file_digest != R17_SNAPSHOT_FILE_SHA256:
+        raise ValueError("R17 snapshot file SHA256 mismatch")
+    snapshot = json.loads(path.read_text(encoding="utf-8"))
+    verify_snapshot_integrity(snapshot)
+    body = {k: v for k, v in snapshot.items() if k != "snapshot_sha256"}
+    if snapshot_content_digest(body) != R17_SNAPSHOT_CONTENT_SHA256:
+        raise ValueError("R17 snapshot content SHA256 mismatch")
     if snapshot.get("candidate_id") != candidate_id:
         raise ValueError("snapshot candidate_id mismatch")
     if snapshot.get("rating_request_hash") != rating_request_hash:
