@@ -38,6 +38,7 @@ from hexagent.exchangers.shell_tube.tube_side_local_loss.result import (
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.canonical import (
     COMPLETENESS_LEDGER_SCHEMA_VERSION,
     COMPOSITION_AUTHORITY_SCHEMA_VERSION,
+    EXCLUSION_AUTHORITY_SCHEMA_VERSION,
     MEMBER_AUTHORITY_SCHEMA_VERSION,
     TASK027_ACCEPTED_SCHEMA_VERSION,
     TASK028_ACCEPTED_SCHEMA_VERSION,
@@ -62,6 +63,7 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.identity
     compute_member_authority_hash,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models import (
+    Task029BlockedResult,
     Task029BlockerEntry,
     Task029Request,
     Task029SuccessResult,
@@ -71,6 +73,9 @@ from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.models i
     TubeSidePressurePathLedgerExclusionEvidence,
     TubeSidePressurePathLedgerMemberEvidence,
     TubeSidePressurePathMemberAuthority,
+)
+from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.pipeline import (
+    compute_task029_composition,
 )
 from hexagent.exchangers.shell_tube.tube_side_pressure_drop_composition.request import (
     build_task029_request,
@@ -611,6 +616,161 @@ def test_T029_UP_008_TASK028_RESULT_ID_REPLAY() -> None:
     result = replay_task028_success(task028)
     assert isinstance(result, Task028ReplayEvidence)
     assert result.result_id == task028.result_id
+
+
+def _empty_task028_success(fixtures: dict[str, Any]) -> Task028SuccessResult:
+    """Build a normally hashed TASK028 success with explicit empty membership."""
+    task028 = fixtures["task028"]
+    return build_t028_success(
+        profile_id=task028.profile_id,
+        request_hash=task028.request_hash,
+        task025_hydraulic_authority_hash=task028.task025_hydraulic_authority_hash,
+        task025_result_hash=task028.task025_result_hash,
+        task026_result_hash=task028.task026_result_hash,
+        property_snapshot_hash=task028.property_snapshot_hash,
+        component_results=(),
+        warnings=task028.warnings,
+        blockers=task028.blockers,
+        deferred_capabilities=task028.deferred_capabilities,
+        provenance=task028.provenance,
+    )
+
+
+def _task027_only_composition(fixtures: dict[str, Any]) -> TubeSidePressurePathCompositionAuthority:
+    """Build a complete modeled path with one friction member and explicit exclusions."""
+    task027_member = replace(
+        fixtures["m001"],
+        global_path_sequence_index=0,
+        member_authority_hash="",
+    )
+    entrance_absence = TubeSidePressurePathExclusionAuthority(
+        schema_version=EXCLUSION_AUTHORITY_SCHEMA_VERSION,
+        exclusion_id="X009",
+        excluded_item_identity="ENTRANCE",
+        exclusion_reason=ExclusionReason.PHYSICALLY_ABSENT,
+        evidence_refs=("geom:absent:ENTRANCE",),
+        exclusion_authority_hash="",
+    )
+    entrance_absence = replace(
+        entrance_absence,
+        exclusion_authority_hash=compute_exclusion_authority_hash(entrance_absence),
+    )
+    composition = replace(
+        fixtures["composition"],
+        start_reference_plane=fixtures["task027"].upstream_reference_plane,
+        end_reference_plane=fixtures["task027"].downstream_reference_plane,
+        member_authorities=(task027_member,),
+        exclusion_authorities=(
+            *fixtures["composition"].exclusion_authorities,
+            entrance_absence,
+        ),
+        composition_authority_hash="",
+    )
+    return recompute_composition(composition)
+
+
+def test_T029_UP_013_EMPTY_TASK028_COMPONENT_TUPLE_REPLAYS_NORMALLY() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+
+    result = replay_task028_success(task028)
+
+    assert isinstance(result, Task028ReplayEvidence)
+    assert result.component_results == ()
+    assert result.components_by_id == {}
+    assert result.result_hash == task028.result_hash
+    assert result.result_id == task028.result_id
+
+
+def test_T029_UP_014_NON_TUPLE_TASK028_COMPONENT_RESULTS_STILL_BLOCKED() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+    malformed = clone_with_field(task028, component_results=[])
+
+    result = replay_task028_success(malformed)
+
+    assert isinstance(result, Task029BlockerEntry)
+    assert result.code == Task029BlockerCode.BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID
+
+
+def test_T029_UP_015_EMPTY_TASK028_WRONG_RESULT_HASH_BLOCKED() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+    malformed = clone_with_field(task028, result_hash="0" * 64)
+
+    result = replay_task028_success(malformed)
+
+    assert isinstance(result, Task029BlockerEntry)
+    assert result.code == Task029BlockerCode.BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID
+
+
+def test_T029_UP_016_EMPTY_TASK028_WRONG_RESULT_ID_BLOCKED() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+    malformed = clone_with_field(task028, result_id="00000000-0000-0000-0000-000000000000")
+
+    result = replay_task028_success(malformed)
+
+    assert isinstance(result, Task029BlockerEntry)
+    assert result.code == Task029BlockerCode.BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID
+
+
+def test_T029_UP_017_ONE_TASK027_MEMBER_ZERO_TASK028_MEMBERS_PRODUCES_COMPLETE_RESULT() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+    composition = _task027_only_composition(fixtures)
+
+    result = compute_task029_composition(
+        composition_to_raw_dict(fixtures, composition),
+        task027_success_result=fixtures["task027"],
+        task028_success_result=task028,
+        input_evidence_refs=INPUT_EVIDENCE_REFS,
+    )
+
+    assert isinstance(result, Task029SuccessResult)
+    assert result.completeness_ledger.expected_member_count == 1
+    assert result.completeness_ledger.observed_member_count == 1
+    assert len(result.completeness_ledger.ordered_member_evidence) == 1
+    assert (
+        result.completeness_ledger.ordered_member_evidence[0].producer_task == ProducerTask.TASK_027
+    )
+    assert result.completeness_ledger.completeness_status == (
+        CompletenessStatus.COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY
+    )
+    assert result.modeled_total_tube_side_pressure_drop_pa == (
+        fixtures["task027"].straight_tube_friction_pressure_drop_pa
+    )
+
+
+def test_T029_UP_018_EMPTY_TASK028_REQUIRES_ALL_PHYSICALLY_ABSENT_EXCLUSIONS() -> None:
+    fixtures = build_production_fixtures()
+    task028 = _empty_task028_success(fixtures)
+    complete = _task027_only_composition(fixtures)
+    missing_entrance_exclusion = replace(
+        complete,
+        exclusion_authorities=tuple(
+            exclusion
+            for exclusion in complete.exclusion_authorities
+            if exclusion.excluded_item_identity != "ENTRANCE"
+        ),
+        composition_authority_hash="",
+    )
+    missing_entrance_exclusion = recompute_composition(missing_entrance_exclusion)
+
+    result = compute_task029_composition(
+        composition_to_raw_dict(fixtures, missing_entrance_exclusion),
+        task027_success_result=fixtures["task027"],
+        task028_success_result=task028,
+        input_evidence_refs=INPUT_EVIDENCE_REFS,
+    )
+
+    assert isinstance(result, Task029BlockedResult)
+    assert Task029BlockerCode.BL_T029_EXCLUSION_EVIDENCE_MISSING in {
+        blocker.code for blocker in result.blockers
+    }
+    assert Task029BlockerCode.BL_T029_COMPLETENESS_LEDGER_INCOMPLETE in {
+        blocker.code for blocker in result.blockers
+    }
 
 
 def test_T029_UP_009_SUCCESS_WARNINGS_BLOCKERS_EMPTY() -> None:
