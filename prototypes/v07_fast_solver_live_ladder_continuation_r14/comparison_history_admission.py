@@ -44,9 +44,7 @@ R16_ORCHESTRATOR_PATH = (
 R16_RESULT_SHA256 = "3b5d2eb4183e247a15436d7906a6641825c98f61719827dcf2cef8164186bad2"
 R16_RESULT_COMMIT = "0d4c4b50d2ee1bfed9fe11d709365571fe1aa7cf"
 
-R13_RESULT_PATH = (
-    "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z.json"
-)
+R13_RESULT_PATH = "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z.json"
 R13_ORCHESTRATOR_PATH = (
     "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z"
     ".live-orchestrator.json"
