@@ -132,9 +132,8 @@ def reconcile_r17_evidence(root: Path, *, compare_budget_s: float = 200.0) -> di
         reconciled_result_sha256=reconciled_sha,
     )
     stamp = manifest["recorded_at_utc"].replace(":", "")
-    manifest_path = (
-        root / "docs/tasks/evidence" / f"V07-FAST-SOLVER-live-n32-candidate-r17-amendment-{stamp}.json"
-    )
+    manifest_name = f"V07-FAST-SOLVER-live-n32-candidate-r17-amendment-{stamp}.json"
+    manifest_path = root / "docs/tasks/evidence" / manifest_name
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
