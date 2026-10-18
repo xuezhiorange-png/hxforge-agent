@@ -32,7 +32,7 @@ def test_admit_full_live_evidence_headroom_pass() -> None:
 
 def test_live_full_rating_result_completed() -> None:
     chain = admit_full_live_mesh_evidence(ROOT, candidate_id=CANDIDATE_B_ID)
-    outcome = experimental_rate_candidate_live_result(chain)
+    outcome = experimental_rate_candidate_live_result(chain, root=ROOT)
     assert not isinstance(outcome, ExperimentalRatingBlocked)
     assert outcome.execution_mode == "LIVE_NUMERICAL_SOLVE"
     assert outcome.accepted_mesh_n == 32
@@ -57,7 +57,7 @@ def test_tampered_mesh_hash_blocks_rating() -> None:
         ladder_status=chain.ladder_status,
         headroom_status=chain.headroom_status,
     )
-    outcome = experimental_rate_candidate_live_result(tampered)
+    outcome = experimental_rate_candidate_live_result(tampered, root=ROOT)
     assert isinstance(outcome, ExperimentalRatingBlocked)
     assert outcome.blocked_code == "MESH_HASH_REPLAY_MISMATCH"
 

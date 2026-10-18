@@ -139,7 +139,7 @@ def main() -> None:
         raise SystemExit("TIMEOUT_BEFORE_RATING_BUILD")
 
     evidence = admit_full_live_mesh_evidence(ROOT, candidate_id=CANDIDATE_B_ID)
-    outcome = experimental_rate_candidate_live_result(evidence)
+    outcome = experimental_rate_candidate_live_result(evidence, root=ROOT)
     if isinstance(outcome, ExperimentalRatingBlocked):
         raise SystemExit(json.dumps(outcome.model_dump(mode="json"), indent=2))
 

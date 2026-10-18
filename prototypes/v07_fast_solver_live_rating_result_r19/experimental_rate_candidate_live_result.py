@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     candidate_rating_request_hash,
@@ -13,6 +15,9 @@ from prototypes.v07_fast_solver_live_rating_result_r19.live_evidence_admission i
 from prototypes.v07_fast_solver_live_rating_result_r19.live_mesh_replay import (
     LiveMeshReplayError,
     replay_verified_prior_stage_mesh,
+)
+from prototypes.v07_fast_solver_live_rating_result_r19.live_rating_authority_gate import (
+    enforce_live_rating_authority_gates,
 )
 from prototypes.v07_fast_solver_live_rating_result_r19.live_result_hash import (
     LIVE_RATING_RESULT_R19_AUTHORITY_ID,
@@ -45,8 +50,13 @@ HEADROOM_MESH_N = 64
 def experimental_rate_candidate_live_result(
     evidence: LiveMeshEvidenceChain,
     *,
+    root: Path,
     provider: CoolPropProvider | None = None,
 ) -> ExperimentalCandidateRatingResult | ExperimentalRatingBlocked:
+    evidence, gate_blocked = enforce_live_rating_authority_gates(root, evidence)
+    if gate_blocked is not None:
+        return gate_blocked
+
     request = evidence.request
     request_hash = candidate_rating_request_hash(request)
     if request_hash != evidence.rating_request_hash:
@@ -184,8 +194,8 @@ def experimental_rate_candidate_live_result(
             energy_balance_residual_w=obs.energy_balance_residual_w,
             terminal_boundary_residual_k=obs.terminal_boundary_residual_k,
             terminal_boundary_residual_j_kg=obs.terminal_boundary_residual_j_kg,
-            mesh_sequence_gate="PASS",
-            strict_replay_pass=True,
+            mesh_sequence_gate="PASS" if evidence.headroom_status == "PASS" else "FAIL",
+            strict_replay_pass=evidence.headroom_status == "PASS",
             task172_cell_closure_verified=cell_ok,
             wall_temperature_extrema_verified=wall_ok,
             energy_balance_pass=energy_ok,
