@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# ruff: noqa: E402
+
 from prototypes.v07_fast_solver_evidence_gate.trusted_constants import CANDIDATE_B_ID
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.bounded_workers import (
     run_bounded_compare,
