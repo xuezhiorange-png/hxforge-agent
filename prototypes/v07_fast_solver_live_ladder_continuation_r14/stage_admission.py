@@ -95,6 +95,23 @@ R18_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     PriorStagePin(32, f"{R17_STAGE_DIR_REL}/live-mesh-n32-receipt.json", R17_N32_STAGE_SHA256),
 )
 
+R18_STAGE_DIR_REL = "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-r18-stages-20261018T092028Z"
+R18_N64_STAGE_SHA256 = "7b1f55e302262e5f9f4bb0e3106ce255ecb5c1173cc6fb2ae413565d03d466a1"
+R18_N64_MESH_HASH = "efd84469bcbcaca1ff093b970b2551be866bcd06de12a69c3e2709e5a3ac3c68"
+R18_N64_SHOOTING_ENTHALPY = "107515.18953503560304216699559375"
+R18_N64_OUTER_ITERATIONS = 5
+R18_TRIALS_JSONL_REL = f"{R18_STAGE_DIR_REL}/live-n64-outer-trials.jsonl"
+R18_TRIALS_JSONL_SHA256 = "99eb1231602414666906b39301c649843efc85306b9979afe8f233fa2d0130a5"
+R18_RESULT_SHA256 = "b66a6e3184af71eb601593fa996378dceada83cc6c4c4e44e02609c6483d2f1f"
+R18_RESULT_SHA256_ORIGINAL = "c300ca7d3798df9faa302aa95facacc17583b4eff66839a58ce1be35bd939b25"
+R18_RESULT_COMMIT_REVISED = "82aa225d92c66a3b25b48f57d1978e645c039bf6"
+R18_RESULT_COMMIT_ORIGINAL = "5a592cb53ea9aac1456b2c315b8b555d4dc13ee8"
+
+R19_PRIOR_PINS: tuple[PriorStagePin, ...] = (
+    *R18_PRIOR_PINS,
+    PriorStagePin(64, f"{R18_STAGE_DIR_REL}/live-mesh-n64-receipt.json", R18_N64_STAGE_SHA256),
+)
+
 
 def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -159,6 +176,13 @@ def admit_prior_stage(
             raise ValueError("R17 n32 shooting enthalpy mismatch")
         if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R17_N32_OUTER_ITERATIONS:
             raise ValueError("R17 n32 outer iterations mismatch")
+    if pin.mesh_n == 64:
+        if receipt.get("mesh_result_hash") != R18_N64_MESH_HASH:
+            raise ValueError("R18 n64 mesh_result_hash mismatch")
+        if receipt.get("shooting_enthalpy_for_rehydrate") != R18_N64_SHOOTING_ENTHALPY:
+            raise ValueError("R18 n64 shooting enthalpy mismatch")
+        if int(receipt.get("outer_iterations_for_rehydrate", 0)) != R18_N64_OUTER_ITERATIONS:
+            raise ValueError("R18 n64 outer iterations mismatch")
     receipt["prior_stage_status"] = "VERIFIED_PRIOR_LIVE_STAGE"
     receipt["stage_receipt_rel_path"] = pin.rel_path
     receipt["stage_receipt_sha256"] = digest

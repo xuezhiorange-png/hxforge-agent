@@ -23,6 +23,9 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.stage_admission imp
     R16_N16_MESH_HASH,
     R17_N32_MESH_HASH,
     R17_RESULT_SHA256,
+    R18_N64_MESH_HASH,
+    R18_RESULT_COMMIT_REVISED,
+    R18_RESULT_SHA256,
 )
 
 RATING_REQUEST_HASH = "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8"
@@ -77,6 +80,15 @@ R17_ORCHESTRATOR_SHA256 = "402f875fa71e382e61611bfa476d3fda7daee8b1bb37eb9cf05f8
 R17_RESULT_COMMIT = "fa36cf7cf0ae2ed47bd30946a51123585fab959e"
 R17_RESULT_SHA256_ORIGINAL = "938a1155d6ef04482fddf376abe00fe71a4b539599e5940681e1017d195d6006"
 
+R18_RESULT_PATH = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z.json"
+)
+R18_ORCHESTRATOR_PATH = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-20261018T092028Z"
+    ".live-orchestrator.json"
+)
+R18_ORCHESTRATOR_SHA256 = "6fe3ff21d236c753393f9ecf3d793e1c52455350771df59b780c71989fcceab4"
+
 PINNED_MESH_RESULT_HASHES: dict[int, str] = {
     1: "5aebddd6094f9b037f68d57289d36afd8607ea75751d77cb6d74c4e4c01d55c2",
     2: "f408506a557f5ecd15910767156cfb2d75c30bb8f910a727365b750d2ea3adac",
@@ -84,9 +96,10 @@ PINNED_MESH_RESULT_HASHES: dict[int, str] = {
     8: R15_N8_MESH_HASH,
     16: R16_N16_MESH_HASH,
     32: R17_N32_MESH_HASH,
+    64: R18_N64_MESH_HASH,
 }
 
-PRIOR_MESH_SEQUENCE = (1, 2, 4, 8, 16, 32)
+PRIOR_MESH_SEQUENCE = (1, 2, 4, 8, 16, 32, 64)
 CANDIDATE_MESH_N = 32
 HEADROOM_MESH_N = 64
 
@@ -160,6 +173,16 @@ COMPARISON_SOURCE_PINS: tuple[ComparisonSourcePin, ...] = (
         R17_RESULT_SHA256,
         R17_RESULT_COMMIT,
         4,
+    ),
+    ComparisonSourcePin(
+        32,
+        64,
+        R18_ORCHESTRATOR_PATH,
+        R18_ORCHESTRATOR_SHA256,
+        R18_RESULT_PATH,
+        R18_RESULT_SHA256,
+        R18_RESULT_COMMIT_REVISED,
+        5,
     ),
 )
 
@@ -290,10 +313,20 @@ def admit_prior_comparison_history(root: Path) -> list[dict[str, Any]]:
 def build_rolling_state_from_admitted_history(
     comparisons: list[dict[str, Any]],
 ) -> RollingMeshState:
+    """Replay comparisons without pre-accepting meshes beyond the last comparison pair."""
     state = RollingMeshState()
+    if not comparisons:
+        return state
+    last_coarse = int(comparisons[-1]["coarse_subdivisions"])
     for mesh_n in PRIOR_MESH_SEQUENCE:
+        if mesh_n > last_coarse:
+            break
         state.record_mesh_accepted(mesh_n)
-    for comparison in comparisons:
+    for index, comparison in enumerate(comparisons):
+        if index == len(comparisons) - 1:
+            fine_n = int(comparison["fine_subdivisions"])
+            if fine_n not in state.runs_mesh_n:
+                state.record_mesh_accepted(fine_n)
         state.record_comparison(comparison)
     return state
 
