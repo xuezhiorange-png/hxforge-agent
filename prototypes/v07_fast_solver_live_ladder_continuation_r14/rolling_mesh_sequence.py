@@ -48,11 +48,7 @@ class RollingMeshState:
                 return
         if self.comparisons:
             last = self.comparisons[-1]
-            recent_pass = len(self.comparisons) >= REQUIRED_CONSECUTIVE_PASSING_PAIRS and all(
-                item.get("overall_status") == "PASS"
-                for item in self.comparisons[-REQUIRED_CONSECUTIVE_PASSING_PAIRS:]
-            )
-            if last.get("overall_status") == "PASS" and recent_pass:
+            if last.get("overall_status") == "PASS":
                 self.ladder_status = "MESH_COMPARISON_PASS"
             else:
                 self.ladder_status = "MESH_COMPARISON_FAIL_CONTINUE"

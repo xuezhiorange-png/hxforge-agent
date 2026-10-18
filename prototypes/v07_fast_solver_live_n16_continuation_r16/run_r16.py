@@ -24,6 +24,9 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.bounded_workers imp
     run_bounded_compare,
     run_bounded_rehydrate,
 )
+from prototypes.v07_fast_solver_live_ladder_continuation_r14.rehydrate_gate import (
+    require_bounded_rehydrate_ok,
+)
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.continuation_engine import (
     LiveContinuationOutcome,
 )
@@ -155,7 +158,7 @@ def main() -> None:
         )
         if time.perf_counter() >= deadline:
             raise SystemExit("TIMEOUT_BEFORE_N16")
-        run_bounded_rehydrate(
+        reh = run_bounded_rehydrate(
             snapshot_path,
             shooting_enthalpy_j_kg=str(stages[-1]["shooting_enthalpy_for_rehydrate"]),
             mesh_n=pin.mesh_n,
@@ -164,6 +167,12 @@ def main() -> None:
             rating_request_hash=RATING_REQUEST_HASH,
             expected_candidate_id=CANDIDATE_B_ID,
             budget_s=min(180.0, deadline - time.perf_counter()),
+        )
+        require_bounded_rehydrate_ok(
+            reh,
+            mesh_n=pin.mesh_n,
+            expected_request_hash=RATING_REQUEST_HASH,
+            expected_mesh_hash=stages[-1].get("mesh_result_hash"),
         )
 
     n8_receipt = next(s for s in stages if s.get("mesh_n") == 8)

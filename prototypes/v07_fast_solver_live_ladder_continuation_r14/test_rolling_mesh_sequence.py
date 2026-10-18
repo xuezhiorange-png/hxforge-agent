@@ -53,7 +53,35 @@ def test_no_consecutive_pass_pair() -> None:
     state.record_mesh_accepted(4)
     state.record_comparison(_cmp("PASS"))
     assert state.candidate_index is None
-    assert state.ladder_status == "MESH_COMPARISON_FAIL_CONTINUE"
+    assert state.ladder_status == "MESH_COMPARISON_PASS"
+
+
+def test_fail_fail_fail_pass_then_pass_identifies_candidate_n32() -> None:
+    state = RollingMeshState()
+    for mesh_n in (1, 2, 4, 8, 16):
+        state.record_mesh_accepted(mesh_n)
+    for status in ("FAIL", "FAIL", "FAIL", "PASS"):
+        state.record_comparison(_cmp(status))
+    assert state.ladder_status == "MESH_COMPARISON_PASS"
+    assert state.candidate_index is None
+    state.record_mesh_accepted(32)
+    state.record_comparison(_cmp("PASS"))
+    assert state.ladder_status == "MESH_CANDIDATE_IDENTIFIED"
+    assert state.runs_mesh_n[state.candidate_index] == 32
+
+
+def test_candidate_then_headroom_fail_blocks() -> None:
+    state = RollingMeshState()
+    for mesh_n in (1, 2, 4, 8, 16, 32):
+        state.record_mesh_accepted(mesh_n)
+    for status in ("FAIL", "FAIL", "FAIL", "PASS", "PASS"):
+        state.record_comparison(_cmp(status))
+    assert state.ladder_status == "MESH_CANDIDATE_IDENTIFIED"
+    state.record_mesh_accepted(64)
+    state.record_comparison(_cmp("FAIL"))
+    state.check_headroom_after_new_mesh(64)
+    assert state.ladder_status == "BLOCKED"
+    assert state.blocked_code == "MESH_NOT_CONVERGED"
 
 
 def test_terminal_boundary_failed() -> None:
