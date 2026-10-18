@@ -6,10 +6,15 @@ import json
 from pathlib import Path
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
+    CandidateRatingRequest,
     candidate_rating_request_hash,
 )
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.comparison_history_admission import (
     comparison_canonical_sha256,
+)
+from prototypes.v07_fast_solver_live_ladder_continuation_r14.native_codec import native_projection
+from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
+    upstream_binding_hashes,
 )
 from prototypes.v07_fast_solver_live_rating_result_r19.live_evidence_admission import (
     LiveEvidenceAdmissionError,
@@ -72,6 +77,29 @@ def _mesh_stages_fingerprint(stages: tuple[dict, ...]) -> tuple[str, ...]:
     return tuple(_stage_canonical(s) for s in stages)
 
 
+def _deep_request_structural_match(
+    caller: CandidateRatingRequest,
+    trusted: CandidateRatingRequest,
+) -> ExperimentalRatingBlocked | None:
+    caller_proj = native_projection(caller)
+    trusted_proj = native_projection(trusted)
+    if caller_proj != trusted_proj:
+        return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "native_projection_deep_mismatch")
+    try:
+        caller_bindings = upstream_binding_hashes(caller)
+        trusted_bindings = upstream_binding_hashes(trusted)
+    except (TypeError, ValueError) as exc:
+        return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", f"upstream_binding_compute:{exc}")
+    for key, trusted_value in trusted_bindings.items():
+        if caller_bindings.get(key) != trusted_value:
+            return _blocked(
+                "CALLER_REQUEST_TAMPER_BLOCKED",
+                "upstream_binding_mismatch",
+                key,
+            )
+    return None
+
+
 def _caller_vs_trusted_tamper_check(
     evidence: LiveMeshEvidenceChain,
     trusted: LiveMeshEvidenceChain,
@@ -98,6 +126,10 @@ def _caller_vs_trusted_tamper_check(
         return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "candidate_id")
     if evidence.request.candidate_hash != trusted.request.candidate_hash:
         return _blocked("CALLER_REQUEST_TAMPER_BLOCKED", "candidate_hash")
+
+    deep = _deep_request_structural_match(evidence.request, trusted.request)
+    if deep is not None:
+        return deep
 
     if not verify_task174_binding(evidence.request):
         return _blocked("CALLER_TASK174_BINDING_TAMPER_BLOCKED", "caller_request")

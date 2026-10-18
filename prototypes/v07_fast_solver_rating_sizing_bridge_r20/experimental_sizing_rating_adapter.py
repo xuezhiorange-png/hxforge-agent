@@ -8,6 +8,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
+    candidate_rating_request_hash,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     SizingRequirementAuthority,
 )
@@ -30,6 +34,9 @@ from prototypes.v07_fast_solver_rating_sizing_bridge_r20.pinned_r19_full_gate im
     PinnedR19FullGateError,
     assert_compact_matches_pinned_r19_full,
     load_and_verify_pinned_r19_full,
+)
+from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_pinned_identity import (
+    RATING_REQUEST_HASH as PINNED_R19_RATING_REQUEST_HASH,
 )
 
 
@@ -88,11 +95,24 @@ def _production_rating_authority_gaps(
     )
 
 
+def _verify_sizing_requirement_canonical_hash(
+    requirement: SizingRequirementAuthority,
+) -> ExperimentalSizingAdapterBlocked | None:
+    projection = requirement.model_dump(mode="json", exclude={"canonical_hash"})
+    if requirement.canonical_hash != canonical_sha256(projection):
+        return _blocked("SIZING_REQUIREMENT_CANONICAL_HASH_MISMATCH")
+    return None
+
+
 def experimental_sizing_rating_adapter(
     root: Path,
     compact: LiveCompactCandidateRating,
     requirement: SizingRequirementAuthority,
 ) -> ExperimentalSizingAdapterOutcome | ExperimentalSizingAdapterBlocked:
+    req_gate = _verify_sizing_requirement_canonical_hash(requirement)
+    if req_gate is not None:
+        return req_gate
+
     if compact.compact_result_hash != live_compact_rating_hash(compact):
         return _blocked("COMPACT_HASH_REPLAY_MISMATCH")
 
@@ -116,6 +136,13 @@ def experimental_sizing_rating_adapter(
         if not snapshot_rel:
             return _blocked("FULL_MISSING_SNAPSHOT_PROVENANCE")
         request = load_request_from_snapshot_file(root / snapshot_rel)
+        snapshot_rating_hash = candidate_rating_request_hash(request)
+        if snapshot_rating_hash != PINNED_R19_RATING_REQUEST_HASH:
+            return _blocked(
+                "SNAPSHOT_RATING_REQUEST_HASH_NOT_PINNED_R19",
+                snapshot_rating_hash,
+                PINNED_R19_RATING_REQUEST_HASH,
+            )
         geom = geometry_summary_from_request(request)
         verify_live_compact_against_full(
             compact,

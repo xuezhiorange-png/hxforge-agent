@@ -121,8 +121,17 @@ def test_injection_untrusted_full_path_blocked() -> None:
 
 
 def test_injection_sizing_constraints_fail() -> None:
+    from hexagent.canonical_json import canonical_sha256
+
     compact, _ = load_verified_live_compact_from_r19_audit(ROOT)
-    impossible = REQ.model_copy(update={"required_duty_w": Decimal("999999999")})
+    projection = REQ.model_dump(mode="json", exclude={"canonical_hash"})
+    projection["required_duty_w"] = "999999999"
+    impossible = REQ.model_copy(
+        update={
+            "required_duty_w": Decimal("999999999"),
+            "canonical_hash": canonical_sha256(projection),
+        }
+    )
     outcome = experimental_sizing_rating_adapter(ROOT, compact, impossible)
     assert outcome.status == "BLOCKED"
     assert "DUTY_BELOW_REQUIRED" in outcome.blocked_diagnostics
