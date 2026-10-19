@@ -9,10 +9,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from hexagent.canonical_json import canonical_sha256
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.pinned_r21e_full_gate import (
     audit_r21e_full_live_rating_file,
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.r22_pinned_identity import (
+    EXPERIMENTAL_SIZING_RESULT_HASH_DOMAIN,
     R21E_COMPACT_HASH,
     R21E_FULL_GIT_BLOB,
     R21E_FULL_JSON_SHA256,
@@ -20,10 +22,6 @@ from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.r22_pinn
     R22_RAW_RESULT_REL,
     R22_RAW_RESULT_SHA256,
     R22_SIZING_RESULT_HASH,
-)
-from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.result_models import (
-    ExperimentalMultiCandidateSizingResult,
-    experimental_multi_candidate_sizing_result_hash,
 )
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import (
     audit_r19_full_live_rating_file,
@@ -60,20 +58,24 @@ def audit_r22_raw_result(root: Path) -> dict[str, Any]:
             "code": "R22_RAW_MISSING_SIZING_RESULT",
             "raw_file_sha256": raw_sha,
         }
-    result = ExperimentalMultiCandidateSizingResult.model_validate(sizing_body, strict=True)
-    replay_hash = experimental_multi_candidate_sizing_result_hash(result)
-    ledger_ids = tuple(r.candidate_id for r in result.candidate_records)
-    trace_ids = tuple(t.candidate_id for t in result.ranking_trace)
+    if not isinstance(sizing_body, dict):
+        return {"blocked": True, "code": "R22_RAW_SIZING_RESULT_INVALID"}
+    body_for_hash = {key: value for key, value in sizing_body.items() if key not in ("result_hash", "result_id")}
+    body_for_hash["_experimental_sizing_hash_domain"] = EXPERIMENTAL_SIZING_RESULT_HASH_DOMAIN
+    replay_hash = canonical_sha256(body_for_hash)
+    records = sizing_body.get("candidate_records") or []
+    trace = sizing_body.get("ranking_trace") or []
+    ledger_ids = tuple(item["candidate_id"] for item in records)
+    trace_ids = tuple(item["candidate_id"] for item in trace)
     ledger_hash_binding = all(
-        entry.candidate_hash
-        == next(rec.candidate_hash for rec in result.candidate_records if rec.candidate_id == entry.candidate_id)
-        for entry in result.ranking_trace
+        entry["candidate_hash"]
+        == next(rec["candidate_hash"] for rec in records if rec["candidate_id"] == entry["candidate_id"])
+        for entry in trace
     )
-    recommended = result.recommended_candidate_id
-    alternatives = tuple(result.alternative_candidate_ids)
+    recommended = sizing_body.get("recommended_candidate_id")
+    alternatives = tuple(sizing_body.get("alternative_candidate_ids") or ())
     ranked = tuple(
-        entry.candidate_id
-        for entry in sorted(result.ranking_trace, key=lambda item: item.rank)
+        entry["candidate_id"] for entry in sorted(trace, key=lambda item: item["rank"])
     )
     return {
         "blocked": False,
@@ -81,8 +83,8 @@ def audit_r22_raw_result(root: Path) -> dict[str, Any]:
         "raw_file_sha256_parity": raw_sha == R22_RAW_RESULT_SHA256,
         "sizing_result_hash_replay": replay_hash,
         "sizing_result_hash_parity": replay_hash == R22_SIZING_RESULT_HASH,
-        "sizing_result_hash_declared": result.result_hash,
-        "declared_result_hash_parity": result.result_hash == R22_SIZING_RESULT_HASH,
+        "sizing_result_hash_declared": sizing_body.get("result_hash"),
+        "declared_result_hash_parity": sizing_body.get("result_hash") == R22_SIZING_RESULT_HASH,
         "recommended_candidate_id": recommended,
         "alternative_candidate_ids": alternatives,
         "candidate_ledger_ids": ledger_ids,
