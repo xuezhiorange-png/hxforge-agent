@@ -1,0 +1,15 @@
+{
+  "mesh_n": 32,
+  "receipt": {
+    "blocked_code": "WORKER_HARD_TIMEOUT",
+    "blocked_diagnostics": [
+      "mesh_n=32",
+      "budget_s=1500.0"
+    ],
+    "mesh_n": 32,
+    "stage_status": "TIMEOUT",
+    "worker_status": "TIMEOUT",
+    "worker_wall_seconds": 1500.0
+  },
+  "schema_version": "task173.experimental-live-mesh-stage-receipt.v1"
+}
