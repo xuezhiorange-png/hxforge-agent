@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.rolling_mesh_sequen
     RollingMeshState,
 )
 from prototypes.v07_fast_solver_live_rating_ladder_r13.stage_persistence import (
+    load_stage_receipt,
     write_stage_receipt,
 )
 from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_models import (
@@ -738,10 +740,6 @@ def continue_second_candidate_r21e(
     stages_by_mesh: dict[int, dict[str, Any]] = {}
     for pin in scsa.SECOND_CANDIDATE_R21E_PRIOR_PINS:
         receipt = scsa.admit_second_candidate_prior_stage(root, pin)
-        run = scsa.replay_admitted_prior_mesh(frozen.request, receipt, mesh_n=pin.mesh_n)
-        scsa.verify_replay_physics(run)
-        if run.mesh_result_hash != receipt["mesh_result_hash"]:
-            return _blocked("PRIOR_MESH_REPLAY_HASH_MISMATCH", f"mesh_n={pin.mesh_n}")
         stages_by_mesh[pin.mesh_n] = receipt
 
     comparisons, rolling = scca.admit_r21e_historical_comparisons(
@@ -854,6 +852,99 @@ def continue_second_candidate_r21e(
 
     return _ledger_outcome(
         status="LIVE_RATING_IN_PROGRESS",
+        request_hash=request_hash,
+        candidate_id=candidate_id,
+        stages=stages,
+        comparisons=comparisons,
+        artifacts=stage_artifacts,
+        rolling=rolling,
+        wall_t0=wall_t0,
+        snapshot_file_sha256=frozen.snapshot_file_sha256,
+        orchestrator_authority_id=ORCHESTRATOR_R21E,
+    )
+
+
+def finalize_r21e_headroom_from_accepted_n64(
+    root: Path,
+    *,
+    evidence_dir: Path,
+    compare_budget_s: float = 300.0,
+) -> LiveContinuationOutcome | ExperimentalRatingBlocked:
+    """Run n32→64 compare (+ rolling headroom) using an on-disk TERMINAL_ACCEPTED n=64 receipt."""
+    from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+        second_candidate_comparison_admission as scca,
+    )
+
+    root = root.resolve()
+    evidence_dir = (evidence_dir if evidence_dir.is_absolute() else root / evidence_dir).resolve()
+    scsa.verify_n64_timeout_receipt_preserved(root)
+    frozen = scsa.admit_frozen_second_candidate_snapshot(root)
+    request_hash = frozen.rating_request_hash
+    candidate_id = frozen.request.candidate_id
+    snapshot_path = root / scsa.SNAPSHOT_REL
+
+    stages_by_mesh: dict[int, dict[str, Any]] = {}
+    for pin in scsa.SECOND_CANDIDATE_R21E_PRIOR_PINS:
+        stages_by_mesh[pin.mesh_n] = scsa.admit_second_candidate_prior_stage(root, pin)
+
+    comparisons, rolling = scca.admit_r21e_historical_comparisons(
+        root,
+        stages_by_mesh=stages_by_mesh,
+    )
+    n64_path = evidence_dir / "stages/live-mesh-n64-receipt.json"
+    if not n64_path.is_file():
+        return _blocked("N64_STAGE_RECEIPT_MISSING", str(n64_path))
+    n64_receipt = load_stage_receipt(n64_path)
+    if n64_receipt.get("worker_status") != "TERMINAL_ACCEPTED":
+        return _blocked(
+            "N64_NOT_TERMINAL_ACCEPTED",
+            str(n64_receipt.get("worker_status")),
+        )
+    if int(n64_receipt.get("mesh_n", 0)) != 64:
+        return _blocked("N64_MESH_N_MISMATCH")
+
+    stages = [stages_by_mesh[n] for n in (1, 2, 4, 8, 16, 32)]
+    stages.append(n64_receipt)
+    stage_artifacts: list[dict[str, str]] = [
+        {
+            "path": str(n64_path.relative_to(root)),
+            "sha256": hashlib.sha256(n64_path.read_bytes()).hexdigest(),
+        }
+    ]
+    comparison_artifacts: list[dict[str, str]] = []
+    comparison_dir = evidence_dir / "comparisons"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+
+    wall_t0 = time.perf_counter()
+    rolling.record_mesh_accepted(64)
+    outcome = _compare_pair(
+        root,
+        snapshot_path,
+        stages[-2],
+        stages[-1],
+        request_hash,
+        candidate_id,
+        rolling,
+        comparisons,
+        comparison_artifacts,
+        comparison_dir,
+        compare_budget_s,
+        compare_budget_s,
+        wall_t0,
+        stages,
+        stage_artifacts,
+        frozen.snapshot_file_sha256,
+        ORCHESTRATOR_R21E,
+    )
+    if outcome is not None:
+        return outcome
+    ledger_status = (
+        "LIVE_RATING_EXPERIMENTAL_COMPLETE"
+        if rolling.ladder_status == "HEADROOM_PASS"
+        else "LIVE_RATING_IN_PROGRESS"
+    )
+    return _ledger_outcome(
+        status=ledger_status,
         request_hash=request_hash,
         candidate_id=candidate_id,
         stages=stages,

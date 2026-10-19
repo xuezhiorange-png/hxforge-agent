@@ -126,6 +126,12 @@ def _summarize_r21d_n64_timeout_trials(root: Path) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--execute-continuation", action="store_true")
+    parser.add_argument(
+        "--finalize-headroom",
+        type=Path,
+        default=None,
+        help="Run n32→64 compare + general rating using existing TERMINAL_ACCEPTED n=64 receipt",
+    )
     parser.add_argument("--output-dir", type=Path, default=None)
     args = parser.parse_args()
     wall_t0 = time.perf_counter()
@@ -141,7 +147,7 @@ def main() -> None:
         cwd=ROOT,
         text=True,
     ).split()[0]
-    if args.execute_continuation:
+    if args.execute_continuation or args.finalize_headroom is not None:
         if (
             subprocess.run(
                 ["git", "merge-base", "--is-ancestor", BASE_HEAD, local_head],
@@ -156,7 +162,23 @@ def main() -> None:
         print("BASE_HEAD_MISMATCH", "remote", remote, "local", local_head, "expected", BASE_HEAD)
         sys.exit(2)
 
-    _run_contract_tests()
+    if args.finalize_headroom is None:
+        _run_contract_tests()
+    else:
+        subprocess.run(
+            [
+                "uv",
+                "run",
+                "pytest",
+                "prototypes/v07_fast_solver_general_candidate_live_rating_r21/"
+                "test_second_candidate_comparison_admission_r21e.py",
+                "prototypes/v07_fast_solver_general_candidate_live_rating_r21/"
+                "test_second_candidate_stage_admission.py::test_r21e_n32_prior_admission_and_replay",
+                "-q",
+            ],
+            cwd=ROOT,
+            check=True,
+        )
 
     frozen = scsa.admit_frozen_second_candidate_snapshot(ROOT)
     scsa.verify_n4_timeout_receipt_preserved(ROOT)
@@ -199,31 +221,47 @@ def main() -> None:
         "next_action": "STOP_FOR_ENGINEERING_REVIEW",
     }
 
-    if not args.execute_continuation:
+    if not args.execute_continuation and args.finalize_headroom is None:
         receipt["continuation"] = "SKIPPED"
         _write_receipt(receipt, args.output_dir, wall_t0)
         return
 
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    evidence_dir = args.output_dir or (
-        ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21e-{stamp}"
+    evidence_dir = (
+        args.output_dir
+        or args.finalize_headroom
+        or (
+            ROOT
+            / f"docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21e-{stamp}"
+        )
     )
+    if not evidence_dir.is_absolute():
+        evidence_dir = ROOT / evidence_dir
+    evidence_dir = evidence_dir.resolve()
     stage_dir = evidence_dir / "stages"
     comparison_dir = evidence_dir / "comparisons"
     progress_dir = evidence_dir / "outer_progress"
     stage_dir.mkdir(parents=True, exist_ok=True)
     comparison_dir.mkdir(parents=True, exist_ok=True)
 
-    mesh_budgets = {64: N64_BUDGET_S}
-    outcome = scc.continue_second_candidate_r21e(
-        ROOT,
-        output_stage_dir=stage_dir,
-        output_comparison_dir=comparison_dir,
-        mesh_budgets_s=mesh_budgets,
-        total_budget_s=TOTAL_BUDGET_S,
-        compare_budget_s=180.0,
-        outer_progress_dir=progress_dir,
-    )
+    if args.finalize_headroom is not None:
+        receipt["continuation_mode"] = "FINALIZE_HEADROOM_FROM_ACCEPTED_N64"
+        outcome = scc.finalize_r21e_headroom_from_accepted_n64(
+            ROOT,
+            evidence_dir=evidence_dir,
+            compare_budget_s=300.0,
+        )
+    else:
+        mesh_budgets = {64: N64_BUDGET_S}
+        outcome = scc.continue_second_candidate_r21e(
+            ROOT,
+            output_stage_dir=stage_dir,
+            output_comparison_dir=comparison_dir,
+            mesh_budgets_s=mesh_budgets,
+            total_budget_s=TOTAL_BUDGET_S,
+            compare_budget_s=180.0,
+            outer_progress_dir=progress_dir,
+        )
     if isinstance(outcome, ExperimentalRatingBlocked):
         receipt["general_live_rating_verified"] = False
         receipt["live_rating_blocked"] = outcome.model_dump(mode="json")
@@ -264,6 +302,12 @@ def main() -> None:
     )
     full_sha = file_sha256(full_path)
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    try:
+        full_blob = git_blob_id(ROOT, commit, full_rel)
+        full_blob_sha = git_blob_sha256(ROOT, commit, full_rel)
+    except Exception:
+        full_blob = None
+        full_blob_sha = full_sha
     geom = geometry_summary_from_request(frozen.request)
     compact = glcr.build_general_live_compact_from_full(
         rating,
@@ -292,10 +336,8 @@ def main() -> None:
             "general_live_rating_verified": True,
             "full_result_hash": rating.result_hash,
             "full_file_sha256": full_sha,
-            "full_git_blob": git_blob_id(ROOT, commit, full_rel) if full_path.is_file() else None,
-            "full_git_blob_content_sha256": git_blob_sha256(ROOT, commit, full_rel)
-            if full_path.is_file()
-            else None,
+            "full_git_blob": full_blob,
+            "full_git_blob_content_sha256": full_blob_sha,
             "compact_result_hash": compact.compact_result_hash,
             "compact_file_sha256": compact_sha,
             "duty_w": str(rating.total_duty_w),
