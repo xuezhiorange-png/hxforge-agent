@@ -26,6 +26,30 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.verification impo
 )
 
 
+def _write_outer_progress(progress_path: Path, subdivisions: int, outer: Any) -> None:
+    stats = outer.stats
+    body = {
+        "schema_version": "task173.experimental-outer-boundary-progress.v1",
+        "mesh_n": subdivisions,
+        "worker_status": outer.status,
+        "blocked_code": outer.blocked_code,
+        "outer_trial_count": stats.outer_trial_count,
+        "mesh_march_count": stats.mesh_march_count,
+        "bisection_iterations": stats.bisection_iterations,
+        "worker_wall_seconds": stats.worker_wall_seconds,
+        "outer_trial_wall_seconds_sum": stats.outer_trial_wall_seconds_sum,
+        "mesh_march_wall_seconds_sum": stats.mesh_march_wall_seconds_sum,
+        "total_eval_trial_calls": stats.total_eval_trial_calls,
+        "experimental_total_production_task172_calls": (
+            stats.experimental_total_production_task172_calls
+        ),
+        "trial_receipts": [r.to_dict() for r in stats.trial_receipts],
+        "last_accepted_shooting_enthalpy_j_kg": stats.last_accepted_shooting_enthalpy_j_kg,
+    }
+    progress_path.parent.mkdir(parents=True, exist_ok=True)
+    progress_path.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _worker_entry(conn: mp.connection.Connection, payload: dict[str, Any]) -> None:
     subdivisions = int(payload["subdivisions"])
     budget_s = float(payload["budget_s"])
@@ -53,6 +77,9 @@ def _worker_entry(conn: mp.connection.Connection, payload: dict[str, Any]) -> No
             )
             run = outer.mesh_run
             obs = run.observables if run is not None else None
+            progress_path = payload.get("outer_progress_path")
+            if progress_path:
+                _write_outer_progress(Path(str(progress_path)), subdivisions, outer)
             receipt: dict[str, Any] = {
                 "worker_status": outer.status,
                 "blocked_code": outer.blocked_code,
@@ -109,6 +136,7 @@ def run_live_mesh_worker_from_snapshot(
     mesh_n: int,
     budget_s: float,
     join_grace_s: float = 15.0,
+    outer_progress_path: Path | None = None,
 ) -> dict[str, Any]:
     ctx = mp.get_context("spawn")
     parent_conn, child_conn = ctx.Pipe(duplex=False)
@@ -118,6 +146,7 @@ def run_live_mesh_worker_from_snapshot(
         "rating_request_hash": rating_request_hash,
         "subdivisions": mesh_n,
         "budget_s": budget_s,
+        "outer_progress_path": str(outer_progress_path) if outer_progress_path else None,
     }
     process = ctx.Process(target=_worker_entry, args=(child_conn, payload))
     process.start()

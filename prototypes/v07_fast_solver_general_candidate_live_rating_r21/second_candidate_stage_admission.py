@@ -47,19 +47,72 @@ SNAPSHOT_CONTENT_SHA256 = "2222d90aa1639f9f26f183d4816b97fa257ad861a4441c81bd496
 N1_RECEIPT_REL = f"{FROZEN_EVIDENCE_REL}/stages/live-mesh-n1-receipt.json"
 N2_RECEIPT_REL = f"{FROZEN_EVIDENCE_REL}/stages/live-mesh-n2-receipt.json"
 N4_TIMEOUT_RECEIPT_REL = f"{FROZEN_EVIDENCE_REL}/stages/live-mesh-n4-receipt.json"
+R21B_EVIDENCE_REL = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21b-20261019T032037Z"
+)
+N4_ACCEPTED_RECEIPT_REL = f"{R21B_EVIDENCE_REL}/stages/live-mesh-n4-receipt.json"
+N8_ACCEPTED_RECEIPT_REL = f"{R21B_EVIDENCE_REL}/stages/live-mesh-n8-receipt.json"
+N16_TIMEOUT_RECEIPT_REL = f"{R21B_EVIDENCE_REL}/stages/live-mesh-n16-receipt.json"
 N1_RECEIPT_SHA256 = "f4a59f012cc83d83e8cf40bb4b14ab562ed635c4cc00ef8b8e38f3f4447b5270"
 N2_RECEIPT_SHA256 = "e5c16c5241b2c0e3ac5c1954b0ca7a5d6d503b52b55ed864b5ffd1e11bc757ab"
+N4_ACCEPTED_RECEIPT_SHA256 = "984cde3ca507114cb8f6245c36dda6fa423a27831c13df6075a68e776390853f"
+N8_ACCEPTED_RECEIPT_SHA256 = "89c1de27c4381d3eccabe48d091cfcae54636011ca8497ce816c2267d735dfdf"
 N4_TIMEOUT_RECEIPT_SHA256 = "1f6954ec310489e6323e19676d6809f6d728a34e9e514acd67b79b156030ce04"
+N16_TIMEOUT_RECEIPT_SHA256 = "25301e09d46a32bbfa7d2a3d59f2ee6c16ccc73ed93baa83c9f591ec5c689b5d"
 N1_MESH_RESULT_HASH = "854b06ac829183f067992ac0b76806c2a5772bd3deab99a4c678fb45ff4da302"
 N2_MESH_RESULT_HASH = "84f2491e89d57b7e470a4578ee4dcc43b810e03de93d5176fa8b57cc0297ae1c"
+N4_MESH_RESULT_HASH = "3d937c37d85c603fcdc07e90b48d829ec8ec257368c5982588ae7d61470273f7"
+N8_MESH_RESULT_HASH = "5a058d84e1060656f82684522b118624457fb9e8a2fea48b87bc7cbfb0b9feea"
 N1_SHOOTING_ENTHALPY = "107519.725252127586206614412367343902587890625"
 N2_SHOOTING_ENTHALPY = "107519.11806278412140252590179443359375"
+N4_SHOOTING_ENTHALPY = "107518.96635549294369729273021221160888671875"
+N8_SHOOTING_ENTHALPY = "107518.928464688024669300019741058349609375"
 N1_OUTER_ITERATIONS = 29
 N2_OUTER_ITERATIONS = 22
+N4_OUTER_ITERATIONS = 28
+N8_OUTER_ITERATIONS = 26
+
+_PRIOR_STAGE_SPECS: dict[int, tuple[str, str, str, str, int]] = {
+    1: (
+        N1_RECEIPT_REL,
+        N1_RECEIPT_SHA256,
+        N1_MESH_RESULT_HASH,
+        N1_SHOOTING_ENTHALPY,
+        N1_OUTER_ITERATIONS,
+    ),
+    2: (
+        N2_RECEIPT_REL,
+        N2_RECEIPT_SHA256,
+        N2_MESH_RESULT_HASH,
+        N2_SHOOTING_ENTHALPY,
+        N2_OUTER_ITERATIONS,
+    ),
+    4: (
+        N4_ACCEPTED_RECEIPT_REL,
+        N4_ACCEPTED_RECEIPT_SHA256,
+        N4_MESH_RESULT_HASH,
+        N4_SHOOTING_ENTHALPY,
+        N4_OUTER_ITERATIONS,
+    ),
+    8: (
+        N8_ACCEPTED_RECEIPT_REL,
+        N8_ACCEPTED_RECEIPT_SHA256,
+        N8_MESH_RESULT_HASH,
+        N8_SHOOTING_ENTHALPY,
+        N8_OUTER_ITERATIONS,
+    ),
+}
 
 SECOND_CANDIDATE_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     PriorStagePin(1, N1_RECEIPT_REL, N1_RECEIPT_SHA256),
     PriorStagePin(2, N2_RECEIPT_REL, N2_RECEIPT_SHA256),
+)
+
+SECOND_CANDIDATE_ACCEPTED_PRIOR_PINS: tuple[PriorStagePin, ...] = (
+    PriorStagePin(1, N1_RECEIPT_REL, N1_RECEIPT_SHA256),
+    PriorStagePin(2, N2_RECEIPT_REL, N2_RECEIPT_SHA256),
+    PriorStagePin(4, N4_ACCEPTED_RECEIPT_REL, N4_ACCEPTED_RECEIPT_SHA256),
+    PriorStagePin(8, N8_ACCEPTED_RECEIPT_REL, N8_ACCEPTED_RECEIPT_SHA256),
 )
 
 
@@ -118,7 +171,7 @@ def admit_second_candidate_prior_stage(
     root: Path,
     pin: PriorStagePin,
 ) -> dict[str, Any]:
-    if pin.mesh_n not in (1, 2):
+    if pin.mesh_n not in _PRIOR_STAGE_SPECS:
         raise SecondCandidateAdmissionError("PRIOR_STAGE_MESH_N_NOT_ADMITTED", str(pin.mesh_n))
     path = root / pin.rel_path
     digest = file_sha256(path)
@@ -138,9 +191,7 @@ def admit_second_candidate_prior_stage(
         raise SecondCandidateAdmissionError("PRIOR_TERMINAL_TOLERANCE_FAIL")
     if not receipt.get("cell_closure_pass") or not receipt.get("energy_balance_pass"):
         raise SecondCandidateAdmissionError("PRIOR_PHYSICS_GATE_FAIL")
-    expected_mesh = N1_MESH_RESULT_HASH if pin.mesh_n == 1 else N2_MESH_RESULT_HASH
-    expected_shooting = N1_SHOOTING_ENTHALPY if pin.mesh_n == 1 else N2_SHOOTING_ENTHALPY
-    expected_iters = N1_OUTER_ITERATIONS if pin.mesh_n == 1 else N2_OUTER_ITERATIONS
+    _rel, _sha, expected_mesh, expected_shooting, expected_iters = _PRIOR_STAGE_SPECS[pin.mesh_n]
     if receipt.get("mesh_result_hash") != expected_mesh:
         raise SecondCandidateAdmissionError("PRIOR_MESH_HASH_MISMATCH")
     if receipt.get("shooting_enthalpy_for_rehydrate") != expected_shooting:
@@ -153,6 +204,18 @@ def admit_second_candidate_prior_stage(
     receipt["stage_receipt_rel_path"] = pin.rel_path
     receipt["stage_receipt_sha256"] = digest
     return receipt
+
+
+def verify_n16_timeout_receipt_preserved(root: Path) -> None:
+    path = root / N16_TIMEOUT_RECEIPT_REL
+    digest = file_sha256(path)
+    if digest != N16_TIMEOUT_RECEIPT_SHA256:
+        raise SecondCandidateAdmissionError("N16_TIMEOUT_RECEIPT_SHA256_MISMATCH")
+    receipt = load_stage_receipt(path)
+    if receipt.get("worker_status") != "TIMEOUT":
+        raise SecondCandidateAdmissionError("N16_NOT_TIMEOUT_RECORD")
+    if receipt.get("blocked_code") != "WORKER_HARD_TIMEOUT":
+        raise SecondCandidateAdmissionError("N16_BLOCKED_CODE_MISMATCH")
 
 
 def verify_n4_timeout_receipt_preserved(root: Path) -> None:
