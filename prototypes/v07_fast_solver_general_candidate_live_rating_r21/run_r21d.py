@@ -92,9 +92,10 @@ def _find_comparison(
     fine_n: int,
 ) -> dict[str, Any] | None:
     for item in comparisons:
-        if int(item.get("coarse_subdivisions", 0)) == coarse_n and int(
-            item.get("fine_subdivisions", 0)
-        ) == fine_n:
+        if (
+            int(item.get("coarse_subdivisions", 0)) == coarse_n
+            and int(item.get("fine_subdivisions", 0)) == fine_n
+        ):
             return item
     return None
 
@@ -209,9 +210,7 @@ def main() -> None:
             receipt["n32_replay"] = run.mesh_result_hash == n32.get("mesh_result_hash")
 
     n64 = next((s for s in outcome.mesh_stages if int(s.get("mesh_n", 0)) == 64), None)
-    receipt["n64_worker_status"] = (
-        n64.get("worker_status") if n64 else "NOT_REACHED"
-    )
+    receipt["n64_worker_status"] = n64.get("worker_status") if n64 else "NOT_REACHED"
     receipt["n64_mesh_result_hash"] = n64.get("mesh_result_hash") if n64 else None
 
     live_comparisons = list(outcome.mesh_comparisons)
@@ -233,15 +232,9 @@ def main() -> None:
         ),
         None,
     )
-    receipt["n16_to_32_comparison"] = (
-        n16_to_32.get("overall_status") if n16_to_32 else "NOT_RUN"
-    )
-    receipt["n32_to_64_comparison"] = (
-        n32_to_64.get("overall_status") if n32_to_64 else "NOT_RUN"
-    )
-    receipt["n32_mesh_candidate_status"] = _mesh_candidate_n32_status(
-        tuple(live_comparisons)
-    )
+    receipt["n16_to_32_comparison"] = n16_to_32.get("overall_status") if n16_to_32 else "NOT_RUN"
+    receipt["n32_to_64_comparison"] = n32_to_64.get("overall_status") if n32_to_64 else "NOT_RUN"
+    receipt["n32_mesh_candidate_status"] = _mesh_candidate_n32_status(tuple(live_comparisons))
     receipt["mesh_sequence_gate"] = (
         "PASS" if outcome.ladder_continuation_status == "HEADROOM_PASS" else "FAIL"
     )
@@ -298,9 +291,7 @@ def main() -> None:
             "tube_dp_pa": str(
                 frozen.request.task174_result.modeled_total_tube_side_pressure_drop_pa
             ),
-            "shell_dp_pa": str(
-                frozen.request.task174_result.bell_total_shell_pressure_drop_pa
-            ),
+            "shell_dp_pa": str(frozen.request.task174_result.bell_total_shell_pressure_drop_pa),
             "experimental_sizing_adapter_status": adapter.status,
         }
     )
