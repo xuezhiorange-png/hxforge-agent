@@ -1,0 +1,588 @@
+{
+  "base_head": "e4e84c28f50a0b78bac3520bc0d5452388dbb195",
+  "candidate_ledger": [
+    {
+      "blockers": [],
+      "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "compact_result_hash": "d86b0490c43cb15580c2977cc9d5a56ff81c635a658561716a029984faab37e7",
+      "duty_constraint": "PASS",
+      "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+      "full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+      "rank": 1,
+      "ranking_score": "16.942454609529350732037732191039958415712351434618",
+      "rated_duty_w": "51901.40592651570346",
+      "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+      "screening_status": "WARN",
+      "shell_dp_constraint": "PASS",
+      "shell_dp_pa": "694.24546095293507320377321910399584157123514346183",
+      "status": "WARN",
+      "tube_dp_constraint": "PASS",
+      "tube_dp_pa": "8.878",
+      "warnings": [
+        "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+        "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+      ]
+    },
+    {
+      "blockers": [],
+      "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+      "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+      "compact_result_hash": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+      "duty_constraint": "PASS",
+      "experimental_rating_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21",
+      "full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+      "rank": 2,
+      "ranking_score": "17.016405731192504657174573055370791187807534501537",
+      "rated_duty_w": "51975.93554998601533",
+      "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+      "screening_status": "WARN",
+      "shell_dp_constraint": "PASS",
+      "shell_dp_pa": "701.64057311925046571745730553707911878075345015373",
+      "status": "WARN",
+      "tube_dp_constraint": "PASS",
+      "tube_dp_pa": "8.878",
+      "warnings": [
+        "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+        "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+      ]
+    }
+  ],
+  "candidate_space_authority_gate": true,
+  "code_commit_head": "03e8dd0e4968565f40bf55039ba601013cef5030",
+  "determinism_test": true,
+  "experimental_multi_candidate_sizing_verified": true,
+  "fiv_authority_status": "MISSING",
+  "full_compact_identity_gate": true,
+  "full_rating_hash_audit": {
+    "full_compact_identity_gate": true,
+    "r19_full_file_sha256": "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172",
+    "r19_full_file_sha256_parity": true,
+    "r19_full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+    "r19_full_result_hash_parity": true,
+    "r19_git_blob": "33067b2edf90feb4df2eea9d993530e79c13adb8",
+    "r19_git_blob_parity": true,
+    "r21e_compact_hash_pinned": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+    "r21e_full_file_sha256": "3dde55a2950f44b78a31e078044fe0a561b212371de40766d2b7c7b3d11f1fa7",
+    "r21e_full_file_sha256_parity": true,
+    "r21e_full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+    "r21e_full_result_hash_parity": true,
+    "r21e_git_blob": "eb43011aa9a782223cda294c88c8d5fe512a078a",
+    "r21e_git_blob_parity": true
+  },
+  "hash_audit": {
+    "alternative_candidate_ids": [
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "alternatives_subset_ledger": true,
+    "blocked": false,
+    "candidate_ledger_ids": [
+      "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "declared_result_hash_parity": true,
+    "ledger_trace_binding": true,
+    "ranking_trace_ids": [
+      "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "ranking_trace_order": [
+      "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "raw_file_sha256": "6b94acc63a1a12ddfc5dde6caf57c97aae663ca517cada933dcc70f41d996006",
+    "raw_file_sha256_parity": true,
+    "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "recommended_in_ledger": true,
+    "sizing_result_hash_declared": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+    "sizing_result_hash_parity": true,
+    "sizing_result_hash_replay": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b"
+  },
+  "mandatory_screening_complete": false,
+  "mandatory_screening_executed": true,
+  "negative_injection_tests": "PYTEST",
+  "next_action": "STOP_FOR_ENGINEERING_REVIEW",
+  "numerical_authority_gap_ledger": [
+    {
+      "current_evidence": "R22 uses frozen R19/R21E live ratings; no new outer boundary solve.",
+      "disposition": "OPEN",
+      "gap": "Experimental fast outer boundary (R3) lacks R2A provider enclosure replay bundle.",
+      "item": "FAST_SOLVER_VS_R2A_OUTER_BOUNDARY_CERTIFICATE",
+      "next_action": "Admit only ratings with R2A certificate chain before production sizing.",
+      "requirement": "Production sizing/rating must bind R2A outer-boundary enclosure certificates."
+    },
+    {
+      "current_evidence": "R19/R21E numerical_authority_status=CANDIDATE on R2 fast cell path.",
+      "disposition": "OPEN",
+      "gap": "No production cell-root solver authority on admitted artifacts.",
+      "item": "CELL_ROOT_SOLVER_AUTHORITY",
+      "next_action": "Complete R2A cell closure qualification before VALIDATED promotion.",
+      "requirement": "Production path requires CELL_ROOT_SOLVER_AUTHORITY_ID with validated enclosure."
+    },
+    {
+      "current_evidence": "R19/R21E full files pass independent SHA256, blob, and result hash replay.",
+      "disposition": "EXPERIMENTAL_ONLY",
+      "gap": "R22 does not re-run mesh shooting; relies on pinned full JSON only.",
+      "item": "MESH_REPLAY_AND_DETERMINISM",
+      "next_action": "Keep fail-closed admission gates; no mesh re-solve in R22A.",
+      "requirement": "Strict mesh replay and ladder comparisons pinned on full rating artifacts."
+    },
+    {
+      "current_evidence": "Pinned snapshots carry Task172 profile binding on live requests.",
+      "disposition": "DEFERRED",
+      "gap": "R22 sizing does not re-validate property provider envelope beyond request hash.",
+      "item": "PROPERTY_PROVIDER_AND_OPERATING_ENVELOPE",
+      "next_action": "Bind property envelope audit into production sizing admission.",
+      "requirement": "Task172 water property profile within declared temperature/pressure envelope."
+    },
+    {
+      "current_evidence": "R19/R21E full artifacts embed task174_result_hash parity.",
+      "disposition": "EXPERIMENTAL_ONLY",
+      "gap": "R22A adds fail-closed injection for Task174 tamper at admission boundary.",
+      "item": "TASK174_HYDRAULIC_AUTHORITY",
+      "next_action": "Extend injection coverage to production Task173 sizing adapter.",
+      "requirement": "Task174 result identity must match request binding for DP constraints."
+    },
+    {
+      "current_evidence": "R22 records DEFERRED screening; FIV numeric limit authority missing on Task174.",
+      "disposition": "OPEN",
+      "gap": "No Task167 bundle on live rating requests; screening not re-executed live.",
+      "item": "TASK167_FIV_MANDATORY_SCREENING",
+      "next_action": "Attach Task167 screening authority to rating requests before production recommend.",
+      "requirement": "Task173 mandatory screening with Task167 approved rule pack on each candidate."
+    },
+    {
+      "current_evidence": "R22A trusted requirement canonical hash and space pins verified independently.",
+      "disposition": "EXPERIMENTAL_ONLY",
+      "gap": "Experimental requirement approval is not production Task173 service authority.",
+      "item": "CANDIDATE_SPACE_SIZING_REQUIREMENT_AUTHORITY",
+      "next_action": "Replace experimental requirement source with licensed production requirement record.",
+      "requirement": "Trusted sizing requirement with Q13 candidate space authority/hash binding."
+    },
+    {
+      "current_evidence": "Admitted ratings use R19/R21 experimental live rating authority IDs.",
+      "disposition": "OPEN",
+      "gap": "Cannot claim production CandidateRatingSuccessResult admission.",
+      "item": "PRODUCTION_CANDIDATE_RATING_SUCCESS_RESULT",
+      "next_action": "Stop at CANDIDATE; do not promote to VALIDATED without review.",
+      "requirement": "VALIDATED numerical authority and production rating authority IDs."
+    },
+    {
+      "current_evidence": "R22 emits experimental-multi-candidate-sizing-result.v1/v2 with screening incomplete.",
+      "disposition": "OPEN",
+      "gap": "PRODUCTION_MULTI_CANDIDATE_SIZING_VERIFIED remains false.",
+      "item": "PRODUCTION_SIZING_RESULT",
+      "next_action": "Close screening and numerical authority gaps before production sizing result.",
+      "requirement": "task173.sizing-result.v1 with mandatory screening complete and production integration."
+    }
+  ],
+  "numerical_authority_status": "CANDIDATE",
+  "production_integration": false,
+  "production_multi_candidate_sizing_verified": false,
+  "production_recommendation_authorized": false,
+  "r19_full_hash_replay": true,
+  "r21e_full_hash_replay": true,
+  "r22_raw_sha256_parity": true,
+  "r22_sizing_result_hash_parity": true,
+  "ranking_policy_replay": true,
+  "ranking_trace": [
+    {
+      "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "composite_score": "16.942454609529350732037732191039958415712351434618",
+      "normalized_objective": "6.9424546095293507320377321910399584157123514346183",
+      "objective_metric": "shell_dp_pa",
+      "objective_value": "694.24546095293507320377321910399584157123514346183",
+      "rank": 1,
+      "reason_codes": [
+        "MINIMIZE_SHELL_DP_PA",
+        "WARN_PENALTY_APPLIED",
+        "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+      ],
+      "source_status": "WARN",
+      "warn_penalty": "10"
+    },
+    {
+      "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+      "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+      "composite_score": "17.016405731192504657174573055370791187807534501537",
+      "normalized_objective": "7.0164057311925046571745730553707911878075345015373",
+      "objective_metric": "shell_dp_pa",
+      "objective_value": "701.64057311925046571745730553707911878075345015373",
+      "rank": 2,
+      "reason_codes": [
+        "MINIMIZE_SHELL_DP_PA",
+        "WARN_PENALTY_APPLIED",
+        "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+      ],
+      "source_status": "WARN",
+      "warn_penalty": "10"
+    }
+  ],
+  "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+  "remote_head_before_evidence": "03e8dd0e4968565f40bf55039ba601013cef5030",
+  "requirement_canonical_hash_gate": true,
+  "screening_gap_ledger": [
+    "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+    "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH",
+    "PRODUCTION_MANDATORY_SCREENING_AUTHORITY_NOT_AVAILABLE",
+    "TASK167_APPROVED_RULE_PACK_AUTHORITY_NOT_ON_RATING_REQUEST"
+  ],
+  "sizing_result_hash_replay": true,
+  "sizing_result_v1": {
+    "alternative_candidate_ids": [
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "candidate_count": 2,
+    "candidate_identity_gate": "PASS",
+    "candidate_records": [
+      {
+        "blockers": [],
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "compact_result_hash": "d86b0490c43cb15580c2977cc9d5a56ff81c635a658561716a029984faab37e7",
+        "duty_constraint": "PASS",
+        "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+        "full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+        "rank": 1,
+        "ranking_score": "16.942454609529350732037732191039958415712351434618",
+        "rated_duty_w": "51901.40592651570346",
+        "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "screening_status": "WARN",
+        "shell_dp_constraint": "PASS",
+        "shell_dp_pa": "694.24546095293507320377321910399584157123514346183",
+        "status": "WARN",
+        "tube_dp_constraint": "PASS",
+        "tube_dp_pa": "8.878",
+        "warnings": [
+          "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+          "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+        ]
+      },
+      {
+        "blockers": [],
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "compact_result_hash": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+        "duty_constraint": "PASS",
+        "experimental_rating_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21",
+        "full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+        "rank": 2,
+        "ranking_score": "17.016405731192504657174573055370791187807534501537",
+        "rated_duty_w": "51975.93554998601533",
+        "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+        "screening_status": "WARN",
+        "shell_dp_constraint": "PASS",
+        "shell_dp_pa": "701.64057311925046571745730553707911878075345015373",
+        "status": "WARN",
+        "tube_dp_constraint": "PASS",
+        "tube_dp_pa": "8.878",
+        "warnings": [
+          "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+          "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+        ]
+      }
+    ],
+    "candidate_space_authority_id": "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R4",
+    "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+    "duty_constraint_gate": "PASS",
+    "experimental_sizing_authority_id": "V07-FAST-SOLVER-EXPERIMENTAL-MULTI-CANDIDATE-SIZING-R22",
+    "mandatory_screening_gate": "EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+    "numerical_authority_status": "CANDIDATE",
+    "production_integration": false,
+    "ranking_trace": [
+      {
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "composite_score": "16.942454609529350732037732191039958415712351434618",
+        "normalized_objective": "6.9424546095293507320377321910399584157123514346183",
+        "objective_metric": "shell_dp_pa",
+        "objective_value": "694.24546095293507320377321910399584157123514346183",
+        "rank": 1,
+        "reason_codes": [
+          "MINIMIZE_SHELL_DP_PA",
+          "WARN_PENALTY_APPLIED",
+          "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+        ],
+        "source_status": "WARN",
+        "warn_penalty": "10"
+      },
+      {
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "composite_score": "17.016405731192504657174573055370791187807534501537",
+        "normalized_objective": "7.0164057311925046571745730553707911878075345015373",
+        "objective_metric": "shell_dp_pa",
+        "objective_value": "701.64057311925046571745730553707911878075345015373",
+        "rank": 2,
+        "reason_codes": [
+          "MINIMIZE_SHELL_DP_PA",
+          "WARN_PENALTY_APPLIED",
+          "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+        ],
+        "source_status": "WARN",
+        "warn_penalty": "10"
+      }
+    ],
+    "ranking_trace_status": "COMPLETE",
+    "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "result_hash": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+    "result_id": "experimental-multi-candidate-sizing:346980708043dedb",
+    "result_provenance": [
+      [
+        "consumer",
+        "experimental_multi_candidate_sizing.v1"
+      ],
+      [
+        "ranking_policy_id",
+        "V07-T173-SIZING-RANKING-POLICY-R1"
+      ],
+      [
+        "ranking_policy_hash",
+        "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+      ],
+      [
+        "candidate_b_full_sha256",
+        "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172"
+      ],
+      [
+        "second_candidate_full_sha256",
+        "3dde55a2950f44b78a31e078044fe0a561b212371de40766d2b7c7b3d11f1fa7"
+      ]
+    ],
+    "schema_version": "task173.experimental-multi-candidate-sizing-result.v1",
+    "shell_dp_constraint_gate": "PASS",
+    "sizing_requirement_hash": "03bc0fa749d5a4d5a38b03448f28d195e60e29a846237abafcfc91fe5802c4d3",
+    "status": "EXPERIMENTAL_COMPLETE",
+    "tube_dp_constraint_gate": "PASS"
+  },
+  "sizing_result_v2": {
+    "experimental_alternative_candidate_ids": [
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "experimental_recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "experimental_sizing_authority_id": "V07-FAST-SOLVER-EXPERIMENTAL-MULTI-CANDIDATE-SIZING-R22A",
+    "fiv_authority_status": "MISSING",
+    "mandatory_screening_complete": false,
+    "mandatory_screening_gate": "EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+    "production_multi_candidate_sizing_verified": false,
+    "production_recommendation_authorized": false,
+    "result_hash": "f3abf9a8f2a4d9ca8525def4333635c7b63bec9887778becd3dd31b64fa4a136",
+    "result_id": "experimental-multi-candidate-sizing-v2:f3abf9a8f2a4d9ca",
+    "schema_version": "task173.experimental-multi-candidate-sizing-result.v2",
+    "screening_gap_codes": [
+      "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+      "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH",
+      "PRODUCTION_MANDATORY_SCREENING_AUTHORITY_NOT_AVAILABLE",
+      "TASK167_APPROVED_RULE_PACK_AUTHORITY_NOT_ON_RATING_REQUEST"
+    ],
+    "screening_rule_records": [
+      {
+        "detail": "V07-T173-SIZING-MANDATORY-SCREENING-R1",
+        "outcome": "EXECUTED",
+        "provenance": [
+          [
+            "requirement_hash",
+            "03bc0fa749d5a4d5a38b03448f28d195e60e29a846237abafcfc91fe5802c4d3"
+          ]
+        ],
+        "rule_id": "V07-T173-SIZING-MANDATORY-SCREENING-POLICY-ID-BINDING"
+      },
+      {
+        "detail": "fiv_numeric_limit_authority_missing=True",
+        "outcome": "WARN",
+        "provenance": [
+          [
+            "candidate_id",
+            "e152cca9-fd5d-59ca-9b46-1df574eee841"
+          ],
+          [
+            "rating_request_hash",
+            "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8"
+          ]
+        ],
+        "rule_id": "V07-TASK174-FIV-NUMERIC-LIMIT-AUTHORITY-FLAG"
+      },
+      {
+        "detail": "TASK167_APPROVED_RULE_PACK_AUTHORITY_NOT_ON_RATING_REQUEST",
+        "outcome": "DEFERRED",
+        "provenance": [
+          [
+            "candidate_id",
+            "e152cca9-fd5d-59ca-9b46-1df574eee841"
+          ]
+        ],
+        "rule_id": "V07-TASK167-SCREENING-BUNDLE-PRESENCE"
+      },
+      {
+        "detail": "fiv_numeric_limit_authority_missing=True",
+        "outcome": "WARN",
+        "provenance": [
+          [
+            "candidate_id",
+            "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+          ],
+          [
+            "rating_request_hash",
+            "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7"
+          ]
+        ],
+        "rule_id": "V07-TASK174-FIV-NUMERIC-LIMIT-AUTHORITY-FLAG"
+      },
+      {
+        "detail": "TASK167_APPROVED_RULE_PACK_AUTHORITY_NOT_ON_RATING_REQUEST",
+        "outcome": "DEFERRED",
+        "provenance": [
+          [
+            "candidate_id",
+            "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+          ]
+        ],
+        "rule_id": "V07-TASK167-SCREENING-BUNDLE-PRESENCE"
+      },
+      {
+        "detail": "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH",
+        "outcome": "DEFERRED",
+        "provenance": [
+          [
+            "path",
+            "experimental_multi_candidate_sizing_r22"
+          ]
+        ],
+        "rule_id": "V07-T173-MANDATORY-SCREENING-LIVE-REEXECUTION"
+      }
+    ],
+    "v1_result": {
+      "alternative_candidate_ids": [
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      "blocked_code": null,
+      "blocked_diagnostics": [],
+      "candidate_count": 2,
+      "candidate_identity_gate": "PASS",
+      "candidate_records": [
+        {
+          "blockers": [],
+          "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+          "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "compact_result_hash": "d86b0490c43cb15580c2977cc9d5a56ff81c635a658561716a029984faab37e7",
+          "duty_constraint": "PASS",
+          "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+          "full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+          "rank": 1,
+          "ranking_score": "16.942454609529350732037732191039958415712351434618",
+          "rated_duty_w": "51901.40592651570346",
+          "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+          "screening_status": "WARN",
+          "shell_dp_constraint": "PASS",
+          "shell_dp_pa": "694.24546095293507320377321910399584157123514346183",
+          "status": "WARN",
+          "tube_dp_constraint": "PASS",
+          "tube_dp_pa": "8.878",
+          "warnings": [
+            "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+            "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+          ]
+        },
+        {
+          "blockers": [],
+          "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+          "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "compact_result_hash": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+          "duty_constraint": "PASS",
+          "experimental_rating_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21",
+          "full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+          "rank": 2,
+          "ranking_score": "17.016405731192504657174573055370791187807534501537",
+          "rated_duty_w": "51975.93554998601533",
+          "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+          "screening_status": "WARN",
+          "shell_dp_constraint": "PASS",
+          "shell_dp_pa": "701.64057311925046571745730553707911878075345015373",
+          "status": "WARN",
+          "tube_dp_constraint": "PASS",
+          "tube_dp_pa": "8.878",
+          "warnings": [
+            "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+            "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+          ]
+        }
+      ],
+      "candidate_space_authority_id": "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R4",
+      "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+      "duty_constraint_gate": "PASS",
+      "experimental_sizing_authority_id": "V07-FAST-SOLVER-EXPERIMENTAL-MULTI-CANDIDATE-SIZING-R22",
+      "mandatory_screening_gate": "EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+      "numerical_authority_status": "CANDIDATE",
+      "production_integration": false,
+      "ranking_trace": [
+        {
+          "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+          "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+          "composite_score": "16.942454609529350732037732191039958415712351434618",
+          "normalized_objective": "6.9424546095293507320377321910399584157123514346183",
+          "objective_metric": "shell_dp_pa",
+          "objective_value": "694.24546095293507320377321910399584157123514346183",
+          "rank": 1,
+          "reason_codes": [
+            "MINIMIZE_SHELL_DP_PA",
+            "WARN_PENALTY_APPLIED",
+            "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+          ],
+          "source_status": "WARN",
+          "warn_penalty": "10"
+        },
+        {
+          "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+          "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+          "composite_score": "17.016405731192504657174573055370791187807534501537",
+          "normalized_objective": "7.0164057311925046571745730553707911878075345015373",
+          "objective_metric": "shell_dp_pa",
+          "objective_value": "701.64057311925046571745730553707911878075345015373",
+          "rank": 2,
+          "reason_codes": [
+            "MINIMIZE_SHELL_DP_PA",
+            "WARN_PENALTY_APPLIED",
+            "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+          ],
+          "source_status": "WARN",
+          "warn_penalty": "10"
+        }
+      ],
+      "ranking_trace_status": "COMPLETE",
+      "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "result_hash": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+      "result_id": "experimental-multi-candidate-sizing:346980708043dedb",
+      "result_provenance": [
+        [
+          "consumer",
+          "experimental_multi_candidate_sizing.v1"
+        ],
+        [
+          "ranking_policy_id",
+          "V07-T173-SIZING-RANKING-POLICY-R1"
+        ],
+        [
+          "ranking_policy_hash",
+          "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+        ],
+        [
+          "candidate_b_full_sha256",
+          "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172"
+        ],
+        [
+          "second_candidate_full_sha256",
+          "3dde55a2950f44b78a31e078044fe0a561b212371de40766d2b7c7b3d11f1fa7"
+        ]
+      ],
+      "schema_version": "task173.experimental-multi-candidate-sizing-result.v1",
+      "shell_dp_constraint_gate": "PASS",
+      "sizing_requirement_hash": "03bc0fa749d5a4d5a38b03448f28d195e60e29a846237abafcfc91fe5802c4d3",
+      "status": "EXPERIMENTAL_COMPLETE",
+      "tube_dp_constraint_gate": "PASS"
+    }
+  },
+  "task_id": "V07_FAST_SOLVER_R22A_ENGINEERING_ADMISSION_REPAIR"
+}
