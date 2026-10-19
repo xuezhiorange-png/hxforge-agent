@@ -7,7 +7,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     RANKING_POLICY_HASH,
     RANKING_POLICY_ID,
@@ -15,6 +14,10 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_sizing_requirement import (
     experimental_multi_candidate_sizing_requirement,
+)
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.mandatory_screening import (
+    MandatoryScreeningOutcome,
+    execute_experimental_mandatory_screening,
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.r22_pinned_identity import (
     FROZEN_Q13_CANDIDATE_SPACE_HASH,
@@ -29,6 +32,10 @@ from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.rating_p
     RatingAdmissionError,
     admit_candidate_b_live_rating,
     admit_second_candidate_live_rating,
+)
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.requirement_verification import (
+    verify_requirement_canonical_hash,
+    verify_trusted_requirement_binding,
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.result_models import (
     ExperimentalCandidateSizingRecord,
@@ -153,28 +160,49 @@ def _blocked_result(
     )
 
 
-def experimental_multi_candidate_sizing(
-    root: Path,
-    requirement: SizingRequirementAuthority | None = None,
+def experimental_multi_candidate_sizing_from_admitted(
+    requirement: SizingRequirementAuthority,
+    admitted: tuple[AdmittedLiveRating, ...],
+    *,
+    screening: MandatoryScreeningOutcome | None = None,
 ) -> ExperimentalMultiCandidateSizingResult:
-    requirement = requirement or experimental_multi_candidate_sizing_requirement()
-    projection = requirement.model_dump(mode="json", exclude={"canonical_hash"})
-    if requirement.canonical_hash != canonical_sha256(projection):
+    if len(admitted) != 2:
         return _blocked_result(
             requirement,
-            code="SIZING_REQUIREMENT_CANONICAL_HASH_MISMATCH",
-            diagnostics=(),
+            code="ADMITTED_CANDIDATE_COUNT_INVALID",
+            diagnostics=(str(len(admitted)),),
         )
+    screening = screening or execute_experimental_mandatory_screening(admitted, requirement)
+    screening_gate = screening.mandatory_screening_gate
 
-    try:
-        candidate_b = admit_candidate_b_live_rating(root)
-        second = admit_second_candidate_live_rating(root)
-    except RatingAdmissionError as exc:
-        return _blocked_result(
-            requirement,
-            code=exc.code,
-            diagnostics=exc.diagnostics,
-        )
+    from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+        general_live_compact_rating as glcr,
+    )
+    from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
+        live_compact_rating_hash,
+    )
+
+    for item in admitted:
+        if item.compact_r19 is not None and (
+            item.compact_r19.compact_result_hash != live_compact_rating_hash(item.compact_r19)
+        ):
+            return _blocked_result(
+                requirement,
+                code="COMPACT_RESULT_HASH_REPLAY_MISMATCH",
+                diagnostics=(item.label,),
+            )
+        if item.compact_general is not None and (
+            item.compact_general.compact_result_hash
+            != glcr.general_live_compact_rating_hash(item.compact_general)
+        ):
+            return _blocked_result(
+                requirement,
+                code="COMPACT_RESULT_HASH_REPLAY_MISMATCH",
+                diagnostics=(item.label,),
+            )
+
+    candidate_b = admitted[0]
+    second = admitted[1]
 
     if candidate_b.request.candidate_id == second.request.candidate_id:
         return _blocked_result(
@@ -191,7 +219,13 @@ def experimental_multi_candidate_sizing(
             code="BLOCKED_CANDIDATE_SPACE_NOT_COMPARABLE",
             diagnostics=(space_b, space_second, FROZEN_Q13_CANDIDATE_SPACE_HASH),
         )
-    bound_space = requirement.discrete_candidate_authority_ids_and_hashes[0][1]
+    bound_authority, bound_space = requirement.discrete_candidate_authority_ids_and_hashes[0]
+    if bound_authority != TASK168_CANDIDATE_SPACE_AUTHORITY_ID:
+        return _blocked_result(
+            requirement,
+            code="REQUIREMENT_CANDIDATE_SPACE_AUTHORITY_ID_MISMATCH",
+            diagnostics=(bound_authority,),
+        )
     if bound_space != FROZEN_Q13_CANDIDATE_SPACE_HASH:
         return _blocked_result(
             requirement,
@@ -216,7 +250,7 @@ def experimental_multi_candidate_sizing(
             candidate_count=len(records),
             candidate_records=tuple(records),
             ranking_trace_status="RANKING_BLOCKED",
-            mandatory_screening_gate="EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+            mandatory_screening_gate=screening_gate,
             duty_constraint_gate=duty_gate,
             tube_dp_constraint_gate=tube_gate,
             shell_dp_constraint_gate=shell_gate,
@@ -257,7 +291,7 @@ def experimental_multi_candidate_sizing(
         ranking_trace_status="COMPLETE",
         recommended_candidate_id=recommended,
         alternative_candidate_ids=alternatives,
-        mandatory_screening_gate="EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+        mandatory_screening_gate=screening_gate,
         duty_constraint_gate=duty_gate,
         tube_dp_constraint_gate=tube_gate,
         shell_dp_constraint_gate=shell_gate,
@@ -287,3 +321,41 @@ def experimental_multi_candidate_sizing(
             records=tuple(ranked_records),
         )
     return final
+
+
+def experimental_multi_candidate_sizing(
+    root: Path,
+    requirement: SizingRequirementAuthority | None = None,
+) -> ExperimentalMultiCandidateSizingResult:
+    requirement = requirement or experimental_multi_candidate_sizing_requirement()
+    if not verify_requirement_canonical_hash(requirement):
+        return _blocked_result(
+            requirement,
+            code="SIZING_REQUIREMENT_CANONICAL_HASH_MISMATCH",
+            diagnostics=(),
+        )
+    trusted_code = verify_trusted_requirement_binding(requirement)
+    if trusted_code is not None:
+        return _blocked_result(
+            requirement,
+            code=trusted_code,
+            diagnostics=(),
+        )
+
+    try:
+        candidate_b = admit_candidate_b_live_rating(root)
+        second = admit_second_candidate_live_rating(root)
+    except RatingAdmissionError as exc:
+        return _blocked_result(
+            requirement,
+            code=exc.code,
+            diagnostics=exc.diagnostics,
+        )
+
+    admitted = (candidate_b, second)
+    screening = execute_experimental_mandatory_screening(admitted, requirement)
+    return experimental_multi_candidate_sizing_from_admitted(
+        requirement,
+        admitted,
+        screening=screening,
+    )

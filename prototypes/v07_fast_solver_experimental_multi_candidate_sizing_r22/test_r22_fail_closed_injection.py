@@ -40,12 +40,33 @@ def test_candidate_space_requirement_mismatch_blocked() -> None:
     )
     result = experimental_multi_candidate_sizing(ROOT, tampered)
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "REQUIREMENT_CANDIDATE_SPACE_HASH_MISMATCH"
+    assert result.blocked_code == "REQUIREMENT_CANDIDATE_SPACE_AUTHORITY_ID_MISMATCH"
 
 
 def test_impossible_duty_blocks_ranking() -> None:
-    req = experimental_multi_candidate_sizing_requirement(required_duty_w="999999999")
-    result = experimental_multi_candidate_sizing(ROOT, req)
+    from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_multi_candidate_sizing import (
+        experimental_multi_candidate_sizing_from_admitted,
+    )
+    from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.rating_pair_admission import (
+        admit_candidate_b_live_rating,
+        admit_second_candidate_live_rating,
+    )
+
+    req = experimental_multi_candidate_sizing_requirement()
+    b = admit_candidate_b_live_rating(ROOT)
+    second = admit_second_candidate_live_rating(ROOT)
+    full = b.full.model_copy(update={"total_duty_w": __import__("decimal").Decimal("1")})
+    b = b.__class__(
+        label=b.label,
+        full=full,
+        compact_r19=b.compact_r19,
+        compact_general=b.compact_general,
+        request=b.request,
+        full_audit=b.full_audit,
+        full_file_sha256=b.full_file_sha256,
+        snapshot_rel_path=b.snapshot_rel_path,
+    )
+    result = experimental_multi_candidate_sizing_from_admitted(req, (b, second))
     assert result.status == "RANKING_BLOCKED"
     assert result.ranking_trace_status == "RANKING_BLOCKED"
 

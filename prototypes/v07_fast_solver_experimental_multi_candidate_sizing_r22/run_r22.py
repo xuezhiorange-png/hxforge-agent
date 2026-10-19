@@ -32,6 +32,9 @@ from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.r22_pinn
     R21E_FULL_JSON_SHA256,
     R21E_RESULT_HASH,
 )
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.requirement_verification import (
+    verify_requirement_canonical_hash,
+)
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import (
     audit_r19_full_live_rating_file,
 )
@@ -114,7 +117,7 @@ def main() -> None:
         "candidate_b_rating_admitted": True,
         "second_candidate_rating_admitted": True,
         "candidate_space_authority": requirement.discrete_candidate_authority_ids_and_hashes[0][0],
-        "sizing_requirement_hash_parity": requirement.canonical_hash == requirement.canonical_hash,
+        "sizing_requirement_hash_parity": verify_requirement_canonical_hash(requirement),
         "candidate_count": result_a.candidate_count,
         "candidate_identity_gate": result_a.candidate_identity_gate,
         "mandatory_screening_gate": result_a.mandatory_screening_gate,
