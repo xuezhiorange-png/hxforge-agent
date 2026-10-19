@@ -39,13 +39,21 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _json_lists_to_tuples(value: object) -> object:
+    if isinstance(value, list):
+        return tuple(_json_lists_to_tuples(item) for item in value)
+    if isinstance(value, dict):
+        return {key: _json_lists_to_tuples(item) for key, item in value.items()}
+    return value
+
+
 def audit_r22_raw_result(root: Path) -> dict[str, Any]:
     raw_path = root / R22_RAW_RESULT_REL
     if not raw_path.is_file():
         return {"blocked": True, "code": "R22_RAW_RESULT_MISSING", "path": R22_RAW_RESULT_REL}
     raw_sha = file_sha256(raw_path)
     payload = json.loads(raw_path.read_text(encoding="utf-8"))
-    sizing_body = payload.get("sizing_result")
+    sizing_body = _json_lists_to_tuples(payload.get("sizing_result"))
     if sizing_body is None:
         return {
             "blocked": True,
