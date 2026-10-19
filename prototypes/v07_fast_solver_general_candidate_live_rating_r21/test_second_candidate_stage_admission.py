@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_frozen_snapshot_and_prior_stages_admit() -> None:
     frozen = scsa.admit_frozen_second_candidate_snapshot(ROOT)
     scsa.verify_n4_timeout_receipt_preserved(ROOT)
+    scsa.verify_n32_timeout_receipt_preserved(ROOT)
     n1 = scsa.admit_second_candidate_prior_stage(ROOT, scsa.SECOND_CANDIDATE_PRIOR_PINS[0])
     n2 = scsa.admit_second_candidate_prior_stage(ROOT, scsa.SECOND_CANDIDATE_PRIOR_PINS[1])
     n4 = scsa.admit_second_candidate_prior_stage(ROOT, scsa.SECOND_CANDIDATE_ACCEPTED_PRIOR_PINS[2])

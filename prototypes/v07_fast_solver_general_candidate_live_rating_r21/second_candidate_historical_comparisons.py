@@ -38,7 +38,7 @@ def rebuild_historical_comparison_chain(
         coarse = stages_by_mesh[coarse_n]
         fine = stages_by_mesh[fine_n]
         try:
-            cmp_payload = scc.compare_admitted_stage_pair(
+            pair_result = scc.compare_admitted_stage_pair(
                 snapshot_path,
                 coarse,
                 fine,
@@ -49,13 +49,15 @@ def rebuild_historical_comparison_chain(
             )
         except scc.ComparePairFailure as exc:
             raise RuntimeError(exc.blocked_code or exc.status) from exc
-        comparisons.append(cmp_payload)
+        if pair_result.headroom_blocked:
+            raise RuntimeError(pair_result.blocked_code or "HEADROOM_BLOCKED")
+        comparisons.append(pair_result.comparison)
         artifacts.append(
             scp.write_comparison_receipt(
                 output_comparison_dir,
                 coarse_n,
                 fine_n,
-                cmp_payload,
+                pair_result.comparison,
                 repo_root=repo_root,
             )
         )

@@ -15,6 +15,10 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models i
     candidate_rating_request_hash,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v07_fast_solver_live_ladder_continuation_r14.outer_boundary_progress import (
+    append_trial_log_entry,
+    materialize_progress_snapshot,
+)
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
     load_request_from_snapshot_file,
     verify_snapshot_integrity,
@@ -69,16 +73,32 @@ def _worker_entry(conn: mp.connection.Connection, payload: dict[str, Any]) -> No
         provider = CoolPropProvider(cache_size=2048)
         try:
             deadline = time.perf_counter() + budget_s
+            trial_log_path = payload.get("outer_progress_trial_log_path")
+
+            def _on_trial(receipt: Any) -> None:
+                if trial_log_path:
+                    append_trial_log_entry(Path(str(trial_log_path)), receipt.to_dict())
+
             outer = solve_fast_outer_boundary(
                 subdivisions,
                 provider,
                 context.shell_authority,
                 deadline_monotonic=deadline,
+                on_trial_receipt=_on_trial if trial_log_path else None,
             )
             run = outer.mesh_run
             obs = run.observables if run is not None else None
             progress_path = payload.get("outer_progress_path")
-            if progress_path:
+            if progress_path and trial_log_path:
+                materialize_progress_snapshot(
+                    progress_path=Path(str(progress_path)),
+                    trial_log_path=Path(str(trial_log_path)),
+                    mesh_n=subdivisions,
+                    worker_status=str(outer.status),
+                    blocked_code=outer.blocked_code,
+                    worker_wall_seconds=outer.stats.worker_wall_seconds,
+                )
+            elif progress_path:
                 _write_outer_progress(Path(str(progress_path)), subdivisions, outer)
             receipt: dict[str, Any] = {
                 "worker_status": outer.status,
@@ -137,6 +157,7 @@ def run_live_mesh_worker_from_snapshot(
     budget_s: float,
     join_grace_s: float = 15.0,
     outer_progress_path: Path | None = None,
+    outer_progress_trial_log_path: Path | None = None,
 ) -> dict[str, Any]:
     ctx = mp.get_context("spawn")
     parent_conn, child_conn = ctx.Pipe(duplex=False)
@@ -147,6 +168,9 @@ def run_live_mesh_worker_from_snapshot(
         "subdivisions": mesh_n,
         "budget_s": budget_s,
         "outer_progress_path": str(outer_progress_path) if outer_progress_path else None,
+        "outer_progress_trial_log_path": (
+            str(outer_progress_trial_log_path) if outer_progress_trial_log_path else None
+        ),
     }
     process = ctx.Process(target=_worker_entry, args=(child_conn, payload))
     process.start()
@@ -157,6 +181,15 @@ def run_live_mesh_worker_from_snapshot(
         process.terminate()
         process.join(5.0)
         parent_conn.close()
+        if outer_progress_path is not None and outer_progress_trial_log_path is not None:
+            materialize_progress_snapshot(
+                progress_path=outer_progress_path,
+                trial_log_path=outer_progress_trial_log_path,
+                mesh_n=mesh_n,
+                worker_status="TIMEOUT",
+                blocked_code="WORKER_HARD_TIMEOUT",
+                worker_wall_seconds=budget_s,
+            )
         return {
             "worker_status": "TIMEOUT",
             "blocked_code": "WORKER_HARD_TIMEOUT",
