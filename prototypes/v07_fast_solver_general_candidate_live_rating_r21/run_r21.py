@@ -20,7 +20,13 @@ if str(ROOT) not in sys.path:
 # ruff: noqa: E402
 
 from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+    general_live_compact_rating as glcr,
+)
+from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
     second_candidate_discovery as second_candidate,
+)
+from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+    second_candidate_experimental_sizing_requirement as scer,
 )
 from prototypes.v07_fast_solver_general_candidate_live_rating_r21.general_live_rating import (
     GeneralLiveRatingBudget,
@@ -35,14 +41,7 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_mode
 from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary import (
     geometry_summary_from_request,
 )
-from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
-    build_live_compact_from_full,
-    live_compact_rating_hash,
-)
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import file_sha256
-from prototypes.v07_fast_solver_rating_sizing_bridge_r20.test_r21a_gate_supplement import (
-    _tight_requirement,
-)
 
 TASK_ID = "V07_FAST_SOLVER_GENERAL_CANDIDATE_LIVE_RATING_R21"
 BASE_HEAD = "22268bb5b88dec6ed0d96c942ba17c0d00e913f4"
@@ -139,14 +138,14 @@ def main() -> None:
     )
     full_sha = file_sha256(full_path)
     geom = geometry_summary_from_request(request)
-    compact = build_live_compact_from_full(
+    compact = glcr.build_general_live_compact_from_full(
         outcome,
         trajectory_artifact_path=full_rel,
         trajectory_file_sha256=full_sha,
         geometry_summary=geom,
     )
     compact = compact.model_copy(
-        update={"compact_result_hash": live_compact_rating_hash(compact)}
+        update={"compact_result_hash": glcr.general_live_compact_rating_hash(compact)}
     )
     compact_rel = str(Path(evidence_dir.relative_to(ROOT)) / "COMPACT_GENERAL_LIVE_RATING.json")
     compact_path = ROOT / compact_rel
@@ -155,7 +154,7 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    requirement = _tight_requirement()
+    requirement = scer.second_candidate_experimental_sizing_requirement()
     adapter = experimental_general_sizing_rating_adapter(
         ROOT,
         compact,

@@ -47,6 +47,16 @@ HEADROOM_MESH_N = 64
 REQUIRED_CONSECUTIVE_PASSING_PAIRS = 2
 
 
+def _general_blocked(code: str, *diag: str) -> ExperimentalRatingBlocked:
+    return ExperimentalRatingBlocked(
+        status="BLOCKED",
+        blocked_code=code,
+        blocked_diagnostics=diag,
+        execution_mode="LIVE_NUMERICAL_SOLVE",
+        experimental_rating_authority_id=GENERAL_LIVE_RATING_R21_AUTHORITY_ID,
+    )
+
+
 @dataclass(frozen=True)
 class GeneralLiveRatingBudget:
     total_budget_s: float = 5400.0
@@ -93,11 +103,7 @@ def experimental_rate_general_candidate_live(
     provider: CoolPropProvider | None = None,
 ) -> ExperimentalCandidateRatingResult | ExperimentalRatingBlocked:
     if not verify_task174_binding(request):
-        return ExperimentalRatingBlocked(
-            status="BLOCKED",
-            blocked_code="TASK174_BINDING_GATE_FAILED",
-            execution_mode="LIVE_NUMERICAL_SOLVE",
-        )
+        return _general_blocked("TASK174_BINDING_GATE_FAILED")
 
     mesh_budgets = budget.mesh_budgets_s or {
         1: 180.0,
@@ -140,39 +146,25 @@ def _finalize_from_continuation(
     provider: CoolPropProvider | None,
 ) -> ExperimentalCandidateRatingResult | ExperimentalRatingBlocked:
     if outcome.status in ("TIMEOUT", "BLOCKED"):
-        return ExperimentalRatingBlocked(
-            status="BLOCKED",
-            blocked_code=outcome.blocked_code or outcome.status,
-            blocked_diagnostics=outcome.blocked_diagnostics,
-            execution_mode="LIVE_NUMERICAL_SOLVE",
+        return _general_blocked(
+            outcome.blocked_code or outcome.status,
+            *outcome.blocked_diagnostics,
         )
     if outcome.ladder_continuation_status != "HEADROOM_PASS":
-        return ExperimentalRatingBlocked(
-            status="BLOCKED",
-            blocked_code="GENERAL_LIVE_RATING_INCOMPLETE",
-            blocked_diagnostics=(
-                f"ladder_status={outcome.ladder_continuation_status}",
-                f"orchestrator_status={outcome.status}",
-            ),
-            execution_mode="LIVE_NUMERICAL_SOLVE",
+        return _general_blocked(
+            "GENERAL_LIVE_RATING_INCOMPLETE",
+            f"ladder_status={outcome.ladder_continuation_status}",
+            f"orchestrator_status={outcome.status}",
         )
 
     mesh_gate, gate_err = _mesh_sequence_gate(tuple(outcome.mesh_comparisons))
     if mesh_gate != "PASS":
-        return ExperimentalRatingBlocked(
-            status="BLOCKED",
-            blocked_code=gate_err or "MESH_SEQUENCE_GATE_FAILED",
-            execution_mode="LIVE_NUMERICAL_SOLVE",
-        )
+        return _general_blocked(gate_err or "MESH_SEQUENCE_GATE_FAILED")
 
     n32_stage = _stage_by_mesh(tuple(outcome.mesh_stages), ACCEPTED_MESH_N)
     n64_stage = _stage_by_mesh(tuple(outcome.mesh_stages), HEADROOM_MESH_N)
     if n32_stage is None or n64_stage is None:
-        return ExperimentalRatingBlocked(
-            status="BLOCKED",
-            blocked_code="MISSING_ACCEPTED_OR_HEADROOM_STAGE",
-            execution_mode="LIVE_NUMERICAL_SOLVE",
-        )
+        return _general_blocked("MISSING_ACCEPTED_OR_HEADROOM_STAGE")
 
     request_hash = candidate_rating_request_hash(request)
     context = t173._candidate_context(request)
@@ -197,52 +189,30 @@ def _finalize_from_continuation(
                 shell_authority=context.shell_authority,
             )
         except LiveMeshReplayError as exc:
-            return ExperimentalRatingBlocked(
-                status="BLOCKED",
-                blocked_code=exc.code,
-                blocked_diagnostics=exc.diagnostics,
-                execution_mode="LIVE_NUMERICAL_SOLVE",
-            )
+            return _general_blocked(exc.code, *exc.diagnostics)
 
         if not verify_accepted_cell_count(accepted, context, ACCEPTED_MESH_N):
-            return ExperimentalRatingBlocked(
-                status="BLOCKED",
-                blocked_code="ACCEPTED_CELL_COUNT_MISMATCH",
-                execution_mode="LIVE_NUMERICAL_SOLVE",
-            )
+            return _general_blocked("ACCEPTED_CELL_COUNT_MISMATCH")
         cell_ok = verify_cell_closure(accepted)
         energy_ok = verify_energy_balance(accepted)
         wall_ok = verify_wall_extrema_from_cells(accepted)
         if not cell_ok or not energy_ok or not wall_ok:
-            return ExperimentalRatingBlocked(
-                status="BLOCKED",
-                blocked_code="CELL_ENERGY_OR_WALL_VERIFICATION_FAILED",
-                blocked_diagnostics=(
-                    f"task172_cell_closure={cell_ok}",
-                    f"energy_balance={energy_ok}",
-                    f"wall_extrema={wall_ok}",
-                ),
-                execution_mode="LIVE_NUMERICAL_SOLVE",
+            return _general_blocked(
+                "CELL_ENERGY_OR_WALL_VERIFICATION_FAILED",
+                f"task172_cell_closure={cell_ok}",
+                f"energy_balance={energy_ok}",
+                f"wall_extrema={wall_ok}",
             )
         terminal_ok = t173._terminal_tolerance_pass(accepted) and t173._terminal_tolerance_pass(
             headroom
         )
         if not terminal_ok:
-            return ExperimentalRatingBlocked(
-                status="BLOCKED",
-                blocked_code="TERMINAL_TOLERANCE_FAILED",
-                execution_mode="LIVE_NUMERICAL_SOLVE",
-            )
+            return _general_blocked("TERMINAL_TOLERANCE_FAILED")
         try:
             trajectory = build_accepted_trajectory_projection(accepted, context)
             trajectory_mode = "PRODUCTION_PROJECTION_COMPATIBLE"
         except t173._Stage3Failure as exc:
-            return ExperimentalRatingBlocked(
-                status="BLOCKED",
-                blocked_code="ACCEPTED_TRAJECTORY_PROJECTION_FAILED",
-                blocked_diagnostics=(str(exc),),
-                execution_mode="LIVE_NUMERICAL_SOLVE",
-            )
+            return _general_blocked("ACCEPTED_TRAJECTORY_PROJECTION_FAILED", str(exc))
 
         obs = accepted.observables
         tube_in = accepted.faces_tube[0].temperature_k
@@ -319,3 +289,18 @@ def _finalize_from_continuation(
         return result.model_copy(update={"result_hash": rh, "result_id": rid})
     finally:
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
+
+
+def finalize_general_live_rating_from_continuation(
+    request: CandidateRatingRequest,
+    outcome: LiveContinuationOutcome,
+    *,
+    provider: CoolPropProvider | None = None,
+) -> ExperimentalCandidateRatingResult | ExperimentalRatingBlocked:
+    snapshot_rel = outcome.request_snapshot_rel_path or ""
+    return _finalize_from_continuation(
+        request,
+        outcome,
+        snapshot_rel_path=snapshot_rel,
+        provider=provider,
+    )

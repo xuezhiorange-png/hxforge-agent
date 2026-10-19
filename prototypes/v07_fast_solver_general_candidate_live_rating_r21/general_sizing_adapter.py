@@ -1,4 +1,4 @@
-"""Experimental sizing adapter for general (non–pinned-R19) live compact ratings."""
+"""Experimental sizing adapter for general (R21) live compact ratings."""
 
 from __future__ import annotations
 
@@ -10,6 +10,12 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models i
 )
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     SizingRequirementAuthority,
+)
+from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
+    general_live_compact_rating as glcr,
+)
+from prototypes.v07_fast_solver_general_candidate_live_rating_r21.general_live_result_hash import (
+    GENERAL_LIVE_RATING_R21_AUTHORITY_ID,
 )
 from prototypes.v07_fast_solver_live_ladder_continuation_r14.request_snapshot import (
     load_request_from_snapshot_file,
@@ -23,13 +29,6 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.geometry_summary 
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.experimental_sizing_rating_adapter import (
     ExperimentalSizingAdapterBlocked,
     ExperimentalSizingAdapterOutcome,
-    _production_rating_authority_gaps,
-)
-from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
-    LiveCompactAuthorityError,
-    LiveCompactCandidateRating,
-    live_compact_rating_hash,
-    verify_live_compact_against_full,
 )
 from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_full_file_audit import file_sha256
 
@@ -42,9 +41,21 @@ def _blocked(code: str, *diag: str) -> ExperimentalSizingAdapterBlocked:
     )
 
 
+def _production_rating_authority_gaps(
+    compact: glcr.GeneralLiveCompactCandidateRating,
+) -> tuple[str, ...]:
+    return (
+        "PRODUCTION_VALIDATE_CANDIDATE_RATING_NOT_INVOKED_FOR_LIVE_EXPERIMENTAL",
+        "PRODUCTION_RATING_REQUIRES_R2A_MESH_SEQUENCE_AND_VALIDATED_AUTHORITY",
+        f"experimental_rating_authority_id={compact.experimental_rating_authority_id}",
+        "numerical_authority_status=CANDIDATE",
+        "multi_candidate_sizing_verified=false",
+    )
+
+
 def experimental_general_sizing_rating_adapter(
     root: Path,
-    compact: LiveCompactCandidateRating,
+    compact: glcr.GeneralLiveCompactCandidateRating,
     requirement: SizingRequirementAuthority,
     *,
     full_rel_path: str,
@@ -53,8 +64,11 @@ def experimental_general_sizing_rating_adapter(
     if requirement.canonical_hash != canonical_sha256(projection):
         return _blocked("SIZING_REQUIREMENT_CANONICAL_HASH_MISMATCH")
 
-    if compact.compact_result_hash != live_compact_rating_hash(compact):
+    if compact.compact_result_hash != glcr.general_live_compact_rating_hash(compact):
         return _blocked("COMPACT_HASH_REPLAY_MISMATCH")
+
+    if compact.experimental_rating_authority_id != GENERAL_LIVE_RATING_R21_AUTHORITY_ID:
+        return _blocked("COMPACT_AUTHORITY_NOT_GENERAL_R21")
 
     if compact.execution_mode != "LIVE_NUMERICAL_SOLVE":
         return _blocked("COMPACT_EXECUTION_MODE_NOT_LIVE")
@@ -74,13 +88,6 @@ def experimental_general_sizing_rating_adapter(
     except Exception as exc:  # noqa: BLE001
         return _blocked("GENERAL_FULL_RATING_PARSE_FAILED", str(exc))
 
-    if full.result_hash != compact.full_result_hash:
-        return _blocked("COMPACT_FULL_RESULT_HASH_MISMATCH")
-    if compact.full_trajectory_artifact.path != full_rel_path:
-        return _blocked("COMPACT_FULL_PATH_MISMATCH")
-    if compact.full_trajectory_artifact.file_sha256 != on_disk_sha:
-        return _blocked("COMPACT_FULL_FILE_SHA256_MISMATCH")
-
     try:
         snapshot_rel = dict(full.provenance).get("snapshot_rel_path")
         if not snapshot_rel:
@@ -89,13 +96,13 @@ def experimental_general_sizing_rating_adapter(
         if candidate_rating_request_hash(request) != full.rating_request_hash:
             return _blocked("SNAPSHOT_RATING_REQUEST_HASH_MISMATCH")
         geom = geometry_summary_from_request(request)
-        verify_live_compact_against_full(
+        glcr.verify_general_live_compact_against_full(
             compact,
             full,
             full_file_sha256=on_disk_sha,
             geometry_summary=geom,
         )
-    except (LiveCompactAuthorityError, ValueError, OSError) as exc:
+    except (glcr.GeneralLiveCompactAuthorityError, ValueError, OSError) as exc:
         return _blocked("COMPACT_FULL_AUTHORITY_INCONSISTENT", str(exc))
 
     if request.candidate_id != compact.candidate_id:
@@ -133,7 +140,6 @@ def experimental_general_sizing_rating_adapter(
         ("full_rating_result_hash", compact.full_result_hash),
         ("task174_result_hash", compact.task174_result_hash),
         ("production_rating_gaps", ";".join(production_gaps)),
-        ("multi_candidate_sizing_verified", "false"),
     )
     return ExperimentalSizingAdapterOutcome(
         status="EXPERIMENTAL_EVALUATED",
