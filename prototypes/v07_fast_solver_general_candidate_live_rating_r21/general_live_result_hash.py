@@ -7,12 +7,8 @@ from prototypes.v07_fast_solver_rating_authority_admission_r11.experimental_mode
     ExperimentalCandidateRatingResult,
 )
 
-GENERAL_LIVE_RATING_HASH_DOMAIN = (
-    "task173.live-numerical-solve-general-candidate-rating-result.v1"
-)
-GENERAL_LIVE_RATING_R21_AUTHORITY_ID = (
-    "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21"
-)
+GENERAL_LIVE_RATING_HASH_DOMAIN = "task173.live-numerical-solve-general-candidate-rating-result.v1"
+GENERAL_LIVE_RATING_R21_AUTHORITY_ID = "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21"
 
 
 def general_live_rating_result_hash(result: ExperimentalCandidateRatingResult) -> str:

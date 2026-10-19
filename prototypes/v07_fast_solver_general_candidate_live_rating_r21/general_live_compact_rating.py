@@ -36,9 +36,9 @@ class StrictModel(BaseModel):
 
 
 class GeneralLiveCompactCandidateRating(StrictModel):
-    schema_version: Literal[
-        "task173.live-numerical-solve-general-candidate-rating-compact.v1"
-    ] = GENERAL_LIVE_COMPACT_RATING_SCHEMA
+    schema_version: Literal["task173.live-numerical-solve-general-candidate-rating-compact.v1"] = (
+        GENERAL_LIVE_COMPACT_RATING_SCHEMA
+    )
     status: Literal["CANDIDATE_UNAPPROVED"]
     numerical_authority_status: Literal["CANDIDATE"]
     production_integration: Literal[False] = False

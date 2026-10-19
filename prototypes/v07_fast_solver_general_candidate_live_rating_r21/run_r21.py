@@ -128,9 +128,7 @@ def main() -> None:
         _write_receipt(receipt, evidence_dir, wall_t0)
         return
 
-    full_rel = str(
-        Path(evidence_dir.relative_to(ROOT)) / "FULL_GENERAL_LIVE_RATING.json"
-    )
+    full_rel = str(Path(evidence_dir.relative_to(ROOT)) / "FULL_GENERAL_LIVE_RATING.json")
     full_path = ROOT / full_rel
     full_path.write_text(
         json.dumps(outcome.model_dump(mode="json"), indent=2, sort_keys=True) + "\n",

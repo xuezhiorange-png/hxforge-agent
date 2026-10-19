@@ -118,9 +118,7 @@ def continue_second_candidate_ladder(
             else receipt.get("worker_status", "BLOCKED")
         )
         stages.append(receipt)
-        artifacts.append(
-            write_stage_receipt(output_stage_dir, mesh_n, receipt, repo_root=root)
-        )
+        artifacts.append(write_stage_receipt(output_stage_dir, mesh_n, receipt, repo_root=root))
         if receipt.get("worker_status") == "TIMEOUT":
             return LiveContinuationOutcome(
                 status="TIMEOUT",

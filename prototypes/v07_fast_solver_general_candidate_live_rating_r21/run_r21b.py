@@ -141,21 +141,15 @@ def main() -> None:
         (s for s in outcome.mesh_stages if int(s.get("mesh_n", 0)) == 4),
         None,
     )
-    receipt["n4_new_worker_status"] = (
-        n4_stage.get("worker_status") if n4_stage else "MISSING"
-    )
-    receipt["n4_terminal_tolerance"] = (
-        n4_stage.get("terminal_tolerance_pass") if n4_stage else None
-    )
+    receipt["n4_new_worker_status"] = n4_stage.get("worker_status") if n4_stage else "MISSING"
+    receipt["n4_terminal_tolerance"] = n4_stage.get("terminal_tolerance_pass") if n4_stage else None
 
     for mesh_n in (8, 16, 32, 64):
         stage = next(
             (s for s in outcome.mesh_stages if int(s.get("mesh_n", 0)) == mesh_n),
             None,
         )
-        receipt[f"n{mesh_n}_status"] = (
-            stage.get("worker_status") if stage else "NOT_REACHED"
-        )
+        receipt[f"n{mesh_n}_status"] = stage.get("worker_status") if stage else "NOT_REACHED"
 
     receipt["mesh_sequence_gate"] = (
         "PASS" if outcome.ladder_continuation_status == "HEADROOM_PASS" else "FAIL"
@@ -208,9 +202,7 @@ def main() -> None:
             "tube_dp_pa": str(
                 frozen.request.task174_result.modeled_total_tube_side_pressure_drop_pa
             ),
-            "shell_dp_pa": str(
-                frozen.request.task174_result.bell_total_shell_pressure_drop_pa
-            ),
+            "shell_dp_pa": str(frozen.request.task174_result.bell_total_shell_pressure_drop_pa),
             "experimental_sizing_adapter_status": adapter.status,
             "experimental_sizing_adapter": adapter.model_dump(mode="json"),
         }

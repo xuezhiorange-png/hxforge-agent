@@ -32,9 +32,7 @@ def second_candidate_experimental_sizing_requirement(
         "evidence_refs": (
             "docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-live-rating-r21-20261018T162215Z/",
         ),
-        "provenance_refs": (
-            "prototypes/v07_fast_solver_general_candidate_live_rating_r21/",
-        ),
+        "provenance_refs": ("prototypes/v07_fast_solver_general_candidate_live_rating_r21/",),
         "required_duty_w": required_duty_w,
         "max_tube_dp_pa": max_tube_dp_pa,
         "max_shell_dp_pa": max_shell_dp_pa,
