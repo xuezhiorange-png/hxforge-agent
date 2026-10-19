@@ -1,0 +1,164 @@
+{
+  "alternative_candidate_ids": [
+    "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+  ],
+  "base_head": "708760f7fb3efb228d07f71091583e6b8810a5bf",
+  "candidate_b_rating_admitted": true,
+  "candidate_count": 2,
+  "candidate_identity_gate": "PASS",
+  "candidate_space_authority": "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R4",
+  "determinism_test": true,
+  "duty_constraint_gate": "PASS",
+  "experimental_multi_candidate_sizing_verified": true,
+  "final_head": "708760f7fb3efb228d07f71091583e6b8810a5bf",
+  "mandatory_screening_gate": "EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+  "negative_injection_tests": "PYTEST",
+  "next_action": "STOP_FOR_ENGINEERING_REVIEW",
+  "numerical_authority_status": "CANDIDATE",
+  "pr_state": "DRAFT",
+  "production_integration": false,
+  "production_multi_candidate_sizing_verified": false,
+  "r19_full_file_sha256_parity": true,
+  "r19_full_result_hash_parity": true,
+  "r21e_full_file_sha256_parity": true,
+  "r21e_full_result_hash_parity": true,
+  "ranking_policy_replay": true,
+  "ranking_trace_status": "COMPLETE",
+  "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+  "second_candidate_rating_admitted": true,
+  "shell_dp_constraint_gate": "PASS",
+  "sizing_requirement_hash_parity": true,
+  "sizing_result": {
+    "alternative_candidate_ids": [
+      "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+    ],
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "candidate_count": 2,
+    "candidate_identity_gate": "PASS",
+    "candidate_records": [
+      {
+        "blockers": [],
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "compact_result_hash": "d86b0490c43cb15580c2977cc9d5a56ff81c635a658561716a029984faab37e7",
+        "duty_constraint": "PASS",
+        "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+        "full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+        "rank": 1,
+        "ranking_score": "16.942454609529350732037732191039958415712351434618",
+        "rated_duty_w": "51901.40592651570346",
+        "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "screening_status": "WARN",
+        "shell_dp_constraint": "PASS",
+        "shell_dp_pa": "694.24546095293507320377321910399584157123514346183",
+        "status": "WARN",
+        "tube_dp_constraint": "PASS",
+        "tube_dp_pa": "8.878",
+        "warnings": [
+          "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+          "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+        ]
+      },
+      {
+        "blockers": [],
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "compact_result_hash": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+        "duty_constraint": "PASS",
+        "experimental_rating_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21",
+        "full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+        "rank": 2,
+        "ranking_score": "17.016405731192504657174573055370791187807534501537",
+        "rated_duty_w": "51975.93554998601533",
+        "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+        "screening_status": "WARN",
+        "shell_dp_constraint": "PASS",
+        "shell_dp_pa": "701.64057311925046571745730553707911878075345015373",
+        "status": "WARN",
+        "tube_dp_constraint": "PASS",
+        "tube_dp_pa": "8.878",
+        "warnings": [
+          "FIV_NUMERIC_LIMIT_AUTHORITY_MISSING",
+          "MANDATORY_SCREENING_POLICY_NOT_REEXECUTED_LIVE_EXPERIMENTAL_PATH"
+        ]
+      }
+    ],
+    "candidate_space_authority_id": "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R4",
+    "candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+    "duty_constraint_gate": "PASS",
+    "experimental_sizing_authority_id": "V07-FAST-SOLVER-EXPERIMENTAL-MULTI-CANDIDATE-SIZING-R22",
+    "mandatory_screening_gate": "EXPERIMENTAL_DEFERRED_WARN_RECORDED",
+    "numerical_authority_status": "CANDIDATE",
+    "production_integration": false,
+    "ranking_trace": [
+      {
+        "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+        "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "composite_score": "16.942454609529350732037732191039958415712351434618",
+        "normalized_objective": "6.9424546095293507320377321910399584157123514346183",
+        "objective_metric": "shell_dp_pa",
+        "objective_value": "694.24546095293507320377321910399584157123514346183",
+        "rank": 1,
+        "reason_codes": [
+          "MINIMIZE_SHELL_DP_PA",
+          "WARN_PENALTY_APPLIED",
+          "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+        ],
+        "source_status": "WARN",
+        "warn_penalty": "10"
+      },
+      {
+        "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+        "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+        "composite_score": "17.016405731192504657174573055370791187807534501537",
+        "normalized_objective": "7.0164057311925046571745730553707911878075345015373",
+        "objective_metric": "shell_dp_pa",
+        "objective_value": "701.64057311925046571745730553707911878075345015373",
+        "rank": 2,
+        "reason_codes": [
+          "MINIMIZE_SHELL_DP_PA",
+          "WARN_PENALTY_APPLIED",
+          "CANDIDATE_HASH_ASC_UTF8_TIE_BREAK"
+        ],
+        "source_status": "WARN",
+        "warn_penalty": "10"
+      }
+    ],
+    "ranking_trace_status": "COMPLETE",
+    "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "result_hash": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+    "result_id": "experimental-multi-candidate-sizing:346980708043dedb",
+    "result_provenance": [
+      [
+        "consumer",
+        "experimental_multi_candidate_sizing.v1"
+      ],
+      [
+        "ranking_policy_id",
+        "V07-T173-SIZING-RANKING-POLICY-R1"
+      ],
+      [
+        "ranking_policy_hash",
+        "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+      ],
+      [
+        "candidate_b_full_sha256",
+        "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172"
+      ],
+      [
+        "second_candidate_full_sha256",
+        "3dde55a2950f44b78a31e078044fe0a561b212371de40766d2b7c7b3d11f1fa7"
+      ]
+    ],
+    "schema_version": "task173.experimental-multi-candidate-sizing-result.v1",
+    "shell_dp_constraint_gate": "PASS",
+    "sizing_requirement_hash": "03bc0fa749d5a4d5a38b03448f28d195e60e29a846237abafcfc91fe5802c4d3",
+    "status": "EXPERIMENTAL_COMPLETE",
+    "tube_dp_constraint_gate": "PASS"
+  },
+  "sizing_result_hash": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+  "sizing_result_replay": true,
+  "task_id": "V07_FAST_SOLVER_EXPERIMENTAL_MULTI_CANDIDATE_SIZING_R22",
+  "tube_dp_constraint_gate": "PASS"
+}
