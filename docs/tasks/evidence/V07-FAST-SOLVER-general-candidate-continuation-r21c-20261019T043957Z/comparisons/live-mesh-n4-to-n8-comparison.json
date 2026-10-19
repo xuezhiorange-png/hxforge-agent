@@ -1,0 +1,34 @@
+{
+  "coarse_mesh_n": 4,
+  "comparison": {
+    "coarse_subdivisions": 4,
+    "duty_difference_w": "0.7585509841767",
+    "duty_metric": "0.00001459399337644505400027970246",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.072123466904048633842133462E-12",
+    "duty_precision_floor_w": "2.1165647974697992479E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 8,
+    "interval_duty_differences_w": [
+      "0.2342398222964",
+      "0.1865907528956",
+      "0.1457777236794",
+      "0.1108724227562",
+      "0.0810702625491"
+    ],
+    "overall_status": "FAIL",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.01238650225437",
+      "T_wall_inner_min": "0.00834310861387",
+      "T_wall_outer_max": "0.01190713966514",
+      "T_wall_outer_min": "0.00802754005826"
+    },
+    "wall_precision_floor_k": "3.4927740250567867E-13",
+    "wall_status": "FAIL"
+  },
+  "comparison_canonical_sha256": "3494f7ce496cf5ade27ec55a7e6831e95fa651745ce143d6bac55e38ef20f23f",
+  "fine_mesh_n": 8,
+  "provenance_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-COMPARISON-PROVENANCE-R21C-V1",
+  "schema_version": "task173.experimental-live-mesh-comparison-receipt.v1"
+}

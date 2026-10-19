@@ -1,0 +1,297 @@
+{
+  "schema_version": "task172.r119a.mesh-authority-candidate.v1",
+  "task_id": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+  "authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+  "revision": "R1",
+  "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "policy": "EXPLICIT_PROJECT_CANDIDATE_NOT_DEFAULT",
+  "construction_rule": "ONE_NUMERICAL_CELL_PER_PHYSICAL_INTERVAL_PER_PATH",
+  "physical_interval_count": 5,
+  "tube_path_cell_count": 5,
+  "shell_path_cell_count": 5,
+  "total_cell_count": 10,
+  "wall_interface_count": 5,
+  "travel_coordinate_rule": "increases from 0 to 6 along each path; shell physical coordinate decreases",
+  "cells": [
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "upstream_face_id": "urn:hxforge:r119a:face:58fdc12a103eba703a95b7ac8693849c539b38446e7e18d931e815f660d1ad8f",
+      "downstream_face_id": "urn:hxforge:r119a:face:11dd11a0814ba1d68815bec3c0cebe9dde15579c7368ea9df89a6da9bae4be13",
+      "physical_upstream_m": "0",
+      "physical_downstream_m": "1.2",
+      "travel_start_m": "0",
+      "travel_end_m": "1.2"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "upstream_face_id": "urn:hxforge:r119a:face:11dd11a0814ba1d68815bec3c0cebe9dde15579c7368ea9df89a6da9bae4be13",
+      "downstream_face_id": "urn:hxforge:r119a:face:4bb928ac654a642c70db9c575ff29a09319cb067fb4abefa8634bb0b78ba5263",
+      "physical_upstream_m": "1.2",
+      "physical_downstream_m": "2.4",
+      "travel_start_m": "1.2",
+      "travel_end_m": "2.4"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "upstream_face_id": "urn:hxforge:r119a:face:4bb928ac654a642c70db9c575ff29a09319cb067fb4abefa8634bb0b78ba5263",
+      "downstream_face_id": "urn:hxforge:r119a:face:8df5efb3b3f694f850cd30a307e55eb5e07a2972e11293e6e6bffdb3b6dbec1b",
+      "physical_upstream_m": "2.4",
+      "physical_downstream_m": "3.6",
+      "travel_start_m": "2.4",
+      "travel_end_m": "3.6"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "upstream_face_id": "urn:hxforge:r119a:face:8df5efb3b3f694f850cd30a307e55eb5e07a2972e11293e6e6bffdb3b6dbec1b",
+      "downstream_face_id": "urn:hxforge:r119a:face:410da0abef1b4df29fab4cd300d37199f37c2148d90ecdcdd89e6b4fed7e780f",
+      "physical_upstream_m": "3.6",
+      "physical_downstream_m": "4.8",
+      "travel_start_m": "3.6",
+      "travel_end_m": "4.8"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "upstream_face_id": "urn:hxforge:r119a:face:410da0abef1b4df29fab4cd300d37199f37c2148d90ecdcdd89e6b4fed7e780f",
+      "downstream_face_id": "urn:hxforge:r119a:face:cf55993907f768b6307172bfc22f1536c862eb601b85087cdcbc662e2dfd0f21",
+      "physical_upstream_m": "4.8",
+      "physical_downstream_m": "6",
+      "travel_start_m": "4.8",
+      "travel_end_m": "6"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "upstream_face_id": "urn:hxforge:r119a:face:def3747b2da59a59134fe16d880adf534ad0470e46087665e2b0665fe0362e9e",
+      "downstream_face_id": "urn:hxforge:r119a:face:c6d1b90189d11b2dc68f247dd3000e8354492fa83542ccea437d928757a4c209",
+      "physical_upstream_m": "6",
+      "physical_downstream_m": "4.8",
+      "travel_start_m": "0",
+      "travel_end_m": "1.2"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "upstream_face_id": "urn:hxforge:r119a:face:c6d1b90189d11b2dc68f247dd3000e8354492fa83542ccea437d928757a4c209",
+      "downstream_face_id": "urn:hxforge:r119a:face:eb7c3f4d18d1d58a2f8a6ed202cfefe78ca0119400e99b2e20174f73bba9d0c3",
+      "physical_upstream_m": "4.8",
+      "physical_downstream_m": "3.6",
+      "travel_start_m": "1.2",
+      "travel_end_m": "2.4"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "upstream_face_id": "urn:hxforge:r119a:face:eb7c3f4d18d1d58a2f8a6ed202cfefe78ca0119400e99b2e20174f73bba9d0c3",
+      "downstream_face_id": "urn:hxforge:r119a:face:7b40cff3ba918a3700e959ed78bc61afb8db113559183907ba7f64c8a5e0cae9",
+      "physical_upstream_m": "3.6",
+      "physical_downstream_m": "2.4",
+      "travel_start_m": "2.4",
+      "travel_end_m": "3.6"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "upstream_face_id": "urn:hxforge:r119a:face:7b40cff3ba918a3700e959ed78bc61afb8db113559183907ba7f64c8a5e0cae9",
+      "downstream_face_id": "urn:hxforge:r119a:face:2601b289a69e00091231bf738003a5c10dbbd2498f569f1bd18802c4b743ecb2",
+      "physical_upstream_m": "2.4",
+      "physical_downstream_m": "1.2",
+      "travel_start_m": "3.6",
+      "travel_end_m": "4.8"
+    },
+    {
+      "numerical_cell_id": "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+      "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "upstream_face_id": "urn:hxforge:r119a:face:2601b289a69e00091231bf738003a5c10dbbd2498f569f1bd18802c4b743ecb2",
+      "downstream_face_id": "urn:hxforge:r119a:face:4363430732aff499850c17da1e61a627c62cea435002c052482422b839797c5f",
+      "physical_upstream_m": "1.2",
+      "physical_downstream_m": "0",
+      "travel_start_m": "4.8",
+      "travel_end_m": "6"
+    }
+  ],
+  "wall_interfaces": [
+    {
+      "wall_interface_id": "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+      "start_m": "0",
+      "end_m": "1.2",
+      "inside_area_m2": "15.02215359168",
+      "outside_area_m2": "18.1696524394605785819779008"
+    },
+    {
+      "wall_interface_id": "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+      "start_m": "1.2",
+      "end_m": "2.4",
+      "inside_area_m2": "15.02215359168",
+      "outside_area_m2": "18.1696524394605785819779008"
+    },
+    {
+      "wall_interface_id": "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+      "start_m": "2.4",
+      "end_m": "3.6",
+      "inside_area_m2": "15.02215359168",
+      "outside_area_m2": "18.1696524394605785819779008"
+    },
+    {
+      "wall_interface_id": "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+      "start_m": "3.6",
+      "end_m": "4.8",
+      "inside_area_m2": "15.02215359168",
+      "outside_area_m2": "18.1696524394605785819779008"
+    },
+    {
+      "wall_interface_id": "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+      "start_m": "4.8",
+      "end_m": "6",
+      "inside_area_m2": "15.02215359168",
+      "outside_area_m2": "18.1696524394605785819779008"
+    }
+  ],
+  "explicit_nonclaims": [
+    "ONE_CELL_PER_INTERVAL_IS_A_PROJECT_CANDIDATE",
+    "NOT_A_TASK171_DEFAULT",
+    "NOT_A_STANDARD_REQUIREMENT",
+    "NOT_A_PRODUCTION_MESH_ADMISSION"
+  ],
+  "evidence_refs": [
+    "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+    "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+    "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+    "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json",
+    "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+    "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+    "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json"
+  ],
+  "wall_interfaces_by_role_variant": {
+    "TUBE_HOT_SHELL_COLD": [
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+        "start_m": "0",
+        "end_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+        "start_m": "1.2",
+        "end_m": "2.4",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+        "start_m": "2.4",
+        "end_m": "3.6",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+        "start_m": "3.6",
+        "end_m": "4.8",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+        "start_m": "4.8",
+        "end_m": "6",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03"
+      }
+    ],
+    "TUBE_COLD_SHELL_HOT": [
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+        "start_m": "0",
+        "end_m": "1.2",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+        "start_m": "1.2",
+        "end_m": "2.4",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+        "start_m": "2.4",
+        "end_m": "3.6",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+        "start_m": "3.6",
+        "end_m": "4.8",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75"
+      },
+      {
+        "wall_interface_id": "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+        "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+        "start_m": "4.8",
+        "end_m": "6",
+        "inside_area_m2": "15.02215359168",
+        "outside_area_m2": "18.1696524394605785819779008",
+        "hot_cell_id": "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03",
+        "cold_cell_id": "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818"
+      }
+    ]
+  },
+  "wall_interface_count_per_role_variant": 5,
+  "identity_rules": {
+    "numerical_cell_id": "canonical_sha256(case, physical segment, side path, directed physical endpoints, and travel endpoints)",
+    "face_id": "canonical_sha256(case, side path, and physical coordinate)",
+    "wall_interface_id": "canonical_sha256(case, physical segment, interval endpoints, and owned areas)"
+  },
+  "canonical_hash": "7e1b9134deed8e4e9071195a312b1f053d43cef43c997e0421fc4e0d9ca62456"
+}

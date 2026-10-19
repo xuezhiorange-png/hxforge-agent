@@ -1,0 +1,26 @@
+{
+  "mesh_n": 4,
+  "receipt": {
+    "blocked_code": "OUTER_BOUNDARY_WALL_CLOCK_EXCEEDED",
+    "blocked_diagnostics": [
+      "partial_last_valid_trial_preserved"
+    ],
+    "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+    "cell_closure_pass": true,
+    "energy_balance_pass": true,
+    "energy_balance_residual_w": "3.148E-10",
+    "mesh_n": 4,
+    "mesh_result_hash": "b2ab73189c713bbc698d1c0df723ba2e32d0a0661fba6e3d061565eaddf74d58",
+    "outer_iterations_for_rehydrate": 24,
+    "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "request_snapshot_sha256": "2222d90aa1639f9f26f183d4816b97fa257ad861a4441c81bd496c3a7fef7a20",
+    "shooting_enthalpy_for_rehydrate": "107518.9663843072440159451961517333984375",
+    "shooting_enthalpy_j_kg": "107518.9663843072440159451961517333984375",
+    "stage_status": "TIMEOUT",
+    "terminal_boundary_residual_k": "1.154806E-8",
+    "terminal_tolerance_pass": false,
+    "worker_status": "TIMEOUT",
+    "worker_wall_seconds": 307.07708130699757
+  },
+  "schema_version": "task173.experimental-live-mesh-stage-receipt.v1"
+}
