@@ -58,6 +58,11 @@ R21C_EVIDENCE_REL = (
 )
 N16_ACCEPTED_RECEIPT_REL = f"{R21C_EVIDENCE_REL}/stages/live-mesh-n16-receipt.json"
 N32_TIMEOUT_RECEIPT_REL = f"{R21C_EVIDENCE_REL}/stages/live-mesh-n32-receipt.json"
+R21D_EVIDENCE_REL = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21d-20261019T075818Z"
+)
+N32_ACCEPTED_RECEIPT_REL = f"{R21D_EVIDENCE_REL}/stages/live-mesh-n32-receipt.json"
+N64_TIMEOUT_RECEIPT_REL = f"{R21D_EVIDENCE_REL}/stages/live-mesh-n64-receipt.json"
 N1_RECEIPT_SHA256 = "f4a59f012cc83d83e8cf40bb4b14ab562ed635c4cc00ef8b8e38f3f4447b5270"
 N2_RECEIPT_SHA256 = "e5c16c5241b2c0e3ac5c1954b0ca7a5d6d503b52b55ed864b5ffd1e11bc757ab"
 N4_ACCEPTED_RECEIPT_SHA256 = "984cde3ca507114cb8f6245c36dda6fa423a27831c13df6075a68e776390853f"
@@ -66,6 +71,9 @@ N4_TIMEOUT_RECEIPT_SHA256 = "1f6954ec310489e6323e19676d6809f6d728a34e9e514acd67b
 N16_TIMEOUT_RECEIPT_SHA256 = "25301e09d46a32bbfa7d2a3d59f2ee6c16ccc73ed93baa83c9f591ec5c689b5d"
 N16_ACCEPTED_RECEIPT_SHA256 = "a79eb38cde65626c1c71ccffd889b0b7135aeb5f9dd302d94f9b71272bd15c5e"
 N32_TIMEOUT_RECEIPT_SHA256 = "4ef650d5a3d47a87d66682f34509c3e7e3f6d41c7d1645ea1dc3aa8f8f5faedb"
+N32_ACCEPTED_RECEIPT_SHA256 = "20184fba29a1da897a5c40b7fbcfad6115b5ca7c4abc11d8e79b9b9718d8757c"
+N64_TIMEOUT_RECEIPT_SHA256 = "3c2499b1679f16f72a9f6596cd03a14ef63f52929237976a46c64d292441ff64"
+N64_TIMEOUT_TRIALS_SHA256 = "152221d5779345f02a59bee34460dfbe3a366e21d409c70565575099a1527d4c"
 N1_MESH_RESULT_HASH = "854b06ac829183f067992ac0b76806c2a5772bd3deab99a4c678fb45ff4da302"
 N2_MESH_RESULT_HASH = "84f2491e89d57b7e470a4578ee4dcc43b810e03de93d5176fa8b57cc0297ae1c"
 N4_MESH_RESULT_HASH = "3d937c37d85c603fcdc07e90b48d829ec8ec257368c5982588ae7d61470273f7"
@@ -81,6 +89,9 @@ N2_OUTER_ITERATIONS = 22
 N4_OUTER_ITERATIONS = 28
 N8_OUTER_ITERATIONS = 26
 N16_OUTER_ITERATIONS = 28
+N32_MESH_RESULT_HASH = "3e4618eb8144cfa8156ff5fe08c11ecf64a734de6ffcbd44f19cac39a11c646e"
+N32_SHOOTING_ENTHALPY = "107518.9165931962933844840526580810546875"
+N32_OUTER_ITERATIONS = 24
 
 _PRIOR_STAGE_SPECS: dict[int, tuple[str, str, str, str, int]] = {
     1: (
@@ -118,6 +129,13 @@ _PRIOR_STAGE_SPECS: dict[int, tuple[str, str, str, str, int]] = {
         N16_SHOOTING_ENTHALPY,
         N16_OUTER_ITERATIONS,
     ),
+    32: (
+        N32_ACCEPTED_RECEIPT_REL,
+        N32_ACCEPTED_RECEIPT_SHA256,
+        N32_MESH_RESULT_HASH,
+        N32_SHOOTING_ENTHALPY,
+        N32_OUTER_ITERATIONS,
+    ),
 }
 
 SECOND_CANDIDATE_PRIOR_PINS: tuple[PriorStagePin, ...] = (
@@ -135,6 +153,11 @@ SECOND_CANDIDATE_ACCEPTED_PRIOR_PINS: tuple[PriorStagePin, ...] = (
 SECOND_CANDIDATE_R21D_PRIOR_PINS: tuple[PriorStagePin, ...] = (
     *SECOND_CANDIDATE_ACCEPTED_PRIOR_PINS,
     PriorStagePin(16, N16_ACCEPTED_RECEIPT_REL, N16_ACCEPTED_RECEIPT_SHA256),
+)
+
+SECOND_CANDIDATE_R21E_PRIOR_PINS: tuple[PriorStagePin, ...] = (
+    *SECOND_CANDIDATE_R21D_PRIOR_PINS,
+    PriorStagePin(32, N32_ACCEPTED_RECEIPT_REL, N32_ACCEPTED_RECEIPT_SHA256),
 )
 
 
@@ -226,6 +249,21 @@ def admit_second_candidate_prior_stage(
     receipt["stage_receipt_rel_path"] = pin.rel_path
     receipt["stage_receipt_sha256"] = digest
     return receipt
+
+
+def verify_n64_timeout_receipt_preserved(root: Path) -> None:
+    path = root / N64_TIMEOUT_RECEIPT_REL
+    digest = file_sha256(path)
+    if digest != N64_TIMEOUT_RECEIPT_SHA256:
+        raise SecondCandidateAdmissionError("N64_TIMEOUT_RECEIPT_SHA256_MISMATCH")
+    trials = root / R21D_EVIDENCE_REL / "outer_progress/outer-progress-n64-trials.jsonl"
+    if file_sha256(trials) != N64_TIMEOUT_TRIALS_SHA256:
+        raise SecondCandidateAdmissionError("N64_TIMEOUT_TRIALS_SHA256_MISMATCH")
+    receipt = load_stage_receipt(path)
+    if receipt.get("worker_status") != "TIMEOUT":
+        raise SecondCandidateAdmissionError("N64_NOT_TIMEOUT_RECORD")
+    if receipt.get("blocked_code") != "WORKER_HARD_TIMEOUT":
+        raise SecondCandidateAdmissionError("N64_BLOCKED_CODE_MISMATCH")
 
 
 def verify_n32_timeout_receipt_preserved(root: Path) -> None:

@@ -31,3 +31,12 @@ def test_frozen_snapshot_and_prior_stages_admit() -> None:
     assert run2.mesh_result_hash == n2["mesh_result_hash"]
     assert run4.mesh_result_hash == scsa.N4_MESH_RESULT_HASH
     assert run8.mesh_result_hash == scsa.N8_MESH_RESULT_HASH
+
+
+def test_r21e_n32_prior_admission_and_replay() -> None:
+    frozen = scsa.admit_frozen_second_candidate_snapshot(ROOT)
+    pin = scsa.SECOND_CANDIDATE_R21E_PRIOR_PINS[-1]
+    n32 = scsa.admit_second_candidate_prior_stage(ROOT, pin)
+    run = scsa.replay_admitted_prior_mesh(frozen.request, n32, mesh_n=32)
+    scsa.verify_replay_physics(run)
+    assert run.mesh_result_hash == scsa.N32_MESH_RESULT_HASH

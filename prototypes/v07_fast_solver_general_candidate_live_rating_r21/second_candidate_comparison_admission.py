@@ -32,6 +32,9 @@ from prototypes.v07_fast_solver_live_ladder_continuation_r14.stage_admission imp
 R21C_EVIDENCE_REL = (
     "docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21c-20261019T043957Z"
 )
+R21D_EVIDENCE_REL = (
+    "docs/tasks/evidence/V07-FAST-SOLVER-general-candidate-continuation-r21d-20261019T075818Z"
+)
 
 
 @dataclass(frozen=True)
@@ -77,6 +80,20 @@ R21C_HISTORICAL_COMPARISON_PINS: tuple[ComparisonAdmissionPin, ...] = (
         "9873a99090c7d3876707d34b3828760ea2c9d877fb5f868aec7ea9bfa660fc75",
         "PASS",
     ),
+)
+
+R21D_N16_TO_N32_COMPARISON_PIN = ComparisonAdmissionPin(
+    16,
+    32,
+    f"{R21D_EVIDENCE_REL}/comparisons/live-mesh-n16-to-n32-comparison.json",
+    "389d94e80a3b903d2c19ad6acadd2b8280d898034f927564e98c34fa2b8cf905",
+    "03557aae354d92ef3021c1cc02bcc66fe44556fb346f5a5bbfded0e360dd923c",
+    "PASS",
+)
+
+R21E_HISTORICAL_COMPARISON_PINS: tuple[ComparisonAdmissionPin, ...] = (
+    *R21C_HISTORICAL_COMPARISON_PINS,
+    R21D_N16_TO_N32_COMPARISON_PIN,
 )
 
 
@@ -172,6 +189,23 @@ def admit_r21c_historical_comparisons(
     for mesh_n in (1, 2, 4, 8, 16):
         rolling.record_mesh_accepted(mesh_n)
     for pin in R21C_HISTORICAL_COMPARISON_PINS:
+        item = admit_pinned_comparison(root, pin, stages_by_mesh=stages_by_mesh)
+        comparisons.append(item)
+        rolling.record_comparison(item)
+        rolling.after_comparison_recorded(pin.fine_mesh_n)
+    return comparisons, rolling
+
+
+def admit_r21e_historical_comparisons(
+    root: Path,
+    *,
+    stages_by_mesh: dict[int, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], RollingMeshState]:
+    comparisons: list[dict[str, Any]] = []
+    rolling = RollingMeshState()
+    for mesh_n in (1, 2, 4, 8, 16, 32):
+        rolling.record_mesh_accepted(mesh_n)
+    for pin in R21E_HISTORICAL_COMPARISON_PINS:
         item = admit_pinned_comparison(root, pin, stages_by_mesh=stages_by_mesh)
         comparisons.append(item)
         rolling.record_comparison(item)
