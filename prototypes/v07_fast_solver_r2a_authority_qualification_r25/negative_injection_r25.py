@@ -31,7 +31,7 @@ _BASE_BINDING = {
     "mesh_identity": "mesh-id-test",
     "mesh_result_hash": "42fa6dfaadbee5d35c20714fe56af8b1c1c33e7e70597994b8c2e5dcc0502838",
     "provider_identity_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
-    "provider_identity_version": "production",
+    "provider_identity_version": "8.0.0",
 }
 
 
@@ -52,6 +52,7 @@ def _base_event(**overrides: Any) -> dict[str, Any]:
         "endpoint_request_projection_right": {},
         "endpoint_result_projection_left": {},
         "endpoint_result_projection_right": {},
+        "provider_coordinates": [{"name": "tube_downstream_h", "identical": True}],
         "Q1_Q15": {f"Q{i}": True for i in range(1, 16)},
     }
     event.update(overrides)
@@ -141,6 +142,8 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             "FORGED_CERTIFICATE_HASH",
             (
                 "R2A_CERTIFICATE_HASH_REPLAY_MISMATCH",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
+                "R2A_PROVIDER_COORDINATES_MISSING",
                 "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_forged_cert_hash,
@@ -156,12 +159,11 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             "R25-003",
             "FORGED_Q1_Q15_PASS",
             (
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
                 "R2A_FORGED_Q1_PASS",
-                "R2A_FORGED_Q15_PASS",
-                "R2A_FORGED_Q1_Q15_ALL_TRUE",
-                "R2A_ENDPOINT_PROJECTION_MISSING",
-                "R2A_ENDPOINT_PROJECTION_INVALID",
+                "R2A_PROVIDER_COORDINATES_MISSING",
                 "R2A_OUTER_CERTIFICATE_MISSING",
+                "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_forged_q_pass,
         )
@@ -176,7 +178,7 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
         InjectionCase(
             "R25-004",
             "PROVIDER_VERSION_TAMPER",
-            ("PROVIDER_IDENTITY_MISMATCH", "FROZEN_EVIDENCE_INSUFFICIENT"),
+            ("R2A_PRODUCER_AUTHORITY_MISMATCH", "FROZEN_EVIDENCE_INSUFFICIENT"),
             case_provider_version,
         )
     )
@@ -196,9 +198,10 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             "CANDIDATE_REQUEST_HASH_SWAP",
             (
                 "R2A_EVENT_CANDIDATE_HASH_MISMATCH",
-                "R2A_ENDPOINT_PROJECTION_INVALID",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
                 "R2A_OUTER_CERTIFICATE_MISSING",
                 "FROZEN_EVIDENCE_INSUFFICIENT",
+                "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_request_hash_swap,
         )
@@ -214,7 +217,11 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
         InjectionCase(
             "R25-006",
             "MESH_IDENTITY_MISMATCH",
-            ("R2A_EVENT_MESH_IDENTITY_MISMATCH", "R2A_OUTER_CERTIFICATE_MISSING"),
+            (
+                "R2A_EVENT_MESH_IDENTITY_MISMATCH",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
+                "R2A_OUTER_CERTIFICATE_MISSING",
+            ),
             case_mesh_identity,
         )
     )
@@ -230,6 +237,7 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             "CERTIFICATE_ORPHAN_OUTER_TRIAL",
             (
                 "R2A_CERTIFICATE_ORPHAN_EVENT_REFERENCE",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
                 "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_orphan_cert_ref,
@@ -250,6 +258,7 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             "WRONG_CANDIDATE_CERTIFICATE",
             (
                 "R2A_CERTIFICATE_CANDIDATE_ID_MISMATCH",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
                 "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_wrong_candidate_cert,
@@ -267,6 +276,8 @@ def run_negative_injection_r25() -> list[dict[str, str]]:
             (
                 "R2A_OUTER_CERTIFICATE_MISSING",
                 "CERTIFICATE_REQUIRED_BUT_MISSING",
+                "R2A_PREDICATE_SOURCE_EVIDENCE_INSUFFICIENT",
+                "R2A_PROVIDER_COORDINATES_MISSING",
                 "R2A_ENDPOINT_PROJECTION_INVALID",
             ),
             case_events_without_cert,

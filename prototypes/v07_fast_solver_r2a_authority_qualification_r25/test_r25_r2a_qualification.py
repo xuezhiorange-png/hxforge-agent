@@ -36,10 +36,10 @@ def test_production_r2a_contract_matches_service_constants() -> None:
     assert payload["r2a_authority_hash"] == R2A_AUTHORITY_HASH
 
 
-def test_frozen_candidates_no_trigger_proven_on_experimental_meshes() -> None:
+def test_frozen_candidates_insufficient_without_producer_non_trigger_witness() -> None:
     rows = qualify_all_frozen_candidates(ROOT)
     assert len(rows) == 4
-    assert all(row["admission_status"] == "NO_TRIGGER_PROVEN" for row in rows)
+    assert all(row["admission_status"] == "FROZEN_EVIDENCE_INSUFFICIENT" for row in rows)
     assert all(row["production_r2a_certificate_replay"] == "BLOCKED" for row in rows)
 
 

@@ -30,6 +30,9 @@ from prototypes.v07_fast_solver_r2a_authority_qualification_r25.r2a_certificate_
     R2aVerificationOutcome,
     verify_r2a_certificate_evidence,
 )
+from prototypes.v07_fast_solver_r2a_producer_origin_r26.producer_non_trigger_witness import (
+    evaluate_no_trigger_producer_witness,
+)
 
 R2A_ARTIFACT_KEYS = (
     "transient_provider_enclosure_event_hashes",
@@ -159,24 +162,22 @@ def qualify_frozen_mesh_pin(
     )
     verifier: R2aVerificationOutcome = verify_r2a_certificate_evidence(evidence)
 
+    non_trigger_status, non_trigger_detail = evaluate_no_trigger_producer_witness(None)
+
     if has_r2a_hashes:
         status = "CERTIFICATE_REQUIRED_BUT_MISSING"
         detail = "Stage references R2A hash fields but projections are not in frozen receipt."
+    elif verifier.status == "CERTIFICATE_PRESENT_VERIFIED":
+        status = verifier.status
+        detail = ""
     elif verifier.status == "FROZEN_EVIDENCE_INSUFFICIENT":
-        if provider_id.startswith("V07-FAST-SOLVER") or provider_id.startswith(
-            "V07-FAST-SOLVER-GENERAL"
-        ):
-            status = "NO_TRIGGER_PROVEN"
-            detail = (
-                "Experimental live mesh stage accepted without production R2A artifacts; "
-                "provider quantization trigger not evidenced on frozen path."
-            )
-        else:
-            status = "FROZEN_EVIDENCE_INSUFFICIENT"
-            detail = verifier.diagnostics[0] if verifier.diagnostics else "missing_r2a_bundle"
+        status = non_trigger_status
+        detail = non_trigger_detail
+        if verifier.diagnostics:
+            detail = f"{detail}; {verifier.diagnostics[0]}"
     else:
         status = verifier.status
-        detail = verifier.blocked_code or ""
+        detail = verifier.blocked_code or non_trigger_detail
 
     production_r2a_replay = (
         "CERTIFICATE_PRESENT_VERIFIED" if status == "CERTIFICATE_PRESENT_VERIFIED" else "BLOCKED"
