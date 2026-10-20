@@ -147,7 +147,9 @@ def main() -> None:
         encoding="utf-8",
     )
     rule_pack_diff = {
-        "configuration_rule_pack_approved": fiv_report["task167_rule_pack_approved_for_configuration_rules"],
+        "configuration_rule_pack_approved": fiv_report[
+            "task167_rule_pack_approved_for_configuration_rules"
+        ],
         "fiv_numeric_limit_authority": fiv_report["fiv_numeric_limit_authority"],
         "authority_intake_status": fiv_report["authority_intake_status"],
         "missing_for_fiv_numeric_screening": fiv_report["missing_for_fiv_numeric_screening"],
@@ -163,7 +165,9 @@ def main() -> None:
                 "engineering_owner_approval_required": fiv_report[
                     "engineering_owner_approval_required"
                 ],
-                "missing_for_fiv_numeric_screening": fiv_report["missing_for_fiv_numeric_screening"],
+                "missing_for_fiv_numeric_screening": fiv_report[
+                    "missing_for_fiv_numeric_screening"
+                ],
             },
             indent=2,
             sort_keys=True,
