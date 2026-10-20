@@ -81,9 +81,7 @@ def run_captured_positive_witness(root: Any) -> dict[str, Any]:
     root_path = Path(root)
     args = build_captured_candidate_b_producer_arguments(root_path)
     event = emit_production_r2a_event(root_path)
-    ok, code, recomputed = verify_event_q_independent_replay(
-        event, producer_arguments=args
-    )
+    ok, code, recomputed = verify_event_q_independent_replay(event, producer_arguments=args)
     event_hash_replay = event["event_hash"] == canonical_sha256(
         {k: v for k, v in event.items() if k != "event_hash"}
     )
@@ -91,9 +89,7 @@ def run_captured_positive_witness(root: Any) -> dict[str, Any]:
     tampered_q = dict(tampered["Q1_Q15"])
     tampered_q["Q2"] = False
     tampered["Q1_Q15"] = tampered_q
-    tamper_ok, tamper_code, _ = verify_event_q_independent_replay(
-        tampered, producer_arguments=args
-    )
+    tamper_ok, tamper_code, _ = verify_event_q_independent_replay(tampered, producer_arguments=args)
     return {
         "schema_version": "task173.r2a-positive-producer-witness.v1",
         "source_evidence_rel": args["evidence_rel"],

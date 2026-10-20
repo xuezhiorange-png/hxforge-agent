@@ -48,9 +48,7 @@ def _base_evidence() -> R2aCertificateEvidence:
     return evidence
 
 
-def _record(
-    outcome: R2aVerificationOutcome | tuple[str, str], expected: str
-) -> dict[str, str]:
+def _record(outcome: R2aVerificationOutcome | tuple[str, str], expected: str) -> dict[str, str]:
     if isinstance(outcome, tuple):
         status, detail = outcome
         actual = status if status != "BLOCKED" else detail
@@ -108,9 +106,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
         cert = dict(bundle["certificate"])
         cert["certificate_hash"] = "f" * 64
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "outer_certificates": (cert,)}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "outer_certificates": (cert,)})
         )
 
     cases.append(
@@ -126,9 +122,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
     def provider_version() -> R2aVerificationOutcome:
         evidence = _base_evidence()
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "provider_identity_version": "9.9.9"}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "provider_identity_version": "9.9.9"})
         )
 
     cases.append(
@@ -193,9 +187,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
         body = {k: v for k, v in cert.items() if k != "certificate_hash"}
         cert["certificate_hash"] = canonical_sha256(body)
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "outer_certificates": (cert,)}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "outer_certificates": (cert,)})
         )
 
     cases.append(
@@ -214,9 +206,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
             bundle["event"], right_event_hash="0" * 64
         )
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "outer_certificates": (cert,)}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "outer_certificates": (cert,)})
         )
 
     cases.append(
@@ -284,9 +274,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
         cert["left_outer_action"] = "TAMPERED_ACTION"
         cert["certificate_hash"] = bundle["certificate"]["certificate_hash"]
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "outer_certificates": (cert,)}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "outer_certificates": (cert,)})
         )
 
     cases.append(
@@ -315,9 +303,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
     def missing_predicate_source() -> R2aVerificationOutcome:
         evidence = _base_evidence()
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "producer_replay_arguments": None}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "producer_replay_arguments": None})
         )
 
     cases.append(
@@ -338,9 +324,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
             "provider_version": "7.0.0",
         }
         return _outcome_from_verify(
-            R2aCertificateEvidence(
-                **{**evidence.__dict__, "producer_replay_arguments": args}
-            )
+            R2aCertificateEvidence(**{**evidence.__dict__, "producer_replay_arguments": args})
         )
 
     cases.append(

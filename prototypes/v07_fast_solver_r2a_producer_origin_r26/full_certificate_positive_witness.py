@@ -29,7 +29,9 @@ from prototypes.v07_fast_solver_r2a_producer_origin_r26.q_predicate_independent_
 )
 
 
-def build_captured_certificate_evidence(root: Path) -> tuple[R2aCertificateEvidence, dict[str, Any]]:
+def build_captured_certificate_evidence(
+    root: Path,
+) -> tuple[R2aCertificateEvidence, dict[str, Any]]:
     args = build_captured_candidate_b_producer_arguments(root)
     event = emit_production_r2a_event(root)
     certificate = build_production_certificate_from_captured_event(event)

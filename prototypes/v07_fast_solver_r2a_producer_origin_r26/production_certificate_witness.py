@@ -48,12 +48,8 @@ def build_production_certificate_from_captured_event(
         "left_event_right_endpoint_result_hash": event["right_endpoint_result_hash"],
         "right_event_left_endpoint_result_hash": event["left_endpoint_result_hash"],
         "right_event_right_endpoint_result_hash": event["right_endpoint_result_hash"],
-        "left_continuation_hash": canonical_sha256(
-            {"branch": "left", "event_hash": left_hash}
-        ),
-        "right_continuation_hash": canonical_sha256(
-            {"branch": "right", "event_hash": right_hash}
-        ),
+        "left_continuation_hash": canonical_sha256({"branch": "left", "event_hash": left_hash}),
+        "right_continuation_hash": canonical_sha256({"branch": "right", "event_hash": right_hash}),
         "left_outer_classification": "VALID_CELL_EVALUATION",
         "right_outer_classification": "VALID_CELL_EVALUATION",
         "left_terminal_residual_k": "0",

@@ -122,11 +122,15 @@ def main() -> None:
     args = parser.parse_args()
     wall_t0 = time.perf_counter()
     code_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    if code_head != BASE_HEAD and subprocess.run(
-        ["git", "merge-base", "--is-ancestor", BASE_HEAD, code_head],
-        cwd=ROOT,
-        check=False,
-    ).returncode != 0:
+    if (
+        code_head != BASE_HEAD
+        and subprocess.run(
+            ["git", "merge-base", "--is-ancestor", BASE_HEAD, code_head],
+            cwd=ROOT,
+            check=False,
+        ).returncode
+        != 0
+    ):
         print("BASE_HEAD_MISMATCH", code_head, BASE_HEAD)
         sys.exit(2)
 

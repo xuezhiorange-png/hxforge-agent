@@ -203,27 +203,23 @@ def _verify_certificate(
     if left_events:
         left_event = event_by_hash.get(left_events[0])
         if left_event is not None:
-            if (
-                certificate.get("left_branch_used_endpoint_request_hash")
-                != left_event.get("left_endpoint_request_hash")
+            if certificate.get("left_branch_used_endpoint_request_hash") != left_event.get(
+                "left_endpoint_request_hash"
             ):
                 return False, "R2A_CERTIFICATE_LEFT_BRANCH_REQUEST_MISMATCH"
-            if (
-                certificate.get("left_branch_used_endpoint_result_hash")
-                != left_event.get("left_endpoint_result_hash")
+            if certificate.get("left_branch_used_endpoint_result_hash") != left_event.get(
+                "left_endpoint_result_hash"
             ):
                 return False, "R2A_CERTIFICATE_LEFT_BRANCH_RESULT_MISMATCH"
     if right_events:
         right_event = event_by_hash.get(right_events[0])
         if right_event is not None:
-            if (
-                certificate.get("right_branch_used_endpoint_request_hash")
-                != right_event.get("right_endpoint_request_hash")
+            if certificate.get("right_branch_used_endpoint_request_hash") != right_event.get(
+                "right_endpoint_request_hash"
             ):
                 return False, "R2A_CERTIFICATE_RIGHT_BRANCH_REQUEST_MISMATCH"
-            if (
-                certificate.get("right_branch_used_endpoint_result_hash")
-                != right_event.get("right_endpoint_result_hash")
+            if certificate.get("right_branch_used_endpoint_result_hash") != right_event.get(
+                "right_endpoint_result_hash"
             ):
                 return False, "R2A_CERTIFICATE_RIGHT_BRANCH_RESULT_MISMATCH"
     trigger = certificate.get("trigger_support_id")
@@ -247,7 +243,10 @@ def _verify_certificate(
     right_cont = certificate.get("right_continuation_hash")
     if not left_cont or not right_cont:
         return False, "R2A_CERTIFICATE_CONTINUATION_HASH_MISSING"
-    if certificate.get("left_outer_action") is None or certificate.get("right_outer_action") is None:
+    if (
+        certificate.get("left_outer_action") is None
+        or certificate.get("right_outer_action") is None
+    ):
         return False, "R2A_CERTIFICATE_OUTER_ACTION_MISSING"
     return True, "PASS"
 
@@ -310,9 +309,7 @@ def verify_r2a_certificate_evidence(evidence: R2aCertificateEvidence) -> R2aVeri
         )
 
     for certificate in evidence.outer_certificates:
-        ok, code = _verify_certificate(
-            certificate, evidence, event_hashes, event_by_hash
-        )
+        ok, code = _verify_certificate(certificate, evidence, event_hashes, event_by_hash)
         if not ok:
             return _fail(code)
 
