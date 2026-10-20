@@ -11,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
+    recompute_task174_result_hash,
+)
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_multi_candidate_sizing import (
     experimental_multi_candidate_sizing,
     experimental_multi_candidate_sizing_from_admitted,
@@ -24,9 +27,6 @@ from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.mandator
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.rating_pair_admission import (
     admit_candidate_b_live_rating,
     admit_second_candidate_live_rating,
-)
-from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
-    recompute_task174_result_hash,
 )
 from prototypes.v07_fast_solver_live_rating_result_r19.live_result_hash import (
     live_rating_result_hash,
