@@ -1,0 +1,28 @@
+{
+  "candidates": [
+    {
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "configuration_rule_pack_approval": "CONFIGURATION_RULE_PACK_APPROVAL_NOT_VERIFIED",
+      "evaluated_rule_pack_present": false,
+      "fiv_numeric_limit_authority": "MISSING",
+      "fiv_numeric_limit_authority_available": false,
+      "label": "CANDIDATE_B_R19",
+      "r24_claim_correction": "R24 task167_rule_pack_approved_for_configuration_rules=true was based on static SOURCE_TASK020_RULE_PACK identity only; no EvaluatedRulePackAuthority is bound on this CandidateRatingRequest.",
+      "source_task020_rule_pack_id": "TASK020_TASK012_APPROVED_RULE_PACK_AUTHORITY"
+    },
+    {
+      "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+      "configuration_rule_pack_approval": "CONFIGURATION_RULE_PACK_APPROVAL_NOT_VERIFIED",
+      "evaluated_rule_pack_present": false,
+      "fiv_numeric_limit_authority": "MISSING",
+      "fiv_numeric_limit_authority_available": false,
+      "label": "SECOND_CANDIDATE_R21E",
+      "r24_claim_correction": "R24 task167_rule_pack_approved_for_configuration_rules=true was based on static SOURCE_TASK020_RULE_PACK identity only; no EvaluatedRulePackAuthority is bound on this CandidateRatingRequest.",
+      "source_task020_rule_pack_id": "TASK020_TASK012_APPROVED_RULE_PACK_AUTHORITY"
+    }
+  ],
+  "fiv_numeric_limit_authority": "MISSING",
+  "r24_static_claim_corrected": true,
+  "schema_version": "task167.rule-pack-claim-audit.v1",
+  "task167_configuration_rule_pack_approval": "CONFIGURATION_RULE_PACK_APPROVAL_NOT_VERIFIED"
+}
