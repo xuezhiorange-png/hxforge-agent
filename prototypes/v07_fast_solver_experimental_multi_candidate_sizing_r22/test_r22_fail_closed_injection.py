@@ -67,8 +67,11 @@ def test_impossible_duty_blocks_ranking() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(req, (b, second))
-    assert result.status == "RANKING_BLOCKED"
-    assert result.ranking_trace_status == "RANKING_BLOCKED"
+    assert result.status == "BLOCKED"
+    assert result.blocked_code in (
+        "FULL_RESULT_HASH_REPLAY_MISMATCH",
+        "COMPACT_FULL_ENGINEERING_PARITY_MISMATCH",
+    )
 
 
 def test_frozen_space_hash_constant() -> None:

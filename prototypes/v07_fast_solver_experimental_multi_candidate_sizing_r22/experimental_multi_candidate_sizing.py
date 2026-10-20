@@ -12,11 +12,11 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     RANKING_POLICY_ID,
     SizingRequirementAuthority,
 )
-from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.admitted_identity_binding import (
-    verify_admitted_pair_identity,
-)
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_sizing_requirement import (
     experimental_multi_candidate_sizing_requirement,
+)
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.independent_consumer_admission import (
+    verify_independent_consumer_admission,
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.mandatory_screening import (
     MandatoryScreeningOutcome,
@@ -169,77 +169,19 @@ def experimental_multi_candidate_sizing_from_admitted(
     *,
     screening: MandatoryScreeningOutcome | None = None,
 ) -> ExperimentalMultiCandidateSizingResult:
-    if len(admitted) != 2:
-        return _blocked_result(
-            requirement,
-            code="ADMITTED_CANDIDATE_COUNT_INVALID",
-            diagnostics=(str(len(admitted)),),
-        )
-    screening = screening or execute_experimental_mandatory_screening(admitted, requirement)
-    screening_gate = screening.mandatory_screening_gate
-
-    from prototypes.v07_fast_solver_general_candidate_live_rating_r21 import (
-        general_live_compact_rating as glcr,
+    screening, admission_failure = verify_independent_consumer_admission(
+        requirement,
+        admitted,
+        screening=screening,
     )
-    from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
-        live_compact_rating_hash,
-    )
-
-    identity_failure = verify_admitted_pair_identity(admitted)
-    if identity_failure is not None:
-        code, diagnostics = identity_failure
+    if admission_failure is not None:
+        code, diagnostics = admission_failure
         return _blocked_result(requirement, code=code, diagnostics=diagnostics)
-
-    for item in admitted:
-        if item.compact_r19 is not None and (
-            item.compact_r19.compact_result_hash != live_compact_rating_hash(item.compact_r19)
-        ):
-            return _blocked_result(
-                requirement,
-                code="COMPACT_RESULT_HASH_REPLAY_MISMATCH",
-                diagnostics=(item.label,),
-            )
-        if item.compact_general is not None and (
-            item.compact_general.compact_result_hash
-            != glcr.general_live_compact_rating_hash(item.compact_general)
-        ):
-            return _blocked_result(
-                requirement,
-                code="COMPACT_RESULT_HASH_REPLAY_MISMATCH",
-                diagnostics=(item.label,),
-            )
+    assert screening is not None
+    screening_gate = screening.mandatory_screening_gate
 
     candidate_b = admitted[0]
     second = admitted[1]
-
-    if candidate_b.request.candidate_id == second.request.candidate_id:
-        return _blocked_result(
-            requirement,
-            code="DUPLICATE_CANDIDATE_ID",
-            diagnostics=(candidate_b.request.candidate_id,),
-        )
-
-    space_b = candidate_b.request.candidate_space_hash
-    space_second = second.request.candidate_space_hash
-    if space_b != space_second or space_b != FROZEN_Q13_CANDIDATE_SPACE_HASH:
-        return _blocked_result(
-            requirement,
-            code="BLOCKED_CANDIDATE_SPACE_NOT_COMPARABLE",
-            diagnostics=(space_b, space_second, FROZEN_Q13_CANDIDATE_SPACE_HASH),
-        )
-    bound_authority, bound_space = requirement.discrete_candidate_authority_ids_and_hashes[0]
-    if bound_authority != TASK168_CANDIDATE_SPACE_AUTHORITY_ID:
-        return _blocked_result(
-            requirement,
-            code="REQUIREMENT_CANDIDATE_SPACE_AUTHORITY_ID_MISMATCH",
-            diagnostics=(bound_authority,),
-        )
-    if bound_space != FROZEN_Q13_CANDIDATE_SPACE_HASH:
-        return _blocked_result(
-            requirement,
-            code="REQUIREMENT_CANDIDATE_SPACE_HASH_MISMATCH",
-            diagnostics=(bound_space,),
-        )
 
     records = [
         _evaluate_candidate(candidate_b, requirement),

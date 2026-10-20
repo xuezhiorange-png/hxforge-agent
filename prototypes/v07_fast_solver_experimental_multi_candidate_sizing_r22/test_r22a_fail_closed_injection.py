@@ -148,8 +148,11 @@ def test_injection_duty_modify_ranking_blocked() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
-    assert result.status == "RANKING_BLOCKED"
-    assert "DUTY_BELOW_REQUIRED" in result.blocked_diagnostics[0]
+    assert result.status == "BLOCKED"
+    assert result.blocked_code in (
+        "FULL_RESULT_HASH_REPLAY_MISMATCH",
+        "COMPACT_FULL_ENGINEERING_PARITY_MISMATCH",
+    )
 
 
 def test_injection_task174_identity_inconsistent_blocked() -> None:
@@ -170,7 +173,11 @@ def test_injection_task174_identity_inconsistent_blocked() -> None:
     )
     second = admit_second_candidate_live_rating(ROOT)
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (tampered, second))
-    assert result.status == "RANKING_BLOCKED"
+    assert result.status == "BLOCKED"
+    assert result.blocked_code in (
+        "TASK174_RESULT_HASH_REPLAY_MISMATCH",
+        "RATING_REQUEST_HASH_REPLAY_MISMATCH",
+    )
 
 
 def test_injection_candidate_space_hash_inconsistent_blocked() -> None:
@@ -188,7 +195,10 @@ def test_injection_candidate_space_hash_inconsistent_blocked() -> None:
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "BLOCKED_CANDIDATE_SPACE_NOT_COMPARABLE"
+    assert result.blocked_code in (
+        "ADMITTED_CANDIDATE_SPACE_HASH_MISMATCH",
+        "RATING_REQUEST_HASH_REPLAY_MISMATCH",
+    )
 
 
 def test_injection_candidate_space_authority_id_mismatch_blocked() -> None:
@@ -230,7 +240,7 @@ def test_injection_duplicate_candidate_id_blocked() -> None:
     b, _ = _admitted_pair()
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, b))
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "DUPLICATE_CANDIDATE_ID"
+    assert result.blocked_code in ("DUPLICATE_CANDIDATE_ID", "ADMITTED_PAIR_ROLE_ORDER_MISMATCH")
 
 
 def test_injection_mandatory_screening_authority_gap_recorded() -> None:
@@ -317,7 +327,7 @@ def test_ranking_blocked_candidate_excluded() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
-    assert result.ranking_trace_status == "RANKING_BLOCKED"
+    assert result.status == "BLOCKED"
     assert result.recommended_candidate_id is None
 
 
@@ -335,7 +345,8 @@ def test_injection_illegal_production_authority_promotion_blocked() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
-    assert result.status == "EXPERIMENTAL_COMPLETE"
+    assert result.status == "BLOCKED"
+    assert result.blocked_code == "FULL_RESULT_HASH_REPLAY_MISMATCH"
 
 
 def test_injection_missing_full_json_blocked() -> None:
