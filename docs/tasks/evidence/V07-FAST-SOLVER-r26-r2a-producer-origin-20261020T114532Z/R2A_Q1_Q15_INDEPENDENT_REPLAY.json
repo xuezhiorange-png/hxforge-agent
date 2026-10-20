@@ -1,0 +1,41 @@
+{
+  "all_match": true,
+  "declared_q_predicates": {
+    "Q1": true,
+    "Q10": true,
+    "Q11": true,
+    "Q12": true,
+    "Q13": true,
+    "Q14": true,
+    "Q15": true,
+    "Q2": true,
+    "Q3": true,
+    "Q4": true,
+    "Q5": true,
+    "Q6": true,
+    "Q7": true,
+    "Q8": true,
+    "Q9": true
+  },
+  "event_hash": "27103aa006719a514241d75b532283db67e9fd15c9197b38c8382a07fe5bca3c",
+  "producer_path": "task173._candidate_provider_enclosure_event",
+  "recomputed_q_predicates": {
+    "Q1": true,
+    "Q10": true,
+    "Q11": true,
+    "Q12": true,
+    "Q13": true,
+    "Q14": true,
+    "Q15": true,
+    "Q2": true,
+    "Q3": true,
+    "Q4": true,
+    "Q5": true,
+    "Q6": true,
+    "Q7": true,
+    "Q8": true,
+    "Q9": true
+  },
+  "schema_version": "task173.r2a-q1-q15-independent-replay.v1",
+  "source_evidence_rel": "docs/tasks/evidence/TASK-173-v0.7-full-sizing-candidate-rating-precision-floor-diagnostic-r2.json"
+}

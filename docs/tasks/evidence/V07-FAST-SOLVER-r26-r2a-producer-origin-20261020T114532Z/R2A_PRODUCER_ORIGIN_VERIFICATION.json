@@ -1,0 +1,19 @@
+{
+  "origin_record": {
+    "evidence_class": "CAPTURED_TASK173_PRECISION_FLOOR_REPLAY",
+    "git_commit_head": "8250ff83a9525b705bc76a2094377797b5a8903f",
+    "producer_authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+    "provider": "CoolProp",
+    "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "provider_version": "8.0.0",
+    "verify_git_head_matches_runtime": false
+  },
+  "provider_binding": {
+    "provider": "CoolProp",
+    "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "provider_version": "8.0.0"
+  },
+  "schema_version": "task173.r2a-producer-origin-verification.v1",
+  "verification_code": "PASS",
+  "verification_pass": true
+}
