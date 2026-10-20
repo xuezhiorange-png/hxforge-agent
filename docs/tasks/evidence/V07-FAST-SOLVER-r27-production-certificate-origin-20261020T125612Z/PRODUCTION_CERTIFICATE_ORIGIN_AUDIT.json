@@ -1,0 +1,22 @@
+{
+  "detail": "immutable_event_projections_not_archived_with_certificates",
+  "immutable_bundle": {
+    "producer_git_commit_head": "21386a88f8290538172e9389ed46f50c3697a426",
+    "producer_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952",
+    "provider_identity": {
+      "provider": "CoolProp",
+      "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+      "provider_version": "8.0.0"
+    },
+    "ratings_evidence_rel": "docs/tasks/evidence/TASK-173-v0.7-full-sizing-reference-plane-serialization-candidate-ratings-r1.json",
+    "raw_evidence_sha256": "80e4648a91d1da2798dc608252a1a67111f1248711b8595343ab8c0739705b42"
+  },
+  "outer_decision_partial_code": "PASS",
+  "outer_decision_partial_replay": true,
+  "pinned_certificate_count": 3,
+  "producer_source_commit_verified": true,
+  "production_certificate_origin": "EVIDENCE_MISSING",
+  "provider_runtime_identity_verified": true,
+  "sample_certificate_hash": "bc1bbdf975352fac70f53d6e7a854028c505b792d5fd559ff52d425f553ed8c7",
+  "schema_version": "task173.r2a-production-certificate-origin-audit.v1"
+}

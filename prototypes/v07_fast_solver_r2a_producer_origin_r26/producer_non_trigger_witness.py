@@ -4,9 +4,9 @@
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from typing import Any
-
-from hexagent.canonical_json import canonical_sha256
 
 REQUIRED_NON_TRIGGER_FIELDS: tuple[str, ...] = (
     "candidate_id",
@@ -22,14 +22,24 @@ REQUIRED_NON_TRIGGER_FIELDS: tuple[str, ...] = (
     "outer_trial_count",
     "outer_trial_coverage_complete",
     "archived_trigger_event_absent",
+    "raw_evidence_rel",
     "raw_evidence_sha256",
+    "producer_git_commit_head",
+    "producer_source_tree",
+    "producer_trace_archive_sha256",
 )
+
+
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def evaluate_no_trigger_producer_witness(
     witness: dict[str, Any] | None,
+    *,
+    root: Path | None = None,
 ) -> tuple[str, str]:
-    """Return (status, detail). Only returns NO_TRIGGER_PROVEN with a complete witness."""
+    """Return (status, detail). Only returns NO_TRIGGER_PROVEN with immutable producer trace."""
     if witness is None:
         return (
             "FROZEN_EVIDENCE_INSUFFICIENT",
@@ -56,9 +66,17 @@ def evaluate_no_trigger_producer_witness(
             "FROZEN_EVIDENCE_INSUFFICIENT",
             "trigger_detection_path_not_proven",
         )
-    digest = canonical_sha256(
-        {key: witness[key] for key in REQUIRED_NON_TRIGGER_FIELDS if key in witness}
-    )
-    if witness.get("witness_canonical_hash") and witness["witness_canonical_hash"] != digest:
-        return ("BLOCKED", "NON_TRIGGER_WITNESS_HASH_MISMATCH")
+    if root is not None:
+        rel = str(witness["raw_evidence_rel"])
+        path = root / rel
+        if not path.is_file():
+            return ("FROZEN_EVIDENCE_INSUFFICIENT", "non_trigger_raw_evidence_missing")
+        digest = _sha256_file(path)
+        if digest != witness.get("raw_evidence_sha256"):
+            return ("BLOCKED", "NON_TRIGGER_RAW_EVIDENCE_SHA256_MISMATCH")
+    if witness.get("witness_canonical_hash"):
+        return (
+            "FROZEN_EVIDENCE_INSUFFICIENT",
+            "self_recomputed_witness_hash_not_trusted_without_immutable_archive",
+        )
     return ("NO_TRIGGER_PROVEN", "producer_trace_documents_no_trigger")

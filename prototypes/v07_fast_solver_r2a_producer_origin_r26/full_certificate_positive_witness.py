@@ -18,14 +18,14 @@ from prototypes.v07_fast_solver_r2a_producer_origin_r26.captured_producer_fixtur
     build_captured_candidate_b_producer_arguments,
     emit_production_r2a_event,
 )
-from prototypes.v07_fast_solver_r2a_producer_origin_r26.producer_origin_verification import (
-    build_runtime_producer_origin,
-)
 from prototypes.v07_fast_solver_r2a_producer_origin_r26.production_certificate_witness import (
-    build_production_certificate_from_captured_event,
+    build_contract_fixture_certificate_from_captured_event,
 )
 from prototypes.v07_fast_solver_r2a_producer_origin_r26.q_predicate_independent_replay import (
     APPROVED_PROVIDER,
+)
+from prototypes.v07_fast_solver_r2a_production_origin_r27.certificate_origin import (
+    FIXTURE_ORIGIN_MARK,
 )
 
 
@@ -34,7 +34,7 @@ def build_captured_certificate_evidence(
 ) -> tuple[R2aCertificateEvidence, dict[str, Any]]:
     args = build_captured_candidate_b_producer_arguments(root)
     event = emit_production_r2a_event(root)
-    certificate = build_production_certificate_from_captured_event(event)
+    certificate = build_contract_fixture_certificate_from_captured_event(event)
     captured = args["captured"]
     evidence = R2aCertificateEvidence(
         candidate_id=str(captured["candidate_id"]),
@@ -50,7 +50,9 @@ def build_captured_certificate_evidence(
         transient_events=(event,),
         outer_certificates=(certificate,),
         producer_replay_arguments=args,
-        producer_origin=build_runtime_producer_origin(root),
+        producer_origin=None,
+        certificate_provenance=FIXTURE_ORIGIN_MARK,
+        production_origin_bundle=None,
     )
     return evidence, {"event": event, "certificate": certificate, "producer_arguments": args}
 
@@ -68,6 +70,7 @@ def run_full_certificate_positive_witness(root: Path) -> dict[str, Any]:
         "provider_identity_binding": outcome.provider_identity_binding,
         "event_hash": bundle["event"]["event_hash"],
         "certificate_hash": bundle["certificate"]["certificate_hash"],
-        "witness_status": "PASS" if outcome.status == "CERTIFICATE_PRESENT_VERIFIED" else "BLOCKED",
+        "contract_fixture_status": outcome.status,
+        "witness_status": "PASS" if outcome.status == "CONTRACT_FIXTURE_PASS" else "BLOCKED",
         "result_hash": outcome.result_hash,
     }

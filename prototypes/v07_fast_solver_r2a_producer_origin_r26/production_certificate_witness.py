@@ -12,15 +12,18 @@ from prototypes.v07_fast_solver_r2a_authority_qualification_r25.r2a_contract imp
     R2A_AUTHORITY_ID,
     R2A_CERTIFICATE_SCHEMA,
 )
+from prototypes.v07_fast_solver_r2a_production_origin_r27.certificate_origin import (
+    FIXTURE_ORIGIN_MARK,
+)
 
 
-def build_production_certificate_from_captured_event(
+def build_contract_fixture_certificate_from_captured_event(
     event: dict[str, Any],
     *,
     left_event_hash: str | None = None,
     right_event_hash: str | None = None,
 ) -> dict[str, Any]:
-    """Project a minimal production certificate bound to one or two branch events."""
+    """Test-only certificate projection; not a production _candidate_transient_outer_boundary artifact."""
     left_hash = left_event_hash or str(event["event_hash"])
     right_hash = right_event_hash or str(event["event_hash"])
     certificate: dict[str, Any] = {
@@ -61,6 +64,23 @@ def build_production_certificate_from_captured_event(
         "midpoint_collapse_disposition_invariant": True,
         "representative_branch_used_to_decide_outer_action": False,
         "representative_endpoint_after_invariance": event.get("representative_endpoint", "LEFT"),
+        "certificate_origin_class": FIXTURE_ORIGIN_MARK,
+        "contract_fixture_reconstruction": True,
+        "producer_execution_binding": False,
     }
     certificate["certificate_hash"] = canonical_sha256(certificate)
     return certificate
+
+
+def build_production_certificate_from_captured_event(
+    event: dict[str, Any],
+    *,
+    left_event_hash: str | None = None,
+    right_event_hash: str | None = None,
+) -> dict[str, Any]:
+    """Deprecated alias: always returns a contract fixture reconstruction certificate."""
+    return build_contract_fixture_certificate_from_captured_event(
+        event,
+        left_event_hash=left_event_hash,
+        right_event_hash=right_event_hash,
+    )

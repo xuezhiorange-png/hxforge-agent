@@ -162,12 +162,12 @@ def qualify_frozen_mesh_pin(
     )
     verifier: R2aVerificationOutcome = verify_r2a_certificate_evidence(evidence)
 
-    non_trigger_status, non_trigger_detail = evaluate_no_trigger_producer_witness(None)
+    non_trigger_status, non_trigger_detail = evaluate_no_trigger_producer_witness(None, root=root)
 
     if has_r2a_hashes:
         status = "CERTIFICATE_REQUIRED_BUT_MISSING"
         detail = "Stage references R2A hash fields but projections are not in frozen receipt."
-    elif verifier.status == "CERTIFICATE_PRESENT_VERIFIED":
+    elif verifier.status == "PRODUCTION_CERTIFICATE_VERIFIED":
         status = verifier.status
         detail = ""
     elif verifier.status == "FROZEN_EVIDENCE_INSUFFICIENT":
@@ -180,7 +180,7 @@ def qualify_frozen_mesh_pin(
         detail = verifier.blocked_code or non_trigger_detail
 
     production_r2a_replay = (
-        "CERTIFICATE_PRESENT_VERIFIED" if status == "CERTIFICATE_PRESENT_VERIFIED" else "BLOCKED"
+        "CERTIFICATE_PRESENT_VERIFIED" if status == "PRODUCTION_CERTIFICATE_VERIFIED" else "BLOCKED"
     )
 
     return {

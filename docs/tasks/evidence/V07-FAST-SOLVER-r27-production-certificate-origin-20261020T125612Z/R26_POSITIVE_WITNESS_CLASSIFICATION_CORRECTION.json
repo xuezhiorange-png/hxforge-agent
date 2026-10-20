@@ -1,0 +1,8 @@
+{
+  "corrected_status": "CONTRACT_FIXTURE_PASS",
+  "prior_r26_status": "CERTIFICATE_PRESENT_VERIFIED",
+  "production_certificate_origin_when_fixture_only": "EVIDENCE_MISSING",
+  "rule": "build_contract_fixture_certificate_from_captured_event() is test reconstruction; must not admit PRODUCTION_CERTIFICATE_VERIFIED without immutable producer bundle.",
+  "schema_version": "task173.r2a-r26-positive-witness-classification-correction.v1",
+  "true_production_witness": "BLOCKED_EVIDENCE_MISSING"
+}

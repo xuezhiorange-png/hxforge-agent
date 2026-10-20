@@ -31,7 +31,8 @@ def test_captured_q1_q15_independent_replay_positive() -> None:
 def test_full_certificate_positive_producer_witness() -> None:
     witness = run_full_certificate_positive_witness(ROOT)
     assert witness["witness_status"] == "PASS"
-    assert witness["verifier_status"] == "CERTIFICATE_PRESENT_VERIFIED"
+    assert witness["verifier_status"] == "CONTRACT_FIXTURE_PASS"
+    assert witness["contract_fixture_status"] == "CONTRACT_FIXTURE_PASS"
 
 
 def test_negative_injection_r26_exact_codes() -> None:

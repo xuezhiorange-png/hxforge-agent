@@ -37,9 +37,7 @@ def verify_producer_origin_record(
     git_head = origin.get("git_commit_head")
     if not isinstance(git_head, str) or len(git_head) != 40:
         return False, "R2A_PRODUCER_GIT_HEAD_INVALID"
-    if origin.get("verify_git_head_matches_runtime") is True and git_head != current_repo_head(
-        root
-    ):
+    if git_head != current_repo_head(root):
         return False, "R2A_PRODUCER_GIT_HEAD_RUNTIME_MISMATCH"
     return True, "PASS"
 
@@ -51,6 +49,6 @@ def build_runtime_producer_origin(root: Path) -> dict[str, Any]:
         "provider_version": APPROVED_PROVIDER["provider_version"],
         "provider_git_revision": APPROVED_PROVIDER["provider_git_revision"],
         "git_commit_head": current_repo_head(root),
-        "verify_git_head_matches_runtime": False,
+        "verify_git_head_matches_runtime": True,
         "evidence_class": "CAPTURED_TASK173_PRECISION_FLOOR_REPLAY",
     }

@@ -34,11 +34,20 @@ from prototypes.v07_fast_solver_r2a_producer_origin_r26.q_predicate_independent_
     verify_event_q_independent_replay,
     verify_producer_provider_identity,
 )
+from prototypes.v07_fast_solver_r2a_production_origin_r27.certificate_origin import (
+    FIXTURE_ORIGIN_MARK,
+    PRODUCTION_ORIGIN_MARK,
+)
+from prototypes.v07_fast_solver_r2a_production_origin_r27.production_origin_gate import (
+    verify_production_origin_bundle,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 
 R2aAdmissionStatus = Literal[
     "CERTIFICATE_PRESENT_VERIFIED",
+    "CONTRACT_FIXTURE_PASS",
+    "PRODUCTION_CERTIFICATE_VERIFIED",
     "NO_TRIGGER_PROVEN",
     "CERTIFICATE_REQUIRED_BUT_MISSING",
     "FROZEN_EVIDENCE_INSUFFICIENT",
@@ -64,6 +73,8 @@ class R2aCertificateEvidence:
     outer_trial_record_hashes: tuple[str, ...] = ()
     producer_replay_arguments: dict[str, Any] | None = None
     producer_origin: dict[str, Any] | None = None
+    certificate_provenance: str | None = None
+    production_origin_bundle: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -105,10 +116,23 @@ def _verify_producer_identity(evidence: R2aCertificateEvidence) -> tuple[bool, s
     if evidence.provider_identity_version != APPROVED_PROVIDER["provider_version"]:
         return False, "R2A_PROVIDER_VERSION_MISMATCH"
     if evidence.producer_origin is not None:
+        if evidence.producer_origin.get("verify_git_head_matches_runtime") is False:
+            return False, "R2A_PRODUCER_RUNTIME_BINDING_BYPASS_REJECTED"
         ok, code = verify_producer_origin_record(evidence.producer_origin, root=ROOT)
         if not ok:
             return False, code
     return True, "PASS"
+
+
+def _certificate_is_fixture(certificate: dict[str, Any], evidence: R2aCertificateEvidence) -> bool:
+    if evidence.certificate_provenance == PRODUCTION_ORIGIN_MARK:
+        return False
+    if evidence.certificate_provenance == FIXTURE_ORIGIN_MARK:
+        return True
+    return (
+        certificate.get("certificate_origin_class") == FIXTURE_ORIGIN_MARK
+        or certificate.get("contract_fixture_reconstruction") is True
+    )
 
 
 def _verify_endpoint_hashes(event: dict[str, Any]) -> tuple[bool, str]:
@@ -160,6 +184,8 @@ def _verify_event(event: dict[str, Any], evidence: R2aCertificateEvidence) -> tu
             return False, "R2A_PROVIDER_IDENTITY_MISMATCH"
         if pid.get("provider_version") != APPROVED_PROVIDER["provider_version"]:
             return False, "R2A_PROVIDER_VERSION_MISMATCH"
+        if pid.get("provider_git_revision") != APPROVED_PROVIDER["provider_git_revision"]:
+            return False, "R2A_PROVIDER_GIT_REVISION_MISMATCH"
     ok, code = _verify_endpoint_hashes(event)
     if not ok:
         return False, code
@@ -243,6 +269,14 @@ def _verify_certificate(
     right_cont = certificate.get("right_continuation_hash")
     if not left_cont or not right_cont:
         return False, "R2A_CERTIFICATE_CONTINUATION_HASH_MISSING"
+    if left_events:
+        expected_left = canonical_sha256({"branch": "left", "event_hash": str(left_events[0])})
+        if left_cont != expected_left:
+            return False, "R2A_CERTIFICATE_HASH_REPLAY_MISMATCH"
+    if right_events:
+        expected_right = canonical_sha256({"branch": "right", "event_hash": str(right_events[0])})
+        if right_cont != expected_right:
+            return False, "R2A_CERTIFICATE_HASH_REPLAY_MISMATCH"
     if (
         certificate.get("left_outer_action") is None
         or certificate.get("right_outer_action") is None
@@ -313,23 +347,57 @@ def verify_r2a_certificate_evidence(evidence: R2aCertificateEvidence) -> R2aVeri
         if not ok:
             return _fail(code)
 
-    return R2aVerificationOutcome(
-        status="CERTIFICATE_PRESENT_VERIFIED",
-        blocked_code=None,
-        diagnostics=(),
-        q_predicate_gate="PASS",
-        certificate_hash_replay=True,
-        provider_identity_binding=True,
-        result_hash=canonical_sha256(
-            {
-                "status": "CERTIFICATE_PRESENT_VERIFIED",
-                "candidate_id": evidence.candidate_id,
-                "mesh_n": evidence.mesh_n,
-                "mesh_result_hash": evidence.mesh_result_hash,
-                "event_hashes": sorted(event_hashes),
-                "certificate_hashes": sorted(
-                    cert["certificate_hash"] for cert in evidence.outer_certificates
-                ),
-            }
-        ),
+    if evidence.certificate_provenance == PRODUCTION_ORIGIN_MARK:
+        ok, code = verify_production_origin_bundle(
+            evidence.production_origin_bundle,
+            root=ROOT,
+            certificates=evidence.outer_certificates,
+            events=evidence.transient_events,
+        )
+        if not ok:
+            return _fail(code)
+        return R2aVerificationOutcome(
+            status="PRODUCTION_CERTIFICATE_VERIFIED",
+            blocked_code=None,
+            diagnostics=(),
+            q_predicate_gate="PASS",
+            certificate_hash_replay=True,
+            provider_identity_binding=True,
+            result_hash=canonical_sha256(
+                {
+                    "status": "PRODUCTION_CERTIFICATE_VERIFIED",
+                    "candidate_id": evidence.candidate_id,
+                    "mesh_n": evidence.mesh_n,
+                    "event_hashes": sorted(event_hashes),
+                    "certificate_hashes": sorted(
+                        cert["certificate_hash"] for cert in evidence.outer_certificates
+                    ),
+                }
+            ),
+        )
+
+    if all(_certificate_is_fixture(cert, evidence) for cert in evidence.outer_certificates):
+        return R2aVerificationOutcome(
+            status="CONTRACT_FIXTURE_PASS",
+            blocked_code=None,
+            diagnostics=("contract_fixture_reconstruction_not_production_origin",),
+            q_predicate_gate="PASS",
+            certificate_hash_replay=True,
+            provider_identity_binding=provider_ok,
+            result_hash=canonical_sha256(
+                {
+                    "status": "CONTRACT_FIXTURE_PASS",
+                    "candidate_id": evidence.candidate_id,
+                    "mesh_n": evidence.mesh_n,
+                    "event_hashes": sorted(event_hashes),
+                    "certificate_hashes": sorted(
+                        cert["certificate_hash"] for cert in evidence.outer_certificates
+                    ),
+                }
+            ),
+        )
+
+    return _fail(
+        "R2A_PRODUCTION_CERTIFICATE_ORIGIN_MISSING",
+        "caller_supplied_self_consistent_json_without_production_origin_bundle",
     )

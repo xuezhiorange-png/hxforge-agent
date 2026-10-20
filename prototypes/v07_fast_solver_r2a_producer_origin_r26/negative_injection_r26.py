@@ -271,7 +271,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
     def joint_cert_rehash() -> R2aVerificationOutcome:
         evidence, bundle = build_captured_certificate_evidence(ROOT)
         cert = dict(bundle["certificate"])
-        cert["left_outer_action"] = "TAMPERED_ACTION"
+        cert["left_continuation_hash"] = "f" * 64
         cert["certificate_hash"] = bundle["certificate"]["certificate_hash"]
         return _outcome_from_verify(
             R2aCertificateEvidence(**{**evidence.__dict__, "outer_certificates": (cert,)})
@@ -288,7 +288,7 @@ def run_negative_injection_r26() -> list[dict[str, str]]:
     )
 
     def no_trigger_without_witness() -> tuple[str, str]:
-        return evaluate_no_trigger_producer_witness(None)
+        return evaluate_no_trigger_producer_witness(None, root=ROOT)
 
     cases.append(
         InjectionCase(
