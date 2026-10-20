@@ -25,6 +25,9 @@ from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.rating_p
     admit_candidate_b_live_rating,
     admit_second_candidate_live_rating,
 )
+from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
+    recompute_task174_result_hash,
+)
 from prototypes.v07_fast_solver_live_rating_result_r19.live_result_hash import (
     live_rating_result_hash,
 )
@@ -207,6 +210,100 @@ def run_negative_injection_detailed(root: Path) -> list[dict[str, str]]:
             "REQUIREMENT_REHASH_UNTRUSTED",
             ("UNTRUSTED_REQUIREMENT_CANONICAL_HASH", "UNTRUSTED_REQUIREMENT_FIELD_BINDING"),
             case_requirement_rehash,
+        )
+    )
+
+    def case_task174_rehash(r: Path):
+        b, second = _pair(r)
+        t174 = b.request.task174_result.model_copy(
+            update={"modeled_total_tube_side_pressure_drop_pa": Decimal("99999")}
+        )
+        t174 = t174.model_copy(update={"result_hash": recompute_task174_result_hash(t174)})
+        req = b.request.model_copy(update={"task174_result": t174})
+        b = b.__class__(
+            label=b.label,
+            full=b.full,
+            compact_r19=b.compact_r19,
+            compact_general=b.compact_general,
+            request=req,
+            full_audit=b.full_audit,
+            full_file_sha256=b.full_file_sha256,
+            snapshot_rel_path=b.snapshot_rel_path,
+        )
+        return experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=r)
+
+    cases.append(
+        InjectionCase(
+            "R24-007",
+            "TASK174_MODIFY_REHASH",
+            (
+                "PINNED_REQUEST_STRUCTURAL_MISMATCH",
+                "TASK174_RESULT_HASH_REPLAY_MISMATCH",
+                "RATING_REQUEST_HASH_REPLAY_MISMATCH",
+            ),
+            case_task174_rehash,
+        )
+    )
+
+    def case_frozen_request_replace(r: Path):
+        b, second = _pair(r)
+        b = b.__class__(
+            label=b.label,
+            full=b.full,
+            compact_r19=b.compact_r19,
+            compact_general=b.compact_general,
+            request=second.request,
+            full_audit=b.full_audit,
+            full_file_sha256=b.full_file_sha256,
+            snapshot_rel_path=b.snapshot_rel_path,
+        )
+        return experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=r)
+
+    cases.append(
+        InjectionCase(
+            "R24-008",
+            "FROZEN_REQUEST_REPLACE",
+            (
+                "PINNED_REQUEST_STRUCTURAL_MISMATCH",
+                "RATING_REQUEST_HASH_REPLAY_MISMATCH",
+                "ADMITTED_REQUEST_CANDIDATE_ID_BINDING_MISMATCH",
+            ),
+            case_frozen_request_replace,
+        )
+    )
+
+    def case_full_compact_joint_rehash(r: Path):
+        b, second = _pair(r)
+        tampered = b.full.model_copy(update={"total_duty_w": b.full.total_duty_w + Decimal("1")})
+        digest = live_rating_result_hash(tampered)
+        rebinding = tampered.model_copy(update={"result_hash": digest})
+        assert b.compact_r19 is not None
+        compact = b.compact_r19.model_copy(
+            update={"compact_result_hash": live_rating_result_hash(rebinding)}
+        )
+        b = b.__class__(
+            label=b.label,
+            full=rebinding,
+            compact_r19=compact,
+            compact_general=b.compact_general,
+            request=b.request,
+            full_audit=b.full_audit,
+            full_file_sha256=b.full_file_sha256,
+            snapshot_rel_path=b.snapshot_rel_path,
+        )
+        return experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=r)
+
+    cases.append(
+        InjectionCase(
+            "R24-009",
+            "FULL_COMPACT_JOINT_REHASH",
+            (
+                "PINNED_FULL_STRUCTURAL_MISMATCH",
+                "PINNED_COMPACT_STRUCTURAL_MISMATCH",
+                "FULL_RESULT_HASH_REPLAY_MISMATCH",
+                "COMPACT_RESULT_HASH_REPLAY_MISMATCH",
+            ),
+            case_full_compact_joint_rehash,
         )
     )
 
