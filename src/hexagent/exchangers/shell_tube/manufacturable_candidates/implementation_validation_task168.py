@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from hexagent.exchangers.shell_tube import validate_request as validate_task020
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
@@ -257,13 +257,13 @@ def build_implementation_validation_task168_reference(
     task166 = task166_tests._request()
     task167 = task167_tests._request()
 
-    task160_template = make_r607_raw()
-    task160_streams = list(task160_template["stream_records"])
+    task160_template = cast(dict[str, Any], make_r607_raw())
+    task160_streams = list(cast(list[object], task160_template["stream_records"]))
     shell_stream = dict(task160_streams[1])
     shell_stream["fluid_or_service_identity"] = "SHELL-WATER-001"
     task160_streams[1] = shell_stream
     task160_template["stream_records"] = task160_streams
-    task161_template = {
+    task161_template: dict[str, Any] = {
         "schema_version": "task161.schema.v1",
         "task161_version": "task161.v1",
         "source_definition_id": "TASK161-SOURCE-DEFINITION-R8-ISSUE-225",

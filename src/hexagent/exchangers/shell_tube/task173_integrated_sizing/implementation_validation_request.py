@@ -7,7 +7,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import replace
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
@@ -66,7 +66,7 @@ def build_implementation_validation_sizing_request(
         baffle_count=baffle_count,
     )
     evaluation = candidate_request.evaluation_input_authority
-    task021_template = deepcopy(evaluation.task021_request_template)
+    task021_template = cast(dict[str, Any], deepcopy(evaluation.task021_request_template))
     task021_template["placement_envelope"]["tube_center_envelope_diameter_m"] = "0.72"
     task021_template["placement_envelope"]["evidence_refs"] = [
         "implementation-validation-only-placement-envelope"
