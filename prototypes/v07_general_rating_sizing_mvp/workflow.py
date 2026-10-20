@@ -153,7 +153,11 @@ def run_general_engineering_workflow(
 
     rated = 0
     if isinstance(outcome, Task173SizingSuccessResult):
-        rated = sum(1 for row in outcome.candidate_records if row.rated_duty_w is not None)
+        rated = sum(
+            1
+            for row in outcome.candidate_records
+            if row.rated_duty_w is not None and row.candidate_rating_result_hash
+        )
 
     if isinstance(outcome, Task173SizingBlockedResult):
         wf_status: WorkflowStatus = "BLOCKED_SIZING"

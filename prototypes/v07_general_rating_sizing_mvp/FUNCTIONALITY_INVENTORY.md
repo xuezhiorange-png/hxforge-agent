@@ -23,3 +23,7 @@ The MVP **does not** import R22 `FROZEN_Q13` identities. Candidate IDs and hashe
 ## Performance
 
 Full `validate_sizing_request` runs the production mesh profile per rated candidate. Use `--preflight-only` for fast geometry enumeration; budget defaults to 3600 s in the case file.
+
+## Known functional blocker (R1)
+
+`validate_sizing_request` currently returns per-candidate `EVALUATION_AUTHORITY_REQUIRED` before Task173 mesh rating completes, even when Task168 preflight admits the candidate (`WARN`). Resolving this requires engineering review of the Task173 sizing candidate-chain evaluation authority binding (kernel), not additional audit prototypes.
