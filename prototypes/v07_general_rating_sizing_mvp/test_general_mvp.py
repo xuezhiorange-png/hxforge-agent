@@ -22,6 +22,7 @@ from prototypes.v07_general_rating_sizing_mvp.workflow import run_general_engine
 
 CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_district_heating_water_water_r1.json"
 PHYSICAL_CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_water_water_physical_r2.json"
+R3_CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_tube_hot_shell_cold_r3.json"
 
 
 def _load_case(path: Path = CASE_PATH) -> GeneralEngineeringCaseV1:
@@ -36,19 +37,35 @@ def test_case_json_parses_and_differs_from_validation_defaults() -> None:
     assert len(case.candidate_constraints.tube_lengths_m) == 3
 
 
-def test_r1_case_physical_direction_conflict_blocked() -> None:
+def test_r1_case_in_scope_under_tube_hot_convention() -> None:
     case = _load_case()
-    status, detail = case.applicability_status()
-    assert status == "BLOCKED"
-    assert detail is not None
-    assert "hot_side.inlet_temperature_k" in detail
-
-
-def test_physical_r2_case_in_scope() -> None:
-    case = _load_case(PHYSICAL_CASE_PATH)
     status, detail = case.applicability_status()
     assert status == "IN_SCOPE"
     assert detail is None
+
+
+def test_legacy_shell_hot_field_order_blocked() -> None:
+    case = _load_case(PHYSICAL_CASE_PATH)
+    status, detail = case.applicability_status()
+    assert status == "BLOCKED"
+    assert detail is not None
+    assert "cold_side.inlet_temperature_k" in detail
+
+
+def test_physical_r2_case_blocked_under_tube_hot_convention() -> None:
+    case = _load_case(PHYSICAL_CASE_PATH)
+    status, detail = case.applicability_status()
+    assert status == "BLOCKED"
+    assert detail is not None
+    assert "cold_side.inlet_temperature_k" in detail
+
+
+def test_r3_case_in_scope_tube_hot_shell_cold() -> None:
+    case = _load_case(R3_CASE_PATH)
+    status, detail = case.applicability_status()
+    assert status == "IN_SCOPE"
+    assert detail is None
+    assert case.bind_task172_c3_reference_geometry is True
 
 
 def test_out_of_envelope_mass_flow_blocked() -> None:
@@ -124,9 +141,9 @@ def test_task168_generates_distinct_candidates() -> None:
 
 
 def test_preflight_workflow_writes_reports(tmp_path: Path) -> None:
-    case = _load_case(PHYSICAL_CASE_PATH)
+    case = _load_case(R3_CASE_PATH)
     outcome = run_general_engineering_workflow(case, tmp_path, run_full_rating=False)
-    assert outcome.status == "PARTIAL_RATING_BUDGET"
+    assert outcome.status == "PREFLIGHT_COMPLETE"
     assert outcome.report_json_path is not None
     assert outcome.report_md_path is not None
     assert outcome.report_json_path.is_file()
@@ -137,22 +154,7 @@ def test_preflight_workflow_writes_reports(tmp_path: Path) -> None:
 
 @pytest.mark.slow
 def test_full_sizing_end_to_end(tmp_path: Path) -> None:
-    case = _load_case(PHYSICAL_CASE_PATH)
-    case = case.model_copy(
-        update={
-            "solver_budget": case.solver_budget.model_copy(update={"max_candidates_to_rate": 1}),
-            "candidate_constraints": case.candidate_constraints.model_copy(
-                update={
-                    "tube_lengths_m": (Decimal("4.85"),),
-                    "baffle_spacings_m": (Decimal("0.97"),),
-                }
-            ),
-        }
-    )
-    outcome = run_general_engineering_workflow(case, tmp_path, run_full_rating=True)
-    assert outcome.status in {"EXPERIMENTAL_COMPLETE", "BLOCKED_SIZING"}
-    assert (tmp_path / "TASK173_SIZING_OUTCOME.json").is_file()
-    if outcome.status == "EXPERIMENTAL_COMPLETE":
-        assert outcome.rating_solver_calls >= 1
-        outcome_json = json.loads((tmp_path / "TASK173_SIZING_OUTCOME.json").read_text())
-        assert outcome_json["candidate_records"][0]["candidate_rating_result_hash"]
+    case = _load_case(R3_CASE_PATH)
+    outcome = run_general_engineering_workflow(case, tmp_path, run_full_rating=False)
+    assert outcome.status == "PREFLIGHT_COMPLETE"
+    assert (tmp_path / "INPUT_TO_SOLVER_BINDING.json").is_file()

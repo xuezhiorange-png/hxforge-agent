@@ -14,6 +14,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing import (
     validate_sizing_request,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.input_to_solver_binding import (
+    write_input_to_solver_binding,
+)
 from prototypes.v07_general_rating_sizing_mvp.native_binding_diagnostics import (
     EVALUATION_AUTHORITY_ORIENTATION_FIX,
     write_native_binding_diagnostics,
@@ -29,7 +32,11 @@ WorkflowStatus = Literal[
     "BLOCKED_INPUT",
     "BLOCKED_PREFLIGHT",
     "BLOCKED_SIZING",
+    "PREFLIGHT_COMPLETE",
     "PARTIAL_RATING_BUDGET",
+    "PARTIAL_RATING_BLOCKED",
+    "PARTIAL_RATING_ACCEPTED",
+    "SIZING_EVALUATED",
     "EXPERIMENTAL_COMPLETE",
 ]
 
@@ -99,6 +106,7 @@ def run_general_engineering_workflow(
         )
 
     write_native_binding_diagnostics(output_dir, (EVALUATION_AUTHORITY_ORIENTATION_FIX,))
+    write_input_to_solver_binding(case, output_dir / "INPUT_TO_SOLVER_BINDING.json")
 
     sizing_request = build_task173_sizing_request(case)
     (output_dir / "TASK173_SIZING_REQUEST_HASH.txt").write_text(
@@ -134,10 +142,10 @@ def run_general_engineering_workflow(
             preflight=preflight,
             sizing_outcome=None,
             output_dir=output_dir,
-            workflow_status="PARTIAL_RATING_BUDGET",
+            workflow_status="PREFLIGHT_COMPLETE",
         )
         return GeneralWorkflowOutcome(
-            status="PARTIAL_RATING_BUDGET",
+            status="PREFLIGHT_COMPLETE",
             engineering_case_id=case.engineering_case_id,
             experimental_ranking_status="PREFLIGHT_ONLY",
             production_design_approved=False,
@@ -158,19 +166,27 @@ def run_general_engineering_workflow(
     )
 
     rated = 0
+    accepted_mesh = 0
     if isinstance(outcome, Task173SizingSuccessResult):
-        rated = sum(1 for row in outcome.candidate_records if row.candidate_rating_result_hash)
+        rated = sum(1 for row in outcome.candidate_records if row.candidate_rating_request_hash)
+        accepted_mesh = sum(
+            1
+            for row in outcome.candidate_records
+            if row.disposition == "EVALUATED" and row.accepted_subdivisions_per_interval is not None
+        )
 
     if isinstance(outcome, Task173SizingBlockedResult):
         wf_status: WorkflowStatus = "BLOCKED_SIZING"
         ranking_status = "BLOCKED"
+    elif accepted_mesh == 0:
+        wf_status = "PARTIAL_RATING_BLOCKED"
+        ranking_status = "EXPERIMENTAL_RANKING_BLOCKED"
+    elif outcome.selection_status == "RECOMMENDATION_AVAILABLE":
+        wf_status = "SIZING_EVALUATED"
+        ranking_status = "EXPERIMENTAL_RANKING_AVAILABLE"
     else:
-        wf_status = "EXPERIMENTAL_COMPLETE"
-        ranking_status = (
-            "EXPERIMENTAL_RANKING_AVAILABLE"
-            if outcome.selection_status == "RECOMMENDATION_AVAILABLE"
-            else "EXPERIMENTAL_RANKING_BLOCKED"
-        )
+        wf_status = "PARTIAL_RATING_ACCEPTED"
+        ranking_status = "EXPERIMENTAL_RANKING_BLOCKED"
 
     report_paths = write_engineering_reports(
         case,

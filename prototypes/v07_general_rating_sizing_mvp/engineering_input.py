@@ -78,6 +78,13 @@ class GeneralEngineeringCaseV1(BaseModel):
     exchanger_type: _SUPPORTED_EXCHANGER
     cold_side: FluidSideSpec
     hot_side: FluidSideSpec
+    bind_task172_c3_reference_geometry: bool = Field(
+        default=False,
+        description=(
+            "When true, bind candidate enumeration to the C3-qualified implementation-validation "
+            "reference geometry (Task025 parallel area / Reynolds envelope), not arbitrary layout."
+        ),
+    )
     target_duty_w: Decimal
     max_tube_side_pressure_drop_pa: Decimal
     max_shell_side_pressure_drop_pa: Decimal
@@ -132,30 +139,35 @@ class GeneralEngineeringCaseV1(BaseModel):
     def heat_transfer_convention(self) -> dict[str, str]:
         """Document side identities and SI energy convention for reports."""
         return {
-            "hot_side_role": "HEAT_SOURCE_SHELL_SIDE",
-            "cold_side_role": "HEAT_SINK_TUBE_SIDE",
-            "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_HOT_TO_COLD",
+            "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+            "tube_stream_field": "cold_side",
+            "shell_stream_field": "hot_side",
+            "tube_mass_flow_kg_s": "12.000000",
+            "shell_mass_flow_kg_s": "20.000000",
+            "kernel_tube_inlet_temperature_k": "300.00",
+            "kernel_shell_inlet_temperature_k": "298.15",
+            "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
             "duty_unit": "W",
             "temperature_unit": "K",
             "mass_flow_unit": "kg_s",
             "pressure_unit": "Pa_absolute",
-            "energy_balance": "Q_hot_release_equals_Q_cold_absorption_steady_state",
+            "energy_balance": "Q_tube_release_equals_Q_shell_absorption_steady_state",
         }
 
     def physical_consistency_status(self) -> tuple[str, str | None]:
         """Basic feasibility checks without mutating the stored case JSON."""
-        if self.hot_side.inlet_temperature_k <= self.cold_side.inlet_temperature_k:
+        if self.cold_side.inlet_temperature_k <= self.hot_side.inlet_temperature_k:
             return (
                 "BLOCKED",
-                "hot_side.inlet_temperature_k must exceed cold_side.inlet_temperature_k "
-                "for positive target_duty_w (hot fluid heats cold fluid)",
+                "cold_side.inlet_temperature_k must exceed hot_side.inlet_temperature_k "
+                "for TUBE_HOT_SHELL_COLD (tube is the hotter stream)",
             )
         cp_water = Decimal("4180")
-        hot_cap = cp_water * self.hot_side.mass_flow_kg_s
-        cold_cap = cp_water * self.cold_side.mass_flow_kg_s
-        max_hot_drop = hot_cap * (self.hot_side.inlet_temperature_k - Decimal("298.15"))
-        max_cold_rise = cold_cap * (Decimal("300.00") - self.cold_side.inlet_temperature_k)
-        max_duty = min(max_hot_drop, max_cold_rise)
+        tube_cap = cp_water * self.cold_side.mass_flow_kg_s
+        shell_cap = cp_water * self.hot_side.mass_flow_kg_s
+        max_tube_drop = tube_cap * (self.cold_side.inlet_temperature_k - Decimal("298.15"))
+        max_shell_rise = shell_cap * (Decimal("300.00") - self.hot_side.inlet_temperature_k)
+        max_duty = min(max_tube_drop, max_shell_rise)
         if self.target_duty_w > max_duty * Decimal("1.05"):
             return (
                 "BLOCKED",

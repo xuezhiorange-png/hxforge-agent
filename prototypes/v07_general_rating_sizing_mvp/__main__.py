@@ -35,7 +35,17 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     print(json.dumps(outcome.to_dict(), indent=2))
-    return 0 if outcome.status in {"EXPERIMENTAL_COMPLETE", "PARTIAL_RATING_BUDGET"} else 1
+    return (
+        0
+        if outcome.status
+        in {
+            "PREFLIGHT_COMPLETE",
+            "PARTIAL_RATING_ACCEPTED",
+            "SIZING_EVALUATED",
+            "PARTIAL_RATING_BLOCKED",
+        }
+        else 1
+    )
 
 
 if __name__ == "__main__":
