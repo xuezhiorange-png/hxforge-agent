@@ -1,0 +1,14 @@
+{
+  "candidate_b": {
+    "n32": "FROZEN_EVIDENCE_INSUFFICIENT",
+    "n64": "FROZEN_EVIDENCE_INSUFFICIENT"
+  },
+  "numerical_authority_status": "CANDIDATE",
+  "production_integration": false,
+  "production_r2a_authority_verified": false,
+  "schema_version": "task173.r2a-candidate-qualification-status.v1",
+  "second_candidate": {
+    "n32": "FROZEN_EVIDENCE_INSUFFICIENT",
+    "n64": "FROZEN_EVIDENCE_INSUFFICIENT"
+  }
+}
