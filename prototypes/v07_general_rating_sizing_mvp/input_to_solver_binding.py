@@ -1,5 +1,7 @@
 """Map general engineering case fields to frozen Task173/Task172 solver bindings."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
@@ -10,62 +12,52 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     TUBE_INLET_T_K,
     TUBE_MASS_FLOW_KG_S,
 )
-from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.case_streams import (
+    shell_stream_spec,
+    tube_stream_spec,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 
-_BINDING_SCHEMA = "hxforge.input-to-solver-binding.v1"
+_BINDING_SCHEMA = "hxforge.input-to-solver-binding.v2"
 
 
-def build_input_to_solver_binding(case: GeneralEngineeringCaseV1) -> dict[str, Any]:
+def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
     """Produce a disclosure table for engineering review (not a solver input file)."""
     convention = case.heat_transfer_convention()
+    tube = tube_stream_spec(case)
+    shell = shell_stream_spec(case)
     rows: list[dict[str, Any]] = [
         {
-            "user_field": "cold_side.mass_flow_kg_s",
-            "user_value": str(case.cold_side.mass_flow_kg_s),
+            "user_field": "tube_side.mass_flow_kg_s",
+            "user_value": str(tube.mass_flow_kg_s),
             "solver_parameter": "Task173 TUBE_MASS_FLOW_KG_S / Task172 tube_mass_flow_kg_s",
             "solver_value": str(TUBE_MASS_FLOW_KG_S),
-            "participates_in_rating_kernel": case.cold_side.mass_flow_kg_s == TUBE_MASS_FLOW_KG_S,
-            "notes": "Tube stream (kernel HOT role).",
+            "participates_in_rating_kernel": tube.mass_flow_kg_s == TUBE_MASS_FLOW_KG_S,
+            "notes": "Tube equipment side carries the kernel HOT stream.",
         },
         {
-            "user_field": "hot_side.mass_flow_kg_s",
-            "user_value": str(case.hot_side.mass_flow_kg_s),
+            "user_field": "shell_side.mass_flow_kg_s",
+            "user_value": str(shell.mass_flow_kg_s),
             "solver_parameter": "Task173 SHELL_MASS_FLOW_KG_S / Task172 shell_mass_flow_kg_s",
             "solver_value": str(SHELL_MASS_FLOW_KG_S),
-            "participates_in_rating_kernel": case.hot_side.mass_flow_kg_s == SHELL_MASS_FLOW_KG_S,
-            "notes": "Shell stream (kernel COLD role).",
+            "participates_in_rating_kernel": shell.mass_flow_kg_s == SHELL_MASS_FLOW_KG_S,
+            "notes": "Shell equipment side carries the kernel COLD stream.",
         },
         {
-            "user_field": "cold_side.inlet_temperature_k",
-            "user_value": str(case.cold_side.inlet_temperature_k),
+            "user_field": "tube_side.inlet_temperature_k",
+            "user_value": str(tube.inlet_temperature_k),
             "solver_parameter": "Task173 TUBE_INLET_T_K (frozen service constant)",
             "solver_value": str(TUBE_INLET_T_K),
             "participates_in_rating_kernel": False,
-            "notes": "Metadata/reporting until native inlet authority is wired.",
+            "notes": "User-declared tube inlet; kernel mesh uses frozen 300 K until native inlet authority.",
         },
         {
-            "user_field": "hot_side.inlet_temperature_k",
-            "user_value": str(case.hot_side.inlet_temperature_k),
+            "user_field": "shell_side.inlet_temperature_k",
+            "user_value": str(shell.inlet_temperature_k),
             "solver_parameter": "Task173 SHELL_INLET_T_K (frozen service constant)",
             "solver_value": str(SHELL_INLET_T_K),
             "participates_in_rating_kernel": False,
-            "notes": "Metadata/reporting until native inlet authority is wired.",
-        },
-        {
-            "user_field": "cold_side.inlet_pressure_pa",
-            "user_value": str(case.cold_side.inlet_pressure_pa),
-            "solver_parameter": "Task173 REFERENCE_PRESSURE_PA",
-            "solver_value": "101325",
-            "participates_in_rating_kernel": False,
-            "notes": "Local property states use 101325 Pa absolute.",
-        },
-        {
-            "user_field": "hot_side.inlet_pressure_pa",
-            "user_value": str(case.hot_side.inlet_pressure_pa),
-            "solver_parameter": "Task173 REFERENCE_PRESSURE_PA",
-            "solver_value": "101325",
-            "participates_in_rating_kernel": False,
-            "notes": "Local property states use 101325 Pa absolute.",
+            "notes": "User-declared shell inlet; kernel mesh uses frozen 298.15 K until native inlet authority.",
         },
         {
             "user_field": "target_duty_w",
@@ -73,7 +65,7 @@ def build_input_to_solver_binding(case: GeneralEngineeringCaseV1) -> dict[str, A
             "solver_parameter": "SizingRequirementAuthority.required_duty_w",
             "solver_value": str(case.target_duty_w),
             "participates_in_rating_kernel": True,
-            "notes": "Sizing constraint evaluation only; mesh shooting uses kernel boundaries.",
+            "notes": "Sizing constraint only.",
         },
         {
             "user_field": "candidate_constraints.*",
@@ -81,16 +73,20 @@ def build_input_to_solver_binding(case: GeneralEngineeringCaseV1) -> dict[str, A
             "solver_parameter": "Task168 discrete authorities + Task171 materialization",
             "solver_value": "native candidate chain",
             "participates_in_rating_kernel": True,
-            "notes": (
-                "When bind_task172_c3_reference_geometry=true, geometry matches the "
-                "C3-qualified implementation-validation reference (Task025 area/Re)."
-            ),
+            "notes": "C3 reference geometry when bind_task172_c3_reference_geometry=true.",
         },
     ]
     return {
         "schema_version": _BINDING_SCHEMA,
         "engineering_case_id": case.engineering_case_id,
+        "engineering_case_schema": case.schema_version,
         "physical_side_role_parity": convention["kernel_thermal_variant"],
+        "equipment_thermal_mapping": {
+            "tube_equipment_side": "tube_side",
+            "shell_equipment_side": "shell_side",
+            "tube_thermal_role": "HOT",
+            "shell_thermal_role": "COLD",
+        },
         "actual_thermal_boundary_binding": {
             "tube_role": "HOT",
             "shell_role": "COLD",
@@ -103,7 +99,7 @@ def build_input_to_solver_binding(case: GeneralEngineeringCaseV1) -> dict[str, A
     }
 
 
-def write_input_to_solver_binding(case: GeneralEngineeringCaseV1, path: Any) -> None:
+def write_input_to_solver_binding(case: EngineeringCase, path: Any) -> None:
     import json
     from pathlib import Path
 

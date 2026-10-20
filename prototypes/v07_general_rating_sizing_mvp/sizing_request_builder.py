@@ -29,15 +29,18 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing import (
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.implementation_validation_request import (
     build_implementation_validation_sizing_request,
 )
-from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.case_streams import (
+    shell_stream_spec,
+    tube_stream_spec,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV2
 
 _MVP_SPACE_ID = "V07-GENERAL-RATING-SIZING-MVP-CANDIDATE-SPACE-R1"
 _C3_REFERENCE_SPACE_ID = "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R3"
 
 
-def _apply_c3_reference_geometry(
-    case: GeneralEngineeringCaseV1, request: Task168Request
-) -> Task168Request:
+def _apply_c3_reference_geometry(case: EngineeringCase, request: Task168Request) -> Task168Request:
     """Bind Task168 evaluation templates to the C3-qualified reference geometry space."""
     evaluation = request.evaluation_input_authority
     shell_m = case.candidate_constraints.shell_inside_diameter_m
@@ -94,9 +97,7 @@ def _apply_c3_reference_geometry(
     )
 
 
-def _apply_case_geometry_catalog(
-    case: GeneralEngineeringCaseV1, request: Task168Request
-) -> Task168Request:
+def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request) -> Task168Request:
     constraints = case.candidate_constraints
     shell_record = replace(
         request.shell_geometry_catalog.records[0],
@@ -143,7 +144,7 @@ def _apply_case_geometry_catalog(
     )
 
 
-def build_task173_sizing_request(case: GeneralEngineeringCaseV1) -> Task173SizingRequest:
+def build_task173_sizing_request(case: EngineeringCase) -> Task173SizingRequest:
     """Bind general case targets to the reviewed Task173 R2 validation candidate space."""
     constraints = case.candidate_constraints
     max_n = case.solver_budget.max_candidates_to_rate
@@ -220,9 +221,17 @@ def build_task173_sizing_request(case: GeneralEngineeringCaseV1) -> Task173Sizin
         canonical_hash=canonical_sha256(requirement_hash_projection),
     )
     metadata = dict(base.request_metadata)
+    tube = tube_stream_spec(case)
+    shell = shell_stream_spec(case)
+    workflow_tag = (
+        "V07_GENERAL_RATING_SIZING_NATIVE_BINDING_R4"
+        if isinstance(case, GeneralEngineeringCaseV2)
+        else "V07_GENERAL_RATING_SIZING_NATIVE_BINDING_R3"
+    )
     metadata.update(
         {
-            "workflow": "V07_GENERAL_RATING_SIZING_NATIVE_BINDING_R3",
+            "workflow": workflow_tag,
+            "engineering_case_schema": case.schema_version,
             "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
             "bind_task172_c3_reference_geometry": str(
                 case.bind_task172_c3_reference_geometry
@@ -231,10 +240,10 @@ def build_task173_sizing_request(case: GeneralEngineeringCaseV1) -> Task173Sizin
             "experimental_ranking": "true",
             "production_design_approved": "false",
             "golden_reuse": "false",
-            "cold_inlet_temperature_k": str(case.cold_side.inlet_temperature_k),
-            "hot_inlet_temperature_k": str(case.hot_side.inlet_temperature_k),
-            "cold_inlet_pressure_pa": str(case.cold_side.inlet_pressure_pa),
-            "hot_inlet_pressure_pa": str(case.hot_side.inlet_pressure_pa),
+            "tube_inlet_temperature_k": str(tube.inlet_temperature_k),
+            "shell_inlet_temperature_k": str(shell.inlet_temperature_k),
+            "tube_inlet_pressure_pa": str(tube.inlet_pressure_pa),
+            "shell_inlet_pressure_pa": str(shell.inlet_pressure_pa),
         }
     )
     return base.model_copy(
@@ -246,7 +255,7 @@ def build_task173_sizing_request(case: GeneralEngineeringCaseV1) -> Task173Sizin
     )
 
 
-def build_task168_request(case: GeneralEngineeringCaseV1) -> Task168Request:
+def build_task168_request(case: EngineeringCase) -> Task168Request:
     return build_task173_sizing_request(case).task168_candidate_request
 
 

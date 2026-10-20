@@ -11,7 +11,13 @@ from pathlib import Path
 
 import pytest
 
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
+    load_general_engineering_case_json,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.input_to_solver_binding import (
+    build_input_to_solver_binding,
+)
 from prototypes.v07_general_rating_sizing_mvp.preflight import enumerate_task168_candidates
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task168_request,
@@ -23,6 +29,7 @@ from prototypes.v07_general_rating_sizing_mvp.workflow import run_general_engine
 CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_district_heating_water_water_r1.json"
 PHYSICAL_CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_water_water_physical_r2.json"
 R3_CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_tube_hot_shell_cold_r3.json"
+R4_CASE_PATH = Path(__file__).resolve().parent / "cases" / "mvp_tube_hot_shell_cold_r4.json"
 
 
 def _load_case(path: Path = CASE_PATH) -> GeneralEngineeringCaseV1:
@@ -66,6 +73,37 @@ def test_r3_case_in_scope_tube_hot_shell_cold() -> None:
     assert status == "IN_SCOPE"
     assert detail is None
     assert case.bind_task172_c3_reference_geometry is True
+
+
+def test_r4_v2_case_in_scope_tube_side_hot_shell_side_cold() -> None:
+    case = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))
+    status, detail = case.applicability_status()
+    assert status == "IN_SCOPE"
+    assert detail is None
+    assert case.schema_version == "hxforge.general-engineering-case.v2"
+    assert case.tube_side.inlet_temperature_k > case.shell_side.inlet_temperature_k
+
+
+def test_r4_input_binding_maps_equipment_to_thermal_roles() -> None:
+    case = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))
+    binding = build_input_to_solver_binding(case)
+    assert binding["schema_version"] == "hxforge.input-to-solver-binding.v2"
+    mapping = binding["equipment_thermal_mapping"]
+    assert mapping["tube_thermal_role"] == "HOT"
+    assert mapping["shell_thermal_role"] == "COLD"
+    assert binding["physical_side_role_parity"] == "TUBE_HOT_SHELL_COLD"
+    assert binding["rows"][0]["user_field"] == "tube_side.mass_flow_kg_s"
+    assert binding["rows"][0]["participates_in_rating_kernel"] is True
+
+
+def test_r3_and_r4_share_c3_candidate_space() -> None:
+    r3 = _load_case(R3_CASE_PATH)
+    r4 = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))
+    pre3 = enumerate_task168_candidates(build_task173_sizing_request(r3))
+    pre4 = enumerate_task168_candidates(build_task173_sizing_request(r4))
+    assert pre3["candidate_space_hash"] == pre4["candidate_space_hash"]
+    r3_ids = {row["candidate_id"] for row in pre3["candidates"]}
+    assert "82f370ff-73cd-5d71-aaf9-efc51645d22e" in r3_ids
 
 
 def test_out_of_envelope_mass_flow_blocked() -> None:

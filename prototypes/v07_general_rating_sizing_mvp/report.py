@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from hexagent.exchangers.shell_tube.task173_integrated_sizing import Task173SizingSuccessResult
-from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.case_streams import design_conditions_for_report
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 
 
 def _candidate_rows(outcome: Task173SizingSuccessResult) -> list[dict[str, Any]]:
@@ -43,7 +44,7 @@ def _candidate_rows(outcome: Task173SizingSuccessResult) -> list[dict[str, Any]]
 
 
 def build_report_payload(
-    case: GeneralEngineeringCaseV1,
+    case: EngineeringCase,
     *,
     preflight: dict[str, Any],
     sizing_outcome: Task173SizingSuccessResult | None,
@@ -65,14 +66,7 @@ def build_report_payload(
         "production_integration": False,
         "fiv_numeric_limit_authority": "MISSING",
         "r2a_production_authority_verified": False,
-        "design_conditions": {
-            "cold_side": case.cold_side.model_dump(mode="json"),
-            "hot_side": case.hot_side.model_dump(mode="json"),
-            "target_duty_w": str(case.target_duty_w),
-            "max_tube_dp_pa": str(case.max_tube_side_pressure_drop_pa),
-            "max_shell_dp_pa": str(case.max_shell_side_pressure_drop_pa),
-            "exchanger_type": case.exchanger_type,
-        },
+        "design_conditions": design_conditions_for_report(case),
         "candidate_generation": {
             "preflight_status": preflight.get("status"),
             "candidate_count": preflight.get("candidate_count"),
@@ -154,15 +148,30 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
     ]
     dc = report["design_conditions"]
+    stream_lines: list[str] = []
+    if "tube_side" in dc:
+        conv = dc.get("heat_transfer_convention") or {}
+        stream_lines = [
+            f"- Tube side ({conv.get('tube_thermal_role', 'HOT')}): "
+            f"{dc['tube_side']['inlet_temperature_k']} K @ "
+            f"{dc['tube_side']['mass_flow_kg_s']} kg/s",
+            f"- Shell side ({conv.get('shell_thermal_role', 'COLD')}): "
+            f"{dc['shell_side']['inlet_temperature_k']} K @ "
+            f"{dc['shell_side']['mass_flow_kg_s']} kg/s",
+        ]
+    else:
+        stream_lines = [
+            f"- Cold side: {dc['cold_side']['inlet_temperature_k']} K @ "
+            f"{dc['cold_side']['mass_flow_kg_s']} kg/s",
+            f"- Hot side: {dc['hot_side']['inlet_temperature_k']} K @ "
+            f"{dc['hot_side']['mass_flow_kg_s']} kg/s",
+        ]
     lines.extend(
         [
             f"- Target duty: {dc['target_duty_w']} W",
             f"- Max tube Δp: {dc['max_tube_dp_pa']} Pa",
             f"- Max shell Δp: {dc['max_shell_dp_pa']} Pa",
-            f"- Cold side: {dc['cold_side']['inlet_temperature_k']} K @ "
-            f"{dc['cold_side']['mass_flow_kg_s']} kg/s",
-            f"- Hot side: {dc['hot_side']['inlet_temperature_k']} K @ "
-            f"{dc['hot_side']['mass_flow_kg_s']} kg/s",
+            *stream_lines,
             "",
             "## Candidate generation (Task168)",
             "",
@@ -221,7 +230,7 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def write_engineering_reports(
-    case: GeneralEngineeringCaseV1,
+    case: EngineeringCase,
     *,
     preflight: dict[str, Any],
     sizing_outcome: Task173SizingSuccessResult | None,

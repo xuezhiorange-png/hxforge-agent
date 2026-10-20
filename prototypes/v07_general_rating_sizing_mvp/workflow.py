@@ -13,7 +13,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing import (
     Task173SizingSuccessResult,
     validate_sizing_request,
 )
-from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.input_to_solver_binding import (
     write_input_to_solver_binding,
 )
@@ -81,7 +81,7 @@ def _serialize_sizing_outcome(
 
 
 def run_general_engineering_workflow(
-    case: GeneralEngineeringCaseV1,
+    case: EngineeringCase,
     output_dir: Path,
     *,
     run_full_rating: bool = True,
