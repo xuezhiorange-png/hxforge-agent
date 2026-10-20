@@ -56,9 +56,10 @@ def test_injection_rating_request_hash_tamper_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_FULL_STRUCTURAL_MISMATCH",
         "RATING_REQUEST_HASH_REPLAY_MISMATCH",
         "FULL_RESULT_HASH_REPLAY_MISMATCH",
     )
@@ -79,10 +80,11 @@ def test_injection_full_duty_modify_rehash_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_FULL_STRUCTURAL_MISMATCH",
         "FULL_RESULT_HASH_REPLAY_MISMATCH",
         "COMPACT_FULL_ENGINEERING_PARITY_MISMATCH",
         "COMPACT_FULL_RESULT_HASH_MISMATCH",
@@ -105,9 +107,10 @@ def test_injection_task174_modify_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_REQUEST_STRUCTURAL_MISMATCH",
         "TASK174_RESULT_HASH_REPLAY_MISMATCH",
         "RATING_REQUEST_HASH_REPLAY_MISMATCH",
     )
@@ -125,7 +128,9 @@ def test_injection_full_compact_swap_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (swapped, second))
+    result = experimental_multi_candidate_sizing_from_admitted(
+        REQ, (swapped, second), evidence_root=ROOT
+    )
     assert result.status == "BLOCKED"
 
 
@@ -141,7 +146,9 @@ def test_injection_untrusted_admitted_bundle_label_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (rogue, second))
+    result = experimental_multi_candidate_sizing_from_admitted(
+        REQ, (rogue, second), evidence_root=ROOT
+    )
     assert result.status == "BLOCKED"
     assert result.blocked_code == "UNTRUSTED_ADMITTED_BUNDLE_LABEL"
 
@@ -183,6 +190,7 @@ def test_injection_forged_screening_outcome_blocked() -> None:
     result = experimental_multi_candidate_sizing_from_admitted(
         REQ,
         (b, second),
+        evidence_root=ROOT,
         screening=forged,
     )
     assert result.status == "BLOCKED"
@@ -191,7 +199,7 @@ def test_injection_forged_screening_outcome_blocked() -> None:
 
 def test_injection_pair_role_order_reversed_blocked() -> None:
     b, second = _pair()
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (second, b))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (second, b), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code == "ADMITTED_PAIR_ROLE_ORDER_MISMATCH"
 

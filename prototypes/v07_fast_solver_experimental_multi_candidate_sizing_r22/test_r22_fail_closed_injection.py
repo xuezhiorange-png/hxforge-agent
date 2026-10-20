@@ -66,9 +66,10 @@ def test_impossible_duty_blocks_ranking() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(req, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(req, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_FULL_STRUCTURAL_MISMATCH",
         "FULL_RESULT_HASH_REPLAY_MISMATCH",
         "COMPACT_FULL_ENGINEERING_PARITY_MISMATCH",
     )

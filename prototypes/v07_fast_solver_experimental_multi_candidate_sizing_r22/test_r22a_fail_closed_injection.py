@@ -76,9 +76,12 @@ def test_injection_candidate_id_replacement_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "ADMITTED_REQUEST_CANDIDATE_ID_BINDING_MISMATCH"
+    assert result.blocked_code in (
+        "PINNED_REQUEST_STRUCTURAL_MISMATCH",
+        "ADMITTED_REQUEST_CANDIDATE_ID_BINDING_MISMATCH",
+    )
     assert result.candidate_identity_gate == "BLOCKED"
 
 
@@ -95,9 +98,12 @@ def test_injection_candidate_hash_replacement_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "ADMITTED_REQUEST_CANDIDATE_HASH_BINDING_MISMATCH"
+    assert result.blocked_code in (
+        "PINNED_REQUEST_STRUCTURAL_MISMATCH",
+        "ADMITTED_REQUEST_CANDIDATE_HASH_BINDING_MISMATCH",
+    )
     assert result.candidate_identity_gate == "BLOCKED"
 
 
@@ -129,9 +135,12 @@ def test_injection_compact_result_hash_tamper_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "COMPACT_RESULT_HASH_REPLAY_MISMATCH"
+    assert result.blocked_code in (
+        "PINNED_COMPACT_STRUCTURAL_MISMATCH",
+        "COMPACT_RESULT_HASH_REPLAY_MISMATCH",
+    )
 
 
 def test_injection_duty_modify_ranking_blocked() -> None:
@@ -147,9 +156,10 @@ def test_injection_duty_modify_ranking_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_FULL_STRUCTURAL_MISMATCH",
         "FULL_RESULT_HASH_REPLAY_MISMATCH",
         "COMPACT_FULL_ENGINEERING_PARITY_MISMATCH",
     )
@@ -172,9 +182,12 @@ def test_injection_task174_identity_inconsistent_blocked() -> None:
         snapshot_rel_path=base.snapshot_rel_path,
     )
     second = admit_second_candidate_live_rating(ROOT)
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (tampered, second))
+    result = experimental_multi_candidate_sizing_from_admitted(
+        REQ, (tampered, second), evidence_root=ROOT
+    )
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_REQUEST_STRUCTURAL_MISMATCH",
         "TASK174_RESULT_HASH_REPLAY_MISMATCH",
         "RATING_REQUEST_HASH_REPLAY_MISMATCH",
     )
@@ -193,9 +206,10 @@ def test_injection_candidate_space_hash_inconsistent_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in (
+        "PINNED_REQUEST_STRUCTURAL_MISMATCH",
         "ADMITTED_CANDIDATE_SPACE_HASH_MISMATCH",
         "RATING_REQUEST_HASH_REPLAY_MISMATCH",
     )
@@ -238,7 +252,7 @@ def test_injection_requirement_modify_without_trusted_binding_blocked() -> None:
 
 def test_injection_duplicate_candidate_id_blocked() -> None:
     b, _ = _admitted_pair()
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, b))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, b), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.blocked_code in ("DUPLICATE_CANDIDATE_ID", "ADMITTED_PAIR_ROLE_ORDER_MISMATCH")
 
@@ -326,7 +340,7 @@ def test_ranking_blocked_candidate_excluded() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
     assert result.recommended_candidate_id is None
 
@@ -344,9 +358,12 @@ def test_injection_illegal_production_authority_promotion_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.status == "BLOCKED"
-    assert result.blocked_code == "FULL_RESULT_HASH_REPLAY_MISMATCH"
+    assert result.blocked_code in (
+        "PINNED_FULL_STRUCTURAL_MISMATCH",
+        "FULL_RESULT_HASH_REPLAY_MISMATCH",
+    )
 
 
 def test_injection_missing_full_json_blocked() -> None:
@@ -380,7 +397,7 @@ def test_injection_tube_dp_constraint_blocked() -> None:
         full_file_sha256=b.full_file_sha256,
         snapshot_rel_path=b.snapshot_rel_path,
     )
-    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
+    result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second), evidence_root=ROOT)
     assert result.tube_dp_constraint_gate == "BLOCKED"
 
 

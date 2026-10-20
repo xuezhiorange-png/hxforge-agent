@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     candidate_rating_request_hash,
 )
@@ -17,13 +19,15 @@ from prototypes.v07_fast_solver_evidence_gate.trusted_constants import CANDIDATE
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.admitted_identity_binding import (
     verify_admitted_pair_identity,
 )
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.immutable_pinned_evidence_admission import (
+    verify_immutable_pinned_evidence,
+)
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.mandatory_screening import (
     MandatoryScreeningOutcome,
     execute_experimental_mandatory_screening,
 )
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.r22_pinned_identity import (
     FROZEN_Q13_CANDIDATE_SPACE_HASH,
-    R21E_FULL_JSON_SHA256,
     SECOND_CANDIDATE_ID,
     TASK168_CANDIDATE_SPACE_AUTHORITY_ID,
 )
@@ -53,9 +57,6 @@ from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating imp
     LiveCompactAuthorityError,
     live_compact_rating_hash,
     verify_live_compact_against_full,
-)
-from prototypes.v07_fast_solver_rating_sizing_bridge_r20.r19_pinned_identity import (
-    R19_FULL_JSON_SHA256,
 )
 
 
@@ -97,13 +98,9 @@ def _verify_trusted_admitted_provenance(
     if admitted.label == "CANDIDATE_B_R19":
         if admitted.compact_r19 is None or admitted.compact_general is not None:
             return _failure("UNTRUSTED_ADMITTED_BUNDLE_SHAPE", admitted.label)
-        if admitted.full_file_sha256 != R19_FULL_JSON_SHA256:
-            return _failure("UNTRUSTED_ADMITTED_FULL_FILE_SHA256", admitted.label)
     elif admitted.label == "SECOND_CANDIDATE_R21E":
         if admitted.compact_general is None or admitted.compact_r19 is not None:
             return _failure("UNTRUSTED_ADMITTED_BUNDLE_SHAPE", admitted.label)
-        if admitted.full_file_sha256 != R21E_FULL_JSON_SHA256:
-            return _failure("UNTRUSTED_ADMITTED_FULL_FILE_SHA256", admitted.label)
     else:
         return _failure("UNTRUSTED_ADMITTED_BUNDLE_LABEL", admitted.label)
     return None
@@ -214,14 +211,7 @@ def verify_mandatory_screening_outcome(
     expected = execute_experimental_mandatory_screening(admitted, requirement)
     if screening is None:
         return expected, None
-    if (
-        screening.mandatory_screening_gate != expected.mandatory_screening_gate
-        or screening.mandatory_screening_complete != expected.mandatory_screening_complete
-        or screening.production_recommendation_authorized
-        != expected.production_recommendation_authorized
-        or screening.fiv_authority_status != expected.fiv_authority_status
-        or screening.screening_gap_codes != expected.screening_gap_codes
-    ):
+    if screening.model_dump(mode="json") != expected.model_dump(mode="json"):
         return None, _failure("FORGED_MANDATORY_SCREENING_OUTCOME")
     return screening, None
 
@@ -230,6 +220,7 @@ def verify_independent_consumer_admission(
     requirement: SizingRequirementAuthority,
     admitted: tuple[AdmittedLiveRating, ...],
     *,
+    evidence_root: Path | None,
     screening: MandatoryScreeningOutcome | None = None,
 ) -> tuple[MandatoryScreeningOutcome | None, tuple[str, tuple[str, ...]] | None]:
     if len(admitted) != 2:
@@ -239,10 +230,16 @@ def verify_independent_consumer_admission(
     if failure is not None:
         return None, failure
 
+    if evidence_root is None:
+        return None, _failure("UNTRUSTED_EVIDENCE_ROOT_MISSING")
+
     for item in admitted:
         failure = _verify_trusted_admitted_provenance(item)
         if failure is not None:
             return None, failure
+        imm = verify_immutable_pinned_evidence(evidence_root, item)
+        if imm is not None:
+            return None, imm
 
     failure = _verify_pair_roles(admitted)
     if failure is not None:

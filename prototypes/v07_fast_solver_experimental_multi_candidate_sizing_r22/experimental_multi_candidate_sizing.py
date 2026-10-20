@@ -167,11 +167,13 @@ def experimental_multi_candidate_sizing_from_admitted(
     requirement: SizingRequirementAuthority,
     admitted: tuple[AdmittedLiveRating, ...],
     *,
+    evidence_root: Path | None = None,
     screening: MandatoryScreeningOutcome | None = None,
 ) -> ExperimentalMultiCandidateSizingResult:
     screening, admission_failure = verify_independent_consumer_admission(
         requirement,
         admitted,
+        evidence_root=evidence_root,
         screening=screening,
     )
     if admission_failure is not None:
@@ -307,5 +309,6 @@ def experimental_multi_candidate_sizing(
     return experimental_multi_candidate_sizing_from_admitted(
         requirement,
         admitted,
+        evidence_root=root,
         screening=screening,
     )
