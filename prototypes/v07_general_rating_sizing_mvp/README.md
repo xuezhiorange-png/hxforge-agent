@@ -1,4 +1,4 @@
-# V07 General Rating + Sizing End-to-End MVP (R1)
+# V07 General Rating + Sizing End-to-End MVP (R1 / R2)
 
 Experimental workflow: **general engineering JSON → Task168 candidates → Task173 integrated rating/hydraulic/sizing → engineering report**.
 
@@ -15,7 +15,7 @@ uv run python -m prototypes.v07_general_rating_sizing_mvp \
 
 # Full integrated sizing (Task173 rating per admitted candidate — may take tens of minutes)
 uv run python -m prototypes.v07_general_rating_sizing_mvp \
-  --input prototypes/v07_general_rating_sizing_mvp/cases/mvp_district_heating_water_water_r1.json \
+  --input prototypes/v07_general_rating_sizing_mvp/cases/mvp_water_water_physical_r2.json \
   --output /tmp/mvp_case_full
 ```
 
@@ -31,6 +31,10 @@ See `engineering_input.py` (`hxforge.general-engineering-case.v1`). The MVP enfo
 - Single-phase water, fixed tubesheet E-shell
 
 Values outside this envelope are rejected at parse time (fail closed).
+
+For positive `target_duty_w`, `hot_side.inlet_temperature_k` must exceed `cold_side.inlet_temperature_k` (checked via `physical_consistency_status()`). The legacy R1 JSON case is retained for evidence but is blocked at workflow time when temperatures are inverted.
+
+Runtime sizing requests are built via `hexagent` implementation-validation producers (`implementation_validation_request.py`); the MVP CLI does **not** import `tests.*`.
 
 ## Capability inventory
 

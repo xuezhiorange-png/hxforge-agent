@@ -14,6 +14,10 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing import (
     validate_sizing_request,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.native_binding_diagnostics import (
+    EVALUATION_AUTHORITY_ORIENTATION_FIX,
+    write_native_binding_diagnostics,
+)
 from prototypes.v07_general_rating_sizing_mvp.preflight import enumerate_task168_candidates
 from prototypes.v07_general_rating_sizing_mvp.report import write_engineering_reports
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
@@ -94,6 +98,8 @@ def run_general_engineering_workflow(
             diagnostics=(detail or "input_blocked",),
         )
 
+    write_native_binding_diagnostics(output_dir, (EVALUATION_AUTHORITY_ORIENTATION_FIX,))
+
     sizing_request = build_task173_sizing_request(case)
     (output_dir / "TASK173_SIZING_REQUEST_HASH.txt").write_text(
         sizing_request_identity(sizing_request) + "\n", encoding="utf-8"
@@ -153,11 +159,7 @@ def run_general_engineering_workflow(
 
     rated = 0
     if isinstance(outcome, Task173SizingSuccessResult):
-        rated = sum(
-            1
-            for row in outcome.candidate_records
-            if row.rated_duty_w is not None and row.candidate_rating_result_hash
-        )
+        rated = sum(1 for row in outcome.candidate_records if row.candidate_rating_result_hash)
 
     if isinstance(outcome, Task173SizingBlockedResult):
         wf_status: WorkflowStatus = "BLOCKED_SIZING"

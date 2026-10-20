@@ -64,6 +64,10 @@ class SolverBudgetSpec(BaseModel):
     enable_full_task173_rating: bool = True
 
 
+class PhysicalConsistencyError(ValueError):
+    """Raised when design temperatures/duty violate basic heat-transfer feasibility."""
+
+
 class GeneralEngineeringCaseV1(BaseModel):
     """Experimental case input; maps to reviewed Task173 service envelope when in scope."""
 
@@ -125,9 +129,46 @@ class GeneralEngineeringCaseV1(BaseModel):
             raise ValueError("v0.7 sizing supports tube_pass_count=1 only")
         return self
 
+    def heat_transfer_convention(self) -> dict[str, str]:
+        """Document side identities and SI energy convention for reports."""
+        return {
+            "hot_side_role": "HEAT_SOURCE_SHELL_SIDE",
+            "cold_side_role": "HEAT_SINK_TUBE_SIDE",
+            "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_HOT_TO_COLD",
+            "duty_unit": "W",
+            "temperature_unit": "K",
+            "mass_flow_unit": "kg_s",
+            "pressure_unit": "Pa_absolute",
+            "energy_balance": "Q_hot_release_equals_Q_cold_absorption_steady_state",
+        }
+
+    def physical_consistency_status(self) -> tuple[str, str | None]:
+        """Basic feasibility checks without mutating the stored case JSON."""
+        if self.hot_side.inlet_temperature_k <= self.cold_side.inlet_temperature_k:
+            return (
+                "BLOCKED",
+                "hot_side.inlet_temperature_k must exceed cold_side.inlet_temperature_k "
+                "for positive target_duty_w (hot fluid heats cold fluid)",
+            )
+        cp_water = Decimal("4180")
+        hot_cap = cp_water * self.hot_side.mass_flow_kg_s
+        cold_cap = cp_water * self.cold_side.mass_flow_kg_s
+        max_hot_drop = hot_cap * (self.hot_side.inlet_temperature_k - Decimal("298.15"))
+        max_cold_rise = cold_cap * (Decimal("300.00") - self.cold_side.inlet_temperature_k)
+        max_duty = min(max_hot_drop, max_cold_rise)
+        if self.target_duty_w > max_duty * Decimal("1.05"):
+            return (
+                "BLOCKED",
+                f"target_duty_w {self.target_duty_w} W exceeds coarse envelope cap {max_duty} W",
+            )
+        return "VALID", None
+
     def applicability_status(self) -> tuple[str, str | None]:
         try:
             self.model_validate(self.model_dump())
         except Exception as exc:
             return "BLOCKED", str(exc)
+        physical, detail = self.physical_consistency_status()
+        if physical == "BLOCKED":
+            return "BLOCKED", detail
         return "IN_SCOPE", None
