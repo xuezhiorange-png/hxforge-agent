@@ -45,7 +45,7 @@ def main(output_dir: Path) -> None:
         output_dir,
         run_full_rating=False,
     )
-    rating_budget_s = min(r3_case.solver_budget.total_budget_s, 90.0)
+    rating_budget_s = min(r3_case.solver_budget.total_budget_s, 1100.0)
     sizing_request = build_task173_sizing_request(r3_case)
     rating_outcome: dict[str, object] = {"status": "NOT_RUN"}
     rating_started = time.perf_counter()
