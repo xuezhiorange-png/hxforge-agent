@@ -1,0 +1,96 @@
+{
+  "base_head": "7a6e48bfebec55bb8ffa3375586fd08613612310",
+  "engineering_case_id": "mvp-district-heating-water-water-r1",
+  "experimental_ranking_status": "PREFLIGHT_ONLY",
+  "final_head": "7a6e48bfebec55bb8ffa3375586fd08613612310",
+  "fixed_golden_result_reused": false,
+  "general_input_schema": "hxforge.general-engineering-case.v1",
+  "general_workflow_entrypoint": "python -m prototypes.v07_general_rating_sizing_mvp",
+  "hardcoded_candidate_id": false,
+  "historical_golden_unchanged": {
+    "r19_r21e": {
+      "full_compact_identity_gate": true,
+      "r19_full_file_sha256": "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172",
+      "r19_full_file_sha256_parity": true,
+      "r19_full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+      "r19_full_result_hash_parity": true,
+      "r19_git_blob": "33067b2edf90feb4df2eea9d993530e79c13adb8",
+      "r19_git_blob_parity": true,
+      "r21e_compact_hash_pinned": "1dd86db141e774d1ea717986b37bd664aaf2a8bcf2b8212352785be44bcd3c9b",
+      "r21e_full_file_sha256": "3dde55a2950f44b78a31e078044fe0a561b212371de40766d2b7c7b3d11f1fa7",
+      "r21e_full_file_sha256_parity": true,
+      "r21e_full_result_hash": "1533e3ed495acf516fed4c00e19b0b265ad5dec7cc7c5285a974f60030d6ed0d",
+      "r21e_full_result_hash_parity": true,
+      "r21e_git_blob": "eb43011aa9a782223cda294c88c8d5fe512a078a",
+      "r21e_git_blob_parity": true
+    },
+    "r22_raw": {
+      "alternative_candidate_ids": [
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      "alternatives_subset_ledger": true,
+      "blocked": false,
+      "candidate_ledger_ids": [
+        "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      "declared_result_hash_parity": true,
+      "ledger_trace_binding": true,
+      "ranking_trace_ids": [
+        "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      "ranking_trace_order": [
+        "e152cca9-fd5d-59ca-9b46-1df574eee841",
+        "adeab5b1-a339-5eb3-aa66-011ffe49bac0"
+      ],
+      "raw_file_sha256": "6b94acc63a1a12ddfc5dde6caf57c97aae663ca517cada933dcc70f41d996006",
+      "raw_file_sha256_parity": true,
+      "recommended_candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "recommended_in_ledger": true,
+      "sizing_result_hash_declared": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b",
+      "sizing_result_hash_parity": true,
+      "sizing_result_hash_replay": "346980708043dedba4c31e65849e45b86df784d69f33a817efd4d403807da78b"
+    }
+  },
+  "preflight": {
+    "candidate_count": 3,
+    "candidate_space_hash": "4f62998894be1ad4286f586e7547f2ac5a212c96a5d7064f7b9d77a225010820",
+    "candidates": [
+      {
+        "baffle_spacing_m": "0.97",
+        "candidate_hash": "a8de03e48402f71d04d2ae4c57f117f39d50f49c9b0f3c87de31ac59b0ea600e",
+        "candidate_id": "68d18c9e-55e5-5040-b7a7-3dab0ae69e50",
+        "disposition": "EVALUATED",
+        "status": "WARN",
+        "tube_length_m": "4.85"
+      },
+      {
+        "baffle_spacing_m": "0.97",
+        "candidate_hash": "586270fe34e2c56036e8fb9ce0e308c34a026b35c641e7754ed616ec9ec56dca",
+        "candidate_id": "a901a6df-1698-521b-ac09-cf9abd4b7c1d",
+        "disposition": "BLOCKED",
+        "status": "BLOCKED",
+        "tube_length_m": "5.00"
+      },
+      {
+        "baffle_spacing_m": "0.97",
+        "candidate_hash": "c00cf08d073f98b65bf75769166f2b4b83b5b118997930e168bd033591a2b638",
+        "candidate_id": "b4c1636a-731e-5057-b605-5a3dd1ded86b",
+        "disposition": "BLOCKED",
+        "status": "BLOCKED",
+        "tube_length_m": "5.15"
+      }
+    ],
+    "distinct_geometry_count": 3,
+    "status": "VALID",
+    "structurally_admitted_count": 1
+  },
+  "production_design_approved": false,
+  "rating_solver_calls": 0,
+  "readme_path": "prototypes/v07_general_rating_sizing_mvp/README.md",
+  "task_id": "V07_GENERAL_RATING_SIZING_END_TO_END_MVP_R1",
+  "total_wall_seconds": 1.3613821270118933,
+  "wall_seconds_runner": 9.74781018999056,
+  "workflow_status": "PARTIAL_RATING_BUDGET"
+}
