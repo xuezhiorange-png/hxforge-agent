@@ -12,6 +12,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_sizing.models import (
     RANKING_POLICY_ID,
     SizingRequirementAuthority,
 )
+from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.admitted_identity_binding import (
+    verify_admitted_pair_identity,
+)
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_sizing_requirement import (
     experimental_multi_candidate_sizing_requirement,
 )
@@ -181,6 +184,11 @@ def experimental_multi_candidate_sizing_from_admitted(
     from prototypes.v07_fast_solver_rating_sizing_bridge_r20.live_compact_rating import (
         live_compact_rating_hash,
     )
+
+    identity_failure = verify_admitted_pair_identity(admitted)
+    if identity_failure is not None:
+        code, diagnostics = identity_failure
+        return _blocked_result(requirement, code=code, diagnostics=diagnostics)
 
     for item in admitted:
         if item.compact_r19 is not None and (

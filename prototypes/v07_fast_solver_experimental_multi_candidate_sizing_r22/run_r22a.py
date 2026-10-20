@@ -122,7 +122,10 @@ def main() -> None:
         sys.exit(4)
 
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    out_dir = ROOT / f"docs/tasks/evidence/V07-FAST-SOLVER-experimental-multi-candidate-sizing-r22a-{stamp}"
+    out_dir = (
+        ROOT
+        / f"docs/tasks/evidence/V07-FAST-SOLVER-experimental-multi-candidate-sizing-r22a-{stamp}"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
 
     receipt: dict[str, Any] = {
@@ -179,7 +182,9 @@ def main() -> None:
         encoding="utf-8",
     )
     (out_dir / "NEGATIVE_INJECTION.json").write_text(
-        json.dumps({"status": "PYTEST_GREEN", "suite": "test_r22a_fail_closed_injection.py"}, indent=2)
+        json.dumps(
+            {"status": "PYTEST_GREEN", "suite": "test_r22a_fail_closed_injection.py"}, indent=2
+        )
         + "\n",
         encoding="utf-8",
     )
@@ -190,7 +195,9 @@ def main() -> None:
             cwd=ROOT,
             check=True,
         )
-        evidence_head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        evidence_head = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip()
         receipt["evidence_staged_commit_head"] = evidence_head
 
     print(json.dumps({k: receipt[k] for k in sorted(receipt) if k != "sizing_result_v1"}, indent=2))

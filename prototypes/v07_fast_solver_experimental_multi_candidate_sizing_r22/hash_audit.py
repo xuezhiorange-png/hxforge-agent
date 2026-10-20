@@ -60,7 +60,9 @@ def audit_r22_raw_result(root: Path) -> dict[str, Any]:
         }
     if not isinstance(sizing_body, dict):
         return {"blocked": True, "code": "R22_RAW_SIZING_RESULT_INVALID"}
-    body_for_hash = {key: value for key, value in sizing_body.items() if key not in ("result_hash", "result_id")}
+    body_for_hash = {
+        key: value for key, value in sizing_body.items() if key not in ("result_hash", "result_id")
+    }
     body_for_hash["_experimental_sizing_hash_domain"] = EXPERIMENTAL_SIZING_RESULT_HASH_DOMAIN
     replay_hash = canonical_sha256(body_for_hash)
     records = sizing_body.get("candidate_records") or []
@@ -69,14 +71,14 @@ def audit_r22_raw_result(root: Path) -> dict[str, Any]:
     trace_ids = tuple(item["candidate_id"] for item in trace)
     ledger_hash_binding = all(
         entry["candidate_hash"]
-        == next(rec["candidate_hash"] for rec in records if rec["candidate_id"] == entry["candidate_id"])
+        == next(
+            rec["candidate_hash"] for rec in records if rec["candidate_id"] == entry["candidate_id"]
+        )
         for entry in trace
     )
     recommended = sizing_body.get("recommended_candidate_id")
     alternatives = tuple(sizing_body.get("alternative_candidate_ids") or ())
-    ranked = tuple(
-        entry["candidate_id"] for entry in sorted(trace, key=lambda item: item["rank"])
-    )
+    ranked = tuple(entry["candidate_id"] for entry in sorted(trace, key=lambda item: item["rank"]))
     return {
         "blocked": False,
         "raw_file_sha256": raw_sha,

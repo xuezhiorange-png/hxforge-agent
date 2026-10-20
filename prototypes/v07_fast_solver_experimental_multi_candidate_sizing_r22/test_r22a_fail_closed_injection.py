@@ -9,7 +9,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from hexagent.canonical_json import canonical_sha256
-from prototypes.v07_fast_solver_evidence_gate.trusted_constants import CANDIDATE_B_ID
 from prototypes.v07_fast_solver_experimental_multi_candidate_sizing_r22.experimental_multi_candidate_sizing import (
     experimental_multi_candidate_sizing,
     experimental_multi_candidate_sizing_from_admitted,
@@ -78,8 +77,9 @@ def test_injection_candidate_id_replacement_blocked() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
-    assert result.status in ("BLOCKED", "RANKING_BLOCKED", "EXPERIMENTAL_COMPLETE")
-    assert result.candidate_identity_gate in ("PASS", "BLOCKED")
+    assert result.status == "BLOCKED"
+    assert result.blocked_code == "ADMITTED_REQUEST_CANDIDATE_ID_BINDING_MISMATCH"
+    assert result.candidate_identity_gate == "BLOCKED"
 
 
 def test_injection_candidate_hash_replacement_blocked() -> None:
@@ -96,7 +96,9 @@ def test_injection_candidate_hash_replacement_blocked() -> None:
         snapshot_rel_path=b.snapshot_rel_path,
     )
     result = experimental_multi_candidate_sizing_from_admitted(REQ, (b, second))
-    assert result.recommended_candidate_id == CANDIDATE_B_ID or result.status != "EXPERIMENTAL_COMPLETE"
+    assert result.status == "BLOCKED"
+    assert result.blocked_code == "ADMITTED_REQUEST_CANDIDATE_HASH_BINDING_MISMATCH"
+    assert result.candidate_identity_gate == "BLOCKED"
 
 
 def test_injection_full_result_hash_tamper_on_admission_blocked() -> None:

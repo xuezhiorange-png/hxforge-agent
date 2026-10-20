@@ -28,7 +28,9 @@ def requirement_canonical_projection(requirement: SizingRequirementAuthority) ->
 
 
 def verify_requirement_canonical_hash(requirement: SizingRequirementAuthority) -> bool:
-    return requirement.canonical_hash == canonical_sha256(requirement_canonical_projection(requirement))
+    return requirement.canonical_hash == canonical_sha256(
+        requirement_canonical_projection(requirement)
+    )
 
 
 def verify_requirement_schema_and_authority(requirement: SizingRequirementAuthority) -> str | None:

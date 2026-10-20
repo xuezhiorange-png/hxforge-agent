@@ -44,9 +44,7 @@ TRUSTED_REQUIREMENT_CANONICAL_HASH = (
 REQUIREMENT_SCHEMA_CLASS = "SizingRequirementAuthority"
 REQUIRED_SCREENING_POLICY_ID = "V07-T173-SIZING-MANDATORY-SCREENING-R1"
 
-EXPERIMENTAL_SIZING_RESULT_V2_SCHEMA = (
-    "task173.experimental-multi-candidate-sizing-result.v2"
-)
+EXPERIMENTAL_SIZING_RESULT_V2_SCHEMA = "task173.experimental-multi-candidate-sizing-result.v2"
 EXPERIMENTAL_SIZING_RESULT_V2_HASH_DOMAIN = (
     "task173.experimental-multi-candidate-sizing-result-hash.v2"
 )
