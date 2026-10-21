@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+from prototypes.v07_general_rating_sizing_mvp.cli_exit import experimental_live_rating_exit_code
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
     load_general_engineering_case_json,
 )
@@ -55,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
             json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         print(json.dumps(outcome.to_dict(), indent=2))
-        return 0 if outcome.status != "INPUT_OUT_OF_SUPPORTED_SCOPE" else 1
+        return experimental_live_rating_exit_code(outcome)
 
     case = GeneralEngineeringCaseV1.model_validate_json(args.input.read_text(encoding="utf-8"))
     outcome = run_general_engineering_workflow(

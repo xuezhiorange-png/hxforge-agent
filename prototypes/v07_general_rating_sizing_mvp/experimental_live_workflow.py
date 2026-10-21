@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    candidate_space_to_json,
     enumerate_experimental_rating_candidates,
     selection_to_json,
 )
@@ -23,11 +24,17 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
 from prototypes.v07_general_rating_sizing_mvp.experimental_constraint_preview import (
     build_experimental_constraint_preview,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_scope import (
+    build_hydraulic_model_scope_document,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_run_identity import (
     build_experimental_live_rating_run_identity,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_scope import (
     check_experimental_live_rating_scope,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_ranking import (
+    build_experimental_ranking,
 )
 from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
     build_native_thermal_boundary_from_case,
@@ -38,6 +45,9 @@ from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
     run_mesh_numeric_with_profile,
 )
 from prototypes.v07_general_rating_sizing_mvp.preflight import enumerate_task168_candidates
+from prototypes.v07_general_rating_sizing_mvp.property_provider_identity import (
+    build_property_provider_identity,
+)
 from prototypes.v07_general_rating_sizing_mvp.report import write_engineering_reports
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
@@ -65,10 +75,15 @@ class ExperimentalLiveRatingOutcome:
     mesh_status: str | None
     total_numerical_seconds: float
     blocker_code: str | None
+    cli_success: bool
+    numeric_valid_count: int
+    blocked_rating_count: int
+    selected_for_rating_count: int
+    multi_candidate_mode: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": "hxforge.experimental-live-workflow-outcome.v1",
+            "schema_version": "hxforge.experimental-live-workflow-outcome.v2",
             "status": self.status,
             "engineering_case_id": self.engineering_case_id,
             "raw_result_path": str(self.raw_result_path) if self.raw_result_path else None,
@@ -76,6 +91,11 @@ class ExperimentalLiveRatingOutcome:
             "mesh_status": self.mesh_status,
             "total_numerical_seconds": self.total_numerical_seconds,
             "blocker_code": self.blocker_code,
+            "cli_success": self.cli_success,
+            "numeric_valid_count": self.numeric_valid_count,
+            "blocked_rating_count": self.blocked_rating_count,
+            "selected_for_rating_count": self.selected_for_rating_count,
+            "multi_candidate_mode": self.multi_candidate_mode,
         }
 
 
@@ -117,6 +137,11 @@ def run_experimental_live_rating_workflow(
             mesh_status=None,
             total_numerical_seconds=time.perf_counter() - t0,
             blocker_code=scope_detail,
+            cli_success=False,
+            numeric_valid_count=0,
+            blocked_rating_count=0,
+            selected_for_rating_count=0,
+            multi_candidate_mode=False,
         )
 
     provider = CoolPropProvider()
@@ -145,11 +170,19 @@ def run_experimental_live_rating_workflow(
         )
 
     selection = enumerate_experimental_rating_candidates(case)
+    (output_dir / "CANDIDATE_SPACE_RESULT.json").write_text(
+        json.dumps(candidate_space_to_json(selection), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     (output_dir / "CANDIDATE_SELECTION_RESULT.json").write_text(
         json.dumps(selection_to_json(selection), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    if selection.selected_candidate_id is None:
+    hydraulic_scope = build_hydraulic_model_scope_document()
+    (output_dir / "HYDRAULIC_MODEL_SCOPE.json").write_text(
+        json.dumps(hydraulic_scope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    if not selection.selected_candidate_ids:
         return _blocked_outcome(
             case,
             output_dir,
@@ -159,87 +192,195 @@ def run_experimental_live_rating_workflow(
             detail=selection.status,
         )
 
-    native = build_native_cell_context(case, selection=selection)
+    multi = len(selection.selected_candidate_ids) > 1
+    budget_s = min(1200.0, float(case.solver_budget.total_budget_s))
+    provider_identity = build_property_provider_identity(provider)
+    rating_rows: list[dict[str, Any]] = []
+    identity_entries: list[dict[str, Any]] = []
+
+    for candidate_id in selection.selected_candidate_ids:
+        if time.perf_counter() - t0 >= budget_s:
+            rating_rows.append(
+                {
+                    "candidate_id": candidate_id,
+                    "mesh_status": "BUDGET_STOP",
+                    "failure_code": "NUMERICAL_BUDGET_EXCEEDED",
+                }
+            )
+            break
+        native = build_native_cell_context(case, selection=selection, candidate_id=candidate_id)
+        mesh, profile, obs = run_mesh_numeric_with_profile(
+            native,
+            subdivisions=mesh_level,
+            case=case,
+            enable_live_thermal_boundary=True,
+            enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+        )
+        numeric_valid = mesh.get("status") == "NUMERIC_VALID"
+        if numeric_valid and obs is not None:
+            mesh = {
+                **mesh,
+                "tube_outlet_temperature_k": str(obs.tube_outlet_temperature_k),
+                "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
+            }
+        constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
+        row: dict[str, Any] = {
+            "candidate_id": native.candidate_id,
+            "candidate_hash": native.candidate_hash,
+            "rating_request_hash": native.rating_request_hash,
+            "task171_result_hash": native.task171_result_hash,
+            "task174_result_hash": native.task174_result_hash,
+            "task025_parallel_area_m2": native.task025_parallel_area_m2,
+            "mesh_status": mesh.get("status"),
+            "mesh_result_hash": mesh.get("mesh_result_hash"),
+            "total_duty_w": mesh.get("total_duty_w"),
+            "tube_outlet_temperature_k": mesh.get("tube_outlet_temperature_k"),
+            "shell_outlet_temperature_k": mesh.get("shell_outlet_temperature_k"),
+            "energy_balance_residual_w": mesh.get("energy_balance_residual_w"),
+            "terminal_boundary_residual_k": mesh.get("terminal_boundary_residual_k"),
+            "task172_local_evaluation_count": mesh.get("task172_local_evaluation_count"),
+            "wall_seconds": mesh.get("wall_seconds"),
+            "failure_code": mesh.get("failure_code"),
+            "constraint_preview": constraint_preview,
+            "solver_performance_profile": profile,
+        }
+        rating_rows.append(row)
+        identity_entries.append(
+            {
+                "candidate_id": native.candidate_id,
+                "rating_request_hash": native.rating_request_hash,
+                "mesh_result_hash": mesh.get("mesh_result_hash"),
+            }
+        )
+
+    (output_dir / "CANDIDATE_RATING_RESULTS.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "hxforge.candidate-rating-results.v1",
+                "mesh_level": mesh_level,
+                "candidates": rating_rows,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    primary_native = build_native_cell_context(
+        case,
+        selection=selection,
+        candidate_id=selection.selected_candidate_ids[0],
+    )
     run_identity = build_experimental_live_rating_run_identity(
         case=case,
-        native_candidate_id=native.candidate_id,
-        native_candidate_hash=native.candidate_hash,
-        rating_request_hash=native.rating_request_hash,
-        task171_result_hash=native.task171_result_hash,
-        task174_result_hash=native.task174_result_hash,
-        task025_parallel_area_m2=native.task025_parallel_area_m2,
+        native_candidate_id=primary_native.candidate_id,
+        native_candidate_hash=primary_native.candidate_hash,
+        rating_request_hash=primary_native.rating_request_hash,
+        task171_result_hash=primary_native.task171_result_hash,
+        task174_result_hash=primary_native.task174_result_hash,
+        task025_parallel_area_m2=primary_native.task025_parallel_area_m2,
         thermal_boundary_binding_doc=binding_doc,
         mesh_level=mesh_level,
         enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
         provider=provider,
+        candidate_rating_entries=tuple(identity_entries),
     )
+    run_identity["property_provider_identity"] = provider_identity
     (output_dir / "EXPERIMENTAL_LIVE_RATING_RUN_IDENTITY.json").write_text(
         json.dumps(run_identity, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    mesh, profile, obs = run_mesh_numeric_with_profile(
-        native,
-        subdivisions=mesh_level,
-        case=case,
-        enable_live_thermal_boundary=True,
-        enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+    ranking = build_experimental_ranking(case, rating_rows)
+    (output_dir / "EXPERIMENTAL_MULTI_CANDIDATE_COMPARISON.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "hxforge.experimental-multi-candidate-comparison.v1",
+                "candidates": rating_rows,
+                "hydraulic_model_scope": hydraulic_scope["task174_hydraulic_status"],
+                "EXPERIMENTAL_COMPARISON_STATUS": ranking["EXPERIMENTAL_COMPARISON_STATUS"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
     )
-    numeric_valid = mesh.get("status") == "NUMERIC_VALID"
-    if numeric_valid and obs is not None:
-        mesh = {
-            **mesh,
-            "tube_outlet_temperature_k": str(obs.tube_outlet_temperature_k),
-            "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
-        }
-        result_name = "REAL_N1_MESH_RESULT.json"
-    else:
-        result_name = "REAL_N1_BLOCKED_RESULT.json"
-    (output_dir / result_name).write_text(
-        json.dumps(mesh, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    if ranking["EXPERIMENTAL_RANKING_STATUS"] == "EXPERIMENTAL_RANKING_AVAILABLE":
+        (output_dir / "EXPERIMENTAL_RANKING_RESULT.json").write_text(
+            json.dumps(ranking, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
-    constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
-    (output_dir / "EXPERIMENTAL_CONSTRAINT_PREVIEW.json").write_text(
-        json.dumps(constraint_preview, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    numeric_valid_count = sum(1 for row in rating_rows if row.get("mesh_status") == "NUMERIC_VALID")
+    blocked_count = sum(
+        1 for row in rating_rows if row.get("mesh_status") not in {"NUMERIC_VALID", "BUDGET_STOP"}
     )
+    selected_count = len(selection.selected_candidate_ids)
+    all_selected_valid = numeric_valid_count == selected_count and selected_count > 0
+
+    first_row = rating_rows[0]
+    first_mesh = {
+        k: first_row[k]
+        for k in (
+            "mesh_status",
+            "mesh_result_hash",
+            "total_duty_w",
+            "energy_balance_residual_w",
+            "terminal_boundary_residual_k",
+            "task172_local_evaluation_count",
+            "wall_seconds",
+            "failure_code",
+            "tube_outlet_temperature_k",
+            "shell_outlet_temperature_k",
+        )
+        if k in first_row
+    }
+    if first_row.get("mesh_status") == "NUMERIC_VALID":
+        (output_dir / "REAL_N1_MESH_RESULT.json").write_text(
+            json.dumps(
+                {"schema_version": "hxforge.low-mesh-result.v1", **first_mesh},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        (output_dir / "EXPERIMENTAL_CONSTRAINT_PREVIEW.json").write_text(
+            json.dumps(first_row["constraint_preview"], indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    else:
+        (output_dir / "REAL_N1_BLOCKED_RESULT.json").write_text(
+            json.dumps(
+                {"schema_version": "hxforge.low-mesh-result.v1", **first_mesh},
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
     experimental_mesh: dict[str, Any] = {
         "mode": "experimental-live-rating",
         "mesh_level": mesh_level,
-        "live_boundary_n1_numeric_valid": numeric_valid,
-        "mesh_result": mesh,
-        "solver_performance_profile": profile,
+        "multi_candidate": multi,
+        "candidate_rating_results": rating_rows,
+        "ranking": ranking,
+        "hydraulic_model_scope": hydraulic_scope,
         "solver_boundary": {
             "thermal_binding": binding_doc,
             "feasible_shell_left_face_temperature_k": _FEASIBLE_SHELL_LEFT_TEMPERATURE_K,
             "live_thermal_boundary_enabled": True,
         },
-        "geometry_summary": {
-            "candidate_id": native.candidate_id,
-            "candidate_hash": native.candidate_hash,
-            "task025_parallel_area_m2": native.task025_parallel_area_m2,
-            "physical_tube_count": native.physical_tube_count,
-            "task171_result_hash": native.task171_result_hash,
-            "task174_result_hash": native.task174_result_hash,
-        },
-        "constraint_preview": constraint_preview,
         "run_identity_hash": run_identity["EXPERIMENTAL_LIVE_RATING_RUN_HASH"],
+        "property_provider_identity": provider_identity,
         "full_rating_converged": False,
-        "low_mesh_numeric_valid": numeric_valid,
-        "mesh_levels": [mesh] if numeric_valid else [],
-        "property_provider_identity": "CoolPropProvider",
+        "low_mesh_numeric_valid": all_selected_valid,
+        "mesh_levels": [row for row in rating_rows if row.get("mesh_status") == "NUMERIC_VALID"],
         "ephemeral_tp_cache_enabled": enable_ephemeral_tp_cache,
     }
-    if obs is not None:
-        experimental_mesh["mesh_observables"] = {
-            "total_duty_w": str(obs.total_duty_w),
-            "tube_outlet_temperature_k": str(obs.tube_outlet_temperature_k),
-            "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
-            "energy_balance_residual_w": str(obs.energy_balance_residual_w),
-            "terminal_boundary_residual_k": str(obs.terminal_boundary_residual_k),
-        }
 
-    workflow_status = "PARTIAL_RATING_ACCEPTED" if numeric_valid else "PARTIAL_RATING_BLOCKED"
+    workflow_status = "PARTIAL_RATING_ACCEPTED" if all_selected_valid else "PARTIAL_RATING_BLOCKED"
     report_paths = write_engineering_reports(
         case,
         preflight=preflight,
@@ -250,33 +391,38 @@ def run_experimental_live_rating_workflow(
     )
 
     total_seconds = round(time.perf_counter() - t0, 3)
+    task_id = (
+        "V07_GENERAL_MULTI_CANDIDATE_LIVE_RATING_R10"
+        if multi
+        else "V07_GENERAL_LIVE_RATING_CLI_AND_ENGINEERING_PREVIEW_R9"
+    )
     raw: dict[str, Any] = {
-        "schema_version": "hxforge.experimental-live-raw-result.v1",
-        "task_id": "V07_GENERAL_LIVE_RATING_CLI_AND_ENGINEERING_PREVIEW_R9",
+        "schema_version": "hxforge.experimental-live-raw-result.v2",
+        "task_id": task_id,
         "EXPERIMENTAL_LIVE_RATING_RUN_HASH": run_identity["EXPERIMENTAL_LIVE_RATING_RUN_HASH"],
         "engineering_case_id": case.engineering_case_id,
-        "candidate_id": native.candidate_id,
-        "rating_request_hash": native.rating_request_hash,
+        "candidate_rating_results": rating_rows,
+        "ranking": ranking,
+        "property_provider_identity": provider_identity,
         "mesh_level": mesh_level,
-        "mesh_status": mesh.get("status"),
-        "mesh_result_hash": mesh.get("mesh_result_hash"),
-        "constraint_preview": constraint_preview,
-        "mesh": mesh,
-        "mesh_observables": experimental_mesh.get("mesh_observables"),
+        "numeric_valid_count": numeric_valid_count,
         "total_numerical_seconds": total_seconds,
         "report_json_path": str(report_paths[0]),
         "report_md_path": str(report_paths[1]),
-        "failure_code": mesh.get("failure_code"),
     }
     raw_path = output_dir / "RAW_RESULT.json"
     raw_path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     raw_sha = _sha256_file(raw_path)
 
-    manifest_entries: dict[str, str] = {}
-    for name in (
+    manifest_names = (
         "GENERAL_ENGINEERING_CASE.json",
+        "CANDIDATE_SPACE_RESULT.json",
         "EXPERIMENTAL_LIVE_RATING_RUN_IDENTITY.json",
         "CANDIDATE_SELECTION_RESULT.json",
+        "CANDIDATE_RATING_RESULTS.json",
+        "EXPERIMENTAL_MULTI_CANDIDATE_COMPARISON.json",
+        "EXPERIMENTAL_RANKING_RESULT.json",
+        "HYDRAULIC_MODEL_SCOPE.json",
         "NATIVE_THERMAL_BOUNDARY.json",
         "REAL_N1_MESH_RESULT.json",
         "REAL_N1_BLOCKED_RESULT.json",
@@ -284,16 +430,18 @@ def run_experimental_live_rating_workflow(
         "ENGINEERING_REPORT.json",
         "ENGINEERING_REPORT.md",
         "RAW_RESULT.json",
-    ):
-        path = output_dir / name
-        if path.is_file():
-            manifest_entries[name] = _sha256_file(path)
+    )
+    manifest_entries = {
+        name: _sha256_file(output_dir / name)
+        for name in manifest_names
+        if (output_dir / name).is_file()
+    }
 
     (output_dir / "EVIDENCE_MANIFEST.json").write_text(
         json.dumps(
             {
                 "schema_version": "hxforge.evidence-manifest.v1",
-                "task_id": "V07_GENERAL_LIVE_RATING_CLI_AND_ENGINEERING_PREVIEW_R9",
+                "task_id": task_id,
                 "files": manifest_entries,
                 "EXPERIMENTAL_LIVE_RATING_RUN_HASH": run_identity[
                     "EXPERIMENTAL_LIVE_RATING_RUN_HASH"
@@ -307,15 +455,21 @@ def run_experimental_live_rating_workflow(
         encoding="utf-8",
     )
 
+    primary_status = str(first_row.get("mesh_status"))
     return ExperimentalLiveRatingOutcome(
-        status="EXPERIMENTAL_COMPLETE" if numeric_valid else "EXPERIMENTAL_BLOCKED",
+        status="EXPERIMENTAL_COMPLETE" if all_selected_valid else "EXPERIMENTAL_BLOCKED",
         engineering_case_id=case.engineering_case_id,
         output_dir=output_dir,
         raw_result_path=raw_path,
         raw_result_sha256=raw_sha,
-        mesh_status=str(mesh.get("status")),
+        mesh_status=primary_status,
         total_numerical_seconds=total_seconds,
-        blocker_code=mesh.get("failure_code") if not numeric_valid else None,
+        blocker_code=first_row.get("failure_code") if not all_selected_valid else None,
+        cli_success=all_selected_valid,
+        numeric_valid_count=numeric_valid_count,
+        blocked_rating_count=blocked_count,
+        selected_for_rating_count=selected_count,
+        multi_candidate_mode=multi,
     )
 
 
@@ -345,6 +499,11 @@ def _blocked_outcome(
         mesh_status=None,
         total_numerical_seconds=time.perf_counter() - t0,
         blocker_code=detail,
+        cli_success=False,
+        numeric_valid_count=0,
+        blocked_rating_count=0,
+        selected_for_rating_count=0,
+        multi_candidate_mode=False,
     )
 
 

@@ -38,7 +38,7 @@ def build_experimental_constraint_preview(
         shell_dp_constraint = "NOT_EVALUATED"
         task174_hydraulic_status = "NOT_EVALUATED"
     else:
-        task174_hydraulic_status = "EVALUATED"
+        task174_hydraulic_status = "HYDRAULIC_REFERENCE_MODEL_PREVIEW"
         tube_dp_dec = Decimal(tube_dp)
         shell_dp_dec = Decimal(shell_dp)
         tube_ok = tube_dp_dec <= case.max_tube_side_pressure_drop_pa

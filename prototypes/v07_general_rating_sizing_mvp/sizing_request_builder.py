@@ -147,8 +147,7 @@ def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request)
 def build_task173_sizing_request(case: EngineeringCase) -> Task173SizingRequest:
     """Bind general case targets to the reviewed Task173 R2 validation candidate space."""
     constraints = case.candidate_constraints
-    max_n = case.solver_budget.max_candidates_to_rate
-    lengths = constraints.tube_lengths_m[:max_n]
+    lengths = constraints.tube_lengths_m
     spacings = constraints.baffle_spacings_m
     shell_diameter = str(constraints.shell_inside_diameter_m)
     tube_od = str(constraints.tube_outer_diameter_m)

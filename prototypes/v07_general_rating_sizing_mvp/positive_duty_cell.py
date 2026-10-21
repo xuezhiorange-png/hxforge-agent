@@ -69,11 +69,12 @@ def build_native_cell_context(
     case: EngineeringCase,
     *,
     selection: CandidateSelectionOutcome | None = None,
+    candidate_id: str | None = None,
 ) -> NativeCellContext:
     outcome = selection or enumerate_experimental_rating_candidates(case)
-    if outcome.selected_candidate_id is None:
+    target_id = candidate_id or outcome.selected_candidate_id
+    if target_id is None:
         raise RuntimeError("no experimental rating candidate selected")
-    target_id = outcome.selected_candidate_id
     sizing_req = build_task173_sizing_request(case)
     t168 = sizing_req.task168_candidate_request
     authorities = task168._authority_map(t168)

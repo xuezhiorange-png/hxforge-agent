@@ -323,3 +323,10 @@ shards:
     files:
       - tests/prototypes/test_r9_experimental_live_cli.py
     timeout: 900
+
+  - name: v07-experimental-live-rating-r10
+    job: shard-v07-experimental-live-rating-r10
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r10_multi_candidate_live_cli.py
+    timeout: 1200

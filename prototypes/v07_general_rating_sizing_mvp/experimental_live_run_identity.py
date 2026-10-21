@@ -6,12 +6,14 @@ import subprocess
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
-from hexagent.exchangers.shell_tube.task172_local_runtime.models import PROFILE_ID
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
     EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.property_provider_identity import (
+    build_property_provider_identity,
+)
 
 
 def _git_revision() -> str:
@@ -37,11 +39,11 @@ def build_experimental_live_rating_run_identity(
     thermal_boundary_binding_doc: dict[str, Any],
     mesh_level: int,
     enable_ephemeral_tp_cache: bool,
-    provider: CoolPropProvider | None = None,
+    provider: CoolPropProvider,
+    candidate_rating_entries: tuple[dict[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Build disclosure + EXPERIMENTAL_LIVE_RATING_RUN_HASH."""
-    _ = provider  # reserved for future provider-version pinning
-    provider_version = "CoolPropProvider"
+    provider_identity = build_property_provider_identity(provider)
     payload_for_hash = {
         "schema_version": "hxforge.experimental-live-rating-run-identity.v1",
         "native_candidate_rating_request_hash": rating_request_hash,
@@ -73,10 +75,10 @@ def build_experimental_live_rating_run_identity(
                 "authority_id": thermal_boundary_binding_doc.get("authority_id"),
             }
         ),
-        "property_profile_id": PROFILE_ID,
-        "property_provider_version": provider_version,
+        "property_provider_identity": provider_identity,
+        "candidate_rating_entries": candidate_rating_entries,
         "git_revision": _git_revision(),
-        "solver_source_revision": _git_revision(),
+        "solver_source_revision": provider_identity["solver_source_revision"],
         "mesh_level": mesh_level,
         "enable_ephemeral_tp_cache": enable_ephemeral_tp_cache,
         "mode": "experimental-live-rating",

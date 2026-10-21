@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -14,9 +16,6 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_scope import (
     check_experimental_live_rating_scope,
 )
-from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import (
-    run_experimental_live_rating_from_paths,
-)
 
 R9_CASE = (
     Path(__file__).resolve().parents[2]
@@ -26,6 +25,29 @@ R8C_CASE = (
     Path(__file__).resolve().parents[2]
     / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_tube_hot_shell_cold_r8c.json"
 )
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _run_cli(input_path: Path, output_dir: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "prototypes.v07_general_rating_sizing_mvp",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_dir),
+            "--mode",
+            "experimental-live-rating",
+            "--mesh",
+            "1",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def test_scope_rejects_unverified_shell_inlet_temperature() -> None:
@@ -37,10 +59,12 @@ def test_scope_rejects_unverified_shell_inlet_temperature() -> None:
 
 
 def test_run_identity_distinguishes_tube_inlet_temperature() -> None:
+    from hexagent.properties.coolprop_provider import CoolPropProvider
     from prototypes.v07_general_rating_sizing_mvp.experimental_live_run_identity import (
         build_experimental_live_rating_run_identity,
     )
 
+    provider = CoolPropProvider()
     case_r7 = load_general_engineering_case_json(
         (
             Path(__file__).resolve().parents[2]
@@ -73,10 +97,16 @@ def test_run_identity_distinguishes_tube_inlet_temperature() -> None:
         "enable_ephemeral_tp_cache": False,
     }
     id_r7 = build_experimental_live_rating_run_identity(
-        case=case_r7, thermal_boundary_binding_doc=binding_r7, **common
+        case=case_r7,
+        thermal_boundary_binding_doc=binding_r7,
+        provider=provider,
+        **common,
     )
     id_r9 = build_experimental_live_rating_run_identity(
-        case=case_r9, thermal_boundary_binding_doc=binding_r9, **common
+        case=case_r9,
+        thermal_boundary_binding_doc=binding_r9,
+        provider=provider,
+        **common,
     )
     assert id_r7["EXPERIMENTAL_LIVE_RATING_RUN_HASH"] != id_r9["EXPERIMENTAL_LIVE_RATING_RUN_HASH"]
 
@@ -87,20 +117,14 @@ def test_r9_case_in_scope() -> None:
 
 
 @pytest.mark.timeout(840)
-def test_r9_experimental_live_n1_cli_e2e() -> None:
+def test_r9_experimental_live_n1_cli_subprocess_e2e() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
-        outcome = run_experimental_live_rating_from_paths(R9_CASE, out, mesh_level=1)
-        assert outcome.status in {"EXPERIMENTAL_COMPLETE", "EXPERIMENTAL_BLOCKED"}
+        proc = _run_cli(R9_CASE, out)
+        assert proc.returncode == 0, proc.stderr
         raw = json.loads((out / "RAW_RESULT.json").read_text(encoding="utf-8"))
         assert raw.get("EXPERIMENTAL_LIVE_RATING_RUN_HASH")
+        assert raw["numeric_valid_count"] == 1
+        mesh = json.loads((out / "REAL_N1_MESH_RESULT.json").read_text(encoding="utf-8"))
+        assert mesh["status"] == "NUMERIC_VALID"
         assert (out / "ENGINEERING_REPORT.json").is_file()
-        assert (out / "EXPERIMENTAL_CONSTRAINT_PREVIEW.json").is_file()
-        report = json.loads((out / "ENGINEERING_REPORT.json").read_text(encoding="utf-8"))
-        assert report.get("experimental_constraint_preview") is not None
-        if outcome.status == "EXPERIMENTAL_COMPLETE":
-            assert (out / "REAL_N1_MESH_RESULT.json").is_file()
-            mesh = json.loads((out / "REAL_N1_MESH_RESULT.json").read_text(encoding="utf-8"))
-            assert mesh["status"] == "NUMERIC_VALID"
-        else:
-            assert (out / "REAL_N1_BLOCKED_RESULT.json").is_file()

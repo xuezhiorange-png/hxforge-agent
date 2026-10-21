@@ -101,6 +101,10 @@ def build_report_payload(
         payload["solver_boundary"] = experimental_mesh.get("solver_boundary")
         payload["experimental_constraint_preview"] = experimental_mesh.get("constraint_preview")
         payload["geometry_summary"] = experimental_mesh.get("geometry_summary")
+        payload["candidate_rating_results"] = experimental_mesh.get("candidate_rating_results")
+        payload["experimental_ranking"] = experimental_mesh.get("ranking")
+        payload["hydraulic_model_scope"] = experimental_mesh.get("hydraulic_model_scope")
+        payload["property_provider_identity"] = experimental_mesh.get("property_provider_identity")
         payload["rating_and_sizing"] = {
             "mode": experimental_mesh.get("mode", "EXPERIMENTAL_LOW_MESH_ONLY"),
             "full_rating_converged": experimental_mesh.get("full_rating_converged", False),
@@ -200,6 +204,24 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
         ]
     )
+    multi_rows = report.get("candidate_rating_results")
+    if multi_rows:
+        lines.extend(["## Multi-candidate experimental rating", ""])
+        for row in multi_rows:
+            lines.append(
+                f"- `{row.get('candidate_id')}`: mesh **{row.get('mesh_status')}**, "
+                f"duty {row.get('total_duty_w')} W, wall {row.get('wall_seconds')} s"
+            )
+        ranking = report.get("experimental_ranking") or {}
+        lines.append(
+            f"- Comparison: **{ranking.get('EXPERIMENTAL_COMPARISON_STATUS')}**; "
+            f"Ranking: **{ranking.get('EXPERIMENTAL_RANKING_STATUS')}**"
+        )
+        if ranking.get("preferred_candidate_id"):
+            lines.append(f"- Preferred (experimental): `{ranking.get('preferred_candidate_id')}`")
+        hyd = report.get("hydraulic_model_scope") or {}
+        lines.append(f"- Hydraulic scope: **{hyd.get('task174_hydraulic_status')}**")
+        lines.append("")
     preview = report.get("experimental_constraint_preview")
     if preview:
         lines.extend(
