@@ -59,4 +59,3 @@ def test_cold_ph_rematerialization_rejects_large_temperature_deficit() -> None:
     finally:
         reset_experimental_thermal_boundary(token)
     assert allowed is False
-

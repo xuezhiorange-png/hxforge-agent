@@ -6,10 +6,10 @@ import subprocess
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.task172_local_runtime.models import PROFILE_ID
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
     EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
 )
-from hexagent.exchangers.shell_tube.task172_local_runtime.models import PROFILE_ID
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 
