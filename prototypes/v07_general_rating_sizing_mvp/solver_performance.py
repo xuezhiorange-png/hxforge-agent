@@ -39,7 +39,9 @@ def build_solver_performance_profile(
         "task172_local_evaluation_count": stats.task172_local_evaluation_count,
         "task172_request_hash_total": len(request_hashes) if request_hashes else "NOT_MEASURED",
         "task172_request_hash_unique": len(unique_hashes) if request_hashes else "NOT_MEASURED",
-        "task172_request_hash_duplicate": duplicate_request_count if request_hashes else "NOT_MEASURED",
+        "task172_request_hash_duplicate": duplicate_request_count
+        if request_hashes
+        else "NOT_MEASURED",
         "ephemeral_tp_cache": tp_cache_stats.to_dict() if tp_cache_stats is not None else None,
         "property_provider_state_lookup_count": property_provider_state_lookup_count,
         "timing_seconds": {

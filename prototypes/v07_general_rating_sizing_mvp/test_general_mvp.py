@@ -130,7 +130,10 @@ def test_r4_r5_physical_model_fingerprint_parity() -> None:
     fp5 = build_physical_model_fingerprint(r5, build_native_cell_context(r5, selection=s5))
     parity = compare_physical_fingerprints(fp4, fp5)
     assert parity["r4_r5_physical_parity"] is True
-    assert fp4["metadata_only_projection"]["engineering_case_id"] != fp5["metadata_only_projection"]["engineering_case_id"]
+    assert (
+        fp4["metadata_only_projection"]["engineering_case_id"]
+        != fp5["metadata_only_projection"]["engineering_case_id"]
+    )
 
 
 def test_tp_cache_ab_parity_on_representative_cell() -> None:

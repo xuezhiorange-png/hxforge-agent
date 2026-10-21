@@ -12,7 +12,9 @@ from hexagent.properties.base import FluidIdentifier, FluidState
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
 
-def _tp_key(fluid: FluidIdentifier | str, temperature_k: float, pressure_pa: float) -> tuple[Any, ...]:
+def _tp_key(
+    fluid: FluidIdentifier | str, temperature_k: float, pressure_pa: float
+) -> tuple[Any, ...]:
     if isinstance(fluid, FluidIdentifier):
         fluid_key = (
             fluid.name,
@@ -38,9 +40,7 @@ class EphemeralTpCacheStats:
 
     def to_dict(self) -> dict[str, Any]:
         duplicate_calls = self.provider_calls - self.unique_keys
-        duplicate_rate = (
-            duplicate_calls / self.provider_calls if self.provider_calls > 0 else 0.0
-        )
+        duplicate_rate = duplicate_calls / self.provider_calls if self.provider_calls > 0 else 0.0
         return {
             "provider_calls": self.provider_calls,
             "cache_hits": self.cache_hits,

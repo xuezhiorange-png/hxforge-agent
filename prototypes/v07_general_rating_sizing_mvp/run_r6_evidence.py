@@ -68,7 +68,9 @@ def main(output_dir: Path) -> dict[str, Any]:
     r5_native = build_native_cell_context(r5_case, selection=r5_sel)
     fp_r4 = build_physical_model_fingerprint(r4_case, r4_native)
     fp_r5 = build_physical_model_fingerprint(r5_case, r5_native)
-    fp_r6 = build_physical_model_fingerprint(r6_case, build_native_cell_context(r6_case, selection=r6_sel))
+    fp_r6 = build_physical_model_fingerprint(
+        r6_case, build_native_cell_context(r6_case, selection=r6_sel)
+    )
     parity = compare_physical_fingerprints(fp_r4, fp_r5)
     parity_doc = {
         **parity,
@@ -76,7 +78,9 @@ def main(output_dir: Path) -> dict[str, Any]:
         "r5_frozen_rating_request_hash": R5_FROZEN_RATING_HASH,
         "r4_built_rating_request_hash": r4_native.rating_request_hash,
         "r5_built_rating_request_hash": r5_native.rating_request_hash,
-        "r6_built_rating_request_hash": fp_r6["metadata_only_projection"]["candidate_rating_request_hash"],
+        "r6_built_rating_request_hash": fp_r6["metadata_only_projection"][
+            "candidate_rating_request_hash"
+        ],
         "physical_model_fingerprint_r4": fp_r4["physical_model_fingerprint_sha256"],
         "physical_model_fingerprint_r5": fp_r5["physical_model_fingerprint_sha256"],
         "physical_model_fingerprint_r6": fp_r6["physical_model_fingerprint_sha256"],

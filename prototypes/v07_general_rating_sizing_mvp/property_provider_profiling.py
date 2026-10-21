@@ -118,9 +118,7 @@ def run_tp_cache_ab_parity(
     baseline_hashes, baseline_wall, _ = run_once(False)
     cached_hashes, cached_wall, cache_stats = run_once(True)
     parity = baseline_hashes == cached_hashes
-    reduction = (
-        (baseline_wall - cached_wall) / baseline_wall * 100.0 if baseline_wall > 0 else 0.0
-    )
+    reduction = (baseline_wall - cached_wall) / baseline_wall * 100.0 if baseline_wall > 0 else 0.0
     call_reduction = 0.0
     if cache_stats is not None and cache_stats.provider_calls > 0:
         call_reduction = cache_stats.cache_hits / cache_stats.provider_calls * 100.0

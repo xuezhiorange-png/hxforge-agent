@@ -79,7 +79,9 @@ def compare_physical_fingerprints(
     left: dict[str, Any],
     right: dict[str, Any],
 ) -> dict[str, Any]:
-    same_physical = left["physical_model_fingerprint_sha256"] == right["physical_model_fingerprint_sha256"]
+    same_physical = (
+        left["physical_model_fingerprint_sha256"] == right["physical_model_fingerprint_sha256"]
+    )
     meta_left = left["metadata_only_projection"]
     meta_right = right["metadata_only_projection"]
     metadata_differences = {
