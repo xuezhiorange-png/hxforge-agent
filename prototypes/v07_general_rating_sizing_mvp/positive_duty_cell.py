@@ -34,6 +34,10 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     enumerate_experimental_rating_candidates,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.experimental_tp_cache import (
+    EphemeralTpCacheStats,
+    install_ephemeral_tp_cache,
+)
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
@@ -288,9 +292,13 @@ def run_mesh_numeric_with_profile(
     native: NativeCellContext,
     *,
     subdivisions: int,
+    enable_ephemeral_tp_cache: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
     provider = CoolPropProvider()
+    tp_cache_stats: EphemeralTpCacheStats | None = None
     lookup_count = {"n": 0}
+    if enable_ephemeral_tp_cache:
+        tp_cache_stats, _ = install_ephemeral_tp_cache(provider)
     _state_tp = provider.state_tp
 
     def _counting_state_tp(*args: Any, **kwargs: Any) -> Any:
@@ -314,6 +322,7 @@ def run_mesh_numeric_with_profile(
             property_provider_state_lookup_count=lookup_count["n"],
             total_wall_seconds=elapsed,
             subdivisions=subdivisions,
+            tp_cache_stats=tp_cache_stats,
         )
         mesh = {
             "schema_version": "hxforge.low-mesh-result.v1",
@@ -337,6 +346,7 @@ def run_mesh_numeric_with_profile(
         property_provider_state_lookup_count=lookup_count["n"],
         total_wall_seconds=elapsed,
         subdivisions=subdivisions,
+        tp_cache_stats=tp_cache_stats,
     )
     mesh = {
         "schema_version": "hxforge.low-mesh-result.v1",

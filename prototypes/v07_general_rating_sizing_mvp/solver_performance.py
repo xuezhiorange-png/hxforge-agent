@@ -1,10 +1,13 @@
 """Aggregate Task173 mesh-run performance from native stats and provider counters."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
+from prototypes.v07_general_rating_sizing_mvp.experimental_tp_cache import EphemeralTpCacheStats
 
 
 def build_solver_performance_profile(
@@ -14,6 +17,7 @@ def build_solver_performance_profile(
     property_provider_state_lookup_count: int,
     total_wall_seconds: float,
     subdivisions: int,
+    tp_cache_stats: EphemeralTpCacheStats | None = None,
 ) -> dict[str, Any]:
     request_hashes = [
         receipt.task172_request_hash
@@ -33,9 +37,10 @@ def build_solver_performance_profile(
         "outer_trial_count": stats.outer_trial_count,
         "cell_root_trial_receipt_count": cell_root_trials,
         "task172_local_evaluation_count": stats.task172_local_evaluation_count,
-        "task172_request_hash_total": len(request_hashes),
-        "task172_request_hash_unique": len(unique_hashes),
-        "task172_request_hash_duplicate": duplicate_request_count,
+        "task172_request_hash_total": len(request_hashes) if request_hashes else "NOT_MEASURED",
+        "task172_request_hash_unique": len(unique_hashes) if request_hashes else "NOT_MEASURED",
+        "task172_request_hash_duplicate": duplicate_request_count if request_hashes else "NOT_MEASURED",
+        "ephemeral_tp_cache": tp_cache_stats.to_dict() if tp_cache_stats is not None else None,
         "property_provider_state_lookup_count": property_provider_state_lookup_count,
         "timing_seconds": {
             "total_wall": round(total_wall_seconds, 3),

@@ -108,6 +108,49 @@ def test_experimental_candidate_selection_picks_rating_ready_row() -> None:
     assert outcome.selected_rating_request_hash is not None
 
 
+def test_r4_r5_physical_model_fingerprint_parity() -> None:
+    from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+        enumerate_experimental_rating_candidates,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.physical_model_parity import (
+        build_physical_model_fingerprint,
+        compare_physical_fingerprints,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+    )
+
+    r4_path = Path(__file__).resolve().parent / "cases" / "mvp_tube_hot_shell_cold_r4.json"
+    r5_path = Path(__file__).resolve().parent / "cases" / "mvp_tube_hot_shell_cold_r5.json"
+    r4 = load_general_engineering_case_json(r4_path.read_text(encoding="utf-8"))
+    r5 = load_general_engineering_case_json(r5_path.read_text(encoding="utf-8"))
+    s4 = enumerate_experimental_rating_candidates(r4)
+    s5 = enumerate_experimental_rating_candidates(r5)
+    fp4 = build_physical_model_fingerprint(r4, build_native_cell_context(r4, selection=s4))
+    fp5 = build_physical_model_fingerprint(r5, build_native_cell_context(r5, selection=s5))
+    parity = compare_physical_fingerprints(fp4, fp5)
+    assert parity["r4_r5_physical_parity"] is True
+    assert fp4["metadata_only_projection"]["engineering_case_id"] != fp5["metadata_only_projection"]["engineering_case_id"]
+
+
+def test_tp_cache_ab_parity_on_representative_cell() -> None:
+    from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+        enumerate_experimental_rating_candidates,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.property_provider_profiling import (
+        run_tp_cache_ab_parity,
+    )
+
+    case = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))
+    selection = enumerate_experimental_rating_candidates(case)
+    native = build_native_cell_context(case, selection=selection)
+    ab = run_tp_cache_ab_parity(native, q_trials_w=(50.0, 500.0))
+    assert ab["numerical_parity"] is True
+
+
 def test_frozen_r4_n1_mesh_identity() -> None:
     from prototypes.v07_general_rating_sizing_mvp.frozen_r4_n1 import (
         R4_FROZEN_MESH_HASH,
