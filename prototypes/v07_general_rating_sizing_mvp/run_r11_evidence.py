@@ -13,9 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_EVIDENCE = (
     _REPO_ROOT / "docs/tasks/evidence/V07-GENERAL-CONSTRAINT-AWARE-SIZING-CI-CLOSURE-R11"
 )
-_R10_EVIDENCE = (
-    _REPO_ROOT / "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10"
-)
+_R10_EVIDENCE = _REPO_ROOT / "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10"
 _R10_BRANCH_PATH = (
     "origin/cursor/v07-general-rating-sizing-e2e-mvp-r1-1201:"
     "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10"

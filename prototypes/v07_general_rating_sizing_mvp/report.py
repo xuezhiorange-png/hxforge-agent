@@ -108,7 +108,9 @@ def build_report_payload(
         payload["experimental_constraint_preview"] = experimental_mesh.get("constraint_preview")
         payload["geometry_summary"] = experimental_mesh.get("geometry_summary")
         payload["candidate_rating_results"] = experimental_mesh.get("candidate_rating_results")
-        payload["experimental_candidate_eligibility"] = experimental_mesh.get("candidate_eligibility")
+        payload["experimental_candidate_eligibility"] = experimental_mesh.get(
+            "candidate_eligibility"
+        )
         payload["experimental_ranking"] = ranking_doc
         payload["experimental_pareto_result"] = experimental_mesh.get("pareto_result")
         payload["sizing_objective_scenarios"] = experimental_mesh.get("sizing_objective_scenarios")
@@ -248,7 +250,9 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"Ranking: **{ranking.get('EXPERIMENTAL_RANKING_STATUS')}**; "
             f"Conditional preference: **{ranking.get('CONDITIONAL_PREFERENCE_STATUS')}**"
         )
-        pref = ranking.get("preferred_candidate_id") or ranking.get("EXPERIMENTAL_PREFERRED_CANDIDATE")
+        pref = ranking.get("preferred_candidate_id") or ranking.get(
+            "EXPERIMENTAL_PREFERRED_CANDIDATE"
+        )
         if pref:
             lines.append(f"- Conditional preferred (experimental): `{pref}`")
         else:
