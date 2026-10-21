@@ -1,0 +1,301 @@
+{
+  "candidate_generation": {
+    "candidate_count": 1,
+    "candidate_space_hash": null,
+    "distinct_geometry_count": null,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97"
+      ],
+      "shell_inside_diameter_m": "0.5",
+      "tube_lengths_m": [
+        "4.85"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidates": [],
+  "design_conditions": {
+    "engineering_case_schema": "hxforge.general-engineering-case.v2",
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "heat_transfer_convention": {
+      "kernel_shell_inlet_temperature_k": "298.15",
+      "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "kernel_tube_inlet_temperature_k": "300.00",
+      "shell_equipment_side": "shell_side",
+      "shell_mass_flow_kg_s": "20.000000",
+      "shell_thermal_role": "COLD",
+      "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+      "tube_equipment_side": "tube_side",
+      "tube_mass_flow_kg_s": "12.000000",
+      "tube_thermal_role": "HOT",
+      "user_shell_inlet_temperature_k": "298.15",
+      "user_tube_inlet_temperature_k": "299.80"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "shell_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "target_duty_w": "9500",
+    "tube_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "299.80",
+      "mass_flow_kg_s": "12.000000"
+    }
+  },
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_low_mesh_rating": {
+    "case_b_low_mesh": {
+      "diagnostics": [
+        "T=298.14999999999714",
+        "P=101325.0",
+        "h=104920.11980931147",
+        "query=PH"
+      ],
+      "failure_code": "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+      "full_rating_converged": false,
+      "low_mesh_numeric_valid": false,
+      "mesh_level": 1,
+      "schema_version": "hxforge.low-mesh-result.v1",
+      "status": "BLOCKED",
+      "wall_seconds": 0.06
+    },
+    "case_b_solver_profile": {
+      "cell_root_trial_receipt_count": 0,
+      "ephemeral_tp_cache": {
+        "cache_hits": 21,
+        "cache_misses": 20,
+        "configuration_verifications": 41,
+        "exact_duplicate_rate": 0.5121951219512195,
+        "exact_duplicate_tp_queries": 21,
+        "provider_calls": 41,
+        "unique_tp_keys": 20
+      },
+      "mesh_run_metadata": null,
+      "mesh_subdivisions": 1,
+      "outer_trial_count": 1,
+      "property_provider_state_lookup_count": 41,
+      "schema_version": "hxforge.solver-performance-profile.v1",
+      "task172_local_evaluation_count": 2,
+      "task172_request_hash_duplicate": "NOT_MEASURED",
+      "task172_request_hash_total": "NOT_MEASURED",
+      "task172_request_hash_unique": "NOT_MEASURED",
+      "timing_seconds": {
+        "outer_solver_estimated": 0.006,
+        "task172_evaluations": 0.054,
+        "total_wall": 0.06
+      }
+    },
+    "full_rating_converged": false,
+    "thermal_boundary_disclosure": {
+      "ACTUAL_SOLVER_BOUNDARY_CASE_A": {
+        "binding_class": "FROZEN_REFERENCE_BOUNDARY",
+        "not_bound_to_solver_unless": "MVP runner enables hxforge.experimental-thermal-boundary.v1 context",
+        "reference_pressure_pa": "101325",
+        "shell_inlet_temperature_k": "298.15",
+        "shell_role": "COLD",
+        "tube_inlet_temperature_k": "300",
+        "tube_role": "HOT"
+      },
+      "ACTUAL_SOLVER_BOUNDARY_CASE_B": {
+        "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+        "participates_in_task173_mesh": true,
+        "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "reference_pressure_pa": "101325",
+        "schema_version": "hxforge.experimental-thermal-boundary.v1",
+        "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+        "shell_inlet_temperature_k": "298.15",
+        "shell_mass_flow_kg_s": "20",
+        "thermal_variant": "TUBE_HOT_SHELL_COLD",
+        "tube_inlet_enthalpy_j_kg": "111818.76594515475",
+        "tube_inlet_temperature_k": "299.80",
+        "tube_mass_flow_kg_s": "12"
+      },
+      "EXPERIMENTAL_LIVE_BOUNDARY": {
+        "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+        "participates_in_task173_mesh": true,
+        "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "reference_pressure_pa": "101325",
+        "schema_version": "hxforge.experimental-thermal-boundary.v1",
+        "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+        "shell_inlet_temperature_k": "298.15",
+        "shell_mass_flow_kg_s": "20",
+        "thermal_variant": "TUBE_HOT_SHELL_COLD",
+        "tube_inlet_enthalpy_j_kg": "111818.76594515475",
+        "tube_inlet_temperature_k": "299.80",
+        "tube_mass_flow_kg_s": "12"
+      },
+      "FROZEN_REFERENCE_BOUNDARY": {
+        "shell_inlet_temperature_k": "298.15",
+        "tube_inlet_temperature_k": "300"
+      },
+      "INPUT_TO_SOLVER_DISCLOSURE_CASE_B": {
+        "actual_thermal_boundary_binding": {
+          "binding_class": "FROZEN_REFERENCE_BOUNDARY",
+          "not_bound_to_solver_unless": "MVP runner enables hxforge.experimental-thermal-boundary.v1 context",
+          "reference_pressure_pa": "101325",
+          "shell_inlet_temperature_k": "298.15",
+          "shell_role": "COLD",
+          "tube_inlet_temperature_k": "300",
+          "tube_role": "HOT"
+        },
+        "bind_task172_c3_reference_geometry": true,
+        "engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+        "engineering_case_schema": "hxforge.general-engineering-case.v2",
+        "equipment_thermal_mapping": {
+          "shell_equipment_side": "shell_side",
+          "shell_thermal_role": "COLD",
+          "tube_equipment_side": "tube_side",
+          "tube_thermal_role": "HOT"
+        },
+        "physical_side_role_parity": "TUBE_HOT_SHELL_COLD",
+        "rows": [
+          {
+            "notes": "Tube equipment side carries the kernel HOT stream.",
+            "participates_in_rating_kernel": true,
+            "solver_parameter": "Task173 TUBE_MASS_FLOW_KG_S / Task172 tube_mass_flow_kg_s",
+            "solver_value": "12",
+            "user_field": "tube_side.mass_flow_kg_s",
+            "user_value": "12.000000"
+          },
+          {
+            "notes": "Shell equipment side carries the kernel COLD stream.",
+            "participates_in_rating_kernel": true,
+            "solver_parameter": "Task173 SHELL_MASS_FLOW_KG_S / Task172 shell_mass_flow_kg_s",
+            "solver_value": "20",
+            "user_field": "shell_side.mass_flow_kg_s",
+            "user_value": "20.000000"
+          },
+          {
+            "notes": "Frozen reference path uses TUBE_INLET_T_K=300 K. Experimental live binding (R7) may override via context when enabled in MVP runner.",
+            "participates_in_rating_kernel": false,
+            "solver_parameter": "Task173 effective_tube_inlet_temperature_k()",
+            "solver_value": "300",
+            "user_field": "tube_side.inlet_temperature_k",
+            "user_value": "299.80"
+          },
+          {
+            "notes": "Shell cold inlet enthalpy target defaults to frozen H_MIN at 298.15 K; experimental binding precomputes enthalpy when live path is enabled.",
+            "participates_in_rating_kernel": true,
+            "solver_parameter": "Task173 effective_shell_cold_inlet_enthalpy_j_kg()",
+            "solver_value": "298.15",
+            "user_field": "shell_side.inlet_temperature_k",
+            "user_value": "298.15"
+          },
+          {
+            "notes": "Sizing constraint only.",
+            "participates_in_rating_kernel": true,
+            "solver_parameter": "SizingRequirementAuthority.required_duty_w",
+            "solver_value": "9500",
+            "user_field": "target_duty_w",
+            "user_value": "9500"
+          },
+          {
+            "notes": "C3 reference geometry when bind_task172_c3_reference_geometry=true.",
+            "participates_in_rating_kernel": true,
+            "solver_parameter": "Task168 discrete authorities + Task171 materialization",
+            "solver_value": "native candidate chain",
+            "user_field": "candidate_constraints.*",
+            "user_value": {
+              "baffle_count": 4,
+              "baffle_spacings_m": [
+                "0.97"
+              ],
+              "shell_inside_diameter_m": "0.5",
+              "tube_lengths_m": [
+                "4.85"
+              ],
+              "tube_outer_diameter_m": "0.01905",
+              "tube_pass_count": 1,
+              "tube_pitch_m": "0.0254",
+              "tube_wall_thickness_m": "0.00165"
+            }
+          }
+        ],
+        "schema_version": "hxforge.input-to-solver-binding.v2"
+      },
+      "USER_SPECIFIED_BOUNDARY": {
+        "engineering_case_schema": "hxforge.general-engineering-case.v2",
+        "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+        "heat_transfer_convention": {
+          "kernel_shell_inlet_temperature_k": "298.15",
+          "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+          "kernel_tube_inlet_temperature_k": "300.00",
+          "shell_equipment_side": "shell_side",
+          "shell_mass_flow_kg_s": "20.000000",
+          "shell_thermal_role": "COLD",
+          "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+          "tube_equipment_side": "tube_side",
+          "tube_mass_flow_kg_s": "12.000000",
+          "tube_thermal_role": "HOT",
+          "user_shell_inlet_temperature_k": "298.15",
+          "user_tube_inlet_temperature_k": "299.80"
+        },
+        "max_shell_dp_pa": "1180",
+        "max_tube_dp_pa": "1150",
+        "shell_side": {
+          "fluid": "PURE_ORDINARY_WATER",
+          "inlet_pressure_pa": "101325",
+          "inlet_temperature_k": "298.15",
+          "mass_flow_kg_s": "20.000000"
+        },
+        "target_duty_w": "9500",
+        "tube_side": {
+          "fluid": "PURE_ORDINARY_WATER",
+          "inlet_pressure_pa": "101325",
+          "inlet_temperature_k": "299.80",
+          "mass_flow_kg_s": "12.000000"
+        }
+      }
+    }
+  },
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-21T08:08:14.490952+00:00",
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "R7: experimental live tube inlet 299.80 K (shell 298.15 K); same C3 geometry as R4\u2013R6.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": {
+    "experimental_ranking_status": "NOT_YET_AVAILABLE",
+    "frozen_r4_n1": null,
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": false,
+    "mesh_comparison": null,
+    "mesh_comparison_available": false,
+    "mesh_levels": [],
+    "mode": "EXPERIMENTAL_LOW_MESH_ONLY",
+    "sizing_evaluated": false
+  },
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "workflow_status": "PARTIAL_RATING_BLOCKED"
+}

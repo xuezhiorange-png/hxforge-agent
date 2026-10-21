@@ -38,6 +38,9 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_tp_cache import (
     EphemeralTpCacheStats,
     install_ephemeral_tp_cache,
 )
+from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
+    native_thermal_boundary_session,
+)
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
@@ -155,83 +158,88 @@ def run_positive_duty_trials(
     shell_left_basis: str,
     shell_temperature_k: float,
     q_values_w: tuple[float, ...],
+    case: EngineeringCase | None = None,
+    enable_live_thermal_boundary: bool = False,
 ) -> dict[str, Any]:
     provider = CoolPropProvider()
-    tube = t173._state_at_inlet(provider, t173.TUBE_INLET_T_K)
-    shell = _shell_state_from_temperature_k(provider, shell_temperature_k)
-    token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
-    trials: list[dict[str, Any]] = []
-    try:
-        for q in q_values_w:
-            t0 = time.perf_counter()
-            record: dict[str, Any] = {
-                "q_trial_w": q,
-                "shell_physical_left_basis": shell_left_basis,
-                "shell_physical_left_temperature_k": shell_temperature_k,
-                "wall_seconds": 0.0,
-            }
-            try:
-                evaluation = t173._cell_evaluation(
-                    q,
-                    support=native.support,
-                    tube_upstream=tube,
-                    shell_physical_left=shell,
-                    provider=provider,
-                    shell_authority=native.shell_authority,
-                )
-                q_task172 = evaluation.task172_result.signed_q_hot_to_cold_w
-                residual = Decimal(str(q)) - q_task172
-                record.update(
-                    {
-                        "outcome": "VALIDATED",
-                        "task172_status": evaluation.task172_result.status,
-                        "task172_signed_q_hot_to_cold_w": str(q_task172),
-                        "residual_f_q_w": str(residual),
-                        "task172_request_hash": evaluation.task172_result.request_hash,
-                        "task172_result_hash": evaluation.task172_result.result_hash,
-                    }
-                )
-            except t173._LowSideDomainInfeasible:
-                record.update(
-                    {
-                        "outcome": "LOW_SIDE_DOMAIN_INFEASIBLE",
-                        "original_failure_code": "LOW_SIDE_DOMAIN_INFEASIBLE",
-                    }
-                )
-            except t173._Stage3Failure as exc:
-                record.update(
-                    {
-                        "outcome": "HARD_BLOCKER",
-                        "original_failure_code": exc.code,
-                        "diagnostics": list(exc.diagnostics),
-                    }
-                )
-            except t173._Task172NumericalHole:
-                record.update(
-                    {
-                        "outcome": "TASK172_NUMERICAL_HOLE",
-                        "original_failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
-                    }
-                )
-            record["wall_seconds"] = round(time.perf_counter() - t0, 6)
-            trials.append(record)
-    finally:
-        t173._CANDIDATE_RATING_CONTEXT.reset(token)
-    positive_validated = sum(
-        1
-        for item in trials
-        if item.get("outcome") == "VALIDATED" and float(item["q_trial_w"]) > 0.0
-    )
-    return {
-        "schema_version": "hxforge.positive-duty-cell-trials.v1",
-        "candidate_id": native.candidate_id,
-        "candidate_hash": native.candidate_hash,
-        "rating_request_hash": native.rating_request_hash,
-        "physical_support_id": native.support.physical_segment_id,
-        "trials": trials,
-        "positive_duty_trial_count": sum(1 for item in trials if float(item["q_trial_w"]) > 0.0),
-        "positive_duty_task172_validated_count": positive_validated,
-    }
+    with native_thermal_boundary_session(
+        case, provider, enable_live_binding=enable_live_thermal_boundary and case is not None
+    ):
+        tube = t173._state_at_inlet(provider, t173.effective_tube_inlet_temperature_k())
+        shell = _shell_state_from_temperature_k(provider, shell_temperature_k)
+        token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
+        trials: list[dict[str, Any]] = []
+        try:
+            for q in q_values_w:
+                t0 = time.perf_counter()
+                record: dict[str, Any] = {
+                    "q_trial_w": q,
+                    "shell_physical_left_basis": shell_left_basis,
+                    "shell_physical_left_temperature_k": shell_temperature_k,
+                    "wall_seconds": 0.0,
+                }
+                try:
+                    evaluation = t173._cell_evaluation(
+                        q,
+                        support=native.support,
+                        tube_upstream=tube,
+                        shell_physical_left=shell,
+                        provider=provider,
+                        shell_authority=native.shell_authority,
+                    )
+                    q_task172 = evaluation.task172_result.signed_q_hot_to_cold_w
+                    residual = Decimal(str(q)) - q_task172
+                    record.update(
+                        {
+                            "outcome": "VALIDATED",
+                            "task172_status": evaluation.task172_result.status,
+                            "task172_signed_q_hot_to_cold_w": str(q_task172),
+                            "residual_f_q_w": str(residual),
+                            "task172_request_hash": evaluation.task172_result.request_hash,
+                            "task172_result_hash": evaluation.task172_result.result_hash,
+                        }
+                    )
+                except t173._LowSideDomainInfeasible:
+                    record.update(
+                        {
+                            "outcome": "LOW_SIDE_DOMAIN_INFEASIBLE",
+                            "original_failure_code": "LOW_SIDE_DOMAIN_INFEASIBLE",
+                        }
+                    )
+                except t173._Stage3Failure as exc:
+                    record.update(
+                        {
+                            "outcome": "HARD_BLOCKER",
+                            "original_failure_code": exc.code,
+                            "diagnostics": list(exc.diagnostics),
+                        }
+                    )
+                except t173._Task172NumericalHole:
+                    record.update(
+                        {
+                            "outcome": "TASK172_NUMERICAL_HOLE",
+                            "original_failure_code": "BLOCKED_RESIDUAL_ACCEPTANCE",
+                        }
+                    )
+                record["wall_seconds"] = round(time.perf_counter() - t0, 6)
+                trials.append(record)
+        finally:
+            t173._CANDIDATE_RATING_CONTEXT.reset(token)
+        positive_validated = sum(
+            1
+            for item in trials
+            if item.get("outcome") == "VALIDATED" and float(item["q_trial_w"]) > 0.0
+        )
+        return {
+            "schema_version": "hxforge.positive-duty-cell-trials.v1",
+            "candidate_id": native.candidate_id,
+            "candidate_hash": native.candidate_hash,
+            "rating_request_hash": native.rating_request_hash,
+            "physical_support_id": native.support.physical_segment_id,
+            "trials": trials,
+            "positive_duty_trial_count": sum(1 for item in trials if float(item["q_trial_w"]) > 0.0),
+            "positive_duty_task172_validated_count": positive_validated,
+        }
 
 
 def solve_positive_duty_cell_root(
@@ -239,24 +247,29 @@ def solve_positive_duty_cell_root(
     *,
     shell_left_basis: str,
     shell_temperature_k: float,
+    case: EngineeringCase | None = None,
+    enable_live_thermal_boundary: bool = False,
 ) -> dict[str, Any]:
     provider = CoolPropProvider()
-    tube = t173._state_at_inlet(provider, t173.TUBE_INLET_T_K)
-    shell = _shell_state_from_temperature_k(provider, shell_temperature_k)
-    token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
-    t0 = time.perf_counter()
-    try:
-        solution = t173._solve_cell(
-            support=native.support,
-            tube_upstream=tube,
-            shell_physical_left=shell,
-            provider=provider,
-            shell_authority=native.shell_authority,
-            mesh_subdivisions=1,
-            capture_diagnostics=True,
-        )
-    finally:
-        t173._CANDIDATE_RATING_CONTEXT.reset(token)
+    with native_thermal_boundary_session(
+        case, provider, enable_live_binding=enable_live_thermal_boundary and case is not None
+    ):
+        tube = t173._state_at_inlet(provider, t173.effective_tube_inlet_temperature_k())
+        shell = _shell_state_from_temperature_k(provider, shell_temperature_k)
+        token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
+        t0 = time.perf_counter()
+        try:
+            solution = t173._solve_cell(
+                support=native.support,
+                tube_upstream=tube,
+                shell_physical_left=shell,
+                provider=provider,
+                shell_authority=native.shell_authority,
+                mesh_subdivisions=1,
+                capture_diagnostics=True,
+            )
+        finally:
+            t173._CANDIDATE_RATING_CONTEXT.reset(token)
     task172 = solution.task172_result
     residual = Decimal(str(solution.q_w)) - task172.signed_q_hot_to_cold_w
     return {
@@ -283,8 +296,15 @@ def run_low_mesh_numeric(
     native: NativeCellContext,
     *,
     subdivisions: int = 1,
+    case: EngineeringCase | None = None,
+    enable_live_thermal_boundary: bool = False,
 ) -> dict[str, Any]:
-    mesh, profile, _obs = run_mesh_numeric_with_profile(native, subdivisions=subdivisions)
+    mesh, profile, _obs = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=subdivisions,
+        case=case,
+        enable_live_thermal_boundary=enable_live_thermal_boundary,
+    )
     return {**mesh, "solver_performance_profile": profile}
 
 
@@ -293,6 +313,8 @@ def run_mesh_numeric_with_profile(
     *,
     subdivisions: int,
     enable_ephemeral_tp_cache: bool = False,
+    case: EngineeringCase | None = None,
+    enable_live_thermal_boundary: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
     provider = CoolPropProvider()
     tp_cache_stats: EphemeralTpCacheStats | None = None
@@ -311,9 +333,12 @@ def run_mesh_numeric_with_profile(
     t0 = time.perf_counter()
     run: t173._MeshRun | None = None
     try:
-        run = t173._candidate_transient_outer_boundary(
-            subdivisions, provider, native.shell_authority, stats
-        )
+        with native_thermal_boundary_session(
+            case, provider, enable_live_binding=enable_live_thermal_boundary and case is not None
+        ):
+            run = t173._candidate_transient_outer_boundary(
+                subdivisions, provider, native.shell_authority, stats
+            )
     except t173._Stage3Failure as exc:
         elapsed = time.perf_counter() - t0
         profile = build_solver_performance_profile(

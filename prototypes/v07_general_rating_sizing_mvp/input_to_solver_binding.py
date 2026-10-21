@@ -46,18 +46,24 @@ def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
         {
             "user_field": "tube_side.inlet_temperature_k",
             "user_value": str(tube.inlet_temperature_k),
-            "solver_parameter": "Task173 TUBE_INLET_T_K (frozen service constant)",
+            "solver_parameter": "Task173 effective_tube_inlet_temperature_k()",
             "solver_value": str(TUBE_INLET_T_K),
-            "participates_in_rating_kernel": False,
-            "notes": "User-declared tube inlet; kernel mesh uses frozen 300 K until native inlet authority.",
+            "participates_in_rating_kernel": tube.inlet_temperature_k == TUBE_INLET_T_K,
+            "notes": (
+                "Frozen reference path uses TUBE_INLET_T_K=300 K. "
+                "Experimental live binding (R7) may override via context when enabled in MVP runner."
+            ),
         },
         {
             "user_field": "shell_side.inlet_temperature_k",
             "user_value": str(shell.inlet_temperature_k),
-            "solver_parameter": "Task173 SHELL_INLET_T_K (frozen service constant)",
+            "solver_parameter": "Task173 effective_shell_cold_inlet_enthalpy_j_kg()",
             "solver_value": str(SHELL_INLET_T_K),
-            "participates_in_rating_kernel": False,
-            "notes": "User-declared shell inlet; kernel mesh uses frozen 298.15 K until native inlet authority.",
+            "participates_in_rating_kernel": shell.inlet_temperature_k == SHELL_INLET_T_K,
+            "notes": (
+                "Shell cold inlet enthalpy target defaults to frozen H_MIN at 298.15 K; "
+                "experimental binding precomputes enthalpy when live path is enabled."
+            ),
         },
         {
             "user_field": "target_duty_w",
@@ -88,11 +94,15 @@ def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
             "shell_thermal_role": "COLD",
         },
         "actual_thermal_boundary_binding": {
+            "binding_class": "FROZEN_REFERENCE_BOUNDARY",
             "tube_role": "HOT",
             "shell_role": "COLD",
             "tube_inlet_temperature_k": str(TUBE_INLET_T_K),
             "shell_inlet_temperature_k": str(SHELL_INLET_T_K),
             "reference_pressure_pa": "101325",
+            "not_bound_to_solver_unless": (
+                "MVP runner enables hxforge.experimental-thermal-boundary.v1 context"
+            ),
         },
         "bind_task172_c3_reference_geometry": case.bind_task172_c3_reference_geometry,
         "rows": rows,

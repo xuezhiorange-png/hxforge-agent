@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hexagent.properties.base import FluidIdentifier, FluidState
-from hexagent.properties.coolprop_provider import CoolPropProvider
+from hexagent.properties.coolprop_provider import _COOLPROP_STATE_LOCK, CoolPropProvider
 
 
 def _tp_key(
@@ -30,12 +30,22 @@ def _tp_key(
     )
 
 
+def _fluid_name_from_key(key: tuple[Any, ...]) -> str:
+    fluid_key = key[0]
+    if isinstance(fluid_key, tuple) and fluid_key and fluid_key[0] != "str":
+        return str(fluid_key[0])
+    if isinstance(fluid_key, tuple) and len(fluid_key) >= 2 and fluid_key[0] == "str":
+        return str(fluid_key[1])
+    return "Water"
+
+
 @dataclass
 class EphemeralTpCacheStats:
     provider_calls: int = 0
     cache_hits: int = 0
     cache_misses: int = 0
     unique_keys: int = 0
+    configuration_verifications: int = 0
     _keys_seen: set[tuple[Any, ...]] = field(default_factory=set)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,13 +58,24 @@ class EphemeralTpCacheStats:
             "unique_tp_keys": self.unique_keys,
             "exact_duplicate_tp_queries": duplicate_calls,
             "exact_duplicate_rate": duplicate_rate,
+            "configuration_verifications": self.configuration_verifications,
         }
+
+
+def _verify_provider_configuration(provider: CoolPropProvider, fluid_name: str) -> str:
+    with _COOLPROP_STATE_LOCK:
+        return provider._verify_configuration(fluid_name)
 
 
 def install_ephemeral_tp_cache(
     provider: CoolPropProvider,
 ) -> tuple[EphemeralTpCacheStats, dict[tuple[Any, ...], FluidState]]:
-    """Bind exact-key cache on provider.state_tp; preserves CoolPropProvider identity."""
+    """Bind exact-key cache on provider.state_tp; preserves CoolPropProvider identity.
+
+    Cache hits re-run the native configuration and DEF reference-state checks before
+    returning a cached FluidState. If configuration drift is detected, the native
+    provider fails closed (same as an uncached query).
+    """
     stats = EphemeralTpCacheStats()
     store: dict[tuple[Any, ...], FluidState] = {}
     original_state_tp = provider.state_tp
@@ -69,6 +90,9 @@ def install_ephemeral_tp_cache(
         if key not in stats._keys_seen:
             stats._keys_seen.add(key)
             stats.unique_keys = len(stats._keys_seen)
+        fluid_name = _fluid_name_from_key(key)
+        _verify_provider_configuration(provider, fluid_name)
+        stats.configuration_verifications += 1
         if key in store:
             stats.cache_hits += 1
             return store[key]

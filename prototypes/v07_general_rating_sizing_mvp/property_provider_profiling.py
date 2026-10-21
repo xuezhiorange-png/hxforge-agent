@@ -90,7 +90,7 @@ def run_tp_cache_ab_parity(
     *,
     q_trials_w: tuple[float, ...] = (50.0, 500.0, 2000.0, 8000.0),
 ) -> dict[str, Any]:
-    def run_once(use_cache: bool) -> tuple[list[str], float, EphemeralTpCacheStats | None]:
+    def run_once(use_cache: bool) -> tuple[list[str], list[str], float, EphemeralTpCacheStats | None]:
         provider = CoolPropProvider()
         cache_stats: EphemeralTpCacheStats | None = None
         if use_cache:
@@ -98,7 +98,8 @@ def run_tp_cache_ab_parity(
         tube = t173._state_at_inlet(provider, t173.TUBE_INLET_T_K)
         shell = _feasible_shell_physical_left(provider)
         token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
-        hashes: list[str] = []
+        result_hashes: list[str] = []
+        request_hashes: list[str] = []
         t0 = time.perf_counter()
         try:
             for q in q_trials_w:
@@ -110,14 +111,15 @@ def run_tp_cache_ab_parity(
                     provider=provider,
                     shell_authority=native.shell_authority,
                 )
-                hashes.append(evaluation.task172_result.result_hash)
+                result_hashes.append(evaluation.task172_result.result_hash)
+                request_hashes.append(evaluation.task172_result.request_hash)
         finally:
             t173._CANDIDATE_RATING_CONTEXT.reset(token)
-        return hashes, time.perf_counter() - t0, cache_stats
+        return result_hashes, request_hashes, time.perf_counter() - t0, cache_stats
 
-    baseline_hashes, baseline_wall, _ = run_once(False)
-    cached_hashes, cached_wall, cache_stats = run_once(True)
-    parity = baseline_hashes == cached_hashes
+    baseline_hashes, baseline_request_hashes, baseline_wall, _ = run_once(False)
+    cached_hashes, cached_request_hashes, cached_wall, cache_stats = run_once(True)
+    parity = baseline_hashes == cached_hashes and baseline_request_hashes == cached_request_hashes
     reduction = (baseline_wall - cached_wall) / baseline_wall * 100.0 if baseline_wall > 0 else 0.0
     call_reduction = 0.0
     if cache_stats is not None and cache_stats.provider_calls > 0:
@@ -127,6 +129,9 @@ def run_tp_cache_ab_parity(
         "numerical_parity": parity,
         "baseline_task172_result_hashes": baseline_hashes,
         "cached_task172_result_hashes": cached_hashes,
+        "baseline_task172_request_hashes": baseline_request_hashes,
+        "cached_task172_request_hashes": cached_request_hashes,
+        "task172_request_hash_parity": baseline_request_hashes == cached_request_hashes,
         "baseline_wall_seconds": round(baseline_wall, 6),
         "cached_wall_seconds": round(cached_wall, 6),
         "wall_time_reduction_percent": reduction,

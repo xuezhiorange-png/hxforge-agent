@@ -55,6 +55,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models i
     candidate_rating_request_hash,
     candidate_rating_result_hash,
 )
+from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
+    active_experimental_thermal_boundary,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     CELL_ROOT_SOLVER_AUTHORITY_ID,
     ENDPOINT_HOLE_LOW_SIDE_CLASSIFICATION_AUTHORITY_ID,
@@ -122,6 +125,20 @@ TUBE_INLET_T_K = Decimal("300")
 SHELL_INLET_T_K = Decimal("298.15")
 TUBE_MASS_FLOW_KG_S = Decimal("12")
 SHELL_MASS_FLOW_KG_S = Decimal("20")
+
+
+def effective_tube_inlet_temperature_k() -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if bound is None:
+        return TUBE_INLET_T_K
+    return bound.tube_inlet_temperature_k
+
+
+def effective_shell_cold_inlet_enthalpy_j_kg() -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if bound is None:
+        return H_MIN_J_KG
+    return bound.shell_inlet_enthalpy_j_kg
 ENERGY_ACCEPTANCE_FLOOR_W = Decimal("1e-6")
 MESH_DUTY_RELATIVE_THRESHOLD = Decimal("0.01")
 MESH_DUTY_ABSOLUTE_THRESHOLD_W = Decimal("0.01")
@@ -2712,7 +2729,7 @@ def _valid_trajectory(
         first_coordinate = Decimal(topology_definition.intervals[0].start_m)
     else:
         first_coordinate = Decimal("0")
-    tube_face_thermo = _state_at_inlet(provider, TUBE_INLET_T_K)
+    tube_face_thermo = _state_at_inlet(provider, effective_tube_inlet_temperature_k())
     shell_face_thermo = _state_from_enthalpy(provider, shell_outlet_enthalpy)
     tube_faces: list[FaceState] = [
         _face_state(
@@ -2858,7 +2875,9 @@ def _valid_trajectory(
         (face_t.temperature_k - face_s.temperature_k)
         for face_t, face_s in zip(tube_faces, shell_faces, strict=True)
     )
-    terminal_residual_h = shell_faces[-1].enthalpy_j_kg - H_MIN_J_KG
+    terminal_residual_h = (
+        shell_faces[-1].enthalpy_j_kg - effective_shell_cold_inlet_enthalpy_j_kg()
+    )
     terminal_residual_t = shell_faces[-1].temperature_k - T_MIN_K
     if terminal_residual_h < 0 or terminal_residual_t < 0:
         raise _Stage3Failure("BLOCKED_TERMINAL_BOUNDARY_BELOW_PRESCRIBED_STATE")
@@ -3032,7 +3051,7 @@ def _solve_outer_boundary_from_trial(
 ) -> _MeshRun:
     """Run the production outer-boundary state machine with an injected trial evaluator."""
 
-    h_low = H_MIN_J_KG
+    h_low = effective_shell_cold_inlet_enthalpy_j_kg()
     h_high = H_MAX_J_KG
     low_trial = trial_at(h_low, 0)
     if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
