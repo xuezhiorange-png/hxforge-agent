@@ -43,6 +43,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Run Task168 enumeration only (skip Task173 full rating)",
     )
+    parser.add_argument(
+        "--objective",
+        choices=(
+            "PARETO_ONLY",
+            "MIN_NOMINAL_TUBE_AREA",
+            "MAX_DUTY",
+            "MIN_SHELL_DP_PREVIEW",
+        ),
+        default=None,
+        help="Experimental sizing objective (default PARETO_ONLY; non-production)",
+    )
     args = parser.parse_args(argv)
     if args.mode == "experimental-live-rating":
         if args.mesh != 1:
@@ -50,7 +61,11 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         case = load_general_engineering_case_json(args.input.read_text(encoding="utf-8"))
         outcome = run_experimental_live_rating_workflow(
-            case, args.output, mesh_level=args.mesh, enable_ephemeral_tp_cache=False
+            case,
+            args.output,
+            mesh_level=args.mesh,
+            enable_ephemeral_tp_cache=False,
+            cli_objective=args.objective,
         )
         (args.output / "WORKFLOW_OUTCOME.json").write_text(
             json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"

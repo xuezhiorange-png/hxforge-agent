@@ -82,7 +82,9 @@ def test_r10_cli_subprocess_two_numeric_valid_candidates() -> None:
         assert results[0]["mesh_result_hash"] != results[1]["mesh_result_hash"]
         assert results[0]["rating_request_hash"] != results[1]["rating_request_hash"]
         ranking = json.loads((out / "EXPERIMENTAL_RANKING_RESULT.json").read_text(encoding="utf-8"))
-        assert ranking["EXPERIMENTAL_RANKING_STATUS"] == "EXPERIMENTAL_RANKING_AVAILABLE"
+        assert ranking["EXPERIMENTAL_RANKING_STATUS"] == "COMPARISON_ONLY"
+        assert ranking["preferred_candidate_id"] is None
+        assert ranking["experimental_sizing_objective"] == "PARETO_ONLY"
         provider = raw["property_provider_identity"]
         assert provider["coolprop_version"]
         assert provider["coolprop_git_revision"]

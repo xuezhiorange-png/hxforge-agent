@@ -57,11 +57,7 @@ def build_report_payload(
         "generated_at_utc": generated_at,
         "engineering_case_id": case.engineering_case_id,
         "workflow_status": workflow_status,
-        "experimental_ranking_status": (
-            "EXPERIMENTAL_RANKING_AVAILABLE"
-            if sizing_outcome and sizing_outcome.selection_status == "RECOMMENDATION_AVAILABLE"
-            else "NOT_AVAILABLE"
-        ),
+        "experimental_ranking_status": "NOT_AVAILABLE",
         "production_design_approved": False,
         "numerical_authority_status": "CANDIDATE",
         "production_integration": False,
@@ -97,12 +93,25 @@ def build_report_payload(
         "notes": case.notes,
     }
     if experimental_mesh is not None:
+        ranking_doc = experimental_mesh.get("ranking") or {}
+        payload["experimental_ranking_status"] = ranking_doc.get(
+            "EXPERIMENTAL_RANKING_STATUS", "NOT_AVAILABLE"
+        )
+        payload["experimental_comparison_status"] = ranking_doc.get(
+            "EXPERIMENTAL_COMPARISON_STATUS", "NOT_AVAILABLE"
+        )
+        payload["conditional_preference_status"] = ranking_doc.get(
+            "CONDITIONAL_PREFERENCE_STATUS", "NOT_AVAILABLE"
+        )
         payload["experimental_live_run_hash"] = experimental_mesh.get("run_identity_hash")
         payload["solver_boundary"] = experimental_mesh.get("solver_boundary")
         payload["experimental_constraint_preview"] = experimental_mesh.get("constraint_preview")
         payload["geometry_summary"] = experimental_mesh.get("geometry_summary")
         payload["candidate_rating_results"] = experimental_mesh.get("candidate_rating_results")
-        payload["experimental_ranking"] = experimental_mesh.get("ranking")
+        payload["experimental_candidate_eligibility"] = experimental_mesh.get("candidate_eligibility")
+        payload["experimental_ranking"] = ranking_doc
+        payload["experimental_pareto_result"] = experimental_mesh.get("pareto_result")
+        payload["sizing_objective_scenarios"] = experimental_mesh.get("sizing_objective_scenarios")
         payload["hydraulic_model_scope"] = experimental_mesh.get("hydraulic_model_scope")
         payload["property_provider_identity"] = experimental_mesh.get("property_provider_identity")
         payload["rating_and_sizing"] = {
@@ -111,7 +120,15 @@ def build_report_payload(
             "low_mesh_numeric_valid": experimental_mesh.get("low_mesh_numeric_valid", False),
             "mesh_comparison_available": experimental_mesh.get("mesh_comparison_available", False),
             "sizing_evaluated": False,
-            "experimental_ranking_status": "NOT_YET_AVAILABLE",
+            "experimental_ranking_status": ranking_doc.get(
+                "EXPERIMENTAL_RANKING_STATUS", "NOT_AVAILABLE"
+            ),
+            "experimental_comparison_status": ranking_doc.get(
+                "EXPERIMENTAL_COMPARISON_STATUS", "NOT_AVAILABLE"
+            ),
+            "conditional_preference_status": ranking_doc.get(
+                "CONDITIONAL_PREFERENCE_STATUS", "NOT_AVAILABLE"
+            ),
             "frozen_r4_n1": experimental_mesh.get("frozen_r4_n1"),
             "mesh_levels": experimental_mesh.get("mesh_levels", []),
             "mesh_comparison": experimental_mesh.get("mesh_comparison"),
@@ -207,20 +224,44 @@ def render_markdown(report: dict[str, Any]) -> str:
     multi_rows = report.get("candidate_rating_results")
     if multi_rows:
         lines.extend(["## Multi-candidate experimental rating", ""])
+        eligibility = report.get("experimental_candidate_eligibility") or []
+        elig_by_id = {row.get("candidate_id"): row for row in eligibility}
         for row in multi_rows:
+            cid = row.get("candidate_id")
+            elig = elig_by_id.get(cid) or {}
             lines.append(
-                f"- `{row.get('candidate_id')}`: mesh **{row.get('mesh_status')}**, "
-                f"duty {row.get('total_duty_w')} W, wall {row.get('wall_seconds')} s"
+                f"- `{cid}`: rating **{elig.get('RATING_STATUS', row.get('mesh_status'))}**, "
+                f"structure **{elig.get('STRUCTURAL_STATUS', 'UNKNOWN')}**, "
+                f"Task174 **{elig.get('TASK174_STATUS', 'UNKNOWN')}**, "
+                f"constraints **{elig.get('CONSTRAINT_STATUS', 'UNKNOWN')}**, "
+                f"duty {row.get('total_duty_w')} W"
             )
+            geom = row.get("nominal_geometry") or elig.get("nominal_geometry")
+            if geom:
+                lines.append(
+                    f"  - Nominal area proxy: {geom.get('nominal_tube_outer_area_m2')} m² "
+                    f"({geom.get('area_kind')})"
+                )
         ranking = report.get("experimental_ranking") or {}
         lines.append(
             f"- Comparison: **{ranking.get('EXPERIMENTAL_COMPARISON_STATUS')}**; "
-            f"Ranking: **{ranking.get('EXPERIMENTAL_RANKING_STATUS')}**"
+            f"Ranking: **{ranking.get('EXPERIMENTAL_RANKING_STATUS')}**; "
+            f"Conditional preference: **{ranking.get('CONDITIONAL_PREFERENCE_STATUS')}**"
         )
-        if ranking.get("preferred_candidate_id"):
-            lines.append(f"- Preferred (experimental): `{ranking.get('preferred_candidate_id')}`")
+        pref = ranking.get("preferred_candidate_id") or ranking.get("EXPERIMENTAL_PREFERRED_CANDIDATE")
+        if pref:
+            lines.append(f"- Conditional preferred (experimental): `{pref}`")
+        else:
+            lines.append("- Conditional preferred (experimental): none (Pareto / no objective)")
+        pareto = report.get("experimental_pareto_result") or {}
+        if pareto.get("pareto_frontier_candidate_ids"):
+            lines.append(f"- Pareto frontier: `{pareto.get('pareto_frontier_candidate_ids')}`")
         hyd = report.get("hydraulic_model_scope") or {}
         lines.append(f"- Hydraulic scope: **{hyd.get('task174_hydraulic_status')}**")
+        lines.append(
+            "- Task168 preflight dispositions in `candidates` are enumeration-only; "
+            "see per-candidate STRUCTURAL_STATUS / RATING_STATUS above for rated paths."
+        )
         lines.append("")
     preview = report.get("experimental_constraint_preview")
     if preview:

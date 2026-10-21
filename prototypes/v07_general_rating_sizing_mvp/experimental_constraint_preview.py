@@ -15,7 +15,10 @@ def build_experimental_constraint_preview(
     mesh: dict[str, Any],
     native: NativeCellContext,
 ) -> dict[str, Any]:
-    numeric_valid = mesh.get("status") == "NUMERIC_VALID"
+    status = mesh.get("status")
+    if status is None:
+        status = mesh.get("mesh_status")
+    numeric_valid = status == "NUMERIC_VALID"
     duty_w: Decimal | None = None
     if numeric_valid and mesh.get("total_duty_w") is not None:
         duty_w = Decimal(str(mesh["total_duty_w"]))

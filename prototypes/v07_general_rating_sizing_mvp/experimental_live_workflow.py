@@ -8,6 +8,7 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
@@ -20,6 +21,9 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
     EngineeringCase,
     load_general_engineering_case_json,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_candidate_eligibility import (
+    build_candidate_eligibility,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_constraint_preview import (
     build_experimental_constraint_preview,
@@ -34,12 +38,16 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_live_scope import (
     check_experimental_live_rating_scope,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_ranking import (
+    build_experimental_pareto_result,
     build_experimental_ranking,
+    build_offline_duty_scenarios,
 )
+from prototypes.v07_general_rating_sizing_mvp.low_mesh_result import low_mesh_result_document
 from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
     build_native_thermal_boundary_from_case,
     disclosure_document,
 )
+from prototypes.v07_general_rating_sizing_mvp.nominal_geometry import nominal_area_for_native
 from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
     build_native_cell_context,
     run_mesh_numeric_with_profile,
@@ -113,6 +121,7 @@ def run_experimental_live_rating_workflow(
     *,
     mesh_level: int = 1,
     enable_ephemeral_tp_cache: bool = False,
+    cli_objective: str | None = None,
 ) -> ExperimentalLiveRatingOutcome:
     output_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.perf_counter()
@@ -224,6 +233,12 @@ def run_experimental_live_rating_workflow(
                 "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
             }
         constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
+        record = next(
+            (rec for rec in selection.records if rec.candidate_id == candidate_id),
+            None,
+        )
+        tube_len = record.tube_length_m if record is not None else ""
+        nominal_geometry = nominal_area_for_native(case, native, tube_length_m=tube_len)
         row: dict[str, Any] = {
             "candidate_id": native.candidate_id,
             "candidate_hash": native.candidate_hash,
@@ -231,7 +246,9 @@ def run_experimental_live_rating_workflow(
             "task171_result_hash": native.task171_result_hash,
             "task174_result_hash": native.task174_result_hash,
             "task025_parallel_area_m2": native.task025_parallel_area_m2,
+            "status": mesh.get("status"),
             "mesh_status": mesh.get("status"),
+            "nominal_geometry": nominal_geometry,
             "mesh_result_hash": mesh.get("mesh_result_hash"),
             "total_duty_w": mesh.get("total_duty_w"),
             "tube_outlet_temperature_k": mesh.get("tube_outlet_temperature_k"),
@@ -291,7 +308,46 @@ def run_experimental_live_rating_workflow(
         json.dumps(run_identity, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    ranking = build_experimental_ranking(case, rating_rows)
+    eligibility = build_candidate_eligibility(case, selection, rating_rows)
+    (output_dir / "EXPERIMENTAL_CANDIDATE_ELIGIBILITY.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "hxforge.experimental-candidate-eligibility.v1",
+                "candidates": eligibility,
+                "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+                "production_qualification": "PRODUCTION_NOT_QUALIFIED",
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    area_comparison = {
+        "schema_version": "hxforge.nominal-geometry-area-comparison.v1",
+        "candidates": [
+            {
+                "candidate_id": item["candidate_id"],
+                "nominal_geometry": item.get("nominal_geometry"),
+            }
+            for item in eligibility
+        ],
+    }
+    (output_dir / "NOMINAL_GEOMETRY_AREA_COMPARISON.json").write_text(
+        json.dumps(area_comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    ranking = build_experimental_ranking(
+        case,
+        rating_rows,
+        selection=selection,
+        cli_objective=cli_objective,
+    )
+    feasible_ids = ranking.get("feasible_candidate_ids") or []
+    pareto = build_experimental_pareto_result(rating_rows, feasible_ids=feasible_ids)
+    (output_dir / "EXPERIMENTAL_PARETO_RESULT.json").write_text(
+        json.dumps(pareto, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     (output_dir / "EXPERIMENTAL_MULTI_CANDIDATE_COMPARISON.json").write_text(
         json.dumps(
             {
@@ -306,7 +362,10 @@ def run_experimental_live_rating_workflow(
         + "\n",
         encoding="utf-8",
     )
-    if ranking["EXPERIMENTAL_RANKING_STATUS"] == "EXPERIMENTAL_RANKING_AVAILABLE":
+    if ranking["EXPERIMENTAL_RANKING_STATUS"] in {
+        "EXPERIMENTAL_RANKING_AVAILABLE",
+        "COMPARISON_ONLY",
+    }:
         (output_dir / "EXPERIMENTAL_RANKING_RESULT.json").write_text(
             json.dumps(ranking, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
@@ -319,30 +378,10 @@ def run_experimental_live_rating_workflow(
     all_selected_valid = numeric_valid_count == selected_count and selected_count > 0
 
     first_row = rating_rows[0]
-    first_mesh = {
-        k: first_row[k]
-        for k in (
-            "mesh_status",
-            "mesh_result_hash",
-            "total_duty_w",
-            "energy_balance_residual_w",
-            "terminal_boundary_residual_k",
-            "task172_local_evaluation_count",
-            "wall_seconds",
-            "failure_code",
-            "tube_outlet_temperature_k",
-            "shell_outlet_temperature_k",
-        )
-        if k in first_row
-    }
+    first_mesh_doc = low_mesh_result_document(first_row, mesh_level=mesh_level)
     if first_row.get("mesh_status") == "NUMERIC_VALID":
         (output_dir / "REAL_N1_MESH_RESULT.json").write_text(
-            json.dumps(
-                {"schema_version": "hxforge.low-mesh-result.v1", **first_mesh},
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
+            json.dumps(first_mesh_doc, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         (output_dir / "EXPERIMENTAL_CONSTRAINT_PREVIEW.json").write_text(
@@ -351,14 +390,38 @@ def run_experimental_live_rating_workflow(
         )
     else:
         (output_dir / "REAL_N1_BLOCKED_RESULT.json").write_text(
-            json.dumps(
-                {"schema_version": "hxforge.low-mesh-result.v1", **first_mesh},
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
+            json.dumps(first_mesh_doc, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+
+    scenarios = build_offline_duty_scenarios(
+        case,
+        rating_rows,
+        scenario_targets_w=(
+            Decimal("9500"),
+            Decimal("38000"),
+            Decimal("38500"),
+        ),
+        objective=ranking.get("experimental_sizing_objective", "PARETO_ONLY"),
+    )
+    (output_dir / "SIZING_OBJECTIVE_SCENARIOS.json").write_text(
+        json.dumps(scenarios, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (output_dir / "R10_CI_COMPATIBILITY_FIX.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "hxforge.r10-ci-compatibility-fix.v1",
+                "low_mesh_result_contract": "hxforge.low-mesh-result.v1",
+                "status_field_source": "solver_mesh_status",
+                "mesh_status_compat_field": True,
+                "MESH_RESULT_STATUS_SCHEMA_FIXED": True,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     experimental_mesh: dict[str, Any] = {
         "mode": "experimental-live-rating",
@@ -366,6 +429,9 @@ def run_experimental_live_rating_workflow(
         "multi_candidate": multi,
         "candidate_rating_results": rating_rows,
         "ranking": ranking,
+        "candidate_eligibility": eligibility,
+        "pareto_result": pareto,
+        "sizing_objective_scenarios": scenarios,
         "hydraulic_model_scope": hydraulic_scope,
         "solver_boundary": {
             "thermal_binding": binding_doc,
@@ -422,6 +488,11 @@ def run_experimental_live_rating_workflow(
         "CANDIDATE_RATING_RESULTS.json",
         "EXPERIMENTAL_MULTI_CANDIDATE_COMPARISON.json",
         "EXPERIMENTAL_RANKING_RESULT.json",
+        "EXPERIMENTAL_CANDIDATE_ELIGIBILITY.json",
+        "EXPERIMENTAL_PARETO_RESULT.json",
+        "NOMINAL_GEOMETRY_AREA_COMPARISON.json",
+        "SIZING_OBJECTIVE_SCENARIOS.json",
+        "R10_CI_COMPATIBILITY_FIX.json",
         "HYDRAULIC_MODEL_SCOPE.json",
         "NATIVE_THERMAL_BOUNDARY.json",
         "REAL_N1_MESH_RESULT.json",
@@ -512,8 +583,13 @@ def run_experimental_live_rating_from_paths(
     output_dir: Path,
     *,
     mesh_level: int = 1,
+    cli_objective: str | None = None,
 ) -> ExperimentalLiveRatingOutcome:
     case = load_general_engineering_case_json(input_path.read_text(encoding="utf-8"))
     return run_experimental_live_rating_workflow(
-        case, output_dir, mesh_level=mesh_level, enable_ephemeral_tp_cache=False
+        case,
+        output_dir,
+        mesh_level=mesh_level,
+        enable_ephemeral_tp_cache=False,
+        cli_objective=cli_objective,
     )

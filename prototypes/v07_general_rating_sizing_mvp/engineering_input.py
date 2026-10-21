@@ -205,6 +205,12 @@ class GeneralEngineeringCaseV2(BaseModel):
     max_shell_side_pressure_drop_pa: Decimal
     candidate_constraints: CandidateGenerationConstraints
     solver_budget: SolverBudgetSpec = Field(default_factory=SolverBudgetSpec)
+    experimental_sizing_objective: Literal[
+        "PARETO_ONLY",
+        "MIN_NOMINAL_TUBE_AREA",
+        "MAX_DUTY",
+        "MIN_SHELL_DP_PREVIEW",
+    ] = "PARETO_ONLY"
     notes: str = ""
 
     @field_validator(
