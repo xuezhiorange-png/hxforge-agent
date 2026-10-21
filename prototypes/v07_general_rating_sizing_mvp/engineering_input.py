@@ -57,6 +57,13 @@ class CandidateGenerationConstraints(BaseModel):
         return value
 
 
+class BaselineGeometryPair(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=False)
+
+    tube_length_m: Decimal
+    baffle_spacing_m: Decimal
+
+
 class SolverBudgetSpec(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=False)
 
@@ -211,6 +218,11 @@ class GeneralEngineeringCaseV2(BaseModel):
         "MAX_DUTY",
         "MIN_SHELL_DP_PREVIEW",
     ] = "PARETO_ONLY"
+    experimental_candidate_selection_mode: Literal[
+        "FIRST_N_DISTINCT_GEOMETRY",
+        "MIN_NOMINAL_TUBE_AREA_SEARCH",
+    ] = "FIRST_N_DISTINCT_GEOMETRY"
+    r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""
 
     @field_validator(

@@ -337,3 +337,11 @@ shards:
     files:
       - tests/prototypes/test_r11_constraint_aware_sizing.py
     timeout: 1200
+
+  - name: v07-target-directed-live-sizing-r12
+    job: shard-v07-target-directed-live-sizing-r12
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r12_target_directed_selection.py
+      - tests/prototypes/test_r12_target_directed_live_cli.py
+    timeout: 2400

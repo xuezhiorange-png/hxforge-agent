@@ -1,0 +1,14 @@
+{
+  "PARETO_FRONTIER_AVAILABLE": true,
+  "dominance_axes": [
+    "maximize_total_duty_w",
+    "minimize_nominal_tube_outer_area_m2",
+    "minimize_modeled_shell_dp_pa_preview"
+  ],
+  "pareto_frontier_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "production_sizing_verified": false,
+  "schema_version": "hxforge.experimental-pareto-result.v1"
+}

@@ -24,6 +24,11 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     Task174NativeOutputs,
     Task174SuccessResult,
 )
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection_policy import (
+    apply_rating_selection_policy,
+    nominal_area_proxy_m2,
+    resolve_candidate_selection_mode,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
@@ -48,6 +53,8 @@ class CandidateSelectionRecord:
     task174_result_hash: str | None
     selected_for_rating: bool
     task173_rating_status: str
+    physical_tube_count: int | None = None
+    nominal_tube_outer_area_proxy_m2: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +113,8 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
     )
 
     records: list[CandidateSelectionRecord] = []
+    selection_mode = resolve_candidate_selection_mode(case)
+    defer_selection = selection_mode == "MIN_NOMINAL_TUBE_AREA_SEARCH"
     selected_ids: list[str] = []
     selected_rating_hash: str | None = None
     selection_reason: str | None = None
@@ -218,14 +227,24 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
             candidate, space_hash, bundle, topology, t174, digest
         )
         rating_hash = candidate_rating_request_hash(rating_request)
-        pick = len(selected_ids) < max_rate and geom_hash not in selected_geometry
-        if pick:
-            selected_ids.append(candidate.candidate_id)
-            selected_geometry.add(geom_hash)
-            if selected_rating_hash is None:
-                selected_rating_hash = rating_hash
-            if selection_reason is None:
-                selection_reason = "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
+        physical_tube_count = bundle.task021_layout.physical_tube_count
+        nominal_area = nominal_area_proxy_m2(
+            case,
+            tube_length_m=tube_len,
+            physical_tube_count=physical_tube_count,
+        )
+        pick = False
+        if not defer_selection:
+            pick = len(selected_ids) < max_rate and geom_hash not in selected_geometry
+            if pick:
+                selected_ids.append(candidate.candidate_id)
+                selected_geometry.add(geom_hash)
+                if selected_rating_hash is None:
+                    selected_rating_hash = rating_hash
+                if selection_reason is None:
+                    selection_reason = (
+                        "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
+                    )
         records.append(
             CandidateSelectionRecord(
                 candidate_id=candidate.candidate_id,
@@ -244,10 +263,18 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                 task174_result_hash=t174.result_hash,
                 selected_for_rating=pick,
                 task173_rating_status="SELECTED" if pick else "NOT_SELECTED",
+                physical_tube_count=physical_tube_count,
+                nominal_tube_outer_area_proxy_m2=nominal_area,
             )
         )
 
-    selected_tuple = tuple(selected_ids)
+    if defer_selection:
+        selected_tuple, selection_reason = apply_rating_selection_policy(case, records)
+        if selected_tuple:
+            first = next(r for r in records if r.candidate_id == selected_tuple[0])
+            selected_rating_hash = first.rating_request_hash
+    else:
+        selected_tuple = tuple(selected_ids)
     status = "SELECTED" if selected_tuple else "BLOCKED_NO_RATING_READY_CANDIDATE"
     return CandidateSelectionOutcome(
         status=status,
@@ -282,6 +309,8 @@ def candidate_space_to_json(outcome: CandidateSelectionOutcome) -> dict[str, Any
                 "task168_chain_status": row.task168_chain_status,
                 "task174_status": row.task174_status,
                 "rating_request_ready": row.rating_request_ready,
+                "nominal_tube_outer_area_proxy_m2": row.nominal_tube_outer_area_proxy_m2,
+                "physical_tube_count": row.physical_tube_count,
             }
             for row in outcome.records
         ],
@@ -319,6 +348,8 @@ def selection_to_json(outcome: CandidateSelectionOutcome) -> dict[str, Any]:
                 "task174_result_hash": row.task174_result_hash,
                 "selected_for_rating": row.selected_for_rating,
                 "task173_rating_status": row.task173_rating_status,
+                "nominal_tube_outer_area_proxy_m2": row.nominal_tube_outer_area_proxy_m2,
+                "physical_tube_count": row.physical_tube_count,
             }
             for row in outcome.records
         ],
