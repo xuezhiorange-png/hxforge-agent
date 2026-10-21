@@ -156,6 +156,32 @@ def effective_hot_ceiling_enthalpy_j_kg() -> Decimal:
     return bound.tube_inlet_enthalpy_j_kg
 
 
+def _cold_ph_rematerialization_allowed(
+    *,
+    shooting_enthalpy_j_kg: Decimal,
+    ph_temperature_k: Decimal,
+    ph_enthalpy_j_kg: Decimal,
+    cold_h: Decimal,
+    cold_t: Decimal,
+) -> bool:
+    """Gate TP re-materialization after PH undershoot at the cold-end isotherm."""
+    if cold_t != T_MIN_K:
+        return False
+    if shooting_enthalpy_j_kg < H_MIN_J_KG or shooting_enthalpy_j_kg > cold_h:
+        return False
+    if not ph_temperature_k.is_finite() or not ph_enthalpy_j_kg.is_finite():
+        return False
+    deficit_k = T_MIN_K - ph_temperature_k
+    if deficit_k <= 0:
+        return False
+    if deficit_k > TERMINAL_TOLERANCE_K:
+        return False
+    isotherm_width = cold_h - H_MIN_J_KG
+    h_ulp = Decimal(str(math.ulp(float(H_MIN_J_KG))))
+    ph_h_delta = abs(ph_enthalpy_j_kg - shooting_enthalpy_j_kg)
+    return ph_h_delta <= isotherm_width + h_ulp
+
+
 ENERGY_ACCEPTANCE_FLOOR_W = Decimal("1e-6")
 MESH_DUTY_RELATIVE_THRESHOLD = Decimal("0.01")
 MESH_DUTY_ABSOLUTE_THRESHOLD_W = Decimal("0.01")
@@ -1509,10 +1535,26 @@ def _state_from_enthalpy(
             "BLOCKED_PROPERTY_EVALUATION_FAILURE", "state_ph", type(exc).__name__
         ) from exc
     temperature = _d(state.temperature_k)
-    if temperature < T_MIN_K and H_MIN_J_KG <= enthalpy_j_kg <= cold_h and cold_t == T_MIN_K:
-        # PH inversion can return T epsilon below T_MIN_K for enthalpy coordinates
-        # on the reviewed cold-end isotherm. Re-materialize with the TP producer.
-        return _state_at_inlet(provider, cold_t)
+    ph_enthalpy = _d(state.enthalpy_j_kg)
+    if _cold_ph_rematerialization_allowed(
+        shooting_enthalpy_j_kg=enthalpy_j_kg,
+        ph_temperature_k=temperature,
+        ph_enthalpy_j_kg=ph_enthalpy,
+        cold_h=cold_h,
+        cold_t=cold_t,
+    ):
+        tp_state = _state_at_inlet(provider, cold_t)
+        tp_h = _d(tp_state.native.enthalpy_j_kg)
+        isotherm_width = cold_h - H_MIN_J_KG
+        h_ulp = Decimal(str(math.ulp(float(H_MIN_J_KG))))
+        if abs(enthalpy_j_kg - tp_h) > isotherm_width + h_ulp:
+            raise _Stage3Failure(
+                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+                "cold_ph_tp_enthalpy_mismatch",
+                str(enthalpy_j_kg),
+                str(tp_h),
+            )
+        return tp_state
     return _checked_thermo(state, query_type="PH")
 
 

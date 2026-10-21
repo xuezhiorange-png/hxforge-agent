@@ -9,7 +9,13 @@ import json
 import sys
 from pathlib import Path
 
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
+    load_general_engineering_case_json,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import (
+    run_experimental_live_rating_workflow,
+)
 from prototypes.v07_general_rating_sizing_mvp.workflow import run_general_engineering_workflow
 
 
@@ -20,11 +26,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--input", required=True, type=Path, help="General engineering case JSON")
     parser.add_argument("--output", required=True, type=Path, help="Output artifact directory")
     parser.add_argument(
+        "--mode",
+        choices=("legacy-v1-workflow", "experimental-live-rating"),
+        default="legacy-v1-workflow",
+        help="legacy-v1-workflow: v1 sizing path; experimental-live-rating: live n=1 mesh CLI",
+    )
+    parser.add_argument(
+        "--mesh",
+        type=int,
+        default=1,
+        help="Mesh subdivisions for experimental-live-rating (only n=1 is supported)",
+    )
+    parser.add_argument(
         "--preflight-only",
         action="store_true",
         help="Run Task168 enumeration only (skip Task173 full rating)",
     )
     args = parser.parse_args(argv)
+    if args.mode == "experimental-live-rating":
+        if args.mesh != 1:
+            print(json.dumps({"error": "only --mesh 1 is supported in R9"}), file=sys.stderr)
+            return 2
+        case = load_general_engineering_case_json(args.input.read_text(encoding="utf-8"))
+        outcome = run_experimental_live_rating_workflow(
+            case, args.output, mesh_level=args.mesh, enable_ephemeral_tp_cache=False
+        )
+        (args.output / "WORKFLOW_OUTCOME.json").write_text(
+            json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(json.dumps(outcome.to_dict(), indent=2))
+        return 0 if outcome.status != "INPUT_OUT_OF_SUPPORTED_SCOPE" else 1
+
     case = GeneralEngineeringCaseV1.model_validate_json(args.input.read_text(encoding="utf-8"))
     outcome = run_general_engineering_workflow(
         case,

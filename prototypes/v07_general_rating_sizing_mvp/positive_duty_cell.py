@@ -58,6 +58,8 @@ class NativeCellContext:
     task174_result_hash: str
     task025_parallel_area_m2: str
     physical_tube_count: int
+    modeled_tube_side_pressure_drop_pa: str | None
+    modeled_shell_side_pressure_drop_pa: str | None
     context: Any
     support: Any
     shell_authority: Any
@@ -138,6 +140,10 @@ def build_native_cell_context(
                 task174_result_hash=t174.result_hash,
                 task025_parallel_area_m2=str(bundle.task025_result.total_parallel_flow_area_m2),
                 physical_tube_count=bundle.task021_layout.physical_tube_count,
+                modeled_tube_side_pressure_drop_pa=str(
+                    t174.modeled_total_tube_side_pressure_drop_pa
+                ),
+                modeled_shell_side_pressure_drop_pa=str(t174.bell_total_shell_pressure_drop_pa),
                 context=ctx,
                 support=support,
                 shell_authority=ctx.shell_authority,

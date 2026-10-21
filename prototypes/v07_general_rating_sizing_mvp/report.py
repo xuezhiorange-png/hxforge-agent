@@ -97,8 +97,12 @@ def build_report_payload(
         "notes": case.notes,
     }
     if experimental_mesh is not None:
+        payload["experimental_live_run_hash"] = experimental_mesh.get("run_identity_hash")
+        payload["solver_boundary"] = experimental_mesh.get("solver_boundary")
+        payload["experimental_constraint_preview"] = experimental_mesh.get("constraint_preview")
+        payload["geometry_summary"] = experimental_mesh.get("geometry_summary")
         payload["rating_and_sizing"] = {
-            "mode": "EXPERIMENTAL_LOW_MESH_ONLY",
+            "mode": experimental_mesh.get("mode", "EXPERIMENTAL_LOW_MESH_ONLY"),
             "full_rating_converged": experimental_mesh.get("full_rating_converged", False),
             "low_mesh_numeric_valid": experimental_mesh.get("low_mesh_numeric_valid", False),
             "mesh_comparison_available": experimental_mesh.get("mesh_comparison_available", False),
@@ -107,6 +111,7 @@ def build_report_payload(
             "frozen_r4_n1": experimental_mesh.get("frozen_r4_n1"),
             "mesh_levels": experimental_mesh.get("mesh_levels", []),
             "mesh_comparison": experimental_mesh.get("mesh_comparison"),
+            "mesh_observables": experimental_mesh.get("mesh_observables"),
         }
     if sizing_outcome is not None:
         payload["rating_and_sizing"] = {
@@ -195,6 +200,22 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
         ]
     )
+    preview = report.get("experimental_constraint_preview")
+    if preview:
+        lines.extend(
+            [
+                "## Experimental constraint preview",
+                "",
+                f"- Capacity preview: **{preview.get('EXPERIMENTAL_CAPACITY_PREVIEW')}**",
+                f"- Δp preview: **{preview.get('EXPERIMENTAL_DP_PREVIEW')}**",
+                f"- Duty constraint: {preview.get('duty_constraint')}",
+                f"- Tube Δp constraint: {preview.get('tube_dp_constraint')}",
+                f"- Shell Δp constraint: {preview.get('shell_dp_constraint')}",
+                f"- Task174 hydraulic status: {preview.get('task174_hydraulic_status')}",
+                "- Production design eligible: **false**",
+                "",
+            ]
+        )
     low_mesh = report.get("experimental_low_mesh_rating") or report.get("rating_and_sizing")
     if low_mesh and low_mesh.get("mesh_levels"):
         lines.extend(["## Experimental mesh rating (native Task173)", ""])
