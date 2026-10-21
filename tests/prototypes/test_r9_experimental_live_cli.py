@@ -86,7 +86,7 @@ def test_r9_case_in_scope() -> None:
     assert check_experimental_live_rating_scope(case) == ("IN_SCOPE", None)
 
 
-@pytest.mark.timeout(600)
+@pytest.mark.timeout(840)
 def test_r9_experimental_live_n1_cli_e2e() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)

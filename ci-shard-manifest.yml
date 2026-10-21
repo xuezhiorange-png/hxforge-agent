@@ -310,10 +310,16 @@ shards:
       - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
     timeout: 600
 
-  - name: v07-experimental-live-rating
-    job: shard-v07-experimental-live-rating
+  - name: v07-experimental-live-rating-r8
+    job: shard-v07-experimental-live-rating-r8
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r8_live_n1_mesh_e2e.py
+    timeout: 900
+
+  - name: v07-experimental-live-rating-r9
+    job: shard-v07-experimental-live-rating-r9
+    python: ["3.11", "3.12"]
+    files:
       - tests/prototypes/test_r9_experimental_live_cli.py
     timeout: 900
