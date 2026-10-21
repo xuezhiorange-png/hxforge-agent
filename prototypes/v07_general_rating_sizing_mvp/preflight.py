@@ -46,12 +46,19 @@ def enumerate_task168_candidates(request: Task173SizingRequest) -> dict[str, Any
             for r in records
         }
     )
-    admitted = sum(1 for r in records if r["status"] != "BLOCKED")
+    structurally_admitted = sum(1 for r in records if r["status"] != "BLOCKED")
     return {
         "status": "VALID",
+        "task168_structural_enumeration_status": "VALID",
+        "task168_downstream_full_evaluation_status": "NOT_RUN_IN_PREFLIGHT_ONLY",
+        "task173_rating_status": "NOT_RUN",
         "candidate_count": len(records),
         "distinct_geometry_count": distinct_geometry,
-        "structurally_admitted_count": admitted,
+        "structurally_admitted_count": structurally_admitted,
         "candidates": records,
         "candidate_space_hash": outcome.valid.candidate_space_hash,
+        "notes": (
+            "Preflight VALID means Task168 request enumeration succeeded; "
+            "per-candidate BLOCKED disposition is downstream evaluation, not geometry illegality."
+        ),
     }

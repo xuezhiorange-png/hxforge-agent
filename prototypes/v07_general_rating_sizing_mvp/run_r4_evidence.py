@@ -10,6 +10,9 @@ import time
 from pathlib import Path
 from typing import Any
 
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    enumerate_experimental_rating_candidates,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
     load_general_engineering_case_json,
 )
@@ -17,7 +20,6 @@ from prototypes.v07_general_rating_sizing_mvp.input_to_solver_binding import (
     build_input_to_solver_binding,
 )
 from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
-    R3_REFERENCE_CANDIDATE_ID,
     build_native_cell_context,
     run_low_mesh_numeric,
     run_positive_duty_trials,
@@ -93,7 +95,8 @@ def main(output_dir: Path) -> dict[str, Any]:
     )
     milestones["PREFLIGHT_COMPLETE"] = preflight.get("status") == "VALID"
 
-    native = build_native_cell_context(case, expected_candidate_id=R3_REFERENCE_CANDIDATE_ID)
+    selection = enumerate_experimental_rating_candidates(case)
+    native = build_native_cell_context(case, selection=selection)
 
     inlet_trials = run_positive_duty_trials(
         native,

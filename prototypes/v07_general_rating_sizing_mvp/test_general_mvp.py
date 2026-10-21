@@ -96,6 +96,29 @@ def test_r4_input_binding_maps_equipment_to_thermal_roles() -> None:
     assert binding["rows"][0]["participates_in_rating_kernel"] is True
 
 
+def test_experimental_candidate_selection_picks_rating_ready_row() -> None:
+    from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+        enumerate_experimental_rating_candidates,
+    )
+
+    case = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))
+    outcome = enumerate_experimental_rating_candidates(case)
+    assert outcome.status == "SELECTED"
+    assert outcome.selected_candidate_id == "82f370ff-73cd-5d71-aaf9-efc51645d22e"
+    assert outcome.selected_rating_request_hash is not None
+
+
+def test_frozen_r4_n1_mesh_identity() -> None:
+    from prototypes.v07_general_rating_sizing_mvp.frozen_r4_n1 import (
+        R4_FROZEN_MESH_HASH,
+        load_frozen_r4_n1_mesh,
+    )
+
+    frozen = load_frozen_r4_n1_mesh()
+    assert frozen.mesh_result_hash == R4_FROZEN_MESH_HASH
+    assert frozen.mesh_level == 1
+
+
 def test_r3_and_r4_share_c3_candidate_space() -> None:
     r3 = _load_case(R3_CASE_PATH)
     r4 = load_general_engineering_case_json(R4_CASE_PATH.read_text(encoding="utf-8"))

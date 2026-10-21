@@ -29,12 +29,18 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
 )
 from hexagent.properties.base import FluidIdentifier
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    CandidateSelectionOutcome,
+    enumerate_experimental_rating_candidates,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
-
-R3_REFERENCE_CANDIDATE_ID = "82f370ff-73cd-5d71-aaf9-efc51645d22e"
+from prototypes.v07_general_rating_sizing_mvp.solver_performance import (
+    CountingPropertyProvider,
+    build_solver_performance_profile,
+)
 
 
 @dataclass(frozen=True)
@@ -54,8 +60,12 @@ class NativeCellContext:
 def build_native_cell_context(
     case: EngineeringCase,
     *,
-    expected_candidate_id: str | None = None,
+    selection: CandidateSelectionOutcome | None = None,
 ) -> NativeCellContext:
+    outcome = selection or enumerate_experimental_rating_candidates(case)
+    if outcome.selected_candidate_id is None:
+        raise RuntimeError("no experimental rating candidate selected")
+    target_id = outcome.selected_candidate_id
     sizing_req = build_task173_sizing_request(case)
     t168 = sizing_req.task168_candidate_request
     authorities = task168._authority_map(t168)
@@ -84,7 +94,7 @@ def build_native_cell_context(
         )
         if stage_failure is not None:
             continue
-        if expected_candidate_id is not None and candidate.candidate_id != expected_candidate_id:
+        if candidate.candidate_id != target_id:
             continue
         topology = materialize_candidate_task171(
             candidate=candidate,
@@ -271,27 +281,58 @@ def run_low_mesh_numeric(
     *,
     subdivisions: int = 1,
 ) -> dict[str, Any]:
-    provider = CoolPropProvider()
+    mesh, profile = run_mesh_numeric_with_profile(native, subdivisions=subdivisions)
+    return {**mesh, "solver_performance_profile": profile}
+
+
+def run_mesh_numeric_with_profile(
+    native: NativeCellContext,
+    *,
+    subdivisions: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    inner = CoolPropProvider()
+    provider = CountingPropertyProvider(inner=inner)
     token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
     stats = t173._CellSearchStats()
     t0 = time.perf_counter()
+    run: t173._MeshRun | None = None
     try:
         run = t173._candidate_transient_outer_boundary(
             subdivisions, provider, native.shell_authority, stats
         )
     except t173._Stage3Failure as exc:
-        return {
+        elapsed = time.perf_counter() - t0
+        profile = build_solver_performance_profile(
+            stats=stats,
+            mesh_run=None,
+            provider=provider,
+            total_wall_seconds=elapsed,
+            subdivisions=subdivisions,
+        )
+        mesh = {
             "schema_version": "hxforge.low-mesh-result.v1",
             "status": "BLOCKED",
             "mesh_level": subdivisions,
             "failure_code": exc.code,
             "diagnostics": list(exc.diagnostics),
-            "wall_seconds": round(time.perf_counter() - t0, 3),
+            "wall_seconds": round(elapsed, 3),
+            "low_mesh_numeric_valid": False,
+            "full_rating_converged": False,
         }
+        return mesh, profile
     finally:
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
+    elapsed = time.perf_counter() - t0
+    assert run is not None
     obs = run.observables
-    return {
+    profile = build_solver_performance_profile(
+        stats=stats,
+        mesh_run=run,
+        provider=provider,
+        total_wall_seconds=elapsed,
+        subdivisions=subdivisions,
+    )
+    mesh = {
         "schema_version": "hxforge.low-mesh-result.v1",
         "status": "NUMERIC_VALID",
         "mesh_level": subdivisions,
@@ -301,7 +342,9 @@ def run_low_mesh_numeric(
         "terminal_boundary_residual_k": str(obs.terminal_boundary_residual_k),
         "terminal_boundary_residual_j_kg": str(obs.terminal_boundary_residual_j_kg),
         "task172_local_evaluation_count": stats.task172_local_evaluation_count,
-        "wall_seconds": round(time.perf_counter() - t0, 3),
+        "wall_seconds": round(elapsed, 3),
         "low_mesh_numeric_valid": True,
         "full_rating_converged": False,
+        "mesh_observables": obs.model_dump(mode="json"),
     }
+    return mesh, profile

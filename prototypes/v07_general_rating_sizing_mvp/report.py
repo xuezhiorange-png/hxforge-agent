@@ -49,6 +49,7 @@ def build_report_payload(
     preflight: dict[str, Any],
     sizing_outcome: Task173SizingSuccessResult | None,
     workflow_status: str,
+    experimental_mesh: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     generated_at = datetime.now(UTC).isoformat()
     payload: dict[str, Any] = {
@@ -76,6 +77,7 @@ def build_report_payload(
         },
         "candidates": preflight.get("candidates", []),
         "rating_and_sizing": None,
+        "experimental_low_mesh_rating": experimental_mesh,
         "ranking": None,
         "engineering_warnings": [
             "EXPERIMENTAL_MVP — not production design approval.",
@@ -94,6 +96,18 @@ def build_report_payload(
         },
         "notes": case.notes,
     }
+    if experimental_mesh is not None:
+        payload["rating_and_sizing"] = {
+            "mode": "EXPERIMENTAL_LOW_MESH_ONLY",
+            "full_rating_converged": experimental_mesh.get("full_rating_converged", False),
+            "low_mesh_numeric_valid": experimental_mesh.get("low_mesh_numeric_valid", False),
+            "mesh_comparison_available": experimental_mesh.get("mesh_comparison_available", False),
+            "sizing_evaluated": False,
+            "experimental_ranking_status": "NOT_YET_AVAILABLE",
+            "frozen_r4_n1": experimental_mesh.get("frozen_r4_n1"),
+            "mesh_levels": experimental_mesh.get("mesh_levels", []),
+            "mesh_comparison": experimental_mesh.get("mesh_comparison"),
+        }
     if sizing_outcome is not None:
         payload["rating_and_sizing"] = {
             "selection_status": sizing_outcome.selection_status,
@@ -181,6 +195,24 @@ def render_markdown(report: dict[str, Any]) -> str:
             "",
         ]
     )
+    low_mesh = report.get("experimental_low_mesh_rating") or report.get("rating_and_sizing")
+    if low_mesh and low_mesh.get("mesh_levels"):
+        lines.extend(["## Experimental mesh rating (native Task173)", ""])
+        for row in low_mesh["mesh_levels"]:
+            lines.append(
+                f"- n={row.get('mesh_level')}: duty {row.get('total_duty_w')} W, "
+                f"energy residual {row.get('energy_balance_residual_w')} W, "
+                f"terminal residual {row.get('terminal_boundary_residual_k')} K, "
+                f"Task172 evals {row.get('task172_local_evaluation_count')}, "
+                f"wall {row.get('wall_seconds')} s"
+            )
+        if low_mesh.get("mesh_comparison"):
+            cmp_row = low_mesh["mesh_comparison"]
+            lines.append(
+                f"- n1/n2 duty delta: {cmp_row.get('duty_delta_w')} W "
+                f"({cmp_row.get('duty_delta_percent')} %), status {cmp_row.get('mesh_comparison_status')}"
+            )
+        lines.append("")
     if report.get("candidate_results"):
         lines.append("## Rating, hydraulic, and sizing results")
         lines.append("")
@@ -236,12 +268,14 @@ def write_engineering_reports(
     sizing_outcome: Task173SizingSuccessResult | None,
     output_dir: Path,
     workflow_status: str,
+    experimental_mesh: dict[str, Any] | None = None,
 ) -> tuple[Path, Path]:
     payload = build_report_payload(
         case,
         preflight=preflight,
         sizing_outcome=sizing_outcome,
         workflow_status=workflow_status,
+        experimental_mesh=experimental_mesh,
     )
     json_path = output_dir / "ENGINEERING_REPORT.json"
     md_path = output_dir / "ENGINEERING_REPORT.md"

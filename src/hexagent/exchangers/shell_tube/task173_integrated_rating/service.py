@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
@@ -447,6 +448,8 @@ class _EndpointHoleSummary:
 @dataclass
 class _CellSearchStats:
     task172_local_evaluation_count: int = 0
+    task172_evaluation_wall_seconds: float = 0.0
+    outer_trial_count: int = 0
     task172_numerical_hole_count: int = 0
     task172_numerical_hole_counts_by_code: dict[str, int] = field(default_factory=dict)
     task172_numerical_hole_trials: list[dict[str, str]] = field(default_factory=list)
@@ -455,8 +458,12 @@ class _CellSearchStats:
     endpoint_hole_level_receipts: list[_EndpointHoleLevelReceipt] = field(default_factory=list)
     maximum_hole_recovery_depth_observed: int = 0
 
-    def record_evaluation(self) -> None:
+    def record_evaluation(self, wall_seconds: float = 0.0) -> None:
         self.task172_local_evaluation_count += 1
+        self.task172_evaluation_wall_seconds += wall_seconds
+
+    def record_outer_trial(self) -> None:
+        self.outer_trial_count += 1
 
     def record_hole(self, q_w: float, support_id: str) -> None:
         code = "BLOCKED_RESIDUAL_ACCEPTANCE"
@@ -2145,7 +2152,7 @@ def _solve_cell(
             if cell_evaluation_count >= MAX_CELL_TASK172_EVALUATIONS:
                 raise resource_exhaustion("TASK172 evaluation cap reached")
             cell_evaluation_count += 1
-            stats.record_evaluation()
+            eval_t0 = time.perf_counter()
             try:
                 evaluation = _cell_evaluation(
                     q,
@@ -2156,6 +2163,7 @@ def _solve_cell(
                     shell_authority=shell_authority,
                 )
             except _Task172NumericalHole as exc:
+                stats.record_evaluation(time.perf_counter() - eval_t0)
                 stats.record_hole(q, support.physical_segment_id)
                 unrecorded_holes.append(q)
                 trials[q] = _CellTrial(
@@ -2169,13 +2177,16 @@ def _solve_cell(
                     exact_blocked_result_type=exc.exact_blocked_result_type,
                 )
             except _LowSideDomainInfeasible:
+                stats.record_evaluation(time.perf_counter() - eval_t0)
                 trials[q] = _CellTrial(q, "LOW_SIDE_DOMAIN_INFEASIBLE")
             except _Stage3Failure as exc:
+                stats.record_evaluation(time.perf_counter() - eval_t0)
                 trials[q] = _CellTrial(q, "HARD_BLOCKER", failure_code=exc.code)
                 if capture_diagnostics:
                     append_trial_receipt(q, trials[q], search_phase or active_search_phase)
                 raise
             else:
+                stats.record_evaluation(time.perf_counter() - eval_t0)
                 cell_valid_evaluation_count += 1
                 residual = _d(q) - evaluation.task172_result.signed_q_hot_to_cold_w
                 trials[q] = _CellTrial(
@@ -2939,6 +2950,8 @@ def _outer_trial(
     iterations: int,
     search_stats: _CellSearchStats | None = None,
 ) -> _OuterTrial:
+    if search_stats is not None:
+        search_stats.record_outer_trial()
     try:
         run = _valid_trajectory(
             subdivisions,
