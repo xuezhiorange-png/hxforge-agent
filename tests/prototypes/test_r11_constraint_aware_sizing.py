@@ -25,10 +25,8 @@ R10_CASE = REPO_ROOT / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_multi
 R9_CASE = (
     REPO_ROOT / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_tube_hot_shell_cold_r9.json"
 )
-R10_FROZEN = (
-    REPO_ROOT
-    / "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10/CANDIDATE_RATING_RESULTS.json"
-)
+_R10_EVIDENCE = "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10"
+R10_FROZEN = REPO_ROOT / _R10_EVIDENCE / "CANDIDATE_RATING_RESULTS.json"
 
 
 def _load_frozen_r10_rows() -> list[dict]:

@@ -330,3 +330,10 @@ shards:
     files:
       - tests/prototypes/test_r10_multi_candidate_live_cli.py
     timeout: 1200
+
+  - name: v07-constraint-aware-sizing-r11
+    job: shard-v07-constraint-aware-sizing-r11
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r11_constraint_aware_sizing.py
+    timeout: 1200

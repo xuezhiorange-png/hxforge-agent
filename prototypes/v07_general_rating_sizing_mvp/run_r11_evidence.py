@@ -31,11 +31,11 @@ def _sha256_file(path: Path) -> str:
 
 
 def main(output_dir: Path) -> dict[str, Any]:
-    from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
-        load_general_engineering_case_json,
-    )
     from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
         enumerate_experimental_rating_candidates,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
+        load_general_engineering_case_json,
     )
     from prototypes.v07_general_rating_sizing_mvp.experimental_candidate_eligibility import (
         build_candidate_eligibility,

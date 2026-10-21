@@ -74,7 +74,11 @@ def build_candidate_eligibility(
         mesh_status = row.get("mesh_status") or row.get("status")
         preview = row.get("constraint_preview")
         rating_status = _rating_status(mesh_status)
-        constraint_status = _constraint_status(case, rating_status=rating_status, constraint_preview=preview)
+        constraint_status = _constraint_status(
+            case,
+            rating_status=rating_status,
+            constraint_preview=preview,
+        )
         entries.append(
             {
                 "candidate_id": candidate_id,
