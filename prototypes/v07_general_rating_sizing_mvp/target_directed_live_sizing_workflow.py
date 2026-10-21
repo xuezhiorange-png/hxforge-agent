@@ -71,8 +71,10 @@ def run_target_directed_live_sizing_workflow(
     mesh_level: int = 1,
 ) -> ExperimentalLiveRatingOutcome:
     if case.experimental_candidate_selection_mode != "MIN_NOMINAL_TUBE_AREA_SEARCH":
-        raise ValueError("R12 workflow requires experimental_candidate_selection_mode="
-                         "MIN_NOMINAL_TUBE_AREA_SEARCH")
+        raise ValueError(
+            "R12 workflow requires experimental_candidate_selection_mode="
+            "MIN_NOMINAL_TUBE_AREA_SEARCH"
+        )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     preflight_selection = enumerate_experimental_rating_candidates(case)

@@ -242,9 +242,7 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                 if selected_rating_hash is None:
                     selected_rating_hash = rating_hash
                 if selection_reason is None:
-                    selection_reason = (
-                        "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
-                    )
+                    selection_reason = "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
         records.append(
             CandidateSelectionRecord(
                 candidate_id=candidate.candidate_id,

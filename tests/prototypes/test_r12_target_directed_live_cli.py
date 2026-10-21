@@ -11,9 +11,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-R12_CASE = (
-    REPO_ROOT / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_target_directed_r12.json"
-)
+R12_CASE = REPO_ROOT / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_target_directed_r12.json"
 
 
 def _run_cli(output_dir: Path) -> subprocess.CompletedProcess[str]:

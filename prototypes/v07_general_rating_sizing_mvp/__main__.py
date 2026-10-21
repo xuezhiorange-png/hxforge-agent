@@ -67,9 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"error": "only --mesh 1 is supported in R12"}), file=sys.stderr)
             return 2
         case = load_general_engineering_case_json(args.input.read_text(encoding="utf-8"))
-        outcome = run_target_directed_live_sizing_workflow(
-            case, args.output, mesh_level=args.mesh
-        )
+        outcome = run_target_directed_live_sizing_workflow(case, args.output, mesh_level=args.mesh)
         (args.output / "WORKFLOW_OUTCOME.json").write_text(
             json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )

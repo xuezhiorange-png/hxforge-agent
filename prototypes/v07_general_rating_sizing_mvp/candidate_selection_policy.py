@@ -54,11 +54,7 @@ def apply_rating_selection_policy(
 
     ready = [row for row in records if row.rating_request_ready]
     if mode == "MIN_NOMINAL_TUBE_AREA_SEARCH":
-        pool = [
-            row
-            for row in ready
-            if (row.tube_length_m, row.baffle_spacing_m) not in baseline
-        ]
+        pool = [row for row in ready if (row.tube_length_m, row.baffle_spacing_m) not in baseline]
         pool_sorted = sorted(
             pool,
             key=lambda row: Decimal(row.nominal_tube_outer_area_proxy_m2 or "Infinity"),
