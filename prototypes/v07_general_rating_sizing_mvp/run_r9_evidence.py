@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 from typing import Any
 
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import (
