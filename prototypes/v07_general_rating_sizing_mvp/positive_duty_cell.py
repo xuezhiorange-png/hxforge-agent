@@ -38,7 +38,7 @@ from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
 from prototypes.v07_general_rating_sizing_mvp.solver_performance import (
-    CountingPropertyProvider,
+    CountingCoolPropProvider,
     build_solver_performance_profile,
 )
 
@@ -290,8 +290,7 @@ def run_mesh_numeric_with_profile(
     *,
     subdivisions: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    inner = CoolPropProvider()
-    provider = CountingPropertyProvider(inner=inner)
+    provider = CountingCoolPropProvider()
     token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
     stats = t173._CellSearchStats()
     t0 = time.perf_counter()

@@ -2,32 +2,29 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
+from hexagent.properties.coolprop_provider import CoolPropProvider
 
 
-@dataclass
-class CountingPropertyProvider:
-    """Delegate property provider that counts thermodynamic state lookups."""
+class CountingCoolPropProvider(CoolPropProvider):
+    """CoolProp provider with state_tp call counting (preserves provider identity)."""
 
-    inner: Any
-    state_lookup_count: int = 0
+    def __init__(self) -> None:
+        super().__init__()
+        self.state_lookup_count = 0
 
     def state_tp(self, *args: Any, **kwargs: Any) -> Any:
         self.state_lookup_count += 1
-        return self.inner.state_tp(*args, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.inner, name)
+        return super().state_tp(*args, **kwargs)
 
 
 def build_solver_performance_profile(
     *,
     stats: t173._CellSearchStats,
     mesh_run: t173._MeshRun | None,
-    provider: CountingPropertyProvider,
+    provider: CountingCoolPropProvider,
     total_wall_seconds: float,
     subdivisions: int,
 ) -> dict[str, Any]:
