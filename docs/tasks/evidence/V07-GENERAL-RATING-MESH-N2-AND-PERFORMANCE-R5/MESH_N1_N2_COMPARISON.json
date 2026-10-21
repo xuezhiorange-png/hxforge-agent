@@ -1,0 +1,18 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "comparable": true,
+  "duty_delta_percent": "0.01665391203745885172424227413",
+  "duty_delta_w": "7.6401293891245",
+  "duty_metric": "0.0001665391203745885172424227413",
+  "duty_metric_threshold": "0.01",
+  "duty_metric_units": "RELATIVE_FRACTION",
+  "duty_status": "PASS",
+  "fine_n2_mesh_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+  "frozen_n1_mesh_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+  "frozen_n1_source": "/workspace/docs/tasks/evidence/V07-GENERAL-RATING-POSITIVE-DUTY-CELL-AND-FIRST-MESH-R4/LOW_MESH_RESULT.json",
+  "mesh_comparison_status": "PASS",
+  "rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+  "schema_version": "hxforge.mesh-n1-n2-comparison.v1",
+  "terminal_boundary_residual_delta_k": "3.65876E-9",
+  "wall_comparison": "WALL_EXTREMA_NOT_COMPARED_WITHOUT_ARCHIVED_R4_N1_OBSERVABLES"
+}

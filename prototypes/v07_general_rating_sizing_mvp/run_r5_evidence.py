@@ -10,7 +10,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from hexagent.exchangers.shell_tube.task173_integrated_rating.models import MeshObservables
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     enumerate_experimental_rating_candidates,
     selection_to_json,
@@ -77,7 +76,7 @@ def main(output_dir: Path) -> dict[str, Any]:
         return raw
 
     native = build_native_cell_context(case, selection=selection)
-    mesh_n2, profile = run_mesh_numeric_with_profile(native, subdivisions=2)
+    mesh_n2, profile, mesh_n2_obs = run_mesh_numeric_with_profile(native, subdivisions=2)
     (output_dir / "MESH_N2_RESULT.json").write_text(
         json.dumps(mesh_n2, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -88,11 +87,10 @@ def main(output_dir: Path) -> dict[str, Any]:
     milestones["LOW_MESH_NUMERIC_VALID"] = True
 
     comparison: dict[str, Any] | None = None
-    if mesh_n2.get("status") == "NUMERIC_VALID":
-        obs = MeshObservables.model_validate(mesh_n2["mesh_observables"])
+    if mesh_n2.get("status") == "NUMERIC_VALID" and mesh_n2_obs is not None:
         comparison = compare_frozen_n1_to_n2_mesh(
             frozen_n1,
-            obs,
+            mesh_n2_obs,
             fine_mesh_hash=mesh_n2["mesh_result_hash"],
             fine_subdivisions=int(mesh_n2["mesh_level"]),
             candidate_id=native.candidate_id,

@@ -1,0 +1,21 @@
+{
+  "cell_root_trial_receipt_count": 0,
+  "mesh_run_metadata": {
+    "bisection_iterations": 24,
+    "mesh_result_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+    "outer_action_count": 26
+  },
+  "mesh_subdivisions": 2,
+  "outer_trial_count": 26,
+  "property_provider_state_lookup_count": 290586,
+  "schema_version": "hxforge.solver-performance-profile.v1",
+  "task172_local_evaluation_count": 8055,
+  "task172_request_hash_duplicate": 0,
+  "task172_request_hash_total": 0,
+  "task172_request_hash_unique": 0,
+  "timing_seconds": {
+    "outer_solver_estimated": 0.578,
+    "task172_evaluations": 436.849,
+    "total_wall": 437.427
+  }
+}

@@ -5,26 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
-from hexagent.properties.coolprop_provider import CoolPropProvider
-
-
-class CountingCoolPropProvider(CoolPropProvider):
-    """CoolProp provider with state_tp call counting (preserves provider identity)."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.state_lookup_count = 0
-
-    def state_tp(self, *args: Any, **kwargs: Any) -> Any:
-        self.state_lookup_count += 1
-        return super().state_tp(*args, **kwargs)
 
 
 def build_solver_performance_profile(
     *,
     stats: t173._CellSearchStats,
     mesh_run: t173._MeshRun | None,
-    provider: CountingCoolPropProvider,
+    property_provider_state_lookup_count: int,
     total_wall_seconds: float,
     subdivisions: int,
 ) -> dict[str, Any]:
@@ -49,7 +36,7 @@ def build_solver_performance_profile(
         "task172_request_hash_total": len(request_hashes),
         "task172_request_hash_unique": len(unique_hashes),
         "task172_request_hash_duplicate": duplicate_request_count,
-        "property_provider_state_lookup_count": provider.state_lookup_count,
+        "property_provider_state_lookup_count": property_provider_state_lookup_count,
         "timing_seconds": {
             "total_wall": round(total_wall_seconds, 3),
             "task172_evaluations": round(stats.task172_evaluation_wall_seconds, 3),

@@ -38,7 +38,6 @@ from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
 from prototypes.v07_general_rating_sizing_mvp.solver_performance import (
-    CountingCoolPropProvider,
     build_solver_performance_profile,
 )
 
@@ -281,7 +280,7 @@ def run_low_mesh_numeric(
     *,
     subdivisions: int = 1,
 ) -> dict[str, Any]:
-    mesh, profile = run_mesh_numeric_with_profile(native, subdivisions=subdivisions)
+    mesh, profile, _obs = run_mesh_numeric_with_profile(native, subdivisions=subdivisions)
     return {**mesh, "solver_performance_profile": profile}
 
 
@@ -289,8 +288,16 @@ def run_mesh_numeric_with_profile(
     native: NativeCellContext,
     *,
     subdivisions: int,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    provider = CountingCoolPropProvider()
+) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
+    provider = CoolPropProvider()
+    lookup_count = {"n": 0}
+    _state_tp = provider.state_tp
+
+    def _counting_state_tp(*args: Any, **kwargs: Any) -> Any:
+        lookup_count["n"] += 1
+        return _state_tp(*args, **kwargs)
+
+    provider.state_tp = _counting_state_tp  # type: ignore[method-assign]
     token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
     stats = t173._CellSearchStats()
     t0 = time.perf_counter()
@@ -304,7 +311,7 @@ def run_mesh_numeric_with_profile(
         profile = build_solver_performance_profile(
             stats=stats,
             mesh_run=None,
-            provider=provider,
+            property_provider_state_lookup_count=lookup_count["n"],
             total_wall_seconds=elapsed,
             subdivisions=subdivisions,
         )
@@ -318,7 +325,7 @@ def run_mesh_numeric_with_profile(
             "low_mesh_numeric_valid": False,
             "full_rating_converged": False,
         }
-        return mesh, profile
+        return mesh, profile, None
     finally:
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
     elapsed = time.perf_counter() - t0
@@ -327,7 +334,7 @@ def run_mesh_numeric_with_profile(
     profile = build_solver_performance_profile(
         stats=stats,
         mesh_run=run,
-        provider=provider,
+        property_provider_state_lookup_count=lookup_count["n"],
         total_wall_seconds=elapsed,
         subdivisions=subdivisions,
     )
@@ -344,6 +351,5 @@ def run_mesh_numeric_with_profile(
         "wall_seconds": round(elapsed, 3),
         "low_mesh_numeric_valid": True,
         "full_rating_converged": False,
-        "mesh_observables": obs.model_dump(mode="json"),
     }
-    return mesh, profile
+    return mesh, profile, obs
