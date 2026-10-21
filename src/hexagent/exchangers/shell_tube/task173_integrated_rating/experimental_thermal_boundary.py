@@ -19,9 +19,7 @@ TUBE_MASS_FLOW_KG_S = Decimal("12")
 SHELL_MASS_FLOW_KG_S = Decimal("20")
 
 EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA: Final = "hxforge.experimental-thermal-boundary.v1"
-EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID: Final = (
-    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1"
-)
+EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID: Final = "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1"
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 _TUBE_HOT_SHELL_COLD = "TUBE_HOT_SHELL_COLD"
@@ -95,9 +93,7 @@ def build_experimental_thermal_boundary_v1(
         raise ValueError("experimental thermal boundary: reference pressure must match kernel")
     tube_h = _enthalpy_at_tp(provider, tube_inlet_temperature_k, reference_pressure_pa)
     shell_h = _enthalpy_at_tp(provider, shell_inlet_temperature_k, reference_pressure_pa)
-    if shell_inlet_temperature_k == SHELL_INLET_T_K and abs(shell_h - H_MIN_J_KG) > Decimal(
-        "1e-3"
-    ):
+    if shell_inlet_temperature_k == SHELL_INLET_T_K and abs(shell_h - H_MIN_J_KG) > Decimal("1e-3"):
         raise ValueError(
             "experimental thermal boundary: shell inlet enthalpy drift vs frozen H_MIN"
         )
@@ -125,5 +121,3 @@ def matches_frozen_reference_boundary(
         and binding.shell_mass_flow_kg_s == SHELL_MASS_FLOW_KG_S
         and binding.reference_pressure_pa == REFERENCE_PRESSURE_PA
     )
-
-

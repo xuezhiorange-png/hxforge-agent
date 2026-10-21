@@ -237,7 +237,9 @@ def run_positive_duty_trials(
             "rating_request_hash": native.rating_request_hash,
             "physical_support_id": native.support.physical_segment_id,
             "trials": trials,
-            "positive_duty_trial_count": sum(1 for item in trials if float(item["q_trial_w"]) > 0.0),
+            "positive_duty_trial_count": sum(
+                1 for item in trials if float(item["q_trial_w"]) > 0.0
+            ),
             "positive_duty_task172_validated_count": positive_validated,
         }
 

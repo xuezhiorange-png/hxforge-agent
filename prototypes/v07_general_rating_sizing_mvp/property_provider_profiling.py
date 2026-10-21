@@ -90,7 +90,9 @@ def run_tp_cache_ab_parity(
     *,
     q_trials_w: tuple[float, ...] = (50.0, 500.0, 2000.0, 8000.0),
 ) -> dict[str, Any]:
-    def run_once(use_cache: bool) -> tuple[list[str], list[str], float, EphemeralTpCacheStats | None]:
+    def run_once(
+        use_cache: bool,
+    ) -> tuple[list[str], list[str], float, EphemeralTpCacheStats | None]:
         provider = CoolPropProvider()
         cache_stats: EphemeralTpCacheStats | None = None
         if use_cache:

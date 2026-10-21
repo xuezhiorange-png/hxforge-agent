@@ -45,7 +45,9 @@ def validate_case_for_native_thermal_binding(case: EngineeringCase) -> None:
     if tube.mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
         raise ValueError("tube mass flow must match frozen Task173 kernel for experimental binding")
     if shell.mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
-        raise ValueError("shell mass flow must match frozen Task173 kernel for experimental binding")
+        raise ValueError(
+            "shell mass flow must match frozen Task173 kernel for experimental binding"
+        )
     if tube.inlet_pressure_pa != REFERENCE_PRESSURE_PA:
         raise ValueError("tube inlet pressure must match REFERENCE_PRESSURE_PA")
     if shell.inlet_pressure_pa != REFERENCE_PRESSURE_PA:

@@ -306,4 +306,6 @@ shards:
       - tests/exchangers/shell_tube/test_task172_local_runtime.py
       - tests/exchangers/shell_tube/test_task173_integrated_rating.py
       - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
+      - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
+      - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
     timeout: 600

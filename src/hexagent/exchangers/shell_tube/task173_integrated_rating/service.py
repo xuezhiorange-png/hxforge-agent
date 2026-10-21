@@ -139,6 +139,23 @@ def effective_shell_cold_inlet_enthalpy_j_kg() -> Decimal:
     if bound is None:
         return H_MIN_J_KG
     return bound.shell_inlet_enthalpy_j_kg
+
+
+def effective_shell_inlet_temperature_k() -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if bound is None:
+        return SHELL_INLET_T_K
+    return bound.shell_inlet_temperature_k
+
+
+def effective_hot_ceiling_enthalpy_j_kg() -> Decimal:
+    """Upper shooting enthalpy for the reviewed hot-end envelope."""
+    bound = active_experimental_thermal_boundary()
+    if bound is None or bound.tube_inlet_temperature_k >= T_MAX_K:
+        return H_MAX_J_KG
+    return bound.tube_inlet_enthalpy_j_kg
+
+
 ENERGY_ACCEPTANCE_FLOOR_W = Decimal("1e-6")
 MESH_DUTY_RELATIVE_THRESHOLD = Decimal("0.01")
 MESH_DUTY_ABSOLUTE_THRESHOLD_W = Decimal("0.01")
@@ -1452,12 +1469,21 @@ def _state_from_enthalpy(
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT", f"h={enthalpy_j_kg}")
     if enthalpy_j_kg > H_MAX_J_KG:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT", f"h={enthalpy_j_kg}")
+    ceiling_h = effective_hot_ceiling_enthalpy_j_kg()
     if enthalpy_j_kg == H_MAX_J_KG:
         # H_MAX is the reviewed 300 K boundary state. PH inversion can return
         # a temperature just above the closed domain. Use the native TP
         # producer at this exact boundary. Its returned enthalpy is retained
         # as provider output and is not reinterpreted as the shooting input.
         return _state_at_inlet(provider, T_MAX_K)
+    if enthalpy_j_kg == ceiling_h and ceiling_h != H_MAX_J_KG:
+        return _state_at_inlet(provider, effective_tube_inlet_temperature_k())
+    cold_h = effective_shell_cold_inlet_enthalpy_j_kg()
+    cold_t = effective_shell_inlet_temperature_k()
+    if enthalpy_j_kg == H_MIN_J_KG:
+        return _state_at_inlet(provider, T_MIN_K)
+    if enthalpy_j_kg == cold_h:
+        return _state_at_inlet(provider, cold_t)
     provider_enthalpy = Decimal(str(float(enthalpy_j_kg)))
     if provider_enthalpy < H_MIN_J_KG:
         if shell_search_state:
@@ -1482,6 +1508,11 @@ def _state_from_enthalpy(
         raise _Stage3Failure(
             "BLOCKED_PROPERTY_EVALUATION_FAILURE", "state_ph", type(exc).__name__
         ) from exc
+    temperature = _d(state.temperature_k)
+    if temperature < T_MIN_K and H_MIN_J_KG <= enthalpy_j_kg <= cold_h and cold_t == T_MIN_K:
+        # PH inversion can return T epsilon below T_MIN_K for enthalpy coordinates
+        # on the reviewed cold-end isotherm. Re-materialize with the TP producer.
+        return _state_at_inlet(provider, cold_t)
     return _checked_thermo(state, query_type="PH")
 
 
@@ -2584,10 +2615,13 @@ def _make_rated_cell(
     )
     tube_approach = tube_left_face.temperature_k - shell_left_face.temperature_k
     shell_approach = tube_right_face.temperature_k - shell_right_face.temperature_k
+    tube_bulk_t = _d(solution.tube_local.native.temperature_k)
+    shell_bulk_t = _d(solution.shell_local.native.temperature_k)
     if (
-        task_result.wall_temperature_inner_k < task_result.wall_temperature_outer_k
-        or task_result.wall_temperature_inner_k > solution.tube_local.native.temperature_k
-        or task_result.wall_temperature_outer_k < solution.shell_local.native.temperature_k
+        task_result.wall_temperature_inner_k + local_wall_floor
+        < task_result.wall_temperature_outer_k
+        or task_result.wall_temperature_inner_k > tube_bulk_t + local_wall_floor
+        or task_result.wall_temperature_outer_k + local_wall_floor < shell_bulk_t
     ):
         raise _Stage3Failure(
             "BLOCKED_PHYSICAL_WALL_ORDERING",
@@ -2875,9 +2909,7 @@ def _valid_trajectory(
         (face_t.temperature_k - face_s.temperature_k)
         for face_t, face_s in zip(tube_faces, shell_faces, strict=True)
     )
-    terminal_residual_h = (
-        shell_faces[-1].enthalpy_j_kg - effective_shell_cold_inlet_enthalpy_j_kg()
-    )
+    terminal_residual_h = shell_faces[-1].enthalpy_j_kg - effective_shell_cold_inlet_enthalpy_j_kg()
     terminal_residual_t = shell_faces[-1].temperature_k - T_MIN_K
     if terminal_residual_h < 0 or terminal_residual_t < 0:
         raise _Stage3Failure("BLOCKED_TERMINAL_BOUNDARY_BELOW_PRESCRIBED_STATE")
@@ -3052,7 +3084,7 @@ def _solve_outer_boundary_from_trial(
     """Run the production outer-boundary state machine with an injected trial evaluator."""
 
     h_low = effective_shell_cold_inlet_enthalpy_j_kg()
-    h_high = H_MAX_J_KG
+    h_high = effective_hot_ceiling_enthalpy_j_kg()
     low_trial = trial_at(h_low, 0)
     if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
         if low_trial.classification == "HARD_BLOCKER":

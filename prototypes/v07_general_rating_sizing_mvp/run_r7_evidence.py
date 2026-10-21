@@ -116,8 +116,10 @@ def main(output_dir: Path) -> dict[str, Any]:
         "case_b_task172_request_hash": root_b["task172_request_hash"],
         "case_a_task172_result_hash": root_a["task172_result_hash"],
         "case_b_task172_result_hash": root_b["task172_result_hash"],
-        "task172_request_hashes_differ": root_a["task172_request_hash"] != root_b["task172_request_hash"],
-        "task172_result_hashes_differ": root_a["task172_result_hash"] != root_b["task172_result_hash"],
+        "task172_request_hashes_differ": root_a["task172_request_hash"]
+        != root_b["task172_request_hash"],
+        "task172_result_hashes_differ": root_a["task172_result_hash"]
+        != root_b["task172_result_hash"],
         "case_a_q_root_w": root_a["q_root_w"],
         "case_b_q_root_w": root_b["q_root_w"],
         "constitutive_heat_rates_differ": root_a["q_root_w"] != root_b["q_root_w"],

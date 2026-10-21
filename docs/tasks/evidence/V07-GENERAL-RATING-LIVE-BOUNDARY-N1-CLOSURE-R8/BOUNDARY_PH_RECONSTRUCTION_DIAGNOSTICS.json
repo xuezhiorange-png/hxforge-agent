@@ -1,0 +1,57 @@
+{
+  "boundary_precision_handling": "TP_REMATERIALIZE_ON_PH_BELOW_T_MIN_COLD_ISOTHERM",
+  "cell_face_mean_enthalpy_j_kg": "104920.119809311465",
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+  "experimental_binding": {
+    "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+    "shell_inlet_temperature_k": "298.15",
+    "tube_inlet_temperature_k": "299.80"
+  },
+  "math_ulp_t_min_k": 5.684341886080802e-14,
+  "ph_provider_result": {
+    "enthalpy_j_kg": 104920.11980931147,
+    "provider": "CoolProp",
+    "temperature_k": 298.14999999999714
+  },
+  "ph_query_inputs": {
+    "enthalpy_j_kg": "104920.119809311465",
+    "pressure_pa": "101325",
+    "reference_state": "DEF"
+  },
+  "r6_frozen_reference_note": "Frozen 300 K tube inlet keeps H_MAX hot-end shooting aligned with tube face; R7 live tube 299.8 K required effective_hot_ceiling_enthalpy_j_kg for outer trials.",
+  "real_out_of_domain_still_blocked": true,
+  "rematerialized_state": {
+    "query_type": "TP",
+    "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+    "temperature_k": 298.15
+  },
+  "reviewed_constants": {
+    "H_MIN_J_KG": "104920.11980926784",
+    "T_MIN_K": "298.15"
+  },
+  "root_cause_summary": "Cell constitutive shell_mid_h is the arithmetic mean of cold-end enthalpies on the T_MIN_K isotherm. Native PH inversion returns T epsilon below T_MIN_K; R8 re-materializes with the TP producer when h lies in [H_MIN, shell_inlet_h] and shell inlet temperature equals T_MIN_K.",
+  "schema_version": "hxforge.boundary-ph-reconstruction-diagnostics.v1",
+  "shell_inlet_tp_state_hash": {
+    "backend": "HEOS::Water",
+    "conductivity_w_m_k": "0.6065160802197994",
+    "configuration_fingerprint": "56026a4893a04f66",
+    "cp_j_kg_k": "4181.314990770664",
+    "density_kg_m3": "997.047636760347",
+    "enthalpy_j_kg": "104920.11980935509",
+    "entropy_j_kg_k": "367.1996421055717",
+    "inputs": {
+      "pressure_pa": "101325.0",
+      "temperature_k": "298.15"
+    },
+    "phase": "liquid",
+    "pressure_pa": "101325.0",
+    "provider": "CoolProp",
+    "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "provider_version": "8.0.0",
+    "query_type": "TP",
+    "reference_state": "DEF",
+    "temperature_k": "298.15",
+    "viscosity_pa_s": "0.0008900224890776964"
+  },
+  "temperature_delta_below_t_min_k": 2.8421709430404007e-12
+}
