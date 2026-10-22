@@ -469,11 +469,15 @@ def run_experimental_live_rating_workflow(
     )
 
     total_seconds = round(time.perf_counter() - t0, 3)
-    task_id = (
-        "V07_GENERAL_MULTI_CANDIDATE_LIVE_RATING_R10"
-        if multi
-        else "V07_GENERAL_LIVE_RATING_CLI_AND_ENGINEERING_PREVIEW_R9"
-    )
+    selection_mode = getattr(case, "experimental_candidate_selection_mode", "")
+    if selection_mode == "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13":
+        task_id = "V07_GENERAL_VARIABLE_BUNDLE_GEOMETRY_SIZING_R13"
+    elif selection_mode == "MIN_NOMINAL_TUBE_AREA_SEARCH":
+        task_id = "V07_GENERAL_TARGET_DIRECTED_LIVE_SIZING_R12"
+    elif multi:
+        task_id = "V07_GENERAL_MULTI_CANDIDATE_LIVE_RATING_R10"
+    else:
+        task_id = "V07_GENERAL_LIVE_RATING_CLI_AND_ENGINEERING_PREVIEW_R9"
     raw: dict[str, Any] = {
         "schema_version": "hxforge.experimental-live-raw-result.v2",
         "task_id": task_id,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -201,6 +202,27 @@ def run_variable_bundle_geometry_sizing_workflow(
         }
         outcome.raw_result_path.write_text(
             json.dumps(raw, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+    manifest_path = output_dir / "EVIDENCE_MANIFEST.json"
+    if manifest_path.is_file():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["task_id"] = "V07_GENERAL_VARIABLE_BUNDLE_GEOMETRY_SIZING_R13"
+        for name in (
+            "R13_ENGINEERING_REPORT.json",
+            "R13_ENGINEERING_REPORT.md",
+            "TARGET_DIRECTED_SIZING_DECISION.json",
+            "R13_BASELINE_COMPARISON.json",
+            "R12_25M_TASK174_BLOCKER_ANALYSIS.json",
+            "R13_PREFLIGHT_CANDIDATE_SEARCH.json",
+        ):
+            path = output_dir / name
+            if path.is_file():
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                manifest.setdefault("files", {})[name] = digest
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
 

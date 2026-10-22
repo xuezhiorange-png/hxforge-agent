@@ -1,0 +1,15 @@
+{
+  "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+  "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+  "participates_in_task173_mesh": true,
+  "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+  "reference_pressure_pa": "101325",
+  "schema_version": "hxforge.experimental-thermal-boundary.v1",
+  "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+  "shell_inlet_temperature_k": "298.15",
+  "shell_mass_flow_kg_s": "20",
+  "thermal_variant": "TUBE_HOT_SHELL_COLD",
+  "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+  "tube_inlet_temperature_k": "299.70",
+  "tube_mass_flow_kg_s": "12"
+}
