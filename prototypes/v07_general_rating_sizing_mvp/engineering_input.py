@@ -238,6 +238,7 @@ class GeneralEngineeringCaseV2(BaseModel):
         "FIXED",
         "VARIABLE_SHELL_DIAMETER_R13",
     ] = "FIXED"
+    experimental_live_thermal_hydraulic_postpass: bool = False
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
     r12_baseline_geometry_fingerprints: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""

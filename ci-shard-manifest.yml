@@ -352,4 +352,5 @@ shards:
     files:
       - tests/prototypes/test_r13_variable_bundle_selection.py
       - tests/prototypes/test_r13_variable_bundle_live_cli.py
+      - tests/prototypes/test_r14_live_thermal_hydraulic_postpass.py
     timeout: 2400

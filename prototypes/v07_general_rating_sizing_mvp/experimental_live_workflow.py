@@ -42,6 +42,12 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_ranking import (
     build_experimental_ranking,
     build_offline_duty_scenarios,
 )
+from prototypes.v07_general_rating_sizing_mvp.live_thermal_hydraulic_connection_analysis import (
+    build_live_thermal_hydraulic_connection_analysis,
+)
+from prototypes.v07_general_rating_sizing_mvp.live_thermal_state_hydraulic_postpass import (
+    postpass_from_mesh_row,
+)
 from prototypes.v07_general_rating_sizing_mvp.low_mesh_result import low_mesh_result_document
 from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
     build_native_thermal_boundary_from_case,
@@ -188,9 +194,25 @@ def run_experimental_live_rating_workflow(
         encoding="utf-8",
     )
     hydraulic_scope = build_hydraulic_model_scope_document()
+    if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
+        hydraulic_scope = {
+            **hydraulic_scope,
+            "live_thermal_state_hydraulic_postpass_enabled": True,
+            "reference_preview_status": hydraulic_scope["task174_hydraulic_status"],
+        }
     (output_dir / "HYDRAULIC_MODEL_SCOPE.json").write_text(
         json.dumps(hydraulic_scope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
+        (output_dir / "LIVE_THERMAL_HYDRAULIC_CONNECTION_ANALYSIS.json").write_text(
+            json.dumps(
+                build_live_thermal_hydraulic_connection_analysis(case),
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     if not selection.selected_candidate_ids:
         return _blocked_outcome(
             case,
@@ -233,6 +255,15 @@ def run_experimental_live_rating_workflow(
                 "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
             }
         constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
+        live_hydraulic_postpass: dict[str, Any] | None = None
+        if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
+            live_hydraulic_postpass = postpass_from_mesh_row(
+                case,
+                candidate_id=candidate_id,
+                mesh=mesh,
+                native_reference_tube_dp=native.modeled_tube_side_pressure_drop_pa,
+                native_reference_shell_dp=native.modeled_shell_side_pressure_drop_pa,
+            )
         record = next(
             (rec for rec in selection.records if rec.candidate_id == candidate_id),
             None,
@@ -270,6 +301,7 @@ def run_experimental_live_rating_workflow(
             "wall_seconds": mesh.get("wall_seconds"),
             "failure_code": mesh.get("failure_code"),
             "constraint_preview": constraint_preview,
+            "live_thermal_state_hydraulic_postpass": live_hydraulic_postpass,
             "solver_performance_profile": profile,
         }
         rating_rows.append(row)

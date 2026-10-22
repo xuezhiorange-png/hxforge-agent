@@ -1,0 +1,120 @@
+{
+  "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+  "connection_analysis": {
+    "live_rating_outlet_thermal_state": {
+      "fields": [
+        "tube_outlet_temperature_k",
+        "shell_outlet_temperature_k",
+        "total_duty_w",
+        "energy_balance_residual_w"
+      ],
+      "present_in_mesh": true,
+      "shell_outlet_temperature_k": "298.53898098805473",
+      "source": "Task173 n=1 mesh observables when mesh_status=NUMERIC_VALID",
+      "tube_outlet_temperature_k": "299.05163815440915"
+    },
+    "pressure_domain_layers": {
+      "coolprop_liquid_water_tp": "Provider-native phase/domain errors surface as post-pass blockers",
+      "task173_reference_pressure_guard": "Property evaluation for R14 post-pass uses inlet reference pressure only (does not weaken Task174 BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT semantics)",
+      "user_max_delta_p": {
+        "shell_pa": "1180",
+        "tube_pa": "1150"
+      }
+    },
+    "r14_experimental_postpass": {
+      "authority_id": "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14",
+      "does_not_recompute": "Task172 coupled cell; iterative thermal-hydraulic closure; Task174 orchestration identity",
+      "enabled_by": "engineering_case.experimental_live_thermal_hydraulic_postpass=true",
+      "hydraulic_status": "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS",
+      "outlet_pressure_model": "one_way_inlet_minus_modeled_delta_p",
+      "property_evaluation_rule": "Per side: bulk mean temperature (T_inlet + T_outlet)/2 at case inlet reference pressure; CoolProp HEOS::Water; separate tube and shell snapshots",
+      "recomputes": "Task026\u2192Task027\u2192Task028\u2192Task029 tube path with live snapshot; Task032\u2192Task166 Bell\u2013Delaware shell path with live snapshot; actual Task025 parallel area and physical tube count from candidate bundle"
+    },
+    "schema_version": "hxforge.live-thermal-hydraulic-connection-analysis.v1",
+    "task174_reference_hydraulic_preview": {
+      "modeled_shell_dp_pa": null,
+      "modeled_tube_dp_pa": null,
+      "status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+      "temperature_pressure_basis": "Task168 evaluation authority frozen property snapshots at sizing templates; Task174 binds Task029/Task166 at reference 101325 Pa without live outlet states"
+    },
+    "task_id": "V07_LIVE_THERMAL_STATE_HYDRAULIC_EVALUATION_R14",
+    "user_inlet_thermal_state": {
+      "does_not_feed": "Task174 reference hydraulic preview without R14 post-pass",
+      "feeds": "Task173 experimental live thermal boundary when enabled",
+      "source": "general engineering case JSON (tube_side / shell_side)"
+    }
+  },
+  "live_rating_duty_w": "32528.427903428549",
+  "postpass": {
+    "authority_id": "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14",
+    "blockers": [],
+    "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+    "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+    "coolprop_outlet_domain_checks": {
+      "shell": {
+        "detail": null,
+        "ok": true,
+        "pressure_pa": "100152.0101173970401332059798",
+        "temperature_k": "298.53898098805473"
+      },
+      "tube": {
+        "detail": null,
+        "ok": true,
+        "pressure_pa": "101321.433",
+        "temperature_k": "299.05163815440915"
+      }
+    },
+    "correlation_applicability_status": "APPLICABLE",
+    "energy_balance_status": "NOT_EVALUATED_IN_POSTPASS",
+    "hydraulic_constraint_status": "SATISFIED",
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "physical_tube_count": 337,
+    "property_evaluation_rule_id": "SIDE_BULK_MEAN_TP_AT_INLET_REFERENCE_PRESSURE_R14",
+    "property_inputs": {
+      "shell": {
+        "bulk_pressure_pa": "101325",
+        "bulk_temperature_k": "298.344490494027365",
+        "density_kg_m3": "996.9975642036436",
+        "dynamic_viscosity_pa_s": "0.0008860922985925122",
+        "property_snapshot_hash": "64f7273d5521ae164344c7461b6ccdc3681fe96b1efe75c5219ff6c28e65de9f"
+      },
+      "tube": {
+        "bulk_pressure_pa": "101325",
+        "bulk_temperature_k": "299.375819077204575",
+        "density_kg_m3": "996.7260722782823",
+        "dynamic_viscosity_pa_s": "0.0008657120415081833",
+        "property_snapshot_hash": "0df7e98b1295909abee3b5f00a77000e50ab2b64b9d6e912f512107195f7feba"
+      }
+    },
+    "recalculated_shell_dp_pa": "1172.9898826029598667940202383314340443039618393996",
+    "recalculated_tube_dp_pa": "3.567",
+    "reference_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+    "reference_tube_dp_pa": "3.965",
+    "schema_version": "hxforge.live-thermal-state-hydraulic-postpass.v1",
+    "shell_bulk_evaluation_temperature_k": "298.344490494027365",
+    "shell_dp_components_pa": {
+      "central_crossflow": "114.13505268479315307772774905359850378737853582591",
+      "end_zone": "141.44894088462464688638578385259130707140430408005",
+      "total": "1172.9898826029598667940202383314340443039618393996",
+      "window": "917.40588903354206682990670542524423344517899949355"
+    },
+    "shell_dp_constraint": "SATISFIED",
+    "shell_dp_task166_result_hash": "e4053db4e1ee4611a150bf76ed451ccd8588d8a3a8ab5f705e177adf41d18b7d",
+    "shell_inlet_temperature_k": "298.15",
+    "shell_outlet_pressure_pa": "100152.0101173970401332059798",
+    "shell_outlet_temperature_k": "298.53898098805473",
+    "task025_total_parallel_flow_area_m2": "0.0656569794",
+    "task174_hydraulic_status": "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS",
+    "task174_style_outlet_pressure_window_pass": true,
+    "thermal_hydraulic_coupling_status": "EXPERIMENTAL_HYDRAULIC_POST_PASS_ONE_WAY",
+    "tube_bulk_evaluation_temperature_k": "299.375819077204575",
+    "tube_dp_constraint": "SATISFIED",
+    "tube_dp_task029_result_hash": "880137a909509286af5244a772c517b01fe239f5a4206e353ae061caaaacf992",
+    "tube_inlet_temperature_k": "299.70",
+    "tube_outlet_pressure_pa": "101321.433",
+    "tube_outlet_temperature_k": "299.05163815440915"
+  },
+  "task_id": "V07_LIVE_THERMAL_STATE_HYDRAULIC_EVALUATION_R14",
+  "wall_seconds": 0.764
+}
