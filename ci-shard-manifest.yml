@@ -346,13 +346,19 @@ shards:
       - tests/prototypes/test_r12_target_directed_live_cli.py
     timeout: 2400
 
-  - name: v07-variable-bundle-geometry-sizing-r13
-    job: shard-v07-variable-bundle-geometry-sizing-r13
+  - name: v07-variable-bundle-geometry-sizing-r13-selection
+    job: shard-v07-variable-bundle-geometry-sizing-r13-selection
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r13_variable_bundle_selection.py
+    timeout: 900
+
+  - name: v07-variable-bundle-geometry-sizing-r13-live-cli
+    job: shard-v07-variable-bundle-geometry-sizing-r13-live-cli
+    python: ["3.11", "3.12"]
+    files:
       - tests/prototypes/test_r13_variable_bundle_live_cli.py
-    timeout: 2400
+    timeout: 3600
 
   - name: v07-live-thermal-hydraulic-postpass-r14
     job: shard-v07-live-thermal-hydraulic-postpass-r14

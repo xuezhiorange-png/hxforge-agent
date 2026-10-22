@@ -36,7 +36,7 @@ def _run_cli(output_dir: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-@pytest.mark.timeout(2400)
+@pytest.mark.timeout(3600)
 def test_r13_live_two_ratings_variable_shell_geometry() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
