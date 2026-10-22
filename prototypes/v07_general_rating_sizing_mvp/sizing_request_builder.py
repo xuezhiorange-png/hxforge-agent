@@ -21,6 +21,9 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
     DiscreteDimensionRole,
     Task168Request,
 )
+from hexagent.exchangers.shell_tube.manufacturable_candidates.variable_shell_r13 import (
+    VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_sizing import (
     SizingRequirementAuthority,
     Task173SizingRequest,
@@ -105,37 +108,19 @@ def _shell_diameter_values(case: EngineeringCase) -> tuple[Decimal, ...]:
     return (constraints.shell_inside_diameter_m,)
 
 
-def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request) -> Task168Request:
-    constraints = case.candidate_constraints
-    shell_records: list[Any] = []
-    for diameter in _shell_diameter_values(case):
-        template = request.shell_geometry_catalog.records[0]
-        shell_record = replace(
-            template,
-            geometry_id=f"{template.geometry_id}::SHELL_D_{diameter}",
-            shell_inside_diameter_m=str(diameter),
-            nominal_label=f"shell_ID_{diameter}m",
-            record_hash="",
-        )
-        shell_record = replace(shell_record, record_hash=shell_record_hash(shell_record))
-        shell_records.append(shell_record)
-    catalog = replace(
-        request.shell_geometry_catalog,
-        records=tuple(shell_records),
-        catalog_hash="",
-    )
-    from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
-        shell_catalog_hash,
-    )
+def _variable_shell_geometry_catalog_enabled(case: EngineeringCase) -> bool:
+    """Multi-shell catalog + per-candidate Task021 envelope apply only for explicit R13 mode."""
+    bundle_mode = getattr(case, "experimental_bundle_geometry_mode", "FIXED")
+    diameters = _shell_diameter_values(case)
+    if bundle_mode == "VARIABLE_SHELL_DIAMETER_R13" and len(diameters) > 1:
+        return True
+    return len(case.candidate_constraints.shell_inside_diameters_m) > 1
 
-    catalog = replace(catalog, catalog_hash=shell_catalog_hash(catalog))
-    evaluation = request.evaluation_input_authority
-    task021_template = cast(dict[str, Any], deepcopy(evaluation.task021_request_template))
-    primary_shell = _shell_diameter_values(case)[0]
-    envelope_m = (primary_shell * Decimal("0.9")).quantize(Decimal("0.0000000001"))
-    task021_template["placement_envelope"]["tube_center_envelope_diameter_m"] = str(envelope_m)
-    evaluation = replace(evaluation, task021_request_template=task021_template, canonical_hash="")
-    evaluation = replace(evaluation, canonical_hash=evaluation_input_authority_hash(evaluation))
+
+def _with_discrete_geometry_authorities(
+    request: Task168Request,
+    constraints: Any,
+) -> Task168Request:
     authorities = list(request.discrete_candidate_set_authorities)
     role_map: dict[DiscreteDimensionRole, Decimal | int] = {
         DiscreteDimensionRole.TUBE_OUTER_DIAMETER: constraints.tube_outer_diameter_m,
@@ -149,12 +134,85 @@ def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request)
             value = role_map[authority.dimension_role]
             changed = replace(authority, values=(value,), canonical_hash="")
             authorities[index] = replace(changed, canonical_hash=discrete_authority_hash(changed))
-    return replace(
+    return replace(request, discrete_candidate_set_authorities=tuple(authorities))
+
+
+def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request) -> Task168Request:
+    from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
+        shell_catalog_hash,
+    )
+
+    constraints = case.candidate_constraints
+    if _variable_shell_geometry_catalog_enabled(case):
+        shell_records: list[Any] = []
+        diameters = _shell_diameter_values(case)
+        multi_shell = len(diameters) > 1
+        for diameter in diameters:
+            template = request.shell_geometry_catalog.records[0]
+            geometry_id = template.geometry_id
+            if multi_shell:
+                geometry_id = f"{template.geometry_id}::SHELL_D_{diameter}"
+            shell_record = replace(
+                template,
+                geometry_id=geometry_id,
+                shell_inside_diameter_m=str(diameter),
+                nominal_label=f"shell_ID_{diameter}m",
+                record_hash="",
+            )
+            shell_record = replace(shell_record, record_hash=shell_record_hash(shell_record))
+            shell_records.append(shell_record)
+        catalog = replace(
+            request.shell_geometry_catalog,
+            records=tuple(shell_records),
+            catalog_hash="",
+        )
+        catalog = replace(catalog, catalog_hash=shell_catalog_hash(catalog))
+        evaluation = request.evaluation_input_authority
+        task021_template = cast(dict[str, Any], deepcopy(evaluation.task021_request_template))
+        primary_shell = diameters[0]
+        envelope_m = (primary_shell * Decimal("0.9")).quantize(Decimal("0.0000000001"))
+        task021_template["placement_envelope"]["tube_center_envelope_diameter_m"] = str(envelope_m)
+        evaluation = replace(
+            evaluation, task021_request_template=task021_template, canonical_hash=""
+        )
+        evidence = tuple(evaluation.evidence_refs)
+        if VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13 not in evidence:
+            evidence = (*evidence, VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13)
+        evaluation = replace(evaluation, evidence_refs=evidence, canonical_hash="")
+        evaluation = replace(evaluation, canonical_hash=evaluation_input_authority_hash(evaluation))
+        updated = replace(
+            request,
+            shell_geometry_catalog=catalog,
+            evaluation_input_authority=evaluation,
+        )
+        return _with_discrete_geometry_authorities(updated, constraints)
+
+    shell_record = replace(
+        request.shell_geometry_catalog.records[0],
+        shell_inside_diameter_m=str(constraints.shell_inside_diameter_m),
+        record_hash="",
+    )
+    shell_record = replace(shell_record, record_hash=shell_record_hash(shell_record))
+    catalog = replace(
+        request.shell_geometry_catalog,
+        records=(shell_record,),
+        catalog_hash="",
+    )
+    catalog = replace(catalog, catalog_hash=shell_catalog_hash(catalog))
+    evaluation = request.evaluation_input_authority
+    task021_template = cast(dict[str, Any], deepcopy(evaluation.task021_request_template))
+    envelope_m = (constraints.shell_inside_diameter_m * Decimal("0.9")).quantize(
+        Decimal("0.0000000001")
+    )
+    task021_template["placement_envelope"]["tube_center_envelope_diameter_m"] = str(envelope_m)
+    evaluation = replace(evaluation, task021_request_template=task021_template, canonical_hash="")
+    evaluation = replace(evaluation, canonical_hash=evaluation_input_authority_hash(evaluation))
+    updated = replace(
         request,
         shell_geometry_catalog=catalog,
         evaluation_input_authority=evaluation,
-        discrete_candidate_set_authorities=tuple(authorities),
     )
+    return _with_discrete_geometry_authorities(updated, constraints)
 
 
 def build_task173_sizing_request(case: EngineeringCase) -> Task173SizingRequest:
