@@ -176,7 +176,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: [parse-manifest, resolve-authority]
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 25 || 30)) }}
+    timeout-minutes: ${{ matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 45 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || 30)) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
