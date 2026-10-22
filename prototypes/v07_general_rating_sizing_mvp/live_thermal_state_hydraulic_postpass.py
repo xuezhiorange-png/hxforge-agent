@@ -175,7 +175,9 @@ def _property_snapshot_from_coolprop_tp(
     return replace(base, property_snapshot_hash=snapshot_hash)
 
 
-def _task026_request_with_snapshot(authority: Any, snapshot: PropertySnapshot) -> TubeSideThermalRequest:
+def _task026_request_with_snapshot(
+    authority: Any, snapshot: PropertySnapshot
+) -> TubeSideThermalRequest:
     raw_or_request = authority.task026_request
     if type(raw_or_request) is TubeSideThermalRequest:
         task026_request = raw_or_request
@@ -277,7 +279,9 @@ def _run_task027_through_029(
             expected_multiplicity=component.multiplicity,
             member_authority_hash="",
         )
-        members.append(replace(updated, member_authority_hash=compute_member_authority_hash(updated)))
+        members.append(
+            replace(updated, member_authority_hash=compute_member_authority_hash(updated))
+        )
     friction = template_friction[0]
     friction_updated = replace(
         friction,
@@ -432,9 +436,9 @@ def run_live_thermal_state_hydraulic_postpass(
     shell_template = authority.task032_property_snapshot or tube_template
 
     blockers: list[dict[str, str]] = []
-    if not _engineering_inlet_pressure_ok(tube_inlet_pressure_pa) or not _engineering_inlet_pressure_ok(
-        shell_inlet_pressure_pa
-    ):
+    if not _engineering_inlet_pressure_ok(
+        tube_inlet_pressure_pa
+    ) or not _engineering_inlet_pressure_ok(shell_inlet_pressure_pa):
         blockers.append(
             {
                 "code": "BLOCKED_ENGINEERING_INLET_REFERENCE_PRESSURE",
@@ -515,7 +519,9 @@ def run_live_thermal_state_hydraulic_postpass(
         )
 
     try:
-        task166_live = _recompute_shell_bell_delaware(ctx=ctx, shell_property_snapshot=shell_snapshot)
+        task166_live = _recompute_shell_bell_delaware(
+            ctx=ctx, shell_property_snapshot=shell_snapshot
+        )
     except RuntimeError as exc:
         blockers.append({"code": "BLOCKED_SHELL_HYDRAULIC_RECOMPUTE", "detail": str(exc)})
         return _blocked_postpass_document(
@@ -542,7 +548,12 @@ def run_live_thermal_state_hydraulic_postpass(
         ("shell", shell_outlet_temperature_k, shell_out_p),
     ):
         ok, detail = _coolprop_outlet_domain_ok(provider, temperature_k=t_out, pressure_pa=p_out)
-        coolprop_checks[side] = {"ok": ok, "detail": detail, "temperature_k": str(t_out), "pressure_pa": str(p_out)}
+        coolprop_checks[side] = {
+            "ok": ok,
+            "detail": detail,
+            "temperature_k": str(t_out),
+            "pressure_pa": str(p_out),
+        }
         if not ok:
             blockers.append(
                 {
@@ -575,7 +586,10 @@ def run_live_thermal_state_hydraulic_postpass(
         hydraulic_constraint = "NOT_SATISFIED"
 
     applicability = "APPLICABLE"
-    if task166_live.applicability is not None and task166_live.applicability.status.value != "APPLICABLE":
+    if (
+        task166_live.applicability is not None
+        and task166_live.applicability.status.value != "APPLICABLE"
+    ):
         applicability = "BLOCKED_OR_WARN"
 
     return {
@@ -587,7 +601,9 @@ def run_live_thermal_state_hydraulic_postpass(
         "candidate_id": ctx.candidate_id,
         "candidate_hash": ctx.candidate_hash,
         "physical_tube_count": ctx.layout.physical_tube_count,
-        "task025_total_parallel_flow_area_m2": str(bundle.task025_result.total_parallel_flow_area_m2),
+        "task025_total_parallel_flow_area_m2": str(
+            bundle.task025_result.total_parallel_flow_area_m2
+        ),
         "tube_inlet_temperature_k": str(tube_inlet_temperature_k),
         "tube_outlet_temperature_k": str(tube_outlet_temperature_k),
         "shell_inlet_temperature_k": str(shell_inlet_temperature_k),
@@ -661,8 +677,12 @@ def _blocked_postpass_document(
         "blockers": blockers,
         "reference_tube_dp_pa": str(reference_tube_dp_pa),
         "reference_shell_dp_pa": str(reference_shell_dp_pa),
-        "recalculated_tube_dp_pa": str(recalculated_tube_dp_pa) if recalculated_tube_dp_pa else None,
-        "recalculated_shell_dp_pa": str(recalculated_shell_dp_pa) if recalculated_shell_dp_pa else None,
+        "recalculated_tube_dp_pa": str(recalculated_tube_dp_pa)
+        if recalculated_tube_dp_pa
+        else None,
+        "recalculated_shell_dp_pa": str(recalculated_shell_dp_pa)
+        if recalculated_shell_dp_pa
+        else None,
         "tube_inlet_temperature_k": str(tube_inlet_temperature_k),
         "tube_outlet_temperature_k": str(tube_outlet_temperature_k),
         "shell_inlet_temperature_k": str(shell_inlet_temperature_k),
@@ -683,7 +703,10 @@ def postpass_from_mesh_row(
 ) -> dict[str, Any] | None:
     if mesh.get("status") != "NUMERIC_VALID":
         return None
-    if mesh.get("tube_outlet_temperature_k") is None or mesh.get("shell_outlet_temperature_k") is None:
+    if (
+        mesh.get("tube_outlet_temperature_k") is None
+        or mesh.get("shell_outlet_temperature_k") is None
+    ):
         return None
     tube_side = tube_stream_spec(case)
     shell_side = shell_stream_spec(case)

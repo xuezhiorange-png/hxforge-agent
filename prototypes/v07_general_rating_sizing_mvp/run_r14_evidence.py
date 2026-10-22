@@ -20,9 +20,9 @@ from prototypes.v07_general_rating_sizing_mvp.live_thermal_state_hydraulic_postp
 
 _REPO = Path(__file__).resolve().parents[2]
 _CASE = _REPO / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_variable_bundle_r13.json"
-_R13_ROWS = (
-    _REPO
-    / "docs/tasks/evidence/V07-GENERAL-VARIABLE-BUNDLE-GEOMETRY-SIZING-R13/CANDIDATE_RATING_RESULTS.json"
+_R13_ROWS = _REPO / (
+    "docs/tasks/evidence/V07-GENERAL-VARIABLE-BUNDLE-GEOMETRY-SIZING-R13/"
+    "CANDIDATE_RATING_RESULTS.json"
 )
 _PINNED = "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
 _EVIDENCE = _REPO / "docs/tasks/evidence/V07-LIVE-THERMAL-STATE-HYDRAULIC-EVALUATION-R14"
