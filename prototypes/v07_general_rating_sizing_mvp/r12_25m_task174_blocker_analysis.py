@@ -74,9 +74,7 @@ def analyze_r12_25m_05m_task174_blocker(case: EngineeringCase) -> dict[str, Any]
             Task174NativeOutputs(
                 task029=bundle.task029_result,
                 task034=None,
-                task166=cast(
-                    Task166Result | Task166BlockedResult | None, bundle.task166_result
-                ),
+                task166=cast(Task166Result | Task166BlockedResult | None, bundle.task166_result),
             ),
         )
         blockers = []

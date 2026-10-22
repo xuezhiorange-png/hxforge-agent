@@ -86,9 +86,7 @@ def run_variable_bundle_geometry_sizing_workflow(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    r12_case_path = (
-        Path(__file__).resolve().parent / "cases" / "mvp_target_directed_r12.json"
-    )
+    r12_case_path = Path(__file__).resolve().parent / "cases" / "mvp_target_directed_r12.json"
     from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
         load_general_engineering_case_json,
     )

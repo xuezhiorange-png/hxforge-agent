@@ -246,8 +246,7 @@ def run_experimental_live_rating_workflow(
                 "shell_geometry_id": record.shell_geometry_id,
                 "physical_tube_count": record.physical_tube_count,
                 "task025_total_parallel_flow_area_m2": (
-                    record.task025_total_parallel_flow_area_m2
-                    or native.task025_parallel_area_m2
+                    record.task025_total_parallel_flow_area_m2 or native.task025_parallel_area_m2
                 ),
             }
         row: dict[str, Any] = {
