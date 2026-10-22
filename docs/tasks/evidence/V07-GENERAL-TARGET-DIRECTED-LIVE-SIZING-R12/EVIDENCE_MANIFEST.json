@@ -22,6 +22,6 @@
     "SIZING_OBJECTIVE_SCENARIOS.json": "b6479145016d72035e470b0b8297e378dda8bd6346b1810f526f9c516f63a6d7"
   },
   "schema_version": "hxforge.evidence-manifest.v1",
-  "task_id": "V07_GENERAL_MULTI_CANDIDATE_LIVE_RATING_R10",
+  "task_id": "V07_GENERAL_TARGET_DIRECTED_LIVE_SIZING_R12",
   "total_numerical_seconds": 508.182
 }

@@ -55,6 +55,9 @@ class CandidateSelectionRecord:
     task173_rating_status: str
     physical_tube_count: int | None = None
     nominal_tube_outer_area_proxy_m2: str | None = None
+    shell_inside_diameter_m: str | None = None
+    shell_geometry_id: str | None = None
+    task025_total_parallel_flow_area_m2: str | None = None
 
 
 @dataclass(frozen=True)
@@ -84,15 +87,21 @@ class CandidateSelectionOutcome:
         return sum(1 for row in self.records if row.selected_for_rating)
 
 
-def _geometry_projection_hash(tube_length_m: str, baffle_spacing_m: str) -> str:
+def _geometry_projection_hash(
+    tube_length_m: str,
+    baffle_spacing_m: str,
+    *,
+    shell_inside_diameter_m: str | None = None,
+) -> str:
     from hexagent.canonical_json import canonical_sha256
 
-    return canonical_sha256(
-        {
-            "tube_length_m": tube_length_m,
-            "baffle_spacing_m": baffle_spacing_m,
-        }
-    )
+    payload: dict[str, str] = {
+        "tube_length_m": tube_length_m,
+        "baffle_spacing_m": baffle_spacing_m,
+    }
+    if shell_inside_diameter_m is not None:
+        payload["shell_inside_diameter_m"] = shell_inside_diameter_m
+    return canonical_sha256(payload)
 
 
 def enumerate_experimental_rating_candidates(case: EngineeringCase) -> CandidateSelectionOutcome:
@@ -114,7 +123,11 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
 
     records: list[CandidateSelectionRecord] = []
     selection_mode = resolve_candidate_selection_mode(case)
-    defer_selection = selection_mode == "MIN_NOMINAL_TUBE_AREA_SEARCH"
+    multi_shell = len(t168.shell_geometry_catalog.records) > 1
+    defer_selection = selection_mode in {
+        "MIN_NOMINAL_TUBE_AREA_SEARCH",
+        "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13",
+    }
     selected_ids: list[str] = []
     selected_rating_hash: str | None = None
     selection_reason: str | None = None
@@ -124,7 +137,13 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
         candidate = task168._candidate(t168, authorities, combination[0], tuple(combination[1:]))
         tube_len = str(candidate.tube_length_m)
         baffle_space = str(candidate.baffle_spacing_m)
-        geom_hash = _geometry_projection_hash(tube_len, baffle_space)
+        shell_d = str(combination[0].shell_inside_diameter_m)
+        shell_gid = combination[0].geometry_id
+        geom_hash = _geometry_projection_hash(
+            tube_len,
+            baffle_space,
+            shell_inside_diameter_m=shell_d if multi_shell else None,
+        )
         structural_blockers = task168._structural_blockers(candidate)
         if structural_blockers:
             blocker_codes = tuple(str(item.code) for item in structural_blockers)
@@ -146,6 +165,8 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                     task174_result_hash=None,
                     selected_for_rating=False,
                     task173_rating_status="NOT_RUN",
+                    shell_inside_diameter_m=shell_d,
+                    shell_geometry_id=shell_gid,
                 )
             )
             continue
@@ -177,6 +198,8 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                     task174_result_hash=None,
                     selected_for_rating=False,
                     task173_rating_status="NOT_RUN",
+                    shell_inside_diameter_m=shell_d,
+                    shell_geometry_id=shell_gid,
                 )
             )
             continue
@@ -219,6 +242,11 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                     task174_result_hash=getattr(t174, "result_hash", None),
                     selected_for_rating=False,
                     task173_rating_status="NOT_RUN",
+                    shell_inside_diameter_m=shell_d,
+                    shell_geometry_id=shell_gid,
+                    task025_total_parallel_flow_area_m2=str(
+                        bundle.task025_result.total_parallel_flow_area_m2
+                    ),
                 )
             )
             continue
@@ -263,6 +291,11 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
                 task173_rating_status="SELECTED" if pick else "NOT_SELECTED",
                 physical_tube_count=physical_tube_count,
                 nominal_tube_outer_area_proxy_m2=nominal_area,
+                shell_inside_diameter_m=shell_d,
+                shell_geometry_id=shell_gid,
+                task025_total_parallel_flow_area_m2=str(
+                    bundle.task025_result.total_parallel_flow_area_m2
+                ),
             )
         )
 
@@ -348,6 +381,9 @@ def selection_to_json(outcome: CandidateSelectionOutcome) -> dict[str, Any]:
                 "task173_rating_status": row.task173_rating_status,
                 "nominal_tube_outer_area_proxy_m2": row.nominal_tube_outer_area_proxy_m2,
                 "physical_tube_count": row.physical_tube_count,
+                "shell_inside_diameter_m": row.shell_inside_diameter_m,
+                "shell_geometry_id": row.shell_geometry_id,
+                "task025_total_parallel_flow_area_m2": row.task025_total_parallel_flow_area_m2,
             }
             for row in outcome.records
         ],

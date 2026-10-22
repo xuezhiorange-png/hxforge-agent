@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from decimal import Decimal
 from math import pi
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 FIRST_N_POLICY = "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
 MIN_AREA_POLICY = "MIN_NOMINAL_TUBE_AREA_SEARCH_EXCLUDING_BASELINE_GEOMETRIES"
+VARIABLE_SHELL_POLICY = "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13"
 
 
 def resolve_candidate_selection_mode(case: EngineeringCase) -> str:
@@ -28,6 +29,30 @@ def baseline_geometry_pair_set(case: EngineeringCase) -> set[tuple[str, str]]:
     for pair in pairs:
         out.add((str(pair.tube_length_m), str(pair.baffle_spacing_m)))
     return out
+
+
+def _matches_fingerprint(row: CandidateSelectionRecord, pair: Any) -> bool:
+    if (row.tube_length_m, row.baffle_spacing_m) != (
+        str(pair.tube_length_m),
+        str(pair.baffle_spacing_m),
+    ):
+        return False
+    shell = getattr(pair, "shell_inside_diameter_m", None)
+    if shell is not None and row.shell_inside_diameter_m != str(shell):
+        return False
+    tube_count = getattr(pair, "physical_tube_count", None)
+    return tube_count is None or row.physical_tube_count == tube_count
+
+
+def _excluded_by_fingerprints(row: CandidateSelectionRecord, case: EngineeringCase) -> bool:
+    for collection in (
+        getattr(case, "r10_baseline_geometry_pairs", ()),
+        getattr(case, "r12_baseline_geometry_fingerprints", ()),
+    ):
+        for pair in collection or ():
+            if _matches_fingerprint(row, pair):
+                return True
+    return False
 
 
 def nominal_area_proxy_m2(
@@ -60,19 +85,52 @@ def apply_rating_selection_policy(
             key=lambda row: Decimal(row.nominal_tube_outer_area_proxy_m2 or "Infinity"),
         )
         reason = MIN_AREA_POLICY
+    elif mode == "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13":
+        pool = [row for row in ready if not _excluded_by_fingerprints(row, case)]
+        pool_sorted = sorted(
+            pool,
+            key=lambda row: (
+                Decimal(row.nominal_tube_outer_area_proxy_m2 or "Infinity"),
+                row.physical_tube_count or 0,
+            ),
+        )
+        reason = VARIABLE_SHELL_POLICY
     else:
         pool_sorted = ready
         reason = FIRST_N_POLICY
 
     selected_ids: list[str] = []
     selected_geometry: set[str] = set()
-    for row in pool_sorted:
+    selected_tube_counts: set[int] = set()
+
+    def _try_pick(row: CandidateSelectionRecord) -> bool:
         if len(selected_ids) >= max_rate:
-            break
+            return False
         if row.geometry_projection_hash in selected_geometry:
-            continue
+            return False
+        if mode == "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13":
+            count = row.physical_tube_count
+            if (
+                len(selected_ids) == 1
+                and count is not None
+                and count in selected_tube_counts
+                and len(pool_sorted) > 2
+            ):
+                return False
         selected_ids.append(row.candidate_id)
         selected_geometry.add(row.geometry_projection_hash)
+        if row.physical_tube_count is not None:
+            selected_tube_counts.add(row.physical_tube_count)
+        return True
+
+    for row in pool_sorted:
+        _try_pick(row)
+    if mode == "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13" and len(selected_ids) < max_rate:
+        for row in pool_sorted:
+            if row.candidate_id in selected_ids:
+                continue
+            if _try_pick(row) and len(selected_ids) >= max_rate:
+                break
 
     selected_set = set(selected_ids)
     for index, row in enumerate(records):

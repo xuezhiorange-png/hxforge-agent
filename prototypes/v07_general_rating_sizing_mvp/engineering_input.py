@@ -43,6 +43,15 @@ class CandidateGenerationConstraints(BaseModel):
     baffle_spacings_m: tuple[Decimal, ...] = Field(min_length=1, max_length=8)
     baffle_count: int = Field(ge=2, le=32)
     tube_pass_count: int = Field(default=1, ge=1, le=2)
+    shell_inside_diameters_m: tuple[Decimal, ...] = Field(default_factory=tuple, max_length=4)
+
+    @field_validator("shell_inside_diameters_m")
+    @classmethod
+    def shell_diameter_list_positive(cls, values: tuple[Decimal, ...]) -> tuple[Decimal, ...]:
+        for value in values:
+            if not value.is_finite() or value <= 0:
+                raise ValueError("shell_inside_diameters_m entries must be positive")
+        return values
 
     @field_validator(
         "shell_inside_diameter_m",
@@ -62,6 +71,8 @@ class BaselineGeometryPair(BaseModel):
 
     tube_length_m: Decimal
     baffle_spacing_m: Decimal
+    shell_inside_diameter_m: Decimal | None = None
+    physical_tube_count: int | None = None
 
 
 class SolverBudgetSpec(BaseModel):
@@ -221,8 +232,14 @@ class GeneralEngineeringCaseV2(BaseModel):
     experimental_candidate_selection_mode: Literal[
         "FIRST_N_DISTINCT_GEOMETRY",
         "MIN_NOMINAL_TUBE_AREA_SEARCH",
+        "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13",
     ] = "FIRST_N_DISTINCT_GEOMETRY"
+    experimental_bundle_geometry_mode: Literal[
+        "FIXED",
+        "VARIABLE_SHELL_DIAMETER_R13",
+    ] = "FIXED"
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
+    r12_baseline_geometry_fingerprints: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""
 
     @field_validator(

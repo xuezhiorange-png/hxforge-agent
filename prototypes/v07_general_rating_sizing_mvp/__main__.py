@@ -20,6 +20,9 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import 
 from prototypes.v07_general_rating_sizing_mvp.target_directed_live_sizing_workflow import (
     run_target_directed_live_sizing_workflow,
 )
+from prototypes.v07_general_rating_sizing_mvp.variable_bundle_geometry_sizing_workflow import (
+    run_variable_bundle_geometry_sizing_workflow,
+)
 from prototypes.v07_general_rating_sizing_mvp.workflow import run_general_engineering_workflow
 
 
@@ -35,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
             "legacy-v1-workflow",
             "experimental-live-rating",
             "experimental-target-directed-sizing-r12",
+            "experimental-variable-bundle-sizing-r13",
         ),
         default="legacy-v1-workflow",
         help="legacy-v1-workflow: v1 sizing path; experimental-live-rating: live n=1 mesh CLI",
@@ -62,6 +66,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Experimental sizing objective (default PARETO_ONLY; non-production)",
     )
     args = parser.parse_args(argv)
+    if args.mode == "experimental-variable-bundle-sizing-r13":
+        if args.mesh != 1:
+            print(json.dumps({"error": "only --mesh 1 is supported in R13"}), file=sys.stderr)
+            return 2
+        case = load_general_engineering_case_json(args.input.read_text(encoding="utf-8"))
+        outcome = run_variable_bundle_geometry_sizing_workflow(
+            case, args.output, mesh_level=args.mesh
+        )
+        (args.output / "WORKFLOW_OUTCOME.json").write_text(
+            json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(json.dumps(outcome.to_dict(), indent=2))
+        return experimental_live_rating_exit_code(outcome)
+
     if args.mode == "experimental-target-directed-sizing-r12":
         if args.mesh != 1:
             print(json.dumps({"error": "only --mesh 1 is supported in R12"}), file=sys.stderr)

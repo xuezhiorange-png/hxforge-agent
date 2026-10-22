@@ -97,17 +97,31 @@ def _apply_c3_reference_geometry(case: EngineeringCase, request: Task168Request)
     )
 
 
+def _shell_diameter_values(case: EngineeringCase) -> tuple[Decimal, ...]:
+    constraints = case.candidate_constraints
+    extra = tuple(constraints.shell_inside_diameters_m)
+    if extra:
+        return extra
+    return (constraints.shell_inside_diameter_m,)
+
+
 def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request) -> Task168Request:
     constraints = case.candidate_constraints
-    shell_record = replace(
-        request.shell_geometry_catalog.records[0],
-        shell_inside_diameter_m=str(constraints.shell_inside_diameter_m),
-        record_hash="",
-    )
-    shell_record = replace(shell_record, record_hash=shell_record_hash(shell_record))
+    shell_records: list[Any] = []
+    for diameter in _shell_diameter_values(case):
+        template = request.shell_geometry_catalog.records[0]
+        shell_record = replace(
+            template,
+            geometry_id=f"{template.geometry_id}::SHELL_D_{diameter}",
+            shell_inside_diameter_m=str(diameter),
+            nominal_label=f"shell_ID_{diameter}m",
+            record_hash="",
+        )
+        shell_record = replace(shell_record, record_hash=shell_record_hash(shell_record))
+        shell_records.append(shell_record)
     catalog = replace(
         request.shell_geometry_catalog,
-        records=(shell_record,),
+        records=tuple(shell_records),
         catalog_hash="",
     )
     from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
@@ -117,9 +131,8 @@ def _apply_case_geometry_catalog(case: EngineeringCase, request: Task168Request)
     catalog = replace(catalog, catalog_hash=shell_catalog_hash(catalog))
     evaluation = request.evaluation_input_authority
     task021_template = cast(dict[str, Any], deepcopy(evaluation.task021_request_template))
-    envelope_m = (constraints.shell_inside_diameter_m * Decimal("0.9")).quantize(
-        Decimal("0.0000000001")
-    )
+    primary_shell = _shell_diameter_values(case)[0]
+    envelope_m = (primary_shell * Decimal("0.9")).quantize(Decimal("0.0000000001"))
     task021_template["placement_envelope"]["tube_center_envelope_diameter_m"] = str(envelope_m)
     evaluation = replace(evaluation, task021_request_template=task021_template, canonical_hash="")
     evaluation = replace(evaluation, canonical_hash=evaluation_input_authority_hash(evaluation))

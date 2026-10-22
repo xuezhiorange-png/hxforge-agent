@@ -31,10 +31,12 @@ def check_experimental_live_rating_scope(
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", detail or "input_validation_blocked"
     if case.exchanger_type != "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE":
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "unsupported exchanger_type"
-    if not case.bind_task172_c3_reference_geometry:
+    bundle_mode = getattr(case, "experimental_bundle_geometry_mode", "FIXED")
+    if not case.bind_task172_c3_reference_geometry and bundle_mode != "VARIABLE_SHELL_DIAMETER_R13":
         return (
             "INPUT_OUT_OF_SUPPORTED_SCOPE",
-            "bind_task172_c3_reference_geometry must be true for experimental live rating",
+            "bind_task172_c3_reference_geometry must be true for experimental live rating "
+            "unless experimental_bundle_geometry_mode=VARIABLE_SHELL_DIAMETER_R13",
         )
     tube = tube_stream_spec(case)
     shell = shell_stream_spec(case)

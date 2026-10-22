@@ -239,6 +239,17 @@ def run_experimental_live_rating_workflow(
         )
         tube_len = record.tube_length_m if record is not None else ""
         nominal_geometry = nominal_area_for_native(case, native, tube_length_m=tube_len)
+        bundle_geometry: dict[str, Any] | None = None
+        if record is not None and record.shell_inside_diameter_m is not None:
+            bundle_geometry = {
+                "shell_inside_diameter_m": record.shell_inside_diameter_m,
+                "shell_geometry_id": record.shell_geometry_id,
+                "physical_tube_count": record.physical_tube_count,
+                "task025_total_parallel_flow_area_m2": (
+                    record.task025_total_parallel_flow_area_m2
+                    or native.task025_parallel_area_m2
+                ),
+            }
         row: dict[str, Any] = {
             "candidate_id": native.candidate_id,
             "candidate_hash": native.candidate_hash,
@@ -246,6 +257,7 @@ def run_experimental_live_rating_workflow(
             "task171_result_hash": native.task171_result_hash,
             "task174_result_hash": native.task174_result_hash,
             "task025_parallel_area_m2": native.task025_parallel_area_m2,
+            "bundle_geometry": bundle_geometry,
             "status": mesh.get("status"),
             "mesh_status": mesh.get("status"),
             "nominal_geometry": nominal_geometry,
