@@ -14,6 +14,10 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
     load_general_engineering_case_json,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV1
+from prototypes.v07_general_rating_sizing_mvp.experimental_live_multi_mesh_workflow import (
+    live_multi_mesh_exit_code,
+    run_experimental_live_multi_mesh_workflow,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import (
     run_experimental_live_rating_workflow,
 )
@@ -39,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
             "experimental-live-rating",
             "experimental-target-directed-sizing-r12",
             "experimental-variable-bundle-sizing-r13",
+            "experimental-live-multi-mesh-rating-r16",
         ),
         default="legacy-v1-workflow",
         help="legacy-v1-workflow: v1 sizing path; experimental-live-rating: live n=1 mesh CLI",
@@ -48,6 +53,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=1,
         help="Mesh subdivisions for experimental-live-rating (only n=1 is supported)",
+    )
+    parser.add_argument(
+        "--mesh-levels",
+        type=str,
+        default="1,2",
+        help="Comma-separated mesh levels for experimental-live-multi-mesh-rating-r16 (e.g. 1,2,4)",
     )
     parser.add_argument(
         "--preflight-only",
@@ -66,6 +77,28 @@ def main(argv: list[str] | None = None) -> int:
         help="Experimental sizing objective (default PARETO_ONLY; non-production)",
     )
     args = parser.parse_args(argv)
+
+    if args.mode == "experimental-live-multi-mesh-rating-r16":
+        levels = tuple(
+            int(part.strip())
+            for part in args.mesh_levels.split(",")
+            if part.strip()
+        )
+        if not levels or any(level < 1 for level in levels):
+            print(json.dumps({"error": "invalid --mesh-levels"}), file=sys.stderr)
+            return 2
+        case = load_general_engineering_case_json(args.input.read_text(encoding="utf-8"))
+        outcome = run_experimental_live_multi_mesh_workflow(
+            case,
+            args.output,
+            mesh_levels=levels,
+        )
+        (args.output / "WORKFLOW_OUTCOME.json").write_text(
+            json.dumps(outcome.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(json.dumps(outcome.to_dict(), indent=2))
+        return live_multi_mesh_exit_code(outcome)
+
     if args.mode == "experimental-variable-bundle-sizing-r13":
         if args.mesh != 1:
             print(json.dumps({"error": "only --mesh 1 is supported in R13"}), file=sys.stderr)

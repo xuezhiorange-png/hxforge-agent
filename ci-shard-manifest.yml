@@ -373,3 +373,17 @@ shards:
     files:
       - tests/prototypes/test_r15_hydraulic_constraint_sizing.py
     timeout: 2400
+
+  - name: v07-live-multi-mesh-rating-r16-unit
+    job: shard-v07-live-multi-mesh-rating-r16-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r16_live_multi_mesh_rating.py
+    timeout: 300
+
+  - name: v07-live-multi-mesh-rating-r16-e2e
+    job: shard-v07-live-multi-mesh-rating-r16-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r16_live_multi_mesh_rating_e2e.py
+    timeout: 3600

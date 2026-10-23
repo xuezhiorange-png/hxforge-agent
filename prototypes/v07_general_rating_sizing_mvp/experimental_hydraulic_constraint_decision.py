@@ -78,8 +78,20 @@ def _live_hydraulic_constraint_status(
     if postpass is None:
         return "NOT_EVALUATED"
 
+    required_fields = (
+        "recalculated_tube_dp_pa",
+        "recalculated_shell_dp_pa",
+        "tube_outlet_pressure_pa",
+        "shell_outlet_pressure_pa",
+        "correlation_applicability_status",
+        "task174_style_outlet_pressure_window_pass",
+    )
+    for field in required_fields:
+        if postpass.get(field) is None:
+            return "NOT_EVALUATED"
+
     applicability = postpass.get("correlation_applicability_status")
-    if applicability not in {None, "APPLICABLE"}:
+    if applicability != "APPLICABLE":
         return "PRELIMINARY_CONSTRAINT_FAILED"
 
     hydraulic_status = postpass.get("hydraulic_constraint_status")

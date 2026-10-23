@@ -149,6 +149,7 @@ def test_live_mode_blocked_postpass_fail_closed(r13_case, pinned_row, live_postp
     blocked = dict(live_postpass_doc)
     blocked["hydraulic_constraint_status"] = "BLOCKED"
     blocked["blockers"] = [{"code": "SYNTHETIC_BLOCK", "scope": "TEST", "detail": "R15"}]
+    blocked["task174_style_outlet_pressure_window_pass"] = False
     row = _synthetic_row(pinned_row, postpass=blocked)
     decision = build_hydraulic_constraint_decision(case, row, rating_status="NUMERIC_VALID")
     assert decision["LIVE_HYDRAULIC_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"

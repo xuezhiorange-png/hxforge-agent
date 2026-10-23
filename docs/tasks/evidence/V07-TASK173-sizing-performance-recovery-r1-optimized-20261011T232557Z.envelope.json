@@ -1,0 +1,12 @@
+{
+  "task_id": "V07_TASK173_SIZING_PERFORMANCE_RECOVERY_R1",
+  "label": "optimized",
+  "timeout_s": 90.0,
+  "benchmark_script": "/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py",
+  "started_at_utc": "20261011T232557Z",
+  "status": "FAIL",
+  "wall_seconds": 2.6088692619996436,
+  "returncode": 1,
+  "raw_result_path": "/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-optimized-20261011T232557Z.json",
+  "stderr_tail": "Traceback (most recent call last):\n  File \"/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py\", line 218, in <module>\n    payload = run_all(timeout_s=args.timeout_s)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py\", line 200, in run_all\n    report[\"samples\"].append(benchmark_task172_mesh_provider_pattern())\n                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py\", line 65, in benchmark_task172_mesh_provider_pattern\n    request = _load_task172_request()\n              ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/docs/tasks/evidence/V07-TASK173-sizing-performance-recovery-r1-benchmark.py\", line 52, in _load_task172_request\n    from tests.exchangers.shell_tube.test_task172_local_runtime import _request\nModuleNotFoundError: No module named 'tests'\n"
+}
