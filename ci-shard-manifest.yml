@@ -401,3 +401,17 @@ shards:
     files:
       - tests/prototypes/test_r18_variable_tube_mass_flow_e2e.py
     timeout: 3600
+
+  - name: v07-variable-shell-mass-flow-r19-unit
+    job: shard-v07-variable-shell-mass-flow-r19-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19_variable_shell_mass_flow.py
+    timeout: 300
+
+  - name: v07-variable-shell-mass-flow-r19-e2e
+    job: shard-v07-variable-shell-mass-flow-r19-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19_variable_shell_mass_flow_e2e.py
+    timeout: 3600

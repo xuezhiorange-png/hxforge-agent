@@ -66,6 +66,9 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import Eng
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
+from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
+    legacy_shell_mass_flow_kg_s,
+)
 from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
     legacy_tube_mass_flow_kg_s,
 )
@@ -340,11 +343,29 @@ def _run_task027_through_029(
     )
 
 
+def _scaled_shell_task032_mass_flow_rate_kg_s(
+    case: EngineeringCase,
+    authority: Any,
+) -> Decimal:
+    shell_side = shell_stream_spec(case)
+    template = authority.task032_mass_flow_authority
+    if template is None:
+        reference = legacy_shell_mass_flow_kg_s()
+    elif hasattr(template, "mass_flow_rate_kg_s"):
+        reference = Decimal(str(template.mass_flow_rate_kg_s))
+    elif type(template) is dict:
+        reference = Decimal(str(template["mass_flow_rate_kg_s"]))
+    else:
+        reference = legacy_shell_mass_flow_kg_s()
+    return reference * shell_side.mass_flow_kg_s / legacy_shell_mass_flow_kg_s()
+
+
 def _recompute_shell_bell_delaware(
     *,
+    case: EngineeringCase,
     ctx: Task168CandidateBundle,
     shell_property_snapshot: PropertySnapshot,
-) -> Task166Result:
+) -> tuple[Task166Result, Any]:
     bundle = ctx.bundle
     authority = ctx.authority
     request031 = task168._task031_payload(
@@ -358,8 +379,10 @@ def _recompute_shell_bell_delaware(
     request032 = task168._task032_payload(authority, result031, ctx.configuration, ctx.layout)
     request032["property_snapshot"] = task168._public_value(shell_property_snapshot)
     request032["property_snapshot_hash"] = shell_property_snapshot.property_snapshot_hash
+    scaled_shell_flow = _scaled_shell_task032_mass_flow_rate_kg_s(case, authority)
     mass_flow = request032.get("mass_flow_authority")
     if type(mass_flow) is dict:
+        mass_flow["mass_flow_rate_kg_s"] = str(scaled_shell_flow)
         mass_flow["property_snapshot_hash"] = shell_property_snapshot.property_snapshot_hash
         parsed = parse_task032_request(request032)
         mass_flow["authority_hash"] = mass_flow_authority_hash(parsed.mass_flow_authority)
@@ -379,7 +402,7 @@ def _recompute_shell_bell_delaware(
     outcome = validate_task166(payload166)
     if outcome.valid is None:
         raise RuntimeError("task166 blocked in live shell hydraulic post-pass")
-    return outcome.valid
+    return outcome.valid, result032
 
 
 def _coolprop_outlet_domain_ok(
@@ -536,8 +559,10 @@ def run_live_thermal_state_hydraulic_postpass(
         )
 
     try:
-        task166_live = _recompute_shell_bell_delaware(
-            ctx=ctx, shell_property_snapshot=shell_snapshot
+        task166_live, task032_live = _recompute_shell_bell_delaware(
+            case=case,
+            ctx=ctx,
+            shell_property_snapshot=shell_snapshot,
         )
     except RuntimeError as exc:
         blockers.append({"code": "BLOCKED_SHELL_HYDRAULIC_RECOMPUTE", "detail": str(exc)})
@@ -640,6 +665,12 @@ def run_live_thermal_state_hydraulic_postpass(
         "shell_dp_constraint": "SATISFIED" if shell_limit_ok else "NOT_SATISFIED",
         "correlation_applicability_status": applicability,
         "tube_reynolds_number": str(task026_result.reynolds_number),
+        "shell_reynolds_number": str(
+            getattr(task032_live.flow_state, "shell_side_reynolds_number", "")
+        ),
+        "shell_side_heat_transfer_coefficient_w_m2_k": str(
+            task166_live.corrected_shell_side_heat_transfer_coefficient
+        ),
         "tube_mass_flow_kg_s": str(tube_side.mass_flow_kg_s),
         "shell_mass_flow_kg_s": str(shell_stream_spec(case).mass_flow_kg_s),
         "energy_balance_status": "NOT_EVALUATED_IN_POSTPASS",

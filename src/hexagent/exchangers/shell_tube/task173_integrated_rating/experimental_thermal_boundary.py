@@ -23,6 +23,12 @@ EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID: Final = "V07-EXPERIMENTAL-THERMAL-BO
 EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID: Final = (
     "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R18-V1"
 )
+EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID: Final = (
+    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R19-V1"
+)
+EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID: Final = (
+    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R18-R19-V1"
+)
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 _TUBE_HOT_SHELL_COLD = "TUBE_HOT_SHELL_COLD"
@@ -87,10 +93,13 @@ def build_experimental_thermal_boundary_v1(
     shell_mass_flow_kg_s: Decimal = SHELL_MASS_FLOW_KG_S,
     reference_pressure_pa: Decimal = REFERENCE_PRESSURE_PA,
     allow_live_variable_tube_mass_flow: bool = False,
+    allow_live_variable_shell_mass_flow: bool = False,
 ) -> ExperimentalThermalBoundaryBindingV1:
     """Validate envelope and materialize inlet enthalpies for the experimental mesh path."""
-    if shell_mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
+    if not allow_live_variable_shell_mass_flow and shell_mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
         raise ValueError("experimental thermal boundary: shell mass flow must match frozen kernel")
+    if allow_live_variable_shell_mass_flow and shell_mass_flow_kg_s <= Decimal(0):
+        raise ValueError("experimental thermal boundary: shell mass flow must be positive")
     if not allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
         raise ValueError("experimental thermal boundary: tube mass flow must match frozen kernel")
     if allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s <= Decimal(0):
@@ -103,9 +112,19 @@ def build_experimental_thermal_boundary_v1(
         raise ValueError(
             "experimental thermal boundary: shell inlet enthalpy drift vs frozen H_MIN"
         )
+    tube_flow_variable = (
+        allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S
+    )
+    shell_flow_variable = (
+        allow_live_variable_shell_mass_flow and shell_mass_flow_kg_s != SHELL_MASS_FLOW_KG_S
+    )
     authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID
-    if allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
+    if tube_flow_variable and shell_flow_variable:
+        authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID
+    elif tube_flow_variable:
         authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID
+    elif shell_flow_variable:
+        authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID
     return ExperimentalThermalBoundaryBindingV1(
         schema_version=EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
         authority_id=authority_id,

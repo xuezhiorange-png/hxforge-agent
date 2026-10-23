@@ -869,22 +869,25 @@ class CandidateTask172LocalRequest(StrictModel):
     @model_validator(mode="after")
     def candidate_reviewed_service(self) -> CandidateTask172LocalRequest:
         from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
             EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
             active_experimental_thermal_boundary,
         )
 
         bound = active_experimental_thermal_boundary()
-        if (
-            bound is not None
-            and bound.authority_id == EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID
+        if bound is not None and bound.authority_id in (
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID,
         ):
-            if self.shell_mass_flow_kg_s != Decimal("20.000000"):
-                raise ValueError(
-                    "variable-tube experimental transfer keeps shell mass flow at 20 kg/s"
-                )
             if self.tube_mass_flow_kg_s != bound.tube_mass_flow_kg_s:
                 raise ValueError(
                     "tube mass flow must match active experimental thermal boundary binding"
+                )
+            if self.shell_mass_flow_kg_s != bound.shell_mass_flow_kg_s:
+                raise ValueError(
+                    "shell mass flow must match active experimental thermal boundary binding"
                 )
         elif self.tube_mass_flow_kg_s != Decimal(
             "12.000000"

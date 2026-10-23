@@ -243,7 +243,14 @@ class GeneralEngineeringCaseV2(BaseModel):
         default=False,
         description=(
             "When true, tube_side.mass_flow_kg_s participates in experimental live Task173 "
-            "enthalpy propagation and Task172 local requests (shell flow remains 20 kg/s)."
+            "enthalpy propagation and Task172 local requests."
+        ),
+    )
+    experimental_live_variable_shell_mass_flow: bool = Field(
+        default=False,
+        description=(
+            "When true, shell_side.mass_flow_kg_s participates in experimental live Task173 "
+            "enthalpy propagation, Task172 local requests, and live Task032/Task166 post-pass."
         ),
     )
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
@@ -276,7 +283,13 @@ class GeneralEngineeringCaseV2(BaseModel):
             validate_variable_tube_mass_flow_kg_s(self.tube_side.mass_flow_kg_s)
         elif self.tube_side.mass_flow_kg_s != Decimal("12.000000"):
             raise ValueError("tube_side mass_flow_kg_s must be 12.000000 kg/s for Task173 binding")
-        if self.shell_side.mass_flow_kg_s != Decimal("20.000000"):
+        if self.experimental_live_variable_shell_mass_flow:
+            from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
+                validate_variable_shell_mass_flow_kg_s,
+            )
+
+            validate_variable_shell_mass_flow_kg_s(self.shell_side.mass_flow_kg_s)
+        elif self.shell_side.mass_flow_kg_s != Decimal("20.000000"):
             raise ValueError("shell_side mass_flow_kg_s must be 20.000000 kg/s for Task173 binding")
         if self.tube_side.inlet_temperature_k <= self.shell_side.inlet_temperature_k:
             raise ValueError(
@@ -312,7 +325,11 @@ class GeneralEngineeringCaseV2(BaseModel):
                 if self.experimental_live_variable_tube_mass_flow
                 else "12.000000"
             ),
-            "shell_mass_flow_kg_s": "20.000000",
+            "shell_mass_flow_kg_s": (
+                str(self.shell_side.mass_flow_kg_s)
+                if self.experimental_live_variable_shell_mass_flow
+                else "20.000000"
+            ),
             "kernel_tube_inlet_temperature_k": "300.00",
             "kernel_shell_inlet_temperature_k": "298.15",
             "user_tube_inlet_temperature_k": str(self.tube_side.inlet_temperature_k),

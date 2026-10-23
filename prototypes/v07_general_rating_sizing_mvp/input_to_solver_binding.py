@@ -17,6 +17,9 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
+    experimental_live_variable_shell_mass_flow_enabled,
+)
 from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
     experimental_live_variable_tube_mass_flow_enabled,
 )
@@ -30,7 +33,11 @@ def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
     tube = tube_stream_spec(case)
     shell = shell_stream_spec(case)
     variable_tube_flow = experimental_live_variable_tube_mass_flow_enabled(case)
+    variable_shell_flow = experimental_live_variable_shell_mass_flow_enabled(case)
     tube_kernel_flow = str(tube.mass_flow_kg_s) if variable_tube_flow else str(TUBE_MASS_FLOW_KG_S)
+    shell_kernel_flow = (
+        str(shell.mass_flow_kg_s) if variable_shell_flow else str(SHELL_MASS_FLOW_KG_S)
+    )
     rows: list[dict[str, Any]] = [
         {
             "user_field": "tube_side.mass_flow_kg_s",
@@ -47,10 +54,14 @@ def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
         {
             "user_field": "shell_side.mass_flow_kg_s",
             "user_value": str(shell.mass_flow_kg_s),
-            "solver_parameter": "Task173 SHELL_MASS_FLOW_KG_S / Task172 shell_mass_flow_kg_s",
-            "solver_value": str(SHELL_MASS_FLOW_KG_S),
-            "participates_in_rating_kernel": shell.mass_flow_kg_s == SHELL_MASS_FLOW_KG_S,
-            "notes": "Shell equipment side carries the kernel COLD stream.",
+            "solver_parameter": "Task173 effective_shell_mass_flow_kg_s() / Task172 shell_mass_flow_kg_s",
+            "solver_value": shell_kernel_flow,
+            "participates_in_rating_kernel": variable_shell_flow
+            or shell.mass_flow_kg_s == SHELL_MASS_FLOW_KG_S,
+            "notes": (
+                "Shell equipment side carries the kernel COLD stream. "
+                "R19 experimental live binding may propagate user shell mass flow when enabled."
+            ),
         },
         {
             "user_field": "tube_side.inlet_temperature_k",

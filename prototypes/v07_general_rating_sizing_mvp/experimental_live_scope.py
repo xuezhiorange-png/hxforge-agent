@@ -10,6 +10,10 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV2
+from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
+    experimental_live_variable_shell_mass_flow_enabled,
+    validate_variable_shell_mass_flow_kg_s,
+)
 from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
     experimental_live_variable_tube_mass_flow_enabled,
     validate_variable_tube_mass_flow_kg_s,
@@ -53,7 +57,12 @@ def check_experimental_live_rating_scope(
             return "INPUT_OUT_OF_SUPPORTED_SCOPE", str(exc)
     elif tube.mass_flow_kg_s != _SUPPORTED_TUBE_FLOW:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "tube_side mass_flow_kg_s must be 12.000000 kg/s"
-    if shell.mass_flow_kg_s != _SUPPORTED_SHELL_FLOW:
+    if experimental_live_variable_shell_mass_flow_enabled(case):
+        try:
+            validate_variable_shell_mass_flow_kg_s(shell.mass_flow_kg_s)
+        except ValueError as exc:
+            return "INPUT_OUT_OF_SUPPORTED_SCOPE", str(exc)
+    elif shell.mass_flow_kg_s != _SUPPORTED_SHELL_FLOW:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "shell_side mass_flow_kg_s must be 20.000000 kg/s"
     if tube.inlet_pressure_pa != _SUPPORTED_PRESSURE_PA:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "tube inlet pressure must be 101325 Pa"
