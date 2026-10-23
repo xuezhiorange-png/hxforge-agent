@@ -66,6 +66,9 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import Eng
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
 )
+from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
+    legacy_tube_mass_flow_kg_s,
+)
 
 LIVE_THERMAL_HYDRAULIC_AUTHORITY_ID = "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14"
 HYDRAULIC_STATUS_LIVE_POSTPASS = "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS"
@@ -176,7 +179,10 @@ def _property_snapshot_from_coolprop_tp(
 
 
 def _task026_request_with_snapshot(
-    authority: Any, snapshot: PropertySnapshot
+    authority: Any,
+    snapshot: PropertySnapshot,
+    *,
+    mass_flow_rate_kg_s: Decimal | None = None,
 ) -> TubeSideThermalRequest:
     raw_or_request = authority.task026_request
     if type(raw_or_request) is TubeSideThermalRequest:
@@ -186,11 +192,13 @@ def _task026_request_with_snapshot(
         task026_request = build_raw_tube_side_request_envelope(projected)
     if type(task026_request) is not TubeSideThermalRequest:
         raise TypeError("task026 request envelope could not be materialized")
-    return replace(
-        task026_request,
-        property_snapshot=snapshot,
-        property_snapshot_hash=snapshot.property_snapshot_hash,
-    )
+    updates: dict[str, object] = {
+        "property_snapshot": snapshot,
+        "property_snapshot_hash": snapshot.property_snapshot_hash,
+    }
+    if mass_flow_rate_kg_s is not None:
+        updates["mass_flow_rate_kg_s"] = mass_flow_rate_kg_s
+    return replace(task026_request, **updates)
 
 
 def _run_task027_through_029(
@@ -472,7 +480,16 @@ def run_live_thermal_state_hydraulic_postpass(
             reference_shell_dp_pa=reference_shell_dp_pa,
         )
 
-    task026_request = _task026_request_with_snapshot(authority, tube_snapshot)
+    tube_side = tube_stream_spec(case)
+    reference_task026_flow = bundle.task026_result.mass_flow_rate_kg_s
+    scaled_task026_flow = (
+        reference_task026_flow * tube_side.mass_flow_kg_s / legacy_tube_mass_flow_kg_s()
+    )
+    task026_request = _task026_request_with_snapshot(
+        authority,
+        tube_snapshot,
+        mass_flow_rate_kg_s=scaled_task026_flow,
+    )
     task026_result = compute_tube_side_heat_transfer_coefficient(
         task026_request, bundle.task025_result
     )
@@ -622,6 +639,9 @@ def run_live_thermal_state_hydraulic_postpass(
         "tube_dp_constraint": "SATISFIED" if tube_limit_ok else "NOT_SATISFIED",
         "shell_dp_constraint": "SATISFIED" if shell_limit_ok else "NOT_SATISFIED",
         "correlation_applicability_status": applicability,
+        "tube_reynolds_number": str(task026_result.reynolds_number),
+        "tube_mass_flow_kg_s": str(tube_side.mass_flow_kg_s),
+        "shell_mass_flow_kg_s": str(shell_stream_spec(case).mass_flow_kg_s),
         "energy_balance_status": "NOT_EVALUATED_IN_POSTPASS",
         "blockers": blockers,
         "property_inputs": {

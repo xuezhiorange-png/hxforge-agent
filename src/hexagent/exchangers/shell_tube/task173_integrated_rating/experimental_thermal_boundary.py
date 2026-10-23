@@ -20,6 +20,9 @@ SHELL_MASS_FLOW_KG_S = Decimal("20")
 
 EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA: Final = "hxforge.experimental-thermal-boundary.v1"
 EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID: Final = "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1"
+EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID: Final = (
+    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R18-V1"
+)
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 _TUBE_HOT_SHELL_COLD = "TUBE_HOT_SHELL_COLD"
@@ -83,12 +86,15 @@ def build_experimental_thermal_boundary_v1(
     tube_mass_flow_kg_s: Decimal = TUBE_MASS_FLOW_KG_S,
     shell_mass_flow_kg_s: Decimal = SHELL_MASS_FLOW_KG_S,
     reference_pressure_pa: Decimal = REFERENCE_PRESSURE_PA,
+    allow_live_variable_tube_mass_flow: bool = False,
 ) -> ExperimentalThermalBoundaryBindingV1:
     """Validate envelope and materialize inlet enthalpies for the experimental mesh path."""
-    if tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
-        raise ValueError("experimental thermal boundary: tube mass flow must match frozen kernel")
     if shell_mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
         raise ValueError("experimental thermal boundary: shell mass flow must match frozen kernel")
+    if not allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
+        raise ValueError("experimental thermal boundary: tube mass flow must match frozen kernel")
+    if allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s <= Decimal(0):
+        raise ValueError("experimental thermal boundary: tube mass flow must be positive")
     if reference_pressure_pa != REFERENCE_PRESSURE_PA:
         raise ValueError("experimental thermal boundary: reference pressure must match kernel")
     tube_h = _enthalpy_at_tp(provider, tube_inlet_temperature_k, reference_pressure_pa)
@@ -97,9 +103,12 @@ def build_experimental_thermal_boundary_v1(
         raise ValueError(
             "experimental thermal boundary: shell inlet enthalpy drift vs frozen H_MIN"
         )
+    authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID
+    if allow_live_variable_tube_mass_flow and tube_mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
+        authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID
     return ExperimentalThermalBoundaryBindingV1(
         schema_version=EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
-        authority_id=EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
+        authority_id=authority_id,
         thermal_variant=_TUBE_HOT_SHELL_COLD,
         tube_inlet_temperature_k=tube_inlet_temperature_k,
         shell_inlet_temperature_k=shell_inlet_temperature_k,

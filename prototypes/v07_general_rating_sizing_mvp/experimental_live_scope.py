@@ -10,6 +10,10 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import GeneralEngineeringCaseV2
+from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
+    experimental_live_variable_tube_mass_flow_enabled,
+    validate_variable_tube_mass_flow_kg_s,
+)
 
 _SUPPORTED_SHELL_INLET_K = Decimal("298.15")
 _SUPPORTED_TUBE_FLOW = Decimal("12.000000")
@@ -42,7 +46,12 @@ def check_experimental_live_rating_scope(
     shell = shell_stream_spec(case)
     if tube.fluid != "PURE_ORDINARY_WATER" or shell.fluid != "PURE_ORDINARY_WATER":
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "only PURE_ORDINARY_WATER single-phase is supported"
-    if tube.mass_flow_kg_s != _SUPPORTED_TUBE_FLOW:
+    if experimental_live_variable_tube_mass_flow_enabled(case):
+        try:
+            validate_variable_tube_mass_flow_kg_s(tube.mass_flow_kg_s)
+        except ValueError as exc:
+            return "INPUT_OUT_OF_SUPPORTED_SCOPE", str(exc)
+    elif tube.mass_flow_kg_s != _SUPPORTED_TUBE_FLOW:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "tube_side mass_flow_kg_s must be 12.000000 kg/s"
     if shell.mass_flow_kg_s != _SUPPORTED_SHELL_FLOW:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "shell_side mass_flow_kg_s must be 20.000000 kg/s"

@@ -1,5 +1,7 @@
 """Strict value models for the TASK172 local constitutive runtime."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
@@ -866,9 +868,27 @@ class CandidateTask172LocalRequest(StrictModel):
 
     @model_validator(mode="after")
     def candidate_reviewed_service(self) -> CandidateTask172LocalRequest:
-        if self.tube_mass_flow_kg_s != Decimal("12.000000") or self.shell_mass_flow_kg_s != Decimal(
-            "20.000000"
+        from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
+            active_experimental_thermal_boundary,
+        )
+
+        bound = active_experimental_thermal_boundary()
+        if (
+            bound is not None
+            and bound.authority_id == EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID
         ):
+            if self.shell_mass_flow_kg_s != Decimal("20.000000"):
+                raise ValueError(
+                    "variable-tube experimental transfer keeps shell mass flow at 20 kg/s"
+                )
+            if self.tube_mass_flow_kg_s != bound.tube_mass_flow_kg_s:
+                raise ValueError(
+                    "tube mass flow must match active experimental thermal boundary binding"
+                )
+        elif self.tube_mass_flow_kg_s != Decimal(
+            "12.000000"
+        ) or self.shell_mass_flow_kg_s != Decimal("20.000000"):
             raise ValueError("candidate transfer is limited to the reviewed 12/20 kg/s service")
         if self.tube_inside_fouling_m2_k_w != 0 or self.shell_outside_fouling_m2_k_w != 0:
             raise ValueError("candidate transfer is limited to the reviewed clean-surface profile")

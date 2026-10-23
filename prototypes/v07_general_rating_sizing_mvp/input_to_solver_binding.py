@@ -17,6 +17,9 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
+    experimental_live_variable_tube_mass_flow_enabled,
+)
 
 _BINDING_SCHEMA = "hxforge.input-to-solver-binding.v2"
 
@@ -26,14 +29,20 @@ def build_input_to_solver_binding(case: EngineeringCase) -> dict[str, Any]:
     convention = case.heat_transfer_convention()
     tube = tube_stream_spec(case)
     shell = shell_stream_spec(case)
+    variable_tube_flow = experimental_live_variable_tube_mass_flow_enabled(case)
+    tube_kernel_flow = str(tube.mass_flow_kg_s) if variable_tube_flow else str(TUBE_MASS_FLOW_KG_S)
     rows: list[dict[str, Any]] = [
         {
             "user_field": "tube_side.mass_flow_kg_s",
             "user_value": str(tube.mass_flow_kg_s),
-            "solver_parameter": "Task173 TUBE_MASS_FLOW_KG_S / Task172 tube_mass_flow_kg_s",
-            "solver_value": str(TUBE_MASS_FLOW_KG_S),
-            "participates_in_rating_kernel": tube.mass_flow_kg_s == TUBE_MASS_FLOW_KG_S,
-            "notes": "Tube equipment side carries the kernel HOT stream.",
+            "solver_parameter": "Task173 effective_tube_mass_flow_kg_s() / Task172 tube_mass_flow_kg_s",
+            "solver_value": tube_kernel_flow,
+            "participates_in_rating_kernel": variable_tube_flow
+            or tube.mass_flow_kg_s == TUBE_MASS_FLOW_KG_S,
+            "notes": (
+                "Tube equipment side carries the kernel HOT stream. "
+                "R18 experimental live binding may propagate user tube mass flow when enabled."
+            ),
         },
         {
             "user_field": "shell_side.mass_flow_kg_s",

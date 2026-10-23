@@ -57,6 +57,8 @@ def build_experimental_live_rating_run_identity(
         "shell_inlet_temperature_k": thermal_boundary_binding_doc.get("shell_inlet_temperature_k"),
         "tube_inlet_enthalpy_j_kg": thermal_boundary_binding_doc.get("tube_inlet_enthalpy_j_kg"),
         "shell_inlet_enthalpy_j_kg": thermal_boundary_binding_doc.get("shell_inlet_enthalpy_j_kg"),
+        "tube_mass_flow_kg_s": thermal_boundary_binding_doc.get("tube_mass_flow_kg_s"),
+        "shell_mass_flow_kg_s": thermal_boundary_binding_doc.get("shell_mass_flow_kg_s"),
         "experimental_thermal_boundary_authority_id": EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
         "experimental_thermal_boundary_binding_hash": canonical_sha256(
             {
@@ -72,6 +74,8 @@ def build_experimental_live_rating_run_identity(
                 "shell_inlet_enthalpy_j_kg": thermal_boundary_binding_doc.get(
                     "shell_inlet_enthalpy_j_kg"
                 ),
+                "tube_mass_flow_kg_s": thermal_boundary_binding_doc.get("tube_mass_flow_kg_s"),
+                "shell_mass_flow_kg_s": thermal_boundary_binding_doc.get("shell_mass_flow_kg_s"),
                 "authority_id": thermal_boundary_binding_doc.get("authority_id"),
             }
         ),

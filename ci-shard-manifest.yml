@@ -387,3 +387,17 @@ shards:
     files:
       - tests/prototypes/test_r16_live_multi_mesh_rating_e2e.py
     timeout: 3600
+
+  - name: v07-variable-tube-mass-flow-r18-unit
+    job: shard-v07-variable-tube-mass-flow-r18-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r18_variable_tube_mass_flow.py
+    timeout: 300
+
+  - name: v07-variable-tube-mass-flow-r18-e2e
+    job: shard-v07-variable-tube-mass-flow-r18-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r18_variable_tube_mass_flow_e2e.py
+    timeout: 3600

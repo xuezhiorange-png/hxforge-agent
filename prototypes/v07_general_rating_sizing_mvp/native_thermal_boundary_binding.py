@@ -30,6 +30,9 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
+    experimental_live_variable_tube_mass_flow_enabled,
+)
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 
@@ -42,7 +45,10 @@ def validate_case_for_native_thermal_binding(case: EngineeringCase) -> None:
     shell = shell_stream_spec(case)
     if tube.fluid != _ALLOWED_FLUID or shell.fluid != _ALLOWED_FLUID:
         raise ValueError("native thermal binding supports PURE_ORDINARY_WATER only")
-    if tube.mass_flow_kg_s != TUBE_MASS_FLOW_KG_S:
+    if (
+        not experimental_live_variable_tube_mass_flow_enabled(case)
+        and tube.mass_flow_kg_s != TUBE_MASS_FLOW_KG_S
+    ):
         raise ValueError("tube mass flow must match frozen Task173 kernel for experimental binding")
     if shell.mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
         raise ValueError(
@@ -65,6 +71,9 @@ def build_native_thermal_boundary_from_case(
         provider=provider,
         tube_inlet_temperature_k=tube.inlet_temperature_k,
         shell_inlet_temperature_k=shell.inlet_temperature_k,
+        tube_mass_flow_kg_s=tube.mass_flow_kg_s,
+        shell_mass_flow_kg_s=shell.mass_flow_kg_s,
+        allow_live_variable_tube_mass_flow=experimental_live_variable_tube_mass_flow_enabled(case),
     )
 
 

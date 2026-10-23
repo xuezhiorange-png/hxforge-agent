@@ -239,6 +239,13 @@ class GeneralEngineeringCaseV2(BaseModel):
         "VARIABLE_SHELL_DIAMETER_R13",
     ] = "FIXED"
     experimental_live_thermal_hydraulic_postpass: bool = False
+    experimental_live_variable_tube_mass_flow: bool = Field(
+        default=False,
+        description=(
+            "When true, tube_side.mass_flow_kg_s participates in experimental live Task173 "
+            "enthalpy propagation and Task172 local requests (shell flow remains 20 kg/s)."
+        ),
+    )
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
     r12_baseline_geometry_fingerprints: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""
@@ -261,7 +268,13 @@ class GeneralEngineeringCaseV2(BaseModel):
         for side in (self.tube_side, self.shell_side):
             if side.fluid != "PURE_ORDINARY_WATER":
                 raise ValueError("MVP supports PURE_ORDINARY_WATER only")
-        if self.tube_side.mass_flow_kg_s != Decimal("12.000000"):
+        if self.experimental_live_variable_tube_mass_flow:
+            from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
+                validate_variable_tube_mass_flow_kg_s,
+            )
+
+            validate_variable_tube_mass_flow_kg_s(self.tube_side.mass_flow_kg_s)
+        elif self.tube_side.mass_flow_kg_s != Decimal("12.000000"):
             raise ValueError("tube_side mass_flow_kg_s must be 12.000000 kg/s for Task173 binding")
         if self.shell_side.mass_flow_kg_s != Decimal("20.000000"):
             raise ValueError("shell_side mass_flow_kg_s must be 20.000000 kg/s for Task173 binding")
@@ -294,7 +307,11 @@ class GeneralEngineeringCaseV2(BaseModel):
             "shell_equipment_side": "shell_side",
             "tube_thermal_role": "HOT",
             "shell_thermal_role": "COLD",
-            "tube_mass_flow_kg_s": "12.000000",
+            "tube_mass_flow_kg_s": (
+                str(self.tube_side.mass_flow_kg_s)
+                if self.experimental_live_variable_tube_mass_flow
+                else "12.000000"
+            ),
             "shell_mass_flow_kg_s": "20.000000",
             "kernel_tube_inlet_temperature_k": "300.00",
             "kernel_shell_inlet_temperature_k": "298.15",

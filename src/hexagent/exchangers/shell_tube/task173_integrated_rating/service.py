@@ -156,6 +156,20 @@ def effective_hot_ceiling_enthalpy_j_kg() -> Decimal:
     return bound.tube_inlet_enthalpy_j_kg
 
 
+def effective_tube_mass_flow_kg_s() -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if bound is None:
+        return TUBE_MASS_FLOW_KG_S
+    return bound.tube_mass_flow_kg_s
+
+
+def effective_shell_mass_flow_kg_s() -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if bound is None:
+        return SHELL_MASS_FLOW_KG_S
+    return bound.shell_mass_flow_kg_s
+
+
 def _cold_ph_rematerialization_allowed(
     *,
     shooting_enthalpy_j_kg: Decimal,
@@ -1797,8 +1811,8 @@ def _task172_request(
                 temperature_k=_d(shell_state.native.temperature_k),
                 pressure_pa=REFERENCE_PRESSURE_PA,
             ),
-            tube_mass_flow_kg_s=TUBE_MASS_FLOW_KG_S,
-            shell_mass_flow_kg_s=SHELL_MASS_FLOW_KG_S,
+            tube_mass_flow_kg_s=effective_tube_mass_flow_kg_s(),
+            shell_mass_flow_kg_s=effective_shell_mass_flow_kg_s(),
             shell_flow_authority=CandidateShellFlowAuthority(
                 task031_geometry=candidate.task031_geometry,
                 task166_result=candidate.task166_result,
@@ -1829,8 +1843,8 @@ def _task172_request(
             temperature_k=_d(shell_state.native.temperature_k),
             pressure_pa=REFERENCE_PRESSURE_PA,
         ),
-        tube_mass_flow_kg_s=TUBE_MASS_FLOW_KG_S,
-        shell_mass_flow_kg_s=SHELL_MASS_FLOW_KG_S,
+        tube_mass_flow_kg_s=effective_tube_mass_flow_kg_s(),
+        shell_mass_flow_kg_s=effective_shell_mass_flow_kg_s(),
         shell_flow_authority=shell_authority,
     )
 
@@ -1926,8 +1940,10 @@ def _cell_evaluation(
     else:
         with localcontext() as context:
             context.prec = 70
-            tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / TUBE_MASS_FLOW_KG_S
-            shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / SHELL_MASS_FLOW_KG_S
+            tube_mdot = effective_tube_mass_flow_kg_s()
+            shell_mdot = effective_shell_mass_flow_kg_s()
+            tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / tube_mdot
+            shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / shell_mdot
             tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
             shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
         if tube_downstream_h < H_MIN_J_KG or tube_downstream_h > H_MAX_J_KG:
@@ -2028,8 +2044,8 @@ def _solve_cell(
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
     with localcontext() as context:
         context.prec = 70
-        tube_capacity = TUBE_MASS_FLOW_KG_S * (h_tube - H_MIN_J_KG)
-        shell_capacity = SHELL_MASS_FLOW_KG_S * (h_shell - H_MIN_J_KG)
+        tube_capacity = effective_tube_mass_flow_kg_s() * (h_tube - H_MIN_J_KG)
+        shell_capacity = effective_shell_mass_flow_kg_s() * (h_shell - H_MIN_J_KG)
     if tube_capacity < 0 or shell_capacity < 0:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT")
 
@@ -2390,8 +2406,8 @@ def _solve_cell(
         q_decimal = Decimal(str(upper))
         with localcontext() as context:
             context.prec = 70
-            tube_h = h_tube - q_decimal / TUBE_MASS_FLOW_KG_S
-            shell_h = h_shell - q_decimal / SHELL_MASS_FLOW_KG_S
+            tube_h = h_tube - q_decimal / effective_tube_mass_flow_kg_s()
+            shell_h = h_shell - q_decimal / effective_shell_mass_flow_kg_s()
         if tube_h >= H_MIN_J_KG and shell_h >= H_MIN_J_KG:
             break
         upper = math.nextafter(upper, 0.0)
@@ -2921,8 +2937,10 @@ def _valid_trajectory(
             raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", str(index))
 
     q_wall = sum((cell.solution.q_w for cell in cells), Decimal(0))
-    hot_loss = TUBE_MASS_FLOW_KG_S * (tube_faces[0].enthalpy_j_kg - tube_faces[-1].enthalpy_j_kg)
-    cold_gain = SHELL_MASS_FLOW_KG_S * (
+    hot_loss = effective_tube_mass_flow_kg_s() * (
+        tube_faces[0].enthalpy_j_kg - tube_faces[-1].enthalpy_j_kg
+    )
+    cold_gain = effective_shell_mass_flow_kg_s() * (
         shell_faces[0].enthalpy_j_kg - shell_faces[-1].enthalpy_j_kg
     )
     energy_residual = max(
