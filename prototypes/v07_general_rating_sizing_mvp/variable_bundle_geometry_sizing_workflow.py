@@ -14,6 +14,10 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     selection_to_json,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    append_hydraulic_sizing_markdown_lines,
+    build_live_hydraulic_sizing_summary,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_live_workflow import (
     ExperimentalLiveRatingOutcome,
     run_experimental_live_rating_workflow,
@@ -23,10 +27,6 @@ from prototypes.v07_general_rating_sizing_mvp.r10_frozen_baseline import (
 )
 from prototypes.v07_general_rating_sizing_mvp.r12_25m_task174_blocker_analysis import (
     analyze_r12_25m_05m_task174_blocker,
-)
-from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
-    append_hydraulic_sizing_markdown_lines,
-    build_live_hydraulic_sizing_summary,
 )
 from prototypes.v07_general_rating_sizing_mvp.target_directed_sizing import (
     build_target_directed_sizing_decision,
@@ -310,6 +310,7 @@ def _render_r13_markdown(
         row=primary_row,
         decision=primary_decision,
     )
+    hyd_source = decision.get("HYDRAULIC_DECISION_SOURCE", decision["HYDRAULIC_MODEL_SCOPE"])
     lines.extend(
         [
             "",
@@ -320,7 +321,7 @@ def _render_r13_markdown(
             f"- Target duty: {decision.get('TARGET_DUTY_W')} W",
             f"- Duty overshoot ratio: {decision.get('DUTY_OVERSHOOT_RATIO_VS_TARGET')}",
             f"- Hydraulic scope: **{decision['HYDRAULIC_MODEL_SCOPE']}**",
-            f"- Hydraulic decision source: **{decision.get('HYDRAULIC_DECISION_SOURCE', decision['HYDRAULIC_MODEL_SCOPE'])}**",
+            f"- Hydraulic decision source: **{hyd_source}**",
             "",
             "## Engineering conclusion",
             "",
