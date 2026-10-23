@@ -24,6 +24,10 @@ from prototypes.v07_general_rating_sizing_mvp.r10_frozen_baseline import (
 from prototypes.v07_general_rating_sizing_mvp.r12_25m_task174_blocker_analysis import (
     analyze_r12_25m_05m_task174_blocker,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    append_hydraulic_sizing_markdown_lines,
+    build_live_hydraulic_sizing_summary,
+)
 from prototypes.v07_general_rating_sizing_mvp.target_directed_sizing import (
     build_target_directed_sizing_decision,
 )
@@ -149,6 +153,14 @@ def run_variable_bundle_geometry_sizing_workflow(
         rating_rows,
         selection_reason=str(selection.selection_reason or ""),
     )
+    live_hydraulic_sizing = build_live_hydraulic_sizing_summary(
+        case,
+        rating_rows,
+        target_directed_decision=decision,
+    )
+    (output_dir / "LIVE_HYDRAULIC_SIZING_DECISION.json").write_text(
+        json.dumps(live_hydraulic_sizing, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     decision["C3_APPLICABILITY_STATUS"] = (
         "C3_REFERENCE_BOUND" if case.bind_task172_c3_reference_geometry else "NOT_C3_REFERENCE"
     )
@@ -171,7 +183,9 @@ def run_variable_bundle_geometry_sizing_workflow(
         json.dumps(comparison, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    report_md = _render_r13_markdown(case, selection, rating_rows, decision, blocker_doc)
+    report_md = _render_r13_markdown(
+        case, selection, rating_rows, decision, blocker_doc, live_hydraulic_sizing
+    )
     (output_dir / "R13_ENGINEERING_REPORT.md").write_text(report_md + "\n", encoding="utf-8")
     (output_dir / "R13_ENGINEERING_REPORT.json").write_text(
         json.dumps(
@@ -233,6 +247,7 @@ def _render_r13_markdown(
     rating_rows: list[dict[str, Any]],
     decision: dict[str, Any],
     blocker_doc: dict[str, Any],
+    live_hydraulic_sizing: dict[str, Any] | None = None,
 ) -> str:
     lines = [
         f"# R13 Variable bundle geometry sizing — {case.engineering_case_id}",
@@ -272,10 +287,29 @@ def _render_r13_markdown(
             f"Task025 A_flow {bundle.get('task025_total_parallel_flow_area_m2')} m²"
         )
         lines.append(
-            f"  - constraints: duty {preview.get('duty_constraint')}, "
+            f"  - reference constraints: duty {preview.get('duty_constraint')}, "
             f"tube Δp {preview.get('tube_dp_constraint')}, "
             f"shell Δp {preview.get('shell_dp_constraint')}"
         )
+        postpass = row.get("live_thermal_state_hydraulic_postpass")
+        if postpass:
+            lines.append(
+                f"  - live post-pass shell Δp {postpass.get('recalculated_shell_dp_pa')} Pa "
+                f"({postpass.get('shell_dp_constraint')})"
+            )
+    primary_decision = None
+    if live_hydraulic_sizing and live_hydraulic_sizing.get("per_candidate"):
+        primary_decision = live_hydraulic_sizing["per_candidate"][0]
+    primary_row = next(
+        (r for r in rating_rows if r.get("mesh_status") == "NUMERIC_VALID"),
+        rating_rows[0] if rating_rows else None,
+    )
+    append_hydraulic_sizing_markdown_lines(
+        lines,
+        case=case,
+        row=primary_row,
+        decision=primary_decision,
+    )
     lines.extend(
         [
             "",
@@ -286,6 +320,7 @@ def _render_r13_markdown(
             f"- Target duty: {decision.get('TARGET_DUTY_W')} W",
             f"- Duty overshoot ratio: {decision.get('DUTY_OVERSHOOT_RATIO_VS_TARGET')}",
             f"- Hydraulic scope: **{decision['HYDRAULIC_MODEL_SCOPE']}**",
+            f"- Hydraulic decision source: **{decision.get('HYDRAULIC_DECISION_SOURCE', decision['HYDRAULIC_MODEL_SCOPE'])}**",
             "",
             "## Engineering conclusion",
             "",

@@ -28,6 +28,12 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_candidate_eligibility
 from prototypes.v07_general_rating_sizing_mvp.experimental_constraint_preview import (
     build_experimental_constraint_preview,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    HYDRAULIC_DECISION_SOURCE_LIVE,
+    HYDRAULIC_DECISION_SOURCE_REFERENCE,
+    build_live_hydraulic_sizing_summary,
+    live_hydraulic_postpass_enabled,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_scope import (
     build_hydraulic_model_scope_document,
 )
@@ -194,11 +200,17 @@ def run_experimental_live_rating_workflow(
         encoding="utf-8",
     )
     hydraulic_scope = build_hydraulic_model_scope_document()
-    if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
+    if live_hydraulic_postpass_enabled(case):
         hydraulic_scope = {
             **hydraulic_scope,
             "live_thermal_state_hydraulic_postpass_enabled": True,
             "reference_preview_status": hydraulic_scope["task174_hydraulic_status"],
+            "sizing_hydraulic_decision_source": HYDRAULIC_DECISION_SOURCE_LIVE,
+        }
+    else:
+        hydraulic_scope = {
+            **hydraulic_scope,
+            "sizing_hydraulic_decision_source": HYDRAULIC_DECISION_SOURCE_REFERENCE,
         }
     (output_dir / "HYDRAULIC_MODEL_SCOPE.json").write_text(
         json.dumps(hydraulic_scope, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -352,12 +364,18 @@ def run_experimental_live_rating_workflow(
     )
 
     eligibility = build_candidate_eligibility(case, selection, rating_rows)
+    hydraulic_decision_source = (
+        HYDRAULIC_DECISION_SOURCE_LIVE
+        if live_hydraulic_postpass_enabled(case)
+        else HYDRAULIC_DECISION_SOURCE_REFERENCE
+    )
     (output_dir / "EXPERIMENTAL_CANDIDATE_ELIGIBILITY.json").write_text(
         json.dumps(
             {
                 "schema_version": "hxforge.experimental-candidate-eligibility.v1",
                 "candidates": eligibility,
-                "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+                "HYDRAULIC_MODEL_SCOPE": hydraulic_decision_source,
+                "HYDRAULIC_DECISION_SOURCE": hydraulic_decision_source,
                 "production_qualification": "PRODUCTION_NOT_QUALIFIED",
             },
             indent=2,
@@ -387,7 +405,7 @@ def run_experimental_live_rating_workflow(
         cli_objective=cli_objective,
     )
     feasible_ids = ranking.get("feasible_candidate_ids") or []
-    pareto = build_experimental_pareto_result(rating_rows, feasible_ids=feasible_ids)
+    pareto = build_experimental_pareto_result(case, rating_rows, feasible_ids=feasible_ids)
     (output_dir / "EXPERIMENTAL_PARETO_RESULT.json").write_text(
         json.dumps(pareto, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -466,6 +484,26 @@ def run_experimental_live_rating_workflow(
         encoding="utf-8",
     )
 
+    live_hydraulic_sizing = build_live_hydraulic_sizing_summary(
+        case,
+        rating_rows,
+        ranking=ranking,
+    )
+    if live_hydraulic_postpass_enabled(case):
+        (output_dir / "LIVE_HYDRAULIC_SIZING_DECISION.json").write_text(
+            json.dumps(live_hydraulic_sizing, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+    first_valid_preview = next(
+        (
+            row.get("constraint_preview")
+            for row in rating_rows
+            if row.get("mesh_status") == "NUMERIC_VALID" and row.get("constraint_preview")
+        ),
+        None,
+    )
+
     experimental_mesh: dict[str, Any] = {
         "mode": "experimental-live-rating",
         "mesh_level": mesh_level,
@@ -473,6 +511,8 @@ def run_experimental_live_rating_workflow(
         "candidate_rating_results": rating_rows,
         "ranking": ranking,
         "candidate_eligibility": eligibility,
+        "live_hydraulic_sizing_decision": live_hydraulic_sizing,
+        "constraint_preview": first_valid_preview,
         "pareto_result": pareto,
         "sizing_objective_scenarios": scenarios,
         "hydraulic_model_scope": hydraulic_scope,

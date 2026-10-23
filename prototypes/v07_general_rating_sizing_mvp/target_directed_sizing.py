@@ -11,6 +11,12 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_candidate_eligibility
     build_candidate_eligibility,
     constraint_satisfied_ids,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    HYDRAULIC_DECISION_SOURCE_LIVE,
+    HYDRAULIC_DECISION_SOURCE_REFERENCE,
+    build_hydraulic_constraint_decision,
+    live_hydraulic_postpass_enabled,
+)
 from prototypes.v07_general_rating_sizing_mvp.r10_frozen_baseline import (
     R10_CANDIDATE_A_REFERENCE,
     r10_reference_a_nominal_area_m2,
@@ -59,6 +65,19 @@ def build_target_directed_sizing_decision(
     if duty_w is not None:
         overshoot_ratio = str(Decimal(str(duty_w)) / case.target_duty_w)
 
+    hydraulic_scope = (
+        HYDRAULIC_DECISION_SOURCE_LIVE
+        if live_hydraulic_postpass_enabled(case)
+        else HYDRAULIC_DECISION_SOURCE_REFERENCE
+    )
+    best_hydraulic: dict[str, Any] | None = None
+    if best_row is not None:
+        best_hydraulic = build_hydraulic_constraint_decision(
+            case,
+            best_row,
+            rating_status="NUMERIC_VALID",
+        )
+
     return {
         "schema_version": "hxforge.target-directed-sizing-decision.v1",
         "selection_reason": selection_reason,
@@ -78,7 +97,9 @@ def build_target_directed_sizing_decision(
         "TARGET_DUTY_W": str(case.target_duty_w),
         "DUTY_OVERSHOOT_RATIO_VS_TARGET": overshoot_ratio,
         "R10_BASELINE_CANDIDATE_A": R10_CANDIDATE_A_REFERENCE,
-        "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+        "HYDRAULIC_MODEL_SCOPE": hydraulic_scope,
+        "HYDRAULIC_DECISION_SOURCE": hydraulic_scope,
+        "LIVE_HYDRAULIC_SIZING_DECISION": best_hydraulic,
         "full_rating_converged": False,
         "production_sizing_verified": False,
         "production_design_approved": False,

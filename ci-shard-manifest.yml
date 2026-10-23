@@ -366,3 +366,10 @@ shards:
     files:
       - tests/prototypes/test_r14_live_thermal_hydraulic_postpass.py
     timeout: 900
+
+  - name: v07-live-hydraulic-constraint-sizing-r15
+    job: shard-v07-live-hydraulic-constraint-sizing-r15
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r15_hydraulic_constraint_sizing.py
+    timeout: 2400

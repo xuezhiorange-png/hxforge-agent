@@ -10,6 +10,10 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     CandidateSelectionRecord,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    build_hydraulic_constraint_decision,
+    live_hydraulic_postpass_enabled,
+)
 
 
 def _structural_status(record: CandidateSelectionRecord) -> str:
@@ -72,13 +76,11 @@ def build_candidate_eligibility(
         record = records_by_id[candidate_id]
         row = rating_by_id.get(candidate_id, {})
         mesh_status = row.get("mesh_status") or row.get("status")
-        preview = row.get("constraint_preview")
         rating_status = _rating_status(mesh_status)
-        constraint_status = _constraint_status(
-            case,
-            rating_status=rating_status,
-            constraint_preview=preview,
+        hydraulic_decision = build_hydraulic_constraint_decision(
+            case, row, rating_status=rating_status
         )
+        constraint_status = str(hydraulic_decision["EFFECTIVE_CONSTRAINT_STATUS"])
         entries.append(
             {
                 "candidate_id": candidate_id,
@@ -89,6 +91,15 @@ def build_candidate_eligibility(
                 "TASK174_STATUS": _task174_status(record),
                 "RATING_STATUS": rating_status,
                 "CONSTRAINT_STATUS": constraint_status,
+                "HYDRAULIC_DECISION_SOURCE": hydraulic_decision["hydraulic_decision_source"],
+                "REFERENCE_CONSTRAINT_STATUS": hydraulic_decision["REFERENCE_CONSTRAINT_STATUS"],
+                "LIVE_HYDRAULIC_CONSTRAINT_STATUS": hydraulic_decision[
+                    "LIVE_HYDRAULIC_CONSTRAINT_STATUS"
+                ],
+                "reference_vs_live_feasibility_changed": hydraulic_decision[
+                    "reference_vs_live_feasibility_changed"
+                ],
+                "hydraulic_constraint_decision": hydraulic_decision,
                 "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
                 "task168_blocked_codes": list(record.task168_blocked_codes),
                 "nominal_geometry": row.get("nominal_geometry"),
@@ -112,10 +123,14 @@ def reevaluate_constraint_for_target(
 ) -> str:
     if row.get("mesh_status") != "NUMERIC_VALID" and row.get("status") != "NUMERIC_VALID":
         return "NOT_EVALUATED"
-    preview = row.get("constraint_preview") or {}
     duty_w = Decimal(str(row.get("total_duty_w")))
     if duty_w < target_duty_w:
         return "PRELIMINARY_CONSTRAINT_FAILED"
+    if live_hydraulic_postpass_enabled(case):
+        rating_status = _rating_status(row.get("mesh_status") or row.get("status"))
+        decision = build_hydraulic_constraint_decision(case, row, rating_status=rating_status)
+        return str(decision["EFFECTIVE_CONSTRAINT_STATUS"])
+    preview = row.get("constraint_preview") or {}
     tube_dp = preview.get("tube_dp_constraint")
     shell_dp = preview.get("shell_dp_constraint")
     if tube_dp != "SATISFIED" or shell_dp != "SATISFIED":

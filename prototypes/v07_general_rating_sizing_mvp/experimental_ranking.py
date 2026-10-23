@@ -14,6 +14,10 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_candidate_eligibility
     constraint_satisfied_ids,
     reevaluate_constraint_for_target,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    effective_shell_dp_pa,
+    live_hydraulic_postpass_enabled,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_objective import (
     DEFAULT_OBJECTIVE,
     ExperimentalSizingObjective,
@@ -66,28 +70,24 @@ def _nominal_area_m2(row: dict[str, Any]) -> Decimal | None:
     return Decimal(str(raw))
 
 
-def _shell_dp_pa(row: dict[str, Any]) -> Decimal | None:
-    preview = row.get("constraint_preview") or {}
-    raw = preview.get("modeled_shell_dp_pa")
-    if raw is None:
-        return None
-    return Decimal(str(raw))
+def _shell_dp_pa(case: Any, row: dict[str, Any]) -> Decimal | None:
+    return effective_shell_dp_pa(case, row)
 
 
-def _pareto_frontier(rows: list[dict[str, Any]]) -> list[str]:
+def _pareto_frontier(case: Any, rows: list[dict[str, Any]]) -> list[str]:
     """Non-dominated on (max duty, min nominal area, min shell Δp preview)."""
     ids: list[str] = []
     for i, a in enumerate(rows):
         duty_a = _duty_w(a)
         area_a = _nominal_area_m2(a)
-        shell_a = _shell_dp_pa(a)
+        shell_a = _shell_dp_pa(case, a)
         dominated = False
         for j, b in enumerate(rows):
             if i == j:
                 continue
             duty_b = _duty_w(b)
             area_b = _nominal_area_m2(b)
-            shell_b = _shell_dp_pa(b)
+            shell_b = _shell_dp_pa(case, b)
             better_or_equal_duty = duty_b >= duty_a
             area_axis = area_a is not None and area_b is not None
             shell_axis = shell_a is not None and shell_b is not None
@@ -112,15 +112,21 @@ def _pareto_frontier(rows: list[dict[str, Any]]) -> list[str]:
 
 
 def build_experimental_pareto_result(
+    case: Any,
     rating_rows: list[dict[str, Any]],
     *,
     feasible_ids: list[str],
 ) -> dict[str, Any]:
     feasible_rows = [row for row in rating_rows if row["candidate_id"] in feasible_ids]
     frontier = (
-        _pareto_frontier(feasible_rows)
+        _pareto_frontier(case, feasible_rows)
         if len(feasible_rows) >= 2
         else [row["candidate_id"] for row in feasible_rows]
+    )
+    shell_axis = (
+        "minimize_live_recalculated_shell_dp_pa"
+        if live_hydraulic_postpass_enabled(case)
+        else "minimize_modeled_shell_dp_pa_preview"
     )
     return {
         "schema_version": "hxforge.experimental-pareto-result.v1",
@@ -129,7 +135,7 @@ def build_experimental_pareto_result(
         "dominance_axes": [
             "maximize_total_duty_w",
             "minimize_nominal_tube_outer_area_m2",
-            "minimize_modeled_shell_dp_pa_preview",
+            shell_axis,
         ],
         "production_sizing_verified": False,
     }
@@ -202,7 +208,7 @@ def build_experimental_ranking(
         )
         return base
 
-    pareto_doc = build_experimental_pareto_result(rating_rows, feasible_ids=feasible_ids)
+    pareto_doc = build_experimental_pareto_result(case, rating_rows, feasible_ids=feasible_ids)
     base["pareto_frontier_candidate_ids"] = pareto_doc["pareto_frontier_candidate_ids"]
 
     if not feasible_rows:
@@ -266,7 +272,7 @@ def build_experimental_ranking(
         ordered_feasible = sorted(
             feasible_rows,
             key=lambda row: (
-                _shell_dp_pa(row) or Decimal("Infinity"),
+                _shell_dp_pa(case, row) or Decimal("Infinity"),
                 -_duty_w(row),
             ),
         )

@@ -12,6 +12,10 @@ from typing import Any
 from hexagent.exchangers.shell_tube.task173_integrated_sizing import Task173SizingSuccessResult
 from prototypes.v07_general_rating_sizing_mvp.case_streams import design_conditions_for_report
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    append_hydraulic_sizing_markdown_lines,
+    live_hydraulic_postpass_enabled,
+)
 
 
 def _candidate_rows(outcome: Task173SizingSuccessResult) -> list[dict[str, Any]]:
@@ -91,6 +95,9 @@ def build_report_payload(
             "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
         },
         "notes": case.notes,
+        "experimental_live_thermal_hydraulic_postpass_enabled": live_hydraulic_postpass_enabled(
+            case
+        ),
     }
     if experimental_mesh is not None:
         ranking_doc = experimental_mesh.get("ranking") or {}
@@ -115,6 +122,9 @@ def build_report_payload(
         payload["experimental_pareto_result"] = experimental_mesh.get("pareto_result")
         payload["sizing_objective_scenarios"] = experimental_mesh.get("sizing_objective_scenarios")
         payload["hydraulic_model_scope"] = experimental_mesh.get("hydraulic_model_scope")
+        payload["live_hydraulic_sizing_decision"] = experimental_mesh.get(
+            "live_hydraulic_sizing_decision"
+        )
         payload["property_provider_identity"] = experimental_mesh.get("property_provider_identity")
         payload["rating_and_sizing"] = {
             "mode": experimental_mesh.get("mode", "EXPERIMENTAL_LOW_MESH_ONLY"),
@@ -174,7 +184,7 @@ def build_report_payload(
     return payload
 
 
-def render_markdown(report: dict[str, Any]) -> str:
+def render_markdown(report: dict[str, Any], *, case: EngineeringCase | None = None) -> str:
     lines = [
         f"# Engineering Report — {report['engineering_case_id']}",
         "",
@@ -263,10 +273,37 @@ def render_markdown(report: dict[str, Any]) -> str:
         hyd = report.get("hydraulic_model_scope") or {}
         lines.append(f"- Hydraulic scope: **{hyd.get('task174_hydraulic_status')}**")
         lines.append(
+            f"- Sizing hydraulic decision source: **{hyd.get('sizing_hydraulic_decision_source', 'HYDRAULIC_REFERENCE_MODEL_PREVIEW')}**"
+        )
+        lines.append(
             "- Task168 preflight dispositions in `candidates` are enumeration-only; "
             "see per-candidate STRUCTURAL_STATUS / RATING_STATUS above for rated paths."
         )
         lines.append("")
+    live_sizing = report.get("live_hydraulic_sizing_decision")
+    primary_row = None
+    multi_rows_for_hyd = report.get("candidate_rating_results")
+    if multi_rows_for_hyd:
+        primary_row = next(
+            (r for r in multi_rows_for_hyd if r.get("mesh_status") == "NUMERIC_VALID"),
+            multi_rows_for_hyd[0],
+        )
+    primary_decision = None
+    if live_sizing and live_sizing.get("per_candidate"):
+        primary_decision = live_sizing["per_candidate"][0]
+    elif primary_row and primary_row.get("hydraulic_constraint_decision"):
+        primary_decision = primary_row["hydraulic_constraint_decision"]
+    elif report.get("experimental_candidate_eligibility"):
+        elig0 = report["experimental_candidate_eligibility"][0]
+        primary_decision = elig0.get("hydraulic_constraint_decision")
+    if case is not None:
+        append_hydraulic_sizing_markdown_lines(
+            lines,
+            case=case,
+            row=primary_row,
+            decision=primary_decision,
+        )
+
     preview = report.get("experimental_constraint_preview")
     if preview:
         lines.extend(
@@ -368,5 +405,5 @@ def write_engineering_reports(
     json_path = output_dir / "ENGINEERING_REPORT.json"
     md_path = output_dir / "ENGINEERING_REPORT.md"
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    md_path.write_text(render_markdown(payload) + "\n", encoding="utf-8")
+    md_path.write_text(render_markdown(payload, case=case) + "\n", encoding="utf-8")
     return json_path, md_path
