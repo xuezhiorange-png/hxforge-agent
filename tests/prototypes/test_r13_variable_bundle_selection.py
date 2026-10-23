@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    CandidateSelectionOutcome,
     enumerate_experimental_rating_candidates,
 )
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection_policy import (
@@ -25,15 +29,25 @@ R13_CASE = REPO / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_variable_b
 R12_CASE = REPO / "prototypes/v07_general_rating_sizing_mvp/cases/mvp_target_directed_r12.json"
 
 
-def test_r13_scope_allows_non_c3_variable_shell() -> None:
-    case = load_general_engineering_case_json(R13_CASE.read_text(encoding="utf-8"))
-    assert check_experimental_live_rating_scope(case) == ("IN_SCOPE", None)
-    assert case.bind_task172_c3_reference_geometry is False
+@pytest.fixture(scope="module")
+def r13_case() -> Any:
+    return load_general_engineering_case_json(R13_CASE.read_text(encoding="utf-8"))
 
 
-def test_r13_task174_ready_candidates_have_distinct_tube_counts() -> None:
-    case = load_general_engineering_case_json(R13_CASE.read_text(encoding="utf-8"))
-    sel = enumerate_experimental_rating_candidates(case)
+@pytest.fixture(scope="module")
+def r13_selection_outcome(r13_case: Any) -> CandidateSelectionOutcome:
+    return enumerate_experimental_rating_candidates(r13_case)
+
+
+def test_r13_scope_allows_non_c3_variable_shell(r13_case: Any) -> None:
+    assert check_experimental_live_rating_scope(r13_case) == ("IN_SCOPE", None)
+    assert r13_case.bind_task172_c3_reference_geometry is False
+
+
+def test_r13_task174_ready_candidates_have_distinct_tube_counts(
+    r13_selection_outcome: CandidateSelectionOutcome,
+) -> None:
+    sel = r13_selection_outcome
     assert sel.selection_reason == VARIABLE_SHELL_POLICY
     ready = [r for r in sel.records if r.rating_request_ready]
     tube_counts = {r.physical_tube_count for r in ready}
@@ -42,9 +56,10 @@ def test_r13_task174_ready_candidates_have_distinct_tube_counts() -> None:
     assert len(shells) >= 2
 
 
-def test_r13_min_area_selection_excludes_r12_fingerprint() -> None:
-    case = load_general_engineering_case_json(R13_CASE.read_text(encoding="utf-8"))
-    sel = enumerate_experimental_rating_candidates(case)
+def test_r13_min_area_selection_excludes_r12_fingerprint(
+    r13_selection_outcome: CandidateSelectionOutcome,
+) -> None:
+    sel = r13_selection_outcome
     selected = [r for r in sel.records if r.selected_for_rating]
     assert len(selected) == 2
     for row in selected:
