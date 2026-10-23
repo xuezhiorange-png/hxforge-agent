@@ -1,8 +1,0 @@
-RUNNER: non-authoritative telemetry, returning 1.
-  failures=['junit_parse_status=unavailable', 'outcome_parse_status=unavailable', 'counts_authoritative=false: outcome artifact missing or invalid', 'node_inventory_parse_status=missing']
-  exit=0 exec=completed
-  junit=unavailable outcome=unavailable
-  resource=available
-  collected=0
-  passed=0 failed=0
-  cnt_auth=False mismatch=outcome artifact missing or invalid
