@@ -79,11 +79,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.mode == "experimental-live-multi-mesh-rating-r16":
-        levels = tuple(
-            int(part.strip())
-            for part in args.mesh_levels.split(",")
-            if part.strip()
-        )
+        levels = tuple(int(part.strip()) for part in args.mesh_levels.split(",") if part.strip())
         if not levels or any(level < 1 for level in levels):
             print(json.dumps({"error": "invalid --mesh-levels"}), file=sys.stderr)
             return 2

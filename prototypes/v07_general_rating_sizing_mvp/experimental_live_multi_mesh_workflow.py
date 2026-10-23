@@ -187,9 +187,7 @@ def run_experimental_live_multi_mesh_workflow(
             cli_success=False,
         )
 
-    native = build_native_cell_context(
-        case, selection=selection, candidate_id=candidate_id
-    )
+    native = build_native_cell_context(case, selection=selection, candidate_id=candidate_id)
     budget_s = float(case.solver_budget.total_budget_s)
     mesh_rows, observations = run_mesh_levels_for_candidate(
         case,
@@ -220,9 +218,7 @@ def run_experimental_live_multi_mesh_workflow(
         highest["live_thermal_state_hydraulic_postpass"] = live_postpass
         analysis["HIGHEST_MESH_LIVE_HYDRAULIC_POSTPASS"] = live_postpass
         if live_postpass:
-            analysis["HIGHEST_MESH_LIVE_TUBE_DP_PA"] = live_postpass.get(
-                "recalculated_tube_dp_pa"
-            )
+            analysis["HIGHEST_MESH_LIVE_TUBE_DP_PA"] = live_postpass.get("recalculated_tube_dp_pa")
             analysis["HIGHEST_MESH_LIVE_SHELL_DP_PA"] = live_postpass.get(
                 "recalculated_shell_dp_pa"
             )
@@ -292,7 +288,10 @@ def run_experimental_live_multi_mesh_workflow(
     raw_path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     status = "EXPERIMENTAL_COMPLETE"
-    if analysis.get("MESH_CONVERGENCE_STATUS") == "NUMERICAL_BLOCKED" or analysis.get("REAL_N1_RATING_STATUS") != "NUMERIC_VALID":
+    if (
+        analysis.get("MESH_CONVERGENCE_STATUS") == "NUMERICAL_BLOCKED"
+        or analysis.get("REAL_N1_RATING_STATUS") != "NUMERIC_VALID"
+    ):
         status = "PARTIAL_RATING_BLOCKED"
 
     return LiveMultiMeshOutcome(

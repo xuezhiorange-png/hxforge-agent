@@ -49,9 +49,7 @@ def mesh_level_public_row(
         "wall_seconds": mesh.get("wall_seconds"),
         "failure_code": mesh.get("failure_code"),
         "solver_performance_profile": profile,
-        "property_provider_state_lookup_count": profile.get(
-            "property_provider_state_lookup_count"
-        ),
+        "property_provider_state_lookup_count": profile.get("property_provider_state_lookup_count"),
     }
     if obs is not None:
         row["tube_outlet_temperature_k"] = str(obs.tube_outlet_temperature_k)
@@ -91,9 +89,7 @@ def run_mesh_levels_for_candidate(
             enable_live_thermal_boundary=True,
             enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
         )
-        row = mesh_level_public_row(
-            mesh_level=level, mesh=mesh, profile=profile, obs=obs
-        )
+        row = mesh_level_public_row(mesh_level=level, mesh=mesh, profile=profile, obs=obs)
         if mesh.get("status") == "NUMERIC_VALID" and obs is not None:
             row["tube_outlet_temperature_k"] = str(obs.tube_outlet_temperature_k)
             row["shell_outlet_temperature_k"] = str(obs.shell_outlet_temperature_k)
@@ -241,9 +237,7 @@ def render_multi_mesh_markdown_table(
         "| Metric | n=1 | n=2 | n=4 |",
         "| --- | --- | --- | --- |",
     ]
-    rows_by_level = {
-        int(row["mesh_level"]): row for row in analysis.get("mesh_level_results", [])
-    }
+    rows_by_level = {int(row["mesh_level"]): row for row in analysis.get("mesh_level_results", [])}
 
     def cell(level: int, key: str) -> str:
         row = rows_by_level.get(level)
@@ -265,9 +259,7 @@ def render_multi_mesh_markdown_table(
         ("Wall seconds", "wall_seconds"),
         ("Mesh status", "mesh_status"),
     ]:
-        lines.append(
-            f"| {label} | {cell(1, key)} | {cell(2, key)} | {cell(4, key)} |"
-        )
+        lines.append(f"| {label} | {cell(1, key)} | {cell(2, key)} | {cell(4, key)} |")
     cmp_doc = analysis.get("n1_n2_comparison") or {}
     lines.extend(
         [

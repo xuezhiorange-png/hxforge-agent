@@ -49,9 +49,7 @@ def test_r16_live_multi_mesh_e2e_n1_n2() -> None:
             check=False,
         )
         assert proc.returncode == 0, proc.stderr
-        analysis = json.loads(
-            (out / "LIVE_MULTI_MESH_ANALYSIS.json").read_text(encoding="utf-8")
-        )
+        analysis = json.loads((out / "LIVE_MULTI_MESH_ANALYSIS.json").read_text(encoding="utf-8"))
         assert analysis["REAL_N1_RATING_STATUS"] == "NUMERIC_VALID"
         assert analysis["REAL_N2_RATING_STATUS"] == "NUMERIC_VALID"
         assert analysis["MESH_CONVERGENCE_STATUS"] == "MESH_COMPARISON_AVAILABLE"
