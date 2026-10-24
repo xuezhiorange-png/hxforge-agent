@@ -1,0 +1,16 @@
+{
+  "coarse_mesh_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+  "coarse_mesh_level": 2,
+  "comparable": true,
+  "duty_comparison_status": "PASS",
+  "duty_delta_percent": "0.004161920016323951193306497190",
+  "duty_delta_w": "1.9089996281247",
+  "duty_metric": "0.00004161920016323951193306497190",
+  "duty_metric_units": "RELATIVE_FRACTION",
+  "fine_mesh_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+  "fine_mesh_level": 4,
+  "full_mesh_comparison_status": "NOT_AVAILABLE_WALL_EXTREMA_NOT_ARCHIVED",
+  "schema_version": "hxforge.mesh-duty-comparison.v1",
+  "terminal_boundary_residual_delta_k": "2.81881E-9",
+  "wall_comparison": "WALL_EXTREMA_NOT_COMPARED_WITHOUT_COARSE_ARCHIVED_OBSERVABLES"
+}

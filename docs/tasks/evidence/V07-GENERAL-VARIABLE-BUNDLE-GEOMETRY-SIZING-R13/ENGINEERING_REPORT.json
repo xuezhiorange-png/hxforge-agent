@@ -1,0 +1,1669 @@
+{
+  "candidate_generation": {
+    "candidate_count": 64,
+    "candidate_space_hash": "6271e3c8016bb2dbd90339314a9ec5dd206aa84736252e7b766bcdcd1d28622e",
+    "distinct_geometry_count": 16,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.5",
+        "0.6",
+        "0.7",
+        "0.8"
+      ],
+      "shell_inside_diameter_m": "0.54",
+      "shell_inside_diameters_m": [
+        "0.54",
+        "0.56",
+        "0.65",
+        "0.75"
+      ],
+      "tube_lengths_m": [
+        "2.5",
+        "3.0",
+        "3.5",
+        "4.0"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidate_rating_results": [
+    {
+      "bundle_geometry": {
+        "physical_tube_count": 313,
+        "shell_geometry_id": "shell-1::SHELL_D_0.54",
+        "shell_inside_diameter_m": "0.54",
+        "task025_total_parallel_flow_area_m2": "0.0609811114"
+      },
+      "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+      "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+      "constraint_preview": {
+        "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+        "EXPERIMENTAL_DP_PREVIEW": "EXCEEDS_LIMIT",
+        "duty_constraint": "SATISFIED",
+        "fiv_numeric_verified": false,
+        "full_rating_converged": false,
+        "max_shell_dp_pa": "1180",
+        "max_tube_dp_pa": "1150",
+        "mesh_ladder_completed": false,
+        "modeled_shell_dp_pa": "1268.2922758312940284778499367107514167209249049183",
+        "modeled_tube_dp_pa": "4.192",
+        "production_design_eligible": false,
+        "r2a_production_authority_verified": false,
+        "rated_duty_w": "32328.8461907676175",
+        "schema_version": "hxforge.experimental-constraint-preview.v1",
+        "shell_dp_constraint": "NOT_SATISFIED",
+        "target_duty_w": "9500",
+        "task167_engineering_approval": false,
+        "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+        "tube_dp_constraint": "SATISFIED"
+      },
+      "energy_balance_residual_w": "4.0E-10",
+      "failure_code": null,
+      "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+      "mesh_status": "NUMERIC_VALID",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.0",
+        "nominal_tube_outer_area_m2": "56.196652307781537694350",
+        "physical_tube_count": 313,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "rating_request_hash": "f6c5ab01373ee8b70fc7c67676fe754bb4c3dcecfa97b1328c2099f75d80700c",
+      "shell_outlet_temperature_k": "298.53659431025187",
+      "solver_performance_profile": {
+        "cell_root_trial_receipt_count": 0,
+        "ephemeral_tp_cache": null,
+        "mesh_run_metadata": {
+          "bisection_iterations": 28,
+          "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+          "outer_action_count": 30
+        },
+        "mesh_subdivisions": 1,
+        "outer_trial_count": 30,
+        "property_provider_state_lookup_count": 160678,
+        "schema_version": "hxforge.solver-performance-profile.v1",
+        "task172_local_evaluation_count": 4375,
+        "task172_request_hash_duplicate": "NOT_MEASURED",
+        "task172_request_hash_total": "NOT_MEASURED",
+        "task172_request_hash_unique": "NOT_MEASURED",
+        "timing_seconds": {
+          "outer_solver_estimated": 0.434,
+          "task172_evaluations": 255.401,
+          "total_wall": 255.835
+        }
+      },
+      "status": "NUMERIC_VALID",
+      "task025_parallel_area_m2": "0.0609811114",
+      "task171_result_hash": "0ea6f509a0b6693b73732711477c5f89c3dcfa2becf0f3212afb871f27afc5e7",
+      "task172_local_evaluation_count": 4375,
+      "task174_result_hash": "d4ac5fa5e70bd4e5a5b9087ddd3ccc25514345384325aaca7ccb086a6c2c8022",
+      "terminal_boundary_residual_k": "6.6676E-9",
+      "total_duty_w": "32328.8461907676175",
+      "tube_outlet_temperature_k": "299.05561613945537",
+      "wall_seconds": 255.835
+    },
+    {
+      "bundle_geometry": {
+        "physical_tube_count": 337,
+        "shell_geometry_id": "shell-1::SHELL_D_0.56",
+        "shell_inside_diameter_m": "0.56",
+        "task025_total_parallel_flow_area_m2": "0.0656569794"
+      },
+      "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+      "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "constraint_preview": {
+        "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+        "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+        "duty_constraint": "SATISFIED",
+        "fiv_numeric_verified": false,
+        "full_rating_converged": false,
+        "max_shell_dp_pa": "1180",
+        "max_tube_dp_pa": "1150",
+        "mesh_ladder_completed": false,
+        "modeled_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+        "modeled_tube_dp_pa": "3.965",
+        "production_design_eligible": false,
+        "r2a_production_authority_verified": false,
+        "rated_duty_w": "32528.427903428549",
+        "schema_version": "hxforge.experimental-constraint-preview.v1",
+        "shell_dp_constraint": "SATISFIED",
+        "target_duty_w": "9500",
+        "task167_engineering_approval": false,
+        "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+        "tube_dp_constraint": "SATISFIED"
+      },
+      "energy_balance_residual_w": "2.11E-10",
+      "failure_code": null,
+      "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+      "mesh_status": "NUMERIC_VALID",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.0",
+        "nominal_tube_outer_area_m2": "60.505660791445297773150",
+        "physical_tube_count": 337,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "rating_request_hash": "a3684f98615b3cb793635f04ca22ad86f2e5e4902dbedfb4ccdca7257121f345",
+      "shell_outlet_temperature_k": "298.53898098805473",
+      "solver_performance_profile": {
+        "cell_root_trial_receipt_count": 0,
+        "ephemeral_tp_cache": null,
+        "mesh_run_metadata": {
+          "bisection_iterations": 27,
+          "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+          "outer_action_count": 29
+        },
+        "mesh_subdivisions": 1,
+        "outer_trial_count": 29,
+        "property_provider_state_lookup_count": 162256,
+        "schema_version": "hxforge.solver-performance-profile.v1",
+        "task172_local_evaluation_count": 4419,
+        "task172_request_hash_duplicate": "NOT_MEASURED",
+        "task172_request_hash_total": "NOT_MEASURED",
+        "task172_request_hash_unique": "NOT_MEASURED",
+        "timing_seconds": {
+          "outer_solver_estimated": 0.415,
+          "task172_evaluations": 249.221,
+          "total_wall": 249.635
+        }
+      },
+      "status": "NUMERIC_VALID",
+      "task025_parallel_area_m2": "0.0656569794",
+      "task171_result_hash": "5799ba1617ce30dead6456540698436b12f506752b938d091957b1452315e59b",
+      "task172_local_evaluation_count": 4419,
+      "task174_result_hash": "dbb2cc4f94d9a190e8eb3b62a0720d48c951cd9afc8b2bf3ccafd3b4b8210607",
+      "terminal_boundary_residual_k": "5.31757E-9",
+      "total_duty_w": "32528.427903428549",
+      "tube_outlet_temperature_k": "299.05163815440915",
+      "wall_seconds": 249.635
+    }
+  ],
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "81a6e929fdfca6c8b29ade2601232f62c105ad65dbbc01ce67ffc4e522f8d93c",
+      "candidate_id": "e3b31da2-3393-5cee-849e-2b7041866460",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "7b9c85aac79038aa06452ab872fa4a7c49fd16090091b58131017b458e6e147b",
+      "candidate_id": "ebbf0d4b-7f37-588d-a775-194afb10794b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "9416c3e192b1afc57c9a667c30e36c966e5f374ce4f1363ba83f0d06fb1f0e17",
+      "candidate_id": "1080fe08-f2cc-577b-9643-2d079a4561a1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "9ba392dafafc918acb05f08f60761c82f212a0b88598e1247b495234be985410",
+      "candidate_id": "f6fccc3b-6554-58b9-bfbf-28e636452289",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "39f1a73eef2cad0a657019f893c6677f71f03bc612ad4b19d0f8f1e17e931575",
+      "candidate_id": "19c1b330-f5ae-58be-b3f8-6af0719fbf4d",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+      "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "ad87dcb46f84e9f72eea0265624b22548b9ec8c3b1837876cecbf22e49c3bbb6",
+      "candidate_id": "c339227d-b242-5d4c-9f8d-f839630d9027",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "5467b17a57522fee15cb196c33163180d6127bad871a2848304d49f68e1c8e9c",
+      "candidate_id": "37ca134a-146e-5b5c-be9e-0a5e80a41f0b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "f1d211a5b120e68ed0713bf26c454a43c878de1af0115b3723c2f4b9b5404368",
+      "candidate_id": "437f3e23-646d-5906-86c9-c06954dc6d61",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "6e226bfa71b294ab0fe5ee881aa8c177a8860ba3848312a6bfa476164dff39eb",
+      "candidate_id": "9d11ba6c-ba5b-5ff9-9395-1dd93316e53b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "6a32d105fa0b7ffa494441946b8725a5ae991507eb8370728e3011e050e8b72f",
+      "candidate_id": "25e4de77-28a9-5e0e-98ad-35519f95ea71",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "8e39a7f2f95ac242b29af3db96939290c01a48713d5eb4d6622068f5b302e261",
+      "candidate_id": "0b0fe328-d9bc-5bd8-ad94-48c6350d967e",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "79aaf993209a0a9c52ffec23f46830e4065c33341ee44e08fbfb533fbd1a4b13",
+      "candidate_id": "c9a9fcca-6a2d-5827-baf8-3b28eb7d3727",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "876271f1b457f63d7b8f5fb4be584fcecd4510bd2ad22309f507afc0e2d123c5",
+      "candidate_id": "2a23015c-4dc8-5024-9ad0-a342c6ee550f",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "1a59c79fc8f00205a1d022375055361f9e2fb7e6ec48b96e34f62a22c1f7f548",
+      "candidate_id": "f31708f6-869d-5984-92f1-adbef970fee5",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "bec2ec4e22eb1787616460e03e74d5990380a7acbb82f840dbf3ec8ec2001080",
+      "candidate_id": "f375168d-b001-5ab7-8fe5-4c76e5937daa",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "122df50804a6d321ea45fd1900dd47311dd9c79ae1c5bb3c6d01b9512f2fd23a",
+      "candidate_id": "1bcaf63d-cd19-5eb1-be64-91fd32a609e5",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "d77712cef0d09cd73e8219579472b6c1fb51ff605d2c846c8728740926b664c6",
+      "candidate_id": "e3a9c23a-e569-593a-a19c-26c8fada49dd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "2e7ab66e4985f98d213cb3e1969474e7e9c7f7042f6a7119f0444e7445275fda",
+      "candidate_id": "b7003ce9-f698-5cbb-8250-fe2cfafe6a2c",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "3a8391d79beaab4bb9f3dd83f749e96381c3d7fd9473d4b970c56ea01484f834",
+      "candidate_id": "a49aa9e2-935b-539b-b72f-4afe2cfb6c56",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "4b6e3c9a36c0aa1c57d65f9eb192b26e5e4c60c67634ab21d99836e9c665c28e",
+      "candidate_id": "4bd7ef3e-fdd3-5dac-91a4-943815c1ce1b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+      "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "3a6e096ab75c31bfc4c1910288fadaf4b9013d4447da5ba28456749ea03af54b",
+      "candidate_id": "ddbdc2ef-9633-5e8c-aca7-337ed238ee18",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "b4a4a9ccca4a3b7cc96b542409de0e984b3176a710a26909d14b005abb2f7a67",
+      "candidate_id": "e5930486-3c3e-5321-bf71-6b5fdf6179c3",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "6eec2279e26057b192865abeaf95daf9cbd9f40af6cbb464daf471a1411a188e",
+      "candidate_id": "f7c0b59c-ecf5-5c02-848b-5db35428c191",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "fd67ab813aecc79571b540cf71cec261544bca45270a5f1bef0f622520e1d157",
+      "candidate_id": "64782581-2fc5-5618-ace7-c4a670e00579",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "3be668998d807307695ec6f11d1b2e55f739a7064bb6af2fcd1c6f5bd320c43a",
+      "candidate_id": "d565aa4d-d0c2-53d0-84db-9800800c295d",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "f976e2b09661fb64f882dfc30716f9e18a1134c584c5321f3638a557d6a9a664",
+      "candidate_id": "6b1d1d45-abc7-503a-9459-515878e47c6c",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "d2465d65031b269c5209dd1626a64b1aa2269655d58d9b70feac82e649611d80",
+      "candidate_id": "94c8ea80-64b1-5133-8f33-e23d17695cfd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "79615f62abf2b1fd056049f5095d31e3b740dbdee15f2d8c10192738a5df38e0",
+      "candidate_id": "2aa001b1-5131-5426-814d-cc58975d704b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "ac17e1b94aa0b01a4ae2e9b59fdc2969b8e77583c097359c0e83f312b2e1e834",
+      "candidate_id": "a76cc6ec-6a8a-5d64-b181-f155c632ce03",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "d94857194a3985b3289da1128e8d2d898b5928f0fb35399d7ea5705fda116a42",
+      "candidate_id": "8dc48a17-bb75-5f5a-8963-ce6f1e5aa5a6",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "efd7f7a547d944f0d250b3242f72552aed7583d86fbb5f29a8718bba4803105c",
+      "candidate_id": "51568c23-02fb-5710-8cf7-611d9a0398d8",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "ba92e0d80b4277ab9607a7bf899bc2cc1dbfa3dede7a9b281fa30ceb7363c56d",
+      "candidate_id": "59cfcf2e-3179-5234-b654-8a5bb2dfc3a1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "a15cb7878ca7668fc85552f8cd20e618530f19eac0059a8f44384bdec99fdef2",
+      "candidate_id": "26156638-4bac-59f0-9412-37602db8ea9a",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "3a9b08c4ef62ab15cc7db8a3119bd02d1b5a3cbea8ca03011034cb7f288ff9ea",
+      "candidate_id": "d0128330-eb96-50a5-a468-87fa7d5cc309",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "1e60d084a8829c062ccbf61984cd15ff98da25580b38447fb5b5ca7ad2310149",
+      "candidate_id": "73991da9-3603-5d0e-a8e8-5777a1091f70",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "560683fbafd309ac3b516598fb8f322473968e9b763abd3a5360e33fe84d2c34",
+      "candidate_id": "82996262-26af-5e5a-a056-7190db6cf10a",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "2ec4b2b50d777d5fda694863d94d1aabfef2679a3bd068035b4b3b63b29e066a",
+      "candidate_id": "d2f47a50-d7e3-5480-8f87-f4949c56edfb",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "c395497ef87108b390494600d0ef73c2bfbbc386edd3c60ac0f4922b4d365691",
+      "candidate_id": "2e451ec1-603e-5114-ba8a-83aae0d8ac7e",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "4e9a126bc2fcf8dbfaf255319b5fbc938199d895c0d1038dc33b35f884d2a4d5",
+      "candidate_id": "e798d250-118e-522b-a1da-d8785b3689fd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "0ddd106f4e77600c02213eedef3654519dda6a83a93e12a4e0947e279c177e2b",
+      "candidate_id": "874aa505-2a34-59a3-bf78-f57e64335554",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "38fc5fb4b9e92cdb7245b6c21c72a473c3aa66ca3f309c7141cd2140876156b1",
+      "candidate_id": "041d61a7-8537-557b-a56a-a9877dc4b54d",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "39b4ba74cb8640fdef01df173898f8a0b430b9da820852e8481e6f76593f00d6",
+      "candidate_id": "ccb7955d-7705-5b7d-9918-4b7d0a80d836",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "4b2139eaf62a9b4f746ffc9c73f994f018f02517a28bab1d6a6a65538dc8e78f",
+      "candidate_id": "ccd7d7bc-186a-5d3c-b3da-b6ba942274fd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "f359fa1219d50343a6749fe0438dd1804ece016b02b82a2115036ddffeaa942c",
+      "candidate_id": "ccc99699-5400-5a06-9f09-4e7c43acf8dd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "01916438274189f4e413d726b81052680bfe5c2d6d8ff511e2c40ace9dffe7db",
+      "candidate_id": "8f56e7e3-94a7-5c42-9d5b-2b53a417e661",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "4e864955ab506a5a28a44db2d9d477ab7642eee35246a75f6ff7c80dae016019",
+      "candidate_id": "b0dae7b4-92df-546c-b11c-a9ea2cb7ddb2",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "8ec1aadde6904e26ceead30f8d47147d40bb842e051cc0f72b0d3fe508b27bf4",
+      "candidate_id": "1bceb98c-4a02-560e-8b85-464f83511226",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "591b24e9b4bcb10249c484c2dd3a6b93e141d1dcc49dfe5cd527ab72cb2e9f9e",
+      "candidate_id": "04603f71-2eef-5390-9117-1cf1dd8c7f48",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "bf6320f2f309131d547a42eb9a0405c50a5c57fe00f0734cfb07c30a14591c95",
+      "candidate_id": "b28727f9-f2e9-5111-bee4-8fb732ed95d6",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "0711ed2647bd9642e50bf52d7400e5c3f8d685be8b0d0283e9fdf79a9df8a316",
+      "candidate_id": "bebca2be-440f-5029-99a5-c3c65344d75e",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "4dd9fe9b44f358b4ddc5779f431a96466fab3db2dc33a9fe75f473a494bece28",
+      "candidate_id": "07d54ef4-2e47-5f17-82ea-75444cfe3880",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "4698607906ccb921bced15d64a0639581fcb37a709de04ff005d6b85421a12cd",
+      "candidate_id": "72747e3c-0a60-56ea-9b72-6f7f94615a17",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "5d322ced602c84b23b76462a083caa9572a6d85ddc70ca29f80e999ecd2eaa90",
+      "candidate_id": "9d7a247a-642b-5557-80b2-3c8305199fb9",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "4a19de1f15ece931c645934afbe489d939235eed4c7f27eb28bee2b4e01654c0",
+      "candidate_id": "e3510741-f453-551b-8af1-321dad888390",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "b15ce3d0016d9b446e6e065b368ee717d3dc9ee5acbe3964dd2ef640b106e0b2",
+      "candidate_id": "9da5e336-7dfb-579d-a491-d980aed41313",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "6c2067e73ecc76d89c85846fd47343c8f4616f07a1a38ec1589e77a7f2832be6",
+      "candidate_id": "eb4dfd7b-a27d-5b54-b534-36533dc8a427",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "4e5f91d228b67b0000d48b5fb36545f956c1aba3ef7672a01d5cee74b02c4d7d",
+      "candidate_id": "bcf05d49-b333-5cbc-9565-f9c120247474",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "9b72138ffb1b35b0b2c3f4be9c56f2c10f06ffd989e93f5aa41d640e580d32f2",
+      "candidate_id": "ba25e33e-8e35-5c9e-9995-739476a94ad4",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "406a4c0c6a716ac978f3d14b057b2d64779cae54d39803d798a2602924fe2955",
+      "candidate_id": "c650c41b-16b0-5162-b73e-4214955debc5",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "9c722ab8443a7d138108fb470bd1db73af3d309039749f98da06f64f846c47dc",
+      "candidate_id": "766e0845-7dca-5916-b0cb-6b5417947e7e",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "bff97ea2d34825d4b442fe75bb5a48e4b61bdc8b7737e5274012f54282a83f78",
+      "candidate_id": "37454f97-425f-515d-8c57-877c7dfc3468",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "a1f68a4be9baffebc6b7945fcad67b6ab1a379c1e70b2ab24b31c7e93bb00481",
+      "candidate_id": "d259ff5e-92e9-5356-8e3c-dd1d8402d2ea",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.0"
+    }
+  ],
+  "conditional_preference_status": "PREFERENCE_AVAILABLE",
+  "design_conditions": {
+    "engineering_case_schema": "hxforge.general-engineering-case.v2",
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "heat_transfer_convention": {
+      "kernel_shell_inlet_temperature_k": "298.15",
+      "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "kernel_tube_inlet_temperature_k": "300.00",
+      "shell_equipment_side": "shell_side",
+      "shell_mass_flow_kg_s": "20.000000",
+      "shell_thermal_role": "COLD",
+      "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+      "tube_equipment_side": "tube_side",
+      "tube_mass_flow_kg_s": "12.000000",
+      "tube_thermal_role": "HOT",
+      "user_shell_inlet_temperature_k": "298.15",
+      "user_tube_inlet_temperature_k": "299.70"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "shell_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "target_duty_w": "9500",
+    "tube_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "299.70",
+      "mass_flow_kg_s": "12.000000"
+    }
+  },
+  "engineering_case_id": "mvp-variable-bundle-r13",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_candidate_eligibility": [
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+      "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.0",
+        "nominal_tube_outer_area_m2": "56.196652307781537694350",
+        "physical_tube_count": 313,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "task168_blocked_codes": [],
+      "tube_length_m": "3.0"
+    },
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+      "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.0",
+        "nominal_tube_outer_area_m2": "60.505660791445297773150",
+        "physical_tube_count": 337,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "task168_blocked_codes": [],
+      "tube_length_m": "3.0"
+    }
+  ],
+  "experimental_comparison_status": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+  "experimental_constraint_preview": null,
+  "experimental_live_run_hash": "d7c63da66c7c08975f09905f3b978f8d08fad750290bde03fa6ea4b6b8961239",
+  "experimental_low_mesh_rating": {
+    "candidate_eligibility": [
+      {
+        "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+        "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+        "RATING_STATUS": "NUMERIC_VALID",
+        "STRUCTURAL_STATUS": "ADMITTED",
+        "TASK174_STATUS": "VALIDATED",
+        "baffle_spacing_m": "0.6",
+        "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+        "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "56.196652307781537694350",
+          "physical_tube_count": 313,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "task168_blocked_codes": [],
+        "tube_length_m": "3.0"
+      },
+      {
+        "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+        "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+        "RATING_STATUS": "NUMERIC_VALID",
+        "STRUCTURAL_STATUS": "ADMITTED",
+        "TASK174_STATUS": "VALIDATED",
+        "baffle_spacing_m": "0.6",
+        "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+        "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "60.505660791445297773150",
+          "physical_tube_count": 337,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "task168_blocked_codes": [],
+        "tube_length_m": "3.0"
+      }
+    ],
+    "candidate_rating_results": [
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 313,
+          "shell_geometry_id": "shell-1::SHELL_D_0.54",
+          "shell_inside_diameter_m": "0.54",
+          "task025_total_parallel_flow_area_m2": "0.0609811114"
+        },
+        "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+        "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "EXCEEDS_LIMIT",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1268.2922758312940284778499367107514167209249049183",
+          "modeled_tube_dp_pa": "4.192",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32328.8461907676175",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "NOT_SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "4.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "56.196652307781537694350",
+          "physical_tube_count": 313,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "f6c5ab01373ee8b70fc7c67676fe754bb4c3dcecfa97b1328c2099f75d80700c",
+        "shell_outlet_temperature_k": "298.53659431025187",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 28,
+            "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+            "outer_action_count": 30
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 30,
+          "property_provider_state_lookup_count": 160678,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4375,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.434,
+            "task172_evaluations": 255.401,
+            "total_wall": 255.835
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0609811114",
+        "task171_result_hash": "0ea6f509a0b6693b73732711477c5f89c3dcfa2becf0f3212afb871f27afc5e7",
+        "task172_local_evaluation_count": 4375,
+        "task174_result_hash": "d4ac5fa5e70bd4e5a5b9087ddd3ccc25514345384325aaca7ccb086a6c2c8022",
+        "terminal_boundary_residual_k": "6.6676E-9",
+        "total_duty_w": "32328.8461907676175",
+        "tube_outlet_temperature_k": "299.05561613945537",
+        "wall_seconds": 255.835
+      },
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 337,
+          "shell_geometry_id": "shell-1::SHELL_D_0.56",
+          "shell_inside_diameter_m": "0.56",
+          "task025_total_parallel_flow_area_m2": "0.0656569794"
+        },
+        "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+        "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+          "modeled_tube_dp_pa": "3.965",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32528.427903428549",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.11E-10",
+        "failure_code": null,
+        "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "60.505660791445297773150",
+          "physical_tube_count": 337,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "a3684f98615b3cb793635f04ca22ad86f2e5e4902dbedfb4ccdca7257121f345",
+        "shell_outlet_temperature_k": "298.53898098805473",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 162256,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4419,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.415,
+            "task172_evaluations": 249.221,
+            "total_wall": 249.635
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0656569794",
+        "task171_result_hash": "5799ba1617ce30dead6456540698436b12f506752b938d091957b1452315e59b",
+        "task172_local_evaluation_count": 4419,
+        "task174_result_hash": "dbb2cc4f94d9a190e8eb3b62a0720d48c951cd9afc8b2bf3ccafd3b4b8210607",
+        "terminal_boundary_residual_k": "5.31757E-9",
+        "total_duty_w": "32528.427903428549",
+        "tube_outlet_temperature_k": "299.05163815440915",
+        "wall_seconds": 249.635
+      }
+    ],
+    "ephemeral_tp_cache_enabled": false,
+    "full_rating_converged": false,
+    "hydraulic_model_scope": {
+      "explanation": "Task174 tube/shell pressure drops are evaluated from the Task168\u2192Task174 native hydraulic chain at the sizing request thermal templates. They are not re-coupled to the experimental live tube inlet temperature (e.g. 299.70 K) during mesh rating. Live-boundary thermal results (duty, outlet temperatures) use the experimental thermal binding; \u0394p previews reference Task174 frozen hydraulic identities.",
+      "live_boundary_hydraulic_evaluated": false,
+      "live_thermal_boundary_coupled_to_mesh": true,
+      "schema_version": "hxforge.experimental-hydraulic-model-scope.v1",
+      "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW"
+    },
+    "low_mesh_numeric_valid": true,
+    "mesh_level": 1,
+    "mesh_levels": [
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 313,
+          "shell_geometry_id": "shell-1::SHELL_D_0.54",
+          "shell_inside_diameter_m": "0.54",
+          "task025_total_parallel_flow_area_m2": "0.0609811114"
+        },
+        "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+        "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "EXCEEDS_LIMIT",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1268.2922758312940284778499367107514167209249049183",
+          "modeled_tube_dp_pa": "4.192",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32328.8461907676175",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "NOT_SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "4.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "56.196652307781537694350",
+          "physical_tube_count": 313,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "f6c5ab01373ee8b70fc7c67676fe754bb4c3dcecfa97b1328c2099f75d80700c",
+        "shell_outlet_temperature_k": "298.53659431025187",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 28,
+            "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+            "outer_action_count": 30
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 30,
+          "property_provider_state_lookup_count": 160678,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4375,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.434,
+            "task172_evaluations": 255.401,
+            "total_wall": 255.835
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0609811114",
+        "task171_result_hash": "0ea6f509a0b6693b73732711477c5f89c3dcfa2becf0f3212afb871f27afc5e7",
+        "task172_local_evaluation_count": 4375,
+        "task174_result_hash": "d4ac5fa5e70bd4e5a5b9087ddd3ccc25514345384325aaca7ccb086a6c2c8022",
+        "terminal_boundary_residual_k": "6.6676E-9",
+        "total_duty_w": "32328.8461907676175",
+        "tube_outlet_temperature_k": "299.05561613945537",
+        "wall_seconds": 255.835
+      },
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 337,
+          "shell_geometry_id": "shell-1::SHELL_D_0.56",
+          "shell_inside_diameter_m": "0.56",
+          "task025_total_parallel_flow_area_m2": "0.0656569794"
+        },
+        "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+        "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+          "modeled_tube_dp_pa": "3.965",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32528.427903428549",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.11E-10",
+        "failure_code": null,
+        "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "60.505660791445297773150",
+          "physical_tube_count": 337,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "a3684f98615b3cb793635f04ca22ad86f2e5e4902dbedfb4ccdca7257121f345",
+        "shell_outlet_temperature_k": "298.53898098805473",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 162256,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4419,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.415,
+            "task172_evaluations": 249.221,
+            "total_wall": 249.635
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0656569794",
+        "task171_result_hash": "5799ba1617ce30dead6456540698436b12f506752b938d091957b1452315e59b",
+        "task172_local_evaluation_count": 4419,
+        "task174_result_hash": "dbb2cc4f94d9a190e8eb3b62a0720d48c951cd9afc8b2bf3ccafd3b4b8210607",
+        "terminal_boundary_residual_k": "5.31757E-9",
+        "total_duty_w": "32528.427903428549",
+        "tube_outlet_temperature_k": "299.05163815440915",
+        "wall_seconds": 249.635
+      }
+    ],
+    "mode": "experimental-live-rating",
+    "multi_candidate": true,
+    "pareto_result": {
+      "PARETO_FRONTIER_AVAILABLE": true,
+      "dominance_axes": [
+        "maximize_total_duty_w",
+        "minimize_nominal_tube_outer_area_m2",
+        "minimize_modeled_shell_dp_pa_preview"
+      ],
+      "pareto_frontier_candidate_ids": [
+        "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+      ],
+      "production_sizing_verified": false,
+      "schema_version": "hxforge.experimental-pareto-result.v1"
+    },
+    "property_provider_identity": {
+      "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+      "coolprop_version": "8.0.0",
+      "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "provider_class": "CoolPropProvider",
+      "provider_name": "CoolProp HEOS",
+      "reference_pressure_pa": "101325",
+      "reference_state_policy": "DEF",
+      "schema_version": "hxforge.property-provider-identity.v1",
+      "solver_source_revision": "a885660cdc287c9147f40db67a2d2f305bbdde8e"
+    },
+    "ranking": {
+      "CONDITIONAL_PREFERENCE_STATUS": "PREFERENCE_AVAILABLE",
+      "EXPERIMENTAL_COMPARISON_AVAILABLE": true,
+      "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+      "EXPERIMENTAL_PREFERRED_CANDIDATE": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+      "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+      "feasible_candidate_ids": [
+        "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+      ],
+      "non_production_disclaimer": "Experimental objective selection \u2014 not production sizing.",
+      "pareto_frontier_candidate_ids": [
+        "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+      ],
+      "preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "production_design_approved": false,
+      "production_sizing_verified": false,
+      "ranked_candidate_ids": [
+        "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+      ],
+      "ranking_policy_id": "EXPERIMENTAL_MIN_NOMINAL_TUBE_AREA",
+      "schema_version": "hxforge.experimental-ranking-result.v1",
+      "trace": [
+        {
+          "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+          "meets_target_duty": true,
+          "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+          "nominal_tube_outer_area_m2": "60.505660791445297773150",
+          "rank": 1,
+          "total_duty_w": "32528.427903428549"
+        }
+      ]
+    },
+    "run_identity_hash": "d7c63da66c7c08975f09905f3b978f8d08fad750290bde03fa6ea4b6b8961239",
+    "sizing_objective_scenarios": {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "production_sizing_verified": false,
+      "scenarios": [
+        {
+          "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+          "candidates": [
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+              "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "9500",
+              "total_duty_w": "32328.8461907676175"
+            },
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+              "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "9500",
+              "total_duty_w": "32528.427903428549"
+            }
+          ],
+          "conditional_preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+          "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+          "feasible_candidate_ids": [
+            "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+          ],
+          "target_duty_w": "9500"
+        },
+        {
+          "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+          "candidates": [
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+              "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "38000",
+              "total_duty_w": "32328.8461907676175"
+            },
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+              "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "38000",
+              "total_duty_w": "32528.427903428549"
+            }
+          ],
+          "conditional_preferred_candidate_id": null,
+          "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+          "feasible_candidate_ids": [],
+          "target_duty_w": "38000"
+        },
+        {
+          "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+          "candidates": [
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+              "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "38500",
+              "total_duty_w": "32328.8461907676175"
+            },
+            {
+              "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+              "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+              "mesh_status": "NUMERIC_VALID",
+              "target_duty_w": "38500",
+              "total_duty_w": "32528.427903428549"
+            }
+          ],
+          "conditional_preferred_candidate_id": null,
+          "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+          "feasible_candidate_ids": [],
+          "target_duty_w": "38500"
+        }
+      ],
+      "schema_version": "hxforge.sizing-objective-scenarios.v1"
+    },
+    "solver_boundary": {
+      "feasible_shell_left_face_temperature_k": 298.5,
+      "live_thermal_boundary_enabled": true,
+      "thermal_binding": {
+        "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+        "participates_in_task173_mesh": true,
+        "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "reference_pressure_pa": "101325",
+        "schema_version": "hxforge.experimental-thermal-boundary.v1",
+        "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+        "shell_inlet_temperature_k": "298.15",
+        "shell_mass_flow_kg_s": "20",
+        "thermal_variant": "TUBE_HOT_SHELL_COLD",
+        "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+        "tube_inlet_temperature_k": "299.70",
+        "tube_mass_flow_kg_s": "12"
+      }
+    }
+  },
+  "experimental_pareto_result": {
+    "PARETO_FRONTIER_AVAILABLE": true,
+    "dominance_axes": [
+      "maximize_total_duty_w",
+      "minimize_nominal_tube_outer_area_m2",
+      "minimize_modeled_shell_dp_pa_preview"
+    ],
+    "pareto_frontier_candidate_ids": [
+      "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+    ],
+    "production_sizing_verified": false,
+    "schema_version": "hxforge.experimental-pareto-result.v1"
+  },
+  "experimental_ranking": {
+    "CONDITIONAL_PREFERENCE_STATUS": "PREFERENCE_AVAILABLE",
+    "EXPERIMENTAL_COMPARISON_AVAILABLE": true,
+    "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+    "EXPERIMENTAL_PREFERRED_CANDIDATE": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+    "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+    "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+    "feasible_candidate_ids": [
+      "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+    ],
+    "non_production_disclaimer": "Experimental objective selection \u2014 not production sizing.",
+    "pareto_frontier_candidate_ids": [
+      "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+    ],
+    "preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+    "production_design_approved": false,
+    "production_sizing_verified": false,
+    "ranked_candidate_ids": [
+      "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+    ],
+    "ranking_policy_id": "EXPERIMENTAL_MIN_NOMINAL_TUBE_AREA",
+    "schema_version": "hxforge.experimental-ranking-result.v1",
+    "trace": [
+      {
+        "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "meets_target_duty": true,
+        "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+        "nominal_tube_outer_area_m2": "60.505660791445297773150",
+        "rank": 1,
+        "total_duty_w": "32528.427903428549"
+      }
+    ]
+  },
+  "experimental_ranking_status": "EXPERIMENTAL_RANKING_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-22T06:44:32.977475+00:00",
+  "geometry_summary": null,
+  "hydraulic_model_scope": {
+    "explanation": "Task174 tube/shell pressure drops are evaluated from the Task168\u2192Task174 native hydraulic chain at the sizing request thermal templates. They are not re-coupled to the experimental live tube inlet temperature (e.g. 299.70 K) during mesh rating. Live-boundary thermal results (duty, outlet temperatures) use the experimental thermal binding; \u0394p previews reference Task174 frozen hydraulic identities.",
+    "live_boundary_hydraulic_evaluated": false,
+    "live_thermal_boundary_coupled_to_mesh": true,
+    "schema_version": "hxforge.experimental-hydraulic-model-scope.v1",
+    "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW"
+  },
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "R13: variable shell ID drives Task021 tube count; Task172 not C3-bound.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "property_provider_identity": {
+    "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "coolprop_version": "8.0.0",
+    "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+    "provider_class": "CoolPropProvider",
+    "provider_name": "CoolProp HEOS",
+    "reference_pressure_pa": "101325",
+    "reference_state_policy": "DEF",
+    "schema_version": "hxforge.property-provider-identity.v1",
+    "solver_source_revision": "a885660cdc287c9147f40db67a2d2f305bbdde8e"
+  },
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": {
+    "conditional_preference_status": "PREFERENCE_AVAILABLE",
+    "experimental_comparison_status": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+    "experimental_ranking_status": "EXPERIMENTAL_RANKING_AVAILABLE",
+    "frozen_r4_n1": null,
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": true,
+    "mesh_comparison": null,
+    "mesh_comparison_available": false,
+    "mesh_levels": [
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 313,
+          "shell_geometry_id": "shell-1::SHELL_D_0.54",
+          "shell_inside_diameter_m": "0.54",
+          "task025_total_parallel_flow_area_m2": "0.0609811114"
+        },
+        "candidate_hash": "347e56c893f5fdf6aea6c46e8dc729167063cc26972616a0e4e22c08540a839b",
+        "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "EXCEEDS_LIMIT",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1268.2922758312940284778499367107514167209249049183",
+          "modeled_tube_dp_pa": "4.192",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32328.8461907676175",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "NOT_SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "4.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "56.196652307781537694350",
+          "physical_tube_count": 313,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "f6c5ab01373ee8b70fc7c67676fe754bb4c3dcecfa97b1328c2099f75d80700c",
+        "shell_outlet_temperature_k": "298.53659431025187",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 28,
+            "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+            "outer_action_count": 30
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 30,
+          "property_provider_state_lookup_count": 160678,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4375,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.434,
+            "task172_evaluations": 255.401,
+            "total_wall": 255.835
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0609811114",
+        "task171_result_hash": "0ea6f509a0b6693b73732711477c5f89c3dcfa2becf0f3212afb871f27afc5e7",
+        "task172_local_evaluation_count": 4375,
+        "task174_result_hash": "d4ac5fa5e70bd4e5a5b9087ddd3ccc25514345384325aaca7ccb086a6c2c8022",
+        "terminal_boundary_residual_k": "6.6676E-9",
+        "total_duty_w": "32328.8461907676175",
+        "tube_outlet_temperature_k": "299.05561613945537",
+        "wall_seconds": 255.835
+      },
+      {
+        "bundle_geometry": {
+          "physical_tube_count": 337,
+          "shell_geometry_id": "shell-1::SHELL_D_0.56",
+          "shell_inside_diameter_m": "0.56",
+          "task025_total_parallel_flow_area_m2": "0.0656569794"
+        },
+        "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+        "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+          "modeled_tube_dp_pa": "3.965",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "32528.427903428549",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.11E-10",
+        "failure_code": null,
+        "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+        "mesh_status": "NUMERIC_VALID",
+        "nominal_geometry": {
+          "actual_effective_area_available": false,
+          "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+          "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+          "nominal_tube_length_m": "3.0",
+          "nominal_tube_outer_area_m2": "60.505660791445297773150",
+          "physical_tube_count": 337,
+          "tube_outer_diameter_m": "0.01905"
+        },
+        "rating_request_hash": "a3684f98615b3cb793635f04ca22ad86f2e5e4902dbedfb4ccdca7257121f345",
+        "shell_outlet_temperature_k": "298.53898098805473",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 162256,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4419,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.415,
+            "task172_evaluations": 249.221,
+            "total_wall": 249.635
+          }
+        },
+        "status": "NUMERIC_VALID",
+        "task025_parallel_area_m2": "0.0656569794",
+        "task171_result_hash": "5799ba1617ce30dead6456540698436b12f506752b938d091957b1452315e59b",
+        "task172_local_evaluation_count": 4419,
+        "task174_result_hash": "dbb2cc4f94d9a190e8eb3b62a0720d48c951cd9afc8b2bf3ccafd3b4b8210607",
+        "terminal_boundary_residual_k": "5.31757E-9",
+        "total_duty_w": "32528.427903428549",
+        "tube_outlet_temperature_k": "299.05163815440915",
+        "wall_seconds": 249.635
+      }
+    ],
+    "mesh_observables": null,
+    "mode": "experimental-live-rating",
+    "sizing_evaluated": false
+  },
+  "schema_version": "hxforge.engineering-report.v1",
+  "sizing_objective_scenarios": {
+    "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+    "production_sizing_verified": false,
+    "scenarios": [
+      {
+        "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+        "candidates": [
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+            "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "9500",
+            "total_duty_w": "32328.8461907676175"
+          },
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+            "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "9500",
+            "total_duty_w": "32528.427903428549"
+          }
+        ],
+        "conditional_preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+        "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+        "feasible_candidate_ids": [
+          "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+        ],
+        "target_duty_w": "9500"
+      },
+      {
+        "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+        "candidates": [
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+            "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "38000",
+            "total_duty_w": "32328.8461907676175"
+          },
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+            "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "38000",
+            "total_duty_w": "32528.427903428549"
+          }
+        ],
+        "conditional_preferred_candidate_id": null,
+        "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+        "feasible_candidate_ids": [],
+        "target_duty_w": "38000"
+      },
+      {
+        "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+        "candidates": [
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+            "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "38500",
+            "total_duty_w": "32328.8461907676175"
+          },
+          {
+            "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+            "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+            "mesh_status": "NUMERIC_VALID",
+            "target_duty_w": "38500",
+            "total_duty_w": "32528.427903428549"
+          }
+        ],
+        "conditional_preferred_candidate_id": null,
+        "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+        "feasible_candidate_ids": [],
+        "target_duty_w": "38500"
+      }
+    ],
+    "schema_version": "hxforge.sizing-objective-scenarios.v1"
+  },
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "solver_boundary": {
+    "feasible_shell_left_face_temperature_k": 298.5,
+    "live_thermal_boundary_enabled": true,
+    "thermal_binding": {
+      "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+      "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+      "participates_in_task173_mesh": true,
+      "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+      "reference_pressure_pa": "101325",
+      "schema_version": "hxforge.experimental-thermal-boundary.v1",
+      "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+      "shell_inlet_temperature_k": "298.15",
+      "shell_mass_flow_kg_s": "20",
+      "thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+      "tube_inlet_temperature_k": "299.70",
+      "tube_mass_flow_kg_s": "12"
+    }
+  },
+  "workflow_status": "PARTIAL_RATING_ACCEPTED"
+}

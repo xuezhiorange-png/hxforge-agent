@@ -1,0 +1,84 @@
+{
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "production_sizing_verified": false,
+  "scenarios": [
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "9500",
+          "total_duty_w": "38387.018185484473"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "9500",
+          "total_duty_w": "38571.727035218992"
+        }
+      ],
+      "conditional_preferred_candidate_id": null,
+      "experimental_sizing_objective": "PARETO_ONLY",
+      "feasible_candidate_ids": [
+        "5a73903d-3325-5604-be3b-ba5950299893",
+        "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee"
+      ],
+      "target_duty_w": "9500"
+    },
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38000",
+          "total_duty_w": "38387.018185484473"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38000",
+          "total_duty_w": "38571.727035218992"
+        }
+      ],
+      "conditional_preferred_candidate_id": null,
+      "experimental_sizing_objective": "PARETO_ONLY",
+      "feasible_candidate_ids": [
+        "5a73903d-3325-5604-be3b-ba5950299893",
+        "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee"
+      ],
+      "target_duty_w": "38000"
+    },
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38500",
+          "total_duty_w": "38387.018185484473"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38500",
+          "total_duty_w": "38571.727035218992"
+        }
+      ],
+      "conditional_preferred_candidate_id": null,
+      "experimental_sizing_objective": "PARETO_ONLY",
+      "feasible_candidate_ids": [
+        "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee"
+      ],
+      "target_duty_w": "38500"
+    }
+  ],
+  "schema_version": "hxforge.sizing-objective-scenarios.v1"
+}

@@ -306,4 +306,140 @@ shards:
       - tests/exchangers/shell_tube/test_task172_local_runtime.py
       - tests/exchangers/shell_tube/test_task173_integrated_rating.py
       - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
+      - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
+      - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
     timeout: 600
+
+  - name: v07-experimental-live-rating-r8
+    job: shard-v07-experimental-live-rating-r8
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r8_live_n1_mesh_e2e.py
+    timeout: 900
+
+  - name: v07-experimental-live-rating-r9
+    job: shard-v07-experimental-live-rating-r9
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r9_experimental_live_cli.py
+    timeout: 900
+
+  - name: v07-experimental-live-rating-r10
+    job: shard-v07-experimental-live-rating-r10
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r10_multi_candidate_live_cli.py
+    timeout: 1200
+
+  - name: v07-constraint-aware-sizing-r11
+    job: shard-v07-constraint-aware-sizing-r11
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r11_constraint_aware_sizing.py
+    timeout: 1200
+
+  - name: v07-target-directed-live-sizing-r12
+    job: shard-v07-target-directed-live-sizing-r12
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r12_target_directed_selection.py
+      - tests/prototypes/test_r12_target_directed_live_cli.py
+    timeout: 2400
+
+  - name: v07-variable-bundle-geometry-sizing-r13-selection
+    job: shard-v07-variable-bundle-geometry-sizing-r13-selection
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r13_variable_bundle_selection.py
+    timeout: 2400
+
+  - name: v07-variable-bundle-geometry-sizing-r13-live-cli
+    job: shard-v07-variable-bundle-geometry-sizing-r13-live-cli
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r13_variable_bundle_live_cli.py
+    timeout: 3600
+
+  - name: v07-live-thermal-hydraulic-postpass-r14
+    job: shard-v07-live-thermal-hydraulic-postpass-r14
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r14_live_thermal_hydraulic_postpass.py
+    timeout: 900
+
+  - name: v07-live-hydraulic-constraint-sizing-r15
+    job: shard-v07-live-hydraulic-constraint-sizing-r15
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r15_hydraulic_constraint_sizing.py
+    timeout: 2400
+
+  - name: v07-live-multi-mesh-rating-r16-unit
+    job: shard-v07-live-multi-mesh-rating-r16-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r16_live_multi_mesh_rating.py
+    timeout: 300
+
+  - name: v07-live-multi-mesh-rating-r16-e2e
+    job: shard-v07-live-multi-mesh-rating-r16-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r16_live_multi_mesh_rating_e2e.py
+    timeout: 3600
+
+  - name: v07-variable-tube-mass-flow-r18-unit
+    job: shard-v07-variable-tube-mass-flow-r18-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r18_variable_tube_mass_flow.py
+    timeout: 300
+
+  - name: v07-variable-tube-mass-flow-r18-e2e
+    job: shard-v07-variable-tube-mass-flow-r18-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r18_variable_tube_mass_flow_e2e.py
+    timeout: 3600
+
+  - name: v07-variable-shell-mass-flow-r19-unit
+    job: shard-v07-variable-shell-mass-flow-r19-unit
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19_variable_shell_mass_flow.py
+    timeout: 300
+
+  - name: v07-variable-shell-mass-flow-r19-e2e
+    job: shard-v07-variable-shell-mass-flow-r19-e2e
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19_variable_shell_mass_flow_e2e.py
+    timeout: 3600
+
+  - name: v07-r19a-live-hydraulic-mass-flow-rebind
+    job: shard-v07-r19a-live-hydraulic-mass-flow-rebind
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19a_live_hydraulic_mass_flow_rebind.py
+    timeout: 600
+
+  - name: v07-r20-experimental-transitional-tube-hydraulic
+    job: shard-v07-r20-experimental-transitional-tube-hydraulic
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r20_experimental_transitional_tube_hydraulic.py
+    timeout: 900
+
+  - name: v07-r21-engineering-tube-local-loss-geometry
+    job: shard-v07-r21-engineering-tube-local-loss-geometry
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r21_engineering_tube_local_loss_geometry.py
+    timeout: 2400
+
+  - name: v07-r22-two-way-bulk-pressure-feedback
+    job: shard-v07-r22-two-way-bulk-pressure-feedback
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r22_two_way_bulk_pressure_feedback.py
+    timeout: 2400

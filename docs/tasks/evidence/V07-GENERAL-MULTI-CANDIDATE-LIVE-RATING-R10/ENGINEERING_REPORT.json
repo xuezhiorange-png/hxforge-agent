@@ -1,0 +1,769 @@
+{
+  "candidate_generation": {
+    "candidate_count": 4,
+    "candidate_space_hash": "b9e6034d14484dfdaedef509d62e46cb5880f458699f8dd0a3478bc8d853b9c4",
+    "distinct_geometry_count": 4,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97",
+        "0.98"
+      ],
+      "shell_inside_diameter_m": "0.5",
+      "tube_lengths_m": [
+        "4.85",
+        "4.90"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidate_rating_results": [
+    {
+      "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "constraint_preview": {
+        "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+        "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+        "duty_constraint": "SATISFIED",
+        "fiv_numeric_verified": false,
+        "full_rating_converged": false,
+        "max_shell_dp_pa": "1180",
+        "max_tube_dp_pa": "1150",
+        "mesh_ladder_completed": false,
+        "modeled_shell_dp_pa": "734.95423128250429504410606749286929349480910365014",
+        "modeled_tube_dp_pa": "7.371",
+        "production_design_eligible": false,
+        "r2a_production_authority_verified": false,
+        "rated_duty_w": "38387.018185484473",
+        "schema_version": "hxforge.experimental-constraint-preview.v1",
+        "shell_dp_constraint": "SATISFIED",
+        "target_duty_w": "9500",
+        "task167_engineering_approval": false,
+        "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+        "tube_dp_constraint": "SATISFIED"
+      },
+      "energy_balance_residual_w": "2.0E-10",
+      "failure_code": null,
+      "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+      "mesh_status": "NUMERIC_VALID",
+      "rating_request_hash": "79f617d9ee87f02fd76bcab1427b93c73b27d37fc99f6b5b78d313e944b71e6b",
+      "shell_outlet_temperature_k": "298.60904062912533",
+      "solver_performance_profile": {
+        "cell_root_trial_receipt_count": 0,
+        "ephemeral_tp_cache": null,
+        "mesh_run_metadata": {
+          "bisection_iterations": 27,
+          "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+          "outer_action_count": 29
+        },
+        "mesh_subdivisions": 1,
+        "outer_trial_count": 29,
+        "property_provider_state_lookup_count": 158279,
+        "schema_version": "hxforge.solver-performance-profile.v1",
+        "task172_local_evaluation_count": 4396,
+        "task172_request_hash_duplicate": "NOT_MEASURED",
+        "task172_request_hash_total": "NOT_MEASURED",
+        "task172_request_hash_unique": "NOT_MEASURED",
+        "timing_seconds": {
+          "outer_solver_estimated": 0.365,
+          "task172_evaluations": 225.864,
+          "total_wall": 226.229
+        }
+      },
+      "task025_parallel_area_m2": "0.0492914415",
+      "task171_result_hash": "42674abe266f66ee35269bccaaa91491393d690a7d3d62daacbf42e8c0488560",
+      "task172_local_evaluation_count": 4396,
+      "task174_result_hash": "4c760bdf35a3450d110b3379fa999e26e6eed3f3571acd337f6ef2ce9d2d04a7",
+      "terminal_boundary_residual_k": "7.74694E-9",
+      "total_duty_w": "38387.018185484473",
+      "tube_outlet_temperature_k": "298.9348676357185",
+      "wall_seconds": 226.229
+    },
+    {
+      "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "constraint_preview": {
+        "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+        "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+        "duty_constraint": "SATISFIED",
+        "fiv_numeric_verified": false,
+        "full_rating_converged": false,
+        "max_shell_dp_pa": "1180",
+        "max_tube_dp_pa": "1150",
+        "mesh_ladder_completed": false,
+        "modeled_shell_dp_pa": "728.15978851750986466110050843577920711220374535579",
+        "modeled_tube_dp_pa": "7.436",
+        "production_design_eligible": false,
+        "r2a_production_authority_verified": false,
+        "rated_duty_w": "38571.727035218992",
+        "schema_version": "hxforge.experimental-constraint-preview.v1",
+        "shell_dp_constraint": "SATISFIED",
+        "target_duty_w": "9500",
+        "task167_engineering_approval": false,
+        "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+        "tube_dp_constraint": "SATISFIED"
+      },
+      "energy_balance_residual_w": "3.2E-10",
+      "failure_code": null,
+      "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+      "mesh_status": "NUMERIC_VALID",
+      "rating_request_hash": "1c587b96ffd821c9e84daa278c9992822db559d4538008905dee5a9ca9044c8e",
+      "shell_outlet_temperature_k": "298.61124946532067",
+      "solver_performance_profile": {
+        "cell_root_trial_receipt_count": 0,
+        "ephemeral_tp_cache": null,
+        "mesh_run_metadata": {
+          "bisection_iterations": 26,
+          "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+          "outer_action_count": 28
+        },
+        "mesh_subdivisions": 1,
+        "outer_trial_count": 28,
+        "property_provider_state_lookup_count": 151929,
+        "schema_version": "hxforge.solver-performance-profile.v1",
+        "task172_local_evaluation_count": 4220,
+        "task172_request_hash_duplicate": "NOT_MEASURED",
+        "task172_request_hash_total": "NOT_MEASURED",
+        "task172_request_hash_unique": "NOT_MEASURED",
+        "timing_seconds": {
+          "outer_solver_estimated": 0.325,
+          "task172_evaluations": 210.584,
+          "total_wall": 210.909
+        }
+      },
+      "task025_parallel_area_m2": "0.0492914415",
+      "task171_result_hash": "4b60ec3ddb18b45d79e3b5214a47e757600e7261a84be68093be11155c418ad4",
+      "task172_local_evaluation_count": 4220,
+      "task174_result_hash": "5f62bbfbf890b92716c165de8ce0e1de33c766d3a7ee987508984a2216a2be87",
+      "terminal_boundary_residual_k": "5.54653E-9",
+      "total_duty_w": "38571.727035218992",
+      "tube_outlet_temperature_k": "298.93118612997137",
+      "wall_seconds": 210.909
+    }
+  ],
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "43f4b70b1acfb8a20ad1b0c22bde31562700ab6754dd20e04449dca0301b8f75",
+      "candidate_id": "439cbc6e-5fdc-58ae-aaa4-e62f44b951bd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "ac95c8dd0ddb1619073478ad8cde651452fd8b7faf02247e437285c268f298ef",
+      "candidate_id": "fec327ba-27d9-53a3-a4f3-a5f11c25e009",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    }
+  ],
+  "design_conditions": {
+    "engineering_case_schema": "hxforge.general-engineering-case.v2",
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "heat_transfer_convention": {
+      "kernel_shell_inlet_temperature_k": "298.15",
+      "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "kernel_tube_inlet_temperature_k": "300.00",
+      "shell_equipment_side": "shell_side",
+      "shell_mass_flow_kg_s": "20.000000",
+      "shell_thermal_role": "COLD",
+      "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+      "tube_equipment_side": "tube_side",
+      "tube_mass_flow_kg_s": "12.000000",
+      "tube_thermal_role": "HOT",
+      "user_shell_inlet_temperature_k": "298.15",
+      "user_tube_inlet_temperature_k": "299.70"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "shell_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "target_duty_w": "9500",
+    "tube_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "299.70",
+      "mass_flow_kg_s": "12.000000"
+    }
+  },
+  "engineering_case_id": "mvp-multi-candidate-r10",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_constraint_preview": null,
+  "experimental_live_run_hash": "75e874a96ec50e996c7d8d75f5081aee1830e1b4aa22c4059347a260146551ba",
+  "experimental_low_mesh_rating": {
+    "candidate_rating_results": [
+      {
+        "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+        "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "734.95423128250429504410606749286929349480910365014",
+          "modeled_tube_dp_pa": "7.371",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38387.018185484473",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "79f617d9ee87f02fd76bcab1427b93c73b27d37fc99f6b5b78d313e944b71e6b",
+        "shell_outlet_temperature_k": "298.60904062912533",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 158279,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4396,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.365,
+            "task172_evaluations": 225.864,
+            "total_wall": 226.229
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "42674abe266f66ee35269bccaaa91491393d690a7d3d62daacbf42e8c0488560",
+        "task172_local_evaluation_count": 4396,
+        "task174_result_hash": "4c760bdf35a3450d110b3379fa999e26e6eed3f3571acd337f6ef2ce9d2d04a7",
+        "terminal_boundary_residual_k": "7.74694E-9",
+        "total_duty_w": "38387.018185484473",
+        "tube_outlet_temperature_k": "298.9348676357185",
+        "wall_seconds": 226.229
+      },
+      {
+        "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+        "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "728.15978851750986466110050843577920711220374535579",
+          "modeled_tube_dp_pa": "7.436",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38571.727035218992",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "3.2E-10",
+        "failure_code": null,
+        "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "1c587b96ffd821c9e84daa278c9992822db559d4538008905dee5a9ca9044c8e",
+        "shell_outlet_temperature_k": "298.61124946532067",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 26,
+            "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+            "outer_action_count": 28
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 28,
+          "property_provider_state_lookup_count": 151929,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4220,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.325,
+            "task172_evaluations": 210.584,
+            "total_wall": 210.909
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "4b60ec3ddb18b45d79e3b5214a47e757600e7261a84be68093be11155c418ad4",
+        "task172_local_evaluation_count": 4220,
+        "task174_result_hash": "5f62bbfbf890b92716c165de8ce0e1de33c766d3a7ee987508984a2216a2be87",
+        "terminal_boundary_residual_k": "5.54653E-9",
+        "total_duty_w": "38571.727035218992",
+        "tube_outlet_temperature_k": "298.93118612997137",
+        "wall_seconds": 210.909
+      }
+    ],
+    "ephemeral_tp_cache_enabled": false,
+    "full_rating_converged": false,
+    "hydraulic_model_scope": {
+      "explanation": "Task174 tube/shell pressure drops are evaluated from the Task168\u2192Task174 native hydraulic chain at the sizing request thermal templates. They are not re-coupled to the experimental live tube inlet temperature (e.g. 299.70 K) during mesh rating. Live-boundary thermal results (duty, outlet temperatures) use the experimental thermal binding; \u0394p previews reference Task174 frozen hydraulic identities.",
+      "live_boundary_hydraulic_evaluated": false,
+      "live_thermal_boundary_coupled_to_mesh": true,
+      "schema_version": "hxforge.experimental-hydraulic-model-scope.v1",
+      "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW"
+    },
+    "low_mesh_numeric_valid": true,
+    "mesh_level": 1,
+    "mesh_levels": [
+      {
+        "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+        "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "734.95423128250429504410606749286929349480910365014",
+          "modeled_tube_dp_pa": "7.371",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38387.018185484473",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "79f617d9ee87f02fd76bcab1427b93c73b27d37fc99f6b5b78d313e944b71e6b",
+        "shell_outlet_temperature_k": "298.60904062912533",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 158279,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4396,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.365,
+            "task172_evaluations": 225.864,
+            "total_wall": 226.229
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "42674abe266f66ee35269bccaaa91491393d690a7d3d62daacbf42e8c0488560",
+        "task172_local_evaluation_count": 4396,
+        "task174_result_hash": "4c760bdf35a3450d110b3379fa999e26e6eed3f3571acd337f6ef2ce9d2d04a7",
+        "terminal_boundary_residual_k": "7.74694E-9",
+        "total_duty_w": "38387.018185484473",
+        "tube_outlet_temperature_k": "298.9348676357185",
+        "wall_seconds": 226.229
+      },
+      {
+        "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+        "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "728.15978851750986466110050843577920711220374535579",
+          "modeled_tube_dp_pa": "7.436",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38571.727035218992",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "3.2E-10",
+        "failure_code": null,
+        "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "1c587b96ffd821c9e84daa278c9992822db559d4538008905dee5a9ca9044c8e",
+        "shell_outlet_temperature_k": "298.61124946532067",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 26,
+            "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+            "outer_action_count": 28
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 28,
+          "property_provider_state_lookup_count": 151929,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4220,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.325,
+            "task172_evaluations": 210.584,
+            "total_wall": 210.909
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "4b60ec3ddb18b45d79e3b5214a47e757600e7261a84be68093be11155c418ad4",
+        "task172_local_evaluation_count": 4220,
+        "task174_result_hash": "5f62bbfbf890b92716c165de8ce0e1de33c766d3a7ee987508984a2216a2be87",
+        "terminal_boundary_residual_k": "5.54653E-9",
+        "total_duty_w": "38571.727035218992",
+        "tube_outlet_temperature_k": "298.93118612997137",
+        "wall_seconds": 210.909
+      }
+    ],
+    "mode": "experimental-live-rating",
+    "multi_candidate": true,
+    "property_provider_identity": {
+      "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+      "coolprop_version": "8.0.0",
+      "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "provider_class": "CoolPropProvider",
+      "provider_name": "CoolProp HEOS",
+      "reference_pressure_pa": "101325",
+      "reference_state_policy": "DEF",
+      "schema_version": "hxforge.property-provider-identity.v1",
+      "solver_source_revision": "1f28a46a27cf5aaa924d4abae1ffa62da2a40509"
+    },
+    "ranking": {
+      "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+      "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+      "preferred_candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "production_design_approved": false,
+      "production_sizing_verified": false,
+      "ranked_candidate_ids": [
+        "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+        "5a73903d-3325-5604-be3b-ba5950299893"
+      ],
+      "ranking_policy_id": "EXPERIMENTAL_MVP_DUTY_THEN_HEADROOM",
+      "schema_version": "hxforge.experimental-ranking-result.v1",
+      "trace": [
+        {
+          "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+          "meets_target_duty": true,
+          "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+          "rank": 1,
+          "total_duty_w": "38571.727035218992"
+        },
+        {
+          "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+          "meets_target_duty": true,
+          "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+          "rank": 2,
+          "total_duty_w": "38387.018185484473"
+        }
+      ]
+    },
+    "run_identity_hash": "75e874a96ec50e996c7d8d75f5081aee1830e1b4aa22c4059347a260146551ba",
+    "solver_boundary": {
+      "feasible_shell_left_face_temperature_k": 298.5,
+      "live_thermal_boundary_enabled": true,
+      "thermal_binding": {
+        "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+        "participates_in_task173_mesh": true,
+        "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+        "reference_pressure_pa": "101325",
+        "schema_version": "hxforge.experimental-thermal-boundary.v1",
+        "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+        "shell_inlet_temperature_k": "298.15",
+        "shell_mass_flow_kg_s": "20",
+        "thermal_variant": "TUBE_HOT_SHELL_COLD",
+        "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+        "tube_inlet_temperature_k": "299.70",
+        "tube_mass_flow_kg_s": "12"
+      }
+    }
+  },
+  "experimental_ranking": {
+    "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+    "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+    "preferred_candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+    "production_design_approved": false,
+    "production_sizing_verified": false,
+    "ranked_candidate_ids": [
+      "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "5a73903d-3325-5604-be3b-ba5950299893"
+    ],
+    "ranking_policy_id": "EXPERIMENTAL_MVP_DUTY_THEN_HEADROOM",
+    "schema_version": "hxforge.experimental-ranking-result.v1",
+    "trace": [
+      {
+        "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+        "meets_target_duty": true,
+        "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+        "rank": 1,
+        "total_duty_w": "38571.727035218992"
+      },
+      {
+        "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+        "meets_target_duty": true,
+        "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+        "rank": 2,
+        "total_duty_w": "38387.018185484473"
+      }
+    ]
+  },
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-21T13:44:10.985640+00:00",
+  "geometry_summary": null,
+  "hydraulic_model_scope": {
+    "explanation": "Task174 tube/shell pressure drops are evaluated from the Task168\u2192Task174 native hydraulic chain at the sizing request thermal templates. They are not re-coupled to the experimental live tube inlet temperature (e.g. 299.70 K) during mesh rating. Live-boundary thermal results (duty, outlet temperatures) use the experimental thermal binding; \u0394p previews reference Task174 frozen hydraulic identities.",
+    "live_boundary_hydraulic_evaluated": false,
+    "live_thermal_boundary_coupled_to_mesh": true,
+    "schema_version": "hxforge.experimental-hydraulic-model-scope.v1",
+    "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW"
+  },
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "R10: two tube lengths at shared baffle spacing; 299.70 K tube / 298.15 K shell.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "property_provider_identity": {
+    "coolprop_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "coolprop_version": "8.0.0",
+    "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+    "provider_class": "CoolPropProvider",
+    "provider_name": "CoolProp HEOS",
+    "reference_pressure_pa": "101325",
+    "reference_state_policy": "DEF",
+    "schema_version": "hxforge.property-provider-identity.v1",
+    "solver_source_revision": "1f28a46a27cf5aaa924d4abae1ffa62da2a40509"
+  },
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": {
+    "experimental_ranking_status": "NOT_YET_AVAILABLE",
+    "frozen_r4_n1": null,
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": true,
+    "mesh_comparison": null,
+    "mesh_comparison_available": false,
+    "mesh_levels": [
+      {
+        "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+        "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "734.95423128250429504410606749286929349480910365014",
+          "modeled_tube_dp_pa": "7.371",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38387.018185484473",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "2.0E-10",
+        "failure_code": null,
+        "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "79f617d9ee87f02fd76bcab1427b93c73b27d37fc99f6b5b78d313e944b71e6b",
+        "shell_outlet_temperature_k": "298.60904062912533",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 27,
+            "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+            "outer_action_count": 29
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 29,
+          "property_provider_state_lookup_count": 158279,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4396,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.365,
+            "task172_evaluations": 225.864,
+            "total_wall": 226.229
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "42674abe266f66ee35269bccaaa91491393d690a7d3d62daacbf42e8c0488560",
+        "task172_local_evaluation_count": 4396,
+        "task174_result_hash": "4c760bdf35a3450d110b3379fa999e26e6eed3f3571acd337f6ef2ce9d2d04a7",
+        "terminal_boundary_residual_k": "7.74694E-9",
+        "total_duty_w": "38387.018185484473",
+        "tube_outlet_temperature_k": "298.9348676357185",
+        "wall_seconds": 226.229
+      },
+      {
+        "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+        "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+        "constraint_preview": {
+          "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+          "EXPERIMENTAL_DP_PREVIEW": "WITHIN_LIMITS",
+          "duty_constraint": "SATISFIED",
+          "fiv_numeric_verified": false,
+          "full_rating_converged": false,
+          "max_shell_dp_pa": "1180",
+          "max_tube_dp_pa": "1150",
+          "mesh_ladder_completed": false,
+          "modeled_shell_dp_pa": "728.15978851750986466110050843577920711220374535579",
+          "modeled_tube_dp_pa": "7.436",
+          "production_design_eligible": false,
+          "r2a_production_authority_verified": false,
+          "rated_duty_w": "38571.727035218992",
+          "schema_version": "hxforge.experimental-constraint-preview.v1",
+          "shell_dp_constraint": "SATISFIED",
+          "target_duty_w": "9500",
+          "task167_engineering_approval": false,
+          "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+          "tube_dp_constraint": "SATISFIED"
+        },
+        "energy_balance_residual_w": "3.2E-10",
+        "failure_code": null,
+        "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+        "mesh_status": "NUMERIC_VALID",
+        "rating_request_hash": "1c587b96ffd821c9e84daa278c9992822db559d4538008905dee5a9ca9044c8e",
+        "shell_outlet_temperature_k": "298.61124946532067",
+        "solver_performance_profile": {
+          "cell_root_trial_receipt_count": 0,
+          "ephemeral_tp_cache": null,
+          "mesh_run_metadata": {
+            "bisection_iterations": 26,
+            "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+            "outer_action_count": 28
+          },
+          "mesh_subdivisions": 1,
+          "outer_trial_count": 28,
+          "property_provider_state_lookup_count": 151929,
+          "schema_version": "hxforge.solver-performance-profile.v1",
+          "task172_local_evaluation_count": 4220,
+          "task172_request_hash_duplicate": "NOT_MEASURED",
+          "task172_request_hash_total": "NOT_MEASURED",
+          "task172_request_hash_unique": "NOT_MEASURED",
+          "timing_seconds": {
+            "outer_solver_estimated": 0.325,
+            "task172_evaluations": 210.584,
+            "total_wall": 210.909
+          }
+        },
+        "task025_parallel_area_m2": "0.0492914415",
+        "task171_result_hash": "4b60ec3ddb18b45d79e3b5214a47e757600e7261a84be68093be11155c418ad4",
+        "task172_local_evaluation_count": 4220,
+        "task174_result_hash": "5f62bbfbf890b92716c165de8ce0e1de33c766d3a7ee987508984a2216a2be87",
+        "terminal_boundary_residual_k": "5.54653E-9",
+        "total_duty_w": "38571.727035218992",
+        "tube_outlet_temperature_k": "298.93118612997137",
+        "wall_seconds": 210.909
+      }
+    ],
+    "mesh_observables": null,
+    "mode": "experimental-live-rating",
+    "sizing_evaluated": false
+  },
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "solver_boundary": {
+    "feasible_shell_left_face_temperature_k": 298.5,
+    "live_thermal_boundary_enabled": true,
+    "thermal_binding": {
+      "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+      "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+      "participates_in_task173_mesh": true,
+      "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+      "reference_pressure_pa": "101325",
+      "schema_version": "hxforge.experimental-thermal-boundary.v1",
+      "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+      "shell_inlet_temperature_k": "298.15",
+      "shell_mass_flow_kg_s": "20",
+      "thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+      "tube_inlet_temperature_k": "299.70",
+      "tube_mass_flow_kg_s": "12"
+    }
+  },
+  "workflow_status": "PARTIAL_RATING_ACCEPTED"
+}

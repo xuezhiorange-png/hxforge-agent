@@ -1,0 +1,15 @@
+{
+  "files": {
+    "ENGINEERING_REPORT.json": "ea4a5ba6b67672981ae36a1f08fb56b1c73164c88d28449bbac39ddbf2b087e1",
+    "ENGINEERING_REPORT.md": "c051a42cce34c91399ecd0ef9593f6bd4c159f0e2180cbf0a01aabde339a2533",
+    "MESH_N2_N4_COMPARISON.json": "b08cc986c15de02c25b38c010e1ee2d2a439d84eeb63f9e9191d38a9caae41d3",
+    "MESH_N4_RESULT.json": "7337d0e1c373e1b36148e46f76e93f59b657fb952c3841cfceaa70094827dc9b",
+    "PERFORMANCE_BASELINE_AND_OPTIMIZATION.json": "9dbdbe3b48d8e0d8d42fd4317350943b97088a845095bacc255015eace9353c7",
+    "PHYSICAL_MODEL_PARITY.json": "bb05e1ef344568d7dfb4281d9cd6e5cc650e74eb3e8f88dfb2dd12b667793deb",
+    "PROPERTY_PROVIDER_CALL_PROFILE.json": "e22b3b1eee3a6b5762d8ca62736f9c4cec90c6445f6e6933307b3f447eecec99",
+    "RAW_RESULT.json": "c3188df3871df6e1aee7fbbd431404ecf201e99e25e02ddfbd6f2860e0e3c765"
+  },
+  "schema_version": "hxforge.evidence-manifest.v1",
+  "task_id": "V07_GENERAL_RATING_N4_PERFORMANCE_AND_MESH_R6",
+  "total_numerical_seconds": 814.555
+}

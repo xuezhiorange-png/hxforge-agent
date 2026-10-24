@@ -889,7 +889,7 @@ def validate_sizing_request(
                 shell_record,
                 include_legacy_task162=False,
                 include_legacy_task168_rating_dependencies=False,
-                preserve_baffle_orientation_sequence=True,
+                preserve_baffle_orientation_sequence=False,
             )
             identities = _native_identities(bundle, None, None)
             if stage_failure is not None:

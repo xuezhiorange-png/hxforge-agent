@@ -1,0 +1,25 @@
+{
+  "actual_solver_boundary": {
+    "case_a": "FROZEN_REFERENCE_BOUNDARY",
+    "case_b": "EXPERIMENTAL_LIVE_BOUNDARY"
+  },
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "case_a_engineering_case_id": "mvp-tube-hot-shell-cold-r6",
+  "case_a_q_root_w": "12054.576226379197",
+  "case_a_task172_request_hash": "c0da6dd6f0943b472bd04dea2314bebdaafaa686f05958dc8da0e7cc9f3b24b7",
+  "case_a_task172_result_hash": "dbcbeb303b7d6d72e055385e141d4bf00810daed09519ffbb22e91b0c75d139f",
+  "case_b_engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+  "case_b_q_root_w": "10430.77217887273",
+  "case_b_task172_request_hash": "cbbbf564f2e8cffdee4345a867361301004193028866171f6d8cd5b576570e24",
+  "case_b_task172_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+  "constitutive_heat_rates_differ": true,
+  "schema_version": "hxforge.case-a-case-b-input-parity.v1",
+  "shared_candidate_id": true,
+  "task172_request_hashes_differ": true,
+  "task172_result_hashes_differ": true,
+  "user_specified_boundary": {
+    "case_a_tube_inlet_k": "300.00",
+    "case_b_shell_inlet_k": "298.15",
+    "case_b_tube_inlet_k": "299.80"
+  }
+}

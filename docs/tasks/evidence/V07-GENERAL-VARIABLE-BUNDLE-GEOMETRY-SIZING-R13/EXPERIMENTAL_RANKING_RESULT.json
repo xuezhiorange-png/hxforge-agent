@@ -1,0 +1,33 @@
+{
+  "CONDITIONAL_PREFERENCE_STATUS": "PREFERENCE_AVAILABLE",
+  "EXPERIMENTAL_COMPARISON_AVAILABLE": true,
+  "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+  "EXPERIMENTAL_PREFERRED_CANDIDATE": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+  "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+  "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+  "feasible_candidate_ids": [
+    "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+  ],
+  "non_production_disclaimer": "Experimental objective selection \u2014 not production sizing.",
+  "pareto_frontier_candidate_ids": [
+    "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+  ],
+  "preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+  "production_design_approved": false,
+  "production_sizing_verified": false,
+  "ranked_candidate_ids": [
+    "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+  ],
+  "ranking_policy_id": "EXPERIMENTAL_MIN_NOMINAL_TUBE_AREA",
+  "schema_version": "hxforge.experimental-ranking-result.v1",
+  "trace": [
+    {
+      "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "meets_target_duty": true,
+      "mesh_result_hash": "216569698d32f69aafe95baffb1bab8ab152268d9e74dc68836811294c28b985",
+      "nominal_tube_outer_area_m2": "60.505660791445297773150",
+      "rank": 1,
+      "total_duty_w": "32528.427903428549"
+    }
+  ]
+}

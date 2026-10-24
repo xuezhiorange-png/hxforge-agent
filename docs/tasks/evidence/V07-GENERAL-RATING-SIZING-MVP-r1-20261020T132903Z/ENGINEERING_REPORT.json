@@ -1,0 +1,96 @@
+{
+  "candidate_generation": {
+    "candidate_count": 3,
+    "candidate_space_hash": "4f62998894be1ad4286f586e7547f2ac5a212c96a5d7064f7b9d77a225010820",
+    "distinct_geometry_count": 3,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97"
+      ],
+      "shell_inside_diameter_m": "0.8",
+      "tube_lengths_m": [
+        "4.85",
+        "5.00",
+        "5.15"
+      ],
+      "tube_outer_diameter_m": "0.02",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.031",
+      "tube_wall_thickness_m": "0.002"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "a8de03e48402f71d04d2ae4c57f117f39d50f49c9b0f3c87de31ac59b0ea600e",
+      "candidate_id": "68d18c9e-55e5-5040-b7a7-3dab0ae69e50",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "586270fe34e2c56036e8fb9ce0e308c34a026b35c641e7754ed616ec9ec56dca",
+      "candidate_id": "a901a6df-1698-521b-ac09-cf9abd4b7c1d",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "5.00"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "c00cf08d073f98b65bf75769166f2b4b83b5b118997930e168bd033591a2b638",
+      "candidate_id": "b4c1636a-731e-5057-b605-5a3dd1ded86b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "5.15"
+    }
+  ],
+  "design_conditions": {
+    "cold_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101000",
+      "inlet_temperature_k": "299.15",
+      "mass_flow_kg_s": "12.000000"
+    },
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "hot_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101200",
+      "inlet_temperature_k": "298.65",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "target_duty_w": "9500"
+  },
+  "engineering_case_id": "mvp-district-heating-water-water-r1",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-20T13:29:05.037724+00:00",
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "New MVP case: 9.5 kW duty (not 10 kW validation default), three tube lengths at 0.8 m shell. Candidate IDs/hashes are generated live via Task168 (not R22 pins).",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": null,
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "workflow_status": "PARTIAL_RATING_BUDGET"
+}

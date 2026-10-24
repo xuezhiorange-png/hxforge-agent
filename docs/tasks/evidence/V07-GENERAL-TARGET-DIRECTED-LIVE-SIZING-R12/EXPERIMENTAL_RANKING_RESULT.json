@@ -1,0 +1,44 @@
+{
+  "CONDITIONAL_PREFERENCE_STATUS": "PREFERENCE_AVAILABLE",
+  "EXPERIMENTAL_COMPARISON_AVAILABLE": true,
+  "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+  "EXPERIMENTAL_PREFERRED_CANDIDATE": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+  "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+  "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+  "feasible_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "non_production_disclaimer": "Experimental objective selection \u2014 not production sizing.",
+  "pareto_frontier_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "preferred_candidate_id": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+  "production_design_approved": false,
+  "production_sizing_verified": false,
+  "ranked_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "ranking_policy_id": "EXPERIMENTAL_MIN_NOMINAL_TUBE_AREA",
+  "schema_version": "hxforge.experimental-ranking-result.v1",
+  "trace": [
+    {
+      "candidate_id": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+      "meets_target_duty": true,
+      "mesh_result_hash": "2a11bb920f716d922a0ffab6647a816be029d8f879abb5d5fefe4519bf4ad34c",
+      "nominal_tube_outer_area_m2": "45.424131098622137497350",
+      "rank": 1,
+      "total_duty_w": "29882.751196130037"
+    },
+    {
+      "candidate_id": "071b9c82-f24a-53dd-b03b-a267f5f8d3c3",
+      "meets_target_duty": true,
+      "mesh_result_hash": "b089f583adeea70c3625815bb10a058b339ea91068dc98e6e25666257912da18",
+      "nominal_tube_outer_area_m2": "52.994819615059160413575",
+      "rank": 2,
+      "total_duty_w": "32561.768761137928"
+    }
+  ]
+}

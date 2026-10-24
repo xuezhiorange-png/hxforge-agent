@@ -1,0 +1,78 @@
+{
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "production_sizing_verified": false,
+  "scenarios": [
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "9500",
+          "total_duty_w": "32328.8461907676175"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+          "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "9500",
+          "total_duty_w": "32528.427903428549"
+        }
+      ],
+      "conditional_preferred_candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+      "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+      "feasible_candidate_ids": [
+        "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5"
+      ],
+      "target_duty_w": "9500"
+    },
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38000",
+          "total_duty_w": "32328.8461907676175"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38000",
+          "total_duty_w": "32528.427903428549"
+        }
+      ],
+      "conditional_preferred_candidate_id": null,
+      "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+      "feasible_candidate_ids": [],
+      "target_duty_w": "38000"
+    },
+    {
+      "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+      "candidates": [
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "ce66b1a2-1f75-5901-bd7f-6a9ee5cd3cfe",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38500",
+          "total_duty_w": "32328.8461907676175"
+        },
+        {
+          "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_FAILED",
+          "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+          "mesh_status": "NUMERIC_VALID",
+          "target_duty_w": "38500",
+          "total_duty_w": "32528.427903428549"
+        }
+      ],
+      "conditional_preferred_candidate_id": null,
+      "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+      "feasible_candidate_ids": [],
+      "target_duty_w": "38500"
+    }
+  ],
+  "schema_version": "hxforge.sizing-objective-scenarios.v1"
+}

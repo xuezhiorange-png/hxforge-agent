@@ -1,0 +1,9 @@
+{
+  "files": {
+    "LIVE_THERMAL_HYDRAULIC_CONNECTION_ANALYSIS.json": "31158fe6370bb618d56404a3d41b39ac5bd308e583a5384b32850c0f74bb2643",
+    "LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS.json": "bb00fd81b7b78a9aaae942a37b139ea2bd41c03faeb3097f6f0288145ab036e4",
+    "RAW_RESULT.json": "473a7115fbafb7095c6f37d6d71c48006a3a1c67da772e48e8bab7f1e2d6f5f0"
+  },
+  "schema_version": "hxforge.evidence-manifest.v1",
+  "task_id": "V07_LIVE_THERMAL_STATE_HYDRAULIC_EVALUATION_R14"
+}

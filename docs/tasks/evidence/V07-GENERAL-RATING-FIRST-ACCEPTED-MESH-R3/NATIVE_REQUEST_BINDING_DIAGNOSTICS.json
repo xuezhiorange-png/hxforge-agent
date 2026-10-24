@@ -1,0 +1,14 @@
+{
+  "entries": [
+    {
+      "ACTUAL_BLOCKER": "EVALUATION_AUTHORITY_REQUIRED",
+      "FIELD_PATH": "evaluation_input_authority.task024_request_template.design_authority.orientation_sequence",
+      "FIXED_FIELD": "task173_integrated_sizing.validate_sizing_request.preserve_baffle_orientation_sequence",
+      "RESULT": "FIXED",
+      "ROOT_CAUSE": "Task173 sizing invoked Task168 with preserve_baffle_orientation_sequence=True while the validation task024 template carries three orientations for four baffles; sizing now uses per-candidate orientations (preserve_baffle_orientation_sequence=False).",
+      "SOURCE_IDENTITY": "V07-T173-SIZING-IMPLEMENTATION-VALIDATION-CANDIDATE-SPACE-R2",
+      "STAGE": "BAFFLE_GEOMETRY"
+    }
+  ],
+  "schema_version": "hxforge.native-binding-diagnostics.v1"
+}
