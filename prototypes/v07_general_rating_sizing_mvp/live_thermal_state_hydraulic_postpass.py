@@ -213,9 +213,7 @@ def _task026_request_with_snapshot(
 def _is_task027_transition_gap_blocker_only(blockers: list[dict[str, str]]) -> bool:
     if not blockers:
         return False
-    return all(
-        blocker.get("code") == "BL_T027_UNSUPPORTED_REYNOLDS_REGIME" for blocker in blockers
-    )
+    return all(blocker.get("code") == "BL_T027_UNSUPPORTED_REYNOLDS_REGIME" for blocker in blockers)
 
 
 def _run_task028_local_loss_only(
