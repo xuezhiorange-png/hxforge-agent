@@ -3034,9 +3034,9 @@ def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
 
     original_helper = service._solve_outer_boundary_from_trial
 
-    def counted_shared_helper(trial_at: Any) -> Any:
+    def counted_shared_helper(trial_at: Any, **kwargs: Any) -> Any:
         control_flow_calls.append(True)
-        return original_helper(trial_at)
+        return original_helper(trial_at, **kwargs)
 
     def fake_outer_trial(
         _subdivisions: int,
