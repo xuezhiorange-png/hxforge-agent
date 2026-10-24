@@ -78,10 +78,14 @@ def _live_hydraulic_constraint_status(
     if postpass is None:
         return "NOT_EVALUATED"
 
+    hydraulic_status = postpass.get("hydraulic_constraint_status")
+    if hydraulic_status == "BLOCKED":
+        return "PRELIMINARY_CONSTRAINT_FAILED"
+    if postpass.get("tube_hydraulic_recompute_status") == "BLOCKED":
+        return "PRELIMINARY_CONSTRAINT_FAILED"
+
     required_fields = (
-        "recalculated_tube_dp_pa",
         "recalculated_shell_dp_pa",
-        "tube_outlet_pressure_pa",
         "shell_outlet_pressure_pa",
         "correlation_applicability_status",
         "task174_style_outlet_pressure_window_pass",
@@ -90,13 +94,21 @@ def _live_hydraulic_constraint_status(
         if postpass.get(field) is None:
             return "NOT_EVALUATED"
 
+    if postpass.get("tube_hydraulic_recompute_status") == "SUCCESS":
+        tube_required = (
+            "recalculated_tube_dp_pa",
+            "tube_outlet_pressure_pa",
+        )
+        for field in tube_required:
+            if postpass.get(field) is None:
+                return "NOT_EVALUATED"
+    elif postpass.get("recalculated_tube_dp_pa") is None:
+        return "PRELIMINARY_CONSTRAINT_FAILED"
+
     applicability = postpass.get("correlation_applicability_status")
     if applicability != "APPLICABLE":
         return "PRELIMINARY_CONSTRAINT_FAILED"
 
-    hydraulic_status = postpass.get("hydraulic_constraint_status")
-    if hydraulic_status == "BLOCKED":
-        return "PRELIMINARY_CONSTRAINT_FAILED"
     if hydraulic_status in {None, "NOT_EVALUATED"}:
         return "NOT_EVALUATED"
     if hydraulic_status == "NOT_SATISFIED":

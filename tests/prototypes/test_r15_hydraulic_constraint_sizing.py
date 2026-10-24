@@ -98,8 +98,10 @@ def test_reference_fails_live_passes_at_1175_pa_limit(
     decision = build_hydraulic_constraint_decision(case, row, rating_status="NUMERIC_VALID")
     assert decision["hydraulic_decision_source"] == HYDRAULIC_DECISION_SOURCE_LIVE
     assert decision["REFERENCE_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"
-    assert decision["LIVE_HYDRAULIC_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
-    assert decision["reference_vs_live_feasibility_changed"] is True
+    assert live_postpass_doc["tube_hydraulic_recompute_status"] == "BLOCKED"
+    assert live_postpass_doc["hydraulic_constraint_status"] == "BLOCKED"
+    assert decision["LIVE_HYDRAULIC_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"
+    assert decision["EFFECTIVE_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"
     ref_shell = Decimal(str(decision["reference_shell_dp_pa"]))
     live_shell = Decimal(str(decision["live_recalculated_shell_dp_pa"]))
     assert ref_shell > Decimal("1175")
@@ -181,7 +183,7 @@ def test_constraint_satisfied_ids_uses_live_effective_status(
             "CONSTRAINT_STATUS": decision["EFFECTIVE_CONSTRAINT_STATUS"],
         }
     ]
-    assert _PINNED in constraint_satisfied_ids(eligibility)
+    assert _PINNED not in constraint_satisfied_ids(eligibility)
 
 
 @pytest.mark.timeout(1800)
@@ -219,10 +221,12 @@ def test_r15_live_hydraulic_e2e_single_rating() -> None:
         sizing = json.loads((out / "LIVE_HYDRAULIC_SIZING_DECISION.json").read_text())
         per = sizing["per_candidate"][0]
         assert per["REFERENCE_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"
-        assert per["LIVE_HYDRAULIC_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
+        assert per["LIVE_HYDRAULIC_CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_FAILED"
+        postpass = rated[0]["live_thermal_state_hydraulic_postpass"]
+        assert postpass["tube_hydraulic_recompute_status"] == "BLOCKED"
         feasible = [
             c
             for c in eligibility["candidates"]
             if c["CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
         ]
-        assert len(feasible) == 1
+        assert len(feasible) == 0
