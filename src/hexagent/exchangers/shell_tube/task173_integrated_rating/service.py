@@ -2087,9 +2087,7 @@ def _preflight_task172_trial(
             or state.snapshot.phase != "liquid"
         ):
             raise _Stage3Failure("BLOCKED_LOCAL_PROPERTY_STATE_PREFLIGHT", side)
-    local_approach = (
-        _d(tube_local.native.temperature_k) - _d(shell_local.native.temperature_k)
-    )
+    local_approach = _d(tube_local.native.temperature_k) - _d(shell_local.native.temperature_k)
     if _local_hot_cold_temperature_crossing(local_approach):
         raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", "local-state-preflight")
     if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):

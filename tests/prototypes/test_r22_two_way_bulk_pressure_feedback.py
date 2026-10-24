@@ -207,7 +207,9 @@ def test_r22_two_way_e2e_cli_with_task172_pressure_binding() -> None:
         assert obs, "expected captured Task172 bulk pressure observations"
         sample = obs[-1]
         assert sample["task173_tube_thermo_pressure_pa"] == sample["task172_tube_local_pressure_pa"]
-        assert sample["task173_shell_thermo_pressure_pa"] == sample["task172_shell_local_pressure_pa"]
+        assert (
+            sample["task173_shell_thermo_pressure_pa"] == sample["task172_shell_local_pressure_pa"]
+        )
         assert (
             sample["task173_tube_thermo_pressure_pa"]
             == sample["task173_tube_property_evaluation_pressure_pa"]
