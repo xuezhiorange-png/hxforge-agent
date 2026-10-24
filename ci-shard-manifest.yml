@@ -429,3 +429,10 @@ shards:
     files:
       - tests/prototypes/test_r20_experimental_transitional_tube_hydraulic.py
     timeout: 900
+
+  - name: v07-r21-engineering-tube-local-loss-geometry
+    job: shard-v07-r21-engineering-tube-local-loss-geometry
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r21_engineering_tube_local_loss_geometry.py
+    timeout: 2400

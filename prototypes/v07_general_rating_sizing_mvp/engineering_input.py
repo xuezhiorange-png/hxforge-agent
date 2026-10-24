@@ -246,6 +246,17 @@ class GeneralEngineeringCaseV2(BaseModel):
             "Task027 blocks 2000<Re<4000. Does not alter Task027/Task029 production paths."
         ),
     )
+    experimental_engineering_tube_local_loss: bool = Field(
+        default=False,
+        description=(
+            "When true, Task028 local-loss component authorities come from tube_local_loss_engineering "
+            "instead of the Task168 historical template."
+        ),
+    )
+    tube_local_loss_engineering: object | None = Field(
+        default=None,
+        description="R21 engineering tube local-loss component specification (see engineering_tube_local_loss_geometry).",
+    )
     experimental_live_variable_tube_mass_flow: bool = Field(
         default=False,
         description=(
@@ -326,6 +337,28 @@ class GeneralEngineeringCaseV2(BaseModel):
                 "experimental_transitional_tube_hydraulic requires "
                 "experimental_live_thermal_hydraulic_postpass=true"
             )
+        if self.experimental_engineering_tube_local_loss:
+            if not self.experimental_live_thermal_hydraulic_postpass:
+                raise ValueError(
+                    "experimental_engineering_tube_local_loss requires "
+                    "experimental_live_thermal_hydraulic_postpass=true"
+                )
+            if not self.experimental_transitional_tube_hydraulic:
+                raise ValueError(
+                    "experimental_engineering_tube_local_loss requires "
+                    "experimental_transitional_tube_hydraulic=true"
+                )
+            if self.tube_local_loss_engineering is None:
+                raise ValueError(
+                    "tube_local_loss_engineering is required when "
+                    "experimental_engineering_tube_local_loss is true"
+                )
+            from prototypes.v07_general_rating_sizing_mvp.engineering_tube_local_loss_geometry import (
+                TubeLocalLossEngineeringInput,
+            )
+
+            if not isinstance(self.tube_local_loss_engineering, TubeLocalLossEngineeringInput):
+                TubeLocalLossEngineeringInput.model_validate(self.tube_local_loss_engineering)
         return self
 
     def heat_transfer_convention(self) -> dict[str, str]:

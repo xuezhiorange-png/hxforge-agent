@@ -63,6 +63,17 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_tube_local_loss_geometry import (
+    BLOCKER_CODE as R21_GEOMETRY_BLOCKER,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_tube_local_loss_geometry import (
+    build_task028_component_authorities,
+    component_results_disclosure,
+    engineering_geometry_disclosure,
+    engineering_tube_local_loss_input,
+    experimental_engineering_tube_local_loss_enabled,
+    validate_engineering_local_loss_activation,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_transitional_tube_hydraulic import (
     APPLICABILITY_STATUS as R20_APPLICABILITY_STATUS,
 )
@@ -218,11 +229,15 @@ def _is_task027_transition_gap_blocker_only(blockers: list[dict[str, str]]) -> b
 
 def _run_task028_local_loss_only(
     *,
+    case: EngineeringCase,
     bundle: Any,
     authority: Any,
     task026_result: Any,
     tube_property_snapshot: PropertySnapshot,
 ) -> tuple[Any | None, list[dict[str, str]]]:
+    engineering_blockers = validate_engineering_local_loss_activation(case)
+    if engineering_blockers:
+        return None, engineering_blockers
     try:
         task028_template_value = task168._public_value(
             authority.task028_request_template, decimal_strings=False
@@ -263,6 +278,17 @@ def _run_task028_local_loss_only(
     task028_template["flow_direction_assertion"] = task168._status_text(
         authority.task027_flow_direction_assertion
     )
+    if experimental_engineering_tube_local_loss_enabled(case):
+        spec = engineering_tube_local_loss_input(case)
+        if spec is None:
+            return None, [
+                {
+                    "code": R21_GEOMETRY_BLOCKER,
+                    "scope": "ENGINEERING_CASE",
+                    "detail": "tube_local_loss_engineering missing",
+                }
+            ]
+        task028_template["component_authorities"] = build_task028_component_authorities(spec)
     result028 = compute_task028_local_loss(
         raw_request=task028_template,
         task025_result=cast(Any, bundle.task025_result),
@@ -619,6 +645,7 @@ def run_live_thermal_state_hydraulic_postpass(
         tube_property_snapshot=tube_snapshot,
     )
     experimental_transitional_tube_hydraulic: dict[str, str] | None = None
+    tube_local_loss_engineering_doc: dict[str, Any] | None = None
     recalc_tube_experimental: Decimal | None = None
     tube_hydraulic_recompute_status = "SUCCESS" if task029_outcome is not None else "BLOCKED"
     if (
@@ -627,6 +654,7 @@ def run_live_thermal_state_hydraulic_postpass(
         and _is_task027_transition_gap_blocker_only(tube_hydraulic_blockers)
     ):
         result028, task028_blockers = _run_task028_local_loss_only(
+            case=case,
             bundle=bundle,
             authority=authority,
             task026_result=task026_result,
@@ -645,7 +673,16 @@ def run_live_thermal_state_hydraulic_postpass(
             if exp_outcome.status == "SUCCESS" and exp_outcome.total_tube_dp_pa is not None:
                 tube_hydraulic_recompute_status = "EXPERIMENTAL_TRANSITIONAL_SUCCESS"
                 recalc_tube_experimental = exp_outcome.total_tube_dp_pa
-                experimental_transitional_tube_hydraulic = exp_outcome.disclosure
+                experimental_transitional_tube_hydraulic = dict(exp_outcome.disclosure)
+                if experimental_engineering_tube_local_loss_enabled(case) and result028 is not None:
+                    spec = engineering_tube_local_loss_input(case)
+                    if spec is not None:
+                        tube_local_loss_engineering_doc = {
+                            **engineering_geometry_disclosure(case, spec),
+                            "computed_local_loss_components": component_results_disclosure(
+                                result028
+                            ),
+                        }
                 tube_hydraulic_blockers = []
             else:
                 tube_hydraulic_blockers = [
@@ -840,6 +877,7 @@ def run_live_thermal_state_hydraulic_postpass(
         "coolprop_outlet_domain_checks": coolprop_checks,
         "task174_style_outlet_pressure_window_pass": task174_style_pressure_ok,
         "experimental_transitional_tube_hydraulic": experimental_transitional_tube_hydraulic,
+        "tube_local_loss_engineering": tube_local_loss_engineering_doc,
         "hydraulic_model_scope": (
             experimental_transitional_tube_hydraulic.get("hydraulic_model_scope")
             if experimental_transitional_tube_hydraulic
