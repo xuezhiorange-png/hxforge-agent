@@ -6,7 +6,7 @@ import json
 import math
 import time
 from collections.abc import Callable
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field, replace
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
@@ -159,6 +159,19 @@ def effective_hot_ceiling_enthalpy_j_kg() -> Decimal:
     return bound.tube_inlet_enthalpy_j_kg
 
 
+def effective_outer_shooting_high_enthalpy_j_kg(provider: PropertyProvider) -> Decimal:
+    """Shell-side shooting upper bound (pressure-aware under R22 bulk feedback)."""
+    bound = active_experimental_thermal_boundary()
+    if bound is None or not bulk_property_pressure_feedback_active(bound):
+        return effective_hot_ceiling_enthalpy_j_kg()
+    state = provider.state_tp(
+        FluidIdentifier(name="Water"),
+        temperature_k=float(effective_tube_inlet_temperature_k()),
+        pressure_pa=float(bound.shell_property_evaluation_pressure_pa),
+    )
+    return Decimal(str(state.enthalpy_j_kg))
+
+
 def effective_tube_mass_flow_kg_s() -> Decimal:
     bound = active_experimental_thermal_boundary()
     if bound is None:
@@ -204,6 +217,96 @@ def _effective_h_min_j_kg() -> Decimal:
     if bulk_property_pressure_feedback_active(bound):
         return effective_shell_cold_inlet_enthalpy_j_kg()
     return H_MIN_J_KG
+
+
+_TASK172_PRESSURE_OBSERVATIONS: ContextVar[list[dict[str, str]] | None] = ContextVar(
+    "task173_task172_pressure_observations",
+    default=None,
+)
+
+
+def bind_task172_pressure_observations() -> Token[list[dict[str, str]] | None]:
+    """Enable capture of Task172 bulk pressures passed from Task173 (R22A diagnostics)."""
+    return _TASK172_PRESSURE_OBSERVATIONS.set([])
+
+
+def reset_task172_pressure_observations(
+    token: Token[list[dict[str, str]] | None],
+) -> None:
+    _TASK172_PRESSURE_OBSERVATIONS.reset(token)
+
+
+def drain_task172_pressure_observations() -> list[dict[str, str]]:
+    bucket = _TASK172_PRESSURE_OBSERVATIONS.get()
+    if bucket is None:
+        return []
+    return list(bucket)
+
+
+def _face_and_receipt_pressure_pa(thermo: _ThermoState) -> Decimal:
+    if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+        return _d(thermo.native.pressure_pa)
+    return REFERENCE_PRESSURE_PA
+
+
+def _task172_local_bulk_pressure_pa(
+    thermo: _ThermoState,
+    *,
+    side: Literal["TUBE", "SHELL"],
+) -> Decimal:
+    if not bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+        return REFERENCE_PRESSURE_PA
+    pressure = _d(thermo.native.pressure_pa)
+    expected_raw = (
+        effective_shell_property_evaluation_pressure_pa()
+        if side == "SHELL"
+        else effective_tube_property_evaluation_pressure_pa()
+    )
+    expected = _task172_canonical_binding_pressure_pa(expected_raw)
+    if pressure != expected:
+        raise _Stage3Failure(
+            "BLOCKED_TASK172_BULK_PRESSURE_BINDING",
+            side,
+            f"thermo_p={pressure}",
+            f"expected_p={expected}",
+        )
+    if not _allowed_local_pressure_pa(pressure):
+        raise _Stage3Failure(
+            "BLOCKED_TASK172_PRESSURE_APPLICABILITY",
+            side,
+            str(pressure),
+        )
+    return pressure
+
+
+def _record_task172_pressure_observation(
+    *,
+    tube_state: _ThermoState,
+    shell_state: _ThermoState,
+    tube_request_pa: Decimal,
+    shell_request_pa: Decimal,
+) -> None:
+    bucket = _TASK172_PRESSURE_OBSERVATIONS.get()
+    if bucket is None:
+        return
+    bucket.append(
+        {
+            "task173_tube_thermo_pressure_pa": str(_d(tube_state.native.pressure_pa)),
+            "task173_shell_thermo_pressure_pa": str(_d(shell_state.native.pressure_pa)),
+            "task172_tube_local_pressure_pa": str(tube_request_pa),
+            "task172_shell_local_pressure_pa": str(shell_request_pa),
+            "task173_tube_property_evaluation_pressure_pa": str(
+                _task172_canonical_binding_pressure_pa(
+                    effective_tube_property_evaluation_pressure_pa()
+                )
+            ),
+            "task173_shell_property_evaluation_pressure_pa": str(
+                _task172_canonical_binding_pressure_pa(
+                    effective_shell_property_evaluation_pressure_pa()
+                )
+            ),
+        }
+    )
 
 
 def _cold_ph_rematerialization_allowed(
@@ -1445,6 +1548,25 @@ def _roundtrip_float(value: float) -> str:
     return str(Decimal(str(value)))
 
 
+def _task172_canonical_binding_pressure_pa(pressure_pa: Decimal) -> Decimal:
+    """Match CoolProp/Task173 float round-trip for R22 bulk-pressure binding."""
+    return Decimal(_roundtrip_float(float(pressure_pa)))
+
+
+def _split_bulk_pressure_local_temperature_approach_k() -> Decimal:
+    """Allow sub-mK ordering slack when tube/shell bulk pressures differ (R22)."""
+    if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+        return Decimal("0.0001")
+    return Decimal(0)
+
+
+def _local_hot_cold_temperature_crossing(local_approach_k: Decimal) -> bool:
+    slack = _split_bulk_pressure_local_temperature_approach_k()
+    if slack == 0:
+        return local_approach_k < 0
+    return local_approach_k < -slack
+
+
 def _property_snapshot(state: FluidState) -> PropertySnapshot:
     provenance = state.provenance
     if (
@@ -1548,13 +1670,27 @@ def _state_from_enthalpy(
     if enthalpy_j_kg > H_MAX_J_KG:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT", f"h={enthalpy_j_kg}")
     ceiling_h = effective_hot_ceiling_enthalpy_j_kg()
+    r22_bulk_pressure = bulk_property_pressure_feedback_active(
+        active_experimental_thermal_boundary()
+    )
     if enthalpy_j_kg == H_MAX_J_KG:
+        if r22_bulk_pressure and side != "TUBE":
+            raise _Stage3Failure(
+                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+                "H_MAX boundary applies to tube hot side only",
+                f"side={side}",
+            )
         # H_MAX is the reviewed 300 K boundary state. PH inversion can return
         # a temperature just above the closed domain. Use the native TP
         # producer at this exact boundary. Its returned enthalpy is retained
         # as provider output and is not reinterpreted as the shooting input.
         return _state_at_inlet(provider, T_MAX_K, side="TUBE")
-    if enthalpy_j_kg == ceiling_h and ceiling_h != H_MAX_J_KG:
+    if (
+        enthalpy_j_kg == ceiling_h
+        and ceiling_h != H_MAX_J_KG
+        and (side == "TUBE" or not r22_bulk_pressure)
+    ):
+        # Frozen reference-pressure mesh retains legacy ceiling enthalpy shortcut.
         return _state_at_inlet(provider, effective_tube_inlet_temperature_k(), side="TUBE")
     cold_h = effective_shell_cold_inlet_enthalpy_j_kg()
     cold_t = effective_shell_inlet_temperature_k()
@@ -1700,7 +1836,7 @@ def _face_state(
         "physical_coordinate_m": str(coordinate_m),
         "travel_role": role,
         "temperature_k": _roundtrip_float(thermo.native.temperature_k),
-        "pressure_pa": str(REFERENCE_PRESSURE_PA),
+        "pressure_pa": str(_face_and_receipt_pressure_pa(thermo)),
         "enthalpy_j_kg": _roundtrip_float(thermo.native.enthalpy_j_kg),
         "property_profile_id": PROFILE_ID,
         "property_snapshot_hash": thermo.snapshot_hash,
@@ -1719,7 +1855,7 @@ def _face_state(
         physical_coordinate_m=coordinate_m,
         travel_role=role,
         temperature_k=_d(thermo.native.temperature_k),
-        pressure_pa=REFERENCE_PRESSURE_PA,
+        pressure_pa=_face_and_receipt_pressure_pa(thermo),
         enthalpy_j_kg=_d(thermo.native.enthalpy_j_kg),
         property_profile_id=PROFILE_ID,
         property_snapshot_hash=thermo.snapshot_hash,
@@ -1766,7 +1902,7 @@ def _local_state_receipt(
         "downstream_face_state_id": downstream.face_id,
         "downstream_face_state_hash": downstream.face_hash,
         "evaluation_temperature_k": _roundtrip_float(evaluation_state.native.temperature_k),
-        "evaluation_pressure_pa": str(REFERENCE_PRESSURE_PA),
+        "evaluation_pressure_pa": str(_face_and_receipt_pressure_pa(evaluation_state)),
         "evaluation_enthalpy_j_kg": _roundtrip_float(evaluation_state.native.enthalpy_j_kg),
         "property_profile_id": PROFILE_ID,
         "property_snapshot_hash": evaluation_state.snapshot_hash,
@@ -1848,6 +1984,14 @@ def _task172_request(
             task025_result=candidate.task025_result,
             task166_result=candidate.task166_result,
         )
+        tube_bulk_pa = _task172_local_bulk_pressure_pa(tube_state, side="TUBE")
+        shell_bulk_pa = _task172_local_bulk_pressure_pa(shell_state, side="SHELL")
+        _record_task172_pressure_observation(
+            tube_state=tube_state,
+            shell_state=shell_state,
+            tube_request_pa=tube_bulk_pa,
+            shell_request_pa=shell_bulk_pa,
+        )
         return CandidateTask172LocalRequest(
             case_id=candidate.candidate_id,
             case_revision_id=candidate.candidate_id,
@@ -1855,11 +1999,11 @@ def _task172_request(
             support=support,
             tube_bulk_state=LocalState(
                 temperature_k=_d(tube_state.native.temperature_k),
-                pressure_pa=REFERENCE_PRESSURE_PA,
+                pressure_pa=tube_bulk_pa,
             ),
             shell_bulk_state=LocalState(
                 temperature_k=_d(shell_state.native.temperature_k),
-                pressure_pa=REFERENCE_PRESSURE_PA,
+                pressure_pa=shell_bulk_pa,
             ),
             tube_mass_flow_kg_s=effective_tube_mass_flow_kg_s(),
             shell_mass_flow_kg_s=effective_shell_mass_flow_kg_s(),
@@ -1882,16 +2026,24 @@ def _task172_request(
         tube_flow_path_id=TUBE_FLOW_PATH_ID,
         shell_flow_path_id=SHELL_FLOW_PATH_ID,
     )
+    tube_bulk_pa = _task172_local_bulk_pressure_pa(tube_state, side="TUBE")
+    shell_bulk_pa = _task172_local_bulk_pressure_pa(shell_state, side="SHELL")
+    _record_task172_pressure_observation(
+        tube_state=tube_state,
+        shell_state=shell_state,
+        tube_request_pa=tube_bulk_pa,
+        shell_request_pa=shell_bulk_pa,
+    )
     return Task172LocalRequest(
         topology=reference_topology,
         support=support,
         tube_bulk_state=LocalState(
             temperature_k=_d(tube_state.native.temperature_k),
-            pressure_pa=REFERENCE_PRESSURE_PA,
+            pressure_pa=tube_bulk_pa,
         ),
         shell_bulk_state=LocalState(
             temperature_k=_d(shell_state.native.temperature_k),
-            pressure_pa=REFERENCE_PRESSURE_PA,
+            pressure_pa=shell_bulk_pa,
         ),
         tube_mass_flow_kg_s=effective_tube_mass_flow_kg_s(),
         shell_mass_flow_kg_s=effective_shell_mass_flow_kg_s(),
@@ -1935,8 +2087,24 @@ def _preflight_task172_trial(
             or state.snapshot.phase != "liquid"
         ):
             raise _Stage3Failure("BLOCKED_LOCAL_PROPERTY_STATE_PREFLIGHT", side)
-    if tube_local.native.temperature_k < shell_local.native.temperature_k:
+    local_approach = (
+        _d(tube_local.native.temperature_k) - _d(shell_local.native.temperature_k)
+    )
+    if _local_hot_cold_temperature_crossing(local_approach):
         raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", "local-state-preflight")
+    if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+        for side, thermo, bulk in (
+            ("tube", tube_local, request.tube_bulk_state),
+            ("shell", shell_local, request.shell_bulk_state),
+        ):
+            thermo_p = _task172_canonical_binding_pressure_pa(_d(thermo.native.pressure_pa))
+            if thermo_p != bulk.pressure_pa:
+                raise _Stage3Failure(
+                    "BLOCKED_TASK172_BULK_PRESSURE_BINDING",
+                    side,
+                    f"thermo_p={thermo.native.pressure_pa}",
+                    f"request_p={bulk.pressure_pa}",
+                )
     candidate_context = _CANDIDATE_RATING_CONTEXT.get()
     identity_failure = (
         request.case_revision_id != CASE_REVISION_ID
@@ -2958,7 +3126,9 @@ def _valid_trajectory(
                 shell_left_face=shell_faces[-1],
                 shell_right_face=shell_right,
             )
-            if record.tube_approach_k < 0 or record.shell_approach_k < 0:
+            if _local_hot_cold_temperature_crossing(
+                record.tube_approach_k
+            ) or _local_hot_cold_temperature_crossing(record.shell_approach_k):
                 raise _Stage3Failure(
                     "BLOCKED_HOT_COLD_TEMPERATURE_CROSSING",
                     support.tube_cell_id,
@@ -2988,7 +3158,8 @@ def _valid_trajectory(
             or tube_face.case_revision_id != shell_face.case_revision_id
         ):
             raise _Stage3Failure("BLOCKED_COMMON_FACE_IDENTITY_MISMATCH", str(index))
-        if tube_face.temperature_k < shell_face.temperature_k:
+        face_approach = tube_face.temperature_k - shell_face.temperature_k
+        if _local_hot_cold_temperature_crossing(face_approach):
             raise _Stage3Failure("BLOCKED_HOT_COLD_TEMPERATURE_CROSSING", str(index))
 
     q_wall = sum((cell.solution.q_w for cell in cells), Decimal(0))
@@ -3190,16 +3361,22 @@ def _solve_outer_boundary(
             subdivisions, enthalpy, provider, shell_authority, iteration, search_stats
         )
 
-    return _solve_outer_boundary_from_trial(trial_at)
+    return _solve_outer_boundary_from_trial(trial_at, provider=provider)
 
 
 def _solve_outer_boundary_from_trial(
     trial_at: Callable[[Decimal, int], _OuterTrial],
+    *,
+    provider: PropertyProvider | None = None,
 ) -> _MeshRun:
     """Run the production outer-boundary state machine with an injected trial evaluator."""
 
     h_low = effective_shell_cold_inlet_enthalpy_j_kg()
-    h_high = effective_hot_ceiling_enthalpy_j_kg()
+    h_high = (
+        effective_outer_shooting_high_enthalpy_j_kg(provider)
+        if provider is not None
+        else effective_hot_ceiling_enthalpy_j_kg()
+    )
     low_trial = trial_at(h_low, 0)
     if low_trial.classification != "LOW_SIDE_DOMAIN_INFEASIBLE":
         if low_trial.classification == "HARD_BLOCKER":
@@ -3207,9 +3384,29 @@ def _solve_outer_boundary_from_trial(
         raise _Stage3Failure("BLOCKED_OUTER_LOW_ENDPOINT_NOT_INFEASIBLE")
     high_trial = trial_at(h_high, 0)
     if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
-        if high_trial.classification == "HARD_BLOCKER":
-            raise _Stage3Failure(*high_trial.diagnostics)
-        raise _Stage3Failure("BLOCKED_OUTER_FEASIBLE_UPPER_ENDPOINT_NOT_FOUND")
+        if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+            bracket_lo = h_low
+            bracket_hi = h_high
+            recovered: _OuterTrial | None = None
+            for _ in range(24):
+                probe_h = (bracket_lo + bracket_hi) / Decimal(2)
+                if probe_h in (bracket_lo, bracket_hi):
+                    break
+                probe = trial_at(probe_h, 0)
+                if probe.classification == "VALID_TRAJECTORY" and probe.mesh_run is not None:
+                    recovered = probe
+                    bracket_lo = probe_h
+                elif probe.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                    bracket_lo = probe_h
+                else:
+                    bracket_hi = probe_h
+            if recovered is not None:
+                high_trial = recovered
+                h_high = recovered.enthalpy_j_kg
+        if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
+            if high_trial.classification == "HARD_BLOCKER":
+                raise _Stage3Failure(*high_trial.diagnostics)
+            raise _Stage3Failure("BLOCKED_OUTER_FEASIBLE_UPPER_ENDPOINT_NOT_FOUND")
     high_run = high_trial.mesh_run
     if (
         high_run.observables.terminal_boundary_residual_j_kg < 0
@@ -3550,7 +3747,7 @@ def _candidate_transient_outer_boundary(
         certificate_projections.append(certificate_projection)
         return representative_trial
 
-    selected = _solve_outer_boundary_from_trial(trial_at)
+    selected = _solve_outer_boundary_from_trial(trial_at, provider=provider)
     accepted_control = _CandidateTransientControl(
         mode="DISABLED",
         mesh_subdivisions=subdivisions,

@@ -442,4 +442,4 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r22_two_way_bulk_pressure_feedback.py
-    timeout: 3600
+    timeout: 2400
