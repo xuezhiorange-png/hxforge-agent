@@ -88,9 +88,7 @@ class TubeLocalLossEngineeringInput(BaseModel):
             self.completeness_declaration == "ENTRANCE_ONLY_ASSUMED"
             and self.geometry_basis != "EXPERIMENTAL_ASSUMED_DEMO"
         ):
-            raise ValueError(
-                "ENTRANCE_ONLY_ASSUMED is allowed only for EXPERIMENTAL_ASSUMED_DEMO"
-            )
+            raise ValueError("ENTRANCE_ONLY_ASSUMED is allowed only for EXPERIMENTAL_ASSUMED_DEMO")
         return self
 
 
