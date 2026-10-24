@@ -93,7 +93,11 @@ from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
 LIVE_THERMAL_HYDRAULIC_AUTHORITY_ID = "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14"
 HYDRAULIC_STATUS_LIVE_POSTPASS = "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS"
 PROPERTY_EVALUATION_RULE_ID = "SIDE_BULK_MEAN_TP_AT_INLET_REFERENCE_PRESSURE_R14"
+PROPERTY_EVALUATION_RULE_ID_TWO_WAY_BULK = (
+    "SIDE_BULK_MEAN_TP_AT_EXPERIMENTAL_BULK_PROPERTY_PRESSURE_R22"
+)
 THERMAL_HYDRAULIC_COUPLING_POSTPASS = "EXPERIMENTAL_HYDRAULIC_POST_PASS_ONE_WAY"
+THERMAL_HYDRAULIC_COUPLING_TWO_WAY = "EXPERIMENTAL_TWO_WAY_BULK_PRESSURE_FEEDBACK"
 
 _COOLPROP_MIN_PRESSURE_PA = Decimal("100000")
 _COOLPROP_MAX_PRESSURE_PA = Decimal("101325")
@@ -565,6 +569,8 @@ def run_live_thermal_state_hydraulic_postpass(
     reference_tube_dp_pa: Decimal | None = None,
     reference_shell_dp_pa: Decimal | None = None,
     provider: CoolPropProvider | None = None,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> dict[str, Any]:
     """One-way hydraulic post-pass; does not mutate Task174 reference preview semantics."""
     provider = provider or CoolPropProvider()
@@ -586,6 +592,14 @@ def run_live_thermal_state_hydraulic_postpass(
 
     tube_eval_t = _bulk_mean_k(tube_inlet_temperature_k, tube_outlet_temperature_k)
     shell_eval_t = _bulk_mean_k(shell_inlet_temperature_k, shell_outlet_temperature_k)
+    tube_eval_p = tube_property_evaluation_pressure_pa or tube_inlet_pressure_pa
+    shell_eval_p = shell_property_evaluation_pressure_pa or shell_inlet_pressure_pa
+    property_rule_id = (
+        PROPERTY_EVALUATION_RULE_ID_TWO_WAY_BULK
+        if tube_property_evaluation_pressure_pa is not None
+        or shell_property_evaluation_pressure_pa is not None
+        else PROPERTY_EVALUATION_RULE_ID
+    )
     tube_template = authority.task027_property_snapshot
     shell_template = authority.task032_property_snapshot or tube_template
 
@@ -604,13 +618,13 @@ def run_live_thermal_state_hydraulic_postpass(
         tube_snapshot = _property_snapshot_from_coolprop_tp(
             provider,
             temperature_k=tube_eval_t,
-            pressure_pa=tube_inlet_pressure_pa,
+            pressure_pa=tube_eval_p,
             template=tube_template,
         )
         shell_snapshot = _property_snapshot_from_coolprop_tp(
             provider,
             temperature_k=shell_eval_t,
-            pressure_pa=shell_inlet_pressure_pa,
+            pressure_pa=shell_eval_p,
             template=shell_template,
         )
     except ValueError as exc:
@@ -819,7 +833,9 @@ def run_live_thermal_state_hydraulic_postpass(
         "authority_id": LIVE_THERMAL_HYDRAULIC_AUTHORITY_ID,
         "task174_hydraulic_status": HYDRAULIC_STATUS_LIVE_POSTPASS,
         "thermal_hydraulic_coupling_status": THERMAL_HYDRAULIC_COUPLING_POSTPASS,
-        "property_evaluation_rule_id": PROPERTY_EVALUATION_RULE_ID,
+        "property_evaluation_rule_id": property_rule_id,
+        "tube_bulk_evaluation_pressure_pa": str(tube_eval_p),
+        "shell_bulk_evaluation_pressure_pa": str(shell_eval_p),
         "candidate_id": ctx.candidate_id,
         "candidate_hash": ctx.candidate_hash,
         "physical_tube_count": ctx.layout.physical_tube_count,
@@ -962,6 +978,8 @@ def postpass_from_mesh_row(
     mesh: dict[str, Any],
     native_reference_tube_dp: str | None,
     native_reference_shell_dp: str | None,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> dict[str, Any] | None:
     if mesh.get("status") != "NUMERIC_VALID":
         return None
@@ -987,4 +1005,6 @@ def postpass_from_mesh_row(
         reference_shell_dp_pa=(
             _decimal_field(native_reference_shell_dp) if native_reference_shell_dp else None
         ),
+        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
     )

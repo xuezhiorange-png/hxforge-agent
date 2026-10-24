@@ -29,6 +29,12 @@ EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID: Final = (
 EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID: Final = (
     "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R18-R19-V1"
 )
+EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID: Final = (
+    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R22-BULK-PRESSURE-V1"
+)
+
+REVIEWED_MIN_PRESSURE_PA: Final = Decimal("100000")
+REVIEWED_MAX_PRESSURE_PA: Final = Decimal("101325")
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 _TUBE_HOT_SHELL_COLD = "TUBE_HOT_SHELL_COLD"
@@ -48,6 +54,8 @@ class ExperimentalThermalBoundaryBindingV1:
     reference_pressure_pa: Decimal
     tube_inlet_enthalpy_j_kg: Decimal
     shell_inlet_enthalpy_j_kg: Decimal
+    tube_property_evaluation_pressure_pa: Decimal
+    shell_property_evaluation_pressure_pa: Decimal
 
 
 _EXPERIMENTAL_THERMAL_BOUNDARY: ContextVar[ExperimentalThermalBoundaryBindingV1 | None] = (
@@ -69,6 +77,22 @@ def reset_experimental_thermal_boundary(
     token: Token[ExperimentalThermalBoundaryBindingV1 | None],
 ) -> None:
     _EXPERIMENTAL_THERMAL_BOUNDARY.reset(token)
+
+
+def _validate_reviewed_pressure_pa(pressure_pa: Decimal, *, label: str) -> None:
+    if pressure_pa < REVIEWED_MIN_PRESSURE_PA or pressure_pa > REVIEWED_MAX_PRESSURE_PA:
+        raise ValueError(
+            f"experimental thermal boundary: {label} pressure {pressure_pa} Pa "
+            f"outside reviewed domain {REVIEWED_MIN_PRESSURE_PA}–{REVIEWED_MAX_PRESSURE_PA} Pa"
+        )
+
+
+def bulk_property_pressure_feedback_active(
+    binding: ExperimentalThermalBoundaryBindingV1 | None,
+) -> bool:
+    if binding is None:
+        return False
+    return binding.authority_id == EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID
 
 
 def _enthalpy_at_tp(
@@ -94,6 +118,8 @@ def build_experimental_thermal_boundary_v1(
     reference_pressure_pa: Decimal = REFERENCE_PRESSURE_PA,
     allow_live_variable_tube_mass_flow: bool = False,
     allow_live_variable_shell_mass_flow: bool = False,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> ExperimentalThermalBoundaryBindingV1:
     """Validate envelope and materialize inlet enthalpies for the experimental mesh path."""
     if not allow_live_variable_shell_mass_flow and shell_mass_flow_kg_s != SHELL_MASS_FLOW_KG_S:
@@ -106,9 +132,17 @@ def build_experimental_thermal_boundary_v1(
         raise ValueError("experimental thermal boundary: tube mass flow must be positive")
     if reference_pressure_pa != REFERENCE_PRESSURE_PA:
         raise ValueError("experimental thermal boundary: reference pressure must match kernel")
-    tube_h = _enthalpy_at_tp(provider, tube_inlet_temperature_k, reference_pressure_pa)
-    shell_h = _enthalpy_at_tp(provider, shell_inlet_temperature_k, reference_pressure_pa)
-    if shell_inlet_temperature_k == SHELL_INLET_T_K and abs(shell_h - H_MIN_J_KG) > Decimal("1e-3"):
+    tube_p = tube_property_evaluation_pressure_pa or reference_pressure_pa
+    shell_p = shell_property_evaluation_pressure_pa or reference_pressure_pa
+    _validate_reviewed_pressure_pa(tube_p, label="tube property evaluation")
+    _validate_reviewed_pressure_pa(shell_p, label="shell property evaluation")
+    tube_h = _enthalpy_at_tp(provider, tube_inlet_temperature_k, tube_p)
+    shell_h = _enthalpy_at_tp(provider, shell_inlet_temperature_k, shell_p)
+    if (
+        shell_inlet_temperature_k == SHELL_INLET_T_K
+        and shell_p == reference_pressure_pa
+        and abs(shell_h - H_MIN_J_KG) > Decimal("1e-3")
+    ):
         raise ValueError(
             "experimental thermal boundary: shell inlet enthalpy drift vs frozen H_MIN"
         )
@@ -125,6 +159,9 @@ def build_experimental_thermal_boundary_v1(
         authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID
     elif shell_flow_variable:
         authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID
+    bulk_pressure_feedback = tube_p != reference_pressure_pa or shell_p != reference_pressure_pa
+    if bulk_pressure_feedback:
+        authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID
     return ExperimentalThermalBoundaryBindingV1(
         schema_version=EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
         authority_id=authority_id,
@@ -136,6 +173,8 @@ def build_experimental_thermal_boundary_v1(
         reference_pressure_pa=reference_pressure_pa,
         tube_inlet_enthalpy_j_kg=tube_h,
         shell_inlet_enthalpy_j_kg=shell_h,
+        tube_property_evaluation_pressure_pa=tube_p,
+        shell_property_evaluation_pressure_pa=shell_p,
     )
 
 

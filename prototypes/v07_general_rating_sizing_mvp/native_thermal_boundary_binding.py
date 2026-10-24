@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from decimal import Decimal
 from typing import Any
 
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
@@ -69,6 +70,9 @@ def validate_case_for_native_thermal_binding(case: EngineeringCase) -> None:
 def build_native_thermal_boundary_from_case(
     case: EngineeringCase,
     provider: CoolPropProvider,
+    *,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> ExperimentalThermalBoundaryBindingV1:
     validate_case_for_native_thermal_binding(case)
     tube = tube_stream_spec(case)
@@ -83,6 +87,8 @@ def build_native_thermal_boundary_from_case(
         allow_live_variable_shell_mass_flow=experimental_live_variable_shell_mass_flow_enabled(
             case
         ),
+        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
     )
 
 
@@ -113,6 +119,8 @@ def disclosure_document(binding: ExperimentalThermalBoundaryBindingV1 | None) ->
         "tube_mass_flow_kg_s": str(binding.tube_mass_flow_kg_s),
         "shell_mass_flow_kg_s": str(binding.shell_mass_flow_kg_s),
         "reference_pressure_pa": str(binding.reference_pressure_pa),
+        "tube_property_evaluation_pressure_pa": str(binding.tube_property_evaluation_pressure_pa),
+        "shell_property_evaluation_pressure_pa": str(binding.shell_property_evaluation_pressure_pa),
         "participates_in_task173_mesh": True,
         "participates_via": EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
     }
@@ -124,11 +132,18 @@ def native_thermal_boundary_session(
     provider: CoolPropProvider,
     *,
     enable_live_binding: bool,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> Iterator[ExperimentalThermalBoundaryBindingV1 | None]:
     if not enable_live_binding:
         yield None
         return
-    binding = build_native_thermal_boundary_from_case(case, provider)
+    binding = build_native_thermal_boundary_from_case(
+        case,
+        provider,
+        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+    )
     token = bind_experimental_thermal_boundary_v1(binding)
     try:
         yield binding

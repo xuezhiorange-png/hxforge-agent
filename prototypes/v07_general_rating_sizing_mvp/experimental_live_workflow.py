@@ -48,6 +48,10 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_ranking import (
     build_experimental_ranking,
     build_offline_duty_scenarios,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_two_way_bulk_pressure_feedback import (
+    experimental_two_way_bulk_pressure_feedback_enabled,
+    run_two_way_bulk_pressure_coupled_rating,
+)
 from prototypes.v07_general_rating_sizing_mvp.live_thermal_hydraulic_connection_analysis import (
     build_live_thermal_hydraulic_connection_analysis,
 )
@@ -252,30 +256,45 @@ def run_experimental_live_rating_workflow(
             )
             break
         native = build_native_cell_context(case, selection=selection, candidate_id=candidate_id)
-        mesh, profile, obs = run_mesh_numeric_with_profile(
-            native,
-            subdivisions=mesh_level,
-            case=case,
-            enable_live_thermal_boundary=True,
-            enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
-        )
-        numeric_valid = mesh.get("status") == "NUMERIC_VALID"
-        if numeric_valid and obs is not None:
-            mesh = {
-                **mesh,
-                "tube_outlet_temperature_k": str(obs.tube_outlet_temperature_k),
-                "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
-            }
-        constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
-        live_hydraulic_postpass: dict[str, Any] | None = None
-        if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
-            live_hydraulic_postpass = postpass_from_mesh_row(
+        two_way_doc: dict[str, Any] | None = None
+        if experimental_two_way_bulk_pressure_feedback_enabled(case):
+            two_way_doc = run_two_way_bulk_pressure_coupled_rating(
                 case,
-                candidate_id=candidate_id,
-                mesh=mesh,
-                native_reference_tube_dp=native.modeled_tube_side_pressure_drop_pa,
-                native_reference_shell_dp=native.modeled_shell_side_pressure_drop_pa,
+                native,
+                mesh_level=mesh_level,
+                enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
             )
+            mesh = two_way_doc.get("final_mesh") or {
+                "status": "BLOCKED",
+                "failure_code": two_way_doc.get("COUPLED_ITERATION_STATUS"),
+            }
+            profile = mesh.get("solver_performance_profile") or {}
+            live_hydraulic_postpass = two_way_doc.get("final_live_thermal_state_hydraulic_postpass")
+        else:
+            mesh, profile, obs = run_mesh_numeric_with_profile(
+                native,
+                subdivisions=mesh_level,
+                case=case,
+                enable_live_thermal_boundary=True,
+                enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+            )
+            numeric_valid = mesh.get("status") == "NUMERIC_VALID"
+            if numeric_valid and obs is not None:
+                mesh = {
+                    **mesh,
+                    "tube_outlet_temperature_k": str(obs.tube_outlet_temperature_k),
+                    "shell_outlet_temperature_k": str(obs.shell_outlet_temperature_k),
+                }
+            live_hydraulic_postpass = None
+            if getattr(case, "experimental_live_thermal_hydraulic_postpass", False):
+                live_hydraulic_postpass = postpass_from_mesh_row(
+                    case,
+                    candidate_id=candidate_id,
+                    mesh=mesh,
+                    native_reference_tube_dp=native.modeled_tube_side_pressure_drop_pa,
+                    native_reference_shell_dp=native.modeled_shell_side_pressure_drop_pa,
+                )
+        constraint_preview = build_experimental_constraint_preview(case, mesh=mesh, native=native)
         record = next(
             (rec for rec in selection.records if rec.candidate_id == candidate_id),
             None,
@@ -314,9 +333,15 @@ def run_experimental_live_rating_workflow(
             "failure_code": mesh.get("failure_code"),
             "constraint_preview": constraint_preview,
             "live_thermal_state_hydraulic_postpass": live_hydraulic_postpass,
+            "experimental_two_way_bulk_pressure_feedback": two_way_doc,
             "solver_performance_profile": profile,
         }
         rating_rows.append(row)
+        if two_way_doc is not None:
+            (output_dir / "EXPERIMENTAL_TWO_WAY_BULK_PRESSURE_FEEDBACK.json").write_text(
+                json.dumps(two_way_doc, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
         identity_entries.append(
             {
                 "candidate_id": native.candidate_id,

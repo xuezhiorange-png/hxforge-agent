@@ -158,6 +158,11 @@ def build_hydraulic_constraint_decision(
         feasibility_changed = ref_feasible != eff_feasible
 
     blockers = list(postpass.get("blockers") or []) if postpass else []
+    from prototypes.v07_general_rating_sizing_mvp.engineering_sizing_eligibility import (
+        assess_engineering_sizing_eligibility,
+    )
+
+    engineering_eligibility = assess_engineering_sizing_eligibility(case, row)
 
     return {
         "schema_version": "hxforge.experimental-hydraulic-constraint-decision.v1",
@@ -197,6 +202,11 @@ def build_hydraulic_constraint_decision(
         ),
         "task174_style_outlet_pressure_window_pass": (
             postpass.get("task174_style_outlet_pressure_window_pass") if postpass else None
+        ),
+        "ENGINEERING_SIZING_ELIGIBILITY": engineering_eligibility["ENGINEERING_SIZING_ELIGIBILITY"],
+        "GEOMETRY_COMPLETENESS_STATUS": engineering_eligibility["GEOMETRY_COMPLETENESS_STATUS"],
+        "engineering_sizing_ineligibility_reasons": engineering_eligibility.get(
+            "ineligibility_reasons", []
         ),
         "postpass_blockers": blockers,
         "live_postpass_present": postpass is not None,

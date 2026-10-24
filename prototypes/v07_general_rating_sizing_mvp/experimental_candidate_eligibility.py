@@ -10,6 +10,10 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     CandidateSelectionRecord,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_sizing_eligibility import (
+    assess_engineering_sizing_eligibility,
+    engineering_sizing_eligible_for_ranking,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
     build_hydraulic_constraint_decision,
     live_hydraulic_postpass_enabled,
@@ -81,6 +85,7 @@ def build_candidate_eligibility(
             case, row, rating_status=rating_status
         )
         constraint_status = str(hydraulic_decision["EFFECTIVE_CONSTRAINT_STATUS"])
+        engineering_eligibility = assess_engineering_sizing_eligibility(case, row)
         entries.append(
             {
                 "candidate_id": candidate_id,
@@ -100,6 +105,13 @@ def build_candidate_eligibility(
                     "reference_vs_live_feasibility_changed"
                 ],
                 "hydraulic_constraint_decision": hydraulic_decision,
+                "ENGINEERING_SIZING_ELIGIBILITY": engineering_eligibility[
+                    "ENGINEERING_SIZING_ELIGIBILITY"
+                ],
+                "GEOMETRY_COMPLETENESS_STATUS": engineering_eligibility[
+                    "GEOMETRY_COMPLETENESS_STATUS"
+                ],
+                "engineering_sizing_eligibility": engineering_eligibility,
                 "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
                 "task168_blocked_codes": list(record.task168_blocked_codes),
                 "nominal_geometry": row.get("nominal_geometry"),
@@ -113,6 +125,9 @@ def constraint_satisfied_ids(eligibility: list[dict[str, Any]]) -> list[str]:
         item["candidate_id"]
         for item in eligibility
         if item["CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
+        and engineering_sizing_eligible_for_ranking(
+            item.get("engineering_sizing_eligibility") or {}
+        )
     ]
 
 

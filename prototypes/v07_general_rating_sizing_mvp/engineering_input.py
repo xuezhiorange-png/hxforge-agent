@@ -271,6 +271,13 @@ class GeneralEngineeringCaseV2(BaseModel):
             "enthalpy propagation, Task172 local requests, and live Task032/Task166 post-pass."
         ),
     )
+    experimental_two_way_bulk_pressure_feedback: bool = Field(
+        default=False,
+        description=(
+            "When true, iterate Task173 rating with side-specific bulk property pressures "
+            "P_bulk=(P_inlet+P_outlet)/2 from live hydraulic post-pass (experimental only)."
+        ),
+    )
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
     r12_baseline_geometry_fingerprints: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""
@@ -359,6 +366,13 @@ class GeneralEngineeringCaseV2(BaseModel):
 
             if not isinstance(self.tube_local_loss_engineering, TubeLocalLossEngineeringInput):
                 TubeLocalLossEngineeringInput.model_validate(self.tube_local_loss_engineering)
+        if self.experimental_two_way_bulk_pressure_feedback and not (
+            self.experimental_live_thermal_hydraulic_postpass
+        ):
+            raise ValueError(
+                "experimental_two_way_bulk_pressure_feedback requires "
+                "experimental_live_thermal_hydraulic_postpass=true"
+            )
         return self
 
     def heat_transfer_convention(self) -> dict[str, str]:

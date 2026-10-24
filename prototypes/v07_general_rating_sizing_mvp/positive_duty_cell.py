@@ -155,8 +155,9 @@ def build_native_cell_context(
 
 
 def _shell_state_from_temperature_k(provider: CoolPropProvider, temperature_k: float) -> Any:
-    state = provider.state_tp(FluidIdentifier("Water", "HEOS"), temperature_k, 101325.0)
-    return t173._state_from_enthalpy(provider, Decimal(str(state.enthalpy_j_kg)))
+    pressure_pa = float(t173.effective_shell_property_evaluation_pressure_pa())
+    state = provider.state_tp(FluidIdentifier("Water", "HEOS"), temperature_k, pressure_pa)
+    return t173._state_from_enthalpy(provider, Decimal(str(state.enthalpy_j_kg)), side="SHELL")
 
 
 def run_positive_duty_trials(
@@ -324,6 +325,8 @@ def run_mesh_numeric_with_profile(
     enable_ephemeral_tp_cache: bool = False,
     case: EngineeringCase | None = None,
     enable_live_thermal_boundary: bool = False,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
     provider = CoolPropProvider()
     tp_cache_stats: EphemeralTpCacheStats | None = None
@@ -343,7 +346,11 @@ def run_mesh_numeric_with_profile(
     run: t173._MeshRun | None = None
     try:
         with native_thermal_boundary_session(
-            case, provider, enable_live_binding=enable_live_thermal_boundary and case is not None
+            case,
+            provider,
+            enable_live_binding=enable_live_thermal_boundary and case is not None,
+            tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+            shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
         ):
             run = t173._candidate_transient_outer_boundary(
                 subdivisions, provider, native.shell_authority, stats

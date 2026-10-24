@@ -436,3 +436,10 @@ shards:
     files:
       - tests/prototypes/test_r21_engineering_tube_local_loss_geometry.py
     timeout: 2400
+
+  - name: v07-r22-two-way-bulk-pressure-feedback
+    job: shard-v07-r22-two-way-bulk-pressure-feedback
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r22_two_way_bulk_pressure_feedback.py
+    timeout: 3600
