@@ -81,7 +81,8 @@ def _live_hydraulic_constraint_status(
     hydraulic_status = postpass.get("hydraulic_constraint_status")
     if hydraulic_status == "BLOCKED":
         return "PRELIMINARY_CONSTRAINT_FAILED"
-    if postpass.get("tube_hydraulic_recompute_status") == "BLOCKED":
+    tube_recompute = postpass.get("tube_hydraulic_recompute_status")
+    if tube_recompute == "BLOCKED":
         return "PRELIMINARY_CONSTRAINT_FAILED"
 
     required_fields = (
@@ -94,7 +95,7 @@ def _live_hydraulic_constraint_status(
         if postpass.get(field) is None:
             return "NOT_EVALUATED"
 
-    if postpass.get("tube_hydraulic_recompute_status") == "SUCCESS":
+    if tube_recompute in {"SUCCESS", "EXPERIMENTAL_TRANSITIONAL_SUCCESS"}:
         tube_required = (
             "recalculated_tube_dp_pa",
             "tube_outlet_pressure_pa",
@@ -106,7 +107,7 @@ def _live_hydraulic_constraint_status(
         return "PRELIMINARY_CONSTRAINT_FAILED"
 
     applicability = postpass.get("correlation_applicability_status")
-    if applicability != "APPLICABLE":
+    if applicability not in {"APPLICABLE", "EXPERIMENTAL_TRANSITIONAL_APPLICABLE"}:
         return "PRELIMINARY_CONSTRAINT_FAILED"
 
     if hydraulic_status in {None, "NOT_EVALUATED"}:

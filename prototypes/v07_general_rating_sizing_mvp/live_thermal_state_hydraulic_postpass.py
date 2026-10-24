@@ -63,6 +63,13 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.experimental_transitional_tube_hydraulic import (
+    APPLICABILITY_STATUS as R20_APPLICABILITY_STATUS,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_transitional_tube_hydraulic import (
+    compute_experimental_transitional_tube_hydraulic,
+    experimental_transitional_tube_hydraulic_enabled,
+)
 from prototypes.v07_general_rating_sizing_mvp.live_hydraulic_mass_flow_binding import (
     equipment_shell_mass_flow_kg_s,
     equipment_tube_mass_flow_kg_s,
@@ -201,6 +208,73 @@ def _task026_request_with_snapshot(
     if mass_flow_rate_kg_s is not None:
         updates["mass_flow_rate_kg_s"] = mass_flow_rate_kg_s
     return replace(task026_request, **updates)
+
+
+def _is_task027_transition_gap_blocker_only(blockers: list[dict[str, str]]) -> bool:
+    if not blockers:
+        return False
+    return all(
+        blocker.get("code") == "BL_T027_UNSUPPORTED_REYNOLDS_REGIME" for blocker in blockers
+    )
+
+
+def _run_task028_local_loss_only(
+    *,
+    bundle: Any,
+    authority: Any,
+    task026_result: Any,
+    tube_property_snapshot: PropertySnapshot,
+) -> tuple[Any | None, list[dict[str, str]]]:
+    try:
+        task028_template_value = task168._public_value(
+            authority.task028_request_template, decimal_strings=False
+        )
+    except (TypeError, ValueError, UnicodeError, ArithmeticError) as exc:
+        return None, [
+            {
+                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                "scope": "TASK028",
+                "detail": f"template projection failed: {exc}",
+            }
+        ]
+    if type(task028_template_value) is not dict:
+        return None, [
+            {
+                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                "scope": "TASK028",
+                "detail": "task028 template must project to a mapping",
+            }
+        ]
+    task028_template = cast(dict[str, object], task028_template_value)
+    task028_template["task025_valid_result"] = task168._public_value(
+        bundle.task025_result, decimal_strings=False
+    )
+    task028_template["task026_success_result"] = task168._public_value(
+        task026_result, decimal_strings=False
+    )
+    task028_template["property_snapshot"] = task168._public_value(
+        tube_property_snapshot, decimal_strings=False
+    )
+    task028_template["property_snapshot_hash"] = tube_property_snapshot.property_snapshot_hash
+    task028_template["constant_density_path_assertion"] = task168._status_text(
+        authority.task027_constant_density_assertion
+    )
+    task028_template["zero_net_elevation_change_assertion"] = task168._status_text(
+        authority.task027_zero_net_elevation_assertion
+    )
+    task028_template["flow_direction_assertion"] = task168._status_text(
+        authority.task027_flow_direction_assertion
+    )
+    result028 = compute_task028_local_loss(
+        raw_request=task028_template,
+        task025_result=cast(Any, bundle.task025_result),
+        task026_result=cast(Any, task026_result),
+    )
+    if type(result028).__name__ != "Task028SuccessResult":
+        return None, [
+            {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK028", "detail": "blocked"}
+        ]
+    return result028, []
 
 
 def _run_task027_through_029(
@@ -546,8 +620,41 @@ def run_live_thermal_state_hydraulic_postpass(
         task026_result=task026_result,
         tube_property_snapshot=tube_snapshot,
     )
-    blockers.extend(tube_hydraulic_blockers)
+    experimental_transitional_tube_hydraulic: dict[str, str] | None = None
+    recalc_tube_experimental: Decimal | None = None
     tube_hydraulic_recompute_status = "SUCCESS" if task029_outcome is not None else "BLOCKED"
+    if (
+        task029_outcome is None
+        and experimental_transitional_tube_hydraulic_enabled(case)
+        and _is_task027_transition_gap_blocker_only(tube_hydraulic_blockers)
+    ):
+        result028, task028_blockers = _run_task028_local_loss_only(
+            bundle=bundle,
+            authority=authority,
+            task026_result=task026_result,
+            tube_property_snapshot=tube_snapshot,
+        )
+        if task028_blockers:
+            tube_hydraulic_blockers = [*tube_hydraulic_blockers, *task028_blockers]
+        elif result028 is not None:
+            exp_outcome = compute_experimental_transitional_tube_hydraulic(
+                task025_result=bundle.task025_result,
+                task026_result=task026_result,
+                property_snapshot=tube_snapshot,
+                roughness_authority=cast(Any, authority.task027_roughness_authority),
+                task028_result=cast(Any, result028),
+            )
+            if exp_outcome.status == "SUCCESS" and exp_outcome.total_tube_dp_pa is not None:
+                tube_hydraulic_recompute_status = "EXPERIMENTAL_TRANSITIONAL_SUCCESS"
+                recalc_tube_experimental = exp_outcome.total_tube_dp_pa
+                experimental_transitional_tube_hydraulic = exp_outcome.disclosure
+                tube_hydraulic_blockers = []
+            else:
+                tube_hydraulic_blockers = [
+                    *tube_hydraulic_blockers,
+                    *list(exp_outcome.blockers),
+                ]
+    blockers.extend(tube_hydraulic_blockers)
 
     task166_live = None
     task032_live = None
@@ -585,7 +692,7 @@ def run_live_thermal_state_hydraulic_postpass(
             recalculated_tube_dp_pa=(
                 task029_outcome.modeled_total_tube_side_pressure_drop_pa
                 if task029_outcome is not None
-                else None
+                else recalc_tube_experimental
             ),
             property_inputs={
                 "tube": _snapshot_public(tube_snapshot),
@@ -600,7 +707,7 @@ def run_live_thermal_state_hydraulic_postpass(
     recalc_tube = (
         task029_outcome.modeled_total_tube_side_pressure_drop_pa
         if task029_outcome is not None
-        else None
+        else recalc_tube_experimental
     )
     recalc_shell = task166_live.total_shell_pressure_drop
     tube_out_p = tube_inlet_pressure_pa - recalc_tube if recalc_tube is not None else None
@@ -662,12 +769,15 @@ def run_live_thermal_state_hydraulic_postpass(
     else:
         hydraulic_constraint = "NOT_SATISFIED"
 
-    applicability = "APPLICABLE"
-    if (
-        task166_live.applicability is not None
-        and task166_live.applicability.status.value != "APPLICABLE"
-    ):
-        applicability = "BLOCKED_OR_WARN"
+    if tube_hydraulic_recompute_status == "EXPERIMENTAL_TRANSITIONAL_SUCCESS":
+        applicability = R20_APPLICABILITY_STATUS
+    else:
+        applicability = "APPLICABLE"
+        if (
+            task166_live.applicability is not None
+            and task166_live.applicability.status.value != "APPLICABLE"
+        ):
+            applicability = "BLOCKED_OR_WARN"
 
     return {
         "schema_version": "hxforge.live-thermal-state-hydraulic-postpass.v1",
@@ -731,6 +841,12 @@ def run_live_thermal_state_hydraulic_postpass(
         "shell_dp_task166_result_hash": task166_live.result_hash,
         "coolprop_outlet_domain_checks": coolprop_checks,
         "task174_style_outlet_pressure_window_pass": task174_style_pressure_ok,
+        "experimental_transitional_tube_hydraulic": experimental_transitional_tube_hydraulic,
+        "hydraulic_model_scope": (
+            experimental_transitional_tube_hydraulic.get("hydraulic_model_scope")
+            if experimental_transitional_tube_hydraulic
+            else None
+        ),
     }
 
 

@@ -239,6 +239,13 @@ class GeneralEngineeringCaseV2(BaseModel):
         "VARIABLE_SHELL_DIAMETER_R13",
     ] = "FIXED"
     experimental_live_thermal_hydraulic_postpass: bool = False
+    experimental_transitional_tube_hydraulic: bool = Field(
+        default=False,
+        description=(
+            "Opt-in Churchill (1977) transitional tube friction for live post-pass when frozen "
+            "Task027 blocks 2000<Re<4000. Does not alter Task027/Task029 production paths."
+        ),
+    )
     experimental_live_variable_tube_mass_flow: bool = Field(
         default=False,
         description=(
@@ -311,6 +318,14 @@ class GeneralEngineeringCaseV2(BaseModel):
                 )
         if self.candidate_constraints.tube_pass_count != 1:
             raise ValueError("v0.7 sizing supports tube_pass_count=1 only")
+        if (
+            self.experimental_transitional_tube_hydraulic
+            and not self.experimental_live_thermal_hydraulic_postpass
+        ):
+            raise ValueError(
+                "experimental_transitional_tube_hydraulic requires "
+                "experimental_live_thermal_hydraulic_postpass=true"
+            )
         return self
 
     def heat_transfer_convention(self) -> dict[str, str]:
