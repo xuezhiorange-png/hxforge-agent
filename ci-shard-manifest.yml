@@ -415,3 +415,10 @@ shards:
     files:
       - tests/prototypes/test_r19_variable_shell_mass_flow_e2e.py
     timeout: 3600
+
+  - name: v07-r19a-live-hydraulic-mass-flow-rebind
+    job: shard-v07-r19a-live-hydraulic-mass-flow-rebind
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r19a_live_hydraulic_mass_flow_rebind.py
+    timeout: 600

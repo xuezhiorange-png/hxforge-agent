@@ -63,14 +63,13 @@ from prototypes.v07_general_rating_sizing_mvp.case_streams import (
     tube_stream_spec,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.live_hydraulic_mass_flow_binding import (
+    equipment_shell_mass_flow_kg_s,
+    equipment_tube_mass_flow_kg_s,
+    live_postpass_binding_document,
+)
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
     build_task173_sizing_request,
-)
-from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
-    legacy_shell_mass_flow_kg_s,
-)
-from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
-    legacy_tube_mass_flow_kg_s,
 )
 
 LIVE_THERMAL_HYDRAULIC_AUTHORITY_ID = "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14"
@@ -210,7 +209,7 @@ def _run_task027_through_029(
     authority: Any,
     task026_result: Any,
     tube_property_snapshot: PropertySnapshot,
-) -> Task029SuccessResult:
+) -> tuple[Task029SuccessResult | None, list[dict[str, str]]]:
     result027 = compute_task027_friction_pressure_drop(
         task025_result=cast(Any, bundle.task025_result),
         task026_result=cast(Any, task026_result),
@@ -223,15 +222,41 @@ def _run_task027_through_029(
         roughness_authority=cast(Any, authority.task027_roughness_authority),
     )
     if type(result027).__name__ != "Task027SuccessResult":
-        raise RuntimeError("task027 blocked in live tube hydraulic post-pass")
+        tube_blockers: list[dict[str, str]] = []
+        for entry in getattr(result027, "blockers", ()):
+            code = getattr(getattr(entry, "code", None), "value", None) or str(
+                getattr(entry, "code", "BLOCKED_TASK027")
+            )
+            tube_blockers.append(
+                {
+                    "code": str(code),
+                    "scope": "TASK027",
+                    "detail": str(getattr(entry, "message_key", "task027 blocked")),
+                }
+            )
+        if not tube_blockers:
+            tube_blockers.append({"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK027"})
+        return None, tube_blockers
     try:
         task028_template_value = task168._public_value(
             authority.task028_request_template, decimal_strings=False
         )
     except (TypeError, ValueError, UnicodeError, ArithmeticError) as exc:
-        raise RuntimeError(f"task028 template projection failed: {exc}") from exc
+        return None, [
+            {
+                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                "scope": "TASK028",
+                "detail": f"template projection failed: {exc}",
+            }
+        ]
     if type(task028_template_value) is not dict:
-        raise RuntimeError("task028 template must project to a mapping")
+        return None, [
+            {
+                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                "scope": "TASK028",
+                "detail": "task028 template must project to a mapping",
+            }
+        ]
     task028_template = cast(dict[str, object], task028_template_value)
     task028_template["task025_valid_result"] = task168._public_value(
         bundle.task025_result, decimal_strings=False
@@ -258,7 +283,9 @@ def _run_task027_through_029(
         task026_result=cast(Any, task026_result),
     )
     if type(result028).__name__ != "Task028SuccessResult":
-        raise RuntimeError("task028 local loss blocked in live hydraulic post-pass")
+        return None, [
+            {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK028", "detail": "blocked"}
+        ]
     task029_template_any = cast(Any, authority.task029_request_template)
     composition = task029_template_any.composition_authority
     template_members = tuple(composition.member_authorities)
@@ -272,7 +299,13 @@ def _run_task027_through_029(
     result028_any = cast(Any, result028)
     components = tuple(result028_any.component_results)
     if len(template_components) != len(components) or len(template_friction) != 1:
-        raise RuntimeError("task029 template member layout mismatch")
+        return None, [
+            {
+                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                "scope": "TASK029",
+                "detail": "template member layout mismatch",
+            }
+        ]
     ordered_template_components = tuple(
         sorted(template_components, key=lambda item: item.global_path_sequence_index)
     )
@@ -335,29 +368,21 @@ def _run_task027_through_029(
         ),
         "request_hash": task029_request.request_hash,
     }
-    return compute_task029_composition(
+    outcome = compute_task029_composition(
         task029_raw,
         task027_success_result=cast(Any, result027),
         task028_success_result=cast(Any, result028),
         input_evidence_refs=authority.evidence_refs,
     )
+    if type(outcome) is not Task029SuccessResult:
+        return None, [
+            {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK029", "detail": "blocked"}
+        ]
+    return outcome, []
 
 
-def _scaled_shell_task032_mass_flow_rate_kg_s(
-    case: EngineeringCase,
-    authority: Any,
-) -> Decimal:
-    shell_side = shell_stream_spec(case)
-    template = authority.task032_mass_flow_authority
-    if template is None:
-        reference = legacy_shell_mass_flow_kg_s()
-    elif hasattr(template, "mass_flow_rate_kg_s"):
-        reference = Decimal(str(template.mass_flow_rate_kg_s))
-    elif type(template) is dict:
-        reference = Decimal(str(template["mass_flow_rate_kg_s"]))
-    else:
-        reference = legacy_shell_mass_flow_kg_s()
-    return reference * shell_side.mass_flow_kg_s / legacy_shell_mass_flow_kg_s()
+def _equipment_shell_task032_mass_flow_rate_kg_s(case: EngineeringCase) -> Decimal:
+    return equipment_shell_mass_flow_kg_s(case)
 
 
 def _recompute_shell_bell_delaware(
@@ -379,7 +404,7 @@ def _recompute_shell_bell_delaware(
     request032 = task168._task032_payload(authority, result031, ctx.configuration, ctx.layout)
     request032["property_snapshot"] = task168._public_value(shell_property_snapshot)
     request032["property_snapshot_hash"] = shell_property_snapshot.property_snapshot_hash
-    scaled_shell_flow = _scaled_shell_task032_mass_flow_rate_kg_s(case, authority)
+    scaled_shell_flow = _equipment_shell_task032_mass_flow_rate_kg_s(case)
     mass_flow = request032.get("mass_flow_authority")
     if type(mass_flow) is dict:
         mass_flow["mass_flow_rate_kg_s"] = str(scaled_shell_flow)
@@ -504,68 +529,49 @@ def run_live_thermal_state_hydraulic_postpass(
         )
 
     tube_side = tube_stream_spec(case)
-    reference_task026_flow = bundle.task026_result.mass_flow_rate_kg_s
-    scaled_task026_flow = (
-        reference_task026_flow * tube_side.mass_flow_kg_s / legacy_tube_mass_flow_kg_s()
-    )
+    equipment_tube_flow = equipment_tube_mass_flow_kg_s(case)
+    equipment_shell_flow = equipment_shell_mass_flow_kg_s(case)
+    historical_task026_template_flow = bundle.task026_result.mass_flow_rate_kg_s
     task026_request = _task026_request_with_snapshot(
         authority,
         tube_snapshot,
-        mass_flow_rate_kg_s=scaled_task026_flow,
+        mass_flow_rate_kg_s=equipment_tube_flow,
     )
     task026_result = compute_tube_side_heat_transfer_coefficient(
         task026_request, bundle.task025_result
     )
-    try:
-        task029_outcome = _run_task027_through_029(
-            bundle=bundle,
-            authority=authority,
-            task026_result=task026_result,
-            tube_property_snapshot=tube_snapshot,
-        )
-    except RuntimeError as exc:
-        blockers.append({"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "detail": str(exc)})
-        return _blocked_postpass_document(
-            ctx=ctx,
-            case=case,
-            blockers=blockers,
-            tube_inlet_temperature_k=tube_inlet_temperature_k,
-            tube_outlet_temperature_k=tube_outlet_temperature_k,
-            shell_inlet_temperature_k=shell_inlet_temperature_k,
-            shell_outlet_temperature_k=shell_outlet_temperature_k,
-            reference_tube_dp_pa=reference_tube_dp_pa,
-            reference_shell_dp_pa=reference_shell_dp_pa,
-            property_inputs={
-                "tube": _snapshot_public(tube_snapshot),
-                "shell": _snapshot_public(shell_snapshot),
-            },
-        )
-    if type(task029_outcome) is not Task029SuccessResult:
-        blockers.append({"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK029"})
-        return _blocked_postpass_document(
-            ctx=ctx,
-            case=case,
-            blockers=blockers,
-            tube_inlet_temperature_k=tube_inlet_temperature_k,
-            tube_outlet_temperature_k=tube_outlet_temperature_k,
-            shell_inlet_temperature_k=shell_inlet_temperature_k,
-            shell_outlet_temperature_k=shell_outlet_temperature_k,
-            reference_tube_dp_pa=reference_tube_dp_pa,
-            reference_shell_dp_pa=reference_shell_dp_pa,
-            property_inputs={
-                "tube": _snapshot_public(tube_snapshot),
-                "shell": _snapshot_public(shell_snapshot),
-            },
-        )
+    task029_outcome, tube_hydraulic_blockers = _run_task027_through_029(
+        bundle=bundle,
+        authority=authority,
+        task026_result=task026_result,
+        tube_property_snapshot=tube_snapshot,
+    )
+    blockers.extend(tube_hydraulic_blockers)
+    tube_hydraulic_recompute_status = "SUCCESS" if task029_outcome is not None else "BLOCKED"
 
+    task166_live = None
+    task032_live = None
+    shell_hydraulic_recompute_status = "NOT_RUN"
     try:
         task166_live, task032_live = _recompute_shell_bell_delaware(
             case=case,
             ctx=ctx,
             shell_property_snapshot=shell_snapshot,
         )
+        shell_hydraulic_recompute_status = "SUCCESS"
     except RuntimeError as exc:
         blockers.append({"code": "BLOCKED_SHELL_HYDRAULIC_RECOMPUTE", "detail": str(exc)})
+        shell_hydraulic_recompute_status = "BLOCKED"
+
+    mass_flow_binding = live_postpass_binding_document(
+        case=case,
+        task026_input_mass_flow_kg_s=equipment_tube_flow,
+        task032_input_mass_flow_kg_s=equipment_shell_flow,
+        task025_total_parallel_flow_area_m2=bundle.task025_result.total_parallel_flow_area_m2,
+        historical_task026_template_mass_flow_kg_s=historical_task026_template_flow,
+    )
+
+    if task166_live is None:
         return _blocked_postpass_document(
             ctx=ctx,
             case=case,
@@ -576,19 +582,39 @@ def run_live_thermal_state_hydraulic_postpass(
             shell_outlet_temperature_k=shell_outlet_temperature_k,
             reference_tube_dp_pa=reference_tube_dp_pa,
             reference_shell_dp_pa=reference_shell_dp_pa,
-            recalculated_tube_dp_pa=task029_outcome.modeled_total_tube_side_pressure_drop_pa,
+            recalculated_tube_dp_pa=(
+                task029_outcome.modeled_total_tube_side_pressure_drop_pa
+                if task029_outcome is not None
+                else None
+            ),
+            property_inputs={
+                "tube": _snapshot_public(tube_snapshot),
+                "shell": _snapshot_public(shell_snapshot),
+            },
+            mass_flow_binding=mass_flow_binding,
+            tube_reynolds_number=str(task026_result.reynolds_number),
+            tube_hydraulic_recompute_status=tube_hydraulic_recompute_status,
+            shell_hydraulic_recompute_status=shell_hydraulic_recompute_status,
         )
 
-    recalc_tube = task029_outcome.modeled_total_tube_side_pressure_drop_pa
+    recalc_tube = (
+        task029_outcome.modeled_total_tube_side_pressure_drop_pa
+        if task029_outcome is not None
+        else None
+    )
     recalc_shell = task166_live.total_shell_pressure_drop
-    tube_out_p = tube_inlet_pressure_pa - recalc_tube
+    tube_out_p = tube_inlet_pressure_pa - recalc_tube if recalc_tube is not None else None
     shell_out_p = shell_inlet_pressure_pa - recalc_shell
 
     coolprop_checks: dict[str, Any] = {}
-    for side, t_out, p_out in (
-        ("tube", tube_outlet_temperature_k, tube_out_p),
+    outlet_checks: list[tuple[str, Decimal, Decimal | None]] = [
         ("shell", shell_outlet_temperature_k, shell_out_p),
-    ):
+    ]
+    if tube_out_p is not None:
+        outlet_checks.insert(0, ("tube", tube_outlet_temperature_k, tube_out_p))
+    for side, t_out, p_out in outlet_checks:
+        if p_out is None:
+            continue
         ok, detail = _coolprop_outlet_domain_ok(provider, temperature_k=t_out, pressure_pa=p_out)
         coolprop_checks[side] = {
             "ok": ok,
@@ -606,9 +632,12 @@ def run_live_thermal_state_hydraulic_postpass(
             )
 
     task174_style_pressure_ok = (
-        _COOLPROP_MIN_PRESSURE_PA <= tube_out_p <= _COOLPROP_MAX_PRESSURE_PA
-        and _COOLPROP_MIN_PRESSURE_PA <= shell_out_p <= _COOLPROP_MAX_PRESSURE_PA
+        _COOLPROP_MIN_PRESSURE_PA <= shell_out_p <= _COOLPROP_MAX_PRESSURE_PA
     )
+    if tube_out_p is not None:
+        task174_style_pressure_ok = task174_style_pressure_ok and (
+            _COOLPROP_MIN_PRESSURE_PA <= tube_out_p <= _COOLPROP_MAX_PRESSURE_PA
+        )
     if not task174_style_pressure_ok:
         blockers.append(
             {
@@ -618,8 +647,14 @@ def run_live_thermal_state_hydraulic_postpass(
             }
         )
 
-    tube_limit_ok = recalc_tube <= case.max_tube_side_pressure_drop_pa
+    tube_limit_ok = recalc_tube is not None and recalc_tube <= case.max_tube_side_pressure_drop_pa
     shell_limit_ok = recalc_shell <= case.max_shell_side_pressure_drop_pa
+    if recalc_tube is None:
+        tube_dp_constraint = "BLOCKED"
+    elif tube_limit_ok:
+        tube_dp_constraint = "SATISFIED"
+    else:
+        tube_dp_constraint = "NOT_SATISFIED"
     if blockers:
         hydraulic_constraint = "BLOCKED"
     elif tube_limit_ok and shell_limit_ok:
@@ -654,14 +689,14 @@ def run_live_thermal_state_hydraulic_postpass(
         "shell_bulk_evaluation_temperature_k": str(shell_eval_t),
         "reference_tube_dp_pa": str(reference_tube_dp_pa),
         "reference_shell_dp_pa": str(reference_shell_dp_pa),
-        "recalculated_tube_dp_pa": str(recalc_tube),
+        "recalculated_tube_dp_pa": str(recalc_tube) if recalc_tube is not None else None,
         "recalculated_shell_dp_pa": str(recalc_shell),
-        "tube_outlet_pressure_pa": str(tube_out_p),
+        "tube_outlet_pressure_pa": str(tube_out_p) if tube_out_p is not None else None,
         "shell_outlet_pressure_pa": str(shell_out_p),
         "max_tube_dp_pa": str(case.max_tube_side_pressure_drop_pa),
         "max_shell_dp_pa": str(case.max_shell_side_pressure_drop_pa),
         "hydraulic_constraint_status": hydraulic_constraint,
-        "tube_dp_constraint": "SATISFIED" if tube_limit_ok else "NOT_SATISFIED",
+        "tube_dp_constraint": tube_dp_constraint,
         "shell_dp_constraint": "SATISFIED" if shell_limit_ok else "NOT_SATISFIED",
         "correlation_applicability_status": applicability,
         "tube_reynolds_number": str(task026_result.reynolds_number),
@@ -685,7 +720,14 @@ def run_live_thermal_state_hydraulic_postpass(
             "end_zone": str(task166_live.end_zone_pressure_drop),
             "total": str(task166_live.total_shell_pressure_drop),
         },
-        "tube_dp_task029_result_hash": task029_outcome.result_hash,
+        "tube_dp_task029_result_hash": (
+            task029_outcome.result_hash if task029_outcome is not None else None
+        ),
+        "mass_flow_binding": mass_flow_binding,
+        "tube_hydraulic_recompute_status": tube_hydraulic_recompute_status,
+        "shell_hydraulic_recompute_status": shell_hydraulic_recompute_status,
+        "task026_input_mass_flow_kg_s": mass_flow_binding["task026_input_mass_flow_kg_s"],
+        "task032_input_mass_flow_kg_s": mass_flow_binding["task032_input_mass_flow_kg_s"],
         "shell_dp_task166_result_hash": task166_live.result_hash,
         "coolprop_outlet_domain_checks": coolprop_checks,
         "task174_style_outlet_pressure_window_pass": task174_style_pressure_ok,
@@ -716,6 +758,10 @@ def _blocked_postpass_document(
     recalculated_tube_dp_pa: Decimal | None = None,
     recalculated_shell_dp_pa: Decimal | None = None,
     property_inputs: dict[str, Any] | None = None,
+    mass_flow_binding: dict[str, str] | None = None,
+    tube_reynolds_number: str | None = None,
+    tube_hydraulic_recompute_status: str = "BLOCKED",
+    shell_hydraulic_recompute_status: str = "BLOCKED",
 ) -> dict[str, Any]:
     return {
         "schema_version": "hxforge.live-thermal-state-hydraulic-postpass.v1",
@@ -741,6 +787,19 @@ def _blocked_postpass_document(
         "max_tube_dp_pa": str(case.max_tube_side_pressure_drop_pa),
         "max_shell_dp_pa": str(case.max_shell_side_pressure_drop_pa),
         "property_inputs": property_inputs,
+        "mass_flow_binding": mass_flow_binding,
+        "tube_reynolds_number": tube_reynolds_number,
+        "tube_hydraulic_recompute_status": tube_hydraulic_recompute_status,
+        "shell_hydraulic_recompute_status": shell_hydraulic_recompute_status,
+        "task026_input_mass_flow_kg_s": (
+            mass_flow_binding.get("task026_input_mass_flow_kg_s") if mass_flow_binding else None
+        ),
+        "task032_input_mass_flow_kg_s": (
+            mass_flow_binding.get("task032_input_mass_flow_kg_s") if mass_flow_binding else None
+        ),
+        "tube_dp_constraint": "BLOCKED",
+        "shell_dp_constraint": "BLOCKED",
+        "correlation_applicability_status": "NOT_EVALUATED",
     }
 
 

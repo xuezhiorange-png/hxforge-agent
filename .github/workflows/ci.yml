@@ -121,7 +121,16 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
-          sudo apt-get update
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "apt-get update failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
@@ -390,7 +399,16 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
-          sudo apt-get update
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "apt-get update failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
@@ -866,7 +884,16 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
-          sudo apt-get update
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "apt-get update failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
@@ -1154,7 +1181,16 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
-          sudo apt-get update
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "apt-get update failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
@@ -1419,7 +1455,16 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
-          sudo apt-get update
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get update; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "apt-get update failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"

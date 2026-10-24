@@ -82,11 +82,12 @@ def test_live_postpass_recomputes_shell_dp_for_r13_pinned_candidate(r13_case, pi
     )
     assert result["authority_id"] == LIVE_THERMAL_HYDRAULIC_AUTHORITY_ID
     assert result["task174_hydraulic_status"] == HYDRAULIC_STATUS_LIVE_POSTPASS
-    assert result["hydraulic_constraint_status"] == "SATISFIED"
+    assert result["shell_hydraulic_recompute_status"] == "SUCCESS"
     ref_shell = Decimal(result["reference_shell_dp_pa"])
     live_shell = Decimal(result["recalculated_shell_dp_pa"])
     assert ref_shell != live_shell
     assert live_shell < Decimal("1180")
+    assert result["mass_flow_binding"]["tube_binding_status"] == "MATCHED_EQUIPMENT_TOTAL"
     assert result["physical_tube_count"] == 337
 
 

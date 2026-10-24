@@ -36,6 +36,8 @@ def _summary_from_postpass(row: dict[str, Any], postpass: dict[str, Any] | None)
         "wall_seconds": row.get("wall_seconds"),
         "tube_reynolds_number": (postpass or {}).get("tube_reynolds_number"),
         "shell_reynolds_number": (postpass or {}).get("shell_reynolds_number"),
+        "task032_input_mass_flow_kg_s": (postpass or {}).get("task032_input_mass_flow_kg_s"),
+        "tube_hydraulic_recompute_status": (postpass or {}).get("tube_hydraulic_recompute_status"),
         "shell_side_heat_transfer_coefficient_w_m2_k": (postpass or {}).get(
             "shell_side_heat_transfer_coefficient_w_m2_k"
         ),

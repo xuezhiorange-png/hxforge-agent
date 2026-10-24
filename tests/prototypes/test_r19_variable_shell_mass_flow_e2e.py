@@ -68,6 +68,8 @@ def test_r19_new_shell_flow_n1_vs_baseline_reference() -> None:
         var_shell_dp = Decimal(str(var["shell_dp_pa"]))
         assert var_shell_dp < base_shell_dp
         assert shell_re > Decimal("0")
+        assert var.get("task032_input_mass_flow_kg_s") == "19.000000"
+        assert var.get("tube_hydraulic_recompute_status") == "BLOCKED"
         artifacts_dir = Path("/opt/cursor/artifacts")
         if artifacts_dir.is_dir():
             (artifacts_dir / "r19_variable_shell_flow_comparison.json").write_text(

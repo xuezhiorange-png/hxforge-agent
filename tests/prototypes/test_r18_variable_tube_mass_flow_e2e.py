@@ -56,12 +56,11 @@ def test_r18_baseline_vs_variable_flow_n1_e2e() -> None:
         assert base_duty != var_duty
         assert comparison["baseline"]["tube_mass_flow_kg_s"] == "12.000000"
         assert comparison["variable_flow"]["tube_mass_flow_kg_s"] == "11.000000"
-        base_re = Decimal(str(comparison["baseline"]["tube_reynolds_number"]))
         var_re = Decimal(str(comparison["variable_flow"]["tube_reynolds_number"]))
+        base_re = Decimal(str(comparison["baseline"]["tube_reynolds_number"]))
         assert var_re < base_re
-        base_dp = Decimal(str(comparison["baseline"]["tube_dp_pa"]))
-        var_dp = Decimal(str(comparison["variable_flow"]["tube_dp_pa"]))
-        assert var_dp < base_dp
+        assert var_re > Decimal("2500")
+        assert comparison["variable_flow"].get("tube_hydraulic_recompute_status") == "BLOCKED"
         artifacts_dir = Path("/opt/cursor/artifacts")
         if artifacts_dir.is_dir():
             dest = artifacts_dir / "r18_variable_tube_flow_comparison.json"

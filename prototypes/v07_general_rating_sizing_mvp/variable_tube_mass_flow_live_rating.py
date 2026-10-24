@@ -36,6 +36,11 @@ def _mesh_summary(row: dict[str, Any], postpass: dict[str, Any] | None) -> dict[
         "task172_local_evaluation_count": row.get("task172_local_evaluation_count"),
         "wall_seconds": row.get("wall_seconds"),
         "tube_reynolds_number": (postpass or {}).get("tube_reynolds_number"),
+        "task026_input_mass_flow_kg_s": (postpass or {}).get("task026_input_mass_flow_kg_s"),
+        "tube_hydraulic_recompute_status": (postpass or {}).get("tube_hydraulic_recompute_status"),
+        "shell_hydraulic_recompute_status": (postpass or {}).get(
+            "shell_hydraulic_recompute_status"
+        ),
         "tube_dp_pa": (postpass or {}).get("recalculated_tube_dp_pa"),
         "shell_dp_pa": (postpass or {}).get("recalculated_shell_dp_pa"),
         "correlation_applicability": (postpass or {}).get("correlation_applicability_status"),
