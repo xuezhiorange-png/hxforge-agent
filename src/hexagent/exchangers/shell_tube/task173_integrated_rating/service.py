@@ -3942,9 +3942,7 @@ def _candidate_accepted_trajectory_projection(
             residual = record.solution.q_w - result.signed_q_hot_to_cold_w
         replay_tolerance = Decimal("1e-6")
         if variable_water_temperature_active(active_experimental_thermal_boundary()):
-            replay_tolerance = _cell_residual_acceptance_tolerance_w(
-                cast(_CellEvaluation, record.solution)
-            )
+            replay_tolerance = _cell_residual_acceptance_tolerance_w(record.solution)
         if (
             result.request_hash != request_hash
             or result.result_hash != result_hash

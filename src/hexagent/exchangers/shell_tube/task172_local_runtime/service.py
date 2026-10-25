@@ -130,7 +130,10 @@ def _residual_acceptance_ratios_from_diagnostics(
         return None
     if any(bound <= 0.0 for bound in bounds):
         return None
-    return tuple(abs(residual) / bound for residual, bound in zip(residuals, bounds, strict=True))
+    return cast(
+        tuple[float, float, float],
+        tuple(abs(residual) / bound for residual, bound in zip(residuals, bounds, strict=True)),
+    )
 
 
 def _warm_start_from_blocked(
@@ -149,7 +152,7 @@ def _warm_start_from_blocked(
         return None
     if not all(math.isfinite(value) for value in values):
         return None
-    return values
+    return cast(tuple[float, float, float], values)
 
 
 def _experimental_wide_delta_t_solver_active() -> bool:
@@ -1122,6 +1125,7 @@ def _solve_once(
 
     residual_scale = max(abs(q_seed), 1.0)
     temperature_scale = max(abs(delta_t), 1.0)
+    diff_step: float | tuple[float, float, float]
     if budget.wide_experimental:
         q_diff_step = max(abs(q_seed) * 1e-6, 1.0)
         temp_diff_step = max(temperature_scale * 1e-4, 1e-3)
@@ -1196,9 +1200,12 @@ def _solve_once(
         nonlocal callback_count
         q_value, twi_value, two_value = start
         relaxation_damping = 1.0
-        initial_ratios = _residual_acceptance_ratios_from_diagnostics(
-            seed_failure.field_path.split(";") if ";" in seed_failure.field_path else ()
+        seed_diagnostics = (
+            tuple(seed_failure.field_path.split(";"))
+            if ";" in seed_failure.field_path
+            else ()
         )
+        initial_ratios = _residual_acceptance_ratios_from_diagnostics(seed_diagnostics)
         if initial_ratios is None or max(initial_ratios) > 4.0:
             raise seed_failure
         best_ratio = max(initial_ratios)
@@ -1266,18 +1273,17 @@ def _solve_once(
             twi_warm,
             two_warm,
         )
-        warm_ratios = _residual_acceptance_ratios_from_diagnostics(
-            tuple(
-                str(value)
-                for value in (
-                    q_warm,
-                    twi_warm,
-                    two_warm,
-                    *warm_evaluated["residuals"],
-                    *warm_evaluated["bounds"],
-                )
+        warm_diagnostic_tuple = tuple(
+            str(value)
+            for value in (
+                q_warm,
+                twi_warm,
+                two_warm,
+                *warm_evaluated["residuals"],
+                *warm_evaluated["bounds"],
             )
         )
+        warm_ratios = _residual_acceptance_ratios_from_diagnostics(warm_diagnostic_tuple)
         if warm_ratios is not None and max(warm_ratios) <= 4.0:
             try:
                 warm_failure = _runtime_failure_from_trial(
@@ -1354,25 +1360,28 @@ def _solve_once(
     solution = tuple(float(value) for value in solver.x)
     if not solver.success or solver.nfev > budget.max_nfev or callback_count > budget.callback_cap:
         raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "solver.termination")
+    evaluated_final: dict[str, Any] | None = None
     try:
-        final, solution = _accept_solution(cast(tuple[float, float, float], solution), solver)
+        evaluated_final, solution = _accept_solution(
+            cast(tuple[float, float, float], solution), solver
+        )
     except _RuntimeFailure as acceptance_failure:
         if not budget.wide_experimental or acceptance_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
             raise
         relax_candidates = [cast(tuple[float, float, float], solution)]
         if initial_guess is not None:
             relax_candidates.insert(0, initial_guess)
-        final = None
+        evaluated_final = None
         for candidate in relax_candidates:
             try:
-                final, solution = _wide_relax_to_acceptance(
+                evaluated_final, solution = _wide_relax_to_acceptance(
                     candidate,
                     seed_failure=acceptance_failure,
                 )
                 break
             except _RuntimeFailure:
                 continue
-        if final is None:
+        if evaluated_final is None:
             raise acceptance_failure
     q, twi, two = cast(tuple[float, float, float], solution)
     if q < 0.0:
@@ -1384,6 +1393,7 @@ def _solve_once(
         <= float(request.tube_bulk_state.temperature_k)
     ):
         raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+    assert evaluated_final is not None
     fallback = method == "dogbox" and not budget.wide_experimental
     if budget.wide_experimental:
         solver_status = (
@@ -1392,7 +1402,7 @@ def _solve_once(
             else f"V07_R25_WIDE_DELTA_T_TRF_STATUS_{solver.status}"
         )
         profile_id = budget.numerical_profile_id
-        provenance = _EVIDENCE_REFS
+        provenance: tuple[str, ...] = _EVIDENCE_REFS
     else:
         solver_status = (
             f"R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_{solver.status}"
@@ -1415,7 +1425,7 @@ def _solve_once(
         shell_pr,
         tube_corr_id,
         tube_corr_version,
-        final,
+        evaluated_final,
         (q, twi, two),
         solver_status,
         int(solver.nfev),
