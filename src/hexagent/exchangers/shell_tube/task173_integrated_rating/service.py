@@ -2382,7 +2382,6 @@ def _solve_cell(
     neighborhoods = hole_neighborhoods if hole_neighborhoods is not None else []
     trials: dict[float, _CellTrial] = {}
     unrecorded_holes: list[float] = []
-    closure_tolerance = Decimal("1e-6")
     cell_evaluation_count = 0
     cell_valid_evaluation_count = 0
     hole_recovery_probe_count = 0
