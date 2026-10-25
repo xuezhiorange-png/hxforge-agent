@@ -1423,9 +1423,7 @@ def _solve_once(
         else f"SCIPY_TRF_STATUS_{solver.status}"
     )
     profile_id = _DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID
-    provenance = (
-        (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
-    )
+    provenance = (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
     return _build_valid_result(
         request,
         canonical_sha256(_request_projection(request)),
