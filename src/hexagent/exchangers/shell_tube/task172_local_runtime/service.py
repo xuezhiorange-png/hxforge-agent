@@ -1201,9 +1201,7 @@ def _solve_once(
         q_value, twi_value, two_value = start
         relaxation_damping = 1.0
         seed_diagnostics = (
-            tuple(seed_failure.field_path.split(";"))
-            if ";" in seed_failure.field_path
-            else ()
+            tuple(seed_failure.field_path.split(";")) if ";" in seed_failure.field_path else ()
         )
         initial_ratios = _residual_acceptance_ratios_from_diagnostics(seed_diagnostics)
         if initial_ratios is None or max(initial_ratios) > 4.0:
