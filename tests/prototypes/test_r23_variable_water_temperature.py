@@ -155,7 +155,7 @@ def test_r23_mild_variable_water_e2e_cli() -> None:
     case_path = Path("/tmp/r23-mild-case.json")
     case_path.write_text(json.dumps(payload), encoding="utf-8")
     raw = _run_live_cli(case_path, Path("/tmp/r23-mild-out"))
-    row = raw["rating_rows"][0]
+    row = raw["candidate_rating_results"][0]
     assert row["mesh_status"] == "NUMERIC_VALID"
     assert Decimal(str(row["total_duty_w"])) > 0
     tube_out = Decimal(str(row["tube_outlet_temperature_k"]))
