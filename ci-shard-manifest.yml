@@ -456,4 +456,5 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r24_wide_delta_t_rating_solver.py
+      - tests/prototypes/test_r25_task172_wide_delta_t_closure.py
     timeout: 600
