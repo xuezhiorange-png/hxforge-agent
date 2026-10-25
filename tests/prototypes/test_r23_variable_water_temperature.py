@@ -72,9 +72,7 @@ def test_two_way_nonconverged_fail_closed_for_sizing() -> None:
             "shell_dp_constraint": "SATISFIED",
         },
     }
-    gated = apply_two_way_coupling_constraint_gate(
-        case, row, "PRELIMINARY_CONSTRAINT_SATISFIED"
-    )
+    gated = apply_two_way_coupling_constraint_gate(case, row, "PRELIMINARY_CONSTRAINT_SATISFIED")
     assert gated == TWO_WAY_COUPLING_NOT_CONVERGED
     eligibility = [
         {

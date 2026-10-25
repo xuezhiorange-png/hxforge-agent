@@ -74,9 +74,7 @@ def check_experimental_live_rating_scope(
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "shell inlet pressure must be 101325 Pa"
     if experimental_variable_water_temperature_enabled(case):
         try:
-            validate_variable_water_inlet_temperature_k(
-                tube.inlet_temperature_k, label="tube_side"
-            )
+            validate_variable_water_inlet_temperature_k(tube.inlet_temperature_k, label="tube_side")
             validate_variable_water_inlet_temperature_k(
                 shell.inlet_temperature_k, label="shell_side"
             )

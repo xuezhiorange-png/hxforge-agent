@@ -174,7 +174,7 @@ def effective_admitted_t_max_k() -> Decimal:
 
 def effective_admitted_h_max_j_kg(provider: PropertyProvider) -> Decimal:
     bound = active_experimental_thermal_boundary()
-    if not variable_water_temperature_active(bound):
+    if bound is None or not variable_water_temperature_active(bound):
         return H_MAX_J_KG
     t_max = admitted_bulk_temperature_max_k(bound)
     state = provider.state_tp(
