@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import sys
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
@@ -87,6 +87,80 @@ _JMU_EXPONENT = Decimal("0.14")
 _C_ROUND = 1.0
 _CALLBACK_CAP = 24
 _NUMERICAL_PROFILE_ID = "R94_R98_STAGE1_CASE_PROFILE_CROUND_1.0"
+_WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID = (
+    "V07-T172-R25-WIDE-DELTA-T-EXPERIMENTAL-THERMAL-BOUNDARY-V1"
+)
+_FROZEN_MAX_NFEV = 6
+_WIDE_EXPERIMENTAL_MAX_NFEV = 18
+_WIDE_EXPERIMENTAL_CALLBACK_CAP = 32
+_WIDE_EXPERIMENTAL_RELAXATION_STEPS = 24
+
+
+@dataclass(frozen=True)
+class _SolverBudget:
+    max_nfev: int
+    callback_cap: int
+    numerical_profile_id: str
+    wide_experimental: bool
+
+
+_FROZEN_SOLVER_BUDGET = _SolverBudget(
+    _FROZEN_MAX_NFEV,
+    _CALLBACK_CAP,
+    _NUMERICAL_PROFILE_ID,
+    False,
+)
+_WIDE_EXPERIMENTAL_SOLVER_BUDGET = _SolverBudget(
+    _WIDE_EXPERIMENTAL_MAX_NFEV,
+    _WIDE_EXPERIMENTAL_CALLBACK_CAP,
+    _WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID,
+    True,
+)
+
+
+def _residual_acceptance_ratios_from_diagnostics(
+    diagnostics: tuple[str, ...],
+) -> tuple[float, float, float] | None:
+    if len(diagnostics) < 9:
+        return None
+    try:
+        residuals = tuple(float(diagnostics[index]) for index in range(3, 6))
+        bounds = tuple(float(diagnostics[index]) for index in range(6, 9))
+    except ValueError:
+        return None
+    if any(bound <= 0.0 for bound in bounds):
+        return None
+    return tuple(abs(residual) / bound for residual, bound in zip(residuals, bounds, strict=True))
+
+
+def _warm_start_from_blocked(
+    blocked: Task172BlockedResult,
+) -> tuple[float, float, float] | None:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return None
+    if len(blocked.diagnostic_last_iterate) < 3:
+        return None
+    ratios = _residual_acceptance_ratios_from_diagnostics(blocked.diagnostic_last_iterate)
+    if ratios is None or max(ratios) > 2.0:
+        return None
+    try:
+        values = tuple(float(blocked.diagnostic_last_iterate[index]) for index in range(3))
+    except ValueError:
+        return None
+    if not all(math.isfinite(value) for value in values):
+        return None
+    return values
+
+
+def _experimental_wide_delta_t_solver_active() -> bool:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.variable_water_temperature_active(bound)
+
+
 _TASK026_PROPERTY_SOURCE_ID = "CoolProp::HEOS::Water"
 _TASK026_PROPERTY_SOURCE_VERSION = f"{COOLPROP_VERSION}+{COOLPROP_GIT_REVISION}"
 _DOGBOX_FALLBACK_AUTHORITY_ID = "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3"
@@ -904,6 +978,8 @@ def _solve_once(
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
 ) -> Task172LocalResult:
     if (
         provider.name != "CoolProp"
@@ -1011,6 +1087,8 @@ def _solve_once(
         )
     wall_inner_seed = float(request.tube_bulk_state.temperature_k) - q_seed * resistance_i_seed
     wall_outer_seed = float(request.shell_bulk_state.temperature_k) + q_seed * resistance_o_seed
+    if initial_guess is not None:
+        q_seed, wall_inner_seed, wall_outer_seed = initial_guess
     if not all(math.isfinite(value) for value in (q_seed, wall_inner_seed, wall_outer_seed)):
         raise _RuntimeFailure("BLOCKED_INITIALIZATION_FAILURE", "initialization.seed")
     t_min, t_max = _admitted_temperature_bounds()
@@ -1026,10 +1104,39 @@ def _solve_once(
     callback_count = 0
     last_iterate: tuple[float, float, float] = (q_seed, wall_inner_seed, wall_outer_seed)
 
+    def _runtime_failure_from_trial(
+        trial_solution: tuple[float, float, float],
+        evaluated: dict[str, Any],
+    ) -> _RuntimeFailure:
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        diagnostics = tuple(
+            str(value)
+            for value in (
+                *trial_solution,
+                *residual_values,
+                *acceptance_bounds,
+            )
+        )
+        return _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+
+    residual_scale = max(abs(q_seed), 1.0)
+    temperature_scale = max(abs(delta_t), 1.0)
+    if budget.wide_experimental:
+        q_diff_step = max(abs(q_seed) * 1e-6, 1.0)
+        temp_diff_step = max(temperature_scale * 1e-4, 1e-3)
+        diff_step = (q_diff_step, temp_diff_step, temp_diff_step)
+        ftol = 1e-8
+        xtol = 1e-10
+    else:
+        diff_step = 1e-5
+        ftol = 1e-6
+        xtol = 1e-12
+
     def residual(values: np.ndarray) -> np.ndarray:
         nonlocal callback_count, last_iterate
         callback_count += 1
-        if callback_count > _CALLBACK_CAP:
+        if callback_count > budget.callback_cap:
             raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
         q, twi, two = (float(value) for value in values)
         last_iterate = (q, twi, two)
@@ -1045,7 +1152,177 @@ def _solve_once(
             twi,
             two,
         )
-        return np.asarray(evaluated["residuals"], dtype=float) / abs(q_seed)
+        return np.asarray(evaluated["residuals"], dtype=float) / residual_scale
+
+    def _accept_solution(
+        candidate_solution: tuple[float, float, float],
+        candidate_solver: Any,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        q_value, twi_value, two_value = candidate_solution
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_value,
+            twi_value,
+            two_value,
+        )
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        if any(
+            abs(value) > bound
+            for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+        ):
+            diagnostics = tuple(
+                str(value)
+                for value in (
+                    *candidate_solution,
+                    *residual_values,
+                    *acceptance_bounds,
+                )
+            )
+            raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+        return evaluated, candidate_solution
+
+    def _wide_relax_to_acceptance(
+        start: tuple[float, float, float],
+        *,
+        seed_failure: _RuntimeFailure,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        nonlocal callback_count
+        q_value, twi_value, two_value = start
+        relaxation_damping = 1.0
+        initial_ratios = _residual_acceptance_ratios_from_diagnostics(
+            seed_failure.field_path.split(";") if ";" in seed_failure.field_path else ()
+        )
+        if initial_ratios is None or max(initial_ratios) > 4.0:
+            raise seed_failure
+        best_ratio = max(initial_ratios)
+        for _ in range(_WIDE_EXPERIMENTAL_RELAXATION_STEPS):
+            if callback_count > budget.callback_cap:
+                raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
+            evaluated = _eval_trial(
+                request,
+                provider,
+                tube_bulk_snapshot,
+                shell_bulk_snapshot,
+                tube_h_base,
+                shell_h_base,
+                wall_resistance,
+                q_value,
+                twi_value,
+                two_value,
+            )
+            callback_count += 1
+            residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+            acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+            ratios = tuple(
+                abs(value) / bound
+                for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+                if bound > 0.0
+            )
+            if ratios and max(ratios) <= 1.0:
+                return evaluated, (q_value, twi_value, two_value)
+            if ratios and max(ratios) > best_ratio * 4.0:
+                raise seed_failure
+            if ratios:
+                best_ratio = min(best_ratio, max(ratios))
+            g_i = float(evaluated["g_i"])
+            g_wall = float(evaluated["g_wall"])
+            g_o = float(evaluated["g_o"])
+            r1, r2, r3 = residual_values
+            twi_value += relaxation_damping * r1 / g_i
+            two_value -= relaxation_damping * r3 / g_o
+            q_value += relaxation_damping * r2 / g_wall
+            twi_value = min(max(twi_value, float(t_min)), float(t_max))
+            two_value = min(max(two_value, float(t_min)), float(t_max))
+        diagnostics = tuple(
+            str(value)
+            for value in (
+                q_value,
+                twi_value,
+                two_value,
+                *residual_values,
+                *acceptance_bounds,
+            )
+        )
+        raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+
+    if budget.wide_experimental and initial_guess is not None:
+        q_warm, twi_warm, two_warm = initial_guess
+        warm_evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_warm,
+            twi_warm,
+            two_warm,
+        )
+        warm_ratios = _residual_acceptance_ratios_from_diagnostics(
+            tuple(
+                str(value)
+                for value in (
+                    q_warm,
+                    twi_warm,
+                    two_warm,
+                    *warm_evaluated["residuals"],
+                    *warm_evaluated["bounds"],
+                )
+            )
+        )
+        if warm_ratios is not None and max(warm_ratios) <= 4.0:
+            try:
+                warm_failure = _runtime_failure_from_trial(
+                    (q_warm, twi_warm, two_warm),
+                    warm_evaluated,
+                )
+                warm_final, warm_solution = _wide_relax_to_acceptance(
+                    (q_warm, twi_warm, two_warm),
+                    seed_failure=warm_failure,
+                )
+            except _RuntimeFailure:
+                pass
+            else:
+                q_value, twi_value, two_value = warm_solution
+                if q_value < 0.0:
+                    raise _RuntimeFailure(
+                        "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w"
+                    )
+                if not (
+                    float(request.shell_bulk_state.temperature_k)
+                    <= two_value
+                    <= twi_value
+                    <= float(request.tube_bulk_state.temperature_k)
+                ):
+                    raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+                return _build_valid_result(
+                    request,
+                    canonical_sha256(_request_projection(request)),
+                    support_id,
+                    tube_bulk_id,
+                    shell_bulk_id,
+                    tube_re,
+                    tube_pr,
+                    shell_re,
+                    shell_pr,
+                    tube_corr_id,
+                    tube_corr_version,
+                    warm_final,
+                    warm_solution,
+                    "V07_R25_WIDE_DELTA_T_RELAXATION_FROM_WARM_START",
+                    0,
+                    callback_count,
+                    numerical_profile_id=budget.numerical_profile_id,
+                    provenance_refs=_EVIDENCE_REFS,
+                )
 
     try:
         solver = least_squares(
@@ -1053,13 +1330,13 @@ def _solve_once(
             np.asarray([q_seed, wall_inner_seed, wall_outer_seed], dtype=float),
             method=method,
             loss="linear",
-            ftol=1e-6,
-            xtol=1e-12,
+            ftol=ftol,
+            xtol=xtol,
             gtol=1e-12,
             jac="2-point",
-            diff_step=1e-5,
-            x_scale=[abs(q_seed), abs(delta_t), abs(delta_t)],
-            max_nfev=6,
+            diff_step=diff_step,
+            x_scale=[residual_scale, temperature_scale, temperature_scale],
+            max_nfev=budget.max_nfev,
             bounds=(
                 np.asarray([-np.inf, float(t_min), float(t_min)], dtype=float),
                 np.asarray([np.inf, float(t_max), float(t_max)], dtype=float),
@@ -1075,26 +1352,29 @@ def _solve_once(
         raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "solver") from exc
 
     solution = tuple(float(value) for value in solver.x)
-    q, twi, two = cast(tuple[float, float, float], solution)
-    final = _eval_trial(
-        request,
-        provider,
-        tube_bulk_snapshot,
-        shell_bulk_snapshot,
-        tube_h_base,
-        shell_h_base,
-        wall_resistance,
-        q,
-        twi,
-        two,
-    )
-    if not solver.success or solver.nfev > 6 or callback_count > _CALLBACK_CAP:
+    if not solver.success or solver.nfev > budget.max_nfev or callback_count > budget.callback_cap:
         raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "solver.termination")
-    residual_values = cast(tuple[float, float, float], final["residuals"])
-    bounds = cast(tuple[float, float, float], final["bounds"])
-    if any(abs(value) > bound for value, bound in zip(residual_values, bounds, strict=True)):
-        diagnostics = tuple(str(value) for value in (*solution, *residual_values, *bounds))
-        raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+    try:
+        final, solution = _accept_solution(cast(tuple[float, float, float], solution), solver)
+    except _RuntimeFailure as acceptance_failure:
+        if not budget.wide_experimental or acceptance_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+            raise
+        relax_candidates = [cast(tuple[float, float, float], solution)]
+        if initial_guess is not None:
+            relax_candidates.insert(0, initial_guess)
+        final = None
+        for candidate in relax_candidates:
+            try:
+                final, solution = _wide_relax_to_acceptance(
+                    candidate,
+                    seed_failure=acceptance_failure,
+                )
+                break
+            except _RuntimeFailure:
+                continue
+        if final is None:
+            raise acceptance_failure
+    q, twi, two = cast(tuple[float, float, float], solution)
     if q < 0.0:
         raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
     if not (
@@ -1104,12 +1384,25 @@ def _solve_once(
         <= float(request.tube_bulk_state.temperature_k)
     ):
         raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
-    fallback = method == "dogbox"
-    solver_status = (
-        f"R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_{solver.status}"
-        if fallback
-        else f"SCIPY_TRF_STATUS_{solver.status}"
-    )
+    fallback = method == "dogbox" and not budget.wide_experimental
+    if budget.wide_experimental:
+        solver_status = (
+            f"V07_R25_WIDE_DELTA_T_DOGBOX_STATUS_{solver.status}"
+            if method == "dogbox"
+            else f"V07_R25_WIDE_DELTA_T_TRF_STATUS_{solver.status}"
+        )
+        profile_id = budget.numerical_profile_id
+        provenance = _EVIDENCE_REFS
+    else:
+        solver_status = (
+            f"R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_{solver.status}"
+            if fallback
+            else f"SCIPY_TRF_STATUS_{solver.status}"
+        )
+        profile_id = _DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID
+        provenance = (
+            (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
+        )
     return _build_valid_result(
         request,
         canonical_sha256(_request_projection(request)),
@@ -1127,10 +1420,8 @@ def _solve_once(
         solver_status,
         int(solver.nfev),
         callback_count,
-        numerical_profile_id=(_DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID),
-        provenance_refs=(
-            (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
-        ),
+        numerical_profile_id=profile_id,
+        provenance_refs=provenance,
     )
 
 
@@ -1139,10 +1430,18 @@ def _solve_attempt(
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
 ) -> Task172LocalOutcome:
     """Run one bounded numerical attempt without applying fallback policy."""
     try:
-        return _solve_once(request, provider, method=method)
+        return _solve_once(
+            request,
+            provider,
+            method=method,
+            budget=budget,
+            initial_guess=initial_guess,
+        )
     except _RuntimeFailure as exc:
         diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
         try:
@@ -1182,39 +1481,97 @@ def _fallback_result_replays_request(
         return False
 
 
+def _blocked_residual_replay_valid(
+    blocked: Task172BlockedResult,
+    request: Task172Request,
+) -> bool:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return False
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        return (
+            blocked.request_hash == request_hash
+            and blocked.blocked_result_hash == recompute_task172_blocked_result_hash(blocked)
+        )
+    except Exception:
+        return False
+
+
 def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalOutcome:
     """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
-    primary = _solve_attempt(request, provider, method="trf")
-    if type(primary) is Task172LocalResult:
-        return primary
-    if (
-        type(primary) is not Task172BlockedResult
-        or primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
-    ):
-        return primary
-
     request_hash: str | None = None
     try:
         request_hash = recompute_task172_request_hash(request)
-        replay_valid = (
-            primary.request_hash == request_hash
-            and primary.blocked_result_hash == recompute_task172_blocked_result_hash(primary)
-        )
     except Exception:
-        replay_valid = False
-    if not replay_valid:
+        request_hash = None
+
+    primary = _solve_attempt(request, provider, method="trf")
+    if type(primary) is Task172LocalResult:
+        return primary
+    if type(primary) is not Task172BlockedResult:
+        return primary
+    if primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return primary
+    if not _blocked_residual_replay_valid(primary, request):
         return primary
 
     fallback = _solve_attempt(request, provider, method="dogbox")
-    if type(fallback) is Task172LocalResult and not _fallback_result_replays_request(
-        request, fallback
+    if type(fallback) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, fallback):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "fallback.result_identity",
+                request_hash,
+            )
+        return fallback
+    if (
+        not _experimental_wide_delta_t_solver_active()
+        or type(fallback) is not Task172BlockedResult
+        or fallback.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(fallback, request)
+    ):
+        return fallback
+
+    warm_start = _warm_start_from_blocked(fallback)
+    wide_trf = _solve_attempt(
+        request,
+        provider,
+        method="trf",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=warm_start,
+    )
+    if type(wide_trf) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, wide_trf):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "wide_experimental.result_identity",
+                request_hash,
+            )
+        return wide_trf
+    if (
+        type(wide_trf) is not Task172BlockedResult
+        or wide_trf.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(wide_trf, request)
+    ):
+        return wide_trf
+
+    wide_dogbox_initial = _warm_start_from_blocked(wide_trf) or warm_start
+    wide_dogbox = _solve_attempt(
+        request,
+        provider,
+        method="dogbox",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=wide_dogbox_initial,
+    )
+    if type(wide_dogbox) is Task172LocalResult and not _fallback_result_replays_request(
+        request, wide_dogbox
     ):
         return _blocked(
             "BLOCKED_RUNTIME_INTERNAL_FAILURE",
-            "fallback.result_identity",
+            "wide_experimental.result_identity",
             request_hash,
         )
-    return fallback
+    return wide_dogbox
 
 
 def validate_request(raw_request: object, provider: PropertyProvider) -> Task172LocalOutcome:

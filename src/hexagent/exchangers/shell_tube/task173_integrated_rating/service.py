@@ -3940,6 +3940,11 @@ def _candidate_accepted_trajectory_projection(
         with localcontext() as decimal_context:
             decimal_context.prec = 80
             residual = record.solution.q_w - result.signed_q_hot_to_cold_w
+        replay_tolerance = Decimal("1e-6")
+        if variable_water_temperature_active(active_experimental_thermal_boundary()):
+            replay_tolerance = _cell_residual_acceptance_tolerance_w(
+                cast(_CellEvaluation, record.solution)
+            )
         if (
             result.request_hash != request_hash
             or result.result_hash != result_hash
@@ -3950,7 +3955,7 @@ def _candidate_accepted_trajectory_projection(
             or request.candidate_binding.candidate_hash != context.request.candidate_hash
             or request.candidate_binding.authority_package_hash
             != context.request.authority_package_hash
-            or abs(residual) > Decimal("1e-6")
+            or abs(residual) > replay_tolerance
         ):
             raise _Stage3Failure(
                 "BLOCKED_ACCEPTED_TRAJECTORY_TASK172_IDENTITY_REPLAY",

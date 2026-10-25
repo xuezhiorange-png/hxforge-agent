@@ -33,7 +33,7 @@ def test_variable_water_cell_residual_tolerance_scales_with_duty() -> None:
     assert Decimal("0.01") > tolerance
 
 
-def test_primary_310_295_k_remains_blocked_until_outer_hole_recovery_improves() -> None:
+def test_primary_310_295_k_r25_task172_closure_status() -> None:
     from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
         load_general_engineering_case_json,
     )
