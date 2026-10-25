@@ -66,14 +66,14 @@ _T_MAX = Decimal("300.00")
 
 
 def _admitted_temperature_bounds() -> tuple[Decimal, Decimal]:
-    from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
-        active_experimental_thermal_boundary,
-        admitted_bulk_temperature_max_k,
-        admitted_bulk_temperature_min_k,
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
     )
 
-    bound = active_experimental_thermal_boundary()
-    return admitted_bulk_temperature_min_k(bound), admitted_bulk_temperature_max_k(bound)
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.admitted_bulk_temperature_min_k(bound), _etb.admitted_bulk_temperature_max_k(bound)
+
+
 _P_MIN = Decimal("100000")
 _P_MAX = Decimal("101325")
 _TUBE_C3_RE_MIN = Decimal("3000")

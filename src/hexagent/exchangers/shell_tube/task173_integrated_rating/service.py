@@ -3235,9 +3235,7 @@ def _valid_trajectory(
         for face_t, face_s in zip(tube_faces, shell_faces, strict=True)
     )
     terminal_residual_h = shell_faces[-1].enthalpy_j_kg - effective_shell_cold_inlet_enthalpy_j_kg()
-    terminal_residual_t = (
-        shell_faces[-1].temperature_k - effective_shell_inlet_temperature_k()
-    )
+    terminal_residual_t = shell_faces[-1].temperature_k - effective_shell_inlet_temperature_k()
     if terminal_residual_h < 0 or terminal_residual_t < 0:
         raise _Stage3Failure("BLOCKED_TERMINAL_BOUNDARY_BELOW_PRESCRIBED_STATE")
     if any(
@@ -3426,9 +3424,9 @@ def _solve_outer_boundary_from_trial(
     high_trial = trial_at(h_high, 0)
     if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
         bound = active_experimental_thermal_boundary()
-        if bulk_property_pressure_feedback_active(
+        if bulk_property_pressure_feedback_active(bound) or variable_water_temperature_active(
             bound
-        ) or variable_water_temperature_active(bound):
+        ):
             bracket_lo = h_low
             bracket_hi = h_high
             recovered: _OuterTrial | None = None

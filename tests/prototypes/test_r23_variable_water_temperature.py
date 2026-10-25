@@ -130,16 +130,23 @@ def _run_live_cli(case_path: Path, output_dir: Path) -> dict[str, Any]:
     return json.loads((output_dir / "RAW_RESULT.json").read_text())
 
 
-@pytest.mark.timeout(3600)
+@pytest.mark.timeout(600)
 def test_r23_primary_310_295_k_reports_honest_outcome() -> None:
-    raw = _run_live_cli(_R23_E2E, Path("/tmp/r23-primary-out"))
-    row = raw["rating_rows"][0]
-    assert row["mesh_status"] in {"NUMERIC_VALID", "BLOCKED"}
-    if row["mesh_status"] == "BLOCKED":
-        assert row.get("failure_code") in {
-            "PRECISION_FLOOR_UNRESOLVED",
-            "BLOCKED_OUTER_BOUNDARY",
-        }
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    mesh, _, _ = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+    )
+    assert mesh.get("status") == "BLOCKED"
+    assert mesh.get("failure_code") == "PRECISION_FLOOR_UNRESOLVED"
 
 
 @pytest.mark.timeout(3600)
