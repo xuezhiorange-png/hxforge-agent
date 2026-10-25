@@ -450,3 +450,10 @@ shards:
     files:
       - tests/prototypes/test_r23_variable_water_temperature.py
     timeout: 2400
+
+  - name: v07-r24-wide-delta-t-rating-solver
+    job: shard-v07-r24-wide-delta-t-rating-solver
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r24_wide_delta_t_rating_solver.py
+    timeout: 600

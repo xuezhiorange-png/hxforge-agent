@@ -342,11 +342,15 @@ class GeneralEngineeringCaseV2(BaseModel):
                     raise ValueError(
                         "inlet temperatures must stay within 298.15–300.00 K service envelope"
                     )
+        for label, side in (
+            ("tube_side", self.tube_side),
+            ("shell_side", self.shell_side),
+        ):
             if side.inlet_pressure_pa < Decimal("100000") or side.inlet_pressure_pa > Decimal(
                 "101325"
             ):
                 raise ValueError(
-                    "inlet pressure must stay within 100000–101325 Pa service envelope"
+                    f"{label} inlet pressure must stay within 100000–101325 Pa service envelope"
                 )
         if self.candidate_constraints.tube_pass_count != 1:
             raise ValueError("v0.7 sizing supports tube_pass_count=1 only")

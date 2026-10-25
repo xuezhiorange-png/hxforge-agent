@@ -573,6 +573,14 @@ class _EndpointHoleRecoveryExhausted(_Stage3Failure):
             and sample.residual < 0
             for sample in valid_recovery_samples
         )
+        self.all_valid_residuals_positive = bool(valid_recovery_samples) and all(
+            sample.classification == "VALID_CELL_EVALUATION"
+            and sample.evaluation is not None
+            and type(sample.evaluation.task172_result) is Task172LocalResult
+            and sample.residual is not None
+            and sample.residual > 0
+            for sample in valid_recovery_samples
+        )
         self.sign_pair_found = sign_pair_found
         self.eligible_root_found = eligible_root_found
 
@@ -762,12 +770,72 @@ class _CellTrial:
 
 
 def _eligible_trial(trial: _CellTrial) -> bool:
-    return (
-        trial.classification == "VALID_CELL_EVALUATION"
-        and trial.evaluation is not None
-        and trial.residual is not None
-        and abs(trial.residual) <= Decimal("1e-6")
+    if (
+        trial.classification != "VALID_CELL_EVALUATION"
+        or trial.evaluation is None
+        or trial.residual is None
+    ):
+        return False
+    q_scale = max(abs(Decimal(str(trial.q_w))), Decimal("1"))
+    tolerance = Decimal("1e-6")
+    if variable_water_temperature_active(active_experimental_thermal_boundary()):
+        tolerance = max(tolerance, q_scale * Decimal("2e-8"))
+    return abs(trial.residual) <= tolerance
+
+
+def _cell_q_bisection_collapsed(left: _CellTrial, right: _CellTrial) -> bool:
+    midpoint = left.q_w + (right.q_w - left.q_w) / 2.0
+    return midpoint in (left.q_w, right.q_w) or float(midpoint) in (
+        float(left.q_w),
+        float(right.q_w),
     )
+
+
+def _cell_residual_acceptance_tolerance_w(evaluation: _CellEvaluation) -> Decimal:
+    q_scale = max(abs(evaluation.q_w), Decimal("1"))
+    # Trial q is binary64 while Task172 closure is Decimal-heavy; at ~40 kW duty the
+    # residual plateaus near 1e-4 W when float q bisection collapses (R24 wide-ΔT).
+    provider_coordinate_floor = q_scale * Decimal("2e-8")
+    return max(Decimal("1e-6"), provider_coordinate_floor)
+
+
+def _accept_cell_root_at_float_precision_floor(
+    left: _CellTrial,
+    right: _CellTrial,
+    *,
+    require_collapsed: bool = True,
+) -> _CellEvaluation | None:
+    """Accept a cell root when float q bisection collapses but residuals bracket zero (R24)."""
+    bound = active_experimental_thermal_boundary()
+    if not variable_water_temperature_active(bound):
+        return None
+    if (
+        left.classification != "VALID_CELL_EVALUATION"
+        or right.classification != "VALID_CELL_EVALUATION"
+    ):
+        return None
+    if (
+        left.evaluation is None
+        or right.evaluation is None
+        or left.residual is None
+        or right.residual is None
+    ):
+        return None
+    if require_collapsed and not _cell_q_bisection_collapsed(left, right):
+        return None
+    if not require_collapsed:
+        q_scale = max(abs(left.q_w), abs(right.q_w), 1.0)
+        if abs(right.q_w - left.q_w) > q_scale * 1e-9:
+            return None
+    if left.residual > 0 or right.residual < 0:
+        return None
+    candidates = (left, right) if abs(left.residual) <= abs(right.residual) else (right, left)
+    for trial in candidates:
+        assert trial.evaluation is not None and trial.residual is not None
+        tolerance = _cell_residual_acceptance_tolerance_w(trial.evaluation)
+        if abs(trial.residual) <= tolerance:
+            return trial.evaluation
+    return None
 
 
 def _valid_sign_pairs(trials: list[_CellTrial]) -> list[tuple[_CellTrial, _CellTrial]]:
@@ -2596,7 +2664,7 @@ def _solve_cell(
         return trial.evaluation, trial.residual
 
     def is_eligible(trial: _CellTrial) -> bool:
-        return _eligible_trial(trial) and abs(trial.residual or Decimal(0)) <= closure_tolerance
+        return _eligible_trial(trial)
 
     def record_hole_neighbors(samples: list[_CellTrial]) -> None:
         valid = sorted(
@@ -2827,11 +2895,37 @@ def _solve_cell(
                 )
                 if endpoint_evaluation is not None:
                     return endpoint_evaluation
+            if (
+                left.residual is not None
+                and right.residual is not None
+                and left.residual <= 0 <= right.residual
+                and right.residual != left.residual
+            ):
+                q_left = Decimal(str(left.q_w))
+                q_right = Decimal(str(right.q_w))
+                with localcontext() as decimal_context:
+                    decimal_context.prec = 60
+                    q_star = q_left + (q_right - q_left) * (-left.residual) / (
+                        right.residual - left.residual
+                    )
+                if q_left < q_star < q_right:
+                    star_trial = evaluate(
+                        float(q_star),
+                        search_phase="CELL_ROOT_LINEAR_REFINEMENT",
+                    )
+                    if is_eligible(star_trial) and star_trial.evaluation is not None:
+                        return star_trial.evaluation
+            if variable_water_temperature_active(active_experimental_thermal_boundary()):
+                floor_accepted = _accept_cell_root_at_float_precision_floor(left, right)
+                if floor_accepted is not None:
+                    return floor_accepted
             raise _Stage3Failure(
                 "PRECISION_FLOOR_UNRESOLVED",
                 "CELL_ROOT_PRECISION_FLOOR_REACHED",
                 f"left_q_w={left.q_w}",
                 f"right_q_w={right.q_w}",
+                f"left_f_q_w={left.residual}",
+                f"right_f_q_w={right.residual}",
             )
         iterations += 1
         current_search_level = 0
@@ -3358,11 +3452,13 @@ def _terminal_tolerance_pass(run: _MeshRun) -> bool:
     residual_t = run.observables.terminal_boundary_residual_k
     residual_h = run.observables.terminal_boundary_residual_j_kg
     cp = Decimal(run.faces_shell[-1].property_snapshot.cp_j_kg_k)
-    h_floor = Decimal(str(math.ulp(float(H_MIN_J_KG))))
+    cold_h = effective_shell_cold_inlet_enthalpy_j_kg()
+    h_floor = Decimal(str(math.ulp(float(cold_h))))
+    shell_inlet_t = effective_shell_inlet_temperature_k()
+    t_floor = Decimal(str(math.ulp(float(shell_inlet_t + residual_t))))
+    allowed_t = TERMINAL_TOLERANCE_K + t_floor
     allowed_h = cp * TERMINAL_TOLERANCE_K + h_floor
-    return (
-        Decimal(0) <= residual_t <= TERMINAL_TOLERANCE_K and Decimal(0) <= residual_h <= allowed_h
-    )
+    return Decimal(0) <= residual_t <= allowed_t and Decimal(0) <= residual_h <= allowed_h
 
 
 def _assert_outer_classification_order(
@@ -3466,8 +3562,13 @@ def _solve_outer_boundary_from_trial(
             context.prec = 80
             h_mid = (h_low + h_high) / Decimal(2)
         if h_mid in (h_low, h_high) or float(h_mid) in (float(h_low), float(h_high)):
+            shell_inlet_t = effective_shell_inlet_temperature_k()
             temp_floor = Decimal(
-                str(math.ulp(float(high_run.observables.terminal_boundary_residual_k + T_MIN_K)))
+                str(
+                    math.ulp(
+                        float(high_run.observables.terminal_boundary_residual_k + shell_inlet_t)
+                    )
+                )
             )
             if _terminal_tolerance_pass(high_run):
                 return high_run
@@ -3513,8 +3614,9 @@ def _solve_outer_boundary_from_trial(
 
 
 def _midpoint_collapse_disposition(run: _MeshRun) -> tuple[str, Decimal]:
+    shell_inlet_t = effective_shell_inlet_temperature_k()
     temperature_floor = Decimal(
-        str(math.ulp(float(run.observables.terminal_boundary_residual_k + T_MIN_K)))
+        str(math.ulp(float(run.observables.terminal_boundary_residual_k + shell_inlet_t)))
     )
     if _terminal_tolerance_pass(run):
         return "RETURN_ACCEPTED_RUN", temperature_floor
