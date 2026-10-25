@@ -32,6 +32,12 @@ EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID: Final = (
 EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID: Final = (
     "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R22-BULK-PRESSURE-V1"
 )
+EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_WATER_TEMPERATURE_R23_AUTHORITY_ID: Final = (
+    "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R23-VARIABLE-WATER-TEMPERATURE-V1"
+)
+
+VARIABLE_WATER_TEMPERATURE_MIN_K: Final = Decimal("290")
+VARIABLE_WATER_TEMPERATURE_MAX_K: Final = Decimal("320")
 
 REVIEWED_MIN_PRESSURE_PA: Final = Decimal("100000")
 REVIEWED_MAX_PRESSURE_PA: Final = Decimal("101325")
@@ -56,6 +62,7 @@ class ExperimentalThermalBoundaryBindingV1:
     shell_inlet_enthalpy_j_kg: Decimal
     tube_property_evaluation_pressure_pa: Decimal
     shell_property_evaluation_pressure_pa: Decimal
+    variable_water_temperature_enabled: bool = False
 
 
 _EXPERIMENTAL_THERMAL_BOUNDARY: ContextVar[ExperimentalThermalBoundaryBindingV1 | None] = (
@@ -95,6 +102,34 @@ def bulk_property_pressure_feedback_active(
     return binding.authority_id == EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID
 
 
+def variable_water_temperature_active(
+    binding: ExperimentalThermalBoundaryBindingV1 | None,
+) -> bool:
+    if binding is None:
+        return False
+    return binding.variable_water_temperature_enabled
+
+
+def admitted_bulk_temperature_min_k(
+    binding: ExperimentalThermalBoundaryBindingV1 | None,
+) -> Decimal:
+    if variable_water_temperature_active(binding):
+        return VARIABLE_WATER_TEMPERATURE_MIN_K
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.models import T_MIN_K
+
+    return T_MIN_K
+
+
+def admitted_bulk_temperature_max_k(
+    binding: ExperimentalThermalBoundaryBindingV1 | None,
+) -> Decimal:
+    if variable_water_temperature_active(binding):
+        return VARIABLE_WATER_TEMPERATURE_MAX_K
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.models import T_MAX_K
+
+    return T_MAX_K
+
+
 def _enthalpy_at_tp(
     provider: PropertyProvider,
     temperature_k: Decimal,
@@ -118,6 +153,7 @@ def build_experimental_thermal_boundary_v1(
     reference_pressure_pa: Decimal = REFERENCE_PRESSURE_PA,
     allow_live_variable_tube_mass_flow: bool = False,
     allow_live_variable_shell_mass_flow: bool = False,
+    allow_variable_water_temperature: bool = False,
     tube_property_evaluation_pressure_pa: Decimal | None = None,
     shell_property_evaluation_pressure_pa: Decimal | None = None,
 ) -> ExperimentalThermalBoundaryBindingV1:
@@ -136,10 +172,26 @@ def build_experimental_thermal_boundary_v1(
     shell_p = shell_property_evaluation_pressure_pa or reference_pressure_pa
     _validate_reviewed_pressure_pa(tube_p, label="tube property evaluation")
     _validate_reviewed_pressure_pa(shell_p, label="shell property evaluation")
+    if allow_variable_water_temperature:
+        if tube_inlet_temperature_k < VARIABLE_WATER_TEMPERATURE_MIN_K or (
+            tube_inlet_temperature_k > VARIABLE_WATER_TEMPERATURE_MAX_K
+        ):
+            raise ValueError(
+                "experimental thermal boundary: tube inlet temperature out of R23 domain"
+            )
+        if shell_inlet_temperature_k < VARIABLE_WATER_TEMPERATURE_MIN_K or (
+            shell_inlet_temperature_k > VARIABLE_WATER_TEMPERATURE_MAX_K
+        ):
+            raise ValueError(
+                "experimental thermal boundary: shell inlet temperature out of R23 domain"
+            )
+        if tube_inlet_temperature_k <= shell_inlet_temperature_k:
+            raise ValueError("experimental thermal boundary: tube inlet must exceed shell inlet")
     tube_h = _enthalpy_at_tp(provider, tube_inlet_temperature_k, tube_p)
     shell_h = _enthalpy_at_tp(provider, shell_inlet_temperature_k, shell_p)
     if (
-        shell_inlet_temperature_k == SHELL_INLET_T_K
+        not allow_variable_water_temperature
+        and shell_inlet_temperature_k == SHELL_INLET_T_K
         and shell_p == reference_pressure_pa
         and abs(shell_h - H_MIN_J_KG) > Decimal("1e-3")
     ):
@@ -162,6 +214,8 @@ def build_experimental_thermal_boundary_v1(
     bulk_pressure_feedback = tube_p != reference_pressure_pa or shell_p != reference_pressure_pa
     if bulk_pressure_feedback:
         authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_BULK_PRESSURE_R22_AUTHORITY_ID
+    elif allow_variable_water_temperature:
+        authority_id = EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_WATER_TEMPERATURE_R23_AUTHORITY_ID
     return ExperimentalThermalBoundaryBindingV1(
         schema_version=EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
         authority_id=authority_id,
@@ -175,6 +229,7 @@ def build_experimental_thermal_boundary_v1(
         shell_inlet_enthalpy_j_kg=shell_h,
         tube_property_evaluation_pressure_pa=tube_p,
         shell_property_evaluation_pressure_pa=shell_p,
+        variable_water_temperature_enabled=allow_variable_water_temperature,
     )
 
 

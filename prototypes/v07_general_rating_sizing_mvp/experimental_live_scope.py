@@ -18,6 +18,10 @@ from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
     experimental_live_variable_tube_mass_flow_enabled,
     validate_variable_tube_mass_flow_kg_s,
 )
+from prototypes.v07_general_rating_sizing_mvp.variable_water_temperature import (
+    experimental_variable_water_temperature_enabled,
+    validate_variable_water_inlet_temperature_k,
+)
 
 _SUPPORTED_SHELL_INLET_K = Decimal("298.15")
 _SUPPORTED_TUBE_FLOW = Decimal("12.000000")
@@ -68,11 +72,21 @@ def check_experimental_live_rating_scope(
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "tube inlet pressure must be 101325 Pa"
     if shell.inlet_pressure_pa != _SUPPORTED_PRESSURE_PA:
         return "INPUT_OUT_OF_SUPPORTED_SCOPE", "shell inlet pressure must be 101325 Pa"
-    if shell.inlet_temperature_k != _SUPPORTED_SHELL_INLET_K:
+    if experimental_variable_water_temperature_enabled(case):
+        try:
+            validate_variable_water_inlet_temperature_k(
+                tube.inlet_temperature_k, label="tube_side"
+            )
+            validate_variable_water_inlet_temperature_k(
+                shell.inlet_temperature_k, label="shell_side"
+            )
+        except ValueError as exc:
+            return "INPUT_OUT_OF_SUPPORTED_SCOPE", str(exc)
+    elif shell.inlet_temperature_k != _SUPPORTED_SHELL_INLET_K:
         return (
             "INPUT_OUT_OF_SUPPORTED_SCOPE",
-            "shell_side.inlet_temperature_k must be 298.15 K until terminal boundary "
-            "validation is complete for other shell inlet temperatures",
+            "shell_side.inlet_temperature_k must be 298.15 K unless "
+            "experimental_variable_water_temperature=true",
         )
     if tube.inlet_temperature_k <= shell.inlet_temperature_k:
         return (

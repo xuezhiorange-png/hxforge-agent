@@ -278,6 +278,13 @@ class GeneralEngineeringCaseV2(BaseModel):
             "P_bulk=(P_inlet+P_outlet)/2 from live hydraulic post-pass (experimental only)."
         ),
     )
+    experimental_variable_water_temperature: bool = Field(
+        default=False,
+        description=(
+            "When true, tube/shell inlet temperatures from the case (290–320 K envelope) "
+            "drive CoolProp, Task173 mesh, and Task172 local properties (experimental only)."
+        ),
+    )
     r10_baseline_geometry_pairs: tuple[BaselineGeometryPair, ...] = ()
     r12_baseline_geometry_fingerprints: tuple[BaselineGeometryPair, ...] = ()
     notes: str = ""
@@ -321,13 +328,20 @@ class GeneralEngineeringCaseV2(BaseModel):
                 "tube_side.inlet_temperature_k must exceed shell_side.inlet_temperature_k "
                 "(hot fluid on tube, cold fluid on shell)"
             )
-        lo = Decimal("298.15")
-        hi = Decimal("300.00")
-        for side in (self.tube_side, self.shell_side):
-            if side.inlet_temperature_k < lo or side.inlet_temperature_k > hi:
-                raise ValueError(
-                    "inlet temperatures must stay within 298.15–300.00 K service envelope"
-                )
+        if self.experimental_variable_water_temperature:
+            from prototypes.v07_general_rating_sizing_mvp.variable_water_temperature import (
+                validate_case_variable_water_temperature,
+            )
+
+            validate_case_variable_water_temperature(self)
+        else:
+            lo = Decimal("298.15")
+            hi = Decimal("300.00")
+            for side in (self.tube_side, self.shell_side):
+                if side.inlet_temperature_k < lo or side.inlet_temperature_k > hi:
+                    raise ValueError(
+                        "inlet temperatures must stay within 298.15–300.00 K service envelope"
+                    )
             if side.inlet_pressure_pa < Decimal("100000") or side.inlet_pressure_pa > Decimal(
                 "101325"
             ):
@@ -371,6 +385,13 @@ class GeneralEngineeringCaseV2(BaseModel):
         ):
             raise ValueError(
                 "experimental_two_way_bulk_pressure_feedback requires "
+                "experimental_live_thermal_hydraulic_postpass=true"
+            )
+        if self.experimental_variable_water_temperature and not (
+            self.experimental_live_thermal_hydraulic_postpass
+        ):
+            raise ValueError(
+                "experimental_variable_water_temperature requires "
                 "experimental_live_thermal_hydraulic_postpass=true"
             )
         return self

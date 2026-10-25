@@ -63,6 +63,17 @@ Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
 
 _T_MIN = Decimal("298.15")
 _T_MAX = Decimal("300.00")
+
+
+def _admitted_temperature_bounds() -> tuple[Decimal, Decimal]:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
+        active_experimental_thermal_boundary,
+        admitted_bulk_temperature_max_k,
+        admitted_bulk_temperature_min_k,
+    )
+
+    bound = active_experimental_thermal_boundary()
+    return admitted_bulk_temperature_min_k(bound), admitted_bulk_temperature_max_k(bound)
 _P_MIN = Decimal("100000")
 _P_MAX = Decimal("101325")
 _TUBE_C3_RE_MIN = Decimal("3000")
@@ -433,7 +444,8 @@ def _blocked(
 
 
 def _provider_state(provider: PropertyProvider, temperature: Decimal, pressure: Decimal) -> Any:
-    if not _T_MIN <= temperature <= _T_MAX:
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= temperature <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT", "property_state.temperature_k"
         )
@@ -1001,11 +1013,12 @@ def _solve_once(
     wall_outer_seed = float(request.shell_bulk_state.temperature_k) + q_seed * resistance_o_seed
     if not all(math.isfinite(value) for value in (q_seed, wall_inner_seed, wall_outer_seed)):
         raise _RuntimeFailure("BLOCKED_INITIALIZATION_FAILURE", "initialization.seed")
-    if not _T_MIN <= Decimal(str(wall_inner_seed)) <= _T_MAX:
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= Decimal(str(wall_inner_seed)) <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_inner"
         )
-    if not _T_MIN <= Decimal(str(wall_outer_seed)) <= _T_MAX:
+    if not t_min <= Decimal(str(wall_outer_seed)) <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_outer"
         )
@@ -1048,8 +1061,8 @@ def _solve_once(
             x_scale=[abs(q_seed), abs(delta_t), abs(delta_t)],
             max_nfev=6,
             bounds=(
-                np.asarray([-np.inf, float(_T_MIN), float(_T_MIN)], dtype=float),
-                np.asarray([np.inf, float(_T_MAX), float(_T_MAX)], dtype=float),
+                np.asarray([-np.inf, float(t_min), float(t_min)], dtype=float),
+                np.asarray([np.inf, float(t_max), float(t_max)], dtype=float),
             ),
             tr_solver="exact",
             tr_options={},

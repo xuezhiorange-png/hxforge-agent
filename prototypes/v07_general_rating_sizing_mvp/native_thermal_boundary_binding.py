@@ -37,6 +37,9 @@ from prototypes.v07_general_rating_sizing_mvp.variable_shell_mass_flow import (
 from prototypes.v07_general_rating_sizing_mvp.variable_tube_mass_flow import (
     experimental_live_variable_tube_mass_flow_enabled,
 )
+from prototypes.v07_general_rating_sizing_mvp.variable_water_temperature import (
+    experimental_variable_water_temperature_enabled,
+)
 
 _ALLOWED_FLUID = "PURE_ORDINARY_WATER"
 
@@ -87,6 +90,7 @@ def build_native_thermal_boundary_from_case(
         allow_live_variable_shell_mass_flow=experimental_live_variable_shell_mass_flow_enabled(
             case
         ),
+        allow_variable_water_temperature=experimental_variable_water_temperature_enabled(case),
         tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
         shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
     )

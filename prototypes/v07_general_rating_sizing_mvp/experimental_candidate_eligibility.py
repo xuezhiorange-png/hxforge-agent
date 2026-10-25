@@ -18,6 +18,13 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_
     build_hydraulic_constraint_decision,
     live_hydraulic_postpass_enabled,
 )
+from prototypes.v07_general_rating_sizing_mvp.experimental_two_way_bulk_pressure_feedback import (
+    experimental_two_way_bulk_pressure_feedback_enabled,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_two_way_coupling_sizing import (
+    apply_two_way_coupling_constraint_gate,
+    two_way_coupling_blocks_sizing,
+)
 
 
 def _structural_status(record: CandidateSelectionRecord) -> str:
@@ -84,8 +91,20 @@ def build_candidate_eligibility(
         hydraulic_decision = build_hydraulic_constraint_decision(
             case, row, rating_status=rating_status
         )
-        constraint_status = str(hydraulic_decision["EFFECTIVE_CONSTRAINT_STATUS"])
+        constraint_status = apply_two_way_coupling_constraint_gate(
+            case,
+            row,
+            str(hydraulic_decision["EFFECTIVE_CONSTRAINT_STATUS"]),
+        )
         engineering_eligibility = assess_engineering_sizing_eligibility(case, row)
+        two_way_blocked, two_way_reason = two_way_coupling_blocks_sizing(case, row)
+        two_way_sizing_status: str | None
+        if experimental_two_way_bulk_pressure_feedback_enabled(case):
+            two_way_sizing_status = (
+                "COUPLED_CONVERGED" if not two_way_blocked else (two_way_reason or "NOT_EVALUATED")
+            )
+        else:
+            two_way_sizing_status = None
         entries.append(
             {
                 "candidate_id": candidate_id,
@@ -96,6 +115,7 @@ def build_candidate_eligibility(
                 "TASK174_STATUS": _task174_status(record),
                 "RATING_STATUS": rating_status,
                 "CONSTRAINT_STATUS": constraint_status,
+                "TWO_WAY_COUPLING_SIZING_STATUS": two_way_sizing_status,
                 "HYDRAULIC_DECISION_SOURCE": hydraulic_decision["hydraulic_decision_source"],
                 "REFERENCE_CONSTRAINT_STATUS": hydraulic_decision["REFERENCE_CONSTRAINT_STATUS"],
                 "LIVE_HYDRAULIC_CONSTRAINT_STATUS": hydraulic_decision[
@@ -125,6 +145,10 @@ def constraint_satisfied_ids(eligibility: list[dict[str, Any]]) -> list[str]:
         item["candidate_id"]
         for item in eligibility
         if item["CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
+        and (
+            item.get("TWO_WAY_COUPLING_SIZING_STATUS") is None
+            or item.get("TWO_WAY_COUPLING_SIZING_STATUS") == "COUPLED_CONVERGED"
+        )
         and engineering_sizing_eligible_for_ranking(
             item.get("engineering_sizing_eligibility") or {}
         )

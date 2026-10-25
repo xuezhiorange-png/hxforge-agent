@@ -873,9 +873,13 @@ class CandidateTask172LocalRequest(StrictModel):
             EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
             EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
             active_experimental_thermal_boundary,
+            admitted_bulk_temperature_max_k,
+            admitted_bulk_temperature_min_k,
         )
 
         bound = active_experimental_thermal_boundary()
+        t_min = admitted_bulk_temperature_min_k(bound)
+        t_max = admitted_bulk_temperature_max_k(bound)
         if bound is not None and bound.authority_id in (
             EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
             EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
@@ -896,7 +900,7 @@ class CandidateTask172LocalRequest(StrictModel):
         if self.tube_inside_fouling_m2_k_w != 0 or self.shell_outside_fouling_m2_k_w != 0:
             raise ValueError("candidate transfer is limited to the reviewed clean-surface profile")
         for state in (self.tube_bulk_state, self.shell_bulk_state):
-            if not Decimal("298.15") <= state.temperature_k <= Decimal("300.00"):
+            if not t_min <= state.temperature_k <= t_max:
                 raise ValueError("candidate bulk temperature leaves the reviewed domain")
             if not Decimal("100000") <= state.pressure_pa <= Decimal("101325"):
                 raise ValueError("candidate bulk pressure leaves the reviewed domain")

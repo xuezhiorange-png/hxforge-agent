@@ -59,7 +59,10 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_therm
     REVIEWED_MAX_PRESSURE_PA,
     REVIEWED_MIN_PRESSURE_PA,
     active_experimental_thermal_boundary,
+    admitted_bulk_temperature_max_k,
+    admitted_bulk_temperature_min_k,
     bulk_property_pressure_feedback_active,
+    variable_water_temperature_active,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     CELL_ROOT_SOLVER_AUTHORITY_ID,
@@ -154,15 +157,45 @@ def effective_shell_inlet_temperature_k() -> Decimal:
 def effective_hot_ceiling_enthalpy_j_kg() -> Decimal:
     """Upper shooting enthalpy for the reviewed hot-end envelope."""
     bound = active_experimental_thermal_boundary()
+    if bound is not None and variable_water_temperature_active(bound):
+        return bound.tube_inlet_enthalpy_j_kg
     if bound is None or bound.tube_inlet_temperature_k >= T_MAX_K:
         return H_MAX_J_KG
     return bound.tube_inlet_enthalpy_j_kg
+
+
+def effective_admitted_t_min_k() -> Decimal:
+    return admitted_bulk_temperature_min_k(active_experimental_thermal_boundary())
+
+
+def effective_admitted_t_max_k() -> Decimal:
+    return admitted_bulk_temperature_max_k(active_experimental_thermal_boundary())
+
+
+def effective_admitted_h_max_j_kg(provider: PropertyProvider) -> Decimal:
+    bound = active_experimental_thermal_boundary()
+    if not variable_water_temperature_active(bound):
+        return H_MAX_J_KG
+    t_max = admitted_bulk_temperature_max_k(bound)
+    state = provider.state_tp(
+        FluidIdentifier(name="Water"),
+        temperature_k=float(t_max),
+        pressure_pa=float(bound.tube_property_evaluation_pressure_pa),
+    )
+    return Decimal(str(state.enthalpy_j_kg))
 
 
 def effective_outer_shooting_high_enthalpy_j_kg(provider: PropertyProvider) -> Decimal:
     """Shell-side shooting upper bound (pressure-aware under R22 bulk feedback)."""
     bound = active_experimental_thermal_boundary()
     if bound is None or not bulk_property_pressure_feedback_active(bound):
+        if bound is not None and variable_water_temperature_active(bound):
+            state = provider.state_tp(
+                FluidIdentifier(name="Water"),
+                temperature_k=float(bound.tube_inlet_temperature_k),
+                pressure_pa=float(bound.shell_property_evaluation_pressure_pa),
+            )
+            return Decimal(str(state.enthalpy_j_kg))
         return effective_hot_ceiling_enthalpy_j_kg()
     state = provider.state_tp(
         FluidIdentifier(name="Water"),
@@ -214,7 +247,9 @@ def _allowed_local_pressure_pa(pressure: Decimal) -> bool:
 def _effective_h_min_j_kg() -> Decimal:
     """Lower enthalpy bound for PH reconstruction (pressure-aware under R22 bulk feedback)."""
     bound = active_experimental_thermal_boundary()
-    if bulk_property_pressure_feedback_active(bound):
+    if bound is not None and (
+        bulk_property_pressure_feedback_active(bound) or variable_water_temperature_active(bound)
+    ):
         return effective_shell_cold_inlet_enthalpy_j_kg()
     return H_MIN_J_KG
 
@@ -1225,7 +1260,9 @@ def _candidate_provider_enclosure_event(
     def property_identity(state: _ThermoState) -> bool:
         snapshot = state.snapshot
         return (
-            T_MIN_K <= _d(state.native.temperature_k) <= T_MAX_K
+            effective_admitted_t_min_k()
+            <= _d(state.native.temperature_k)
+            <= effective_admitted_t_max_k()
             and _allowed_local_pressure_pa(_d(state.native.pressure_pa))
             and state.native.phase is PhaseRegion.LIQUID
             and state.native.provenance.fluid_identifier == "HEOS::Water"
@@ -1617,7 +1654,7 @@ def _checked_thermo(
     # the returned enthalpy is provider output. For a TP query, enthalpy is
     # likewise output, not a second shooting-coordinate input to clip or bound.
     if (
-        not T_MIN_K <= temperature <= T_MAX_K
+        not effective_admitted_t_min_k() <= temperature <= effective_admitted_t_max_k()
         or not _allowed_local_pressure_pa(pressure)
         or state.phase is not PhaseRegion.LIQUID
         or snapshot.query_type != query_type
@@ -1644,7 +1681,9 @@ def _reuse_authority_valid_thermo_state(state: _ThermoState) -> _ThermoState:
     if (
         replayed_snapshot != state.snapshot
         or canonical_sha256(state.snapshot.model_dump(mode="json")) != state.snapshot_hash
-        or not T_MIN_K <= _d(state.native.temperature_k) <= T_MAX_K
+        or not effective_admitted_t_min_k()
+        <= _d(state.native.temperature_k)
+        <= effective_admitted_t_max_k()
         or not _allowed_local_pressure_pa(_d(state.native.pressure_pa))
         or state.native.phase is not PhaseRegion.LIQUID
         or state.snapshot.query_type not in {"TP", "PH"}
@@ -1667,7 +1706,8 @@ def _state_from_enthalpy(
         if shell_search_state:
             raise _LowSideDomainInfeasible
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT", f"h={enthalpy_j_kg}")
-    if enthalpy_j_kg > H_MAX_J_KG:
+    h_max = effective_admitted_h_max_j_kg(provider)
+    if enthalpy_j_kg > h_max:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT", f"h={enthalpy_j_kg}")
     ceiling_h = effective_hot_ceiling_enthalpy_j_kg()
     r22_bulk_pressure = bulk_property_pressure_feedback_active(
@@ -1694,8 +1734,6 @@ def _state_from_enthalpy(
         return _state_at_inlet(provider, effective_tube_inlet_temperature_k(), side="TUBE")
     cold_h = effective_shell_cold_inlet_enthalpy_j_kg()
     cold_t = effective_shell_inlet_temperature_k()
-    if enthalpy_j_kg == H_MIN_J_KG and side == "SHELL":
-        return _state_at_inlet(provider, T_MIN_K, side="SHELL")
     if enthalpy_j_kg == cold_h and side == "SHELL":
         return _state_at_inlet(provider, cold_t, side="SHELL")
     provider_enthalpy = Decimal(str(float(enthalpy_j_kg)))
@@ -1706,7 +1744,7 @@ def _state_from_enthalpy(
             "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
             f"provider_h={provider_enthalpy}",
         )
-    if provider_enthalpy > H_MAX_J_KG:
+    if provider_enthalpy > h_max:
         raise _Stage3Failure(
             "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
             f"provider_h={provider_enthalpy}",
@@ -2077,7 +2115,9 @@ def _preflight_task172_trial(
         if not all(math.isfinite(value) for value in numeric_values):
             raise _Stage3Failure("BLOCKED_NONFINITE_LOCAL_PROPERTY_STATE", side)
         if (
-            not T_MIN_K <= _d(native.temperature_k) <= T_MAX_K
+            not effective_admitted_t_min_k()
+            <= _d(native.temperature_k)
+            <= effective_admitted_t_max_k()
             or not _allowed_local_pressure_pa(_d(native.pressure_pa))
             or native.phase is not PhaseRegion.LIQUID
             or state.snapshot.backend != "HEOS::Water"
@@ -2163,7 +2203,8 @@ def _cell_evaluation(
             tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
             shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
         h_min = _effective_h_min_j_kg()
-        if tube_downstream_h < h_min or tube_downstream_h > H_MAX_J_KG:
+        h_max = effective_admitted_h_max_j_kg(provider)
+        if tube_downstream_h < h_min or tube_downstream_h > h_max:
             raise _Stage3Failure(
                 "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
                 "tube downstream face enthalpy outside admitted domain",
@@ -2172,7 +2213,7 @@ def _cell_evaluation(
         if shell_next_h < h_min:
             # Search-side feasibility only. No property call is made for this state.
             raise _LowSideDomainInfeasible
-        if shell_next_h > H_MAX_J_KG:
+        if shell_next_h > h_max:
             raise _Stage3Failure(
                 "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
                 "shell next face enthalpy outside admitted domain",
@@ -3194,7 +3235,9 @@ def _valid_trajectory(
         for face_t, face_s in zip(tube_faces, shell_faces, strict=True)
     )
     terminal_residual_h = shell_faces[-1].enthalpy_j_kg - effective_shell_cold_inlet_enthalpy_j_kg()
-    terminal_residual_t = shell_faces[-1].temperature_k - T_MIN_K
+    terminal_residual_t = (
+        shell_faces[-1].temperature_k - effective_shell_inlet_temperature_k()
+    )
     if terminal_residual_h < 0 or terminal_residual_t < 0:
         raise _Stage3Failure("BLOCKED_TERMINAL_BOUNDARY_BELOW_PRESCRIBED_STATE")
     if any(
@@ -3382,7 +3425,10 @@ def _solve_outer_boundary_from_trial(
         raise _Stage3Failure("BLOCKED_OUTER_LOW_ENDPOINT_NOT_INFEASIBLE")
     high_trial = trial_at(h_high, 0)
     if high_trial.classification != "VALID_TRAJECTORY" or high_trial.mesh_run is None:
-        if bulk_property_pressure_feedback_active(active_experimental_thermal_boundary()):
+        bound = active_experimental_thermal_boundary()
+        if bulk_property_pressure_feedback_active(
+            bound
+        ) or variable_water_temperature_active(bound):
             bracket_lo = h_low
             bracket_hi = h_high
             recovered: _OuterTrial | None = None
