@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 import sys
 
+import pytest
+
 from hexagent.exchangers.shell_tube.task172_local_runtime import service as task172_service
 
 
@@ -14,7 +16,9 @@ def test_scipy_diff_step_is_relative_not_absolute() -> None:
     perturbations = task172_service._actual_jacobian_perturbations(values, relative)
     assert perturbations[0] == abs(values[0]) * _q_step(relative)
     assert perturbations[1] == abs(values[1]) * _temp_step(relative)
-    assert perturbations == (5.0, 0.00305, 0.00298)
+    assert perturbations[0] == pytest.approx(5.0)
+    assert perturbations[1] == pytest.approx(0.00305)
+    assert perturbations[2] == pytest.approx(0.00298)
     frozen = task172_service._relative_diff_step_vector(wide_experimental=False)
     assert type(frozen) is float
     frozen_h = task172_service._actual_jacobian_perturbations(values, frozen)
