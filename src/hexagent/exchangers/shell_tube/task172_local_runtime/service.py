@@ -186,10 +186,7 @@ def _uv_from_wall_temperatures(
         return (0.5, 0.5)
     u_value = (two - shell_bulk_k) / delta_t
     tube_gap = tube_bulk_k - two
-    if tube_gap <= 0.0:
-        v_value = 0.0
-    else:
-        v_value = (twi - two) / tube_gap
+    v_value = 0.0 if tube_gap <= 0.0 else (twi - two) / tube_gap
     return (min(max(u_value, 0.0), 1.0), min(max(v_value, 0.0), 1.0))
 
 
