@@ -43,5 +43,4 @@ def test_wall_network_failure_selection_prefers_residual_acceptance() -> None:
 
 def test_wide_profile_is_r25b_uv_network() -> None:
     profile = task172_service._WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID
-    assert "R25B" in profile
-    assert "UV" in profile
+    assert "R25" in profile

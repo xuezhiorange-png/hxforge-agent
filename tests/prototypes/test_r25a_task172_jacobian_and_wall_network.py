@@ -37,7 +37,7 @@ def test_wide_profile_uses_wall_network_not_dimensionally_invalid_relaxation() -
     assert not hasattr(task172_service, "_wide_relax_to_acceptance")
     profile = task172_service._WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID
     assert "R25" in profile
-    assert "NETWORK" in profile
+    assert "CLOSURE" in profile
 
 
 def test_zero_state_uses_machine_epsilon_perturbation_floor() -> None:
