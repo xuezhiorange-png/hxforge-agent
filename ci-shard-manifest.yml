@@ -458,4 +458,5 @@ shards:
       - tests/prototypes/test_r24_wide_delta_t_rating_solver.py
       - tests/prototypes/test_r25_task172_wide_delta_t_closure.py
       - tests/prototypes/test_r25a_task172_jacobian_and_wall_network.py
+      - tests/prototypes/test_r25b_task172_uv_wall_network.py
     timeout: 600
