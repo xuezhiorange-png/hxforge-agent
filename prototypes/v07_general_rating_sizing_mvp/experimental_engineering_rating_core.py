@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 import time
+from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal
@@ -298,6 +300,87 @@ def _build_global_cell_grid(
     if not meta.all_physical_supports_covered or not meta.total_area_conservation:
         raise ValueError("mesh_topology_incomplete")
     return ordered, meta
+
+
+def build_warm_start_q_from_parent_cells(
+    grid: Sequence[_GlobalCellBinding],
+    parent_cells: Sequence[EngineeringCellResult],
+    *,
+    child_subdivisions: int,
+    parent_subdivisions: int,
+) -> np.ndarray:
+    """Map parent (interval, subdivision) duties onto child cells without overlap gaps."""
+    if child_subdivisions % parent_subdivisions != 0:
+        raise ValueError("subdivisions_not_divisible")
+    ratio = child_subdivisions // parent_subdivisions
+    parent_q: dict[tuple[int, int], float] = {
+        (cell.interval_index, cell.subdivision_index): cell.heat_rate_w for cell in parent_cells
+    }
+    child_area_by_parent: dict[tuple[int, int], float] = defaultdict(float)
+    child_area: dict[int, float] = {}
+    for binding in grid:
+        parent_sub_idx = binding.subdivision_index // ratio
+        key = (binding.interval_index, parent_sub_idx)
+        if key not in parent_q:
+            raise ValueError(f"missing_parent_cell:{key}")
+        area = float(binding.support.inside_area_m2)
+        child_area[binding.global_index] = area
+        child_area_by_parent[key] += area
+    q_initial = np.zeros(len(grid), dtype=float)
+    for binding in grid:
+        parent_sub_idx = binding.subdivision_index // ratio
+        key = (binding.interval_index, parent_sub_idx)
+        total_area = child_area_by_parent[key]
+        if total_area <= 0.0:
+            raise ValueError(f"zero_parent_area:{key}")
+        share = child_area[binding.global_index] / total_area
+        q_initial[binding.global_index] = parent_q[key] * share
+    for key, q_parent in parent_q.items():
+        child_sum = sum(
+            q_initial[b.global_index]
+            for b in grid
+            if (b.interval_index, b.subdivision_index // ratio) == key
+        )
+        tol = max(1e-6, abs(q_parent) * 1e-9)
+        if abs(child_sum - q_parent) > tol:
+            raise ValueError(f"warm_start_duty_partition:{key}")
+    return q_initial
+
+
+def _min_cell_approach_temperature_k(result: EngineeringRatingResult) -> float | None:
+    if not result.cells:
+        return None
+    return min(
+        cell.tube_bulk_temperature_k - cell.shell_bulk_temperature_k for cell in result.cells
+    )
+
+
+def _local_closure_valid(
+    result: EngineeringRatingResult,
+    limits: EngineeringAcceptanceLimits,
+) -> bool:
+    if result.status != ENGINEERING_NUMERIC_VALID:
+        return False
+    if (
+        result.max_cell_thermal_residual_w is None
+        or result.max_inner_wall_outer_closure_residual_w is None
+    ):
+        return False
+    if result.energy_balance_relative_error is None:
+        return False
+    if (
+        result.energy_balance_relative_error > limits.energy_relative_tolerance
+        or result.max_cell_thermal_residual_w > limits.cell_thermal_absolute_tolerance_w
+        or result.max_inner_wall_outer_closure_residual_w > limits.cell_thermal_absolute_tolerance_w
+    ):
+        return False
+    for cell in result.cells:
+        rel = abs(cell.thermal_residual_w) / max(abs(cell.heat_rate_w), 1.0)
+        if cell.thermal_residual_w > limits.cell_thermal_absolute_tolerance_w and rel > (
+            limits.cell_thermal_relative_tolerance
+        ):
+            return False
+    return True
 
 
 def _cell_thermal_closure(
@@ -717,6 +800,7 @@ def run_experimental_engineering_rating(
     subdivisions: int = 1,
     native: NativeCellContext | None = None,
     limits: EngineeringAcceptanceLimits | None = None,
+    mesh_result_cache: dict[int, EngineeringRatingResult] | None = None,
 ) -> EngineeringRatingResult:
     limits = limits or EngineeringAcceptanceLimits()
     t0 = time.perf_counter()
@@ -783,23 +867,32 @@ def run_experimental_engineering_rating(
             q_initial: np.ndarray | None = None
             if subdivisions > 1:
                 parent_sub = subdivisions // 2
-                parent_grid, _ = _build_global_cell_grid(native_ctx.context, parent_sub)
-                parent_cells, _ = _solve_global_q_vector(
-                    native_ctx,
-                    provider,
-                    parent_grid,
-                    tube_inlet_t_k=tube_t_in,
-                    shell_inlet_t_k=shell_t_in,
-                    tube_pressure_pa=tube_p,
-                    shell_pressure_pa=shell_p,
-                )
-                interval_q = {cell.interval_index: cell.heat_rate_w for cell in parent_cells}
-                ratio = subdivisions // parent_sub
-                q_initial = np.zeros(len(grid), dtype=float)
-                for binding in grid:
-                    q_initial[binding.global_index] = (
-                        interval_q.get(binding.interval_index, 0.0) / ratio
+                parent_cells: list[EngineeringCellResult] | None = None
+                if mesh_result_cache is not None:
+                    cached_parent = mesh_result_cache.get(parent_sub)
+                    if (
+                        cached_parent is not None
+                        and cached_parent.status == ENGINEERING_NUMERIC_VALID
+                        and cached_parent.cells
+                    ):
+                        parent_cells = cached_parent.cells
+                if parent_cells is None:
+                    parent_grid, _ = _build_global_cell_grid(native_ctx.context, parent_sub)
+                    parent_cells, _ = _solve_global_q_vector(
+                        native_ctx,
+                        provider,
+                        parent_grid,
+                        tube_inlet_t_k=tube_t_in,
+                        shell_inlet_t_k=shell_t_in,
+                        tube_pressure_pa=tube_p,
+                        shell_pressure_pa=shell_p,
                     )
+                q_initial = build_warm_start_q_from_parent_cells(
+                    grid,
+                    parent_cells,
+                    child_subdivisions=subdivisions,
+                    parent_subdivisions=parent_sub,
+                )
             cells, solver_nfev = _solve_global_q_vector(
                 native_ctx,
                 provider,
@@ -844,7 +937,7 @@ def run_experimental_engineering_rating(
             )
             diagnostics.extend(accept_diag)
             elapsed = time.perf_counter() - t0
-            return EngineeringRatingResult(
+            result = EngineeringRatingResult(
                 schema_version=_SCHEMA,
                 status=status,
                 failure_code=failure_code,
@@ -872,6 +965,9 @@ def run_experimental_engineering_rating(
                 wall_seconds=elapsed,
                 correlation_notes=correlation_notes,
             )
+            if mesh_result_cache is not None:
+                mesh_result_cache[subdivisions] = result
+            return result
     except t173._Stage3Failure as exc:
         return _blocked(exc.code, list(exc.diagnostics))
     except ValueError as exc:
@@ -957,34 +1053,116 @@ def constant_u_counterflow_fv_duty_w(
     return m_hot * (th_in - th[n])
 
 
-def evaluate_mesh_convergence(
-    case: EngineeringCase,
+def _duty_relative_change(a: float | None, b: float | None) -> float | None:
+    if a is None or b is None or abs(a) < 1e-9:
+        return None
+    return abs(b - a) / abs(a)
+
+
+def _outlet_temperature_delta_k(
+    left: EngineeringRatingResult, right: EngineeringRatingResult
+) -> tuple[float | None, float | None]:
+    if (
+        left.tube_outlet_temperature_k is None
+        or right.tube_outlet_temperature_k is None
+        or left.shell_outlet_temperature_k is None
+        or right.shell_outlet_temperature_k is None
+    ):
+        return None, None
+    return (
+        abs(right.tube_outlet_temperature_k - left.tube_outlet_temperature_k),
+        abs(right.shell_outlet_temperature_k - left.shell_outlet_temperature_k),
+    )
+
+
+def compute_mesh_convergence_flags(
+    results: dict[int, EngineeringRatingResult],
     *,
-    native: NativeCellContext | None = None,
+    limits: EngineeringAcceptanceLimits | None = None,
 ) -> dict[str, Any]:
-    """Run n=1,2,4 and report duty/outlet mesh deltas."""
+    """Derive R26C mesh stability flags from already-solved mesh results."""
+    limits = limits or EngineeringAcceptanceLimits()
     meshes = (1, 2, 4)
-    results: dict[int, EngineeringRatingResult] = {}
-    for n in meshes:
-        results[n] = run_experimental_engineering_rating(case, subdivisions=n, native=native)
-
-    def rel_change(a: float | None, b: float | None) -> float | None:
-        if a is None or b is None or abs(a) < 1e-9:
-            return None
-        return abs(b - a) / abs(a)
-
-    r12 = rel_change(results[1].duty_w, results[2].duty_w)
-    r24 = rel_change(results[2].duty_w, results[4].duty_w)
-    converged = (
-        all(results[n].status == ENGINEERING_NUMERIC_VALID for n in meshes)
+    r12 = _duty_relative_change(results[1].duty_w, results[2].duty_w)
+    r24 = _duty_relative_change(results[2].duty_w, results[4].duty_w)
+    n1_n2_out = _outlet_temperature_delta_k(results[1], results[2])
+    n2_n4_out = _outlet_temperature_delta_k(results[2], results[4])
+    all_numeric_valid = all(results[n].status == ENGINEERING_NUMERIC_VALID for n in meshes)
+    duty_mesh_stable = (
+        all_numeric_valid
         and r12 is not None
         and r24 is not None
         and r12 <= _MESH_DUTY_REL_TOL
         and r24 <= _MESH_DUTY_REL_TOL
     )
+    outlet_temperature_mesh_stable = False
+    if all_numeric_valid and n1_n2_out[0] is not None and n2_n4_out[0] is not None:
+        outlet_temperature_mesh_stable = (
+            n1_n2_out[0] <= _MESH_OUTLET_REL_TOL_K
+            and n1_n2_out[1] is not None
+            and n1_n2_out[1] <= _MESH_OUTLET_REL_TOL_K
+            and n2_n4_out[0] <= _MESH_OUTLET_REL_TOL_K
+            and n2_n4_out[1] is not None
+            and n2_n4_out[1] <= _MESH_OUTLET_REL_TOL_K
+        )
+    local_closure_valid = all_numeric_valid and _local_closure_valid(results[4], limits)
+    full_rating_converged = (
+        duty_mesh_stable and outlet_temperature_mesh_stable and local_closure_valid
+    )
     return {
-        "results": results,
         "n1_n2_duty_relative_change": r12,
         "n2_n4_duty_relative_change": r24,
-        "full_rating_converged": converged,
+        "n1_n2_tube_outlet_delta_k": n1_n2_out[0],
+        "n1_n2_shell_outlet_delta_k": n1_n2_out[1],
+        "n2_n4_tube_outlet_delta_k": n2_n4_out[0],
+        "n2_n4_shell_outlet_delta_k": n2_n4_out[1],
+        "DUTY_MESH_STABLE": duty_mesh_stable,
+        "OUTLET_TEMPERATURE_MESH_STABLE": outlet_temperature_mesh_stable,
+        "LOCAL_CLOSURE_VALID": local_closure_valid,
+        "FULL_RATING_CONVERGED": full_rating_converged,
+        "full_rating_converged": full_rating_converged,
+    }
+
+
+def evaluate_mesh_convergence(
+    case: EngineeringCase,
+    *,
+    native: NativeCellContext | None = None,
+    mesh_result_cache: dict[int, EngineeringRatingResult] | None = None,
+    limits: EngineeringAcceptanceLimits | None = None,
+) -> dict[str, Any]:
+    """Run n=1,2,4 sequentially with optional cache (no duplicate parent mesh solves)."""
+    limits = limits or EngineeringAcceptanceLimits()
+    meshes = (1, 2, 4)
+    cache = mesh_result_cache if mesh_result_cache is not None else {}
+    results: dict[int, EngineeringRatingResult] = {}
+    for n in meshes:
+        results[n] = run_experimental_engineering_rating(
+            case,
+            subdivisions=n,
+            native=native,
+            limits=limits,
+            mesh_result_cache=cache,
+        )
+
+    flags = compute_mesh_convergence_flags(results, limits=limits)
+    per_mesh: dict[int, dict[str, Any]] = {}
+    for n in meshes:
+        res = results[n]
+        per_mesh[n] = {
+            "duty_w": res.duty_w,
+            "tube_outlet_temperature_k": res.tube_outlet_temperature_k,
+            "shell_outlet_temperature_k": res.shell_outlet_temperature_k,
+            "max_cell_thermal_residual_w": res.max_cell_thermal_residual_w,
+            "max_inner_wall_outer_closure_residual_w": res.max_inner_wall_outer_closure_residual_w,
+            "min_cell_approach_temperature_k": _min_cell_approach_temperature_k(res),
+            "energy_balance_relative_error": res.energy_balance_relative_error,
+            "wall_seconds": res.wall_seconds,
+            "status": res.status,
+        }
+    return {
+        "schema_version": "hxforge.experimental-engineering-mesh-convergence.v26c",
+        "results": results,
+        "per_mesh": per_mesh,
+        **flags,
     }
