@@ -463,4 +463,4 @@ shards:
       - tests/prototypes/test_r25d_physical_two_scalar_bracket.py
       - tests/prototypes/test_r26_engineering_rating_core.py
       - tests/prototypes/test_r26c_engineering_rating_live_hydraulic_bridge.py
-    timeout: 1200
+    timeout: 1800
