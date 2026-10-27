@@ -129,9 +129,7 @@ def build_experimental_engineering_rating_live_package(
     if finest is not None:
         _level, rating = finest
         mesh_row = _engineering_result_to_mesh_row(rating)
-        preview = build_experimental_constraint_preview(
-            case, mesh=mesh_row, native=native_ctx
-        )
+        preview = build_experimental_constraint_preview(case, mesh=mesh_row, native=native_ctx)
         live_postpass = run_live_thermal_state_hydraulic_postpass(
             case,
             candidate_id=native_ctx.candidate_id,

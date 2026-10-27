@@ -202,12 +202,14 @@ def test_live_hydraulic_bridge_r22_n1() -> None:
     assert package["GEOMETRY_COMPLETENESS_STATUS"] == "ENTRANCE_ONLY_ASSUMED"
     tube_dp = Decimal(str(receipt["LIVE_TUBE_DP_PA"]))
     shell_dp = Decimal(str(receipt["LIVE_SHELL_DP_PA"]))
-    assert tube_dp <= case.max_tube_side_pressure_drop_pa or receipt[
-        "TUBE_HYDRAULIC_STATUS"
-    ] == "NOT_SATISFIED"
-    assert shell_dp <= case.max_shell_side_pressure_drop_pa or receipt[
-        "SHELL_HYDRAULIC_STATUS"
-    ] == "NOT_SATISFIED"
+    assert (
+        tube_dp <= case.max_tube_side_pressure_drop_pa
+        or receipt["TUBE_HYDRAULIC_STATUS"] == "NOT_SATISFIED"
+    )
+    assert (
+        shell_dp <= case.max_shell_side_pressure_drop_pa
+        or receipt["SHELL_HYDRAULIC_STATUS"] == "NOT_SATISFIED"
+    )
 
 
 @pytest.mark.slow
