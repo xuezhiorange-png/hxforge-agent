@@ -286,6 +286,7 @@ jobs:
           set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             --hx-collection-scope shard \
             --hx-shard "${{ matrix.name }}" \
@@ -517,6 +518,7 @@ jobs:
           set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             --hx-collection-scope shard \
             --hx-shard "${{ matrix.name }}" \
@@ -691,6 +693,7 @@ jobs:
           set +e
           uv run --locked python -m tests.ci.run_test_shard \
             --timeout=${{ matrix.timeout }} -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             --hx-collection-scope shard \
             --hx-shard "${{ matrix.name }}" \
