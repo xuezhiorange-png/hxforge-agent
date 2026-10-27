@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from hexagent.exchangers.shell_tube.task172_local_runtime import service as task172_service
 from hexagent.exchangers.shell_tube.task172_local_runtime.models import Task172LocalResult
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
@@ -58,7 +56,9 @@ def test_r25d_profile_and_shell_conductance_helper() -> None:
         request.shell_bulk_state.temperature_k,
         request.shell_bulk_state.pressure_pa,
     )
-    tube_h, _, _, _, _ = task172_service._tube_base_htc(request, tube_bulk, request.tube_mass_flow_kg_s)
+    tube_h, _, _, _, _ = task172_service._tube_base_htc(
+        request, tube_bulk, request.tube_mass_flow_kg_s
+    )
     shell_h, _, _, _ = task172_service._shell_base_htc(
         request, shell_bulk, request.shell_mass_flow_kg_s
     )
@@ -71,6 +71,54 @@ def test_r25d_profile_and_shell_conductance_helper() -> None:
         two_k,
     )
     assert g_o > 0.0
+
+
+def test_r23_support0_lower_endpoint_hole_replay_exposes_bracket_gap() -> None:
+    """Replay 310/295 n=1 mesh: Support:0 LOWER_ENDPOINT hole, no valid F(q) sign pair."""
+    from pathlib import Path
+
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
+    from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
+        load_general_engineering_case_json,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
+        native_thermal_boundary_session,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+    )
+
+    fixture = (
+        Path(__file__).resolve().parents[1] / "fixtures/r23_variable_water_temperature_n1_case.json"
+    )
+    case = load_general_engineering_case_json(fixture.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    provider = CoolPropProvider()
+    stats = t173._CellSearchStats()
+    with native_thermal_boundary_session(case, provider, enable_live_binding=True):
+        token = t173._CANDIDATE_RATING_CONTEXT.set(native.context)
+        try:
+            try:
+                t173._candidate_transient_outer_boundary(1, provider, native.shell_authority, stats)
+            except t173._Stage3Failure as exc:
+                assert exc.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+                assert any("sign_pair_found=false" in d for d in exc.diagnostics)
+            else:
+                raise AssertionError("expected mesh bracket unresolved for 310/295 n=1")
+        finally:
+            t173._CANDIDATE_RATING_CONTEXT.reset(token)
+    assert stats.task172_numerical_hole_trials, "mesh must record TASK172 numerical holes"
+    sid = stats.task172_numerical_hole_trials[0]["physical_support_id"]
+    holes = [h for h in stats.task172_numerical_hole_trials if h["physical_support_id"] == sid]
+    assert holes, "blocking support must record TASK172 numerical holes on replay"
+    assert all(h["failure_code"] == "BLOCKED_RESIDUAL_ACCEPTANCE" for h in holes)
+    assert stats.maximum_hole_recovery_depth_observed >= 1
+    if stats.endpoint_hole_level_receipts:
+        level_receipts = [
+            r for r in stats.endpoint_hole_level_receipts if r.physical_support_id == sid
+        ]
+        assert level_receipts
+        assert not any(r.sign_pair_found for r in level_receipts)
 
 
 def test_wide_solver_replay_on_frozen_request_still_validates() -> None:

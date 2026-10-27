@@ -1473,10 +1473,10 @@ def _solve_once(
         q_inner = float(evaluated["g_i"]) * (tube_bulk_k - twi_value)
         try:
             return _accept_solution((q_inner, twi_value, two_value), two_value)
-        except _RuntimeFailure as inner_failure:
+        except _RuntimeFailure:
             try:
                 return _accept_solution((q_outer, twi_value, two_value), two_value)
-            except _RuntimeFailure:
+            except _RuntimeFailure as residual_failure:
                 residual_values = cast(tuple[float, float, float], evaluated["residuals"])
                 acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
                 diagnostics = ";".join(
@@ -1489,7 +1489,9 @@ def _solve_once(
                         *acceptance_bounds,
                     )
                 )
-                raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", diagnostics)
+                raise _RuntimeFailure(
+                    "BLOCKED_RESIDUAL_ACCEPTANCE", diagnostics
+                ) from residual_failure
 
     def _solve_wide_physical_two_scalar() -> tuple[dict[str, Any], tuple[float, float, float], int]:
         nonlocal callback_count

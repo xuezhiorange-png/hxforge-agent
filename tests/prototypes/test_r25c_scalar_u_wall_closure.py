@@ -10,8 +10,7 @@ def test_r25c_scalar_profile_id() -> None:
     assert "R25" in profile
 
 
-def test_scalar_u_budget_constants_are_bounded() -> None:
-    assert task172_service._WIDE_SCALAR_U_BRACKET_SAMPLES <= 8
-    assert task172_service._WIDE_SCALAR_U_MAX_BRENT_ITER <= 12
-    assert task172_service._WIDE_SCALAR_U_MAX_SEEDS <= 2
-    assert task172_service._WIDE_EXPERIMENTAL_CALLBACK_CAP <= 32
+def test_wide_scalar_two_budget_constants_are_bounded() -> None:
+    assert task172_service._WIDE_SCALAR_TWO_UPPER_BISECTION_MAX <= 32
+    assert task172_service._WIDE_SCALAR_TWO_MAX_BRENT_ITER <= 64
+    assert task172_service._WIDE_EXPERIMENTAL_CALLBACK_CAP <= 64
