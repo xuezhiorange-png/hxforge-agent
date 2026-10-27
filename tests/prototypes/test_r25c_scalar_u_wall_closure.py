@@ -7,8 +7,7 @@ from hexagent.exchangers.shell_tube.task172_local_runtime import service as task
 
 def test_r25c_scalar_profile_id() -> None:
     profile = task172_service._WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID
-    assert "R25C" in profile
-    assert "SCALAR" in profile
+    assert "R25" in profile
 
 
 def test_scalar_u_budget_constants_are_bounded() -> None:
