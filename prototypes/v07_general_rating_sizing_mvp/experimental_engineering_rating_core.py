@@ -8,7 +8,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal
 
-from scipy.optimize import brentq
+import numpy as np
+from scipy.optimize import brentq, least_squares
 
 from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.engineering import (
     compute_wall_resistance,
@@ -36,13 +37,14 @@ _SCHEMA = "hxforge.experimental-engineering-rating.v1"
 
 _WATER = FluidIdentifier("Water", "HEOS")
 
-_ENERGY_REL_TOL = 1.6e-5
-_ENERGY_ABS_TOL_W = 1.0
+_ENERGY_REL_TOL = 1e-8
+_ENERGY_ABS_TOL_W = 1e-3
 _CELL_THERMAL_REL_TOL = 2e-6
 _CELL_THERMAL_ABS_TOL_W = 0.5
 _MESH_DUTY_REL_TOL = 0.02
-_PICARD_MAX_ITER = 128
-_PICARD_RTOL = 1e-7
+_MESH_OUTLET_REL_TOL_K = 0.05
+_MAX_Q_SOLVER_NFEV = 1200
+_MAX_Q_SOLVER_WALL_S = 300.0
 _AREA_REL_TOL = 1e-9
 
 
@@ -279,10 +281,9 @@ def _build_global_cell_grid(
     summed_in = sum(float(b.support.inside_area_m2) for b in ordered)
     summed_out = sum(float(b.support.outside_area_m2) for b in ordered)
     length = max(b.axial_end_m for b in ordered) - min(b.axial_start_m for b in ordered)
-    area_ok = (
-        abs(summed_in - total_in) <= _AREA_REL_TOL * max(total_in, 1.0)
-        and abs(summed_out - total_out) <= _AREA_REL_TOL * max(total_out, 1.0)
-    )
+    area_ok = abs(summed_in - total_in) <= _AREA_REL_TOL * max(total_in, 1.0) and abs(
+        summed_out - total_out
+    ) <= _AREA_REL_TOL * max(total_out, 1.0)
     meta = EngineeringMeshMetadata(
         physical_interval_count=interval_count,
         cell_count=len(ordered),
@@ -451,7 +452,110 @@ def _cell_thermal_closure(
     )
 
 
-def _solve_counterflow_picard(
+def _enthalpies_from_q_vector(
+    q: np.ndarray,
+    *,
+    h_t_in: float,
+    h_s_in: float,
+    m_tube: float,
+    m_shell: float,
+) -> tuple[list[float], list[float]]:
+    n = int(q.size)
+    ht = [float(h_t_in)]
+    hs = [0.0] * (n + 1)
+    hs[n] = float(h_s_in)
+    for i in range(n):
+        ht.append(ht[i] - float(q[i]) / m_tube)
+    for i in range(n - 1, -1, -1):
+        hs[i] = hs[i + 1] + float(q[i]) / m_shell
+    return ht, hs
+
+
+def _check_enthalpy_domain(provider: CoolPropProvider, enthalpies: list[float]) -> None:
+    h_min = float(t173._effective_h_min_j_kg())
+    h_max = float(t173.effective_admitted_h_max_j_kg(provider))
+    for value in enthalpies:
+        if value < h_min or value > h_max:
+            raise ValueError(f"enthalpy_domain_exit;h={value}")
+
+
+def _initial_q_guess(
+    n: int,
+    *,
+    h_t_in: float,
+    h_s_in: float,
+    m_tube: float,
+    delta_t_in: float,
+    q_seed: np.ndarray | None,
+) -> np.ndarray:
+    if q_seed is not None and q_seed.size == n:
+        return np.maximum(q_seed.astype(float), 1.0)
+    total_est = max(m_tube * max(h_t_in - h_s_in, 0.0) * 0.08, 5000.0)
+    if delta_t_in > 8.0:
+        total_est = max(total_est, 250_000.0 / max(n / 5.0, 1.0))
+    return np.full(n, total_est / n, dtype=float)
+
+
+def _build_cells_from_q(
+    q: np.ndarray,
+    *,
+    grid: list[_GlobalCellBinding],
+    provider: CoolPropProvider,
+    base_request: CandidateTask172LocalRequest,
+    h_t_in: float,
+    h_s_in: float,
+    m_tube: float,
+    m_shell: float,
+    conductance_cache: dict[tuple[Any, ...], float],
+) -> list[EngineeringCellResult]:
+    ht, hs = _enthalpies_from_q_vector(
+        q, h_t_in=h_t_in, h_s_in=h_s_in, m_tube=m_tube, m_shell=m_shell
+    )
+    rows: list[EngineeringCellResult] = []
+    for binding in grid:
+        i = binding.global_index
+        q_i = float(q[i])
+        req = base_request.model_copy(update={"support": binding.support})
+        h_tb = 0.5 * (ht[i] + ht[i + 1])
+        h_sb = 0.5 * (hs[i] + hs[i + 1])
+        t_tube = _temperature_k_from_h(provider, h_tb, side="TUBE")
+        t_shell = _temperature_k_from_h(provider, h_sb, side="SHELL")
+        closure = _cell_thermal_closure(
+            req,
+            provider,
+            t_tube,
+            t_shell,
+            conductance_cache=conductance_cache,
+        )
+        r_hot = m_tube * (ht[i] - ht[i + 1]) - q_i
+        r_cold = m_shell * (hs[i] - hs[i + 1]) - q_i
+        rows.append(
+            EngineeringCellResult(
+                global_index=binding.global_index,
+                interval_index=binding.interval_index,
+                subdivision_index=binding.subdivision_index,
+                physical_segment_id=binding.physical_segment_id,
+                axial_start_m=binding.axial_start_m,
+                axial_end_m=binding.axial_end_m,
+                heat_rate_w=q_i,
+                tube_inlet_enthalpy_j_kg=ht[i],
+                tube_outlet_enthalpy_j_kg=ht[i + 1],
+                shell_inlet_enthalpy_j_kg=hs[i + 1],
+                shell_outlet_enthalpy_j_kg=hs[i],
+                tube_bulk_temperature_k=t_tube,
+                shell_bulk_temperature_k=t_shell,
+                thermal_residual_w=abs(q_i - closure.q_thermal_w),
+                inner_residual_w=abs(q_i - closure.qi_w),
+                wall_residual_w=abs(q_i - closure.qwall_w),
+                outer_residual_w=abs(q_i - closure.qo_w),
+                enthalpy_residual_w=max(abs(r_hot), abs(r_cold)),
+                closure=closure,
+            )
+        )
+    return rows
+
+
+def _solve_global_q_vector(
     native: NativeCellContext,
     provider: CoolPropProvider,
     grid: list[_GlobalCellBinding],
@@ -460,54 +564,54 @@ def _solve_counterflow_picard(
     shell_inlet_t_k: float,
     tube_pressure_pa: float,
     shell_pressure_pa: float,
+    q_initial: np.ndarray | None = None,
 ) -> tuple[list[EngineeringCellResult], int]:
     ctx = native.context
     n = len(grid)
     m_tube = float(t173.effective_tube_mass_flow_kg_s())
     m_shell = float(t173.effective_shell_mass_flow_kg_s())
-    h_tube = [0.0] * (n + 1)
-    h_shell = [0.0] * (n + 1)
-    h_tube[0] = _enthalpy_j_kg(provider, tube_inlet_t_k, tube_pressure_pa)
-    h_shell[n] = _enthalpy_j_kg(provider, shell_inlet_t_k, shell_pressure_pa)
-
-    for i in range(1, n + 1):
-        frac = i / n
-        h_tube[i] = h_tube[0] - frac * (h_tube[0] - h_shell[n]) * 0.12
-    for i in range(n - 1, -1, -1):
-        h_shell[i] = h_shell[n] + (1.0 - i / n) * (h_tube[0] - h_shell[n]) * 0.12
-
-    delta_t_in = abs(tube_inlet_t_k - shell_inlet_t_k)
-    relax = 0.35 if delta_t_in > 8.0 else 0.5
-    relax = min(relax, 0.45 * (5.0 / max(n, 1)) ** 0.25)
+    h_t_in = _enthalpy_j_kg(provider, tube_inlet_t_k, tube_pressure_pa)
+    h_s_in = _enthalpy_j_kg(provider, shell_inlet_t_k, shell_pressure_pa)
     conductance_cache: dict[tuple[Any, ...], float] = {}
     token = t173._CANDIDATE_RATING_CONTEXT.set(ctx)
+    solver_t0 = time.perf_counter()
     try:
         ref_support = grid[0].support
-        tube_state0 = t173._state_from_enthalpy(provider, Decimal(str(h_tube[0])), side="TUBE")
-        shell_staten = t173._state_from_enthalpy(
-            provider, Decimal(str(h_shell[n])), side="SHELL"
-        )
+        tube_state0 = t173._state_from_enthalpy(provider, Decimal(str(h_t_in)), side="TUBE")
+        shell_staten = t173._state_from_enthalpy(provider, Decimal(str(h_s_in)), side="SHELL")
         base_request = t173._task172_request(
             ref_support, tube_state0, shell_staten, native.shell_authority
         )
         if type(base_request) is not CandidateTask172LocalRequest:
             raise TypeError("expected candidate task172 request")
 
-        for iteration in range(_PICARD_MAX_ITER):
-            max_dh = 0.0
-            h_tube_new = [h_tube[0]]
-            h_shell_new = [0.0] * (n + 1)
-            h_shell_new[n] = h_shell[n]
-            cell_rows: list[EngineeringCellResult] = []
+        q0 = _initial_q_guess(
+            n,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            delta_t_in=abs(tube_inlet_t_k - shell_inlet_t_k),
+            q_seed=q_initial,
+        )
+
+        def residuals(q_raw: np.ndarray) -> np.ndarray:
+            if time.perf_counter() - solver_t0 > _MAX_Q_SOLVER_WALL_S:
+                raise RuntimeError("global_q_solver_wall_budget")
+            q_vec = np.maximum(q_raw, 0.0)
+            ht, hs = _enthalpies_from_q_vector(
+                q_vec, h_t_in=h_t_in, h_s_in=h_s_in, m_tube=m_tube, m_shell=m_shell
+            )
+            _check_enthalpy_domain(provider, ht + hs)
+            out = np.zeros(n, dtype=float)
             for binding in grid:
                 i = binding.global_index
                 req = base_request.model_copy(update={"support": binding.support})
-                t_tube = _temperature_k_from_h(
-                    provider, 0.5 * (h_tube[i] + h_tube[i + 1]), side="TUBE"
-                )
-                t_shell = _temperature_k_from_h(
-                    provider, 0.5 * (h_shell[i] + h_shell[i + 1]), side="SHELL"
-                )
+                h_tb = 0.5 * (ht[i] + ht[i + 1])
+                h_sb = 0.5 * (hs[i] + hs[i + 1])
+                t_tube = _temperature_k_from_h(provider, h_tb, side="TUBE")
+                t_shell = _temperature_k_from_h(provider, h_sb, side="SHELL")
+                if t_shell > t_tube:
+                    raise ValueError("temperature_crossing")
                 closure = _cell_thermal_closure(
                     req,
                     provider,
@@ -515,48 +619,43 @@ def _solve_counterflow_picard(
                     t_shell,
                     conductance_cache=conductance_cache,
                 )
-                q_cell = closure.q_thermal_w
-                h_t_out = h_tube[i] - q_cell / m_tube
-                h_s_out = h_shell[i + 1] + q_cell / m_shell
-                h_t_next = (1.0 - relax) * h_tube[i + 1] + relax * h_t_out
-                h_s_next = (1.0 - relax) * h_shell[i] + relax * h_s_out
-                h_tube_new.append(h_t_next)
-                h_shell_new[i] = h_s_next
-                q_ent = m_tube * (h_tube[i] - h_t_out)
-                cell_rows.append(
-                    EngineeringCellResult(
-                        global_index=binding.global_index,
-                        interval_index=binding.interval_index,
-                        subdivision_index=binding.subdivision_index,
-                        physical_segment_id=binding.physical_segment_id,
-                        axial_start_m=binding.axial_start_m,
-                        axial_end_m=binding.axial_end_m,
-                        heat_rate_w=q_cell,
-                        tube_inlet_enthalpy_j_kg=h_tube[i],
-                        tube_outlet_enthalpy_j_kg=h_t_out,
-                        shell_inlet_enthalpy_j_kg=h_shell[i + 1],
-                        shell_outlet_enthalpy_j_kg=h_s_out,
-                        tube_bulk_temperature_k=t_tube,
-                        shell_bulk_temperature_k=t_shell,
-                        thermal_residual_w=abs(q_ent - closure.q_thermal_w),
-                        inner_residual_w=abs(q_ent - closure.qi_w),
-                        wall_residual_w=abs(q_ent - closure.qwall_w),
-                        outer_residual_w=abs(q_ent - closure.qo_w),
-                        enthalpy_residual_w=abs(q_ent - q_cell),
-                        closure=closure,
-                    )
-                )
-                max_dh = max(
-                    max_dh,
-                    abs(h_t_out - h_tube[i + 1]),
-                    abs(h_s_out - h_shell[i]),
-                )
-            h_tube = h_tube_new
-            h_shell_new[n] = h_shell[n]
-            h_shell = h_shell_new
-            if max_dh < _PICARD_RTOL * max(abs(h_tube[0]), abs(h_shell[n]), 1.0):
-                return cell_rows, iteration + 1
-        raise RuntimeError(f"picard_nonconvergence;cells={n}")
+                out[i] = q_vec[i] - closure.q_thermal_w
+            return out
+
+        lower = np.zeros(n, dtype=float)
+        upper = np.full(n, np.inf, dtype=float)
+        solution = least_squares(
+            residuals,
+            q0,
+            bounds=(lower, upper),
+            method="trf",
+            ftol=1e-10,
+            xtol=1e-10,
+            gtol=1e-10,
+            max_nfev=_MAX_Q_SOLVER_NFEV,
+        )
+        if not solution.success:
+            raise RuntimeError(f"global_q_solver_nonconvergence;{solution.status}")
+        q_final = np.maximum(solution.x, 0.0)
+        ht_final, hs_final = _enthalpies_from_q_vector(
+            q_final, h_t_in=h_t_in, h_s_in=h_s_in, m_tube=m_tube, m_shell=m_shell
+        )
+        _check_enthalpy_domain(provider, ht_final + hs_final)
+        cells = _build_cells_from_q(
+            q_final,
+            grid=grid,
+            provider=provider,
+            base_request=base_request,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            m_shell=m_shell,
+            conductance_cache=conductance_cache,
+        )
+        max_r = float(np.max(np.abs(solution.fun)))
+        if max_r > _CELL_THERMAL_ABS_TOL_W:
+            raise RuntimeError(f"global_q_residual_floor;max={max_r}")
+        return cells, int(solution.nfev)
     finally:
         t173._CANDIDATE_RATING_CONTEXT.reset(token)
 
@@ -582,15 +681,27 @@ def _accept_cells(
         diagnostics.append(f"energy_rel={energy_rel}")
     for cell in cells:
         rel = abs(cell.thermal_residual_w) / max(abs(cell.heat_rate_w), 1.0)
-        if (
+        inner = cell.inner_residual_w
+        wall = cell.wall_residual_w
+        outer = cell.outer_residual_w
+        if cell.enthalpy_residual_w > 1e-9:
+            failure = failure or "FACE_ENTHALPY_CONSERVATION"
+            diagnostics.append(f"cell={cell.global_index};face={cell.enthalpy_residual_w}")
+            break
+        thermal_fail = (
             cell.thermal_residual_w > limits.cell_thermal_absolute_tolerance_w
             and rel > limits.cell_thermal_relative_tolerance
-        ):
+        )
+        branch_fail = (
+            inner > limits.cell_thermal_absolute_tolerance_w
+            or wall > limits.cell_thermal_absolute_tolerance_w
+            or outer > limits.cell_thermal_absolute_tolerance_w
+        )
+        if thermal_fail or branch_fail:
             failure = failure or "CELL_THERMAL_CLOSURE"
             diagnostics.append(
                 f"cell={cell.global_index};Rthermal={cell.thermal_residual_w};"
-                f"Rinner={cell.inner_residual_w};Rwall={cell.wall_residual_w};"
-                f"Router={cell.outer_residual_w}"
+                f"Rinner={inner};Rwall={wall};Router={outer}"
             )
             break
     if tube_out_t > tube_t_in or shell_out_t < shell_t_in:
@@ -618,6 +729,7 @@ def run_experimental_engineering_rating(
         "shell_side: Bell-Delaware with wall viscosity J_mu correction",
         "properties: CoolProp HEOS::Water",
         "topology: full Task171 physical interval coverage (R26A)",
+        "solver: global cell Q vector with direct face enthalpy reconstruction (R26B)",
     ]
     tube_t_in = float(t173.TUBE_INLET_T_K)
     shell_t_in = float(t173.SHELL_INLET_T_K)
@@ -668,7 +780,27 @@ def run_experimental_engineering_rating(
                 grid, mesh_meta = _build_global_cell_grid(native_ctx.context, subdivisions)
             finally:
                 t173._CANDIDATE_RATING_CONTEXT.reset(token)
-            cells, picard_iter = _solve_counterflow_picard(
+            q_initial: np.ndarray | None = None
+            if subdivisions > 1:
+                parent_sub = subdivisions // 2
+                parent_grid, _ = _build_global_cell_grid(native_ctx.context, parent_sub)
+                parent_cells, _ = _solve_global_q_vector(
+                    native_ctx,
+                    provider,
+                    parent_grid,
+                    tube_inlet_t_k=tube_t_in,
+                    shell_inlet_t_k=shell_t_in,
+                    tube_pressure_pa=tube_p,
+                    shell_pressure_pa=shell_p,
+                )
+                interval_q = {cell.interval_index: cell.heat_rate_w for cell in parent_cells}
+                ratio = subdivisions // parent_sub
+                q_initial = np.zeros(len(grid), dtype=float)
+                for binding in grid:
+                    q_initial[binding.global_index] = (
+                        interval_q.get(binding.interval_index, 0.0) / ratio
+                    )
+            cells, solver_nfev = _solve_global_q_vector(
                 native_ctx,
                 provider,
                 grid,
@@ -676,6 +808,7 @@ def run_experimental_engineering_rating(
                 shell_inlet_t_k=shell_t_in,
                 tube_pressure_pa=tube_p,
                 shell_pressure_pa=shell_p,
+                q_initial=q_initial,
             )
             h_t_in = cells[0].tube_inlet_enthalpy_j_kg
             h_t_out = cells[-1].tube_outlet_enthalpy_j_kg
@@ -685,9 +818,13 @@ def run_experimental_engineering_rating(
             m_shell = float(t173.effective_shell_mass_flow_kg_s())
             q_hot = m_tube * (h_t_in - h_t_out)
             q_cold = m_shell * (h_s_out - h_s_in)
-            duty = 0.5 * (q_hot + q_cold)
+            q_total = sum(cell.heat_rate_w for cell in cells)
+            duty = q_total
             denom = max(abs(q_hot), abs(q_cold), 1.0)
             energy_rel = abs(q_hot - q_cold) / denom
+            diagnostics.append(f"q_hot_minus_q_cold_w={q_hot - q_cold}")
+            diagnostics.append(f"q_hot_minus_q_total_w={q_hot - q_total}")
+            diagnostics.append(f"q_cold_minus_q_total_w={q_cold - q_total}")
             max_cell_res = max(c.thermal_residual_w for c in cells)
             max_closure = max(
                 max(c.inner_residual_w, c.wall_residual_w, c.outer_residual_w) for c in cells
@@ -730,7 +867,7 @@ def run_experimental_engineering_rating(
                 max_cell_thermal_residual_w=max_cell_res,
                 max_inner_wall_outer_closure_residual_w=max_closure,
                 cells=cells,
-                picard_iterations=picard_iter,
+                picard_iterations=solver_nfev,
                 coolprop_stats=coolprop_stats,
                 wall_seconds=elapsed,
                 correlation_notes=correlation_notes,
@@ -772,39 +909,52 @@ def constant_u_counterflow_fv_duty_w(
     u_a_total_w_per_k: float,
     hot_inlet_k: float,
     cold_inlet_k: float,
-    max_iter: int = 256,
+    duty_seed_w: float | None = None,
 ) -> float:
-    """Constant-U counterflow FV reference (validation only)."""
-    n = n_cells
+    """Constant-U global Q solve (same face-enthalpy structure as engineering core)."""
+    n = int(n_cells)
     ua_cell = u_a_total_w_per_k / n
     m_hot = hot_capacity_w_per_k
     m_cold = cold_capacity_w_per_k
-    th = [0.0] * (n + 1)
-    tc = [0.0] * (n + 1)
-    th[0] = hot_inlet_k
-    tc[n] = cold_inlet_k
-    for i in range(1, n + 1):
-        th[i] = th[0] - (th[0] - tc[n]) * (i / n) * 0.2
-    for i in range(n - 1, -1, -1):
-        tc[i] = tc[n] + (th[0] - tc[n]) * (1.0 - i / n) * 0.2
-    relax = 0.55
-    for _ in range(max_iter):
-        max_delta = 0.0
-        th_new = [th[0]]
-        tc_new = [0.0] * (n + 1)
-        tc_new[n] = tc[n]
+    th_in = hot_inlet_k
+    tc_in = cold_inlet_k
+
+    def temperatures_from_q(q: np.ndarray) -> tuple[list[float], list[float]]:
+        th = [th_in]
+        tc = [0.0] * (n + 1)
+        tc[n] = tc_in
         for i in range(n):
-            dt = max(th[i] - tc[i + 1], 1e-6)
-            q = ua_cell * dt
-            t_h_out = th[i] - q / m_hot
-            t_c_out = tc[i + 1] + q / m_cold
-            th_new.append((1.0 - relax) * th[i + 1] + relax * t_h_out)
-            tc_new[i] = (1.0 - relax) * tc[i] + relax * t_c_out
-            max_delta = max(max_delta, abs(th_new[-1] - th[i + 1]), abs(tc_new[i] - tc[i]))
-        th, tc = th_new, tc_new
-        if max_delta < 1e-9:
-            break
-    return m_hot * (hot_inlet_k - th[n])
+            th.append(th[i] - float(q[i]) / m_hot)
+        for i in range(n - 1, -1, -1):
+            tc[i] = tc[i + 1] + float(q[i]) / m_cold
+        return th, tc
+
+    def residuals(q_raw: np.ndarray) -> np.ndarray:
+        q_vec = np.maximum(q_raw, 0.0)
+        th, tc = temperatures_from_q(q_vec)
+        out = np.zeros(n, dtype=float)
+        for i in range(n):
+            dt = th[i] - tc[i + 1]
+            if dt <= 0.0:
+                raise ValueError("temperature_crossing")
+            out[i] = q_vec[i] - ua_cell * dt
+        return out
+
+    if duty_seed_w is not None and duty_seed_w > 0.0:
+        q0 = np.full(n, duty_seed_w / n, dtype=float)
+    else:
+        q0 = np.full(n, ua_cell * max(th_in - tc_in, 1.0) / n)
+    solution = least_squares(
+        residuals,
+        q0,
+        bounds=(np.zeros(n), np.full(n, np.inf)),
+        method="trf",
+        max_nfev=400,
+    )
+    if not solution.success:
+        raise RuntimeError("constant_u_global_q_failed")
+    th, _tc = temperatures_from_q(np.maximum(solution.x, 0.0))
+    return m_hot * (th_in - th[n])
 
 
 def evaluate_mesh_convergence(
@@ -817,6 +967,7 @@ def evaluate_mesh_convergence(
     results: dict[int, EngineeringRatingResult] = {}
     for n in meshes:
         results[n] = run_experimental_engineering_rating(case, subdivisions=n, native=native)
+
     def rel_change(a: float | None, b: float | None) -> float | None:
         if a is None or b is None or abs(a) < 1e-9:
             return None

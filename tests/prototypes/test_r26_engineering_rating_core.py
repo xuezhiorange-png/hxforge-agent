@@ -36,15 +36,26 @@ def test_epsilon_ntu_matches_constant_u_fv_counterflow() -> None:
         cold_inlet_k=tc_in,
     )
     duty_fv = constant_u_counterflow_fv_duty_w(
-        n_cells=8,
+        n_cells=32,
         hot_capacity_w_per_k=c_hot,
         cold_capacity_w_per_k=c_cold,
         u_a_total_w_per_k=ua,
         hot_inlet_k=th_in,
         cold_inlet_k=tc_in,
+        duty_seed_w=duty_ntu,
     )
     rel = abs(duty_ntu - duty_fv) / duty_ntu
-    assert rel < 0.05
+    assert rel < 0.02
+    duty_fv_n16 = constant_u_counterflow_fv_duty_w(
+        n_cells=64,
+        hot_capacity_w_per_k=c_hot,
+        cold_capacity_w_per_k=c_cold,
+        u_a_total_w_per_k=ua,
+        hot_inlet_k=th_in,
+        cold_inlet_k=tc_in,
+        duty_seed_w=duty_ntu,
+    )
+    assert abs(duty_fv_n16 - duty_fv) / duty_ntu < 0.01
 
 
 def test_frozen_298_15_case_engineering_n1_runs() -> None:
@@ -56,7 +67,7 @@ def test_frozen_298_15_case_engineering_n1_runs() -> None:
     assert result.mesh_metadata.total_area_conservation
     assert result.duty_w is not None and result.duty_w > 0.0
     assert result.energy_balance_relative_error is not None
-    assert result.energy_balance_relative_error < 1.6e-5
+    assert result.energy_balance_relative_error < 1e-8
     assert result.tube_outlet_temperature_k is not None
     assert result.tube_outlet_temperature_k < float(t173.TUBE_INLET_T_K)
 
