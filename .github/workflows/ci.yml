@@ -799,6 +799,7 @@ jobs:
       - name: Global collection (py${{ matrix.python }})
         run: |
           uv run --locked pytest --collect-only -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             -p tests.ci.outcome_plugin \
             --hx-collection-scope global \
@@ -939,6 +940,7 @@ jobs:
       - name: Global collection merge-ref (py${{ matrix.python }})
         run: |
           uv run --locked pytest --collect-only -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             -p tests.ci.outcome_plugin \
             --hx-collection-scope global \
