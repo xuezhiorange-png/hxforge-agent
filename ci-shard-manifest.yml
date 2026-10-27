@@ -461,4 +461,5 @@ shards:
       - tests/prototypes/test_r25b_task172_uv_wall_network.py
       - tests/prototypes/test_r25c_scalar_u_wall_closure.py
       - tests/prototypes/test_r25d_physical_two_scalar_bracket.py
+      - tests/prototypes/test_r26_engineering_rating_core.py
     timeout: 600
