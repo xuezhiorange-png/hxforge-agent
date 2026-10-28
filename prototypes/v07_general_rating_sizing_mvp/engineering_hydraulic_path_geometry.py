@@ -116,9 +116,10 @@ def assess_full_hydraulic_path_input_status(case: EngineeringCase) -> dict[str, 
     spec = engineering_tube_local_loss_input(case)
     tube = assess_tube_side_path_completeness(case, spec)
     shell = assess_shell_side_nozzle_path(case)
-    if tube.get("tube_side_path_status") == "DEMONSTRATION_ENTRANCE_ONLY" and shell.get(
-        "shell_nozzle_path_status"
-    ) == "ENGINEERING_GEOMETRY_INPUT_REQUIRED":
+    if (
+        tube.get("tube_side_path_status") == "DEMONSTRATION_ENTRANCE_ONLY"
+        and shell.get("shell_nozzle_path_status") == "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
+    ):
         overall = "DEMONSTRATION_PARTIAL_PATH_ONLY"
     elif shell.get("shell_nozzle_path_status") == "ENGINEERING_GEOMETRY_INPUT_REQUIRED":
         overall = "ENGINEERING_GEOMETRY_INPUT_REQUIRED"

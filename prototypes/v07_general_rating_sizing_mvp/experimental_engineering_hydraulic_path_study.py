@@ -52,7 +52,9 @@ def _resolve_representative_records(
     records: tuple[CandidateSelectionRecord, ...],
 ) -> list[CandidateSelectionRecord]:
     chosen: list[CandidateSelectionRecord] = []
-    baseline = next((r for r in records if _is_baseline_candidate_b(r) and r.rating_request_ready), None)
+    baseline = next(
+        (r for r in records if _is_baseline_candidate_b(r) and r.rating_request_ready), None
+    )
     if baseline:
         chosen.append(baseline)
     middle = next(
@@ -108,9 +110,9 @@ def _rate_candidate(
     return {
         "candidate_geometry_authority": candidate_geometry_from_selection_record(record),
         "demonstration_entrance_only_model": {
-            "THERMAL_NUMERIC_STATUS": (package or {}).get("engineering_delivery_receipt", {}).get(
-                "THERMAL_NUMERIC_STATUS"
-            ),
+            "THERMAL_NUMERIC_STATUS": (package or {})
+            .get("engineering_delivery_receipt", {})
+            .get("THERMAL_NUMERIC_STATUS"),
             "MESH_CONVERGENCE_STATUS": _mesh_thermal_status(mesh),
             "HYDRAULIC_NOMINAL_STATUS": margin.get("HYDRAULIC_NOMINAL_STATUS"),
             "HYDRAULIC_ROBUSTNESS_STATUS": margin.get("HYDRAULIC_ROBUSTNESS_STATUS"),
@@ -143,9 +145,7 @@ def run_experimental_engineering_hydraulic_path_study(
     selection = enumerate_experimental_rating_candidates(case)
     path_status = assess_full_hydraulic_path_input_status(case)
     representatives = _resolve_representative_records(selection.records)
-    candidate_results = [
-        _rate_candidate(case, record, selection) for record in representatives
-    ]
+    candidate_results = [_rate_candidate(case, record, selection) for record in representatives]
     return {
         "schema_version": _SCHEMA,
         "TASK_ID": _TASK_ID,

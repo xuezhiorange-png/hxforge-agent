@@ -49,9 +49,7 @@ def build_hydraulic_dp_breakdown(
         shell_internal = shell_total
 
     shell_nozzle_doc = postpass.get("shell_nozzle_local_loss_engineering")
-    shell_nozzle_dp = _dec(
-        (shell_nozzle_doc or {}).get("total_nozzle_and_transition_dp_pa")
-    )
+    shell_nozzle_dp = _dec((shell_nozzle_doc or {}).get("total_nozzle_and_transition_dp_pa"))
     if shell_nozzle_dp is None:
         shell_nozzle_dp = Decimal("0")
         shell_nozzle_status = "NOT_MODELED_INPUT_REQUIRED"
