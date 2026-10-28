@@ -64,7 +64,17 @@ def test_shell_margin_near_boundary_disclosure_on_r22() -> None:
     margin = package["hydraulic_margin"]
     assert margin["HYDRAULIC_ROBUSTNESS_STATUS"] in {
         "NEAR_CONSTRAINT_BOUNDARY",
-        "SATISFIED",
-        "NOT_SATISFIED",
+        "SENSITIVITY_INDICATES_RISK",
+        "NOT_OWNER_DESIGN_TOLERANCE_VERIFIED",
+        "NOT_EVALUATED",
     }
+    assert margin["HYDRAULIC_ROBUSTNESS_STATUS"] != "SATISFIED"
     assert margin["SHELL_FLOW_SENSITIVITY"]["mode"] == "FIXED_THERMAL_STATE_HYDRAULIC_SENSITIVITY"
+    plus = margin["SHELL_FLOW_SENSITIVITY"]["cases"][0]
+    assert plus["perturbed_inputs"]["equipment_case_shell_mass_flow_kg_s"] != (
+        plus["perturbed_inputs"]["task032_shell_mass_flow_kg_s"]
+    )
+    assert plus["postpass"]["task032_shell_mass_flow_kg_s"] == plus["perturbed_inputs"][
+        "task032_shell_mass_flow_kg_s"
+    ]
+    assert "SHELL_TEMPERATURE_SENSITIVITY" in margin

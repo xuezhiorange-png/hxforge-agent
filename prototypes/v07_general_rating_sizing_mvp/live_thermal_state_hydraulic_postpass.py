@@ -571,6 +571,7 @@ def run_live_thermal_state_hydraulic_postpass(
     provider: CoolPropProvider | None = None,
     tube_property_evaluation_pressure_pa: Decimal | None = None,
     shell_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_temperature_k: Decimal | None = None,
     equipment_shell_mass_flow_kg_s_override: Decimal | None = None,
 ) -> dict[str, Any]:
     """One-way hydraulic post-pass; does not mutate Task174 reference preview semantics."""
@@ -592,13 +593,19 @@ def run_live_thermal_state_hydraulic_postpass(
         reference_shell_dp_pa = cast(Task166Result, bundle.task166_result).total_shell_pressure_drop
 
     tube_eval_t = _bulk_mean_k(tube_inlet_temperature_k, tube_outlet_temperature_k)
-    shell_eval_t = _bulk_mean_k(shell_inlet_temperature_k, shell_outlet_temperature_k)
+    shell_bulk_mean_k = _bulk_mean_k(shell_inlet_temperature_k, shell_outlet_temperature_k)
+    shell_eval_t = (
+        _decimal_field(shell_property_evaluation_temperature_k)
+        if shell_property_evaluation_temperature_k is not None
+        else shell_bulk_mean_k
+    )
     tube_eval_p = tube_property_evaluation_pressure_pa or tube_inlet_pressure_pa
     shell_eval_p = shell_property_evaluation_pressure_pa or shell_inlet_pressure_pa
     property_rule_id = (
         PROPERTY_EVALUATION_RULE_ID_TWO_WAY_BULK
         if tube_property_evaluation_pressure_pa is not None
         or shell_property_evaluation_pressure_pa is not None
+        or shell_property_evaluation_temperature_k is not None
         else PROPERTY_EVALUATION_RULE_ID
     )
     tube_template = authority.task027_property_snapshot
@@ -854,6 +861,12 @@ def run_live_thermal_state_hydraulic_postpass(
         "shell_outlet_temperature_k": str(shell_outlet_temperature_k),
         "tube_bulk_evaluation_temperature_k": str(tube_eval_t),
         "shell_bulk_evaluation_temperature_k": str(shell_eval_t),
+        "shell_bulk_mean_from_outlets_k": str(shell_bulk_mean_k),
+        "shell_property_evaluation_temperature_override_k": (
+            str(shell_property_evaluation_temperature_k)
+            if shell_property_evaluation_temperature_k is not None
+            else None
+        ),
         "reference_tube_dp_pa": str(reference_tube_dp_pa),
         "reference_shell_dp_pa": str(reference_shell_dp_pa),
         "recalculated_tube_dp_pa": str(recalc_tube) if recalc_tube is not None else None,
@@ -874,7 +887,9 @@ def run_live_thermal_state_hydraulic_postpass(
             task166_live.corrected_shell_side_heat_transfer_coefficient
         ),
         "tube_mass_flow_kg_s": str(tube_side.mass_flow_kg_s),
-        "shell_mass_flow_kg_s": str(shell_stream_spec(case).mass_flow_kg_s),
+        "equipment_case_shell_mass_flow_kg_s": str(shell_stream_spec(case).mass_flow_kg_s),
+        "task032_shell_mass_flow_kg_s": str(equipment_shell_flow),
+        "shell_mass_flow_kg_s": str(equipment_shell_flow),
         "energy_balance_status": "NOT_EVALUATED_IN_POSTPASS",
         "blockers": blockers,
         "property_inputs": {

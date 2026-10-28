@@ -230,11 +230,12 @@ def test_r26c_primary_310_295_mesh_ladder_and_live_hydraulic() -> None:
     assert receipt["LIVE_HYDRAULIC_IMPLEMENTED"] is True
     margin = package["hydraulic_margin"]
     assert margin["SHELL_NEAR_CONSTRAINT_BOUNDARY"] is True
-    assert margin["HYDRAULIC_ROBUSTNESS_STATUS"] in {
-        "NEAR_CONSTRAINT_BOUNDARY",
-        "NOT_SATISFIED",
-    }
+    assert margin["HYDRAULIC_ROBUSTNESS_STATUS"] == "SENSITIVITY_INDICATES_RISK"
+    flow_plus = margin["SHELL_FLOW_SENSITIVITY"]["cases"][0]
+    assert flow_plus["shell_dp_constraint"] == "NOT_SATISFIED"
     delivery = package["engineering_delivery_receipt"]
-    assert delivery["N1_DUTY_W"] == mesh["results"][1].duty_w
-    assert delivery["N4_DUTY_W"] == mesh["results"][4].duty_w
+    assert delivery["THERMAL_NUMERIC_STATUS"] == ENGINEERING_NUMERIC_VALID
+    assert delivery["N1_TUBE_OUTLET_K"] == mesh["results"][1].tube_outlet_temperature_k
+    assert delivery["N4_SHELL_OUTLET_K"] == mesh["results"][4].shell_outlet_temperature_k
+    assert delivery["SHELL_TEMPERATURE_SENSITIVITY"] is not None
     assert package["GEOMETRY_COMPLETENESS_STATUS"] == "ENTRANCE_ONLY_ASSUMED"

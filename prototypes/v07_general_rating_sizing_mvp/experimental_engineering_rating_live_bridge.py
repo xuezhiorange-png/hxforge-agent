@@ -20,6 +20,7 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_constraint_preview im
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_hydraulic_margin import (
     assess_hydraulic_margin_and_robustness,
     build_engineering_delivery_receipt,
+    thermal_numeric_status_from_mesh,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
     ENGINEERING_NUMERIC_VALID,
@@ -272,6 +273,7 @@ def build_experimental_engineering_rating_live_package(
                 "mesh_convergence": mesh_report,
                 "hydraulic_receipt": hydraulic_receipt,
                 "hydraulic_margin": hydraulic_margin,
+                "THERMAL_NUMERIC_STATUS": thermal_numeric_status_from_mesh(mesh_report),
                 "GEOMETRY_COMPLETENESS_STATUS": eligibility.get(
                     "GEOMETRY_COMPLETENESS_STATUS", "ENTRANCE_ONLY_ASSUMED"
                 ),
@@ -283,6 +285,7 @@ def build_experimental_engineering_rating_live_package(
                 "PRODUCTION_DESIGN_APPROVED": False,
             }
         ),
+        "THERMAL_NUMERIC_STATUS": thermal_numeric_status_from_mesh(mesh_report),
     }
     return package
 

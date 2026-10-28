@@ -370,6 +370,7 @@ def run_mesh_numeric_with_profile(
                 "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
                 "diagnostics": [
                     f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
+                    "legacy_resource_budget_enforcement=SOFT_WALL_TIMEOUT_THREAD_POOL",
                     f"elapsed_wall_s={elapsed:.3f}",
                 ],
                 "wall_seconds": round(elapsed, 3),
