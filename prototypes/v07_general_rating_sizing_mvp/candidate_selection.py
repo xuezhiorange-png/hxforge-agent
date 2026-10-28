@@ -27,7 +27,6 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection_policy import (
     apply_rating_selection_policy,
     nominal_area_proxy_m2,
-    resolve_candidate_selection_mode,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.sizing_request_builder import (
@@ -122,12 +121,8 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
     )
 
     records: list[CandidateSelectionRecord] = []
-    selection_mode = resolve_candidate_selection_mode(case)
     multi_shell = len(t168.shell_geometry_catalog.records) > 1
-    defer_selection = selection_mode in {
-        "MIN_NOMINAL_TUBE_AREA_SEARCH",
-        "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13",
-    }
+    defer_selection = True
     selected_ids: list[str] = []
     selected_rating_hash: str | None = None
     selection_reason: str | None = None

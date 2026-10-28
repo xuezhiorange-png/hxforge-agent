@@ -68,6 +68,18 @@ def nominal_area_proxy_m2(
     return str(area)
 
 
+def _pinned_baseline_rows(
+    case: EngineeringCase, ready: list[CandidateSelectionRecord]
+) -> list[CandidateSelectionRecord]:
+    pinned: list[CandidateSelectionRecord] = []
+    for pair in getattr(case, "r10_baseline_geometry_pairs", ()) or ():
+        for row in ready:
+            if _matches_fingerprint(row, pair):
+                pinned.append(row)
+                break
+    return pinned
+
+
 def apply_rating_selection_policy(
     case: EngineeringCase,
     records: list[CandidateSelectionRecord],
@@ -122,6 +134,13 @@ def apply_rating_selection_policy(
         if row.physical_tube_count is not None:
             selected_tube_counts.add(row.physical_tube_count)
         return True
+
+    if mode not in {
+        "MIN_NOMINAL_TUBE_AREA_SEARCH",
+        "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13",
+    }:
+        for row in _pinned_baseline_rows(case, ready):
+            _try_pick(row)
 
     for row in pool_sorted:
         _try_pick(row)
