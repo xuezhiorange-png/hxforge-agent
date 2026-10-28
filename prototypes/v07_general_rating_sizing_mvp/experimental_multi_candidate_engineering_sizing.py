@@ -45,8 +45,10 @@ def _finest_duty_w(
     results = mesh.get("results") or {}
     for level in (4, 2, 1):
         if level in results and hasattr(results[level], "duty_w"):
-            return float(results[level].duty_w)
-    if n1_result is not None:
+            duty = results[level].duty_w
+            if duty is not None:
+                return float(duty)
+    if n1_result is not None and n1_result.duty_w is not None:
         return float(n1_result.duty_w)
     return None
 
