@@ -114,6 +114,16 @@ def tube_dp_components_summary(breakdown: dict[str, Any]) -> list[dict[str, Any]
                 "included_in_model": "R20_TRANSITIONAL_FRICTION",
             }
         )
+    elif breakdown.get("TUBE_TOTAL_DP_PA") is not None:
+        rows.append(
+            {
+                "component_id": "TUBE_SIDE_TOTAL",
+                "path": "TUBE_COMBINED",
+                "dp_pa": breakdown["TUBE_TOTAL_DP_PA"],
+                "included_in_model": "TASK029_OR_R20_COMBINED",
+                "decomposition_status": "FRICTION_LOCAL_SPLIT_NOT_IN_POSTPASS",
+            }
+        )
     for comp in breakdown.get("component_audit", {}).get("tube_local_loss_components") or []:
         rows.append(
             {

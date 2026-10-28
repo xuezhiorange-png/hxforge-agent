@@ -144,6 +144,7 @@ def test_r26f_representative_hydraulic_path_study_slow(r26e_case) -> None:
     assert demo["ENGINEERING_SIZING_ELIGIBILITY"] == (
         "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"
     )
+    assert demo["hydraulic_dp_breakdown"]["TUBE_TOTAL_DP_PA"] is not None
     assert demo["TUBE_DP_COMPONENTS"]
     assert demo["SHELL_DP_COMPONENTS"]
     assert middle["authorized_full_path_model"]["status"] == "NOT_RUN"
