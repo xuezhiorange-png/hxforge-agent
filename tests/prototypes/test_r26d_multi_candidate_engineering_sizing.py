@@ -20,7 +20,8 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_multi_candidate_engin
 )
 
 _FIXTURE = (
-    Path(__file__).resolve().parents[1] / "fixtures/r26d_multi_candidate_engineering_sizing_case.json"
+    Path(__file__).resolve().parents[1]
+    / "fixtures/r26d_multi_candidate_engineering_sizing_case.json"
 )
 
 
@@ -66,15 +67,18 @@ def test_r26d_shell_eval_pressure_uses_bulk_pressure_pa_field() -> None:
 
 @pytest.mark.slow
 def test_r26d_full_multi_candidate_engineering_sizing_slow(r26d_case) -> None:
-    report = run_experimental_multi_candidate_engineering_sizing(r26d_case, run_full_mesh_hydraulic=True)
+    report = run_experimental_multi_candidate_engineering_sizing(
+        r26d_case, run_full_mesh_hydraulic=True
+    )
     assert report["DISTINCT_READY_GEOMETRY_COUNT"] >= 2
     assert report["RATED_CANDIDATE_COUNT"] >= 2
     assert report["FULLY_CONVERGED_CANDIDATE_COUNT"] >= 1
     baseline = next(r for r in report["candidates"] if r["is_candidate_b_baseline_geometry"])
     assert baseline["FULL_RATING_CONVERGED"] is True
-    assert report["engineering_comparison_report"]["baseline_candidate_b"]["candidate_id"] == baseline[
-        "candidate_id"
-    ]
+    assert (
+        report["engineering_comparison_report"]["baseline_candidate_b"]["candidate_id"]
+        == baseline["candidate_id"]
+    )
     assert report["SIZING_TARGET_AUTHORITY"] == "EXPERIMENTAL_DEMONSTRATION_NOT_OWNER_APPROVED"
     for row in report["candidates"]:
         if row.get("FULL_RATING_CONVERGED"):

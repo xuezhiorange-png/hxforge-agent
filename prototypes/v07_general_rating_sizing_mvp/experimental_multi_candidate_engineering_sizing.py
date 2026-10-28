@@ -109,16 +109,22 @@ def _candidate_report_row(
         assess_engineering_sizing_eligibility(
             case,
             {
-                "status": "NUMERIC_VALID" if n1_result and n1_result.status == ENGINEERING_NUMERIC_VALID else "BLOCKED",
+                "status": "NUMERIC_VALID"
+                if n1_result and n1_result.status == ENGINEERING_NUMERIC_VALID
+                else "BLOCKED",
                 "mesh_status": (
-                    "NUMERIC_VALID" if n1_result and n1_result.status == ENGINEERING_NUMERIC_VALID else "BLOCKED"
+                    "NUMERIC_VALID"
+                    if n1_result and n1_result.status == ENGINEERING_NUMERIC_VALID
+                    else "BLOCKED"
                 ),
             },
         )
         if n1_result
         else {}
     )
-    nominal_ok, nominal_status, nominal_reasons = _nominal_experimental_comparison_status(package, case=case)
+    nominal_ok, nominal_status, nominal_reasons = _nominal_experimental_comparison_status(
+        package, case=case
+    )
     tube_area = record.nominal_tube_outer_area_proxy_m2
     row: dict[str, Any] = {
         "candidate_id": record.candidate_id,
@@ -154,7 +160,11 @@ def _candidate_report_row(
         "NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE": nominal_ok,
         "ENGINEERING_SIZING_ELIGIBILITY": eligibility.get("ENGINEERING_SIZING_ELIGIBILITY"),
         "GEOMETRY_COMPLETENESS_STATUS": eligibility.get("GEOMETRY_COMPLETENESS_STATUS"),
-        "elimination_reason": None if nominal_ok else nominal_reasons[0] if nominal_reasons else screening_status,
+        "elimination_reason": None
+        if nominal_ok
+        else nominal_reasons[0]
+        if nominal_reasons
+        else screening_status,
     }
     if package:
         row["engineering_delivery_receipt"] = receipt
@@ -188,7 +198,9 @@ def run_experimental_multi_candidate_engineering_sizing(
     if max_candidates is not None:
         rate_ids = rate_ids[:max_candidates]
 
-    ready_distinct = len({r.geometry_projection_hash for r in selection.records if r.rating_request_ready})
+    ready_distinct = len(
+        {r.geometry_projection_hash for r in selection.records if r.rating_request_ready}
+    )
     space_blocker: str | None = None
     if ready_distinct < 2:
         space_blocker = (
@@ -291,7 +303,9 @@ def run_experimental_multi_candidate_engineering_sizing(
         "ranked_candidates": ranked,
         "candidates": candidate_rows,
         "nominal_infeasible_gap_summary": gap_summary,
-        "engineering_comparison_report": _build_comparison_report(case, candidate_rows, ranked, best_id),
+        "engineering_comparison_report": _build_comparison_report(
+            case, candidate_rows, ranked, best_id
+        ),
     }
 
 
