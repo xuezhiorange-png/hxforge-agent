@@ -464,4 +464,5 @@ shards:
       - tests/prototypes/test_r26_engineering_rating_core.py
       - tests/prototypes/test_r26c_engineering_rating_live_hydraulic_bridge.py
       - tests/prototypes/test_r26ca_engineering_delivery_hydraulic_margin.py
+      - tests/prototypes/test_r26d_multi_candidate_engineering_sizing.py
     timeout: 2400

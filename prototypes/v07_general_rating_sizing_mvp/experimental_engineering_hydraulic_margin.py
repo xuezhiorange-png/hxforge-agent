@@ -74,11 +74,15 @@ def _postpass_summary(
         "equipment_case_shell_mass_flow_kg_s": binding.get("equipment_shell_mass_flow_kg_s"),
         "task032_shell_mass_flow_kg_s": postpass.get("task032_shell_mass_flow_kg_s"),
         "shell_bulk_evaluation_temperature_k": postpass.get("shell_bulk_evaluation_temperature_k"),
-        "shell_property_evaluation_pressure_pa": (
-            (postpass.get("property_inputs") or {}).get("shell", {}).get("pressure_pa")
-        ),
+        "shell_property_evaluation_pressure_pa": _shell_eval_pressure_from_postpass(postpass),
         "blockers": postpass.get("blockers"),
     }
+
+
+def _shell_eval_pressure_from_postpass(postpass: dict[str, Any]) -> str | None:
+    shell_snap = (postpass.get("property_inputs") or {}).get("shell") or {}
+    raw = shell_snap.get("bulk_pressure_pa") or shell_snap.get("pressure_pa")
+    return str(raw) if raw is not None else None
 
 
 def _sensitivity_case_row(
