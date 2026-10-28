@@ -466,4 +466,5 @@ shards:
       - tests/prototypes/test_r26ca_engineering_delivery_hydraulic_margin.py
       - tests/prototypes/test_r26d_multi_candidate_engineering_sizing.py
       - tests/prototypes/test_r26e_multi_candidate_engineering_sizing.py
+      - tests/prototypes/test_r26f_engineering_hydraulic_path.py
     timeout: 3600

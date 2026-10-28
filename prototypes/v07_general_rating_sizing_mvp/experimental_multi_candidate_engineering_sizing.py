@@ -14,6 +14,11 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     selection_to_json,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_geometry import (
+    R26D_HISTORICAL_LONG_BASELINE_REFERENCE,
+    candidate_geometry_from_selection_record,
+    historical_long_baseline_area,
+)
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
     ENGINEERING_NUMERIC_VALID,
     run_experimental_engineering_rating,
@@ -146,7 +151,17 @@ def _candidate_report_row(
         package, case=case
     )
     tube_area = record.nominal_tube_outer_area_proxy_m2
+    if screening_status == "NOT_SELECTED_FOR_RATING":
+        participation = "NOT_SELECTED_FOR_RATING"
+    elif package is not None and mesh.get("FULL_RATING_CONVERGED"):
+        participation = "FULLY_RATED"
+    elif n1_result is not None:
+        participation = "SCREENED_N1_ONLY"
+    else:
+        participation = "NOT_EVALUATED"
     row: dict[str, Any] = {
+        "candidate_geometry_authority": candidate_geometry_from_selection_record(record),
+        "rating_participation_status": participation,
         "candidate_id": record.candidate_id,
         "candidate_hash": record.candidate_hash,
         "geometry_projection_hash": record.geometry_projection_hash,
@@ -181,6 +196,8 @@ def _candidate_report_row(
         "ENGINEERING_SIZING_ELIGIBILITY": engineering_eligibility,
         "GEOMETRY_COMPLETENESS_STATUS": geometry_completeness,
         "elimination_reason": None
+        if participation in {"NOT_SELECTED_FOR_RATING", "NOT_EVALUATED", "SCREENED_N1_ONLY"}
+        else None
         if nominal_ok
         else nominal_reasons[0]
         if nominal_reasons
@@ -188,6 +205,12 @@ def _candidate_report_row(
     }
     if package:
         row["engineering_delivery_receipt"] = receipt
+        postpass = package.get("live_thermal_state_hydraulic_postpass") or {}
+        from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_dp_breakdown import (
+            build_hydraulic_dp_breakdown,
+        )
+
+        row["hydraulic_dp_breakdown"] = build_hydraulic_dp_breakdown(postpass, case=case)
     return row
 
 
@@ -256,7 +279,14 @@ def _build_experimental_tradeoff_views(
     rows: list[dict[str, Any]],
     ranked: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    feasible = [row for row in rows if row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE")]
+    fully_rated_feasible = [
+        row
+        for row in rows
+        if row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE")
+        and row.get("FULL_RATING_CONVERGED") is True
+        and row.get("rating_participation_status") == "FULLY_RATED"
+    ]
+    feasible = fully_rated_feasible
     target = Decimal(str(case.target_duty_w))
     min_area_row = ranked[0] if ranked else None
     lower_risk_sorted = sorted(
@@ -269,45 +299,46 @@ def _build_experimental_tradeoff_views(
     )
     pareto_ids = _pareto_frontier_candidates(feasible, target_duty_w=target)
     baseline_b = next((r for r in rows if r.get("is_candidate_b_baseline_geometry")), None)
-    long_alt = max(
-        (
-            r
-            for r in feasible
-            if not r.get("is_candidate_b_baseline_geometry")
-            and _decimal_or_zero(r.get("nominal_tube_outer_area_m2")) > Decimal("90")
-        ),
-        key=lambda r: _decimal_or_zero(r.get("nominal_tube_outer_area_m2")),
-        default=None,
-    )
+    historical_long_area = historical_long_baseline_area()
     middle_candidates = [
         r
         for r in feasible
         if baseline_b
-        and long_alt
         and baseline_b.get("candidate_id") != r.get("candidate_id")
-        and long_alt.get("candidate_id") != r.get("candidate_id")
         and _decimal_or_zero(baseline_b.get("nominal_tube_outer_area_m2"))
         < _decimal_or_zero(r.get("nominal_tube_outer_area_m2"))
-        < _decimal_or_zero(long_alt.get("nominal_tube_outer_area_m2"))
+        < historical_long_area
     ]
     middle_answer: dict[str, Any] = {
         "question": (
-            "Is there a more reasonable intermediate geometry between the ~60.5 m2 and ~97.8 m2 "
-            "R26D baselines under the same demonstration case?"
+            "Is there a more reasonable intermediate geometry between the ~60.5 m2 short "
+            "baseline and the ~97.8 m2 historical R26D long reference under the same case?"
         ),
+        "current_rating_scope": (
+            "Intermediate assessment uses candidates with FULL_RATING_CONVERGED in this run only."
+        ),
+        "historical_long_baseline_reference": R26D_HISTORICAL_LONG_BASELINE_REFERENCE,
         "baseline_short_area_m2": baseline_b.get("nominal_tube_outer_area_m2")
         if baseline_b
         else None,
-        "baseline_long_area_m2": long_alt.get("nominal_tube_outer_area_m2") if long_alt else None,
+        "historical_long_reference_area_m2": str(historical_long_area),
         "intermediate_feasible_candidates": [
             {
                 "candidate_id": r["candidate_id"],
-                "tube_length_m": r["tube_length_m"],
-                "baffle_spacing_m": r["baffle_spacing_m"],
-                "shell_inside_diameter_m": r["shell_inside_diameter_m"],
-                "nominal_tube_outer_area_m2": r["nominal_tube_outer_area_m2"],
+                "candidate_geometry_authority": r.get("candidate_geometry_authority"),
+                "tube_length_m": r["candidate_geometry_authority"]["tube_length_m"],
+                "baffle_spacing_m": r["candidate_geometry_authority"]["baffle_spacing_m"],
+                "shell_inside_diameter_m": r["candidate_geometry_authority"][
+                    "shell_inside_diameter_m"
+                ],
+                "physical_tube_count": r["candidate_geometry_authority"]["physical_tube_count"],
+                "nominal_tube_outer_area_m2": r["candidate_geometry_authority"][
+                    "nominal_tube_outer_area_m2"
+                ],
                 "area_delta_vs_short_baseline_m2": str(
-                    _decimal_or_zero(r.get("nominal_tube_outer_area_m2"))
+                    _decimal_or_zero(
+                        r["candidate_geometry_authority"].get("nominal_tube_outer_area_m2")
+                    )
                     - _decimal_or_zero(baseline_b.get("nominal_tube_outer_area_m2"))
                 )
                 if baseline_b
@@ -321,23 +352,24 @@ def _build_experimental_tradeoff_views(
     }
     if middle_candidates:
         middle_answer["conclusion"] = (
-            "At least one intermediate feasible geometry exists between the short and long R26D "
-            "baselines; see area and margin deltas in intermediate_feasible_candidates "
-            "(experimental comparison only)."
+            "At least one fully rated, nominally feasible geometry lies between the short baseline "
+            "and the historical long reference area (experimental comparison only)."
         )
-    elif len(feasible) >= 2:
+    elif len(feasible) >= 1 and baseline_b:
         middle_answer["conclusion"] = (
-            "No additional feasible geometry lies strictly between the short and long baseline "
-            "areas in this search space; see blocked combinations in candidate_selection records."
+            "No fully rated nominally feasible geometry in this run lies strictly between the "
+            "short baseline and historical long reference areas; unrated combinations are not "
+            "treated as eliminated."
         )
     else:
         middle_answer["conclusion"] = (
-            "Insufficient feasible rated candidates to assess intermediates."
+            "Insufficient fully rated feasible candidates to assess intermediates."
         )
 
     return {
         "ENGINEERING_DESIGN_PREFERENCE": "OWNER_POLICY_REQUIRED",
         "MIN_AREA_NOMINAL_CANDIDATE_ID": min_area_row["candidate_id"] if min_area_row else None,
+        "MIN_AREA_SCOPE": "FULLY_RATED_NOMINAL_FEASIBLE_CANDIDATES_THIS_RUN",
         "LOWER_OBSERVED_HYDRAULIC_RISK_CANDIDATE_IDS": [
             row["candidate_id"] for row in lower_risk_sorted
         ],
@@ -367,7 +399,13 @@ def _build_experimental_tradeoff_views(
 
 
 def _rank_feasible(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    feasible = [row for row in rows if row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE")]
+    feasible = [
+        row
+        for row in rows
+        if row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE")
+        and row.get("FULL_RATING_CONVERGED") is True
+        and row.get("rating_participation_status") == "FULLY_RATED"
+    ]
     feasible.sort(
         key=lambda item: (
             Decimal(str(item["nominal_tube_outer_area_m2"]))
