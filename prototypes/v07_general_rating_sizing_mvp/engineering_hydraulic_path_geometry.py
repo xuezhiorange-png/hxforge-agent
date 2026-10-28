@@ -1,5 +1,7 @@
 """Engineering hydraulic path geometry authority and completeness (R26F)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from decimal import Decimal
