@@ -234,7 +234,8 @@ def assess_hydraulic_margin_and_robustness(
         "mode": _SENSITIVITY_MODE,
         "disclosure": (
             f"±{_SHELL_BULK_TEMP_PERTURBATION_K} K on shell bulk property evaluation temperature "
-            "only; thermal rating outlet states unchanged; not a re-rated thermal–hydraulic coupling"
+            "only; thermal rating outlet states unchanged; "
+            "not a re-rated thermal-hydraulic coupling"
         ),
         "cases": [
             _sensitivity_case_row(
@@ -320,9 +321,7 @@ def thermal_numeric_status_from_mesh(mesh: dict[str, Any] | None) -> str:
     if not results:
         return "NOT_EVALUATED"
     statuses = [
-        results[level].status
-        for level in sorted(results)
-        if hasattr(results[level], "status")
+        results[level].status for level in sorted(results) if hasattr(results[level], "status")
     ]
     if not statuses:
         return "NOT_EVALUATED"
