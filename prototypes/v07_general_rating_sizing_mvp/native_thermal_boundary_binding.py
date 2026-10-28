@@ -12,9 +12,9 @@ from typing import Any
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
     EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
     EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
-    ExperimentalThermalBoundaryBindingV1,
     REVIEWED_MAX_PRESSURE_PA,
     REVIEWED_MIN_PRESSURE_PA,
+    ExperimentalThermalBoundaryBindingV1,
     bind_experimental_thermal_boundary_v1,
     build_experimental_thermal_boundary_v1,
     matches_frozen_reference_boundary,
