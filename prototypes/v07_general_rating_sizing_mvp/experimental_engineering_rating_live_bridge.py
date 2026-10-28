@@ -96,12 +96,15 @@ def build_experimental_engineering_rating_live_package(
     run_mesh_ladder: bool = True,
     single_mesh_subdivisions: int | None = None,
     run_hydraulic_sensitivity: bool = True,
+    mesh_result_cache: dict[int, EngineeringRatingResult] | None = None,
 ) -> dict[str, Any]:
     """Thermal mesh ladder (optional) + live hydraulic post-pass on finest valid mesh."""
     native_ctx = native or build_native_cell_context(case)
     tube_inlet_pressure_pa = tube_stream_spec(case).inlet_pressure_pa
     shell_inlet_pressure_pa = shell_stream_spec(case).inlet_pressure_pa
-    cache: dict[int, EngineeringRatingResult] = {}
+    cache: dict[int, EngineeringRatingResult] = (
+        mesh_result_cache if mesh_result_cache is not None else {}
+    )
     mesh_report: dict[str, Any] | None = None
     if run_mesh_ladder:
         mesh_report = evaluate_mesh_convergence(case, native=native_ctx, mesh_result_cache=cache)

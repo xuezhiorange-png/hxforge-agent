@@ -85,6 +85,7 @@ def test_r26d_full_multi_candidate_engineering_sizing_slow(r26d_case) -> None:
             assert row["ENGINEERING_SIZING_ELIGIBILITY"] == (
                 "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"
             )
+            assert row["GEOMETRY_COMPLETENESS_STATUS"] == "ENTRANCE_ONLY_ASSUMED"
     if report["NOMINAL_FEASIBLE_COUNT"] >= 1:
         assert report["RANKING_STATUS"] == "EXPERIMENTAL_RANKING_AVAILABLE"
         best = report["BEST_EXPERIMENTAL_CANDIDATE_ID"]
