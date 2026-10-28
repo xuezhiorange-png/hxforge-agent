@@ -13,12 +13,13 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_therm
     EXPERIMENTAL_THERMAL_BOUNDARY_AUTHORITY_ID,
     EXPERIMENTAL_THERMAL_BOUNDARY_SCHEMA,
     ExperimentalThermalBoundaryBindingV1,
+    REVIEWED_MAX_PRESSURE_PA,
+    REVIEWED_MIN_PRESSURE_PA,
     bind_experimental_thermal_boundary_v1,
     build_experimental_thermal_boundary_v1,
     matches_frozen_reference_boundary,
     reset_experimental_thermal_boundary,
 )
-from hexagent.exchangers.shell_tube.task173_integrated_rating.models import REFERENCE_PRESSURE_PA
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     SHELL_INLET_T_K,
     SHELL_MASS_FLOW_KG_S,
@@ -64,10 +65,16 @@ def validate_case_for_native_thermal_binding(case: EngineeringCase) -> None:
         raise ValueError(
             "shell mass flow must match frozen Task173 kernel for experimental binding"
         )
-    if tube.inlet_pressure_pa != REFERENCE_PRESSURE_PA:
-        raise ValueError("tube inlet pressure must match REFERENCE_PRESSURE_PA")
-    if shell.inlet_pressure_pa != REFERENCE_PRESSURE_PA:
-        raise ValueError("shell inlet pressure must match REFERENCE_PRESSURE_PA")
+    if (
+        tube.inlet_pressure_pa < REVIEWED_MIN_PRESSURE_PA
+        or tube.inlet_pressure_pa > REVIEWED_MAX_PRESSURE_PA
+    ):
+        raise ValueError("tube inlet pressure outside reviewed service envelope")
+    if (
+        shell.inlet_pressure_pa < REVIEWED_MIN_PRESSURE_PA
+        or shell.inlet_pressure_pa > REVIEWED_MAX_PRESSURE_PA
+    ):
+        raise ValueError("shell inlet pressure outside reviewed service envelope")
 
 
 def build_native_thermal_boundary_from_case(
@@ -91,8 +98,12 @@ def build_native_thermal_boundary_from_case(
             case
         ),
         allow_variable_water_temperature=experimental_variable_water_temperature_enabled(case),
-        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
-        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+        tube_property_evaluation_pressure_pa=(
+            tube_property_evaluation_pressure_pa or tube.inlet_pressure_pa
+        ),
+        shell_property_evaluation_pressure_pa=(
+            shell_property_evaluation_pressure_pa or shell.inlet_pressure_pa
+        ),
     )
 
 

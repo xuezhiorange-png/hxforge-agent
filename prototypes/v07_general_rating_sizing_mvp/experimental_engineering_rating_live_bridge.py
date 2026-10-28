@@ -6,12 +6,20 @@ import json
 from decimal import Decimal
 from typing import Any
 
+from prototypes.v07_general_rating_sizing_mvp.case_streams import (
+    shell_stream_spec,
+    tube_stream_spec,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_sizing_eligibility import (
     assess_engineering_sizing_eligibility,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_constraint_preview import (
     build_experimental_constraint_preview,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_hydraulic_margin import (
+    assess_hydraulic_margin_and_robustness,
+    build_engineering_delivery_receipt,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
     ENGINEERING_NUMERIC_VALID,
@@ -86,9 +94,12 @@ def build_experimental_engineering_rating_live_package(
     native: NativeCellContext | None = None,
     run_mesh_ladder: bool = True,
     single_mesh_subdivisions: int | None = None,
+    run_hydraulic_sensitivity: bool = True,
 ) -> dict[str, Any]:
     """Thermal mesh ladder (optional) + live hydraulic post-pass on finest valid mesh."""
     native_ctx = native or build_native_cell_context(case)
+    tube_inlet_pressure_pa = tube_stream_spec(case).inlet_pressure_pa
+    shell_inlet_pressure_pa = shell_stream_spec(case).inlet_pressure_pa
     cache: dict[int, EngineeringRatingResult] = {}
     mesh_report: dict[str, Any] | None = None
     if run_mesh_ladder:
@@ -102,19 +113,29 @@ def build_experimental_engineering_rating_live_package(
             native=native_ctx,
             mesh_result_cache=cache,
         )
+        single_valid = result.status == ENGINEERING_NUMERIC_VALID
         mesh_report = {
             "results": {subdivisions: result},
-            "per_mesh": {subdivisions: {"duty_w": result.duty_w}},
-            "FULL_RATING_CONVERGED": result.status == ENGINEERING_NUMERIC_VALID,
+            "per_mesh": {
+                subdivisions: {
+                    "duty_w": result.duty_w,
+                    "tube_outlet_temperature_k": result.tube_outlet_temperature_k,
+                    "shell_outlet_temperature_k": result.shell_outlet_temperature_k,
+                }
+            },
+            "FULL_RATING_CONVERGED": False,
+            "SINGLE_MESH_NUMERIC_VALID": single_valid,
+            "MESH_CONVERGENCE_NOT_EVALUATED": True,
             "DUTY_MESH_STABLE": False,
             "OUTLET_TEMPERATURE_MESH_STABLE": False,
-            "LOCAL_CLOSURE_VALID": result.status == ENGINEERING_NUMERIC_VALID,
+            "LOCAL_CLOSURE_VALID": single_valid,
         }
-        finest = (subdivisions, result) if result.status == ENGINEERING_NUMERIC_VALID else None
+        finest = (subdivisions, result) if single_valid else None
 
     thermal_status = "EXPERIMENTAL_ENGINEERING_THERMAL_RATING"
     mesh_row: dict[str, Any] = {}
     live_postpass: dict[str, Any] | None = None
+    hydraulic_margin: dict[str, Any] = {}
     hydraulic_receipt: dict[str, Any] = {
         "LIVE_HYDRAULIC_IMPLEMENTED": False,
         "LIVE_TUBE_DP_PA": None,
@@ -125,9 +146,12 @@ def build_experimental_engineering_rating_live_package(
         "SHELL_HYDRAULIC_STATUS": "NOT_EVALUATED",
         "HYDRAULIC_CONSTRAINT_STATUS": "NOT_EVALUATED",
         "CORRELATION_APPLICABILITY_STATUS": "NOT_EVALUATED",
+        "TUBE_INLET_PRESSURE_PA": str(tube_inlet_pressure_pa),
+        "SHELL_INLET_PRESSURE_PA": str(shell_inlet_pressure_pa),
     }
+    finest_level: int | None = None
     if finest is not None:
-        _level, rating = finest
+        finest_level, rating = finest
         mesh_row = _engineering_result_to_mesh_row(rating)
         preview = build_experimental_constraint_preview(case, mesh=mesh_row, native=native_ctx)
         live_postpass = run_live_thermal_state_hydraulic_postpass(
@@ -137,8 +161,8 @@ def build_experimental_engineering_rating_live_package(
             tube_outlet_temperature_k=Decimal(str(rating.tube_outlet_temperature_k)),
             shell_inlet_temperature_k=Decimal(str(rating.shell_inlet_temperature_k)),
             shell_outlet_temperature_k=Decimal(str(rating.shell_outlet_temperature_k)),
-            tube_inlet_pressure_pa=Decimal("101325"),
-            shell_inlet_pressure_pa=Decimal("101325"),
+            tube_inlet_pressure_pa=tube_inlet_pressure_pa,
+            shell_inlet_pressure_pa=shell_inlet_pressure_pa,
             reference_tube_dp_pa=(
                 Decimal(str(preview["modeled_tube_dp_pa"]))
                 if preview.get("modeled_tube_dp_pa")
@@ -152,8 +176,27 @@ def build_experimental_engineering_rating_live_package(
         )
         hydraulic_receipt = {
             "LIVE_HYDRAULIC_IMPLEMENTED": True,
+            "TUBE_INLET_PRESSURE_PA": str(tube_inlet_pressure_pa),
+            "SHELL_INLET_PRESSURE_PA": str(shell_inlet_pressure_pa),
             **_hydraulic_receipt_from_postpass(live_postpass, case),
         }
+        if run_hydraulic_sensitivity:
+            hydraulic_margin = assess_hydraulic_margin_and_robustness(
+                case,
+                native_candidate_id=native_ctx.candidate_id,
+                rating_thermal_state={
+                    "tube_inlet_temperature_k": Decimal(str(rating.tube_inlet_temperature_k)),
+                    "tube_outlet_temperature_k": Decimal(str(rating.tube_outlet_temperature_k)),
+                    "shell_inlet_temperature_k": Decimal(str(rating.shell_inlet_temperature_k)),
+                    "shell_outlet_temperature_k": Decimal(str(rating.shell_outlet_temperature_k)),
+                    "tube_inlet_pressure_pa": tube_inlet_pressure_pa,
+                    "shell_inlet_pressure_pa": shell_inlet_pressure_pa,
+                },
+                nominal_postpass=live_postpass,
+                thermal_mesh_level=finest_level,
+                mesh_convergence=mesh_report,
+            )
+            hydraulic_receipt = {**hydraulic_receipt, **hydraulic_margin}
         mesh_row["live_thermal_state_hydraulic_postpass"] = live_postpass
 
     eligibility = assess_engineering_sizing_eligibility(case, mesh_row)
@@ -168,6 +211,7 @@ def build_experimental_engineering_rating_live_package(
         "schema_version": _BRIDGE_SCHEMA,
         "TASK_ID": "V07_R26C_ENGINEERING_RATING_LIVE_HYDRAULIC_BRIDGE",
         "thermal_rating_status": thermal_status,
+        "THERMAL_RATING_STATUS": thermal_status,
         "task173_reference_status": "UNCHANGED",
         "Engineering_Rating": {
             "Geometry": {
@@ -181,6 +225,8 @@ def build_experimental_engineering_rating_live_package(
                 "shell_inlet_temperature_k": (
                     finest[1].shell_inlet_temperature_k if finest else None
                 ),
+                "tube_inlet_pressure_pa": str(tube_inlet_pressure_pa),
+                "shell_inlet_pressure_pa": str(shell_inlet_pressure_pa),
             },
             "Tube_Shell_Outlet_State": {
                 "tube_outlet_temperature_k": (
@@ -209,14 +255,34 @@ def build_experimental_engineering_rating_live_package(
         "mesh_convergence": mesh_report,
         "live_thermal_state_hydraulic_postpass": live_postpass,
         "hydraulic_receipt": hydraulic_receipt,
+        "hydraulic_margin": hydraulic_margin,
         "GEOMETRY_COMPLETENESS_STATUS": eligibility.get(
             "GEOMETRY_COMPLETENESS_STATUS", "ENTRANCE_ONLY_ASSUMED"
         ),
         "ENGINEERING_SIZING_ELIGIBILITY": eligibility.get("ENGINEERING_SIZING_ELIGIBILITY"),
+        "HYDRAULIC_NOMINAL_STATUS": hydraulic_margin.get("HYDRAULIC_NOMINAL_STATUS")
+        or hydraulic_receipt.get("HYDRAULIC_CONSTRAINT_STATUS"),
+        "HYDRAULIC_ROBUSTNESS_STATUS": hydraulic_margin.get("HYDRAULIC_ROBUSTNESS_STATUS"),
         "PRODUCTION_SIZING_VERIFIED": False,
         "PRODUCTION_DESIGN_APPROVED": False,
         "TOTAL_COOLPROP_CALLS": total_coolprop,
         "N4_WALL_SECONDS": n4_wall,
+        "engineering_delivery_receipt": build_engineering_delivery_receipt(
+            {
+                "mesh_convergence": mesh_report,
+                "hydraulic_receipt": hydraulic_receipt,
+                "hydraulic_margin": hydraulic_margin,
+                "GEOMETRY_COMPLETENESS_STATUS": eligibility.get(
+                    "GEOMETRY_COMPLETENESS_STATUS", "ENTRANCE_ONLY_ASSUMED"
+                ),
+                "ENGINEERING_SIZING_ELIGIBILITY": eligibility.get("ENGINEERING_SIZING_ELIGIBILITY"),
+                "thermal_rating_status": thermal_status,
+                "N4_WALL_SECONDS": n4_wall,
+                "TOTAL_COOLPROP_CALLS": total_coolprop,
+                "PRODUCTION_SIZING_VERIFIED": False,
+                "PRODUCTION_DESIGN_APPROVED": False,
+            }
+        ),
     }
     return package
 

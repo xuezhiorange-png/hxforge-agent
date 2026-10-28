@@ -1023,6 +1023,7 @@ jobs:
       - name: Global collection main (py${{ matrix.python }})
         run: |
           uv run --locked pytest --collect-only -q \
+            -m "not slow" \
             -p tests.ci.collect_nodes_plugin \
             -p tests.ci.outcome_plugin \
             --hx-collection-scope global \

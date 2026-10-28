@@ -24,7 +24,6 @@ from hexagent.exchangers.shell_tube.shell_side_flow_state.schema import (
 from hexagent.exchangers.shell_tube.shell_side_hydraulic_geometry import (
     validate_request as validate_task031,
 )
-from hexagent.exchangers.shell_tube.task173_integrated_rating.models import REFERENCE_PRESSURE_PA
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.service import DIMENSION_ORDER
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     compute_task027_friction_pressure_drop,
@@ -492,6 +491,7 @@ def _recompute_shell_bell_delaware(
     case: EngineeringCase,
     ctx: Task168CandidateBundle,
     shell_property_snapshot: PropertySnapshot,
+    shell_mass_flow_kg_s: Decimal | None = None,
 ) -> tuple[Task166Result, Any]:
     bundle = ctx.bundle
     authority = ctx.authority
@@ -506,7 +506,7 @@ def _recompute_shell_bell_delaware(
     request032 = task168._task032_payload(authority, result031, ctx.configuration, ctx.layout)
     request032["property_snapshot"] = task168._public_value(shell_property_snapshot)
     request032["property_snapshot_hash"] = shell_property_snapshot.property_snapshot_hash
-    scaled_shell_flow = _equipment_shell_task032_mass_flow_rate_kg_s(case)
+    scaled_shell_flow = shell_mass_flow_kg_s or _equipment_shell_task032_mass_flow_rate_kg_s(case)
     mass_flow = request032.get("mass_flow_authority")
     if type(mass_flow) is dict:
         mass_flow["mass_flow_rate_kg_s"] = str(scaled_shell_flow)
@@ -553,7 +553,7 @@ def _coolprop_outlet_domain_ok(
 
 
 def _engineering_inlet_pressure_ok(pressure_pa: Decimal) -> bool:
-    return pressure_pa == REFERENCE_PRESSURE_PA
+    return _COOLPROP_MIN_PRESSURE_PA <= pressure_pa <= _COOLPROP_MAX_PRESSURE_PA
 
 
 def run_live_thermal_state_hydraulic_postpass(
@@ -571,6 +571,7 @@ def run_live_thermal_state_hydraulic_postpass(
     provider: CoolPropProvider | None = None,
     tube_property_evaluation_pressure_pa: Decimal | None = None,
     shell_property_evaluation_pressure_pa: Decimal | None = None,
+    equipment_shell_mass_flow_kg_s_override: Decimal | None = None,
 ) -> dict[str, Any]:
     """One-way hydraulic post-pass; does not mutate Task174 reference preview semantics."""
     provider = provider or CoolPropProvider()
@@ -642,7 +643,11 @@ def run_live_thermal_state_hydraulic_postpass(
 
     tube_side = tube_stream_spec(case)
     equipment_tube_flow = equipment_tube_mass_flow_kg_s(case)
-    equipment_shell_flow = equipment_shell_mass_flow_kg_s(case)
+    equipment_shell_flow = (
+        equipment_shell_mass_flow_kg_s_override
+        if equipment_shell_mass_flow_kg_s_override is not None
+        else equipment_shell_mass_flow_kg_s(case)
+    )
     historical_task026_template_flow = bundle.task026_result.mass_flow_rate_kg_s
     task026_request = _task026_request_with_snapshot(
         authority,
@@ -713,6 +718,7 @@ def run_live_thermal_state_hydraulic_postpass(
             case=case,
             ctx=ctx,
             shell_property_snapshot=shell_snapshot,
+            shell_mass_flow_kg_s=equipment_shell_flow,
         )
         shell_hydraulic_recompute_status = "SUCCESS"
     except RuntimeError as exc:

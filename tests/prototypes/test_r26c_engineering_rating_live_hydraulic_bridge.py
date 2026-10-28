@@ -191,7 +191,11 @@ def test_live_hydraulic_bridge_r22_n1() -> None:
         case,
         run_mesh_ladder=False,
         single_mesh_subdivisions=1,
+        run_hydraulic_sensitivity=False,
     )
+    mesh = package["mesh_convergence"]
+    assert mesh["FULL_RATING_CONVERGED"] is False
+    assert mesh["SINGLE_MESH_NUMERIC_VALID"] is True
     receipt = package["hydraulic_receipt"]
     assert receipt["LIVE_HYDRAULIC_IMPLEMENTED"] is True
     assert receipt["LIVE_TUBE_DP_PA"] is not None
@@ -220,6 +224,17 @@ def test_r26c_primary_310_295_mesh_ladder_and_live_hydraulic() -> None:
     assert mesh["results"][1].status == ENGINEERING_NUMERIC_VALID
     assert mesh["results"][2].status == ENGINEERING_NUMERIC_VALID
     assert mesh["results"][4].status == ENGINEERING_NUMERIC_VALID
+    mesh = package["mesh_convergence"]
+    assert mesh["FULL_RATING_CONVERGED"] is True
     receipt = package["hydraulic_receipt"]
     assert receipt["LIVE_HYDRAULIC_IMPLEMENTED"] is True
+    margin = package["hydraulic_margin"]
+    assert margin["SHELL_NEAR_CONSTRAINT_BOUNDARY"] is True
+    assert margin["HYDRAULIC_ROBUSTNESS_STATUS"] in {
+        "NEAR_CONSTRAINT_BOUNDARY",
+        "NOT_SATISFIED",
+    }
+    delivery = package["engineering_delivery_receipt"]
+    assert delivery["N1_DUTY_W"] == mesh["results"][1].duty_w
+    assert delivery["N4_DUTY_W"] == mesh["results"][4].duty_w
     assert package["GEOMETRY_COMPLETENESS_STATUS"] == "ENTRANCE_ONLY_ASSUMED"

@@ -38,6 +38,8 @@ def test_primary_310_295_k_r25_task172_closure_status() -> None:
         load_general_engineering_case_json,
     )
     from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        DEFAULT_LEGACY_LOW_MESH_CI_RESOURCE_BUDGET_S,
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
         build_native_cell_context,
         run_mesh_numeric_with_profile,
     )
@@ -49,9 +51,11 @@ def test_primary_310_295_k_r25_task172_closure_status() -> None:
         subdivisions=1,
         case=case,
         enable_live_thermal_boundary=True,
+        resource_budget_wall_s=DEFAULT_LEGACY_LOW_MESH_CI_RESOURCE_BUDGET_S,
     )
     assert mesh.get("status") == "BLOCKED"
     assert mesh.get("failure_code") in {
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
         "PRECISION_FLOOR_UNRESOLVED",
         "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
         "BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID",

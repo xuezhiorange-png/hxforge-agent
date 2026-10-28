@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import itertools
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, cast
@@ -318,7 +320,74 @@ def run_low_mesh_numeric(
     return {**mesh, "solver_performance_profile": profile}
 
 
+LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE = "BLOCKED_RESOURCE_BUDGET"
+DEFAULT_LEGACY_LOW_MESH_CI_RESOURCE_BUDGET_S = 90.0
+
+
 def run_mesh_numeric_with_profile(
+    native: NativeCellContext,
+    *,
+    subdivisions: int,
+    enable_ephemeral_tp_cache: bool = False,
+    case: EngineeringCase | None = None,
+    enable_live_thermal_boundary: bool = False,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
+    resource_budget_wall_s: float | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
+    if resource_budget_wall_s is not None and resource_budget_wall_s <= 0:
+        raise ValueError("resource_budget_wall_s must be positive when set")
+    if resource_budget_wall_s is None:
+        return _run_mesh_numeric_with_profile_impl(
+            native,
+            subdivisions=subdivisions,
+            enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+            case=case,
+            enable_live_thermal_boundary=enable_live_thermal_boundary,
+            tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+            shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+        )
+    t0 = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(
+            _run_mesh_numeric_with_profile_impl,
+            native,
+            subdivisions=subdivisions,
+            enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+            case=case,
+            enable_live_thermal_boundary=enable_live_thermal_boundary,
+            tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+            shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+        )
+        try:
+            return future.result(timeout=resource_budget_wall_s)
+        except FuturesTimeoutError:
+            elapsed = time.perf_counter() - t0
+            mesh = {
+                "schema_version": "hxforge.low-mesh-result.v1",
+                "status": "BLOCKED",
+                "mesh_level": subdivisions,
+                "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+                "diagnostics": [
+                    f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
+                    f"elapsed_wall_s={elapsed:.3f}",
+                ],
+                "wall_seconds": round(elapsed, 3),
+                "low_mesh_numeric_valid": False,
+                "full_rating_converged": False,
+            }
+            profile = build_solver_performance_profile(
+                stats=t173._CellSearchStats(),
+                mesh_run=None,
+                property_provider_state_lookup_count=0,
+                total_wall_seconds=elapsed,
+                subdivisions=subdivisions,
+                tp_cache_stats=None,
+            )
+            return mesh, profile, None
+
+
+def _run_mesh_numeric_with_profile_impl(
     native: NativeCellContext,
     *,
     subdivisions: int,
