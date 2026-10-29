@@ -48,6 +48,15 @@ def build_hydraulic_dp_breakdown(
     tube_local = _dec(exp.get("tube_local_loss_dp_pa"))
     if tube_friction is None and tube_total is not None and tube_local is not None:
         tube_friction = tube_total - tube_local
+    if tube_friction is None and tube_total is not None:
+        embedded_local = Decimal("0")
+        for comp in (postpass.get("tube_local_loss_engineering") or {}).get(
+            "computed_local_loss_components"
+        ) or []:
+            loss = comp.get("component_irreversible_pressure_loss_pa")
+            if loss is not None:
+                embedded_local += Decimal(str(loss))
+        tube_friction = tube_total - embedded_local
 
     shell_parts = postpass.get("shell_dp_components_pa") or {}
     shell_internal = _dec(shell_parts.get("total"))

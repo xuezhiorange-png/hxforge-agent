@@ -150,13 +150,22 @@ def run_authorized_full_path_hydraulic_calculation(
     tube_friction = _dec(exp.get("tube_friction_dp_pa"))
     if tube_friction is None:
         tube_friction = _dec(partial_breakdown.get("TUBE_FRICTION_DP_PA"))
-    if tube_friction is None and postpass:
-        tube_total_partial = _dec(postpass.get("recalculated_tube_dp_pa"))
-        tube_local_partial = _dec(exp.get("tube_local_loss_dp_pa"))
-        if tube_local_partial is None:
-            tube_local_partial = _dec(partial_breakdown.get("TUBE_LOCAL_LOSS_DP_PA"))
-        if tube_total_partial is not None and tube_local_partial is not None:
-            tube_friction = tube_total_partial - tube_local_partial
+    tube_total_partial = _dec(postpass.get("recalculated_tube_dp_pa")) if postpass else None
+    if tube_friction is None and tube_total_partial is not None:
+        partial_local = _dec(partial_breakdown.get("TUBE_LOCAL_LOSS_DP_PA"))
+        if partial_local is None:
+            partial_local = _dec(exp.get("tube_local_loss_dp_pa"))
+        if partial_local is not None:
+            tube_friction = tube_total_partial - partial_local
+        else:
+            embedded_local = Decimal("0")
+            for comp in (postpass.get("tube_local_loss_engineering") or {}).get(
+                "computed_local_loss_components"
+            ) or []:
+                loss = comp.get("component_irreversible_pressure_loss_pa")
+                if loss is not None:
+                    embedded_local += Decimal(str(loss))
+            tube_friction = tube_total_partial - embedded_local
 
     shell_parts = (postpass or {}).get("shell_dp_components_pa") or {}
     shell_bd_internal = _dec(shell_parts.get("total"))
@@ -173,6 +182,9 @@ def run_authorized_full_path_hydraulic_calculation(
     tube_full_status = "BLOCKED"
     shell_full_status = "BLOCKED"
     blockers: list[str] = list(binding_errors)
+    for row in tube_rows + shell_external_rows:
+        if row.get("status") == "BLOCKED":
+            blockers.append(f"{row.get('component_id')}: {row.get('blocker')}")
 
     if binding_errors:
         overall_status = "BLOCKED_BINDING"
