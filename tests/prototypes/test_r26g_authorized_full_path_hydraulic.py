@@ -132,7 +132,7 @@ def test_r26g_representative_full_path_study_slow(r26e_case) -> None:
         if row["candidate_geometry_authority"]["candidate_id"] == _MIDDLE_CANDIDATE_ID
     )
     authorized = middle["authorized_full_path_model"]
-    assert authorized["status"] == "COMPUTED"
+    assert authorized["status"] == "COMPUTED", authorized.get("blockers")
     assert authorized["SHELL_BELL_DELAWARE_INTERNAL_DP_PA"] is not None
     assert authorized["SHELL_EXTERNAL_LOCAL_DP_PA"] is not None
     assert authorized["SHELL_FULL_PATH_TOTAL_DP_PA"] is not None

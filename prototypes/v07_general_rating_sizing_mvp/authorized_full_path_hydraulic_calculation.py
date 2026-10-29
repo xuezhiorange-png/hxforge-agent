@@ -14,6 +14,9 @@ from hexagent.properties.base import FluidIdentifier
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import CandidateSelectionRecord
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_dp_breakdown import (
+    build_hydraulic_dp_breakdown,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_completeness import (
     assess_hydraulic_path_completeness,
 )
@@ -143,15 +146,22 @@ def run_authorized_full_path_hydraulic_calculation(
     ]
 
     exp = (postpass or {}).get("experimental_transitional_tube_hydraulic") or {}
+    partial_breakdown = build_hydraulic_dp_breakdown(postpass, case=case) if postpass else {}
     tube_friction = _dec(exp.get("tube_friction_dp_pa"))
+    if tube_friction is None:
+        tube_friction = _dec(partial_breakdown.get("TUBE_FRICTION_DP_PA"))
     if tube_friction is None and postpass:
         tube_total_partial = _dec(postpass.get("recalculated_tube_dp_pa"))
         tube_local_partial = _dec(exp.get("tube_local_loss_dp_pa"))
+        if tube_local_partial is None:
+            tube_local_partial = _dec(partial_breakdown.get("TUBE_LOCAL_LOSS_DP_PA"))
         if tube_total_partial is not None and tube_local_partial is not None:
             tube_friction = tube_total_partial - tube_local_partial
 
     shell_parts = (postpass or {}).get("shell_dp_components_pa") or {}
     shell_bd_internal = _dec(shell_parts.get("total"))
+    if shell_bd_internal is None:
+        shell_bd_internal = _dec(partial_breakdown.get("SHELL_INTERNAL_DP_PA"))
     if shell_bd_internal is None and postpass:
         shell_bd_internal = _dec(postpass.get("recalculated_shell_dp_pa"))
 
