@@ -96,6 +96,9 @@ def test_r26f_dp_breakdown_from_transitional_postpass_fields() -> None:
     assert breakdown["TUBE_LOCAL_LOSS_DP_PA"] == "100"
     assert breakdown["TUBE_TOTAL_DP_PA"] == "800"
     assert breakdown["SHELL_INTERNAL_DP_PA"] == "900"
+    assert breakdown["SHELL_NOZZLE_AND_LOCAL_DP_PA"] is None
+    assert breakdown["SHELL_MODELED_PARTIAL_DP_PA"] == "900"
+    assert breakdown["SHELL_FULL_PATH_STATUS"] == "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
     assert breakdown["total_reconciliation_ok"] is True
     assert tube_dp_components_summary(breakdown)[0]["component_id"] == "TUBE_BUNDLE_FRICTION"
     shell_rows = shell_dp_components_summary(breakdown)

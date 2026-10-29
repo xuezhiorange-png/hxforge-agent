@@ -474,3 +474,10 @@ shards:
     files:
       - tests/prototypes/test_r26f_engineering_hydraulic_path.py
     timeout: 7200
+
+  - name: v07-r26g-authorized-full-path
+    job: shard-v07-r26g-authorized-full-path
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r26g_authorized_full_path_hydraulic.py
+    timeout: 7200

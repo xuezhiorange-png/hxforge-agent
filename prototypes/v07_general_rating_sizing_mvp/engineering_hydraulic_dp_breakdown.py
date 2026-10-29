@@ -24,9 +24,15 @@ def build_hydraulic_dp_breakdown(
             "status": "NOT_EVALUATED",
             "TUBE_FRICTION_DP_PA": None,
             "TUBE_LOCAL_LOSS_DP_PA": None,
+            "TUBE_MODELED_PARTIAL_DP_PA": None,
+            "TUBE_FULL_PATH_TOTAL_DP_PA": None,
+            "TUBE_FULL_PATH_STATUS": "NOT_EVALUATED",
             "TUBE_TOTAL_DP_PA": None,
             "SHELL_INTERNAL_DP_PA": None,
+            "SHELL_MODELED_PARTIAL_DP_PA": None,
             "SHELL_NOZZLE_AND_LOCAL_DP_PA": None,
+            "SHELL_FULL_PATH_TOTAL_DP_PA": None,
+            "SHELL_FULL_PATH_STATUS": "NOT_EVALUATED",
             "SHELL_TOTAL_DP_PA": None,
             "TUBE_DP_MARGIN_PA": None,
             "SHELL_DP_MARGIN_PA": None,
@@ -51,10 +57,27 @@ def build_hydraulic_dp_breakdown(
     shell_nozzle_doc = postpass.get("shell_nozzle_local_loss_engineering")
     shell_nozzle_dp = _dec((shell_nozzle_doc or {}).get("total_nozzle_and_transition_dp_pa"))
     if shell_nozzle_dp is None:
-        shell_nozzle_dp = Decimal("0")
+        shell_nozzle_dp = None
         shell_nozzle_status = "NOT_MODELED_INPUT_REQUIRED"
+        shell_full_path_status = "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
+        shell_full_path_total = None
     else:
         shell_nozzle_status = "INCLUDED"
+        shell_full_path_status = "COMPUTED"
+        shell_full_path_total = (
+            (shell_internal + shell_nozzle_dp)
+            if shell_internal is not None
+            else None
+        )
+
+    tube_modeled_partial = tube_total
+    shell_modeled_partial = shell_total
+
+    tube_full_path_status = "DEMONSTRATION_PARTIAL_PATH_ONLY"
+    tube_full_path_total = None
+    if tube_total is not None and tube_friction is not None and tube_local is not None:
+        tube_full_path_total = tube_total
+        tube_full_path_status = "PARTIAL_MODEL_ONLY"
 
     tube_margin = (max_tube - tube_total) if tube_total is not None else None
     shell_margin = (max_shell - shell_total) if shell_total is not None else None
@@ -77,7 +100,7 @@ def build_hydraulic_dp_breakdown(
     reconciliation_ok = None
     if tube_total is not None and tube_friction is not None and tube_local is not None:
         reconciliation_ok = abs((tube_friction + tube_local) - tube_total) <= Decimal("0.01")
-    if shell_total is not None and shell_internal is not None:
+    if shell_total is not None and shell_internal is not None and shell_nozzle_dp is not None:
         expected_shell = shell_internal + shell_nozzle_dp
         if reconciliation_ok is None:
             reconciliation_ok = abs(expected_shell - shell_total) <= Decimal("0.01")
@@ -90,9 +113,25 @@ def build_hydraulic_dp_breakdown(
         "status": "COMPUTED" if tube_total is not None and shell_total is not None else "BLOCKED",
         "TUBE_FRICTION_DP_PA": str(tube_friction) if tube_friction is not None else None,
         "TUBE_LOCAL_LOSS_DP_PA": str(tube_local) if tube_local is not None else None,
+        "TUBE_MODELED_PARTIAL_DP_PA": (
+            str(tube_modeled_partial) if tube_modeled_partial is not None else None
+        ),
+        "TUBE_FULL_PATH_TOTAL_DP_PA": (
+            str(tube_full_path_total) if tube_full_path_total is not None else None
+        ),
+        "TUBE_FULL_PATH_STATUS": tube_full_path_status,
         "TUBE_TOTAL_DP_PA": str(tube_total) if tube_total is not None else None,
         "SHELL_INTERNAL_DP_PA": str(shell_internal) if shell_internal is not None else None,
-        "SHELL_NOZZLE_AND_LOCAL_DP_PA": str(shell_nozzle_dp),
+        "SHELL_MODELED_PARTIAL_DP_PA": (
+            str(shell_modeled_partial) if shell_modeled_partial is not None else None
+        ),
+        "SHELL_NOZZLE_AND_LOCAL_DP_PA": (
+            str(shell_nozzle_dp) if shell_nozzle_dp is not None else None
+        ),
+        "SHELL_FULL_PATH_TOTAL_DP_PA": (
+            str(shell_full_path_total) if shell_full_path_total is not None else None
+        ),
+        "SHELL_FULL_PATH_STATUS": shell_full_path_status,
         "SHELL_TOTAL_DP_PA": str(shell_total) if shell_total is not None else None,
         "TUBE_DP_MARGIN_PA": str(tube_margin) if tube_margin is not None else None,
         "SHELL_DP_MARGIN_PA": str(shell_margin) if shell_margin is not None else None,
@@ -149,13 +188,13 @@ def shell_dp_components_summary(breakdown: dict[str, Any]) -> list[dict[str, Any
                     "included_in_model": "TASK166",
                 }
             )
-    if breakdown.get("SHELL_NOZZLE_AND_LOCAL_DP_PA") not in (None, "0"):
+    if breakdown.get("SHELL_NOZZLE_AND_LOCAL_DP_PA") is not None:
         rows.append(
             {
                 "component_id": "SHELL_NOZZLE_AND_TRANSITION",
                 "path": "SHELL_EXTERNAL",
                 "dp_pa": breakdown["SHELL_NOZZLE_AND_LOCAL_DP_PA"],
-                "included_in_model": "NOT_MODELED",
+                "included_in_model": "AUTHORIZED_SHELL_EXTERNAL_PATH",
             }
         )
     elif breakdown.get("component_audit", {}).get("shell_nozzle_path_status") == (

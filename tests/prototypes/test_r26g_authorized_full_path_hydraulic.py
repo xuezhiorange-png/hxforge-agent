@@ -1,0 +1,146 @@
+"""R26G authorized full-path hydraulic calculation and input contract."""
+
+# ruff: noqa: E501
+
+from __future__ import annotations
+
+from decimal import Decimal
+from pathlib import Path
+
+import pytest
+
+from prototypes.v07_general_rating_sizing_mvp.authorized_full_path_hydraulic_calculation import (
+    run_authorized_full_path_hydraulic_calculation,
+)
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    enumerate_experimental_rating_candidates,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
+    load_general_engineering_case_json,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_dp_breakdown import (
+    build_hydraulic_dp_breakdown,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_completeness import (
+    assess_hydraulic_path_completeness,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v1 import (
+    build_r26g_demonstration_hydraulic_path_input_v1,
+    load_engineering_hydraulic_path_input_v1_json,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_authorized_full_path_study import (
+    run_r26g_authorized_full_path_hydraulic_study,
+)
+
+_FIXTURE_R26E = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures/r26e_multi_candidate_engineering_sizing_case.json"
+)
+_MIDDLE_CANDIDATE_ID = "3c129a7f-eba7-5b5a-9b86-5b2ce9629dae"
+
+
+@pytest.fixture(name="r26e_case")
+def _r26e_case():
+    return load_general_engineering_case_json(_FIXTURE_R26E.read_text(encoding="utf-8"))
+
+
+def test_r26g_breakdown_missing_nozzle_not_zero(r26e_case) -> None:
+    postpass = {
+        "recalculated_tube_dp_pa": "800",
+        "recalculated_shell_dp_pa": "900",
+        "experimental_transitional_tube_hydraulic": {
+            "tube_friction_dp_pa": "700",
+            "tube_local_loss_dp_pa": "100",
+        },
+        "shell_dp_components_pa": {"total": "900"},
+    }
+    breakdown = build_hydraulic_dp_breakdown(postpass, case=r26e_case)
+    assert breakdown["SHELL_NOZZLE_AND_LOCAL_DP_PA"] is None
+    assert breakdown["SHELL_MODELED_PARTIAL_DP_PA"] == "900"
+    assert breakdown["SHELL_FULL_PATH_TOTAL_DP_PA"] is None
+    assert breakdown["SHELL_FULL_PATH_STATUS"] == "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
+
+
+def test_r26g_demonstration_path_input_binds_and_parses(r26e_case) -> None:
+    selection = enumerate_experimental_rating_candidates(r26e_case)
+    record = next(r for r in selection.records if r.candidate_id == _MIDDLE_CANDIDATE_ID)
+    path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
+    roundtrip = load_engineering_hydraulic_path_input_v1_json(path_input.model_dump_json())
+    assert roundtrip.binding.candidate_id == record.candidate_id
+    completeness = assess_hydraulic_path_completeness(roundtrip)
+    assert completeness["path_completeness_status"] == "DEMONSTRATION_FULL_PATH_DECLARED"
+    assert completeness["FULL_PATH_VERIFICATION_STATUS"] == "NOT_VERIFIED"
+
+
+def test_r26g_authorized_calc_fail_closed_without_postpass(r26e_case) -> None:
+    selection = enumerate_experimental_rating_candidates(r26e_case)
+    record = selection.records[0]
+    path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
+    result = run_authorized_full_path_hydraulic_calculation(
+        case=r26e_case,
+        path_input=path_input,
+        record=record,
+        postpass=None,
+    )
+    assert result["status"] == "BLOCKED_INCOMPLETE_INPUT"
+    assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is None
+    assert result["SHELL_FULL_PATH_TOTAL_DP_PA"] is None
+
+
+def test_r26g_authorized_calc_reconciles_with_postpass(r26e_case) -> None:
+    selection = enumerate_experimental_rating_candidates(r26e_case)
+    record = next(r for r in selection.records if r.candidate_id == _MIDDLE_CANDIDATE_ID)
+    path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
+    postpass = {
+        "recalculated_tube_dp_pa": "850",
+        "recalculated_shell_dp_pa": "920",
+        "experimental_transitional_tube_hydraulic": {
+            "tube_friction_dp_pa": "750",
+            "tube_local_loss_dp_pa": "100",
+        },
+        "shell_dp_components_pa": {"central_crossflow": "500", "window": "300", "total": "920"},
+    }
+    result = run_authorized_full_path_hydraulic_calculation(
+        case=r26e_case,
+        path_input=path_input,
+        record=record,
+        postpass=postpass,
+    )
+    assert result["status"] == "COMPUTED"
+    assert result["TUBE_INTERNAL_FRICTION_DP_PA"] == "750"
+    assert Decimal(result["TUBE_LOCAL_DP_PA"]) > 0
+    assert Decimal(result["SHELL_EXTERNAL_LOCAL_DP_PA"]) > 0
+    assert result["reconciliation"]["tube_full_equals_friction_plus_local"] is True
+    assert result["reconciliation"]["shell_full_equals_bd_plus_external"] is True
+    assert result["PRODUCTION_DESIGN_APPROVED"] is False
+    assert (
+        result["ENGINEERING_SIZING_ELIGIBILITY"]
+        == "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"
+    )
+
+
+@pytest.mark.slow
+def test_r26g_representative_full_path_study_slow(r26e_case) -> None:
+    study = run_r26g_authorized_full_path_hydraulic_study(
+        r26e_case, use_demonstration_path_inputs=True
+    )
+    assert study["TASK_ID"] == "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION"
+    assert study["PRODUCTION_DESIGN_APPROVED"] is False
+    middle = next(
+        row
+        for row in study["representative_candidates"]
+        if row["candidate_geometry_authority"]["candidate_id"] == _MIDDLE_CANDIDATE_ID
+    )
+    authorized = middle["authorized_full_path_model"]
+    assert authorized["status"] == "COMPUTED"
+    assert authorized["SHELL_BELL_DELAWARE_INTERNAL_DP_PA"] is not None
+    assert authorized["SHELL_EXTERNAL_LOCAL_DP_PA"] is not None
+    assert authorized["SHELL_FULL_PATH_TOTAL_DP_PA"] is not None
+    assert middle["model_delta"]["status"] == "COMPUTED"
+    baseline = next(
+        row
+        for row in study["representative_candidates"]
+        if row["candidate_geometry_authority"]["shell_inside_diameter_m"] == "0.56"
+        and row["candidate_geometry_authority"]["tube_length_m"] == "3.0"
+    )
+    assert baseline["authorized_full_path_model"]["status"] == "COMPUTED"

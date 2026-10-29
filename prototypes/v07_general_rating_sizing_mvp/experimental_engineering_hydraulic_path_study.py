@@ -4,8 +4,12 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
+from prototypes.v07_general_rating_sizing_mvp.authorized_full_path_hydraulic_calculation import (
+    run_authorized_full_path_hydraulic_calculation,
+)
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
     CandidateSelectionRecord,
     enumerate_experimental_rating_candidates,
@@ -20,6 +24,9 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_geometr
     R26D_HISTORICAL_LONG_BASELINE_REFERENCE,
     assess_full_hydraulic_path_input_status,
     candidate_geometry_from_selection_record,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v1 import (
+    EngineeringHydraulicPathInputV1,
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
     ENGINEERING_NUMERIC_VALID,
@@ -81,10 +88,59 @@ def _resolve_representative_records(
     return chosen
 
 
+def _model_delta(
+    breakdown: dict[str, Any],
+    authorized: dict[str, Any],
+    *,
+    case: EngineeringCase,
+) -> dict[str, Any]:
+    if authorized.get("status") != "COMPUTED":
+        return {
+            "status": "NOT_COMPUTED",
+            "reason": authorized.get("blockers") or authorized.get("status"),
+        }
+    partial_tube = breakdown.get("TUBE_MODELED_PARTIAL_DP_PA")
+    partial_shell = breakdown.get("SHELL_MODELED_PARTIAL_DP_PA")
+    full_tube = authorized.get("TUBE_FULL_PATH_TOTAL_DP_PA")
+    full_shell = authorized.get("SHELL_FULL_PATH_TOTAL_DP_PA")
+    delta_tube = None
+    delta_shell = None
+    if partial_tube is not None and full_tube is not None:
+        delta_tube = str(Decimal(full_tube) - Decimal(partial_tube))
+    if partial_shell is not None and full_shell is not None:
+        delta_shell = str(Decimal(full_shell) - Decimal(partial_shell))
+    max_tube = case.max_tube_side_pressure_drop_pa
+    max_shell = case.max_shell_side_pressure_drop_pa
+    tube_margin_full = None
+    shell_margin_full = None
+    if full_tube is not None:
+        tube_margin_full = str(max_tube - Decimal(full_tube))
+    if full_shell is not None:
+        shell_margin_full = str(max_shell - Decimal(full_shell))
+    return {
+        "status": "COMPUTED",
+        "partial_tube_dp_pa": partial_tube,
+        "partial_shell_dp_pa": partial_shell,
+        "full_path_tube_dp_pa": full_tube,
+        "full_path_shell_dp_pa": full_shell,
+        "added_tube_local_and_path_dp_pa": delta_tube,
+        "added_shell_external_local_dp_pa": delta_shell,
+        "tube_dp_margin_after_full_path_pa": tube_margin_full,
+        "shell_dp_margin_after_full_path_pa": shell_margin_full,
+        "nominal_constraint_change_evaluated": False,
+        "note": (
+            "Nominal feasibility flags are not auto-updated; compare margins manually until "
+            "owner authorizes production path inputs."
+        ),
+    }
+
+
 def _rate_candidate(
     case: EngineeringCase,
     record: CandidateSelectionRecord,
     selection: Any,
+    *,
+    path_input: EngineeringHydraulicPathInputV1 | None = None,
 ) -> dict[str, Any]:
     native = build_native_cell_context(case, selection=selection, candidate_id=record.candidate_id)
     n1_cache: dict[int, Any] = {}
@@ -107,6 +163,22 @@ def _rate_candidate(
     )
     mesh = (package or {}).get("mesh_convergence") or {}
     margin = (package or {}).get("hydraulic_margin") or {}
+    authorized_block: dict[str, Any]
+    if path_input is None:
+        authorized_block = {
+            "status": "NOT_RUN",
+            "reason": (
+                "Full-path hydraulic model requires EngineeringHydraulicPathInputV1 bound to "
+                "candidate; see FULL_PATH_INPUT_STATUS."
+            ),
+        }
+    else:
+        authorized_block = run_authorized_full_path_hydraulic_calculation(
+            case=case,
+            path_input=path_input,
+            record=record,
+            postpass=postpass or None,
+        )
     return {
         "candidate_geometry_authority": candidate_geometry_from_selection_record(record),
         "demonstration_entrance_only_model": {
@@ -124,31 +196,38 @@ def _rate_candidate(
             "hydraulic_dp_breakdown": breakdown,
             "TUBE_DP_COMPONENTS": tube_dp_components_summary(breakdown),
             "SHELL_DP_COMPONENTS": shell_dp_components_summary(breakdown),
+            "SHELL_MODELED_PARTIAL_DP_PA": breakdown.get("SHELL_MODELED_PARTIAL_DP_PA"),
+            "SHELL_FULL_PATH_TOTAL_DP_PA": breakdown.get("SHELL_FULL_PATH_TOTAL_DP_PA"),
+            "SHELL_FULL_PATH_STATUS": breakdown.get("SHELL_FULL_PATH_STATUS"),
         },
-        "authorized_full_path_model": {
-            "status": "NOT_RUN",
-            "reason": (
-                "Full-path hydraulic model requires AUTHORIZED_ENGINEERING_INPUT for tube header, "
-                "exit, and shell nozzle transitions; see FULL_PATH_INPUT_STATUS."
-            ),
-        },
-        "model_delta": {
-            "status": "NOT_COMPUTED",
-            "reason": "Authorized full-path inputs not supplied; no delta vs demonstration model.",
-        },
+        "authorized_full_path_model": authorized_block,
+        "model_delta": _model_delta(breakdown, authorized_block, case=case),
     }
 
 
 def run_experimental_engineering_hydraulic_path_study(
     case: EngineeringCase,
+    *,
+    hydraulic_path_inputs: dict[str, EngineeringHydraulicPathInputV1] | None = None,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     selection = enumerate_experimental_rating_candidates(case)
     path_status = assess_full_hydraulic_path_input_status(case)
     representatives = _resolve_representative_records(selection.records)
-    candidate_results = [_rate_candidate(case, record, selection) for record in representatives]
+    path_map = hydraulic_path_inputs or {}
+
+    def _rate(record: CandidateSelectionRecord) -> dict[str, Any]:
+        return _rate_candidate(
+            case,
+            record,
+            selection,
+            path_input=path_map.get(record.candidate_id),
+        )
+
+    candidate_results = [_rate(record) for record in representatives]
     return {
         "schema_version": _SCHEMA,
-        "TASK_ID": _TASK_ID,
+        "TASK_ID": task_id or _TASK_ID,
         "historical_reference_geometries": {
             "r26d_long_baseline": R26D_HISTORICAL_LONG_BASELINE_REFERENCE,
         },
