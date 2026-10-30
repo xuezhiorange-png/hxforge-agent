@@ -82,7 +82,7 @@ def test_r26g_authorized_calc_fail_closed_without_postpass(r26e_case) -> None:
         record=record,
         postpass=None,
     )
-    assert result["status"] == "BLOCKED_INCOMPLETE_INPUT"
+    assert result["status"] == "BLOCKED_UPSTREAM"
     assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is None
     assert result["SHELL_FULL_PATH_TOTAL_DP_PA"] is None
 
@@ -94,6 +94,11 @@ def test_r26g_authorized_calc_reconciles_with_postpass(r26e_case) -> None:
     postpass = {
         "recalculated_tube_dp_pa": "850",
         "recalculated_shell_dp_pa": "920",
+        "tube_hydraulic_recompute_status": "EXPERIMENTAL_TRANSITIONAL_SUCCESS",
+        "shell_hydraulic_recompute_status": "SUCCESS",
+        "correlation_applicability_status": "APPLICABLE",
+        "tube_inlet_pressure_pa": "101325",
+        "shell_inlet_pressure_pa": "101325",
         "experimental_transitional_tube_hydraulic": {
             "tube_friction_dp_pa": "750",
             "tube_local_loss_dp_pa": "100",
@@ -124,7 +129,7 @@ def test_r26g_representative_full_path_study_slow(r26e_case) -> None:
     study = run_r26g_authorized_full_path_hydraulic_study(
         r26e_case, use_demonstration_path_inputs=True
     )
-    assert study["TASK_ID"] == "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION"
+    assert study["TASK_ID"] == "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE"
     assert study["PRODUCTION_DESIGN_APPROVED"] is False
     middle = next(
         row

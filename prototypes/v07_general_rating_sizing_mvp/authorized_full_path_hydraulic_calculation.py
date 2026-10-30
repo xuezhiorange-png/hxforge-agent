@@ -26,6 +26,13 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v
     resolved_reference_flow_area_m2,
     validate_path_input_binding,
 )
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_physical_consistency import (
+    assess_full_path_hydraulic_constraints,
+    assess_tube_internal_friction_separation,
+    assess_upstream_hydraulic_postpass_for_full_path,
+    validate_no_duplicate_local_loss_with_postpass,
+    validate_path_input_physical_consistency,
+)
 
 _TASK_ID = "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION"
 
@@ -135,39 +142,43 @@ def run_authorized_full_path_hydraulic_calculation(
     postpass: dict[str, Any] | None,
 ) -> dict[str, Any]:
     binding_errors = validate_path_input_binding(path_input, case=case, record=record)
+    physical = validate_path_input_physical_consistency(path_input, case=case)
     completeness = assess_hydraulic_path_completeness(path_input)
-    provider = CoolPropProvider()
-
-    tube_rows = [
-        _compute_component_row(case=case, component=component, provider=provider)
-        for component in path_input.tube_side_components
-    ]
-    shell_external_rows = [
-        _compute_component_row(case=case, component=component, provider=provider)
-        for component in path_input.shell_external_components
-    ]
-
-    exp = (postpass or {}).get("experimental_transitional_tube_hydraulic") or {}
+    upstream = assess_upstream_hydraulic_postpass_for_full_path(postpass)
     partial_breakdown = build_hydraulic_dp_breakdown(postpass, case=case) if postpass else {}
-    tube_friction = _dec(exp.get("tube_friction_dp_pa"))
-    if tube_friction is None:
-        tube_friction = _dec(partial_breakdown.get("TUBE_FRICTION_DP_PA"))
-    tube_total_partial = _dec(postpass.get("recalculated_tube_dp_pa")) if postpass else None
-    if tube_friction is None and tube_total_partial is not None:
-        partial_local = _dec(partial_breakdown.get("TUBE_LOCAL_LOSS_DP_PA"))
-        if partial_local is None:
-            partial_local = _dec(exp.get("tube_local_loss_dp_pa"))
-        if partial_local is not None:
-            tube_friction = tube_total_partial - partial_local
-        else:
-            embedded_local = Decimal("0")
-            for comp in (postpass.get("tube_local_loss_engineering") or {}).get(
-                "computed_local_loss_components"
-            ) or []:
-                loss = comp.get("component_irreversible_pressure_loss_pa")
-                if loss is not None:
-                    embedded_local += Decimal(str(loss))
-            tube_friction = tube_total_partial - embedded_local
+
+    duplicate_errors: list[str] = []
+    if postpass:
+        duplicate_errors = validate_no_duplicate_local_loss_with_postpass(path_input, postpass)
+
+    blockers: list[str] = list(binding_errors)
+    provider = CoolPropProvider()
+    tube_rows: list[dict[str, Any]] = []
+    shell_external_rows: list[dict[str, Any]] = []
+    if physical["PHYSICAL_CONSISTENCY_STATUS"] == "PASS":
+        tube_rows = [
+            _compute_component_row(case=case, component=component, provider=provider)
+            for component in path_input.tube_side_components
+        ]
+        shell_external_rows = [
+            _compute_component_row(case=case, component=component, provider=provider)
+            for component in path_input.shell_external_components
+        ]
+        for row in tube_rows + shell_external_rows:
+            if row.get("status") == "BLOCKED":
+                blockers.append(f"{row.get('component_id')}: {row.get('blocker')}")
+
+    tube_friction: Decimal | None = None
+    friction_authority = "NOT_EVALUATED"
+    friction_blockers: list[str] = []
+    if postpass and upstream.get("tube_side_numeric_usable"):
+        tube_friction, friction_authority, friction_blockers = (
+            assess_tube_internal_friction_separation(postpass, partial_breakdown=partial_breakdown)
+        )
+    elif postpass:
+        friction_blockers = list(upstream.get("upstream_blockers") or [])
+
+    blockers.extend(friction_blockers)
 
     shell_parts = (postpass or {}).get("shell_dp_components_pa") or {}
     shell_bd_internal = _dec(shell_parts.get("total"))
@@ -176,20 +187,24 @@ def run_authorized_full_path_hydraulic_calculation(
     if shell_bd_internal is None and postpass:
         shell_bd_internal = _dec(postpass.get("recalculated_shell_dp_pa"))
 
-    tube_local_full = _sum_component_dp(tube_rows)
-    shell_external_local = _sum_component_dp(shell_external_rows)
+    tube_local_full = _sum_component_dp(tube_rows) if tube_rows else None
+    shell_external_local = _sum_component_dp(shell_external_rows) if shell_external_rows else None
 
-    tube_full = None
-    shell_full = None
-    tube_full_status = "BLOCKED"
-    shell_full_status = "BLOCKED"
-    blockers: list[str] = list(binding_errors)
-    for row in tube_rows + shell_external_rows:
-        if row.get("status") == "BLOCKED":
-            blockers.append(f"{row.get('component_id')}: {row.get('blocker')}")
+    tube_full: Decimal | None = None
+    shell_full: Decimal | None = None
+    tube_full_status = "NOT_COMPUTED"
+    shell_full_status = "NOT_COMPUTED"
+    blockers.extend(physical.get("physical_consistency_errors") or [])
+    blockers.extend(duplicate_errors)
+    blockers.extend(friction_blockers)
+    blockers.extend(friction_blockers)
 
     if binding_errors:
         overall_status = "BLOCKED_BINDING"
+    elif physical["PHYSICAL_CONSISTENCY_STATUS"] != "PASS":
+        overall_status = "BLOCKED_PHYSICAL_CONSISTENCY"
+    elif duplicate_errors:
+        overall_status = "BLOCKED_DUPLICATE_LOCAL_LOSS"
     elif completeness["path_completeness_status"] in (
         "INCOMPLETE_COMPONENT_COVERAGE",
         "INCOMPLETE_SEQUENCE",
@@ -197,32 +212,67 @@ def run_authorized_full_path_hydraulic_calculation(
     ):
         overall_status = "BLOCKED_INCOMPLETE_INPUT"
         blockers.append(completeness["path_completeness_status"])
+    elif not postpass:
+        overall_status = "BLOCKED_UPSTREAM"
+        blockers.append("POSTPASS_MISSING")
     else:
         overall_status = "COMPUTED"
-        if tube_friction is not None and tube_local_full is not None:
+        if not upstream.get("tube_side_numeric_usable"):
+            tube_full_status = "BLOCKED_UPSTREAM"
+            blockers.extend(
+                b
+                for b in upstream.get("upstream_blockers") or []
+                if "TUBE" in b or "CORRELATION" in b
+            )
+        elif tube_friction is None or tube_local_full is None:
+            tube_full_status = "BLOCKED_FRICTION_OR_LOCAL_PATH"
+        else:
             tube_full = tube_friction + tube_local_full
             tube_full_status = "COMPUTED"
+
+        if not upstream.get("shell_side_numeric_usable"):
+            shell_full_status = "BLOCKED_UPSTREAM"
+        elif shell_bd_internal is None or shell_external_local is None:
+            shell_full_status = "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
         else:
-            tube_full_status = "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
-            blockers.append("tube friction or local path incomplete")
-        if shell_bd_internal is not None and shell_external_local is not None:
             shell_full = shell_bd_internal + shell_external_local
             shell_full_status = "COMPUTED"
-        else:
-            shell_full_status = "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
-            blockers.append("shell Bell–Delaware or external path incomplete")
-        if tube_full_status != "COMPUTED" or shell_full_status != "COMPUTED":
+
+        if tube_full_status != "COMPUTED":
+            tube_full = None
+        if shell_full_status != "COMPUTED":
+            shell_full = None
+        if tube_full is None and shell_full is None:
             overall_status = "BLOCKED_INCOMPLETE_INPUT"
+        elif tube_full is None or shell_full is None:
+            overall_status = "PARTIAL_FULL_PATH"
 
     demo_only = completeness.get("demonstration_input_present")
     production = completeness.get("authorized_input_present") and not demo_only
 
+    full_path_constraints = (
+        assess_full_path_hydraulic_constraints(
+            case=case,
+            postpass=postpass or {},
+            tube_full_dp=tube_full,
+            shell_full_dp=shell_full,
+        )
+        if postpass
+        else {}
+    )
+
     return {
         "TASK_ID": _TASK_ID,
+        "PHYSICAL_CONSISTENCY_GATE": "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE",
         "status": overall_status,
         "blockers": blockers,
         "binding_validation_errors": binding_errors,
+        "physical_consistency": physical,
+        "upstream_postpass_assessment": upstream,
         "path_completeness": completeness,
+        "tube_friction_separation_authority": friction_authority,
+        "TUBE_MODELED_PARTIAL_DP_PA": partial_breakdown.get("TUBE_MODELED_PARTIAL_DP_PA"),
+        "SHELL_MODELED_PARTIAL_DP_PA": partial_breakdown.get("SHELL_MODELED_PARTIAL_DP_PA"),
         "TUBE_INTERNAL_FRICTION_DP_PA": str(tube_friction) if tube_friction is not None else None,
         "TUBE_LOCAL_DP_PA": str(tube_local_full) if tube_local_full is not None else None,
         "TUBE_FULL_PATH_TOTAL_DP_PA": str(tube_full) if tube_full is not None else None,
@@ -237,6 +287,7 @@ def run_authorized_full_path_hydraulic_calculation(
         "SHELL_FULL_PATH_STATUS": shell_full_status,
         "TUBE_DP_COMPONENTS": tube_rows,
         "SHELL_DP_COMPONENTS": shell_external_rows,
+        **full_path_constraints,
         "PRODUCTION_DESIGN_APPROVED": False,
         "ENGINEERING_SIZING_ELIGIBILITY": (
             "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"

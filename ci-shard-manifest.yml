@@ -480,4 +480,5 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r26g_authorized_full_path_hydraulic.py
+      - tests/prototypes/test_r26ga_full_path_physical_consistency.py
     timeout: 7200
