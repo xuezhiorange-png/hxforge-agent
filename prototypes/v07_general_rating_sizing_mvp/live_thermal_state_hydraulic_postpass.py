@@ -343,21 +343,29 @@ def _run_task027_through_029(
             authority.task028_request_template, decimal_strings=False
         )
     except (TypeError, ValueError, UnicodeError, ArithmeticError) as exc:
-        return None, result027, [
-            {
-                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
-                "scope": "TASK028",
-                "detail": f"template projection failed: {exc}",
-            }
-        ]
+        return (
+            None,
+            result027,
+            [
+                {
+                    "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                    "scope": "TASK028",
+                    "detail": f"template projection failed: {exc}",
+                }
+            ],
+        )
     if type(task028_template_value) is not dict:
-        return None, result027, [
-            {
-                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
-                "scope": "TASK028",
-                "detail": "task028 template must project to a mapping",
-            }
-        ]
+        return (
+            None,
+            result027,
+            [
+                {
+                    "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                    "scope": "TASK028",
+                    "detail": "task028 template must project to a mapping",
+                }
+            ],
+        )
     task028_template = cast(dict[str, object], task028_template_value)
     task028_template["task025_valid_result"] = task168._public_value(
         bundle.task025_result, decimal_strings=False
@@ -384,9 +392,11 @@ def _run_task027_through_029(
         task026_result=cast(Any, task026_result),
     )
     if type(result028).__name__ != "Task028SuccessResult":
-        return None, result027, [
-            {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK028", "detail": "blocked"}
-        ]
+        return (
+            None,
+            result027,
+            [{"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK028", "detail": "blocked"}],
+        )
     task029_template_any = cast(Any, authority.task029_request_template)
     composition = task029_template_any.composition_authority
     template_members = tuple(composition.member_authorities)
@@ -400,13 +410,17 @@ def _run_task027_through_029(
     result028_any = cast(Any, result028)
     components = tuple(result028_any.component_results)
     if len(template_components) != len(components) or len(template_friction) != 1:
-        return None, result027, [
-            {
-                "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
-                "scope": "TASK029",
-                "detail": "template member layout mismatch",
-            }
-        ]
+        return (
+            None,
+            result027,
+            [
+                {
+                    "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
+                    "scope": "TASK029",
+                    "detail": "template member layout mismatch",
+                }
+            ],
+        )
     ordered_template_components = tuple(
         sorted(template_components, key=lambda item: item.global_path_sequence_index)
     )
@@ -476,9 +490,11 @@ def _run_task027_through_029(
         input_evidence_refs=authority.evidence_refs,
     )
     if type(outcome) is not Task029SuccessResult:
-        return None, result027, [
-            {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK029", "detail": "blocked"}
-        ]
+        return (
+            None,
+            result027,
+            [{"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK029", "detail": "blocked"}],
+        )
     return outcome, result027, []
 
 
