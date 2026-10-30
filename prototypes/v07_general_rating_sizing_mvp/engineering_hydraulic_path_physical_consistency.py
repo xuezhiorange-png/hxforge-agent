@@ -268,6 +268,19 @@ def assess_tube_internal_friction_separation(
         return tube_friction, "R20_TRANSITIONAL_FRICTION", blockers
 
     if recompute == "SUCCESS" and friction_raw is None:
+        task027_raw = postpass.get("task027_straight_tube_friction_pressure_drop_pa")
+        if task027_raw is not None:
+            tube_friction = Decimal(str(task027_raw))
+            total_d = Decimal(str(total_raw)) if total_raw is not None else None
+            embedded = postpass_embedded_local_loss_pa(postpass)
+            if (
+                total_d is not None
+                and embedded > 0
+                and abs(total_d - (tube_friction + embedded)) > Decimal("0.01")
+            ):
+                blockers.append("TASK027_TASK029_COMPOSITION_MISMATCH")
+                return None, "TUBE_FRICTION_SEPARATION_UNRELIABLE", blockers
+            return tube_friction, "TASK027_STRAIGHT_TUBE_FRICTION", blockers
         blockers.append(
             "TUBE_FRICTION_SEPARATION_UNRELIABLE: Task029 total must not be used as bundle friction"
         )

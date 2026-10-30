@@ -310,7 +310,7 @@ def _run_task027_through_029(
     authority: Any,
     task026_result: Any,
     tube_property_snapshot: PropertySnapshot,
-) -> tuple[Task029SuccessResult | None, list[dict[str, str]]]:
+) -> tuple[Task029SuccessResult | None, Any | None, list[dict[str, str]]]:
     result027 = compute_task027_friction_pressure_drop(
         task025_result=cast(Any, bundle.task025_result),
         task026_result=cast(Any, task026_result),
@@ -337,13 +337,13 @@ def _run_task027_through_029(
             )
         if not tube_blockers:
             tube_blockers.append({"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK027"})
-        return None, tube_blockers
+        return None, None, tube_blockers
     try:
         task028_template_value = task168._public_value(
             authority.task028_request_template, decimal_strings=False
         )
     except (TypeError, ValueError, UnicodeError, ArithmeticError) as exc:
-        return None, [
+        return None, result027, [
             {
                 "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
                 "scope": "TASK028",
@@ -351,7 +351,7 @@ def _run_task027_through_029(
             }
         ]
     if type(task028_template_value) is not dict:
-        return None, [
+        return None, result027, [
             {
                 "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
                 "scope": "TASK028",
@@ -384,7 +384,7 @@ def _run_task027_through_029(
         task026_result=cast(Any, task026_result),
     )
     if type(result028).__name__ != "Task028SuccessResult":
-        return None, [
+        return None, result027, [
             {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK028", "detail": "blocked"}
         ]
     task029_template_any = cast(Any, authority.task029_request_template)
@@ -400,7 +400,7 @@ def _run_task027_through_029(
     result028_any = cast(Any, result028)
     components = tuple(result028_any.component_results)
     if len(template_components) != len(components) or len(template_friction) != 1:
-        return None, [
+        return None, result027, [
             {
                 "code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE",
                 "scope": "TASK029",
@@ -476,10 +476,10 @@ def _run_task027_through_029(
         input_evidence_refs=authority.evidence_refs,
     )
     if type(outcome) is not Task029SuccessResult:
-        return None, [
+        return None, result027, [
             {"code": "BLOCKED_TUBE_HYDRAULIC_RECOMPUTE", "scope": "TASK029", "detail": "blocked"}
         ]
-    return outcome, []
+    return outcome, result027, []
 
 
 def _equipment_shell_task032_mass_flow_rate_kg_s(case: EngineeringCase) -> Decimal:
@@ -664,12 +664,17 @@ def run_live_thermal_state_hydraulic_postpass(
     task026_result = compute_tube_side_heat_transfer_coefficient(
         task026_request, bundle.task025_result
     )
-    task029_outcome, tube_hydraulic_blockers = _run_task027_through_029(
+    task029_outcome, task027_success, tube_hydraulic_blockers = _run_task027_through_029(
         bundle=bundle,
         authority=authority,
         task026_result=task026_result,
         tube_property_snapshot=tube_snapshot,
     )
+    task027_straight_tube_friction_pressure_drop_pa: str | None = None
+    if task027_success is not None and type(task027_success).__name__ == "Task027SuccessResult":
+        task027_straight_tube_friction_pressure_drop_pa = str(
+            task027_success.straight_tube_friction_pressure_drop_pa
+        )
     experimental_transitional_tube_hydraulic: dict[str, str] | None = None
     tube_local_loss_engineering_doc: dict[str, Any] | None = None
     recalc_tube_experimental: Decimal | None = None
@@ -904,6 +909,9 @@ def run_live_thermal_state_hydraulic_postpass(
         },
         "tube_dp_task029_result_hash": (
             task029_outcome.result_hash if task029_outcome is not None else None
+        ),
+        "task027_straight_tube_friction_pressure_drop_pa": (
+            task027_straight_tube_friction_pressure_drop_pa
         ),
         "mass_flow_binding": mass_flow_binding,
         "tube_hydraulic_recompute_status": tube_hydraulic_recompute_status,
