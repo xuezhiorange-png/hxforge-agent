@@ -1,5 +1,7 @@
 """Engineering completeness checks for authorized full-path hydraulics (R26G)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
@@ -9,9 +11,7 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v
     HydraulicPathComponentV1,
 )
 
-REQUIRED_TUBE_TYPES_FOR_FULL_PATH = frozenset(
-    {"NOZZLE", "CHANNEL_HEAD", "ENTRANCE", "EXIT"}
-)
+REQUIRED_TUBE_TYPES_FOR_FULL_PATH = frozenset({"NOZZLE", "CHANNEL_HEAD", "ENTRANCE", "EXIT"})
 REQUIRED_SHELL_EXTERNAL_TYPES_FOR_FULL_PATH = frozenset(
     {
         "SHELL_INLET_NOZZLE",
@@ -27,7 +27,9 @@ ENGINEERING_LIMITS_NOT_VERIFIED = (
 )
 
 
-def _sorted_components(components: tuple[HydraulicPathComponentV1, ...]) -> list[HydraulicPathComponentV1]:
+def _sorted_components(
+    components: tuple[HydraulicPathComponentV1, ...],
+) -> list[HydraulicPathComponentV1]:
     return sorted(components, key=lambda c: c.path_sequence_index)
 
 
@@ -96,6 +98,4 @@ def _sequence_covers_inlet_to_outlet(components: list[HydraulicPathComponentV1])
     indices = [c.path_sequence_index for c in components]
     if indices != sorted(indices):
         return False
-    if len(set(indices)) != len(indices):
-        return False
-    return True
+    return len(set(indices)) == len(indices)

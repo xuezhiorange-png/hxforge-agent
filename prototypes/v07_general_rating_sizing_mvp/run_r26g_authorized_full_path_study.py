@@ -1,5 +1,7 @@
 """R26G: write authorized full-path hydraulic study JSON report."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse

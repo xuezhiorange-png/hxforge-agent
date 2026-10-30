@@ -1,5 +1,7 @@
 """R26G authorized full-path hydraulic study entry point."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from typing import Any
@@ -69,8 +71,6 @@ def run_r26g_authorized_full_path_hydraulic_study(
         task_id=_TASK_ID,
     )
     report["schema_version"] = _SCHEMA
-    report["ENGINEERING_SIZING_ELIGIBILITY"] = (
-        "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"
-    )
+    report["ENGINEERING_SIZING_ELIGIBILITY"] = "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE"
     report["PRODUCTION_DESIGN_APPROVED"] = False
     return report

@@ -52,9 +52,7 @@ class FluidDensitySourceV1(BaseModel):
 
     @model_validator(mode="after")
     def kind_requires_fields(self) -> FluidDensitySourceV1:
-        if self.kind == "COOLPROP_TP" and (
-            self.temperature_k is None or self.pressure_pa is None
-        ):
+        if self.kind == "COOLPROP_TP" and (self.temperature_k is None or self.pressure_pa is None):
             raise ValueError("COOLPROP_TP requires temperature_k and pressure_pa")
         if self.kind == "CASE_SIDE_INLET" and self.fluid_role is None:
             raise ValueError("CASE_SIDE_INLET requires fluid_role")
@@ -101,7 +99,9 @@ class HydraulicPathComponentV1(BaseModel):
     @model_validator(mode="after")
     def area_or_nozzle(self) -> HydraulicPathComponentV1:
         if self.reference_flow_area_m2 is None and self.nozzle_inside_diameter_m is None:
-            raise ValueError("each component requires reference_flow_area_m2 or nozzle_inside_diameter_m")
+            raise ValueError(
+                "each component requires reference_flow_area_m2 or nozzle_inside_diameter_m"
+            )
         if self.reference_flow_area_m2 is not None and self.nozzle_inside_diameter_m is not None:
             raise ValueError("provide reference_flow_area_m2 or nozzle_inside_diameter_m, not both")
         return self
@@ -158,7 +158,9 @@ def resolved_reference_flow_area_m2(component: HydraulicPathComponentV1) -> Deci
     return nozzle_flow_area_m2(component.nozzle_inside_diameter_m)
 
 
-def load_engineering_hydraulic_path_input_v1(data: dict[str, Any]) -> EngineeringHydraulicPathInputV1:
+def load_engineering_hydraulic_path_input_v1(
+    data: dict[str, Any],
+) -> EngineeringHydraulicPathInputV1:
     if data.get("schema_version") != SCHEMA_VERSION:
         raise ValueError(f"unsupported hydraulic path input schema: {data.get('schema_version')}")
     return EngineeringHydraulicPathInputV1.model_validate(data)

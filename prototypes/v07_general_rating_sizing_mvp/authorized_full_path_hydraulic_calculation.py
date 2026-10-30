@@ -72,7 +72,9 @@ def _compute_component_row(
     component: HydraulicPathComponentV1,
     provider: CoolPropProvider,
 ) -> dict[str, Any]:
-    density, density_error = _resolve_density_kg_m3(case=case, component=component, provider=provider)
+    density, density_error = _resolve_density_kg_m3(
+        case=case, component=component, provider=provider
+    )
     if density is None:
         return {
             "component_id": component.component_id,

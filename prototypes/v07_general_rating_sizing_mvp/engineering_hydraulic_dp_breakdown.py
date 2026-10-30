@@ -74,9 +74,7 @@ def build_hydraulic_dp_breakdown(
         shell_nozzle_status = "INCLUDED"
         shell_full_path_status = "COMPUTED"
         shell_full_path_total = (
-            (shell_internal + shell_nozzle_dp)
-            if shell_internal is not None
-            else None
+            (shell_internal + shell_nozzle_dp) if shell_internal is not None else None
         )
 
     tube_modeled_partial = tube_total
