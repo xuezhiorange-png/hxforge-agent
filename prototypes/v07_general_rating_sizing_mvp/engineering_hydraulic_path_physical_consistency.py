@@ -7,6 +7,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any, Literal
 
+from hexagent.properties.base import FluidIdentifier
+from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v1 import (
     EngineeringHydraulicPathInputV1,
@@ -122,24 +124,56 @@ def assess_engineering_input_authority(
             "verified_authorized_component_count": 0,
             "disclosure": "All components marked DEMONSTRATION.",
         }
-    verified = 0
-    for component in authorized_components:
-        refs = component.geometry_evidence_refs
-        if any(ref.startswith("OWNER-APPROVED-") for ref in refs):
-            verified += 1
-    if verified == len(authorized_components):
-        status = "AUTHORIZED_EVIDENCE_PRESENT"
-    else:
-        status = "INPUT_AUTHORITY_NOT_VERIFIED"
     return {
-        "INPUT_AUTHORITY_STATUS": status,
-        "verified_authorized_component_count": verified,
+        "INPUT_AUTHORITY_STATUS": "INPUT_AUTHORITY_NOT_VERIFIED",
+        "verified_authorized_component_count": 0,
         "authorized_component_count": len(authorized_components),
         "disclosure": (
-            "AUTHORIZED_ENGINEERING_INPUT string alone does not verify owner approval; "
-            "requires geometry_evidence_refs with OWNER-APPROVED- prefix."
+            "AUTHORIZED_ENGINEERING_INPUT and OWNER-APPROVED-* refs do not verify real owner "
+            "approval without independent auditable evidence; production eligibility remains closed."
         ),
     }
+
+
+def _side_upstream_blockers(
+    postpass: dict[str, Any],
+    side: Literal["TUBE", "SHELL"],
+) -> list[str]:
+    blockers: list[str] = []
+    if postpass.get("hydraulic_constraint_status") == "BLOCKED":
+        blockers.append("HYDRAULIC_CONSTRAINT_BLOCKED")
+    if postpass.get("blockers"):
+        blockers.append("HYDRAULIC_POSTPASS_BLOCKERS_PRESENT")
+    applicability = postpass.get("correlation_applicability_status")
+    if applicability not in _ALLOWED_UPSTREAM_APPLICABILITY:
+        blockers.append(f"CORRELATION_APPLICABILITY_{applicability or 'NOT_EVALUATED'}")
+
+    props = postpass.get("property_inputs") or {}
+    if side == "TUBE":
+        if postpass.get("tube_hydraulic_recompute_status") not in _TUBE_RECOMPUTE_OK:
+            blockers.append(
+                f"TUBE_HYDRAULIC_RECOMPUTE_{postpass.get('tube_hydraulic_recompute_status') or 'NOT_EVALUATED'}"
+            )
+        if postpass.get("recalculated_tube_dp_pa") is None:
+            blockers.append("TUBE_RECALCULATED_DP_MISSING")
+        if not props.get("tube"):
+            blockers.append("TUBE_PROPERTY_INPUT_MISSING")
+    else:
+        if postpass.get("shell_hydraulic_recompute_status") not in _SHELL_RECOMPUTE_OK:
+            blockers.append(
+                f"SHELL_HYDRAULIC_RECOMPUTE_{postpass.get('shell_hydraulic_recompute_status') or 'NOT_EVALUATED'}"
+            )
+        if postpass.get("recalculated_shell_dp_pa") is None:
+            blockers.append("SHELL_RECALCULATED_DP_MISSING")
+        if not props.get("shell"):
+            blockers.append("SHELL_PROPERTY_INPUT_MISSING")
+
+    coolprop_checks = postpass.get("coolprop_outlet_domain_checks") or {}
+    side_key = "tube" if side == "TUBE" else "shell"
+    check = coolprop_checks.get(side_key)
+    if isinstance(check, dict) and check.get("ok") is False:
+        blockers.append(f"COOLPROP_OUTLET_DOMAIN_{side}_FAILED")
+    return blockers
 
 
 def assess_upstream_hydraulic_postpass_for_full_path(
@@ -151,44 +185,25 @@ def assess_upstream_hydraulic_postpass_for_full_path(
             "tube_side_numeric_usable": False,
             "shell_side_numeric_usable": False,
             "upstream_blockers": ["POSTPASS_MISSING"],
+            "tube_upstream_blockers": ["POSTPASS_MISSING"],
+            "shell_upstream_blockers": ["POSTPASS_MISSING"],
         }
-    blockers: list[str] = []
-    tube_status = postpass.get("tube_hydraulic_recompute_status")
-    shell_status = postpass.get("shell_hydraulic_recompute_status")
-    if tube_status not in _TUBE_RECOMPUTE_OK:
-        blockers.append(f"TUBE_HYDRAULIC_RECOMPUTE_{tube_status or 'NOT_EVALUATED'}")
-    if shell_status not in _SHELL_RECOMPUTE_OK:
-        blockers.append(f"SHELL_HYDRAULIC_RECOMPUTE_{shell_status or 'NOT_EVALUATED'}")
-    applicability = postpass.get("correlation_applicability_status")
-    if applicability not in _ALLOWED_UPSTREAM_APPLICABILITY:
-        blockers.append(f"CORRELATION_APPLICABILITY_{applicability or 'NOT_EVALUATED'}")
-    if postpass.get("blockers"):
-        blockers.append("HYDRAULIC_POSTPASS_BLOCKERS_PRESENT")
-    coolprop_checks = postpass.get("coolprop_outlet_domain_checks") or {}
-    for side, check in coolprop_checks.items():
-        if isinstance(check, dict) and check.get("ok") is False:
-            blockers.append(f"COOLPROP_OUTLET_DOMAIN_{side.upper()}_FAILED")
-
-    tube_usable = not any(b.startswith("TUBE_HYDRAULIC") for b in blockers) and not any(
-        b.startswith("CORRELATION") for b in blockers
-    )
-    shell_usable = not any(b.startswith("SHELL_HYDRAULIC") for b in blockers) and not any(
-        b.startswith("CORRELATION") for b in blockers
-    )
-    if postpass.get("blockers"):
-        tube_usable = False
-        shell_usable = False
+    tube_blockers = _side_upstream_blockers(postpass, "TUBE")
+    shell_blockers = _side_upstream_blockers(postpass, "SHELL")
+    all_blockers = sorted(set(tube_blockers + shell_blockers))
 
     return {
-        "UPSTREAM_POSTPASS_STATUS": "USABLE" if not blockers else "BLOCKED",
-        "tube_side_numeric_usable": tube_usable,
-        "shell_side_numeric_usable": shell_usable,
-        "upstream_blockers": blockers,
+        "UPSTREAM_POSTPASS_STATUS": "USABLE" if not all_blockers else "BLOCKED",
+        "tube_side_numeric_usable": len(tube_blockers) == 0,
+        "shell_side_numeric_usable": len(shell_blockers) == 0,
+        "upstream_blockers": all_blockers,
+        "tube_upstream_blockers": tube_blockers,
+        "shell_upstream_blockers": shell_blockers,
         "partial_model_tube_dp_constraint": postpass.get("tube_dp_constraint"),
         "partial_model_shell_dp_constraint": postpass.get("shell_dp_constraint"),
         "disclosure": (
             "NOT_SATISFIED on partial dp_constraint does not block full-path Δp composition; "
-            "BLOCKED recompute status does."
+            "BLOCKED recompute, correlation, CoolProp outlet domain, or missing upstream data does."
         ),
     }
 
@@ -233,52 +248,72 @@ def assess_tube_internal_friction_separation(
     partial_breakdown: dict[str, Any],
 ) -> tuple[Decimal | None, str, list[str]]:
     """Return (friction_pa, authority, blockers)."""
+    del partial_breakdown  # full-path friction must not be inferred from partial breakdown totals
     blockers: list[str] = []
     exp = postpass.get("experimental_transitional_tube_hydraulic") or {}
-    tube_friction = None
-    if exp.get("tube_friction_dp_pa") is not None:
-        tube_friction = Decimal(str(exp["tube_friction_dp_pa"]))
-        return tube_friction, "EXPLICIT_TRANSITIONAL_FRICTION", blockers
+    recompute = postpass.get("tube_hydraulic_recompute_status")
 
-    if partial_breakdown.get("TUBE_FRICTION_DP_PA") is not None:
-        tube_friction = Decimal(str(partial_breakdown["TUBE_FRICTION_DP_PA"]))
-        return tube_friction, "PARTIAL_BREAKDOWN_FRICTION", blockers
+    friction_raw = exp.get("tube_friction_dp_pa")
+    local_raw = exp.get("tube_local_loss_dp_pa")
+    total_raw = exp.get("total_tube_dp_pa") or postpass.get("recalculated_tube_dp_pa")
 
-    tube_total = postpass.get("recalculated_tube_dp_pa")
-    if tube_total is None:
-        blockers.append("TUBE_RECALCULATED_DP_MISSING")
-        return None, "UNRELIABLE", blockers
+    if friction_raw is not None and recompute == "EXPERIMENTAL_TRANSITIONAL_SUCCESS":
+        tube_friction = Decimal(str(friction_raw))
+        if local_raw is not None and total_raw is not None:
+            total_d = Decimal(str(total_raw))
+            local_d = Decimal(str(local_raw))
+            if abs(total_d - (tube_friction + local_d)) > Decimal("0.01"):
+                blockers.append("R20_TRANSITIONAL_DECOMPOSITION_MISMATCH")
+                return None, "TUBE_FRICTION_SEPARATION_UNRELIABLE", blockers
+        return tube_friction, "R20_TRANSITIONAL_FRICTION", blockers
 
-    tube_total_d = Decimal(str(tube_total))
-    partial_local = partial_breakdown.get("TUBE_LOCAL_LOSS_DP_PA")
-    if partial_local is not None:
-        tube_friction = tube_total_d - Decimal(str(partial_local))
-        return tube_friction, "TOTAL_MINUS_BREAKDOWN_LOCAL", blockers
-
-    if exp.get("tube_local_loss_dp_pa") is not None:
-        tube_friction = tube_total_d - Decimal(str(exp["tube_local_loss_dp_pa"]))
-        return tube_friction, "TOTAL_MINUS_TRANSITIONAL_LOCAL", blockers
+    if recompute == "SUCCESS" and friction_raw is None:
+        blockers.append(
+            "TUBE_FRICTION_SEPARATION_UNRELIABLE: Task029 total must not be used as bundle friction"
+        )
+        return None, "TUBE_FRICTION_SEPARATION_UNRELIABLE", blockers
 
     embedded = postpass_embedded_local_loss_pa(postpass)
-    if embedded > 0 or (postpass.get("tube_local_loss_engineering") or {}).get(
-        "computed_local_loss_components"
+    if (
+        friction_raw is None
+        and local_raw is not None
+        and total_raw is not None
+        and embedded > 0
+        and abs(Decimal(str(local_raw)) - embedded) <= Decimal("0.01")
     ):
-        tube_friction = tube_total_d - embedded
-        return tube_friction, "TOTAL_MINUS_POSTPASS_EMBEDDED_LOCAL", blockers
-
-    if postpass.get("tube_local_loss_engineering") and embedded == 0:
-        blockers.append("TUBE_LOCAL_LOSS_DOC_PRESENT_BUT_NO_COMPONENTS")
-        return None, "UNRELIABLE", blockers
-
-    if postpass.get("tube_hydraulic_recompute_status") in _TUBE_RECOMPUTE_OK:
-        local_doc = postpass.get("tube_local_loss_engineering") or {}
-        if not local_doc.get("computed_local_loss_components"):
-            return tube_total_d, "PARTIAL_TOTAL_AS_BUNDLE_FRICTION_ONLY", blockers
+        tube_friction = Decimal(str(total_raw)) - embedded
+        return tube_friction, "VERIFIED_TASK028_LOCAL_DECOMPOSITION", blockers
 
     blockers.append(
-        "TUBE_FRICTION_SEPARATION_UNRELIABLE: cannot split bundle friction from historical local loss"
+        "TUBE_FRICTION_SEPARATION_UNRELIABLE: no independent Task027/R20 friction or verified decomposition"
     )
-    return None, "UNRELIABLE", blockers
+    return None, "TUBE_FRICTION_SEPARATION_UNRELIABLE", blockers
+
+
+_COOLPROP_MIN_PRESSURE_PA = Decimal("100000")
+_COOLPROP_MAX_PRESSURE_PA = Decimal("10000000")
+
+
+def _outlet_domain_ok(
+    provider: CoolPropProvider,
+    *,
+    temperature_k: Decimal,
+    pressure_pa: Decimal,
+) -> tuple[bool, str | None]:
+    try:
+        state = provider.state_tp(
+            FluidIdentifier("Water", "HEOS"),
+            float(temperature_k),
+            float(pressure_pa),
+        )
+    except Exception as exc:
+        return False, f"COOLPROP_TP_ERROR:{type(exc).__name__}"
+    phase_name = getattr(state.phase, "value", str(state.phase)).lower()
+    if "liquid" not in phase_name:
+        return False, f"COOLPROP_PHASE_{phase_name}"
+    if not (_COOLPROP_MIN_PRESSURE_PA <= pressure_pa <= _COOLPROP_MAX_PRESSURE_PA):
+        return False, "COOLPROP_PRESSURE_OUT_OF_MODEL_ENVELOPE"
+    return True, None
 
 
 def assess_full_path_hydraulic_constraints(
@@ -287,7 +322,9 @@ def assess_full_path_hydraulic_constraints(
     postpass: dict[str, Any],
     tube_full_dp: Decimal | None,
     shell_full_dp: Decimal | None,
+    provider: CoolPropProvider | None = None,
 ) -> dict[str, Any]:
+    provider = provider or CoolPropProvider()
     tube_inlet_p = Decimal(
         str(postpass.get("tube_inlet_pressure_pa", case.tube_side.inlet_pressure_pa))
     )
@@ -304,17 +341,42 @@ def assess_full_path_hydraulic_constraints(
     tube_outlet_p = None
     shell_outlet_p = None
 
+    tube_outlet_domain = "NOT_COMPUTED"
+    shell_outlet_domain = "NOT_COMPUTED"
+    tube_outlet_detail = None
+    shell_outlet_detail = None
+
     if tube_full_dp is not None:
         tube_margin = max_tube - tube_full_dp
         tube_outlet_p = tube_inlet_p - tube_full_dp
         tube_constraint = "SATISFIED" if tube_full_dp <= max_tube else "NOT_SATISFIED"
+        tube_t_out = Decimal(
+            str(postpass.get("tube_outlet_temperature_k", case.tube_side.inlet_temperature_k))
+        )
+        ok, detail = _outlet_domain_ok(
+            provider, temperature_k=tube_t_out, pressure_pa=tube_outlet_p
+        )
+        tube_outlet_domain = "SATISFIED" if ok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+        tube_outlet_detail = detail
     if shell_full_dp is not None:
         shell_margin = max_shell - shell_full_dp
         shell_outlet_p = shell_inlet_p - shell_full_dp
         shell_constraint = "SATISFIED" if shell_full_dp <= max_shell else "NOT_SATISFIED"
+        shell_t_out = Decimal(
+            str(postpass.get("shell_outlet_temperature_k", case.shell_side.inlet_temperature_k))
+        )
+        ok, detail = _outlet_domain_ok(
+            provider, temperature_k=shell_t_out, pressure_pa=shell_outlet_p
+        )
+        shell_outlet_domain = "SATISFIED" if ok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+        shell_outlet_detail = detail
 
     if tube_constraint == "NOT_COMPUTED" or shell_constraint == "NOT_COMPUTED":
         combined = "NOT_COMPUTED"
+    elif tube_outlet_domain == "OUTLET_PRESSURE_OUT_OF_DOMAIN" or (
+        shell_outlet_domain == "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+    ):
+        combined = "OUTLET_PRESSURE_DOMAIN_BLOCKED"
     elif tube_constraint == "SATISFIED" and shell_constraint == "SATISFIED":
         combined = "SATISFIED"
     else:
@@ -325,6 +387,10 @@ def assess_full_path_hydraulic_constraints(
         "SHELL_FULL_PATH_DP_MARGIN_PA": str(shell_margin) if shell_margin is not None else None,
         "FULL_PATH_TUBE_CONSTRAINT_STATUS": tube_constraint,
         "FULL_PATH_SHELL_CONSTRAINT_STATUS": shell_constraint,
+        "FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS": tube_outlet_domain,
+        "FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS": shell_outlet_domain,
+        "FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL": tube_outlet_detail,
+        "FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL": shell_outlet_detail,
         "FULL_PATH_HYDRAULIC_STATUS": combined,
         "full_path_tube_outlet_pressure_pa": str(tube_outlet_p)
         if tube_outlet_p is not None

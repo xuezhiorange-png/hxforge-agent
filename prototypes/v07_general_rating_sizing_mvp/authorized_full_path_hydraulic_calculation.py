@@ -197,7 +197,6 @@ def run_authorized_full_path_hydraulic_calculation(
     blockers.extend(physical.get("physical_consistency_errors") or [])
     blockers.extend(duplicate_errors)
     blockers.extend(friction_blockers)
-    blockers.extend(friction_blockers)
 
     if binding_errors:
         overall_status = "BLOCKED_BINDING"
@@ -219,11 +218,7 @@ def run_authorized_full_path_hydraulic_calculation(
         overall_status = "COMPUTED"
         if not upstream.get("tube_side_numeric_usable"):
             tube_full_status = "BLOCKED_UPSTREAM"
-            blockers.extend(
-                b
-                for b in upstream.get("upstream_blockers") or []
-                if "TUBE" in b or "CORRELATION" in b
-            )
+            blockers.extend(upstream.get("tube_upstream_blockers") or [])
         elif tube_friction is None or tube_local_full is None:
             tube_full_status = "BLOCKED_FRICTION_OR_LOCAL_PATH"
         else:

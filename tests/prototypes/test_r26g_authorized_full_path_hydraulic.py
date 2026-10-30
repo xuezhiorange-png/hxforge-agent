@@ -99,6 +99,14 @@ def test_r26g_authorized_calc_reconciles_with_postpass(r26e_case) -> None:
         "correlation_applicability_status": "APPLICABLE",
         "tube_inlet_pressure_pa": "101325",
         "shell_inlet_pressure_pa": "101325",
+        "property_inputs": {
+            "tube": {"bulk_pressure_pa": "101325", "bulk_temperature_k": "300"},
+            "shell": {"bulk_pressure_pa": "101325", "bulk_temperature_k": "300"},
+        },
+        "coolprop_outlet_domain_checks": {
+            "tube": {"ok": True},
+            "shell": {"ok": True},
+        },
         "experimental_transitional_tube_hydraulic": {
             "tube_friction_dp_pa": "750",
             "tube_local_loss_dp_pa": "100",

@@ -23,6 +23,8 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v
     build_r26g_demonstration_hydraulic_path_input_v1,
 )
 from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_physical_consistency import (
+    assess_full_path_hydraulic_constraints,
+    assess_upstream_hydraulic_postpass_for_full_path,
     validate_path_input_physical_consistency,
 )
 
@@ -46,6 +48,14 @@ def _good_postpass(**overrides: object) -> dict:
         "correlation_applicability_status": "APPLICABLE",
         "tube_inlet_pressure_pa": "101325",
         "shell_inlet_pressure_pa": "101325",
+        "property_inputs": {
+            "tube": {"bulk_pressure_pa": "101325", "bulk_temperature_k": "300"},
+            "shell": {"bulk_pressure_pa": "101325", "bulk_temperature_k": "300"},
+        },
+        "coolprop_outlet_domain_checks": {
+            "tube": {"ok": True},
+            "shell": {"ok": True},
+        },
         "experimental_transitional_tube_hydraulic": {
             "tube_friction_dp_pa": "700",
             "tube_local_loss_dp_pa": "100",
@@ -153,6 +163,61 @@ def test_r26ga_full_path_constraint_independent_of_partial_not_satisfied(r26e_ca
     assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is not None
     assert result["partial_model_tube_dp_constraint"] == "NOT_SATISFIED"
     assert result["FULL_PATH_TUBE_CONSTRAINT_STATUS"] in ("SATISFIED", "NOT_SATISFIED")
+
+
+def test_r26ga_blocks_full_tube_path_when_coolprop_outlet_domain_fails(r26e_case) -> None:
+    selection = enumerate_experimental_rating_candidates(r26e_case)
+    record = selection.records[0]
+    path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
+    postpass = _good_postpass(
+        coolprop_outlet_domain_checks={
+            "tube": {"ok": False, "detail": "fixture domain fail"},
+            "shell": {"ok": True},
+        }
+    )
+    upstream = assess_upstream_hydraulic_postpass_for_full_path(postpass)
+    assert upstream["tube_side_numeric_usable"] is False
+    assert any("COOLPROP_OUTLET_DOMAIN_TUBE" in b for b in upstream["tube_upstream_blockers"])
+    result = run_authorized_full_path_hydraulic_calculation(
+        case=r26e_case,
+        path_input=path_input,
+        record=record,
+        postpass=postpass,
+    )
+    assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is None
+    assert result["TUBE_FULL_PATH_STATUS"] == "BLOCKED_UPSTREAM"
+
+
+def test_r26ga_task029_total_without_friction_blocks_full_tube_path(r26e_case) -> None:
+    selection = enumerate_experimental_rating_candidates(r26e_case)
+    record = selection.records[0]
+    path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
+    postpass = _good_postpass(
+        tube_hydraulic_recompute_status="SUCCESS",
+        experimental_transitional_tube_hydraulic={},
+    )
+    result = run_authorized_full_path_hydraulic_calculation(
+        case=r26e_case,
+        path_input=path_input,
+        record=record,
+        postpass=postpass,
+    )
+    assert result["tube_friction_separation_authority"] == "TUBE_FRICTION_SEPARATION_UNRELIABLE"
+    assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is None
+    assert result["TUBE_INTERNAL_FRICTION_DP_PA"] is None
+
+
+def test_r26ga_outlet_pressure_domain_blocks_satisfied_despite_dp_limit_ok(r26e_case) -> None:
+    postpass = _good_postpass(tube_inlet_pressure_pa="100500")
+    constraints = assess_full_path_hydraulic_constraints(
+        case=r26e_case,
+        postpass=postpass,
+        tube_full_dp=Decimal("1000"),
+        shell_full_dp=Decimal("500"),
+    )
+    assert constraints["FULL_PATH_TUBE_CONSTRAINT_STATUS"] == "SATISFIED"
+    assert constraints["FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS"] == "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+    assert constraints["FULL_PATH_HYDRAULIC_STATUS"] == "OUTLET_PRESSURE_DOMAIN_BLOCKED"
 
 
 def test_r26ga_authorized_input_without_owner_evidence_not_verified(r26e_case) -> None:

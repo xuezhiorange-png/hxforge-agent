@@ -46,17 +46,7 @@ def build_hydraulic_dp_breakdown(
     exp = postpass.get("experimental_transitional_tube_hydraulic") or {}
     tube_friction = _dec(exp.get("tube_friction_dp_pa"))
     tube_local = _dec(exp.get("tube_local_loss_dp_pa"))
-    if tube_friction is None and tube_total is not None and tube_local is not None:
-        tube_friction = tube_total - tube_local
-    if tube_friction is None and tube_total is not None:
-        embedded_local = Decimal("0")
-        for comp in (postpass.get("tube_local_loss_engineering") or {}).get(
-            "computed_local_loss_components"
-        ) or []:
-            loss = comp.get("component_irreversible_pressure_loss_pa")
-            if loss is not None:
-                embedded_local += Decimal(str(loss))
-        tube_friction = tube_total - embedded_local
+    # Task029 combined totals must not be inferred as bundle friction (R26G-A P0-2).
 
     shell_parts = postpass.get("shell_dp_components_pa") or {}
     shell_internal = _dec(shell_parts.get("total"))
