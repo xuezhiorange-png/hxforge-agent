@@ -1,0 +1,78 @@
+{
+  "schema_version": "hxforge.general-engineering-case.v2",
+  "engineering_case_id": "mvp-variable-bundle-r13",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "299.70",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "12.000000"
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "298.15",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "20.000000"
+  },
+  "bind_task172_c3_reference_geometry": false,
+  "target_duty_w": "9500",
+  "max_tube_side_pressure_drop_pa": "1150",
+  "max_shell_side_pressure_drop_pa": "1180",
+  "candidate_constraints": {
+    "shell_inside_diameter_m": "0.54",
+    "tube_outer_diameter_m": "0.01905",
+    "tube_wall_thickness_m": "0.00165",
+    "tube_pitch_m": "0.0254",
+    "tube_lengths_m": [
+      "2.5",
+      "3.0",
+      "3.5",
+      "4.0"
+    ],
+    "baffle_spacings_m": [
+      "0.5",
+      "0.6",
+      "0.7",
+      "0.8"
+    ],
+    "baffle_count": 4,
+    "tube_pass_count": 1,
+    "shell_inside_diameters_m": [
+      "0.54",
+      "0.56",
+      "0.65",
+      "0.75"
+    ]
+  },
+  "solver_budget": {
+    "total_budget_s": 1200.0,
+    "max_candidates_to_rate": 2,
+    "enable_full_task173_rating": false
+  },
+  "experimental_sizing_objective": "MIN_NOMINAL_TUBE_AREA",
+  "experimental_candidate_selection_mode": "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13",
+  "experimental_bundle_geometry_mode": "VARIABLE_SHELL_DIAMETER_R13",
+  "r10_baseline_geometry_pairs": [
+    {
+      "tube_length_m": "4.85",
+      "baffle_spacing_m": "0.97",
+      "shell_inside_diameter_m": null,
+      "physical_tube_count": null
+    },
+    {
+      "tube_length_m": "4.90",
+      "baffle_spacing_m": "0.98",
+      "shell_inside_diameter_m": null,
+      "physical_tube_count": null
+    }
+  ],
+  "r12_baseline_geometry_fingerprints": [
+    {
+      "tube_length_m": "3.0",
+      "baffle_spacing_m": "0.6",
+      "shell_inside_diameter_m": "0.5",
+      "physical_tube_count": 253
+    }
+  ],
+  "notes": "R13: variable shell ID drives Task021 tube count; Task172 not C3-bound."
+}

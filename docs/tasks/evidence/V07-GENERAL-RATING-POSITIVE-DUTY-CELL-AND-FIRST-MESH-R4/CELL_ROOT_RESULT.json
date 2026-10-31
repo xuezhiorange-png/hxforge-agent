@@ -1,0 +1,16 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "cell_root_result_hash": "dbcbeb303b7d6d72e055385e141d4bf00810daed09519ffbb22e91b0c75d139f",
+  "positive_duty_cell_root_accepted": true,
+  "q_root_w": "12054.576226379197",
+  "residual_f_q_w": "2.13790E-7",
+  "schema_version": "hxforge.cell-root-result.v1",
+  "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+  "shell_physical_left_temperature_k": 298.5,
+  "status": "ACCEPTED",
+  "task172_request_hash": "c0da6dd6f0943b472bd04dea2314bebdaafaa686f05958dc8da0e7cc9f3b24b7",
+  "task172_result_hash": "dbcbeb303b7d6d72e055385e141d4bf00810daed09519ffbb22e91b0c75d139f",
+  "task172_signed_q_hot_to_cold_w": "12054.576226165407",
+  "task172_status": "VALIDATED",
+  "wall_seconds": 1.816
+}

@@ -1,0 +1,56 @@
+{
+  "candidate_space_count": 4,
+  "candidate_space_hash": "b9e6034d14484dfdaedef509d62e46cb5880f458699f8dd0a3478bc8d853b9c4",
+  "distinct_geometry_count": 4,
+  "max_candidates_to_rate": "from_case_solver_budget",
+  "records": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "geometry_projection_hash": "12d68cae0f4e9c0e08e9a39d103d8703dad9745010487cf1cd251152be758054",
+      "rating_request_ready": true,
+      "structural_admitted": true,
+      "task168_chain_status": "CHAIN_COMPLETE",
+      "task174_status": "VALIDATED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "43f4b70b1acfb8a20ad1b0c22bde31562700ab6754dd20e04449dca0301b8f75",
+      "candidate_id": "439cbc6e-5fdc-58ae-aaa4-e62f44b951bd",
+      "geometry_projection_hash": "30e28e57f8834750f44733c5876037061cdc48be1a6bf416d23c6a2162cc02ff",
+      "rating_request_ready": false,
+      "structural_admitted": true,
+      "task168_chain_status": "BLOCKED_DOWNSTREAM",
+      "task174_status": "NOT_RUN",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "ac95c8dd0ddb1619073478ad8cde651452fd8b7faf02247e437285c268f298ef",
+      "candidate_id": "fec327ba-27d9-53a3-a4f3-a5f11c25e009",
+      "geometry_projection_hash": "5b5c3ff0508ccfd6d6b79c0a70360dd0e3164e99d45730c3313a738e7179454a",
+      "rating_request_ready": false,
+      "structural_admitted": true,
+      "task168_chain_status": "BLOCKED_DOWNSTREAM",
+      "task174_status": "NOT_RUN",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "geometry_projection_hash": "0d9813d5e6630346cced884fc43b39b6828faf7261d7d4def091aa5a78a7ae82",
+      "rating_request_ready": true,
+      "structural_admitted": true,
+      "task168_chain_status": "CHAIN_COMPLETE",
+      "task174_status": "VALIDATED",
+      "tube_length_m": "4.90"
+    }
+  ],
+  "schema_version": "hxforge.candidate-space-result.v1",
+  "selected_for_rating_count": 2,
+  "structurally_admitted_count": 4,
+  "task174_ready_count": 2
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "hxforge.general-engineering-case.v2",
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r4",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "bind_task172_c3_reference_geometry": true,
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "300.00",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "12.000000"
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "298.15",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "20.000000"
+  },
+  "target_duty_w": "9500",
+  "max_tube_side_pressure_drop_pa": "1150",
+  "max_shell_side_pressure_drop_pa": "1180",
+  "candidate_constraints": {
+    "shell_inside_diameter_m": "0.5",
+    "tube_outer_diameter_m": "0.01905",
+    "tube_wall_thickness_m": "0.00165",
+    "tube_pitch_m": "0.0254",
+    "tube_lengths_m": ["4.85"],
+    "baffle_spacings_m": ["0.97"],
+    "baffle_count": 4,
+    "tube_pass_count": 1
+  },
+  "solver_budget": {
+    "total_budget_s": 900,
+    "max_candidates_to_rate": 1,
+    "enable_full_task173_rating": false
+  },
+  "notes": "R4: tube_side=hot equipment stream, shell_side=cold equipment stream; C3 reference geometry; unified positive-duty cell + n=1 mesh evidence."
+}

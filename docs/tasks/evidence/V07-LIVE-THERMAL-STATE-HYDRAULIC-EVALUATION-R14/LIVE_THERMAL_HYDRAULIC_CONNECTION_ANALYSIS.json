@@ -1,0 +1,44 @@
+{
+  "live_rating_outlet_thermal_state": {
+    "fields": [
+      "tube_outlet_temperature_k",
+      "shell_outlet_temperature_k",
+      "total_duty_w",
+      "energy_balance_residual_w"
+    ],
+    "present_in_mesh": true,
+    "shell_outlet_temperature_k": "298.53898098805473",
+    "source": "Task173 n=1 mesh observables when mesh_status=NUMERIC_VALID",
+    "tube_outlet_temperature_k": "299.05163815440915"
+  },
+  "pressure_domain_layers": {
+    "coolprop_liquid_water_tp": "Provider-native phase/domain errors surface as post-pass blockers",
+    "task173_reference_pressure_guard": "Property evaluation for R14 post-pass uses inlet reference pressure only (does not weaken Task174 BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT semantics)",
+    "user_max_delta_p": {
+      "shell_pa": "1180",
+      "tube_pa": "1150"
+    }
+  },
+  "r14_experimental_postpass": {
+    "authority_id": "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14",
+    "does_not_recompute": "Task172 coupled cell; iterative thermal-hydraulic closure; Task174 orchestration identity",
+    "enabled_by": "engineering_case.experimental_live_thermal_hydraulic_postpass=true",
+    "hydraulic_status": "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS",
+    "outlet_pressure_model": "one_way_inlet_minus_modeled_delta_p",
+    "property_evaluation_rule": "Per side: bulk mean temperature (T_inlet + T_outlet)/2 at case inlet reference pressure; CoolProp HEOS::Water; separate tube and shell snapshots",
+    "recomputes": "Task026\u2192Task027\u2192Task028\u2192Task029 tube path with live snapshot; Task032\u2192Task166 Bell\u2013Delaware shell path with live snapshot; actual Task025 parallel area and physical tube count from candidate bundle"
+  },
+  "schema_version": "hxforge.live-thermal-hydraulic-connection-analysis.v1",
+  "task174_reference_hydraulic_preview": {
+    "modeled_shell_dp_pa": null,
+    "modeled_tube_dp_pa": null,
+    "status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+    "temperature_pressure_basis": "Task168 evaluation authority frozen property snapshots at sizing templates; Task174 binds Task029/Task166 at reference 101325 Pa without live outlet states"
+  },
+  "task_id": "V07_LIVE_THERMAL_STATE_HYDRAULIC_EVALUATION_R14",
+  "user_inlet_thermal_state": {
+    "does_not_feed": "Task174 reference hydraulic preview without R14 post-pass",
+    "feeds": "Task173 experimental live thermal boundary when enabled",
+    "source": "general engineering case JSON (tube_side / shell_side)"
+  }
+}

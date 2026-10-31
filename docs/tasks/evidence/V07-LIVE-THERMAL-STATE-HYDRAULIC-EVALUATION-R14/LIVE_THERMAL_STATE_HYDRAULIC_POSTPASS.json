@@ -1,0 +1,70 @@
+{
+  "authority_id": "V07-LIVE-THERMAL-STATE-HYDRAULIC-POSTPASS-R14",
+  "blockers": [],
+  "candidate_hash": "eae80b7dc84937478d8be299fef8b0f92b69494b4248696bf7eec241a8376b47",
+  "candidate_id": "a409a550-4d1d-5b71-b3f5-0f1b665e2fe5",
+  "coolprop_outlet_domain_checks": {
+    "shell": {
+      "detail": null,
+      "ok": true,
+      "pressure_pa": "100152.0101173970401332059798",
+      "temperature_k": "298.53898098805473"
+    },
+    "tube": {
+      "detail": null,
+      "ok": true,
+      "pressure_pa": "101321.433",
+      "temperature_k": "299.05163815440915"
+    }
+  },
+  "correlation_applicability_status": "APPLICABLE",
+  "energy_balance_status": "NOT_EVALUATED_IN_POSTPASS",
+  "hydraulic_constraint_status": "SATISFIED",
+  "max_shell_dp_pa": "1180",
+  "max_tube_dp_pa": "1150",
+  "physical_tube_count": 337,
+  "property_evaluation_rule_id": "SIDE_BULK_MEAN_TP_AT_INLET_REFERENCE_PRESSURE_R14",
+  "property_inputs": {
+    "shell": {
+      "bulk_pressure_pa": "101325",
+      "bulk_temperature_k": "298.344490494027365",
+      "density_kg_m3": "996.9975642036436",
+      "dynamic_viscosity_pa_s": "0.0008860922985925122",
+      "property_snapshot_hash": "64f7273d5521ae164344c7461b6ccdc3681fe96b1efe75c5219ff6c28e65de9f"
+    },
+    "tube": {
+      "bulk_pressure_pa": "101325",
+      "bulk_temperature_k": "299.375819077204575",
+      "density_kg_m3": "996.7260722782823",
+      "dynamic_viscosity_pa_s": "0.0008657120415081833",
+      "property_snapshot_hash": "0df7e98b1295909abee3b5f00a77000e50ab2b64b9d6e912f512107195f7feba"
+    }
+  },
+  "recalculated_shell_dp_pa": "1172.9898826029598667940202383314340443039618393996",
+  "recalculated_tube_dp_pa": "3.567",
+  "reference_shell_dp_pa": "1177.7864150994619125708671516363047321243533825214",
+  "reference_tube_dp_pa": "3.965",
+  "schema_version": "hxforge.live-thermal-state-hydraulic-postpass.v1",
+  "shell_bulk_evaluation_temperature_k": "298.344490494027365",
+  "shell_dp_components_pa": {
+    "central_crossflow": "114.13505268479315307772774905359850378737853582591",
+    "end_zone": "141.44894088462464688638578385259130707140430408005",
+    "total": "1172.9898826029598667940202383314340443039618393996",
+    "window": "917.40588903354206682990670542524423344517899949355"
+  },
+  "shell_dp_constraint": "SATISFIED",
+  "shell_dp_task166_result_hash": "e4053db4e1ee4611a150bf76ed451ccd8588d8a3a8ab5f705e177adf41d18b7d",
+  "shell_inlet_temperature_k": "298.15",
+  "shell_outlet_pressure_pa": "100152.0101173970401332059798",
+  "shell_outlet_temperature_k": "298.53898098805473",
+  "task025_total_parallel_flow_area_m2": "0.0656569794",
+  "task174_hydraulic_status": "EXPERIMENTAL_LIVE_THERMAL_STATE_HYDRAULIC_POSTPASS",
+  "task174_style_outlet_pressure_window_pass": true,
+  "thermal_hydraulic_coupling_status": "EXPERIMENTAL_HYDRAULIC_POST_PASS_ONE_WAY",
+  "tube_bulk_evaluation_temperature_k": "299.375819077204575",
+  "tube_dp_constraint": "SATISFIED",
+  "tube_dp_task029_result_hash": "880137a909509286af5244a772c517b01fe239f5a4206e353ae061caaaacf992",
+  "tube_inlet_temperature_k": "299.70",
+  "tube_outlet_pressure_pa": "101321.433",
+  "tube_outlet_temperature_k": "299.05163815440915"
+}

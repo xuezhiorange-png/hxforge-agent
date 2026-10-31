@@ -1,0 +1,24 @@
+{
+  "candidate_space_hash": "f52842793cba22d6a0c532c09f48743da7bf5f7397bf1d0efcc6a4b1154abb24",
+  "records": [
+    {
+      "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+      "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+      "rating_request_ready": true,
+      "selected_for_rating": true,
+      "structural_admitted": true,
+      "task168_blocked_codes": [],
+      "task168_blocked_stage": null,
+      "task168_chain_status": "CHAIN_COMPLETE",
+      "task171_result_hash": "3c2c815fefbb4845dec8e4afaf8e91c89c2f9be2bdcd517a35510492bb209a9b",
+      "task174_result_hash": "0449efde89fec337615888d2ffe52ccf4df4b7be4f525477729f3f2c6f1e0f72",
+      "task174_status": "VALIDATED"
+    }
+  ],
+  "schema_version": "hxforge.candidate-selection-result.v1",
+  "selected_candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "selected_rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+  "selection_reason": "FIRST_STRUCTURAL_AND_TASK174_READY_UNDER_MVP_POLICY",
+  "status": "SELECTED"
+}

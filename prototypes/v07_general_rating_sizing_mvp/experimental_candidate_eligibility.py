@@ -1,0 +1,177 @@
+"""Per-candidate structural / rating / constraint eligibility (experimental)."""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from typing import Any
+
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
+    CandidateSelectionOutcome,
+    CandidateSelectionRecord,
+)
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
+from prototypes.v07_general_rating_sizing_mvp.engineering_sizing_eligibility import (
+    assess_engineering_sizing_eligibility,
+    engineering_sizing_eligible_for_ranking,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_hydraulic_constraint_decision import (
+    build_hydraulic_constraint_decision,
+    live_hydraulic_postpass_enabled,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_two_way_bulk_pressure_feedback import (
+    experimental_two_way_bulk_pressure_feedback_enabled,
+)
+from prototypes.v07_general_rating_sizing_mvp.experimental_two_way_coupling_sizing import (
+    apply_two_way_coupling_constraint_gate,
+    two_way_coupling_blocks_sizing,
+)
+
+
+def _structural_status(record: CandidateSelectionRecord) -> str:
+    if not record.structural_admitted:
+        return "BLOCKED_STRUCTURAL"
+    if record.task168_chain_status == "BLOCKED_DOWNSTREAM":
+        return "BLOCKED_DOWNSTREAM"
+    if record.task168_chain_status == "CHAIN_COMPLETE":
+        return "ADMITTED"
+    return record.task168_chain_status
+
+
+def _task174_status(record: CandidateSelectionRecord) -> str:
+    if record.task174_status == "VALIDATED":
+        return "VALIDATED"
+    if record.task174_status == "BLOCKED":
+        return "BLOCKED"
+    return "NOT_RUN"
+
+
+def _rating_status(mesh_status: str | None) -> str:
+    if mesh_status == "NUMERIC_VALID":
+        return "NUMERIC_VALID"
+    if mesh_status in {None, "NOT_RUN"}:
+        return "NOT_EVALUATED"
+    if mesh_status == "BUDGET_STOP":
+        return "NOT_EVALUATED"
+    return "BLOCKED"
+
+
+def _constraint_status(
+    case: EngineeringCase,
+    *,
+    rating_status: str,
+    constraint_preview: dict[str, Any] | None,
+) -> str:
+    if rating_status != "NUMERIC_VALID":
+        return "NOT_EVALUATED"
+    if constraint_preview is None:
+        return "NOT_EVALUATED"
+    duty = constraint_preview.get("duty_constraint")
+    tube_dp = constraint_preview.get("tube_dp_constraint")
+    shell_dp = constraint_preview.get("shell_dp_constraint")
+    if duty == "NOT_EVALUATED" or tube_dp == "NOT_EVALUATED" or shell_dp == "NOT_EVALUATED":
+        return "NOT_EVALUATED"
+    if duty == "SATISFIED" and tube_dp == "SATISFIED" and shell_dp == "SATISFIED":
+        return "PRELIMINARY_CONSTRAINT_SATISFIED"
+    return "PRELIMINARY_CONSTRAINT_FAILED"
+
+
+def build_candidate_eligibility(
+    case: EngineeringCase,
+    selection: CandidateSelectionOutcome,
+    rating_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rating_by_id = {row["candidate_id"]: row for row in rating_rows}
+    records_by_id = {rec.candidate_id: rec for rec in selection.records}
+    entries: list[dict[str, Any]] = []
+    for candidate_id in selection.selected_candidate_ids:
+        record = records_by_id[candidate_id]
+        row = rating_by_id.get(candidate_id, {})
+        mesh_status = row.get("mesh_status") or row.get("status")
+        rating_status = _rating_status(mesh_status)
+        hydraulic_decision = build_hydraulic_constraint_decision(
+            case, row, rating_status=rating_status
+        )
+        constraint_status = apply_two_way_coupling_constraint_gate(
+            case,
+            row,
+            str(hydraulic_decision["EFFECTIVE_CONSTRAINT_STATUS"]),
+        )
+        engineering_eligibility = assess_engineering_sizing_eligibility(case, row)
+        two_way_blocked, two_way_reason = two_way_coupling_blocks_sizing(case, row)
+        two_way_sizing_status: str | None
+        if experimental_two_way_bulk_pressure_feedback_enabled(case):
+            two_way_sizing_status = (
+                "COUPLED_CONVERGED" if not two_way_blocked else (two_way_reason or "NOT_EVALUATED")
+            )
+        else:
+            two_way_sizing_status = None
+        entries.append(
+            {
+                "candidate_id": candidate_id,
+                "candidate_hash": record.candidate_hash,
+                "tube_length_m": record.tube_length_m,
+                "baffle_spacing_m": record.baffle_spacing_m,
+                "STRUCTURAL_STATUS": _structural_status(record),
+                "TASK174_STATUS": _task174_status(record),
+                "RATING_STATUS": rating_status,
+                "CONSTRAINT_STATUS": constraint_status,
+                "TWO_WAY_COUPLING_SIZING_STATUS": two_way_sizing_status,
+                "HYDRAULIC_DECISION_SOURCE": hydraulic_decision["hydraulic_decision_source"],
+                "REFERENCE_CONSTRAINT_STATUS": hydraulic_decision["REFERENCE_CONSTRAINT_STATUS"],
+                "LIVE_HYDRAULIC_CONSTRAINT_STATUS": hydraulic_decision[
+                    "LIVE_HYDRAULIC_CONSTRAINT_STATUS"
+                ],
+                "reference_vs_live_feasibility_changed": hydraulic_decision[
+                    "reference_vs_live_feasibility_changed"
+                ],
+                "hydraulic_constraint_decision": hydraulic_decision,
+                "ENGINEERING_SIZING_ELIGIBILITY": engineering_eligibility[
+                    "ENGINEERING_SIZING_ELIGIBILITY"
+                ],
+                "GEOMETRY_COMPLETENESS_STATUS": engineering_eligibility[
+                    "GEOMETRY_COMPLETENESS_STATUS"
+                ],
+                "engineering_sizing_eligibility": engineering_eligibility,
+                "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+                "task168_blocked_codes": list(record.task168_blocked_codes),
+                "nominal_geometry": row.get("nominal_geometry"),
+            }
+        )
+    return entries
+
+
+def constraint_satisfied_ids(eligibility: list[dict[str, Any]]) -> list[str]:
+    return [
+        item["candidate_id"]
+        for item in eligibility
+        if item["CONSTRAINT_STATUS"] == "PRELIMINARY_CONSTRAINT_SATISFIED"
+        and (
+            item.get("TWO_WAY_COUPLING_SIZING_STATUS") is None
+            or item.get("TWO_WAY_COUPLING_SIZING_STATUS") == "COUPLED_CONVERGED"
+        )
+        and engineering_sizing_eligible_for_ranking(
+            item.get("engineering_sizing_eligibility") or {}
+        )
+    ]
+
+
+def reevaluate_constraint_for_target(
+    case: EngineeringCase,
+    row: dict[str, Any],
+    target_duty_w: Decimal,
+) -> str:
+    if row.get("mesh_status") != "NUMERIC_VALID" and row.get("status") != "NUMERIC_VALID":
+        return "NOT_EVALUATED"
+    duty_w = Decimal(str(row.get("total_duty_w")))
+    if duty_w < target_duty_w:
+        return "PRELIMINARY_CONSTRAINT_FAILED"
+    if live_hydraulic_postpass_enabled(case):
+        rating_status = _rating_status(row.get("mesh_status") or row.get("status"))
+        decision = build_hydraulic_constraint_decision(case, row, rating_status=rating_status)
+        return str(decision["EFFECTIVE_CONSTRAINT_STATUS"])
+    preview = row.get("constraint_preview") or {}
+    tube_dp = preview.get("tube_dp_constraint")
+    shell_dp = preview.get("shell_dp_constraint")
+    if tube_dp != "SATISFIED" or shell_dp != "SATISFIED":
+        return "PRELIMINARY_CONSTRAINT_FAILED"
+    return "PRELIMINARY_CONSTRAINT_SATISFIED"

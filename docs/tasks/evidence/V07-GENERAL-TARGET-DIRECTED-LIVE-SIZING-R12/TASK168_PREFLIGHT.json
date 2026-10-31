@@ -1,0 +1,293 @@
+{
+  "candidate_count": 35,
+  "candidate_space_hash": "72731397c4bc98816c043c8ab4f2dc0b64e00a985f7b53b02376e35564fd35e3",
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "f2846fcc378a74d5ce23abd20b7bc9794d764ddbb46e570301ae701fa6f7a0ec",
+      "candidate_id": "986f9cd4-0d69-5e4f-ad8a-1a70a6767162",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "a25dcca2bc4f47360645b2ea4fb70de55a7105739c3d7dcb01f92512996b6971",
+      "candidate_id": "9c09bb45-3a54-5718-b51f-9756a038519d",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "1ce585776825c0bae03539d3dc0544d127936c00d11b9e5d7899600ff65bb57c",
+      "candidate_id": "9f4a40c8-6dd5-5995-9304-b0e2a91c18c0",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "acc7e72e94ca17982e5307aea75c4856ae1798a1703d2f443f15e9344b21651b",
+      "candidate_id": "0a3787fd-22a5-5573-9df2-b7344b4fd1d1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "6ad0cc61a0df86dabd2f918eebbb0ac055a99a2e557acc01255e4f387019e098",
+      "candidate_id": "84b5052d-ddb4-5f1b-bd2d-8009f253f959",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "2.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "a1b0a04ec3e36abafd7d86539997d09571c240ddb4e2a471a86d571da7517fb2",
+      "candidate_id": "df87c34f-5d8b-5a87-a4dd-c41097ee3afd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "5458e3f125923aa1c63211e1be4d5176a9957498d938ba42b3cc432dd4911039",
+      "candidate_id": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "3a4591ace9231eea07ecaa1dcd1320317f5a57a4d138a7fd0d4669fd9f018dad",
+      "candidate_id": "15d556a2-f87d-5168-a912-36688dee35c1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "b61e80c7bdd4e01050b5d2810a9017fc3eb1dd9a12cb4c2132eceb6ed0be1cf5",
+      "candidate_id": "8b336ed6-d7b3-5b68-afcc-cbbb2144b3ff",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "1a1ff324b677640498166c7b8c77c40fd77f6ff6a4fd99c857870939ca9e066c",
+      "candidate_id": "34257e11-9817-501b-9ae0-daeb418bd885",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "31bf15cc6735c2807682def65d9ea00ffbb13a979e1dc4f999574e847592d91f",
+      "candidate_id": "55a85114-f5d0-57cc-85f4-a3fae3579a52",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "a89cfd86b661bfca48f2d1b3b6fb9d8c19177d1ea978e2a1fe7403a557060189",
+      "candidate_id": "d14c1de5-2730-54dc-a724-c4a98ddb362f",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "fd8a0e69a5bc131c1da9d4c3208cfb0124d11299a8ae0002e3c99c3a14de8087",
+      "candidate_id": "071b9c82-f24a-53dd-b03b-a267f5f8d3c3",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "7f29b0ebbd30389cfa574af7b168e3a75c4e2cdc4a3a07dfab0e223f8787a661",
+      "candidate_id": "ad7f641f-0786-54b7-936f-beac54d4d52a",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "33bfd9e77f629123a17cded4e4fcb0120e398afc83b5c69eea3e4982a542839e",
+      "candidate_id": "c260900a-5e06-5842-8ec9-9613b128f210",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "3.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "796a1c4aafca785143a3ec052dcaf2edf980c53844170a1e5ac225ec1e1ac5b8",
+      "candidate_id": "5ecd21a8-75b1-5388-aeb0-ca0a36b4748a",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "cba5580ca37e07cb6ea9bb9802b2ffe82e1e2f6180d17267bea9a4726aa0919d",
+      "candidate_id": "1cbd047e-e031-56ae-8f81-97e365666866",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "2e3da5ff0fef74803bbc3fa7c9072c51aef0b0897a87660a808ced755ed10ef9",
+      "candidate_id": "27e80a51-2ece-5970-8a03-0f9e7b2bbfb4",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "ea834b0ddc575537c2330f839469b4e0f23ed4db90330a3149e5e0bbea329320",
+      "candidate_id": "b573f479-d4f4-5cb4-aff4-513028981905",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "f6c775d0309cc9c11cd5a441db91a5c8e1fb9b8fc3419dbc8496ba75e676fd63",
+      "candidate_id": "75c422e5-3e14-5511-a0e4-eb7ac60827a0",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.0"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "af2f572eea882dcc93d1d06415a3c0b79cc57826a916cec02552da1d25e3ba00",
+      "candidate_id": "a3e1db46-5eb6-5b01-8671-e7aa58f646a1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.5"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "6e849ae32c944bd102d83df3d8021dedb9b60e5038e6551fdd99ef400ce99266",
+      "candidate_id": "901ef5e8-7825-5cb9-8821-e9af80ecfecf",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.5"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "ff8c8fa53d9f5d28b353370b9273175c5ea73a93f24f1e72da896ffec2196651",
+      "candidate_id": "a4954a4d-bc8d-580d-b6cd-a229875eb110",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.5"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "3fb6c2d6737c6d5e47b9feef90e0cfcddd7ace9441163df42ece910f62871f2c",
+      "candidate_id": "72da2d2e-9563-5069-8ef4-af4cbb3e3e49",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.5"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "94890e0ef3b5d16d67ba82ffc8e2360b24ad58c4d6e08cccb3bf549233919eef",
+      "candidate_id": "9982aa4f-ec92-516c-a8d8-4f366b07178b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.5"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "ddb27457c2d657d07a2d72e8767c35aa18db13a7ba152bcedfc4c65151fe7c85",
+      "candidate_id": "c1c03077-78bd-573e-a14c-5ab5ba9abcc0",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "0000e8563a3c0fd651e402e7c87a4ba7ff7479a19a668425576536f2af9c5702",
+      "candidate_id": "fb782961-27c9-5701-8178-876291ef398b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "e36145fd9f24ef824a31bef90a24bded23302d9a3486ba68c934dc464a679cd4",
+      "candidate_id": "1301ef6e-4a7a-5ced-80f4-fccaa4a85e38",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "47832116b3de678efebe8e7f0345a8d647fe93082fd8248a787d799abdfcb0a5",
+      "candidate_id": "135bd0ab-c51f-5e10-906d-c6ad70ec7af1",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "7ee099b0080c660c674ad3d659c80035b5feb684d484a9a8e9d244d299b59a99",
+      "candidate_id": "a135729e-2f1f-5914-83b4-195fb1730313",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.5",
+      "candidate_hash": "1ca185603840ab282be8d64e8db0848c6275e152ce7ad770c7a94bb57ea1b7f9",
+      "candidate_id": "ba944514-9058-54d6-8b29-398be9fc1173",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "360c55e524d180c9edd605a9bc7901056065ba014fe3c0dd8ce76c6d48a2619d",
+      "candidate_id": "caf4c9d5-7946-5d46-808d-922ff9828317",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "d91652deee6796ad740b3a60d5957d1b4e75beba13d8d8f6834e3ad0feaf0206",
+      "candidate_id": "188e01e5-84eb-541f-b825-ca02fd9a3336",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.8",
+      "candidate_hash": "9f8835e9ebcba9a95c6e8a551aa8cdcf1fce8f98bee700f1cc7dcc86f8c527c2",
+      "candidate_id": "42d49b78-dcc5-5b5b-8a52-e2d787a42360",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "cdf6980337ef07f55afcb1f81fc9f84a7a93dfb1ef9c76e0b4b6b53e76173ece",
+      "candidate_id": "de1dbc87-b41b-5d49-a67a-ea3b85949e72",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    }
+  ],
+  "distinct_geometry_count": 35,
+  "notes": "Preflight VALID means Task168 request enumeration succeeded; per-candidate BLOCKED disposition is downstream evaluation, not geometry illegality.",
+  "status": "VALID",
+  "structurally_admitted_count": 0,
+  "task168_downstream_full_evaluation_status": "NOT_RUN_IN_PREFLIGHT_ONLY",
+  "task168_structural_enumeration_status": "VALID",
+  "task173_rating_status": "NOT_RUN"
+}

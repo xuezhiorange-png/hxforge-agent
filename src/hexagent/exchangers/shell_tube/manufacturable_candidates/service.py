@@ -2045,6 +2045,16 @@ def _task021_payload(
     layout_rule["snapshot_hash"] = task021_canonical.sha256_hex(
         {key: item for key, item in layout_rule.items() if key != "snapshot_hash"}
     )
+    from hexagent.exchangers.shell_tube.manufacturable_candidates.variable_shell_r13 import (
+        VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13,
+    )
+
+    if VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13 in authority.evidence_refs:
+        envelope = payload.get("placement_envelope")
+        if type(envelope) is dict:
+            shell_m = candidate.shell_inside_diameter_m
+            env_d = (shell_m * Decimal("0.9")).quantize(Decimal("0.0000000001"))
+            cast(dict[str, object], envelope)["tube_center_envelope_diameter_m"] = str(env_d)
     return payload
 
 

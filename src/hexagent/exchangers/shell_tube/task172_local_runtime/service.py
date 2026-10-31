@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import math
+import struct
 import sys
-from dataclasses import fields
+from dataclasses import dataclass, fields
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
 import numpy as np
 from pydantic import ValidationError
-from scipy.optimize import least_squares
+from scipy.optimize import brentq, least_squares
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.bell_delaware.heat_transfer import calculate_heat_transfer
@@ -63,6 +64,17 @@ Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
 
 _T_MIN = Decimal("298.15")
 _T_MAX = Decimal("300.00")
+
+
+def _admitted_temperature_bounds() -> tuple[Decimal, Decimal]:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.admitted_bulk_temperature_min_k(bound), _etb.admitted_bulk_temperature_max_k(bound)
+
+
 _P_MIN = Decimal("100000")
 _P_MAX = Decimal("101325")
 _TUBE_C3_RE_MIN = Decimal("3000")
@@ -76,6 +88,179 @@ _JMU_EXPONENT = Decimal("0.14")
 _C_ROUND = 1.0
 _CALLBACK_CAP = 24
 _NUMERICAL_PROFILE_ID = "R94_R98_STAGE1_CASE_PROFILE_CROUND_1.0"
+_WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID = "V07-T172-R25D-PHYSICAL-TWO-SCALAR-BRACKET-V1"
+_FROZEN_MAX_NFEV = 6
+_WIDE_EXPERIMENTAL_MAX_NFEV = 24
+_WIDE_EXPERIMENTAL_CALLBACK_CAP = 48
+# SciPy least_squares: step h_i = |x_i| * diff_step_i (relative; see 1.17+ docs).
+_FROZEN_RELATIVE_DIFF_STEP = 1e-5
+# Wide q uses a larger relative step than temperature: |q|~50 kW with 1e-4 gives ~5 W perturbation.
+_WIDE_RELATIVE_DIFF_STEP_Q = 1e-4
+_WIDE_RELATIVE_DIFF_STEP_TEMPERATURE = 1e-5
+_WIDE_RELATIVE_DIFF_STEP_UV = 1e-5
+_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX = 24
+_WIDE_SCALAR_TWO_MAX_BRENT_ITER = 48
+_WIDE_SCALAR_TWO_BRENT_XTOL = 1e-12
+
+
+@dataclass(frozen=True)
+class _SolverBudget:
+    max_nfev: int
+    callback_cap: int
+    numerical_profile_id: str
+    wide_experimental: bool
+
+
+_FROZEN_SOLVER_BUDGET = _SolverBudget(
+    _FROZEN_MAX_NFEV,
+    _CALLBACK_CAP,
+    _NUMERICAL_PROFILE_ID,
+    False,
+)
+_WIDE_EXPERIMENTAL_SOLVER_BUDGET = _SolverBudget(
+    _WIDE_EXPERIMENTAL_MAX_NFEV,
+    _WIDE_EXPERIMENTAL_CALLBACK_CAP,
+    _WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID,
+    True,
+)
+
+
+def _relative_diff_step_vector(
+    *,
+    wide_experimental: bool,
+) -> tuple[float, float, float] | float:
+    if wide_experimental:
+        return (
+            _WIDE_RELATIVE_DIFF_STEP_Q,
+            _WIDE_RELATIVE_DIFF_STEP_TEMPERATURE,
+            _WIDE_RELATIVE_DIFF_STEP_TEMPERATURE,
+        )
+    return _FROZEN_RELATIVE_DIFF_STEP
+
+
+def _actual_jacobian_perturbations(
+    values: tuple[float, float, float],
+    diff_step: float | tuple[float, float, float],
+) -> tuple[float, float, float]:
+    """Return SciPy 2-point Jacobian step magnitudes h_i = |x_i| * diff_step_i."""
+    if type(diff_step) is float:
+        relative: tuple[float, float, float] = (diff_step, diff_step, diff_step)
+    else:
+        relative = cast(tuple[float, float, float], diff_step)
+    perturbations: list[float] = []
+    for value, step in zip(values, relative, strict=True):
+        magnitude = abs(value)
+        if magnitude == 0.0:
+            perturbations.append(math.sqrt(sys.float_info.epsilon))
+        else:
+            perturbations.append(magnitude * step)
+    return cast(tuple[float, float, float], tuple(perturbations))
+
+
+def _wall_temperatures_from_uv(
+    u: float,
+    v: float,
+    *,
+    shell_bulk_k: float,
+    tube_bulk_k: float,
+) -> tuple[float, float]:
+    """Map (u,v) in [0,1]^2 to wall temps with Tshell <= Two <= Twi <= Ttube."""
+    delta_t = tube_bulk_k - shell_bulk_k
+    if delta_t <= 0.0:
+        raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_mapping.delta_t")
+    u_value = min(max(float(u), 0.0), 1.0)
+    v_value = min(max(float(v), 0.0), 1.0)
+    two_value = shell_bulk_k + u_value * delta_t
+    twi_value = two_value + v_value * (tube_bulk_k - two_value)
+    return twi_value, two_value
+
+
+def _uv_from_wall_temperatures(
+    twi: float,
+    two: float,
+    *,
+    shell_bulk_k: float,
+    tube_bulk_k: float,
+) -> tuple[float, float]:
+    delta_t = tube_bulk_k - shell_bulk_k
+    if delta_t <= 0.0:
+        return (0.5, 0.5)
+    u_value = (two - shell_bulk_k) / delta_t
+    tube_gap = tube_bulk_k - two
+    v_value = 0.0 if tube_gap <= 0.0 else (twi - two) / tube_gap
+    return (min(max(u_value, 0.0), 1.0), min(max(v_value, 0.0), 1.0))
+
+
+def _select_wall_network_failure(failures: tuple[_RuntimeFailure, ...]) -> _RuntimeFailure:
+    if not failures:
+        return _RuntimeFailure("BLOCKED_NONCONVERGENCE", "wide.wall_network.no_attempt")
+    priority = (
+        "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT",
+        "BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT",
+        "BLOCKED_PROPERTY_EVALUATION_FAILURE",
+        "BLOCKED_PROPERTY_PHASE",
+        "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN",
+        "BLOCKED_SHELL_BELL_REYNOLDS_OUT_OF_DOMAIN",
+        "BLOCKED_PHYSICAL_WALL_ORDERING",
+        "BLOCKED_SOLVER_RESOURCE_EXHAUSTION",
+        "BLOCKED_NONCONVERGENCE",
+        "BLOCKED_SOLVER_FAILURE",
+        "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN",
+    )
+    for code in priority:
+        for failure in failures:
+            if failure.code == code:
+                return failure
+    return failures[-1]
+
+
+def _residual_acceptance_ratios_from_diagnostics(
+    diagnostics: tuple[str, ...],
+) -> tuple[float, float, float] | None:
+    if len(diagnostics) < 9:
+        return None
+    try:
+        residuals = tuple(float(diagnostics[index]) for index in range(3, 6))
+        bounds = tuple(float(diagnostics[index]) for index in range(6, 9))
+    except ValueError:
+        return None
+    if any(bound <= 0.0 for bound in bounds):
+        return None
+    return cast(
+        tuple[float, float, float],
+        tuple(abs(residual) / bound for residual, bound in zip(residuals, bounds, strict=True)),
+    )
+
+
+def _warm_start_from_blocked(
+    blocked: Task172BlockedResult,
+) -> tuple[float, float, float] | None:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return None
+    if len(blocked.diagnostic_last_iterate) < 3:
+        return None
+    ratios = _residual_acceptance_ratios_from_diagnostics(blocked.diagnostic_last_iterate)
+    if ratios is None or max(ratios) > 2.0:
+        return None
+    try:
+        values = tuple(float(blocked.diagnostic_last_iterate[index]) for index in range(3))
+    except ValueError:
+        return None
+    if not all(math.isfinite(value) for value in values):
+        return None
+    return cast(tuple[float, float, float], values)
+
+
+def _experimental_wide_delta_t_solver_active() -> bool:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.variable_water_temperature_active(bound)
+
+
 _TASK026_PROPERTY_SOURCE_ID = "CoolProp::HEOS::Water"
 _TASK026_PROPERTY_SOURCE_VERSION = f"{COOLPROP_VERSION}+{COOLPROP_GIT_REVISION}"
 _DOGBOX_FALLBACK_AUTHORITY_ID = "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3"
@@ -433,7 +618,8 @@ def _blocked(
 
 
 def _provider_state(provider: PropertyProvider, temperature: Decimal, pressure: Decimal) -> Any:
-    if not _T_MIN <= temperature <= _T_MAX:
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= temperature <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT", "property_state.temperature_k"
         )
@@ -634,6 +820,104 @@ def _decimal_power(value: Decimal, exponent: Decimal) -> Decimal:
     if not result.is_finite() or result <= 0:
         raise _RuntimeFailure("BLOCKED_CORRELATION_NONFINITE", "wall_correction")
     return result
+
+
+def _temperature_cache_key(temperature_k: float) -> int:
+    return cast(int, struct.unpack("!q", struct.pack("!d", float(temperature_k)))[0])
+
+
+def _shell_outer_wall_conductance_w_per_k(
+    request: Task172Request,
+    provider: PropertyProvider,
+    shell_bulk_snapshot: PropertySnapshot,
+    shell_geometry_htc: Decimal,
+    wall_outer_k: float,
+    *,
+    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    property_eval_counter: list[int] | None = None,
+) -> float:
+    """Shell-side film conductance g_o = h_o(Two) * Ao (W/K), matching _eval_trial()."""
+    cache_key = ("shell_g_o", _temperature_cache_key(wall_outer_k))
+    if property_eval_cache is not None and cache_key in property_eval_cache:
+        return property_eval_cache[cache_key]
+    support = request.support
+    shell_wall, _shell_wall_id, _shell_wall_state = _snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{support.wall_interface_id}:SHELL_FLUID_WALL_INTERFACE",
+        Decimal(str(wall_outer_k)),
+        request.shell_bulk_state.pressure_pa,
+    )
+    if property_eval_counter is not None:
+        property_eval_counter[0] += 1
+    shell_jmu_ratio = shell_bulk_snapshot.dynamic_viscosity_pa_s / shell_wall.dynamic_viscosity_pa_s
+    shell_jmu = _decimal_power(shell_jmu_ratio, _JMU_EXPONENT)
+    shell_htc = shell_geometry_htc * shell_jmu
+    g_o = float(shell_htc) * float(support.outside_area_m2)
+    if g_o <= 0.0 or not math.isfinite(g_o):
+        raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "shell_wall_conductance")
+    if property_eval_cache is not None:
+        property_eval_cache[cache_key] = g_o
+    return g_o
+
+
+def _tube_inner_wall_conductance_w_per_k(
+    request: Task172Request,
+    provider: PropertyProvider,
+    tube_bulk_snapshot: PropertySnapshot,
+    tube_htc_base: Decimal,
+    wall_inner_k: float,
+    *,
+    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    property_eval_counter: list[int] | None = None,
+) -> float:
+    """Tube-side film conductance g_i = h_i(Twi) * Ai (W/K), matching _eval_trial()."""
+    cache_key = ("tube_g_i", _temperature_cache_key(wall_inner_k))
+    if property_eval_cache is not None and cache_key in property_eval_cache:
+        return property_eval_cache[cache_key]
+    support = request.support
+    tube_wall, _tube_wall_id, _tube_wall_state = _snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{support.wall_interface_id}:TUBE_FLUID_WALL_INTERFACE",
+        Decimal(str(wall_inner_k)),
+        request.tube_bulk_state.pressure_pa,
+    )
+    if property_eval_counter is not None:
+        property_eval_counter[0] += 1
+    tube_pr_wall = (
+        tube_wall.dynamic_viscosity_pa_s
+        * tube_wall.specific_heat_capacity_j_kg_k
+        / tube_wall.thermal_conductivity_w_m_k
+    )
+    tube_pr_bulk = (
+        tube_bulk_snapshot.dynamic_viscosity_pa_s
+        * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
+        / tube_bulk_snapshot.thermal_conductivity_w_m_k
+    )
+    if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+        )
+    pr_ratio = tube_pr_bulk / tube_pr_wall
+    if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
+        raise _RuntimeFailure("BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio")
+    tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
+    tube_htc = tube_htc_base * tube_factor
+    g_i = float(tube_htc) * float(support.inside_area_m2)
+    if g_i <= 0.0 or not math.isfinite(g_i):
+        raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "tube_wall_conductance")
+    if property_eval_cache is not None:
+        property_eval_cache[cache_key] = g_i
+    return g_i
+
+
+def _neighbor_temperature_candidates(center_k: float) -> tuple[float, ...]:
+    center = float(center_k)
+    neighbors = {center, math.nextafter(center, math.inf), math.nextafter(center, -math.inf)}
+    return tuple(sorted(neighbors))
 
 
 def _c_residual_bounds(
@@ -892,6 +1176,8 @@ def _solve_once(
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
 ) -> Task172LocalResult:
     if (
         provider.name != "CoolProp"
@@ -999,13 +1285,16 @@ def _solve_once(
         )
     wall_inner_seed = float(request.tube_bulk_state.temperature_k) - q_seed * resistance_i_seed
     wall_outer_seed = float(request.shell_bulk_state.temperature_k) + q_seed * resistance_o_seed
+    if initial_guess is not None:
+        q_seed, wall_inner_seed, wall_outer_seed = initial_guess
     if not all(math.isfinite(value) for value in (q_seed, wall_inner_seed, wall_outer_seed)):
         raise _RuntimeFailure("BLOCKED_INITIALIZATION_FAILURE", "initialization.seed")
-    if not _T_MIN <= Decimal(str(wall_inner_seed)) <= _T_MAX:
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= Decimal(str(wall_inner_seed)) <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_inner"
         )
-    if not _T_MIN <= Decimal(str(wall_outer_seed)) <= _T_MAX:
+    if not t_min <= Decimal(str(wall_outer_seed)) <= t_max:
         raise _RuntimeFailure(
             "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_outer"
         )
@@ -1013,10 +1302,39 @@ def _solve_once(
     callback_count = 0
     last_iterate: tuple[float, float, float] = (q_seed, wall_inner_seed, wall_outer_seed)
 
+    def _runtime_failure_from_trial(
+        trial_solution: tuple[float, float, float],
+        evaluated: dict[str, Any],
+    ) -> _RuntimeFailure:
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        diagnostics = tuple(
+            str(value)
+            for value in (
+                *trial_solution,
+                *residual_values,
+                *acceptance_bounds,
+            )
+        )
+        return _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+
+    residual_scale = max(abs(q_seed), 1.0)
+    temperature_scale = max(abs(delta_t), 1.0)
+    diff_step = _relative_diff_step_vector(wide_experimental=budget.wide_experimental)
+    if budget.wide_experimental:
+        ftol = 1e-8
+        xtol = 1e-10
+    else:
+        ftol = 1e-6
+        xtol = 1e-12
+    tube_bulk_k = float(request.tube_bulk_state.temperature_k)
+    shell_bulk_k = float(request.shell_bulk_state.temperature_k)
+    wall_resistance_k_w = float(wall_resistance)
+
     def residual(values: np.ndarray) -> np.ndarray:
         nonlocal callback_count, last_iterate
         callback_count += 1
-        if callback_count > _CALLBACK_CAP:
+        if callback_count > budget.callback_cap:
             raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
         q, twi, two = (float(value) for value in values)
         last_iterate = (q, twi, two)
@@ -1032,7 +1350,229 @@ def _solve_once(
             twi,
             two,
         )
-        return np.asarray(evaluated["residuals"], dtype=float) / abs(q_seed)
+        return np.asarray(evaluated["residuals"], dtype=float) / residual_scale
+
+    def _accept_solution(
+        candidate_solution: tuple[float, float, float],
+        candidate_solver: Any,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        q_value, twi_value, two_value = candidate_solution
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_value,
+            twi_value,
+            two_value,
+        )
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        if any(
+            abs(value) > bound
+            for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+        ):
+            diagnostics = tuple(
+                str(value)
+                for value in (
+                    *candidate_solution,
+                    *residual_values,
+                    *acceptance_bounds,
+                )
+            )
+            raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+        return evaluated, candidate_solution
+
+    def _counted_eval_trial(
+        q_hc: float,
+        wall_inner: float,
+        wall_outer: float,
+    ) -> dict[str, Any]:
+        nonlocal callback_count
+        callback_count += 1
+        if callback_count > budget.callback_cap:
+            raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
+        return _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_hc,
+            wall_inner,
+            wall_outer,
+        )
+
+    property_eval_cache: dict[tuple[str, int], float] = {}
+    property_eval_counter = [0]
+
+    def _twi_from_two(two_value: float) -> tuple[float, float]:
+        two_value = float(two_value)
+        if two_value < shell_bulk_k:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower")
+        g_o = _shell_outer_wall_conductance_w_per_k(
+            request,
+            provider,
+            shell_bulk_snapshot,
+            shell_h_base,
+            two_value,
+            property_eval_cache=property_eval_cache,
+            property_eval_counter=property_eval_counter,
+        )
+        q_outer = g_o * (two_value - shell_bulk_k)
+        if q_outer < 0.0:
+            raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "scalar_two.q_outer")
+        twi_value = two_value + q_outer * wall_resistance_k_w
+        return q_outer, twi_value
+
+    def _scalar_F_two(two_value: float) -> float:
+        """F(Two) = Qi(Two) - Qo(Two) using shell/tube wall conductances only."""
+        q_outer, twi_value = _twi_from_two(two_value)
+        if twi_value > tube_bulk_k:
+            return -1.0
+        g_i = _tube_inner_wall_conductance_w_per_k(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            tube_h_base,
+            twi_value,
+            property_eval_cache=property_eval_cache,
+            property_eval_counter=property_eval_counter,
+        )
+        q_inner = g_i * (tube_bulk_k - twi_value)
+        return q_inner - q_outer
+
+    def _physical_two_upper_bound(two_low: float) -> float:
+        if _twi_from_two(two_low)[1] > tube_bulk_k:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower_twi")
+        two_hi = tube_bulk_k
+        if _twi_from_two(two_hi)[1] <= tube_bulk_k:
+            return two_hi
+        lo = two_low
+        hi = two_hi
+        for _ in range(_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX):
+            mid = 0.5 * (lo + hi)
+            if _twi_from_two(mid)[1] <= tube_bulk_k:
+                lo = mid
+            else:
+                hi = mid
+            if hi - lo <= max(math.ulp(tube_bulk_k), 1e-12):
+                break
+        return lo
+
+    def _accept_scalar_two_solution(
+        two_value: float,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        q_outer, twi_value = _twi_from_two(two_value)
+        evaluated = _counted_eval_trial(q_outer, twi_value, two_value)
+        q_inner = float(evaluated["g_i"]) * (tube_bulk_k - twi_value)
+        try:
+            return _accept_solution((q_inner, twi_value, two_value), two_value)
+        except _RuntimeFailure:
+            try:
+                return _accept_solution((q_outer, twi_value, two_value), two_value)
+            except _RuntimeFailure as residual_failure:
+                residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+                acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+                diagnostics = ";".join(
+                    str(item)
+                    for item in (
+                        q_inner,
+                        twi_value,
+                        two_value,
+                        *residual_values,
+                        *acceptance_bounds,
+                    )
+                )
+                raise _RuntimeFailure(
+                    "BLOCKED_RESIDUAL_ACCEPTANCE", diagnostics
+                ) from residual_failure
+
+    def _solve_wide_physical_two_scalar() -> tuple[dict[str, Any], tuple[float, float, float], int]:
+        nonlocal callback_count
+        evaluations_at_start = callback_count
+        two_low = shell_bulk_k
+        two_high = _physical_two_upper_bound(two_low)
+        span = two_high - two_low
+        if span <= 0.0:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.span")
+
+        def _two_from_u(u_value: float) -> float:
+            u_clamped = min(max(float(u_value), 0.0), 1.0)
+            return two_low + u_clamped * span
+
+        def _scalar_F_u(u_value: float) -> float:
+            return _scalar_F_two(_two_from_u(u_value))
+
+        f_lower = _scalar_F_u(0.0)
+        f_upper = _scalar_F_u(1.0)
+        if f_lower < 0.0 or f_upper > 0.0:
+            raise _RuntimeFailure(
+                "BLOCKED_NONCONVERGENCE",
+                f"scalar_two.endpoint_sign;{f_lower};{f_upper}",
+            )
+        try:
+            u_root = float(
+                brentq(
+                    _scalar_F_u,
+                    0.0,
+                    1.0,
+                    maxiter=_WIDE_SCALAR_TWO_MAX_BRENT_ITER,
+                    xtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
+                    rtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
+                )
+            )
+            two_root = _two_from_u(u_root)
+        except _RuntimeFailure:
+            raise
+        except ValueError as exc:
+            raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.brentq") from exc
+        except Exception as exc:
+            raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "scalar_two.brentq") from exc
+        evaluated, solution = _accept_scalar_two_solution(two_root)
+        function_evaluations = callback_count - evaluations_at_start
+        return evaluated, solution, function_evaluations
+
+    if budget.wide_experimental:
+        try:
+            evaluated_final, solution, scalar_nfev = _solve_wide_physical_two_scalar()
+        except _RuntimeFailure as failure:
+            raise failure
+        q, twi, two = solution
+        if q < 0.0:
+            raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
+        if not (shell_bulk_k <= two <= twi <= tube_bulk_k):
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+        solver_status = (
+            "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_DOGBOX"
+            if method == "dogbox"
+            else "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_TRF"
+        )
+        return _build_valid_result(
+            request,
+            canonical_sha256(_request_projection(request)),
+            support_id,
+            tube_bulk_id,
+            shell_bulk_id,
+            tube_re,
+            tube_pr,
+            shell_re,
+            shell_pr,
+            tube_corr_id,
+            tube_corr_version,
+            evaluated_final,
+            (q, twi, two),
+            solver_status,
+            scalar_nfev,
+            callback_count,
+            numerical_profile_id=budget.numerical_profile_id,
+            provenance_refs=_EVIDENCE_REFS,
+        )
 
     try:
         solver = least_squares(
@@ -1040,16 +1580,16 @@ def _solve_once(
             np.asarray([q_seed, wall_inner_seed, wall_outer_seed], dtype=float),
             method=method,
             loss="linear",
-            ftol=1e-6,
-            xtol=1e-12,
+            ftol=ftol,
+            xtol=xtol,
             gtol=1e-12,
             jac="2-point",
-            diff_step=1e-5,
-            x_scale=[abs(q_seed), abs(delta_t), abs(delta_t)],
-            max_nfev=6,
+            diff_step=diff_step,
+            x_scale=[residual_scale, temperature_scale, temperature_scale],
+            max_nfev=budget.max_nfev,
             bounds=(
-                np.asarray([-np.inf, float(_T_MIN), float(_T_MIN)], dtype=float),
-                np.asarray([np.inf, float(_T_MAX), float(_T_MAX)], dtype=float),
+                np.asarray([-np.inf, float(t_min), float(t_min)], dtype=float),
+                np.asarray([np.inf, float(t_max), float(t_max)], dtype=float),
             ),
             tr_solver="exact",
             tr_options={},
@@ -1061,27 +1601,14 @@ def _solve_once(
     except Exception as exc:
         raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "solver") from exc
 
-    solution = tuple(float(value) for value in solver.x)
-    q, twi, two = cast(tuple[float, float, float], solution)
-    final = _eval_trial(
-        request,
-        provider,
-        tube_bulk_snapshot,
-        shell_bulk_snapshot,
-        tube_h_base,
-        shell_h_base,
-        wall_resistance,
-        q,
-        twi,
-        two,
+    solution = cast(
+        tuple[float, float, float],
+        tuple(float(value) for value in solver.x),
     )
-    if not solver.success or solver.nfev > 6 or callback_count > _CALLBACK_CAP:
+    if not solver.success or solver.nfev > budget.max_nfev or callback_count > budget.callback_cap:
         raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "solver.termination")
-    residual_values = cast(tuple[float, float, float], final["residuals"])
-    bounds = cast(tuple[float, float, float], final["bounds"])
-    if any(abs(value) > bound for value, bound in zip(residual_values, bounds, strict=True)):
-        diagnostics = tuple(str(value) for value in (*solution, *residual_values, *bounds))
-        raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+    evaluated_final, solution = _accept_solution(solution, solver)
+    q, twi, two = solution
     if q < 0.0:
         raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
     if not (
@@ -1097,6 +1624,8 @@ def _solve_once(
         if fallback
         else f"SCIPY_TRF_STATUS_{solver.status}"
     )
+    profile_id = _DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID
+    provenance = (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
     return _build_valid_result(
         request,
         canonical_sha256(_request_projection(request)),
@@ -1109,15 +1638,13 @@ def _solve_once(
         shell_pr,
         tube_corr_id,
         tube_corr_version,
-        final,
+        evaluated_final,
         (q, twi, two),
         solver_status,
         int(solver.nfev),
         callback_count,
-        numerical_profile_id=(_DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID),
-        provenance_refs=(
-            (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
-        ),
+        numerical_profile_id=profile_id,
+        provenance_refs=provenance,
     )
 
 
@@ -1126,10 +1653,18 @@ def _solve_attempt(
     provider: PropertyProvider,
     *,
     method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
 ) -> Task172LocalOutcome:
     """Run one bounded numerical attempt without applying fallback policy."""
     try:
-        return _solve_once(request, provider, method=method)
+        return _solve_once(
+            request,
+            provider,
+            method=method,
+            budget=budget,
+            initial_guess=initial_guess,
+        )
     except _RuntimeFailure as exc:
         diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
         try:
@@ -1169,39 +1704,97 @@ def _fallback_result_replays_request(
         return False
 
 
+def _blocked_residual_replay_valid(
+    blocked: Task172BlockedResult,
+    request: Task172Request,
+) -> bool:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return False
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        return (
+            blocked.request_hash == request_hash
+            and blocked.blocked_result_hash == recompute_task172_blocked_result_hash(blocked)
+        )
+    except Exception:
+        return False
+
+
 def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalOutcome:
     """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
-    primary = _solve_attempt(request, provider, method="trf")
-    if type(primary) is Task172LocalResult:
-        return primary
-    if (
-        type(primary) is not Task172BlockedResult
-        or primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
-    ):
-        return primary
-
     request_hash: str | None = None
     try:
         request_hash = recompute_task172_request_hash(request)
-        replay_valid = (
-            primary.request_hash == request_hash
-            and primary.blocked_result_hash == recompute_task172_blocked_result_hash(primary)
-        )
     except Exception:
-        replay_valid = False
-    if not replay_valid:
+        request_hash = None
+
+    primary = _solve_attempt(request, provider, method="trf")
+    if type(primary) is Task172LocalResult:
+        return primary
+    if type(primary) is not Task172BlockedResult:
+        return primary
+    if primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return primary
+    if not _blocked_residual_replay_valid(primary, request):
         return primary
 
     fallback = _solve_attempt(request, provider, method="dogbox")
-    if type(fallback) is Task172LocalResult and not _fallback_result_replays_request(
-        request, fallback
+    if type(fallback) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, fallback):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "fallback.result_identity",
+                request_hash,
+            )
+        return fallback
+    if (
+        not _experimental_wide_delta_t_solver_active()
+        or type(fallback) is not Task172BlockedResult
+        or fallback.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(fallback, request)
+    ):
+        return fallback
+
+    warm_start = _warm_start_from_blocked(fallback)
+    wide_trf = _solve_attempt(
+        request,
+        provider,
+        method="trf",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=warm_start,
+    )
+    if type(wide_trf) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, wide_trf):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "wide_experimental.result_identity",
+                request_hash,
+            )
+        return wide_trf
+    if (
+        type(wide_trf) is not Task172BlockedResult
+        or wide_trf.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(wide_trf, request)
+    ):
+        return wide_trf
+
+    wide_dogbox_initial = _warm_start_from_blocked(wide_trf) or warm_start
+    wide_dogbox = _solve_attempt(
+        request,
+        provider,
+        method="dogbox",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=wide_dogbox_initial,
+    )
+    if type(wide_dogbox) is Task172LocalResult and not _fallback_result_replays_request(
+        request, wide_dogbox
     ):
         return _blocked(
             "BLOCKED_RUNTIME_INTERNAL_FAILURE",
-            "fallback.result_identity",
+            "wide_experimental.result_identity",
             request_hash,
         )
-    return fallback
+    return wide_dogbox
 
 
 def validate_request(raw_request: object, provider: PropertyProvider) -> Task172LocalOutcome:

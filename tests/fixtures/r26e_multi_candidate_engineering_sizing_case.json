@@ -1,0 +1,70 @@
+{
+  "schema_version": "hxforge.general-engineering-case.v2",
+  "engineering_case_id": "r26e-multi-candidate-engineering-sizing",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "bind_task172_c3_reference_geometry": false,
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "310",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "12.000000"
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "295",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "20.000000"
+  },
+  "target_duty_w": "330000",
+  "max_tube_side_pressure_drop_pa": "1150",
+  "max_shell_side_pressure_drop_pa": "1180",
+  "candidate_constraints": {
+    "shell_inside_diameter_m": "0.56",
+    "shell_inside_diameters_m": ["0.54", "0.56", "0.65"],
+    "tube_outer_diameter_m": "0.01905",
+    "tube_wall_thickness_m": "0.00165",
+    "tube_pitch_m": "0.0254",
+    "tube_lengths_m": ["3.0", "3.5", "4.0", "4.85"],
+    "baffle_spacings_m": ["0.6", "0.7", "0.8", "0.97"],
+    "baffle_count": 4,
+    "tube_pass_count": 1
+  },
+  "solver_budget": {
+    "total_budget_s": 7200,
+    "max_candidates_to_rate": 4,
+    "enable_full_task173_rating": false
+  },
+  "experimental_live_thermal_hydraulic_postpass": true,
+  "experimental_transitional_tube_hydraulic": true,
+  "experimental_engineering_tube_local_loss": true,
+  "experimental_variable_water_temperature": true,
+  "experimental_candidate_selection_mode": "FIRST_N_DISTINCT_GEOMETRY",
+  "tube_local_loss_engineering": {
+    "geometry_basis": "EXPERIMENTAL_ASSUMED_DEMO",
+    "completeness_declaration": "ENTRANCE_ONLY_ASSUMED",
+    "components": [
+      {
+        "component_id": "R21-DEMO-ENTRANCE-100MM",
+        "component_type": "ENTRANCE",
+        "loss_coefficient": "0.5",
+        "nozzle_inside_diameter_m": "0.100",
+        "multiplicity": 1,
+        "path_sequence_index": 0,
+        "upstream_reference_plane": "TUBE_LOCAL_LOSS_START_PLANE",
+        "downstream_reference_plane": "TUBE_INTERNAL_FLOW_START_PLANE",
+        "coefficient_source_id": "R21-EXPERIMENTAL-DEMO-ENTRANCE-K",
+        "coefficient_source_version": "2026-R21",
+        "coefficient_source_location": "HXForge R21 assumed demo scenario (100 mm nozzle, K=0.5)",
+        "geometry_evidence_refs": ["R21-ASSUMED-NOZZLE-100MM-ID-NOT-EQUIPMENT-DESIGN"]
+      }
+    ]
+  },
+  "r10_baseline_geometry_pairs": [
+    {
+      "tube_length_m": "3.0",
+      "baffle_spacing_m": "0.6",
+      "shell_inside_diameter_m": "0.56"
+    }
+  ],
+  "notes": "R26E expanded candidate search (310/295 K, 330 kW). Retains R26D baseline 3.0/0.6/0.56 m; adds intermediate length/baffle grid and limited shell-ID exploration."
+}

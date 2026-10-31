@@ -1,0 +1,48 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "cell_root": {
+    "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+    "cell_root_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+    "positive_duty_cell_root_accepted": true,
+    "q_root_w": "10430.77217887273",
+    "residual_f_q_w": "7.76477E-7",
+    "schema_version": "hxforge.cell-root-result.v1",
+    "shell_physical_left_basis": "feasible_shell_left_face",
+    "shell_physical_left_temperature_k": 298.5,
+    "status": "ACCEPTED",
+    "task172_request_hash": "cbbbf564f2e8cffdee4345a867361301004193028866171f6d8cd5b576570e24",
+    "task172_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+    "task172_signed_q_hot_to_cold_w": "10430.772178096253",
+    "task172_status": "VALIDATED",
+    "wall_seconds": 1.825
+  },
+  "live_boundary_n1_numeric_valid": true,
+  "live_case_id": "mvp-tube-hot-shell-cold-r7",
+  "mesh": {
+    "energy_balance_residual_w": "3.2E-10",
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": true,
+    "mesh_level": 1,
+    "mesh_result_hash": "a9c3d42eb0dc73655bd6c8cf6349c3a5f78f2e0469557e46360322e4673ad70e",
+    "schema_version": "hxforge.low-mesh-result.v1",
+    "status": "NUMERIC_VALID",
+    "task172_local_evaluation_count": 4492,
+    "terminal_boundary_residual_j_kg": "0.00003235550",
+    "terminal_boundary_residual_k": "7.73034E-9",
+    "total_duty_w": "40881.216702017436",
+    "wall_seconds": 237.326
+  },
+  "mesh_observables": {
+    "energy_balance_residual_w": "3.2E-10",
+    "shell_outlet_temperature_k": "298.63886750748424",
+    "terminal_boundary_residual_k": "7.73034E-9",
+    "total_duty_w": "40881.216702017436",
+    "tube_outlet_temperature_k": "298.98514796711873"
+  },
+  "rating_request_hash": "780ca41d98a2a38c7f1f3353a3fc6d0cad74f82df2ab8e1c39cd6c3f7855f68c",
+  "report_json_path": "docs/tasks/evidence/V07-GENERAL-RATING-LIVE-BOUNDARY-N1-CLOSURE-R8/ENGINEERING_REPORT.json",
+  "report_md_path": "docs/tasks/evidence/V07-GENERAL-RATING-LIVE-BOUNDARY-N1-CLOSURE-R8/ENGINEERING_REPORT.md",
+  "schema_version": "hxforge.general-r8-raw-result.v1",
+  "task_id": "V07_GENERAL_RATING_LIVE_BOUNDARY_N1_CLOSURE_R8",
+  "total_numerical_seconds": 240.73
+}

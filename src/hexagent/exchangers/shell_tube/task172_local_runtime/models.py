@@ -1,5 +1,7 @@
 """Strict value models for the TASK172 local constitutive runtime."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
@@ -866,14 +868,39 @@ class CandidateTask172LocalRequest(StrictModel):
 
     @model_validator(mode="after")
     def candidate_reviewed_service(self) -> CandidateTask172LocalRequest:
-        if self.tube_mass_flow_kg_s != Decimal("12.000000") or self.shell_mass_flow_kg_s != Decimal(
-            "20.000000"
+        from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
+            active_experimental_thermal_boundary,
+            admitted_bulk_temperature_max_k,
+            admitted_bulk_temperature_min_k,
+        )
+
+        bound = active_experimental_thermal_boundary()
+        t_min = admitted_bulk_temperature_min_k(bound)
+        t_max = admitted_bulk_temperature_max_k(bound)
+        if bound is not None and bound.authority_id in (
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_TUBE_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_SHELL_FLOW_AUTHORITY_ID,
+            EXPERIMENTAL_THERMAL_BOUNDARY_VARIABLE_DUAL_FLOW_AUTHORITY_ID,
         ):
+            if self.tube_mass_flow_kg_s != bound.tube_mass_flow_kg_s:
+                raise ValueError(
+                    "tube mass flow must match active experimental thermal boundary binding"
+                )
+            if self.shell_mass_flow_kg_s != bound.shell_mass_flow_kg_s:
+                raise ValueError(
+                    "shell mass flow must match active experimental thermal boundary binding"
+                )
+        elif self.tube_mass_flow_kg_s != Decimal(
+            "12.000000"
+        ) or self.shell_mass_flow_kg_s != Decimal("20.000000"):
             raise ValueError("candidate transfer is limited to the reviewed 12/20 kg/s service")
         if self.tube_inside_fouling_m2_k_w != 0 or self.shell_outside_fouling_m2_k_w != 0:
             raise ValueError("candidate transfer is limited to the reviewed clean-surface profile")
         for state in (self.tube_bulk_state, self.shell_bulk_state):
-            if not Decimal("298.15") <= state.temperature_k <= Decimal("300.00"):
+            if not t_min <= state.temperature_k <= t_max:
                 raise ValueError("candidate bulk temperature leaves the reviewed domain")
             if not Decimal("100000") <= state.pressure_pa <= Decimal("101325"):
                 raise ValueError("candidate bulk pressure leaves the reviewed domain")
