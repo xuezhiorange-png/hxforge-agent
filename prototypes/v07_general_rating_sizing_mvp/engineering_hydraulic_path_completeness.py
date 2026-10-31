@@ -42,7 +42,7 @@ def assess_hydraulic_path_completeness(
     missing_shell = sorted(REQUIRED_SHELL_EXTERNAL_TYPES_FOR_FULL_PATH - shell_types)
 
     demo_only = any(
-        c.engineering_input_status == "DEMONSTRATION"
+        c.engineering_input_status in ("DEMONSTRATION", "ASSUMPTION_BASED")
         for c in (*path_input.tube_side_components, *path_input.shell_external_components)
     )
     authorized_only = all(

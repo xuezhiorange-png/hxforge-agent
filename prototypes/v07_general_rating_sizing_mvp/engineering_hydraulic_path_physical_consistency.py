@@ -118,6 +118,24 @@ def assess_engineering_input_authority(
         )
         if c.engineering_input_status == "AUTHORIZED_ENGINEERING_INPUT"
     ]
+    assumption_components = [
+        c
+        for c in (
+            *path_input.tube_side_components,
+            *path_input.shell_external_components,
+        )
+        if c.engineering_input_status == "ASSUMPTION_BASED"
+    ]
+    if assumption_components and not authorized_components:
+        return {
+            "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+            "verified_authorized_component_count": 0,
+            "assumption_based_component_count": len(assumption_components),
+            "disclosure": (
+                "All path components use configurable assumption-based loss coefficients and "
+                "R27A preliminary nozzle geometry; not verified engineering design."
+            ),
+        }
     if not authorized_components:
         return {
             "INPUT_AUTHORITY_STATUS": "DEMONSTRATION_ONLY",
