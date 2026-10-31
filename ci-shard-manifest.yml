@@ -466,8 +466,14 @@ shards:
       - tests/prototypes/test_r26ca_engineering_delivery_hydraulic_margin.py
       - tests/prototypes/test_r26d_multi_candidate_engineering_sizing.py
       - tests/prototypes/test_r26e_multi_candidate_engineering_sizing.py
-      - tests/prototypes/test_r27a_calculation_first_automatic_sizing.py
     timeout: 3600
+
+  - name: v07-r27a-calculation-first-sizing
+    job: shard-v07-r27a-calculation-first-sizing
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r27a_calculation_first_automatic_sizing.py
+    timeout: 7200
 
   - name: v07-r26f-hydraulic-path
     job: shard-v07-r26f-hydraulic-path

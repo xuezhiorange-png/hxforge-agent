@@ -15,33 +15,31 @@ from prototypes.v07_general_rating_sizing_mvp.calculation_first_automatic_sizing
     run_calculation_first_automatic_sizing,
     write_calculation_first_sizing_reports,
 )
-from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
-    enumerate_experimental_rating_candidates,
-)
-from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
-    load_general_engineering_case_json,
-)
 from prototypes.v07_general_rating_sizing_mvp.experimental_multi_candidate_engineering_sizing import (
     _is_baseline_candidate_b,
 )
-
-_FIXTURE_R26E = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures/r26e_multi_candidate_engineering_sizing_case.json"
+from tests.prototypes.r26g_r26ga_shared_setup import (
+    shared_r26e_engineering_case,
+    shared_r26e_experimental_rating_selection,
 )
-
 
 @pytest.fixture(name="r26e_case")
 def _r26e_case():
-    return load_general_engineering_case_json(_FIXTURE_R26E.read_text(encoding="utf-8"))
+    return shared_r26e_engineering_case()
 
 
-def test_r27a_report_schema_and_unrated_not_eliminated(r26e_case) -> None:
+@pytest.fixture(name="r26e_selection")
+def _r26e_selection():
+    return shared_r26e_experimental_rating_selection()
+
+
+def test_r27a_report_schema_and_unrated_not_eliminated(r26e_case, r26e_selection) -> None:
     report = run_calculation_first_automatic_sizing(
         r26e_case,
         run_full_mesh_hydraulic=False,
         run_authorized_full_path_hydraulic=False,
         max_candidates=1,
+        precomputed_selection=r26e_selection,
     )
     assert report["TASK_ID"] == "V07_R27A_CALCULATION_FIRST_AUTOMATIC_SIZING"
     assert report["schema_version"] == "hxforge.calculation-first-automatic-sizing.v27a"
@@ -59,8 +57,8 @@ def test_r27a_report_schema_and_unrated_not_eliminated(r26e_case) -> None:
     assert not_rated[0]["elimination_or_incomplete_reason"] is None
 
 
-def test_r27a_reference_geometries_in_candidate_space(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
+def test_r27a_reference_geometries_in_candidate_space(r26e_selection) -> None:
+    selection = r26e_selection
     middle = find_middle_reference_record(selection)
     baseline_b = find_candidate_b_record(selection)
     assert middle is not None
@@ -70,12 +68,13 @@ def test_r27a_reference_geometries_in_candidate_space(r26e_case) -> None:
     assert _is_baseline_candidate_b(baseline_b)
 
 
-def test_r27a_writes_json_and_markdown_reports(r26e_case, tmp_path: Path) -> None:
+def test_r27a_writes_json_and_markdown_reports(r26e_case, r26e_selection, tmp_path: Path) -> None:
     report = run_calculation_first_automatic_sizing(
         r26e_case,
         run_full_mesh_hydraulic=False,
         run_authorized_full_path_hydraulic=False,
         max_candidates=1,
+        precomputed_selection=r26e_selection,
     )
     json_path, md_path = write_calculation_first_sizing_reports(report, tmp_path)
     assert json_path.is_file()
@@ -84,19 +83,19 @@ def test_r27a_writes_json_and_markdown_reports(r26e_case, tmp_path: Path) -> Non
 
 
 @pytest.mark.slow
-def test_r27a_r26e_end_to_end_sizing_regression_slow(r26e_case) -> None:
+def test_r27a_r26e_end_to_end_sizing_regression_slow(r26e_case, r26e_selection) -> None:
     report = run_calculation_first_automatic_sizing(
         r26e_case,
         run_full_mesh_hydraulic=True,
         run_authorized_full_path_hydraulic=True,
+        precomputed_selection=r26e_selection,
     )
     assert report["workflow_status"] == "SIZING_CALCULATION_COMPLETE"
     assert report["multi_candidate_engineering_run"]["FULLY_RATED_CANDIDATE_COUNT"] >= 3
     target = float(r26e_case.target_duty_w)
     by_id = {row["candidate_id"]: row for row in report["sizing_candidates"]}
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    baseline = find_candidate_b_record(selection)
-    middle = find_middle_reference_record(selection)
+    baseline = find_candidate_b_record(r26e_selection)
+    middle = find_middle_reference_record(r26e_selection)
     assert baseline and middle
     base_row = by_id[baseline.candidate_id]
     mid_row = by_id[middle.candidate_id]
