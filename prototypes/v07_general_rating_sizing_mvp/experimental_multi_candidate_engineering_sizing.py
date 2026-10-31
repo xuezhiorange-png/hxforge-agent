@@ -212,6 +212,14 @@ def _candidate_report_row(
 
         row["hydraulic_dp_breakdown"] = build_hydraulic_dp_breakdown(postpass, case=case)
         row["live_thermal_state_hydraulic_postpass"] = postpass
+        mesh = package.get("mesh_convergence") or {}
+        results = mesh.get("results") or {}
+        for level in (4, 2, 1):
+            res = results.get(level)
+            meta = getattr(res, "mesh_metadata", None) if res is not None else None
+            if meta is not None and meta.task171_total_outside_area_m2:
+                row["task171_total_outside_area_m2"] = meta.task171_total_outside_area_m2
+                break
     return row
 
 

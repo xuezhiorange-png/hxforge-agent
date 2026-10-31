@@ -9,8 +9,10 @@ import math
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+from hexagent.properties.base import FluidIdentifier
+from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.authorized_full_path_hydraulic_calculation import (
     run_authorized_full_path_hydraulic_calculation,
 )
@@ -33,9 +35,28 @@ from prototypes.v07_general_rating_sizing_mvp.experimental_multi_candidate_engin
     run_experimental_multi_candidate_engineering_sizing,
 )
 
-_TASK_ID = "V07_R27A_CALCULATION_FIRST_AUTOMATIC_SIZING"
-_SCHEMA = "hxforge.calculation-first-automatic-sizing.v27a"
+_TASK_ID = "V07_R27A_CALCULATION_REPORT_INTEGRITY"
+_SCHEMA = "hxforge.calculation-first-automatic-sizing.v27a-integrity"
 _SIZING_AUTHORITY = "EXPERIMENTAL_CALCULATION_FIRST_NOT_PRODUCTION_APPROVED"
+
+NOZZLE_VELOCITY_DESIGN_RULE: dict[str, Any] = {
+    "rule_id": "R27A-PRELIMINARY-NOZZLE-VELOCITY-BAND",
+    "source_nature": "CONFIGURABLE_PRELIMINARY_DESIGN_ASSUMPTION",
+    "velocity_m_s_min": 1.0,
+    "velocity_m_s_max": 3.0,
+    "disclosure": (
+        "Preliminary nozzle inside diameter from m/(rho*A) with a configurable velocity band; "
+        "not an owner-approved project specification."
+    ),
+}
+
+CandidateFeasibilityClass = Literal[
+    "NOT_RATED_THIS_RUN",
+    "PARTIAL_RATING_ONLY",
+    "THERMAL_AND_PARTIAL_HYDRAULIC_NOMINAL",
+    "DEMONSTRATION_FULL_PATH_COMPARISON_ONLY",
+    "NOT_EVALUATED",
+]
 
 
 def _record_map(selection: CandidateSelectionOutcome) -> dict[str, CandidateSelectionRecord]:
@@ -61,53 +82,194 @@ def _counterflow_lmtd_k(
     return (dt1 - dt2) / math.log(ratio)
 
 
-def _effective_overall_u_w_m2_k(
+def _counterflow_equivalent_u_w_m2_k(
     *,
     duty_w: float | None,
-    heat_transfer_area_m2: float | None,
+    area_m2: float | None,
     lmtd_k: float | None,
 ) -> float | None:
-    if duty_w is None or heat_transfer_area_m2 is None or lmtd_k is None:
+    if duty_w is None or area_m2 is None or lmtd_k is None:
         return None
-    if heat_transfer_area_m2 <= 0 or lmtd_k <= 0:
+    if area_m2 <= 0 or lmtd_k <= 0:
         return None
-    return duty_w / (heat_transfer_area_m2 * lmtd_k)
+    return duty_w / (area_m2 * lmtd_k)
 
 
-def _heat_transfer_area_m2(row: dict[str, Any], package: dict[str, Any] | None) -> float | None:
-    mesh = (package or {}).get("mesh_convergence") or {}
-    results = mesh.get("results") or {}
-    for level in (4, 2, 1):
-        res = results.get(level)
-        meta = getattr(res, "mesh_metadata", None) if res is not None else None
-        if meta is not None and meta.task171_total_outside_area_m2:
-            return float(meta.task171_total_outside_area_m2)
-    proxy = row.get("nominal_tube_outer_area_m2")
-    return float(proxy) if proxy is not None else None
+def _geometry_report_block(
+    *,
+    row: dict[str, Any],
+    case: EngineeringCase,
+) -> dict[str, Any]:
+    authority = row.get("candidate_geometry_authority") or {}
+    constraints = case.candidate_constraints
+    task171_area = row.get("task171_total_outside_area_m2")
+    return {
+        "geometry_authority": authority.get(
+            "geometry_authority", "TASK168_TASK021_SELECTION_RECORD"
+        ),
+        "shell_inside_diameter_m": authority.get("shell_inside_diameter_m"),
+        "physical_tube_count": authority.get("physical_tube_count"),
+        "tube_length_m": authority.get("tube_length_m"),
+        "baffle_spacing_m": authority.get("baffle_spacing_m"),
+        "tube_pass_count": {
+            "value": constraints.tube_pass_count,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT",
+        },
+        "baffle_count": {
+            "value": constraints.baffle_count,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT",
+        },
+        "nominal_tube_outer_area_proxy_m2": authority.get("nominal_tube_outer_area_m2"),
+        "task171_rated_outside_area_m2": task171_area,
+        "task171_rated_outside_area_status": (
+            "FROM_FULL_MESH_RATING"
+            if task171_area is not None
+            else "NOT_AVAILABLE_UNTIL_FULL_RATING"
+        ),
+    }
 
 
 def _constraint_summary(row: dict[str, Any], *, target_duty_w: Decimal) -> dict[str, Any]:
+    full_converged = row.get("FULL_RATING_CONVERGED") is True
     duty = row.get("duty_w_at_finest_mesh")
-    duty_ok = duty is not None and float(duty) >= float(target_duty_w)
-    tube_margin = row.get("TUBE_DP_MARGIN_PA")
-    shell_margin = row.get("SHELL_DP_MARGIN_PA")
+    postpass = row.get("live_thermal_state_hydraulic_postpass") or {}
+    breakdown = row.get("hydraulic_dp_breakdown") or {}
+
+    if full_converged and duty is not None:
+        duty_constraint = "SATISFIED" if float(duty) >= float(target_duty_w) else "NOT_SATISFIED"
+    else:
+        duty_constraint = "NOT_FORMALLY_EVALUATED"
+
+    tube_dp_constraint = postpass.get("tube_dp_constraint")
+    shell_dp_constraint = postpass.get("shell_dp_constraint")
+    if tube_dp_constraint is None and breakdown.get("TUBE_DP_MARGIN_PA") is not None:
+        margin = Decimal(str(breakdown["TUBE_DP_MARGIN_PA"]))
+        tube_dp_constraint = "SATISFIED" if margin >= 0 else "NOT_SATISFIED"
+    if shell_dp_constraint is None and breakdown.get("SHELL_DP_MARGIN_PA") is not None:
+        margin = Decimal(str(breakdown["SHELL_DP_MARGIN_PA"]))
+        shell_dp_constraint = "SATISFIED" if margin >= 0 else "NOT_SATISFIED"
+
+    tube_margin = row.get("TUBE_DP_MARGIN_PA") or breakdown.get("TUBE_DP_MARGIN_PA")
+    shell_margin = row.get("SHELL_DP_MARGIN_PA") or breakdown.get("SHELL_DP_MARGIN_PA")
+
     return {
         "target_duty_w": str(target_duty_w),
         "duty_w_at_finest_mesh": duty,
-        "duty_constraint": "SATISFIED" if duty_ok else "NOT_SATISFIED_OR_NOT_RATED",
+        "duty_constraint": duty_constraint,
+        "duty_constraint_basis": (
+            "FULL_MESH_RATING" if full_converged else "NOT_FORMALLY_EVALUATED"
+        ),
+        "tube_dp_constraint": tube_dp_constraint,
+        "shell_dp_constraint": shell_dp_constraint,
         "tube_dp_margin_pa": tube_margin,
         "shell_dp_margin_pa": shell_margin,
-        "tube_dp_constraint": row.get("hydraulic_dp_breakdown", {})
-        .get("tube_side", {})
-        .get("constraint_status")
-        if row.get("hydraulic_dp_breakdown")
-        else None,
-        "shell_dp_constraint": row.get("hydraulic_dp_breakdown", {})
-        .get("shell_side", {})
-        .get("constraint_status")
-        if row.get("hydraulic_dp_breakdown")
-        else None,
+        "hydraulic_constraint_status": postpass.get("hydraulic_constraint_status"),
         "nominal_experimental_sizing_feasible": row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE"),
+    }
+
+
+def _classify_candidate_feasibility(
+    row: dict[str, Any],
+    *,
+    authorized_full_path: dict[str, Any] | None,
+) -> dict[str, Any]:
+    participation = row.get("rating_participation_status")
+    if participation == "NOT_SELECTED_FOR_RATING":
+        return {
+            "feasibility_class": "NOT_RATED_THIS_RUN",
+            "basis": "Not selected under solver_budget.max_candidates_to_rate; not eliminated.",
+        }
+    if participation != "FULLY_RATED" or row.get("FULL_RATING_CONVERGED") is not True:
+        return {
+            "feasibility_class": "PARTIAL_RATING_ONLY",
+            "basis": "Only screening or partial mesh rating; constraints not formally closed.",
+        }
+    if row.get("NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE"):
+        thermal_class: CandidateFeasibilityClass = "THERMAL_AND_PARTIAL_HYDRAULIC_NOMINAL"
+        basis = (
+            "Full mesh thermal rating converged; live post-pass nominal hydraulic constraints "
+            "satisfied for partial path model."
+        )
+    else:
+        thermal_class = "PARTIAL_RATING_ONLY"
+        basis = (
+            "Full mesh rating completed but nominal experimental sizing comparison not feasible."
+        )
+
+    auth = authorized_full_path or {}
+    demo_path = {
+        "feasibility_class": "DEMONSTRATION_FULL_PATH_COMPARISON_ONLY",
+        "basis": (
+            "Authorized full-path hydraulic uses R26G demonstration EngineeringHydraulicPathInputV1; "
+            "comparison valid only under those disclosed assumptions."
+        ),
+        "authorized_status": auth.get("status"),
+    }
+    return {
+        "thermal_and_partial_hydraulic": {
+            "feasibility_class": thermal_class,
+            "basis": basis,
+        },
+        "demonstration_full_path": demo_path,
+        "eligible_for_formal_constraint_ranking": thermal_class
+        == "THERMAL_AND_PARTIAL_HYDRAULIC_NOMINAL",
+    }
+
+
+def estimate_preliminary_nozzle_diameters(
+    case: EngineeringCase,
+    *,
+    velocity_rule: dict[str, Any] | None = None,
+    provider: CoolPropProvider | None = None,
+) -> dict[str, Any]:
+    """Preliminary nozzle ID from mass flow, CoolProp density, and configurable velocity band."""
+    rule = velocity_rule or NOZZLE_VELOCITY_DESIGN_RULE
+    v_min = float(rule["velocity_m_s_min"])
+    v_max = float(rule["velocity_m_s_max"])
+    prov = provider or CoolPropProvider()
+    sides: dict[str, Any] = {}
+    for role, spec in (
+        ("tube_side", tube_stream_spec(case)),
+        ("shell_side", shell_stream_spec(case)),
+    ):
+        t_k = float(spec.inlet_temperature_k)
+        p_pa = float(spec.inlet_pressure_pa)
+        m_kg_s = float(spec.mass_flow_kg_s)
+        state = prov.state_tp(FluidIdentifier("Water", "HEOS"), t_k, p_pa)
+        rho = float(state.density_kg_m3)
+        candidates: list[dict[str, Any]] = []
+        for label, v in (
+            ("min_velocity", v_min),
+            ("max_velocity", v_max),
+            ("mid_band", (v_min + v_max) / 2),
+        ):
+            area = m_kg_s / (rho * v)
+            d_m = math.sqrt(4.0 * area / math.pi)
+            candidates.append(
+                {
+                    "velocity_assumption_m_s": v,
+                    "assumption_label": label,
+                    "inside_diameter_m": d_m,
+                    "actual_velocity_m_s": v,
+                }
+            )
+        sides[role] = {
+            "mass_flow_kg_s": m_kg_s,
+            "inlet_density_kg_m3": rho,
+            "density_source": "CoolProp HEOS at case inlet T,P",
+            "diameter_candidates_m": candidates,
+        }
+    return {
+        "schema_version": "hxforge.r27a-preliminary-nozzle-sizing.v1",
+        "velocity_design_rule": rule,
+        "local_loss_coefficients": {
+            "status": "NOT_SUPPLIED_AS_REAL_DESIGN",
+            "disclosure": (
+                "No reliable K values asserted; tube local losses follow case engineering "
+                "spec when present, otherwise report unmodeled segments separately."
+            ),
+        },
+        "sides": sides,
     }
 
 
@@ -117,7 +279,15 @@ def _sizing_candidate_snapshot(
     row: dict[str, Any],
     authorized_full_path: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    heat_area = _heat_transfer_area_m2(row, None)
+    geometry = _geometry_report_block(row=row, case=case)
+    task171_area = row.get("task171_total_outside_area_m2")
+    proxy_area = geometry.get("nominal_tube_outer_area_proxy_m2")
+    area_for_u = float(task171_area) if task171_area is not None else None
+    area_for_u_label = "task171_rated_outside_area_m2"
+    if area_for_u is None and proxy_area is not None:
+        area_for_u = float(proxy_area)
+        area_for_u_label = "nominal_tube_outer_area_proxy_m2_NOT_TASK171"
+
     tube_out = row.get("tube_outlet_temperature_k_n4")
     shell_out = row.get("shell_outlet_temperature_k_n4")
     tube_in = float(tube_stream_spec(case).inlet_temperature_k)
@@ -135,34 +305,31 @@ def _sizing_candidate_snapshot(
             cold_outlet_k=float(cold_out),
         )
     duty = row.get("duty_w_at_finest_mesh")
-    u_eff = _effective_overall_u_w_m2_k(
-        duty_w=float(duty) if duty is not None else None,
-        heat_transfer_area_m2=heat_area,
-        lmtd_k=lmtd,
-    )
-    geom = row.get("candidate_geometry_authority") or {}
+    u_equiv = None
+    if row.get("FULL_RATING_CONVERGED") is True and duty is not None:
+        u_equiv = _counterflow_equivalent_u_w_m2_k(
+            duty_w=float(duty),
+            area_m2=area_for_u,
+            lmtd_k=lmtd,
+        )
     breakdown = row.get("hydraulic_dp_breakdown")
     return {
         "candidate_id": row["candidate_id"],
         "candidate_hash": row.get("candidate_hash"),
         "rating_participation_status": row.get("rating_participation_status"),
-        "geometry": {
-            "shell_inside_diameter_m": geom.get("shell_inside_diameter_m"),
-            "tube_length_m": geom.get("tube_length_m"),
-            "baffle_spacing_m": geom.get("baffle_spacing_m"),
-            "physical_tube_count": geom.get("physical_tube_count"),
-            "tube_pass_count": geom.get("tube_pass_count"),
-            "baffle_count": geom.get("baffle_count"),
-            "nominal_tube_outer_area_m2": geom.get("nominal_tube_outer_area_m2"),
-            "heat_transfer_area_m2_task171": heat_area,
-        },
+        "geometry": geometry,
         "thermal_rating": {
             "duty_w": duty,
             "tube_outlet_temperature_k": tube_out,
             "shell_outlet_temperature_k": shell_out,
             "full_rating_converged": row.get("FULL_RATING_CONVERGED"),
-            "effective_overall_u_w_m2_k": u_eff,
-            "lmtd_k": lmtd,
+            "counterflow_lmtd_k": lmtd,
+            "counterflow_equivalent_u_w_m2_k": u_equiv,
+            "counterflow_equivalent_u_definition": (
+                "Q/(A·LMTD_counterflow) from finest-mesh duty and rated outlet temperatures; "
+                "counterflow equivalent screening metric only — not formal TEMA overall U."
+            ),
+            "counterflow_equivalent_u_area_source": area_for_u_label,
         },
         "hydraulic_performance": {
             "live_tube_dp_pa": row.get("LIVE_TUBE_DP_PA"),
@@ -171,8 +338,16 @@ def _sizing_candidate_snapshot(
             "shell_dp_margin_pa": row.get("SHELL_DP_MARGIN_PA"),
             "hydraulic_dp_breakdown": breakdown,
             "authorized_full_path_hydraulic": authorized_full_path,
+            "authorized_path_input_basis": (
+                "R26G_DEMONSTRATION_ENGINEERING_HYDRAULIC_PATH_INPUT_V1"
+                if authorized_full_path
+                else None
+            ),
         },
         "constraints": _constraint_summary(row, target_duty_w=Decimal(str(case.target_duty_w))),
+        "feasibility_classification": _classify_candidate_feasibility(
+            row, authorized_full_path=authorized_full_path
+        ),
         "elimination_or_incomplete_reason": row.get("elimination_reason"),
         "is_candidate_b_baseline_geometry": row.get("is_candidate_b_baseline_geometry"),
     }
@@ -180,6 +355,7 @@ def _sizing_candidate_snapshot(
 
 def _recommendation_block(
     multi: dict[str, Any],
+    sizing_rows: list[dict[str, Any]],
     *,
     selection: CandidateSelectionOutcome,
 ) -> dict[str, Any]:
@@ -190,9 +366,28 @@ def _recommendation_block(
         for row in multi.get("candidates") or []
         if row.get("rating_participation_status") == "NOT_SELECTED_FOR_RATING"
     )
+    formal_rank_ids = [
+        row["candidate_id"]
+        for row in sizing_rows
+        if row.get("feasibility_classification", {}).get("eligible_for_formal_constraint_ranking")
+    ]
+    demo_rank_ids = [
+        row["candidate_id"]
+        for row in sizing_rows
+        if (
+            (row.get("hydraulic_performance") or {}).get("authorized_full_path_hydraulic") or {}
+        ).get("status")
+        == "COMPUTED"
+    ]
     return {
         "recommended_candidate_id": best_in_run,
         "recommendation_scope": "BEST_NOMINAL_FEASIBLE_FULLY_RATED_IN_THIS_RUN",
+        "formal_constraint_ranking_candidate_ids": formal_rank_ids,
+        "demonstration_full_path_comparison_candidate_ids": demo_rank_ids,
+        "demonstration_ranking_disclosure": (
+            "Demonstration full-path IDs use R26G demo path inputs and must not be merged "
+            "into formal constraint ranking."
+        ),
         "global_optimum_disclosure": (
             "Recommendation applies only to candidates fully rated in this run. "
             f"{not_rated_count} enumerated candidate(s) were not selected for rating under "
@@ -258,6 +453,7 @@ def run_calculation_first_automatic_sizing(
         )
         for row in multi["candidates"]
     ]
+    nominal_feasible = multi.get("NOMINAL_FEASIBLE_COUNT", 0) or 0
 
     return {
         "schema_version": _SCHEMA,
@@ -267,6 +463,7 @@ def run_calculation_first_automatic_sizing(
         "PRODUCTION_DESIGN_APPROVED": False,
         "ENGINEERING_SIZING_ELIGIBILITY": "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE",
         "user_design_input": design_conditions_for_report(case),
+        "preliminary_nozzle_sizing": estimate_preliminary_nozzle_diameters(case),
         "manufacturing_search_constraints": case.candidate_constraints.model_dump(mode="json")
         if hasattr(case, "candidate_constraints")
         else None,
@@ -280,12 +477,16 @@ def run_calculation_first_automatic_sizing(
             "TASK_ID": multi.get("TASK_ID"),
             "SCREENED_CANDIDATE_COUNT": multi.get("SCREENED_CANDIDATE_COUNT"),
             "FULLY_RATED_CANDIDATE_COUNT": multi.get("FULLY_RATED_CANDIDATE_COUNT"),
-            "NOMINAL_FEASIBLE_COUNT": multi.get("NOMINAL_FEASIBLE_COUNT"),
+            "NOMINAL_FEASIBLE_COUNT": nominal_feasible,
         },
-        "recommendation": _recommendation_block(multi, selection=selection),
+        "recommendation": _recommendation_block(multi, sizing_rows, selection=selection),
         "sizing_candidates": sizing_rows,
         "experimental_tradeoff_comparison": multi.get("experimental_tradeoff_comparison"),
         "engineering_comparison_report": multi.get("engineering_comparison_report"),
+        "sizing_calculation_status": "SIZING_CALCULATION_COMPLETE",
+        "found_feasible_design": (
+            "FOUND_FEASIBLE_DESIGN" if nominal_feasible >= 1 else "NO_NOMINAL_FEASIBLE_DESIGN"
+        ),
         "workflow_status": (
             "SIZING_CALCULATION_COMPLETE"
             if multi.get("FULLY_RATED_CANDIDATE_COUNT", 0) >= 1
@@ -301,6 +502,7 @@ def run_calculation_first_automatic_sizing(
             "Hydraulic breakdown distinguishes computed segments, assumed nozzle/local losses, "
             "and paths not yet modeled — see hydraulic_dp_breakdown per candidate.",
             "Unrated enumerated candidates are not treated as eliminated designs.",
+            "Counterflow equivalent U is not a formal overall heat-transfer coefficient.",
         ],
     }
 
@@ -311,6 +513,9 @@ def render_calculation_first_sizing_markdown(report: dict[str, Any]) -> str:
         "",
         f"Generated (UTC): {report['generated_at_utc']}",
         "",
+        f"- Sizing calculation: **{report.get('sizing_calculation_status')}**",
+        f"- Feasible design: **{report.get('found_feasible_design')}**",
+        "",
         "## Design input",
         "",
     ]
@@ -319,52 +524,83 @@ def render_calculation_first_sizing_markdown(report: dict[str, Any]) -> str:
     lines.append(f"- Max tube Δp: **{dc['max_tube_dp_pa']} Pa**")
     lines.append(f"- Max shell Δp: **{dc['max_shell_dp_pa']} Pa**")
     lines.append("")
+    nozzle = report.get("preliminary_nozzle_sizing") or {}
+    rule = nozzle.get("velocity_design_rule") or {}
+    lines.extend(
+        [
+            "## Preliminary nozzle sizing (assumption-based)",
+            "",
+            f"- Velocity rule: {rule.get('rule_id')} ({rule.get('velocity_m_s_min')}–"
+            f"{rule.get('velocity_m_s_max')} m/s)",
+            f"- {rule.get('disclosure', '')}",
+            "",
+        ]
+    )
+    for side_key, side in (nozzle.get("sides") or {}).items():
+        mid = next(
+            (
+                c
+                for c in side.get("diameter_candidates_m") or []
+                if c.get("assumption_label") == "mid_band"
+            ),
+            None,
+        )
+        if mid:
+            lines.append(
+                f"- {side_key}: ρ={side.get('inlet_density_kg_m3'):.1f} kg/m³, "
+                f"mid-band ID ≈ {mid['inside_diameter_m']:.4f} m @ {mid['velocity_assumption_m_s']} m/s"
+            )
+    lines.append("")
     rec = report["recommendation"]
     lines.extend(
         [
             "## Recommendation (scoped to this run)",
             "",
             f"- Recommended candidate: `{rec.get('recommended_candidate_id')}`",
-            f"- Scope: **{rec['recommendation_scope']}**",
-            f"- Global optimum note: {rec['global_optimum_disclosure']}",
+            f"- Formal constraint ranking IDs: {rec.get('formal_constraint_ranking_candidate_ids')}",
+            f"- Demo full-path comparison IDs: {rec.get('demonstration_full_path_comparison_candidate_ids')}",
+            f"- {rec.get('demonstration_ranking_disclosure')}",
             "",
             "## Candidates",
             "",
+            "| ID (short) | Status | Duty W | T_out tube/shell K | Area proxy / Task171 m² | Δp tube/shell Pa | Margins Pa | Duty constr |",
+            "|---|---|---:|---|---|---:|---|---|---|",
         ]
     )
     for row in report["sizing_candidates"]:
         geom = row["geometry"]
         therm = row["thermal_rating"]
         hyd = row["hydraulic_performance"]
-        lines.append(f"### `{row['candidate_id']}` ({row['rating_participation_status']})")
+        constr = row["constraints"]
+        cid = row["candidate_id"][:8]
+        proxy = geom.get("nominal_tube_outer_area_proxy_m2")
+        t171 = geom.get("task171_rated_outside_area_m2")
+        u_note = therm.get("counterflow_equivalent_u_w_m2_k")
         lines.append(
-            f"- Shell ID {geom.get('shell_inside_diameter_m')} m, "
-            f"L={geom.get('tube_length_m')} m, "
-            f"tubes={geom.get('physical_tube_count')}, "
-            f"baffle spacing {geom.get('baffle_spacing_m')} m"
+            f"| `{cid}` | {row['rating_participation_status']} | {therm.get('duty_w')} | "
+            f"{therm.get('tube_outlet_temperature_k')}/{therm.get('shell_outlet_temperature_k')} | "
+            f"{proxy}/{t171} | {hyd.get('live_tube_dp_pa')}/{hyd.get('live_shell_dp_pa')} | "
+            f"{constr.get('tube_dp_margin_pa')}/{constr.get('shell_dp_margin_pa')} | "
+            f"{constr.get('duty_constraint')} |"
         )
         lines.append(
-            f"- Area (proxy / Task171): {geom.get('nominal_tube_outer_area_m2')} / "
-            f"{geom.get('heat_transfer_area_m2_task171')} m²"
+            f"  - Geometry: shell ID {geom.get('shell_inside_diameter_m')} m, "
+            f"L {geom.get('tube_length_m')} m, tubes {geom.get('physical_tube_count')}, "
+            f"baffles {geom.get('baffle_count', {}).get('value')} @ spacing "
+            f"{geom.get('baffle_spacing_m')} m, passes {geom.get('tube_pass_count', {}).get('value')}"
         )
         lines.append(
-            f"- Duty: {therm.get('duty_w')} W; "
-            f"T_out tube/shell: {therm.get('tube_outlet_temperature_k')} / "
-            f"{therm.get('shell_outlet_temperature_k')} K"
+            f"  - U_cf_equiv: {u_note} W/m²K ({therm.get('counterflow_equivalent_u_area_source')}) — "
+            f"{therm.get('counterflow_equivalent_u_definition')}"
         )
+        fc = row.get("feasibility_classification") or {}
         lines.append(
-            f"- U_eff: {therm.get('effective_overall_u_w_m2_k')} W/m²K (Q/(A·LMTD) from rated outlets)"
+            f"  - Feasibility: {fc.get('thermal_and_partial_hydraulic', {}).get('feasibility_class')} / "
+            f"demo path {fc.get('demonstration_full_path', {}).get('authorized_status')}"
         )
-        lines.append(
-            f"- Δp tube/shell (live): {hyd.get('live_tube_dp_pa')} / {hyd.get('live_shell_dp_pa')} Pa"
-        )
-        auth = hyd.get("authorized_full_path_hydraulic") or {}
-        lines.append(f"- Authorized full-path hydraulic status: {auth.get('status', 'NOT_RUN')}")
-        if row.get("elimination_or_incomplete_reason"):
-            lines.append(f"- Note: {row['elimination_or_incomplete_reason']}")
-        lines.append("")
+    lines.append("")
     for warn in report.get("engineering_warnings") or []:
-        lines.append(f"- ⚠ {warn}")
+        lines.append(f"- Warning: {warn}")
     return "\n".join(lines) + "\n"
 
 
