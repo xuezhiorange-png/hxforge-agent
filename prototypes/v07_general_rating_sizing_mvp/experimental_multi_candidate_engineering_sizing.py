@@ -211,6 +211,7 @@ def _candidate_report_row(
         )
 
         row["hydraulic_dp_breakdown"] = build_hydraulic_dp_breakdown(postpass, case=case)
+        row["live_thermal_state_hydraulic_postpass"] = postpass
     return row
 
 
@@ -423,9 +424,10 @@ def run_experimental_multi_candidate_engineering_sizing(
     *,
     max_candidates: int | None = None,
     run_full_mesh_hydraulic: bool = True,
+    precomputed_selection: CandidateSelectionOutcome | None = None,
 ) -> dict[str, Any]:
     """Engineering case → Task168 space → n=1 screen → n=1/2/4 + live hydraulic per admitted candidate."""
-    selection = enumerate_experimental_rating_candidates(case)
+    selection = precomputed_selection or enumerate_experimental_rating_candidates(case)
     records = _record_by_id(selection)
     rate_ids = list(selection.selected_candidate_ids)
     if max_candidates is not None:
