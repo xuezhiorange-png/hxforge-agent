@@ -5,19 +5,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 from prototypes.v07_general_rating_sizing_mvp.authorized_full_path_hydraulic_calculation import (
     run_authorized_full_path_hydraulic_calculation,
 )
-from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
-    enumerate_experimental_rating_candidates,
-)
-from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
-    load_general_engineering_case_json,
-)
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import CandidateSelectionOutcome
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_dp_breakdown import (
     build_hydraulic_dp_breakdown,
 )
@@ -31,17 +26,21 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_authorized_full_path_study import (
     run_r26g_authorized_full_path_hydraulic_study,
 )
-
-_FIXTURE_R26E = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures/r26e_multi_candidate_engineering_sizing_case.json"
+from tests.prototypes.r26g_r26ga_shared_setup import (
+    R26G_MIDDLE_CANDIDATE_ID,
+    shared_r26e_engineering_case,
+    shared_r26e_experimental_rating_selection,
 )
-_MIDDLE_CANDIDATE_ID = "3c129a7f-eba7-5b5a-9b86-5b2ce9629dae"
 
 
 @pytest.fixture(name="r26e_case")
-def _r26e_case():
-    return load_general_engineering_case_json(_FIXTURE_R26E.read_text(encoding="utf-8"))
+def _r26e_case() -> EngineeringCase:
+    return shared_r26e_engineering_case()
+
+
+@pytest.fixture(name="r26e_experimental_rating_selection")
+def _r26e_experimental_rating_selection() -> CandidateSelectionOutcome:
+    return shared_r26e_experimental_rating_selection()
 
 
 def test_r26g_breakdown_missing_nozzle_not_zero(r26e_case) -> None:
@@ -61,9 +60,14 @@ def test_r26g_breakdown_missing_nozzle_not_zero(r26e_case) -> None:
     assert breakdown["SHELL_FULL_PATH_STATUS"] == "ENGINEERING_GEOMETRY_INPUT_REQUIRED"
 
 
-def test_r26g_demonstration_path_input_binds_and_parses(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = next(r for r in selection.records if r.candidate_id == _MIDDLE_CANDIDATE_ID)
+def test_r26g_demonstration_path_input_binds_and_parses(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = next(
+        r
+        for r in r26e_experimental_rating_selection.records
+        if r.candidate_id == R26G_MIDDLE_CANDIDATE_ID
+    )
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     roundtrip = load_engineering_hydraulic_path_input_v1_json(path_input.model_dump_json())
     assert roundtrip.binding.candidate_id == record.candidate_id
@@ -72,9 +76,10 @@ def test_r26g_demonstration_path_input_binds_and_parses(r26e_case) -> None:
     assert completeness["FULL_PATH_VERIFICATION_STATUS"] == "NOT_VERIFIED"
 
 
-def test_r26g_authorized_calc_fail_closed_without_postpass(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26g_authorized_calc_fail_closed_without_postpass(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     result = run_authorized_full_path_hydraulic_calculation(
         case=r26e_case,
@@ -87,9 +92,14 @@ def test_r26g_authorized_calc_fail_closed_without_postpass(r26e_case) -> None:
     assert result["SHELL_FULL_PATH_TOTAL_DP_PA"] is None
 
 
-def test_r26g_authorized_calc_reconciles_with_postpass(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = next(r for r in selection.records if r.candidate_id == _MIDDLE_CANDIDATE_ID)
+def test_r26g_authorized_calc_reconciles_with_postpass(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = next(
+        r
+        for r in r26e_experimental_rating_selection.records
+        if r.candidate_id == R26G_MIDDLE_CANDIDATE_ID
+    )
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     postpass = {
         "recalculated_tube_dp_pa": "850",
@@ -142,7 +152,7 @@ def test_r26g_representative_full_path_study_slow(r26e_case) -> None:
     middle = next(
         row
         for row in study["representative_candidates"]
-        if row["candidate_geometry_authority"]["candidate_id"] == _MIDDLE_CANDIDATE_ID
+        if row["candidate_geometry_authority"]["candidate_id"] == R26G_MIDDLE_CANDIDATE_ID
     )
     authorized = middle["authorized_full_path_model"]
     assert authorized["status"] == "COMPUTED", authorized.get("blockers")

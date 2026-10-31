@@ -5,19 +5,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 from prototypes.v07_general_rating_sizing_mvp.authorized_full_path_hydraulic_calculation import (
     run_authorized_full_path_hydraulic_calculation,
 )
-from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
-    enumerate_experimental_rating_candidates,
-)
-from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import (
-    load_general_engineering_case_json,
-)
+from prototypes.v07_general_rating_sizing_mvp.candidate_selection import CandidateSelectionOutcome
+from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import EngineeringCase
 from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_input_v1 import (
     FluidDensitySourceV1,
     build_r26g_demonstration_hydraulic_path_input_v1,
@@ -27,16 +22,20 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_physica
     assess_upstream_hydraulic_postpass_for_full_path,
     validate_path_input_physical_consistency,
 )
-
-_FIXTURE_R26E = (
-    Path(__file__).resolve().parents[1]
-    / "fixtures/r26e_multi_candidate_engineering_sizing_case.json"
+from tests.prototypes.r26g_r26ga_shared_setup import (
+    shared_r26e_engineering_case,
+    shared_r26e_experimental_rating_selection,
 )
 
 
 @pytest.fixture(name="r26e_case")
-def _r26e_case():
-    return load_general_engineering_case_json(_FIXTURE_R26E.read_text(encoding="utf-8"))
+def _r26e_case() -> EngineeringCase:
+    return shared_r26e_engineering_case()
+
+
+@pytest.fixture(name="r26e_experimental_rating_selection")
+def _r26e_experimental_rating_selection() -> CandidateSelectionOutcome:
+    return shared_r26e_experimental_rating_selection()
 
 
 def _good_postpass(**overrides: object) -> dict:
@@ -66,9 +65,10 @@ def _good_postpass(**overrides: object) -> dict:
     return base
 
 
-def test_r26ga_blocks_tube_shell_mass_flow_mismatch(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_blocks_tube_shell_mass_flow_mismatch(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     bad_tube = path_input.model_copy(
         update={
@@ -83,9 +83,8 @@ def test_r26ga_blocks_tube_shell_mass_flow_mismatch(r26e_case) -> None:
     assert any("TUBE_MASS_FLOW_MISMATCH" in e for e in result["physical_consistency_errors"])
 
 
-def test_r26ga_blocks_density_side_mismatch(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_blocks_density_side_mismatch(r26e_case, r26e_experimental_rating_selection) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     shell_comp = path_input.shell_external_components[0]
     bad_shell = shell_comp.model_copy(
@@ -103,9 +102,10 @@ def test_r26ga_blocks_density_side_mismatch(r26e_case) -> None:
     assert any("DENSITY_SIDE_MISMATCH" in e for e in result["physical_consistency_errors"])
 
 
-def test_r26ga_blocks_upstream_tube_recompute_blocked(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_blocks_upstream_tube_recompute_blocked(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     result = run_authorized_full_path_hydraulic_calculation(
         case=r26e_case,
@@ -117,9 +117,8 @@ def test_r26ga_blocks_upstream_tube_recompute_blocked(r26e_case) -> None:
     assert result["TUBE_FULL_PATH_STATUS"] == "BLOCKED_UPSTREAM"
 
 
-def test_r26ga_duplicate_local_loss_blocked(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_duplicate_local_loss_blocked(r26e_case, r26e_experimental_rating_selection) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     comp_id = path_input.tube_side_components[2].component_id
     postpass = _good_postpass(
@@ -142,9 +141,10 @@ def test_r26ga_duplicate_local_loss_blocked(r26e_case) -> None:
     assert result["TUBE_FULL_PATH_TOTAL_DP_PA"] is None
 
 
-def test_r26ga_full_path_constraint_independent_of_partial_not_satisfied(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_full_path_constraint_independent_of_partial_not_satisfied(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     postpass = _good_postpass(
         tube_dp_constraint="NOT_SATISFIED",
@@ -165,9 +165,10 @@ def test_r26ga_full_path_constraint_independent_of_partial_not_satisfied(r26e_ca
     assert result["FULL_PATH_TUBE_CONSTRAINT_STATUS"] in ("SATISFIED", "NOT_SATISFIED")
 
 
-def test_r26ga_blocks_full_tube_path_when_coolprop_outlet_domain_fails(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_blocks_full_tube_path_when_coolprop_outlet_domain_fails(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     postpass = _good_postpass(
         coolprop_outlet_domain_checks={
@@ -188,9 +189,10 @@ def test_r26ga_blocks_full_tube_path_when_coolprop_outlet_domain_fails(r26e_case
     assert result["TUBE_FULL_PATH_STATUS"] == "BLOCKED_UPSTREAM"
 
 
-def test_r26ga_task029_total_without_friction_blocks_full_tube_path(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_task029_total_without_friction_blocks_full_tube_path(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     postpass = _good_postpass(
         tube_hydraulic_recompute_status="SUCCESS",
@@ -220,9 +222,10 @@ def test_r26ga_outlet_pressure_domain_blocks_satisfied_despite_dp_limit_ok(r26e_
     assert constraints["FULL_PATH_HYDRAULIC_STATUS"] == "OUTLET_PRESSURE_DOMAIN_BLOCKED"
 
 
-def test_r26ga_authorized_input_without_owner_evidence_not_verified(r26e_case) -> None:
-    selection = enumerate_experimental_rating_candidates(r26e_case)
-    record = selection.records[0]
+def test_r26ga_authorized_input_without_owner_evidence_not_verified(
+    r26e_case, r26e_experimental_rating_selection
+) -> None:
+    record = r26e_experimental_rating_selection.records[0]
     path_input = build_r26g_demonstration_hydraulic_path_input_v1(case=r26e_case, record=record)
     authorized_comp = path_input.tube_side_components[0].model_copy(
         update={"engineering_input_status": "AUTHORIZED_ENGINEERING_INPUT"}
