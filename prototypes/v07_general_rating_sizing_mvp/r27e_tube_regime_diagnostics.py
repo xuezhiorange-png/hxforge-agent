@@ -39,7 +39,6 @@ def scan_tube_regime_along_temperature(
 ) -> dict[str, Any]:
     """Sweep tube bulk T at fixed m_dot to locate first Task026 transition / laminar onset."""
     provider = CoolPropProvider()
-    native = build_native_cell_context(case, selection=selection, candidate_id=candidate_id)
     record = next(r for r in selection.records if r.candidate_id == candidate_id)
     parallel_area, tube_id = _tube_hydraulics_from_record(record)
     sweep: list[dict[str, Any]] = []
