@@ -9,7 +9,6 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
 )
 from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
     ENGINEERING_BLOCKED,
-    ENGINEERING_NUMERIC_VALID,
     run_experimental_engineering_rating,
 )
 from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import build_native_cell_context
