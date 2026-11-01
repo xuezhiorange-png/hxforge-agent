@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 
 from prototypes.v07_general_rating_sizing_mvp import r27e_tube_regime_diagnostics
-
 from prototypes.v07_general_rating_sizing_mvp.r27e_targeted_recovery import (
     R27D_ORIGINAL_BLOCKERS,
     R27D_RECOVERY_CANDIDATE_IDS,

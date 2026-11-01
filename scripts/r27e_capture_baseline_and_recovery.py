@@ -11,19 +11,18 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from prototypes.v07_general_rating_sizing_mvp.r27e_reference_regression import (
-    capture_reference_metrics,
-    compare_reference_metrics,
-    load_reference_fixture,
-)
-from prototypes.v07_general_rating_sizing_mvp.r27e_targeted_recovery import (
-    run_r27e_targeted_recovery,
-    write_r27e_recovery_report,
-)
-from tests.prototypes.r26g_r26ga_shared_setup import shared_r26e_engineering_case
-
-
 def main() -> None:
+    from prototypes.v07_general_rating_sizing_mvp.r27e_reference_regression import (
+        capture_reference_metrics,
+        compare_reference_metrics,
+        load_reference_fixture,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.r27e_targeted_recovery import (
+        run_r27e_targeted_recovery,
+        write_r27e_recovery_report,
+    )
+    from tests.prototypes.r26g_r26ga_shared_setup import shared_r26e_engineering_case
+
     case = shared_r26e_engineering_case()
     output_dir = Path("/opt/cursor/artifacts/r27e-recovery")
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -18,7 +18,6 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import Eng
 from prototypes.v07_general_rating_sizing_mvp.native_thermal_boundary_binding import (
     native_thermal_boundary_session,
 )
-from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import build_native_cell_context
 
 _WATER = FluidIdentifier("Water", "HEOS")
 

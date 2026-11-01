@@ -11,6 +11,8 @@ This script must run against R27D sources, not R27E; it never modifies the workt
 
 from __future__ import annotations
 
+# ruff: noqa: E501
+
 import argparse
 import json
 import subprocess
