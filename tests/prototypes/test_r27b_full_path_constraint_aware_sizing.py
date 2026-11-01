@@ -62,7 +62,9 @@ def test_r27b_path_input_uses_preliminary_nozzle_not_demo_fixed_diameter(
     demo_in = demo.tube_side_components[0]
     assert demo_in.nozzle_inside_diameter_m == Decimal("0.100")
     bundle = next(c for c in path.tube_side_components if c.component_type == "ENTRANCE")
-    assert bundle.reference_flow_area_m2 == Decimal(str(baseline.task025_total_parallel_flow_area_m2))
+    assert bundle.reference_flow_area_m2 == Decimal(
+        str(baseline.task025_total_parallel_flow_area_m2)
+    )
 
 
 @pytest.mark.slow
@@ -101,12 +103,14 @@ def test_r27b_330kw_reference_candidates_regression_slow(
         duty = float(row["thermal_rating"]["duty_w"])
         duty_a = float(a_row["thermal_rating"]["duty_w"])
         assert duty == pytest.approx(duty_a, rel=0, abs=0.01)
-        assert row["hydraulic_performance"]["live_tube_dp_pa"] == a_row["hydraulic_performance"][
-            "live_tube_dp_pa"
-        ]
-        assert row["hydraulic_performance"]["live_shell_dp_pa"] == a_row["hydraulic_performance"][
-            "live_shell_dp_pa"
-        ]
+        assert (
+            row["hydraulic_performance"]["live_tube_dp_pa"]
+            == a_row["hydraulic_performance"]["live_tube_dp_pa"]
+        )
+        assert (
+            row["hydraulic_performance"]["live_shell_dp_pa"]
+            == a_row["hydraulic_performance"]["live_shell_dp_pa"]
+        )
         fp = row["hydraulic_performance"]["full_path_hydraulic"]
         demo_fp = a_row["hydraulic_performance"]["authorized_full_path_hydraulic"]
         assert fp is not None and demo_fp is not None
