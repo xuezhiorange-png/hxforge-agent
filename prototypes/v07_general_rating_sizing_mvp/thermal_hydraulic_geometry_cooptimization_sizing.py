@@ -201,9 +201,7 @@ def classify_r27d_search_phases(
     elif full_path_feasible_mid_band_among_fully_rated > 0:
         phases["feasibility_among_fully_rated"] = "CONFIRMED_FEASIBLE_PRESENT_MID_BAND"
     else:
-        phases["feasibility_among_fully_rated"] = (
-            "NO_CONFIRMED_FEASIBLE_AMONG_EVALUATED_CANDIDATES"
-        )
+        phases["feasibility_among_fully_rated"] = "NO_CONFIRMED_FEASIBLE_AMONG_EVALUATED_CANDIDATES"
     return phases
 
 
@@ -238,9 +236,7 @@ def _mesh_rating_evidence_from_multi_row(row: dict[str, Any]) -> dict[str, Any]:
         "screening_n1_status": screening,
         "n1_thermal_numeric_status": n1_status,
         "n1_failure_code": (
-            screening.replace("BLOCKED_N1_", "")
-            if screening.startswith("BLOCKED_N1_")
-            else None
+            screening.replace("BLOCKED_N1_", "") if screening.startswith("BLOCKED_N1_") else None
         ),
         "n1_duty_w": row.get("n1_duty_w"),
         "entered_n2_n4_mesh_ladder": entered_mesh_ladder
@@ -300,9 +296,7 @@ def _search_coverage_block(
     )
     if solver_budget_incomplete:
         headline_status = "SEARCH_INCOMPLETE"
-        headline_reason = (
-            f"Solver budget selected {selected} of {distinct_ready} Task174-ready distinct geometries."
-        )
+        headline_reason = f"Solver budget selected {selected} of {distinct_ready} Task174-ready distinct geometries."
     elif fully_rated < selected:
         headline_status = "FULL_MESH_RATING_INCOMPLETE"
         headline_reason = (
