@@ -1,5 +1,7 @@
 """R27D: CLI for thermal–hydraulic–geometry co-optimization sizing."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse
