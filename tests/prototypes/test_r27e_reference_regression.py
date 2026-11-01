@@ -13,9 +13,7 @@ from prototypes.v07_general_rating_sizing_mvp.r27e_reference_regression import (
 )
 from tests.prototypes.r26g_r26ga_shared_setup import shared_r26e_engineering_case
 
-_FIXTURE = (
-    Path(__file__).resolve().parents[1] / "fixtures/r27e_r27d_seven_reference_baseline.json"
-)
+_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/r27e_r27d_seven_reference_baseline.json"
 
 
 @pytest.mark.slow

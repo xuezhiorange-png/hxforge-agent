@@ -59,9 +59,7 @@ def test_non_experimental_laminar_still_blocked_c3_regime(
         request.tube_bulk_state.pressure_pa,
     )
     with pytest.raises(task172_service._RuntimeFailure) as exc:
-        task172_service._resolve_tube_side_htc(
-            request, tube_bulk, request.tube_mass_flow_kg_s
-        )
+        task172_service._resolve_tube_side_htc(request, tube_bulk, request.tube_mass_flow_kg_s)
     assert exc.value.code == "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE"
 
 
@@ -148,9 +146,7 @@ def test_transition_raises_thermal_correlation_unavailable(
             request.tube_bulk_state.pressure_pa,
         )
         with pytest.raises(task172_service._RuntimeFailure) as exc:
-            task172_service._resolve_tube_side_htc(
-                request, tube_bulk, request.tube_mass_flow_kg_s
-            )
+            task172_service._resolve_tube_side_htc(request, tube_bulk, request.tube_mass_flow_kg_s)
         assert exc.value.code == "THERMAL_CORRELATION_UNAVAILABLE"
     finally:
         reset_experimental_thermal_boundary(token)
