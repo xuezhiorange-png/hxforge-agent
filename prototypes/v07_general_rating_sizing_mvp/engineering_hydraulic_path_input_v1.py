@@ -418,10 +418,12 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
     *,
     case: EngineeringCase,
     record: CandidateSelectionRecord,
-    preliminary_nozzle_sizing: dict[str, Any],
+    preliminary_nozzle_sizing: dict[str, Any] | None = None,
     loss_scenario_key: str = "mid_band",
+    tube_nozzle_inside_diameter_m: Decimal | None = None,
+    shell_nozzle_inside_diameter_m: Decimal | None = None,
 ) -> EngineeringHydraulicPathInputV1:
-    """R27B: preliminary nozzle IDs + candidate bundle areas + configurable assumed K values."""
+    """R27B/R27C: bundle areas + assumed K values; nozzles from sizing or explicit diameters."""
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS.get(loss_scenario_key)
     if scenario is None:
         raise ValueError(f"unknown R27B loss scenario: {loss_scenario_key}")
@@ -431,12 +433,20 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
     tube_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="TUBE_SIDE")
     shell_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="SHELL_SIDE")
 
-    tube_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
-        preliminary_nozzle_sizing, "tube_side"
-    )
-    shell_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
-        preliminary_nozzle_sizing, "shell_side"
-    )
+    if tube_nozzle_inside_diameter_m is None or shell_nozzle_inside_diameter_m is None:
+        if preliminary_nozzle_sizing is None:
+            raise ValueError(
+                "preliminary_nozzle_sizing required when nozzle diameters are not explicit"
+            )
+        tube_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
+            preliminary_nozzle_sizing, "tube_side"
+        )
+        shell_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
+            preliminary_nozzle_sizing, "shell_side"
+        )
+    else:
+        tube_nozzle_d = tube_nozzle_inside_diameter_m
+        shell_nozzle_d = shell_nozzle_inside_diameter_m
     if record.task025_total_parallel_flow_area_m2 is None:
         raise ValueError(
             f"candidate {record.candidate_id} missing task025_total_parallel_flow_area_m2"
