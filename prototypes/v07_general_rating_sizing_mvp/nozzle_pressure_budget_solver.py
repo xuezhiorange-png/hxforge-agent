@@ -41,6 +41,24 @@ LossScenarioKey = Literal["mid_band", "low_loss_sensitivity", "high_loss_sensiti
 _ALLOWED_APPLICABILITY = frozenset({"APPLICABLE", R20_TRANSITIONAL_APPLICABILITY})
 
 
+def full_path_meets_recommendation_constraints(full_path: dict[str, Any] | None) -> bool:
+    return _authorized_full_path_feasible(full_path)
+
+
+def _authorized_full_path_feasible(full_path: dict[str, Any] | None) -> bool:
+    if not full_path or full_path.get("status") != "COMPUTED":
+        return False
+    if full_path.get("FULL_PATH_HYDRAULIC_STATUS") != "SATISFIED":
+        return False
+    if full_path.get("FULL_PATH_TUBE_CONSTRAINT_STATUS") != "SATISFIED":
+        return False
+    if full_path.get("FULL_PATH_SHELL_CONSTRAINT_STATUS") != "SATISFIED":
+        return False
+    if full_path.get("FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS") == "OUTLET_PRESSURE_OUT_OF_DOMAIN":
+        return False
+    return full_path.get("FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS") != "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+
+
 def _velocity_bounds_m_s(
     velocity_rule: dict[str, Any] | None = None,
 ) -> tuple[float, float]:
@@ -70,7 +88,9 @@ def _side_inlet_density_kg_m3(case: EngineeringCase, side: SideKey) -> float:
 
 
 def _tube_friction_pa(postpass: dict[str, Any]) -> Decimal | None:
-    friction, _authority, blockers = assess_tube_internal_friction_separation(postpass, partial_breakdown={})
+    friction, _authority, blockers = assess_tube_internal_friction_separation(
+        postpass, partial_breakdown={}
+    )
     if blockers or friction is None:
         return None
     return friction
@@ -109,6 +129,7 @@ def _tube_path_dp_pa_for_nozzle_d(
     postpass: dict[str, Any],
     scenario: dict[str, Any],
     tube_nozzle_d_m: Decimal,
+    include_nozzle_pair: bool = True,
 ) -> tuple[Decimal | None, dict[str, Decimal | None]]:
     friction = _tube_friction_pa(postpass)
     if friction is None or record.task025_total_parallel_flow_area_m2 is None:
@@ -141,14 +162,17 @@ def _tube_path_dp_pa_for_nozzle_d(
             ref_area_m2=bundle,
             loss_k=scenario["tube_bundle_exit_k"],
         ),
-        "tube_nozzle_pair_dp_pa": _component_dp_pa(
+    }
+    if include_nozzle_pair:
+        breakdown["tube_nozzle_pair_dp_pa"] = _component_dp_pa(
             rho=rho,
             mass_kg_s=m,
             ref_area_m2=nozzle_area,
             loss_k=scenario["tube_nozzle_k"],
             multiplicity=2,
-        ),
-    }
+        )
+    else:
+        breakdown["tube_nozzle_pair_dp_pa"] = Decimal("0")
     if any(v is None for v in breakdown.values()):
         return None, breakdown
     total = friction
@@ -169,6 +193,7 @@ def _shell_external_dp_pa_for_nozzle_d(
     record: CandidateSelectionRecord,
     scenario: dict[str, Any],
     shell_nozzle_d_m: Decimal,
+    include_nozzle_pair: bool = True,
 ) -> tuple[Decimal | None, dict[str, Decimal | None]]:
     rho = Decimal(str(_side_inlet_density_kg_m3(case, "shell_side")))
     m = Decimal(str(case.shell_side.mass_flow_kg_s))
@@ -188,14 +213,17 @@ def _shell_external_dp_pa_for_nozzle_d(
             ref_area_m2=transition,
             loss_k=scenario["shell_transition_k"],
         ),
-        "shell_nozzle_pair_dp_pa": _component_dp_pa(
+    }
+    if include_nozzle_pair:
+        breakdown["shell_nozzle_pair_dp_pa"] = _component_dp_pa(
             rho=rho,
             mass_kg_s=m,
             ref_area_m2=nozzle_area,
             loss_k=scenario["shell_nozzle_k"],
             multiplicity=2,
-        ),
-    }
+        )
+    else:
+        breakdown["shell_nozzle_pair_dp_pa"] = Decimal("0")
     total = Decimal("0")
     for val in breakdown.values():
         if val is None:
@@ -259,7 +287,9 @@ def _search_nozzle_d_in_velocity_band(
 ) -> tuple[float, float]:
     v_min, v_max = _velocity_bounds_m_s(velocity_rule)
     rho = _side_inlet_density_kg_m3(case, side)
-    m = float(case.tube_side.mass_flow_kg_s if side == "tube_side" else case.shell_side.mass_flow_kg_s)
+    m = float(
+        case.tube_side.mass_flow_kg_s if side == "tube_side" else case.shell_side.mass_flow_kg_s
+    )
     d_at_v_max = _diameter_from_velocity_m(mass_flow_kg_s=m, rho=rho, velocity_m_s=v_max)
     d_at_v_min = _diameter_from_velocity_m(mass_flow_kg_s=m, rho=rho, velocity_m_s=v_min)
     return min(d_at_v_max, d_at_v_min), max(d_at_v_max, d_at_v_min)
@@ -273,102 +303,124 @@ def _bisect_feasible_nozzle_d(
     scenario: dict[str, Any],
     side: SideKey,
     max_dp_pa: Decimal,
-    fixed_other_side_dp: Decimal,
-    other_side: SideKey,
     velocity_rule: dict[str, Any] | None,
     tube_nozzle_d_m: Decimal | None,
     shell_nozzle_d_m: Decimal | None,
 ) -> dict[str, Any]:
-    """Find largest nozzle diameter (lowest velocity) within band satisfying side budget."""
-    d_lo, d_hi = _search_nozzle_d_in_velocity_band(case=case, side=side, velocity_rule=velocity_rule)
+    """Minimum nozzle ID within velocity band that satisfies side total Δp (loss decreases as D increases)."""
+    d_min_band, d_max_band = _search_nozzle_d_in_velocity_band(
+        case=case, side=side, velocity_rule=velocity_rule
+    )
     rho = _side_inlet_density_kg_m3(case, side)
-    m = float(case.tube_side.mass_flow_kg_s if side == "tube_side" else case.shell_side.mass_flow_kg_s)
+    m = float(
+        case.tube_side.mass_flow_kg_s if side == "tube_side" else case.shell_side.mass_flow_kg_s
+    )
     v_min, v_max = _velocity_bounds_m_s(velocity_rule)
 
-    def side_external_dp(d_m: float) -> Decimal | None:
+    def side_total_dp(d_m: float, *, include_nozzles: bool = True) -> Decimal | None:
         d_dec = Decimal(str(d_m))
         if side == "tube_side":
-            tube_d = d_dec
-            shell_d = shell_nozzle_d_m or Decimal(str(d_lo))
             total, _ = _tube_path_dp_pa_for_nozzle_d(
                 case=case,
                 record=record,
                 postpass=postpass,
                 scenario=scenario,
-                tube_nozzle_d_m=tube_d,
+                tube_nozzle_d_m=d_dec,
+                include_nozzle_pair=include_nozzles,
             )
             return total
-        shell_d = d_dec
-        tube_d = tube_nozzle_d_m or Decimal(str(d_lo))
         ext, _ = _shell_external_dp_pa_for_nozzle_d(
             case=case,
             record=record,
             scenario=scenario,
-            shell_nozzle_d_m=shell_d,
+            shell_nozzle_d_m=d_dec,
+            include_nozzle_pair=include_nozzles,
         )
         bd = _shell_bd_internal_pa(postpass)
         if ext is None or bd is None:
             return None
         return bd + ext
 
-    dp_at_largest = side_external_dp(d_hi)
-    dp_at_smallest = side_external_dp(d_lo)
+    dp_at_min_diameter = side_total_dp(d_min_band)
+    dp_at_max_diameter = side_total_dp(d_max_band)
+    dp_fixed_without_nozzles = side_total_dp(d_max_band, include_nozzles=False)
 
     result: dict[str, Any] = {
         "side": side,
         "velocity_band_m_s": {"min": v_min, "max": v_max},
-        "diameter_search_band_m": {"min": d_lo, "max": d_hi},
-        "dp_at_max_diameter_pa": str(dp_at_largest) if dp_at_largest is not None else None,
-        "dp_at_min_diameter_pa": str(dp_at_smallest) if dp_at_smallest is not None else None,
+        "diameter_search_band_m": {"min": d_min_band, "max": d_max_band},
+        "dp_at_min_diameter_max_velocity_pa": (
+            str(dp_at_min_diameter) if dp_at_min_diameter is not None else None
+        ),
+        "dp_at_max_diameter_min_velocity_pa": (
+            str(dp_at_max_diameter) if dp_at_max_diameter is not None else None
+        ),
+        "dp_fixed_without_nozzle_pair_pa": (
+            str(dp_fixed_without_nozzles) if dp_fixed_without_nozzles is not None else None
+        ),
         "allowed_total_dp_pa": str(max_dp_pa),
+        "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
     }
 
-    if dp_at_largest is None:
+    if dp_at_min_diameter is None or dp_at_max_diameter is None:
         result["status"] = "BLOCKED_UPSTREAM"
         return result
 
-    if dp_at_largest > max_dp_pa:
-        # Even slowest allowed nozzle (largest D) exceeds budget
+    if dp_at_max_diameter > max_dp_pa:
         result["status"] = "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS"
-        min_possible = dp_at_largest
-        if side == "shell_side":
-            result["failure_dominant_mechanism"] = (
-                "SHELL_BUNDLE_INTERNAL_PLUS_FIXED_TRANSITIONS_DOMINATE"
-                if min_possible > max_dp_pa
-                else "SHELL_NOZZLE_BUDGET_EXHAUSTED"
+        if dp_fixed_without_nozzles is not None and dp_fixed_without_nozzles > max_dp_pa:
+            result["infeasibility_class"] = (
+                "FIXED_INTERNAL_AND_TRANSITION_LOSSES_EXCEED_BUDGET_EVEN_WITH_ZERO_NOZZLE_LOSS"
             )
+            if side == "shell_side":
+                result["failure_dominant_mechanism"] = (
+                    "SHELL_BUNDLE_INTERNAL_PLUS_FIXED_TRANSITIONS_DOMINATE"
+                )
+            else:
+                result["failure_dominant_mechanism"] = "TUBE_BUNDLE_AND_FIXED_LOCALS_DOMINATE"
         else:
-            result["failure_dominant_mechanism"] = "TUBE_BUNDLE_AND_FIXED_LOCALS_DOMINATE"
-        # theoretical diameter for zero nozzle loss not implemented separately — report velocity at d_hi
-        result["theoretical_at_band_max_diameter_m"] = d_hi
-        result["velocity_at_band_max_diameter_m_s"] = _velocity_from_diameter_m(
-            mass_flow_kg_s=m, rho=rho, diameter_m=d_hi
-        )
-        if dp_at_smallest > max_dp_pa:
-            result["OUTSIDE_DESIGN_VELOCITY_RANGE"] = (
-                "Would require velocity above band maximum to reduce losses further"
+            result["infeasibility_class"] = (
+                "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM"
             )
+            result["OUTSIDE_DESIGN_VELOCITY_RANGE"] = (
+                "At band minimum velocity (largest allowed nozzle), Δp still exceeds limit; "
+                "a larger nozzle (lower velocity below the configured band) would be required."
+            )
+        result["theoretical_at_band_max_diameter_m"] = d_max_band
+        result["velocity_at_band_max_diameter_m_s"] = _velocity_from_diameter_m(
+            mass_flow_kg_s=m, rho=rho, diameter_m=d_max_band
+        )
         return result
 
-    # Binary search smallest d (highest v) that still satisfies — prefer max margin => use largest feasible d
-    lo, hi = d_lo, d_hi
-    for _ in range(48):
-        mid = (lo + hi) / 2.0
-        dp_mid = side_external_dp(mid)
-        if dp_mid is None:
-            result["status"] = "BLOCKED_UPSTREAM"
-            return result
-        if dp_mid <= max_dp_pa:
-            lo = mid
-        else:
-            hi = mid
-    chosen_d = lo
+    if dp_at_min_diameter <= max_dp_pa:
+        chosen_d = d_min_band
+    else:
+        lo, hi = d_min_band, d_max_band
+        for _ in range(48):
+            mid = (lo + hi) / 2.0
+            dp_mid = side_total_dp(mid)
+            if dp_mid is None:
+                result["status"] = "BLOCKED_UPSTREAM"
+                return result
+            if dp_mid <= max_dp_pa:
+                hi = mid
+            else:
+                lo = mid
+        chosen_d = hi
+
+    chosen_dp = side_total_dp(chosen_d)
+    if chosen_dp is None or chosen_dp > max_dp_pa:
+        result["status"] = "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS"
+        result["infeasibility_class"] = "POST_BISECT_VERIFICATION_FAILED"
+        return result
+
     chosen_v = _velocity_from_diameter_m(mass_flow_kg_s=m, rho=rho, diameter_m=chosen_d)
     result["status"] = "FEASIBLE_WITHIN_DESIGN_BOUNDS"
+    result["infeasibility_class"] = "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED"
     result["selected_inside_diameter_m"] = chosen_d
     result["selected_velocity_m_s"] = chosen_v
-    result["modeled_side_total_dp_pa"] = str(side_external_dp(chosen_d))
-    result["remaining_dp_margin_pa"] = str(max_dp_pa - side_external_dp(chosen_d))  # type: ignore[operator]
+    result["modeled_side_total_dp_pa"] = str(chosen_dp)
+    result["remaining_dp_margin_pa"] = str(max_dp_pa - chosen_dp)
     return result
 
 
@@ -401,8 +453,6 @@ def cooptimize_nozzles_for_candidate_scenario(
         scenario=scenario,
         side="tube_side",
         max_dp_pa=max_tube,
-        fixed_other_side_dp=Decimal("0"),
-        other_side="shell_side",
         velocity_rule=velocity_rule,
         tube_nozzle_d_m=None,
         shell_nozzle_d_m=None,
@@ -414,8 +464,6 @@ def cooptimize_nozzles_for_candidate_scenario(
         scenario=scenario,
         side="shell_side",
         max_dp_pa=max_shell,
-        fixed_other_side_dp=Decimal("0"),
-        other_side="tube_side",
         velocity_rule=velocity_rule,
         tube_nozzle_d_m=(
             Decimal(str(tube_search["selected_inside_diameter_m"]))
@@ -443,10 +491,7 @@ def cooptimize_nozzles_for_candidate_scenario(
             tube_nozzle_d_m=tube_d,
             shell_nozzle_d_m=shell_d,
         )
-        full_path_feasible = (
-            full_path.get("FULL_PATH_HYDRAULIC_STATUS") == "SATISFIED"
-            and full_path.get("status") == "COMPUTED"
-        )
+        full_path_feasible = _authorized_full_path_feasible(full_path)
 
     tube_breakdown: dict[str, Any] = {}
     shell_breakdown: dict[str, Any] = {}

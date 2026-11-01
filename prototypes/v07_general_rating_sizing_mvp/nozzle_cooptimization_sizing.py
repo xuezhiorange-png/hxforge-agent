@@ -40,6 +40,7 @@ from prototypes.v07_general_rating_sizing_mvp.full_path_constraint_aware_sizing 
 from prototypes.v07_general_rating_sizing_mvp.nozzle_pressure_budget_solver import (
     LossScenarioKey,
     cooptimize_nozzles_for_candidate_scenario,
+    full_path_meets_recommendation_constraints,
 )
 
 _TASK_ID = "V07_R27C_NOZZLE_PRESSURE_BUDGET_CO_OPTIMIZATION"
@@ -95,16 +96,27 @@ def _thermal_block_from_row(row: dict[str, Any], *, case: EngineeringCase) -> di
     }
 
 
+def _scenario_recommendation_eligible(row: dict[str, Any], scenario_key: LossScenarioKey) -> bool:
+    if row.get("rating_participation_status") != "FULLY_RATED":
+        return False
+    if row.get("thermal_rating", {}).get("full_rating_converged") is not True:
+        return False
+    constraints = row.get("constraints") or {}
+    if constraints.get("duty_constraint") != "SATISFIED":
+        return False
+    sc = (row.get("loss_scenario_results") or {}).get(scenario_key) or {}
+    if not sc.get("full_path_feasible"):
+        return False
+    return full_path_meets_recommendation_constraints(sc.get("full_path_hydraulic_verification"))
+
+
 def _rank_candidates(
     sizing_rows: list[dict[str, Any]],
     *,
     scenario_key: LossScenarioKey = "mid_band",
 ) -> list[dict[str, Any]]:
     feasible = [
-        row
-        for row in sizing_rows
-        if row.get("rating_participation_status") == "FULLY_RATED"
-        and (row.get("loss_scenario_results") or {}).get(scenario_key, {}).get("full_path_feasible")
+        row for row in sizing_rows if _scenario_recommendation_eligible(row, scenario_key)
     ]
 
     def key(row: dict[str, Any]) -> tuple[float, float]:
@@ -220,9 +232,7 @@ def run_nozzle_pressure_budget_cooptimization(
                 key: [
                     row["candidate_id"]
                     for row in sizing_rows
-                    if (row.get("loss_scenario_results") or {})
-                    .get(key, {})
-                    .get("full_path_feasible")
+                    if _scenario_recommendation_eligible(row, key)
                 ]
                 for key in LOSS_SCENARIO_KEYS
             },

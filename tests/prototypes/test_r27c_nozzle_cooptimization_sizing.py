@@ -82,6 +82,10 @@ def test_r27c_330kw_regression_and_candidate_b_not_false_feasible(
         assert sc["overall_scenario_status"] != "FEASIBLE_FULL_PATH_VERIFIED"
         shell_solve = sc["shell_nozzle_solve"]
         assert shell_solve["status"] == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS"
+        tube_solve = sc["tube_nozzle_solve"]
+        if tube_solve.get("status") == "FEASIBLE_WITHIN_DESIGN_BOUNDS":
+            assert float(tube_solve["modeled_side_total_dp_pa"]) <= 1150.0
+            assert float(tube_solve["selected_velocity_m_s"]) < 3.0 - 1e-6
 
     assert report["found_feasible_design"] == "NO_FULL_PATH_FEASIBLE_CANDIDATE"
     assert report["recommendation"]["recommended_candidate_id"] is None

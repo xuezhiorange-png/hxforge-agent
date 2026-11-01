@@ -487,6 +487,7 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_r27c_nozzle_cooptimization_sizing.py
+      - tests/prototypes/test_r27c_p0_nozzle_bisect.py
     timeout: 7200
 
   - name: v07-r26f-hydraulic-path
