@@ -122,8 +122,26 @@ def probe_enthalpy_domain_exit(
     enthalpy_j_kg: float,
     pressure_pa: float,
     side: Literal["TUBE", "SHELL"] = "TUBE",
+    rating_admitted_h_min_j_kg: float | None = None,
+    rating_admitted_h_max_j_kg: float | None = None,
 ) -> dict[str, Any]:
+    """Keep unrestricted CoolProp P-H capability separate from the rating admission window."""
     provider = CoolPropProvider()
+    rating_domain_ok = (
+        rating_admitted_h_min_j_kg <= enthalpy_j_kg <= rating_admitted_h_max_j_kg
+        if rating_admitted_h_min_j_kg is not None
+        and rating_admitted_h_max_j_kg is not None
+        else None
+    )
+    result: dict[str, Any] = {
+        "side": side,
+        "enthalpy_j_kg": enthalpy_j_kg,
+        "pressure_pa": pressure_pa,
+        "rating_admitted_h_min_j_kg": rating_admitted_h_min_j_kg,
+        "rating_admitted_h_max_j_kg": rating_admitted_h_max_j_kg,
+        "rating_admitted_enthalpy_domain_ok": rating_domain_ok,
+        "rating_domain_is_not_coolprop_domain": True,
+    }
     try:
         state = provider.state_ph(
             _WATER,
@@ -131,20 +149,15 @@ def probe_enthalpy_domain_exit(
             enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
-        return {
-            "side": side,
-            "enthalpy_j_kg": enthalpy_j_kg,
-            "pressure_pa": pressure_pa,
+        result.update({
             "property_domain_ok": True,
             "temperature_k": state.temperature_k,
             "phase": str(getattr(state, "phase", None)),
-        }
+        })
     except Exception as exc:
-        return {
-            "side": side,
-            "enthalpy_j_kg": enthalpy_j_kg,
-            "pressure_pa": pressure_pa,
+        result.update({
             "property_domain_ok": False,
             "error_type": type(exc).__name__,
             "error_message": str(exc),
-        }
+        })
+    return result

@@ -212,15 +212,27 @@ def run_r27e_targeted_recovery(
             if cid == "c20fb684-9827-5cdb-9550-a4c5c03200c0":
                 h_probe = _parse_enthalpy_from_diagnostics(list(n1.diagnostics or []))
                 if h_probe is None:
-                    h_probe = 85139.62401371569
-                with native_thermal_boundary_session(
-                    case, CoolPropProvider(), enable_live_binding=True
-                ):
-                    p_pa = float(t173.effective_tube_property_evaluation_pressure_pa())
-                regime_diag["enthalpy_domain_probe"] = probe_enthalpy_domain_exit(
-                    enthalpy_j_kg=h_probe,
-                    pressure_pa=p_pa,
-                )
+                    regime_diag["enthalpy_domain_probe"] = {
+                        "status": "NOT_EXECUTED_NO_RUNTIME_ENTHALPY_DIAGNOSTIC",
+                        "disclosure": (
+                            "Do not substitute a historical assumed enthalpy for an "
+                            "actual R27E solver diagnostic."
+                        ),
+                    }
+                else:
+                    with native_thermal_boundary_session(
+                        case, CoolPropProvider(), enable_live_binding=True
+                    ):
+                        provider = CoolPropProvider()
+                        p_pa = float(t173.effective_tube_property_evaluation_pressure_pa())
+                        h_min = float(t173._effective_h_min_j_kg())
+                        h_max = float(t173.effective_admitted_h_max_j_kg(provider))
+                    regime_diag["enthalpy_domain_probe"] = probe_enthalpy_domain_exit(
+                        enthalpy_j_kg=h_probe,
+                        pressure_pa=p_pa,
+                        rating_admitted_h_min_j_kg=h_min,
+                        rating_admitted_h_max_j_kg=h_max,
+                    )
         rows.append(
             {
                 "candidate_id": cid,

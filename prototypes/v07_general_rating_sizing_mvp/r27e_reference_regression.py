@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,8 @@ from prototypes.v07_general_rating_sizing_mvp.r27e_targeted_recovery import (
 )
 
 _SCHEMA = "hxforge.r27e-r27d-seven-reference-regression.v27e"
+_R27D_BASELINE_HEAD = "e320aaf5840812eafe86a0e7d6fef97bf8062544"
+_MESH_LEVELS = ("1", "2", "4")
 
 
 def r27d_seven_reference_candidate_ids(
@@ -74,7 +77,10 @@ def capture_reference_metrics(case: EngineeringCase) -> dict[str, Any]:
             row.update(
                 {
                     "FULL_RATING_CONVERGED": mesh.get("FULL_RATING_CONVERGED"),
-                    "mesh_ladder": mesh.get("mesh_ladder"),
+                    "mesh_ladder": {
+                        str(level): metrics
+                        for level, metrics in (mesh.get("per_mesh") or {}).items()
+                    },
                     "N4_DUTY_W": receipt.get("N4_DUTY_W"),
                     "N4_TUBE_OUTLET_K": receipt.get("N4_TUBE_OUTLET_K"),
                     "N4_SHELL_OUTLET_K": receipt.get("N4_SHELL_OUTLET_K"),
@@ -102,74 +108,122 @@ def compare_reference_metrics(
     duty_abs_tol_w: float = 0.5,
     temperature_abs_tol_k: float = 1e-4,
     dp_rel_tol: float = 1e-6,
+    energy_abs_tol: float = 1e-9,
+    closure_abs_tol_w: float = 0.5,
 ) -> list[dict[str, Any]]:
+    """Fail closed on R27D provenance, missing fields, and N1/N2/N4 numeric drift."""
     deltas: list[dict[str, Any]] = []
-    base_by_id = {row["candidate_id"]: row for row in baseline["candidates"]}
-    for row in current["candidates"]:
-        cid = row["candidate_id"]
-        base = base_by_id.get(cid)
-        if base is None:
-            deltas.append({"candidate_id": cid, "error": "missing_baseline"})
-            continue
-        if base.get("candidate_hash") != row.get("candidate_hash"):
+    if baseline.get("schema_version") != _SCHEMA or current.get("schema_version") != _SCHEMA:
+        deltas.append({"error": "reference_schema_mismatch"})
+    source = baseline.get("baseline_provenance") or {}
+    if (
+        source.get("source_commit_sha") != _R27D_BASELINE_HEAD
+        or source.get("source_pr_number") != 310
+    ):
+        deltas.append({
+            "error": "unverified_r27d_baseline_origin",
+            "expected_head": _R27D_BASELINE_HEAD,
+            "actual": source,
+        })
+
+    base_rows = baseline.get("candidates") or []
+    current_rows = current.get("candidates") or []
+    base_by_id = {row["candidate_id"]: row for row in base_rows}
+    current_by_id = {row["candidate_id"]: row for row in current_rows}
+    if len(base_rows) != 7 or len(base_by_id) != 7:
+        deltas.append({"error": "baseline_must_have_seven_unique_candidates"})
+    if len(current_rows) != 7 or len(current_by_id) != 7:
+        deltas.append({"error": "current_must_have_seven_unique_candidates"})
+    for missing in sorted(base_by_id.keys() - current_by_id.keys()):
+        deltas.append({"candidate_id": missing, "error": "missing_current"})
+    for missing in sorted(current_by_id.keys() - base_by_id.keys()):
+        deltas.append({"candidate_id": missing, "error": "missing_baseline"})
+
+    def compare_numeric(
+        cid: str,
+        label: str,
+        bval: Any,
+        cval: Any,
+        tolerance: float,
+        *,
+        relative: bool = False,
+    ) -> None:
+        if bval is None or cval is None:
+            deltas.append({"candidate_id": cid, "field": label, "error": "missing_numeric_metric"})
+            return
+        try:
+            b, c = float(bval), float(cval)
+        except (TypeError, ValueError):
+            deltas.append({"candidate_id": cid, "field": label, "error": "invalid_numeric_metric"})
+            return
+        if not math.isfinite(b) or not math.isfinite(c):
             deltas.append(
-                {
-                    "candidate_id": cid,
-                    "error": "candidate_hash_changed",
-                    "baseline": base.get("candidate_hash"),
-                    "current": row.get("candidate_hash"),
-                }
+                {"candidate_id": cid, "field": label, "error": "nonfinite_numeric_metric"}
             )
-            continue
-        for key, tol, mode in (
-            ("N4_DUTY_W", duty_abs_tol_w, "abs"),
-            ("N4_TUBE_OUTLET_K", temperature_abs_tol_k, "abs"),
-            ("N4_SHELL_OUTLET_K", temperature_abs_tol_k, "abs"),
-            ("LIVE_TUBE_DP_PA", dp_rel_tol, "rel"),
-            ("LIVE_SHELL_DP_PA", dp_rel_tol, "rel"),
+            return
+        difference = abs(b - c) / max(abs(b), 1.0) if relative else abs(b - c)
+        if difference > tolerance:
+            deltas.append({
+                "candidate_id": cid,
+                "field": label,
+                "baseline": b,
+                "current": c,
+                "delta": difference,
+                "tolerance": tolerance,
+            })
+
+    for cid in sorted(base_by_id.keys() & current_by_id.keys()):
+        base, row = base_by_id[cid], current_by_id[cid]
+        for field in ("candidate_hash", "geometry_projection_hash", "n1_status"):
+            if not base.get(field) or base.get(field) != row.get(field):
+                deltas.append(
+                    {"candidate_id": cid, "field": field, "error": "identity_or_status_drift"}
+                )
+        for field, tolerance, relative in (
+            ("n1_duty_w", duty_abs_tol_w, False),
+            ("energy_balance_relative_error_n1", energy_abs_tol, False),
+            ("max_cell_thermal_residual_w_n1", closure_abs_tol_w, False),
+            ("max_closure_residual_w_n1", closure_abs_tol_w, False),
+            ("N4_DUTY_W", duty_abs_tol_w, False),
+            ("N4_TUBE_OUTLET_K", temperature_abs_tol_k, False),
+            ("N4_SHELL_OUTLET_K", temperature_abs_tol_k, False),
+            ("LIVE_TUBE_DP_PA", dp_rel_tol, True),
+            ("LIVE_SHELL_DP_PA", dp_rel_tol, True),
         ):
-            b_val = base.get(key)
-            c_val = row.get(key)
-            if b_val is None or c_val is None:
-                continue
-            bf = float(b_val)
-            cf = float(c_val)
-            if mode == "abs":
-                diff = abs(cf - bf)
-                if diff > tol:
-                    deltas.append(
-                        {
-                            "candidate_id": cid,
-                            "field": key,
-                            "baseline": bf,
-                            "current": cf,
-                            "abs_delta": diff,
-                            "tolerance": tol,
-                        }
-                    )
-            else:
-                denom = max(abs(bf), 1.0)
-                rel = abs(cf - bf) / denom
-                if rel > tol:
-                    deltas.append(
-                        {
-                            "candidate_id": cid,
-                            "field": key,
-                            "baseline": bf,
-                            "current": cf,
-                            "rel_delta": rel,
-                            "tolerance": tol,
-                        }
-                    )
-        if base.get("FULL_RATING_CONVERGED") != row.get("FULL_RATING_CONVERGED"):
-            deltas.append(
-                {
-                    "candidate_id": cid,
-                    "field": "FULL_RATING_CONVERGED",
-                    "baseline": base.get("FULL_RATING_CONVERGED"),
-                    "current": row.get("FULL_RATING_CONVERGED"),
-                }
+            compare_numeric(
+                cid, field, base.get(field), row.get(field), tolerance, relative=relative
             )
+        if (
+            base.get("FULL_RATING_CONVERGED") is not True
+            or row.get("FULL_RATING_CONVERGED") is not True
+        ):
+            deltas.append(
+                {"candidate_id": cid, "field": "FULL_RATING_CONVERGED", "error": "not_converged"}
+            )
+        bmesh = base.get("mesh_ladder") or {}
+        cmesh = row.get("mesh_ladder") or {}
+        for level in _MESH_LEVELS:
+            bm, cm = bmesh.get(level) or {}, cmesh.get(level) or {}
+            if not bm or not cm:
+                deltas.append(
+                    {"candidate_id": cid, "field": f"N{level}", "error": "missing_mesh_metrics"}
+                )
+                continue
+            if bm.get("status") != cm.get("status") or not bm.get("status"):
+                deltas.append(
+                    {"candidate_id": cid, "field": f"N{level}.status", "error": "status_drift"}
+                )
+            for metric, tolerance in (
+                ("duty_w", duty_abs_tol_w),
+                ("tube_outlet_temperature_k", temperature_abs_tol_k),
+                ("shell_outlet_temperature_k", temperature_abs_tol_k),
+                ("energy_balance_relative_error", energy_abs_tol),
+                ("max_cell_thermal_residual_w", closure_abs_tol_w),
+                ("max_inner_wall_outer_closure_residual_w", closure_abs_tol_w),
+            ):
+                compare_numeric(
+                    cid, f"N{level}.{metric}", bm.get(metric), cm.get(metric), tolerance
+                )
     return deltas
 
 
