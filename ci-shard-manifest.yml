@@ -490,6 +490,13 @@ shards:
       - tests/prototypes/test_r27c_p0_nozzle_bisect.py
     timeout: 7200
 
+  - name: v07-r27d-thermal-hydraulic-geometry-cooptimization
+    job: shard-v07-r27d-thermal-hydraulic-geometry-cooptimization
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r27d_thermal_hydraulic_geometry_cooptimization_sizing.py
+    timeout: 7200
+
   - name: v07-r26f-hydraulic-path
     job: shard-v07-r26f-hydraulic-path
     python: ["3.11", "3.12"]

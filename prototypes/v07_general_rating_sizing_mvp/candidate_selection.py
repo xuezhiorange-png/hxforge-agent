@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from hexagent.exchangers.shell_tube.bell_delaware.models import Task166BlockedResult, Task166Result
 from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168
@@ -25,6 +25,7 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     Task174SuccessResult,
 )
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection_policy import (
+    apply_r27d_rating_selection_policy,
     apply_rating_selection_policy,
     nominal_area_proxy_m2,
 )
@@ -103,7 +104,13 @@ def _geometry_projection_hash(
     return canonical_sha256(payload)
 
 
-def enumerate_experimental_rating_candidates(case: EngineeringCase) -> CandidateSelectionOutcome:
+def enumerate_experimental_rating_candidates(
+    case: EngineeringCase,
+    *,
+    rating_selection_policy: Literal["default", "r27d"] = "default",
+    max_candidates_to_rate_override: int | None = None,
+    rate_all_distinct_task174_ready: bool = False,
+) -> CandidateSelectionOutcome:
     """Enumerate full discrete space; select up to max_candidates_to_rate for mesh rating."""
     sizing_req = build_task173_sizing_request(case)
     t168 = sizing_req.task168_candidate_request
@@ -295,7 +302,22 @@ def enumerate_experimental_rating_candidates(case: EngineeringCase) -> Candidate
         )
 
     if defer_selection:
-        selected_tuple, selection_reason = apply_rating_selection_policy(case, records)
+        if rating_selection_policy == "r27d":
+            ready_rows = [row for row in records if row.rating_request_ready]
+            distinct_ready = len({row.geometry_projection_hash for row in ready_rows})
+            if rate_all_distinct_task174_ready:
+                effective_max = distinct_ready
+            elif max_candidates_to_rate_override is not None:
+                effective_max = max_candidates_to_rate_override
+            else:
+                effective_max = max_rate
+            selected_tuple, selection_reason = apply_r27d_rating_selection_policy(
+                case,
+                records,
+                max_rate=effective_max,
+            )
+        else:
+            selected_tuple, selection_reason = apply_rating_selection_policy(case, records)
         if selected_tuple:
             first = next(r for r in records if r.candidate_id == selected_tuple[0])
             selected_rating_hash = first.rating_request_hash
