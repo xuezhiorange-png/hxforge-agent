@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 FIRST_N_POLICY = "FIRST_N_DISTINCT_GEOMETRY_TASK174_READY_UNDER_SOLVER_BUDGET"
 MIN_AREA_POLICY = "MIN_NOMINAL_TUBE_AREA_SEARCH_EXCLUDING_BASELINE_GEOMETRIES"
 VARIABLE_SHELL_POLICY = "VARIABLE_SHELL_BUNDLE_MIN_NOMINAL_AREA_R13"
+R27D_POLICY = "R27D_DISTINCT_TASK174_READY_PRIORITY_NOMINAL_AREA_UNDER_SOLVER_BUDGET"
 
 
 def resolve_candidate_selection_mode(case: EngineeringCase) -> str:
@@ -163,3 +164,50 @@ def apply_rating_selection_policy(
             )
 
     return tuple(selected_ids), reason
+
+
+def apply_r27d_rating_selection_policy(
+    case: EngineeringCase,
+    records: list[CandidateSelectionRecord],
+    *,
+    max_rate: int | None = None,
+) -> tuple[tuple[str, ...], str]:
+    """R27D: mesh-rate distinct Task174-ready geometries up to budget; priority by nominal area."""
+    limit = max_rate if max_rate is not None else case.solver_budget.max_candidates_to_rate
+    ready = [row for row in records if row.rating_request_ready]
+    pool_sorted = sorted(
+        ready,
+        key=lambda row: (
+            Decimal(row.nominal_tube_outer_area_proxy_m2 or "0"),
+            row.physical_tube_count or 0,
+        ),
+        reverse=True,
+    )
+    selected_ids: list[str] = []
+    selected_geometry: set[str] = set()
+
+    def _try_pick(row: CandidateSelectionRecord) -> None:
+        if len(selected_ids) >= limit:
+            return
+        if row.geometry_projection_hash in selected_geometry:
+            return
+        selected_ids.append(row.candidate_id)
+        selected_geometry.add(row.geometry_projection_hash)
+
+    for row in _pinned_baseline_rows(case, ready):
+        _try_pick(row)
+    for row in pool_sorted:
+        _try_pick(row)
+
+    selected_set = set(selected_ids)
+    for index, row in enumerate(records):
+        if row.candidate_id in selected_set:
+            records[index] = replace(
+                row, selected_for_rating=True, task173_rating_status="SELECTED"
+            )
+        elif row.rating_request_ready:
+            records[index] = replace(
+                row, selected_for_rating=False, task173_rating_status="NOT_SELECTED"
+            )
+
+    return tuple(selected_ids), R27D_POLICY
