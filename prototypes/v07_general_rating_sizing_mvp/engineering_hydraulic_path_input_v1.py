@@ -15,7 +15,11 @@ from prototypes.v07_general_rating_sizing_mvp.engineering_case_loader import Eng
 
 SCHEMA_VERSION = "hxforge.engineering-hydraulic-path-input.v1"
 
-EngineeringInputStatus = Literal["DEMONSTRATION", "AUTHORIZED_ENGINEERING_INPUT"]
+EngineeringInputStatus = Literal[
+    "DEMONSTRATION",
+    "ASSUMPTION_BASED",
+    "AUTHORIZED_ENGINEERING_INPUT",
+]
 PathSide = Literal["TUBE", "SHELL"]
 LossConvention = Literal["K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2"]
 PathCompletenessDeclaration = Literal[
@@ -332,6 +336,243 @@ def build_r26g_demonstration_hydraulic_path_input_v1(
             mass_flow_kg_s=shell_mass,
             fluid_density_source=shell_density,
             loss_coefficient=Decimal("0.5"),
+            **common_coeff,
+        ),
+    )
+    return EngineeringHydraulicPathInputV1(
+        schema_version=SCHEMA_VERSION,
+        binding=EngineeringHydraulicPathBindingV1(
+            engineering_case_id=str(getattr(case, "engineering_case_id", "")),
+            candidate_id=record.candidate_id,
+            candidate_hash=record.candidate_hash,
+            geometry_projection_hash=record.geometry_projection_hash,
+        ),
+        path_completeness_declaration="FULL_TUBE_AND_SHELL_EXTERNAL_PATH",
+        tube_side_components=tube_components,
+        shell_external_components=shell_components,
+    )
+
+
+R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS: dict[str, dict[str, Any]] = {
+    "mid_band": {
+        "scenario_id": "R27B-ASSUMPTION-K-MID-BAND",
+        "source_nature": "CONFIGURABLE_ASSUMPTION_SCENARIO",
+        "disclosure": "Mid-band K values for R27B full-path sizing; not owner-verified design data.",
+        "tube_nozzle_k": Decimal("0.45"),
+        "tube_channel_head_k": Decimal("0.55"),
+        "tube_bundle_entrance_k": Decimal("0.5"),
+        "tube_bundle_exit_k": Decimal("0.9"),
+        "shell_nozzle_k": Decimal("0.5"),
+        "shell_transition_k": Decimal("0.35"),
+    },
+    "low_loss_sensitivity": {
+        "scenario_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+        "source_nature": "CONFIGURABLE_ASSUMPTION_SCENARIO",
+        "disclosure": "Lower-bound sensitivity scenario for assumption-based K values.",
+        "tube_nozzle_k": Decimal("0.35"),
+        "tube_channel_head_k": Decimal("0.45"),
+        "tube_bundle_entrance_k": Decimal("0.4"),
+        "tube_bundle_exit_k": Decimal("0.7"),
+        "shell_nozzle_k": Decimal("0.4"),
+        "shell_transition_k": Decimal("0.25"),
+    },
+    "high_loss_sensitivity": {
+        "scenario_id": "R27B-ASSUMPTION-K-HIGH-SENSITIVITY",
+        "source_nature": "CONFIGURABLE_ASSUMPTION_SCENARIO",
+        "disclosure": "Upper-bound sensitivity scenario for assumption-based K values.",
+        "tube_nozzle_k": Decimal("0.55"),
+        "tube_channel_head_k": Decimal("0.65"),
+        "tube_bundle_entrance_k": Decimal("0.6"),
+        "tube_bundle_exit_k": Decimal("1.1"),
+        "shell_nozzle_k": Decimal("0.6"),
+        "shell_transition_k": Decimal("0.45"),
+    },
+}
+
+
+def _preliminary_nozzle_mid_inside_diameter_m(
+    preliminary_nozzle_sizing: dict[str, Any],
+    side_key: Literal["tube_side", "shell_side"],
+) -> Decimal:
+    side = preliminary_nozzle_sizing["sides"][side_key]
+    mid = next(c for c in side["diameter_candidates_m"] if c.get("assumption_label") == "mid_band")
+    return Decimal(str(mid["inside_diameter_m"]))
+
+
+def _assumption_channel_head_area_m2(
+    *,
+    bundle_parallel_flow_area_m2: Decimal,
+    nozzle_inside_diameter_m: Decimal,
+) -> Decimal:
+    nozzle_area = nozzle_flow_area_m2(nozzle_inside_diameter_m)
+    scaled = bundle_parallel_flow_area_m2 * Decimal("1.25")
+    return max(scaled, nozzle_area)
+
+
+def _assumption_shell_transition_area_m2(*, shell_inside_diameter_m: Decimal) -> Decimal:
+    shell_cross = Decimal(str(math.pi)) * (shell_inside_diameter_m / Decimal(2)) ** 2
+    return (shell_cross * Decimal("0.35")).quantize(Decimal("0.0000000001"))
+
+
+def build_r27b_assumption_based_hydraulic_path_input_v1(
+    *,
+    case: EngineeringCase,
+    record: CandidateSelectionRecord,
+    preliminary_nozzle_sizing: dict[str, Any],
+    loss_scenario_key: str = "mid_band",
+) -> EngineeringHydraulicPathInputV1:
+    """R27B: preliminary nozzle IDs + candidate bundle areas + configurable assumed K values."""
+    scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS.get(loss_scenario_key)
+    if scenario is None:
+        raise ValueError(f"unknown R27B loss scenario: {loss_scenario_key}")
+
+    tube_mass = Decimal(str(case.tube_side.mass_flow_kg_s))
+    shell_mass = Decimal(str(case.shell_side.mass_flow_kg_s))
+    tube_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="TUBE_SIDE")
+    shell_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="SHELL_SIDE")
+
+    tube_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
+        preliminary_nozzle_sizing, "tube_side"
+    )
+    shell_nozzle_d = _preliminary_nozzle_mid_inside_diameter_m(
+        preliminary_nozzle_sizing, "shell_side"
+    )
+    if record.task025_total_parallel_flow_area_m2 is None:
+        raise ValueError(
+            f"candidate {record.candidate_id} missing task025_total_parallel_flow_area_m2"
+        )
+    bundle_area = Decimal(str(record.task025_total_parallel_flow_area_m2))
+    shell_id = Decimal(str(record.shell_inside_diameter_m or "0.56"))
+    channel_area = _assumption_channel_head_area_m2(
+        bundle_parallel_flow_area_m2=bundle_area,
+        nozzle_inside_diameter_m=tube_nozzle_d,
+    )
+    shell_transition_area = _assumption_shell_transition_area_m2(shell_inside_diameter_m=shell_id)
+
+    coeff_src = str(scenario["scenario_id"])
+    common_coeff = {
+        "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+        "coefficient_source_id": coeff_src,
+        "coefficient_source_version": "2026-R27B",
+        "coefficient_source_location": (
+            "R27B configurable assumption scenario for calculation-first full-path sizing"
+        ),
+        "geometry_evidence_refs": (
+            "R27A-PRELIMINARY-NOZZLE-VELOCITY-BAND",
+            record.geometry_projection_hash,
+        ),
+        "engineering_input_status": "ASSUMPTION_BASED",
+    }
+
+    tube_components = (
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-TUBE-INLET-NOZZLE",
+            side="TUBE",
+            component_type="NOZZLE",
+            reference_plane="TUBE_INLET_NOZZLE_PLANE",
+            path_sequence_index=0,
+            nozzle_inside_diameter_m=tube_nozzle_d,
+            mass_flow_kg_s=tube_mass,
+            fluid_density_source=tube_density,
+            loss_coefficient=scenario["tube_nozzle_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-TUBE-CHANNEL-HEAD",
+            side="TUBE",
+            component_type="CHANNEL_HEAD",
+            reference_plane="TUBE_CHANNEL_HEAD_PLANE",
+            path_sequence_index=1,
+            reference_flow_area_m2=channel_area,
+            mass_flow_kg_s=tube_mass,
+            fluid_density_source=tube_density,
+            loss_coefficient=scenario["tube_channel_head_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE",
+            side="TUBE",
+            component_type="ENTRANCE",
+            reference_plane="TUBE_BUNDLE_ENTRANCE_PLANE",
+            path_sequence_index=2,
+            reference_flow_area_m2=bundle_area,
+            mass_flow_kg_s=tube_mass,
+            fluid_density_source=tube_density,
+            loss_coefficient=scenario["tube_bundle_entrance_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-TUBE-BUNDLE-EXIT",
+            side="TUBE",
+            component_type="EXIT",
+            reference_plane="TUBE_BUNDLE_EXIT_PLANE",
+            path_sequence_index=3,
+            reference_flow_area_m2=bundle_area,
+            mass_flow_kg_s=tube_mass,
+            fluid_density_source=tube_density,
+            loss_coefficient=scenario["tube_bundle_exit_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-TUBE-OUTLET-NOZZLE",
+            side="TUBE",
+            component_type="NOZZLE",
+            reference_plane="TUBE_OUTLET_NOZZLE_PLANE",
+            path_sequence_index=4,
+            nozzle_inside_diameter_m=tube_nozzle_d,
+            mass_flow_kg_s=tube_mass,
+            fluid_density_source=tube_density,
+            loss_coefficient=scenario["tube_nozzle_k"],
+            **common_coeff,
+        ),
+    )
+    shell_components = (
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-SHELL-INLET-NOZZLE",
+            side="SHELL",
+            component_type="SHELL_INLET_NOZZLE",
+            reference_plane="SHELL_INLET_NOZZLE_PLANE",
+            path_sequence_index=0,
+            nozzle_inside_diameter_m=shell_nozzle_d,
+            mass_flow_kg_s=shell_mass,
+            fluid_density_source=shell_density,
+            loss_coefficient=scenario["shell_nozzle_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-SHELL-INLET-TRANSITION",
+            side="SHELL",
+            component_type="SHELL_INLET_TRANSITION",
+            reference_plane="SHELL_INLET_TRANSITION_PLANE",
+            path_sequence_index=1,
+            reference_flow_area_m2=shell_transition_area,
+            mass_flow_kg_s=shell_mass,
+            fluid_density_source=shell_density,
+            loss_coefficient=scenario["shell_transition_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-SHELL-OUTLET-TRANSITION",
+            side="SHELL",
+            component_type="SHELL_OUTLET_TRANSITION",
+            reference_plane="SHELL_OUTLET_TRANSITION_PLANE",
+            path_sequence_index=2,
+            reference_flow_area_m2=shell_transition_area,
+            mass_flow_kg_s=shell_mass,
+            fluid_density_source=shell_density,
+            loss_coefficient=scenario["shell_transition_k"],
+            **common_coeff,
+        ),
+        HydraulicPathComponentV1(
+            component_id="R27B-ASSUMP-SHELL-OUTLET-NOZZLE",
+            side="SHELL",
+            component_type="SHELL_OUTLET_NOZZLE",
+            reference_plane="SHELL_OUTLET_NOZZLE_PLANE",
+            path_sequence_index=3,
+            nozzle_inside_diameter_m=shell_nozzle_d,
+            mass_flow_kg_s=shell_mass,
+            fluid_density_source=shell_density,
+            loss_coefficient=scenario["shell_nozzle_k"],
             **common_coeff,
         ),
     )
