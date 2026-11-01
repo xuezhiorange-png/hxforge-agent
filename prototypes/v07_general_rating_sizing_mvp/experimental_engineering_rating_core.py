@@ -425,9 +425,11 @@ def _cell_thermal_closure(
         req.shell_bulk_state.temperature_k,
         req.shell_bulk_state.pressure_pa,
     )
-    tube_h_base, _, _, _, _ = task172_service._tube_base_htc(
+    tube_resolution = task172_service._resolve_tube_side_htc(
         req, tube_bulk_snapshot, req.tube_mass_flow_kg_s
     )
+    tube_h_base = tube_resolution.htc_w_m2_k
+    tube_apply_c3 = tube_resolution.apply_c3_wall_pr_correction
     shell_h_base, _, _, _ = task172_service._shell_base_htc(
         req, shell_bulk_snapshot, req.shell_mass_flow_kg_s
     )
@@ -471,6 +473,7 @@ def _cell_thermal_closure(
                 tube_bulk_snapshot,
                 tube_h_base,
                 twi_value,
+                apply_c3_wall_pr_correction=tube_apply_c3,
                 property_eval_cache=None,
                 property_eval_counter=None,
             )

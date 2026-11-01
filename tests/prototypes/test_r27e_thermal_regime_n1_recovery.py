@@ -47,5 +47,12 @@ def test_r27e_targeted_recovery_runs_five_candidates() -> None:
         "MODEL_NOT_APPLICABLE"
     )
     assert by_id["09dac82a-0a84-5bc2-9b3f-93aaecd30a9e"]["recovery_outcome_class"] == (
-        "FULL_RATING_CONVERGED"
+        "FULL_PATH_CONSTRAINT_NOT_SATISFIED"
+    )
+    assert by_id["6ec6323f-402b-5d5f-90ef-2aab514d37de"]["recovery_root_cause"] == (
+        "THERMAL_CORRELATION_TRANSITION_GAP"
+    )
+    assert (
+        by_id["6ec6323f-402b-5d5f-90ef-2aab514d37de"]["original_r27d_blocker"]
+        == "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE"
     )
