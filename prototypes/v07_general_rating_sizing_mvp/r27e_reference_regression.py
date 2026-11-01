@@ -120,11 +120,13 @@ def compare_reference_metrics(
         source.get("source_commit_sha") != _R27D_BASELINE_HEAD
         or source.get("source_pr_number") != 310
     ):
-        deltas.append({
-            "error": "unverified_r27d_baseline_origin",
-            "expected_head": _R27D_BASELINE_HEAD,
-            "actual": source,
-        })
+        deltas.append(
+            {
+                "error": "unverified_r27d_baseline_origin",
+                "expected_head": _R27D_BASELINE_HEAD,
+                "actual": source,
+            }
+        )
 
     base_rows = baseline.get("candidates") or []
     current_rows = current.get("candidates") or []
@@ -163,14 +165,16 @@ def compare_reference_metrics(
             return
         difference = abs(b - c) / max(abs(b), 1.0) if relative else abs(b - c)
         if difference > tolerance:
-            deltas.append({
-                "candidate_id": cid,
-                "field": label,
-                "baseline": b,
-                "current": c,
-                "delta": difference,
-                "tolerance": tolerance,
-            })
+            deltas.append(
+                {
+                    "candidate_id": cid,
+                    "field": label,
+                    "baseline": b,
+                    "current": c,
+                    "delta": difference,
+                    "tolerance": tolerance,
+                }
+            )
 
     for cid in sorted(base_by_id.keys() & current_by_id.keys()):
         base, row = base_by_id[cid], current_by_id[cid]

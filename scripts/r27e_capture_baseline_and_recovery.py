@@ -11,6 +11,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+
 def main() -> None:
     from prototypes.v07_general_rating_sizing_mvp.r27e_reference_regression import (
         capture_reference_metrics,
@@ -43,7 +44,7 @@ def main() -> None:
         regression_status = "NOT_VERIFIED"
 
     regression_report = {
-        "TASK_ID": "V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FIX",
+        "TASK_ID": "V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FINAL_ACCEPTANCE",
         "status": regression_status,
         "reference_candidate_count": current["reference_candidate_count"],
         "baseline_path": str(fixture),
@@ -56,12 +57,17 @@ def main() -> None:
 
     report = run_r27e_targeted_recovery(case)
     write_r27e_recovery_report(report, output_dir)
-    print(json.dumps({
-        "reference_candidate_count": current["reference_candidate_count"],
-        "regression_status": regression_status,
-        "regression_delta_count": len(deltas),
-        "recovery_candidate_count": len(report["recovery_candidates"]),
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "reference_candidate_count": current["reference_candidate_count"],
+                "regression_status": regression_status,
+                "regression_delta_count": len(deltas),
+                "recovery_candidate_count": len(report["recovery_candidates"]),
+            },
+            indent=2,
+        )
+    )
     if regression_status != "PASS":
         raise SystemExit("R27E numerical regression is unverified or failed; see regression report")
 

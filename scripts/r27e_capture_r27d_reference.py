@@ -12,7 +12,6 @@ This script must run against R27D sources, not R27E; it never modifies the workt
 from __future__ import annotations
 
 # ruff: noqa: E501
-
 import argparse
 import json
 import subprocess
@@ -24,8 +23,13 @@ _R27D_HEAD = "e320aaf5840812eafe86a0e7d6fef97bf8062544"
 _SCHEMA = "hxforge.r27e-r27d-seven-reference-regression.v27e"
 _RECOVERY_PREFIXES = {"6ec6323f", "5b75a185", "8988992a", "c20fb684", "09dac82a"}
 _REFERENCE_PREFIXES = {
-    "9aba0e5c", "9c4b84db", "7357afdf", "580fc128",
-    "8b05db3b", "3c129a7f", "40d78e67",
+    "9aba0e5c",
+    "9c4b84db",
+    "7357afdf",
+    "580fc128",
+    "8b05db3b",
+    "3c129a7f",
+    "40d78e67",
 }
 
 
@@ -41,9 +45,7 @@ def main() -> None:
     args = parser.parse_args()
     source_head = _git("rev-parse", "HEAD")
     if source_head != _R27D_HEAD:
-        raise SystemExit(
-            f"REFUSED: capture requires R27D HEAD {_R27D_HEAD}; got {source_head}"
-        )
+        raise SystemExit(f"REFUSED: capture requires R27D HEAD {_R27D_HEAD}; got {source_head}")
     if _git("status", "--porcelain", "--untracked-files=no"):
         raise SystemExit("REFUSED: source worktree has modified tracked files")
     sys.path.insert(0, str(Path.cwd()))
@@ -67,10 +69,7 @@ def main() -> None:
     selection = enumerate_experimental_rating_candidates(
         case, rating_selection_policy="r27d", rate_all_distinct_task174_ready=True
     )
-    ids = [
-        cid for cid in selection.selected_candidate_ids
-        if cid[:8] not in _RECOVERY_PREFIXES
-    ]
+    ids = [cid for cid in selection.selected_candidate_ids if cid[:8] not in _RECOVERY_PREFIXES]
     if len(ids) != 7 or {cid[:8] for cid in ids} != _REFERENCE_PREFIXES:
         raise SystemExit(f"REFUSED: R27D seven candidate selection drift: {ids}")
 
@@ -95,26 +94,28 @@ def main() -> None:
         receipt = package.get("engineering_delivery_receipt") or {}
         if mesh.get("FULL_RATING_CONVERGED") is not True:
             raise SystemExit(f"REFUSED: R27D mesh not fully converged for {cid}")
-        rows.append({
-            "candidate_id": cid,
-            "candidate_hash": record.candidate_hash,
-            "geometry_projection_hash": record.geometry_projection_hash,
-            "n1_status": n1.status,
-            "n1_duty_w": n1.duty_w,
-            "energy_balance_relative_error_n1": n1.energy_balance_relative_error,
-            "max_cell_thermal_residual_w_n1": n1.max_cell_thermal_residual_w,
-            "max_closure_residual_w_n1": n1.max_inner_wall_outer_closure_residual_w,
-            "FULL_RATING_CONVERGED": mesh.get("FULL_RATING_CONVERGED"),
-            "mesh_ladder": {
-                str(level): metrics for level, metrics in (mesh.get("per_mesh") or {}).items()
-            },
-            "N4_DUTY_W": receipt.get("N4_DUTY_W"),
-            "N4_TUBE_OUTLET_K": receipt.get("N4_TUBE_OUTLET_K"),
-            "N4_SHELL_OUTLET_K": receipt.get("N4_SHELL_OUTLET_K"),
-            "LIVE_TUBE_DP_PA": receipt.get("LIVE_TUBE_DP_PA"),
-            "LIVE_SHELL_DP_PA": receipt.get("LIVE_SHELL_DP_PA"),
-            "experimental_mesh_result_hash": receipt.get("EXPERIMENTAL_MESH_RESULT_HASH"),
-        })
+        rows.append(
+            {
+                "candidate_id": cid,
+                "candidate_hash": record.candidate_hash,
+                "geometry_projection_hash": record.geometry_projection_hash,
+                "n1_status": n1.status,
+                "n1_duty_w": n1.duty_w,
+                "energy_balance_relative_error_n1": n1.energy_balance_relative_error,
+                "max_cell_thermal_residual_w_n1": n1.max_cell_thermal_residual_w,
+                "max_closure_residual_w_n1": n1.max_inner_wall_outer_closure_residual_w,
+                "FULL_RATING_CONVERGED": mesh.get("FULL_RATING_CONVERGED"),
+                "mesh_ladder": {
+                    str(level): metrics for level, metrics in (mesh.get("per_mesh") or {}).items()
+                },
+                "N4_DUTY_W": receipt.get("N4_DUTY_W"),
+                "N4_TUBE_OUTLET_K": receipt.get("N4_TUBE_OUTLET_K"),
+                "N4_SHELL_OUTLET_K": receipt.get("N4_SHELL_OUTLET_K"),
+                "LIVE_TUBE_DP_PA": receipt.get("LIVE_TUBE_DP_PA"),
+                "LIVE_SHELL_DP_PA": receipt.get("LIVE_SHELL_DP_PA"),
+                "experimental_mesh_result_hash": receipt.get("EXPERIMENTAL_MESH_RESULT_HASH"),
+            }
+        )
 
     payload = {
         "schema_version": _SCHEMA,
@@ -132,11 +133,16 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, default=str) + "\n", encoding="utf-8")
-    print(json.dumps({
-        "baseline_source_sha": source_head,
-        "reference_candidate_count": len(rows),
-        "output": str(args.output),
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "baseline_source_sha": source_head,
+                "reference_candidate_count": len(rows),
+                "output": str(args.output),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

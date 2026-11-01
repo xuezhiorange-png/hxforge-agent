@@ -1,0 +1,85 @@
+{
+  "TASK_ID": "V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FINAL_ACCEPTANCE",
+  "generated_at_utc": "2026-11-01T16:08:00.723305+00:00",
+  "r27d_baseline_provenance": {
+    "source_pr_number": 310,
+    "source_commit_sha": "e320aaf5840812eafe86a0e7d6fef97bf8062544",
+    "capture_mode": "ISOLATED_R27D_WORKTREE"
+  },
+  "reference_candidate_count": 7,
+  "regression_status": "FAIL",
+  "regression_pass_candidate_ids": [
+    "3c129a7f",
+    "40d78e67",
+    "580fc128",
+    "8b05db3b",
+    "9aba0e5c"
+  ],
+  "regression_fail_candidate_ids": [
+    "7357afdf",
+    "9c4b84db"
+  ],
+  "regression_fail_explanation": {
+    "9c4b84db": "R27E N1 MESH_TOPOLOGY_INVALID enthalpy_domain_exit (h\u224888026 J/kg); R27D e320aaf full mesh converged",
+    "7357afdf": "R27E N1 MESH_TOPOLOGY_INVALID enthalpy_domain_exit (h\u224889339 J/kg); R27D e320aaf full mesh converged"
+  },
+  "max_deltas_among_passing_candidates": {
+    "MAX_DUTY_DELTA_W": 0.00010694528464227915,
+    "MAX_OUTLET_TEMPERATURE_DELTA_K": 8.009237717487849e-11,
+    "MAX_ENERGY_BALANCE_DELTA": 0.0,
+    "MAX_LOCAL_CLOSURE_DELTA_W": 0.0,
+    "MAX_TUBE_DP_REL_DELTA": 0.0,
+    "MAX_SHELL_DP_REL_DELTA": 0.0
+  },
+  "full_rating_converged_count_r27e": 5,
+  "full_rating_converged_count_r27d_baseline": 7,
+  "four_065m_diagnostics": {
+    "5b75a185": {
+      "original_r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "recovery_root_cause": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "recovery_outcome_class": "MODEL_NOT_APPLICABLE",
+      "inlet_reynolds": 3102.3786,
+      "first_transition_temperature_k": 308.125,
+      "first_transition_reynolds": 2989.5968
+    },
+    "6ec6323f": {
+      "original_r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "recovery_root_cause": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "recovery_outcome_class": "MODEL_NOT_APPLICABLE",
+      "inlet_reynolds": 3102.3786,
+      "first_transition_temperature_k": 308.125,
+      "first_transition_reynolds": 2989.5968
+    },
+    "8988992a": {
+      "original_r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "recovery_root_cause": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "recovery_outcome_class": "MODEL_NOT_APPLICABLE",
+      "inlet_reynolds": 3102.3786,
+      "first_transition_temperature_k": 308.125,
+      "first_transition_reynolds": 2989.5968
+    },
+    "c20fb684": {
+      "original_r27d_blocker": "MESH_TOPOLOGY_INVALID;enthalpy_domain_exit",
+      "recovery_root_cause": "PROPERTY_ENTHALPY_DOMAIN_EXIT",
+      "recovery_outcome_class": "MODEL_NOT_APPLICABLE",
+      "inlet_reynolds": 3102.3786,
+      "first_transition_temperature_k": 308.125,
+      "first_transition_reynolds": 2989.5968
+    }
+  },
+  "engineering_330kw_audit": {
+    "design_q_kw_min": 330,
+    "task174_ready_count": 12,
+    "full_mesh_rating_confirmed_count": 8,
+    "mid_band_confirmed_feasible_count": 0,
+    "low_loss_critical_candidate": "9c4b84db (R27D shell margin ~0.0005 Pa; R27E N1 enthalpy blocked)"
+  },
+  "compare_delta_count": 28,
+  "paths": {
+    "baseline_fixture": "tests/fixtures/r27e_r27d_seven_reference_baseline.json",
+    "current_capture": "/opt/cursor/artifacts/r27e-recovery/R27E_SEVEN_REFERENCE_CURRENT.json",
+    "regression_report": "/opt/cursor/artifacts/r27e-recovery/R27E_SEVEN_REFERENCE_REGRESSION.json",
+    "targeted_recovery": "/opt/cursor/artifacts/r27e-recovery/R27E_TARGETED_RECOVERY.json"
+  },
+  "note_max_deltas": "Computed by pairwise baseline vs current for five converged candidates; mesh-ladder fields identical within compare_reference_metrics tolerances."
+}

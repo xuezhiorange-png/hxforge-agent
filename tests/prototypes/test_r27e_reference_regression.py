@@ -103,7 +103,6 @@ def test_r27e_regression_comparator_refuses_missing_mesh_and_dp() -> None:
     errors = compare_reference_metrics(baseline, current)
     assert any(d.get("error") == "missing_mesh_metrics" for d in errors)
     assert any(
-        d.get("field") == "LIVE_TUBE_DP_PA"
-        and d.get("error") == "missing_numeric_metric"
+        d.get("field") == "LIVE_TUBE_DP_PA" and d.get("error") == "missing_numeric_metric"
         for d in errors
     )

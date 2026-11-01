@@ -128,8 +128,7 @@ def probe_enthalpy_domain_exit(
     provider = CoolPropProvider()
     rating_domain_ok = (
         rating_admitted_h_min_j_kg <= enthalpy_j_kg <= rating_admitted_h_max_j_kg
-        if rating_admitted_h_min_j_kg is not None
-        and rating_admitted_h_max_j_kg is not None
+        if rating_admitted_h_min_j_kg is not None and rating_admitted_h_max_j_kg is not None
         else None
     )
     result: dict[str, Any] = {
@@ -148,15 +147,19 @@ def probe_enthalpy_domain_exit(
             enthalpy_j_kg,
             reference_state=ReferenceStatePolicy.DEF,
         )
-        result.update({
-            "property_domain_ok": True,
-            "temperature_k": state.temperature_k,
-            "phase": str(getattr(state, "phase", None)),
-        })
+        result.update(
+            {
+                "property_domain_ok": True,
+                "temperature_k": state.temperature_k,
+                "phase": str(getattr(state, "phase", None)),
+            }
+        )
     except Exception as exc:
-        result.update({
-            "property_domain_ok": False,
-            "error_type": type(exc).__name__,
-            "error_message": str(exc),
-        })
+        result.update(
+            {
+                "property_domain_ok": False,
+                "error_type": type(exc).__name__,
+                "error_message": str(exc),
+            }
+        )
     return result
