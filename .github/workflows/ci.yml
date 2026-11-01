@@ -132,15 +132,15 @@ jobs:
             sleep $((attempt * 5))
           done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+            ca-certificates curl make gcc-13 g++-13 libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
           SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
           rm -rf "${SRC_PARENT}"
           mkdir -p "${SRC_PARENT}"
           curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
             | tar -xz -C "${SRC_PARENT}"
-          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
           export PATH="/usr/local/bin:${PATH}"
           echo "/usr/local/bin" >> "${GITHUB_PATH}"
           ACTUAL="$(git --version)"
@@ -411,15 +411,15 @@ jobs:
             sleep $((attempt * 5))
           done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+            ca-certificates curl make gcc-13 g++-13 libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
           SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
           rm -rf "${SRC_PARENT}"
           mkdir -p "${SRC_PARENT}"
           curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
             | tar -xz -C "${SRC_PARENT}"
-          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
           export PATH="/usr/local/bin:${PATH}"
           echo "/usr/local/bin" >> "${GITHUB_PATH}"
           ACTUAL="$(git --version)"
@@ -899,15 +899,15 @@ jobs:
             sleep $((attempt * 5))
           done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+            ca-certificates curl make gcc-13 g++-13 libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
           SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
           rm -rf "${SRC_PARENT}"
           mkdir -p "${SRC_PARENT}"
           curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
             | tar -xz -C "${SRC_PARENT}"
-          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
           export PATH="/usr/local/bin:${PATH}"
           echo "/usr/local/bin" >> "${GITHUB_PATH}"
           ACTUAL="$(git --version)"
@@ -1198,15 +1198,15 @@ jobs:
             sleep $((attempt * 5))
           done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+            ca-certificates curl make gcc-13 g++-13 libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
           SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
           rm -rf "${SRC_PARENT}"
           mkdir -p "${SRC_PARENT}"
           curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
             | tar -xz -C "${SRC_PARENT}"
-          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
           export PATH="/usr/local/bin:${PATH}"
           echo "/usr/local/bin" >> "${GITHUB_PATH}"
           ACTUAL="$(git --version)"
@@ -1472,15 +1472,15 @@ jobs:
             sleep $((attempt * 5))
           done
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates curl make gcc libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
+            ca-certificates curl make gcc-13 g++-13 libssl-dev zlib1g-dev libcurl4-openssl-dev gettext
           SRC_PARENT="/tmp/hxforge-merge-authority-git-src"
           SRC_DIR="${SRC_PARENT}/git-${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"
           rm -rf "${SRC_PARENT}"
           mkdir -p "${SRC_PARENT}"
           curl -fsSL "https://github.com/git/git/archive/refs/tags/v${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}.tar.gz" \
             | tar -xz -C "${SRC_PARENT}"
-          make -C "${SRC_DIR}" prefix=/usr/local -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
-          sudo make -C "${SRC_DIR}" prefix=/usr/local NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
+          make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 -j"$(nproc)" NO_TCLTK=YesPlease NO_GETTEXT=YesPlease all
+          sudo make -C "${SRC_DIR}" prefix=/usr/local CC=gcc-13 CXX=g++-13 NO_TCLTK=YesPlease NO_GETTEXT=YesPlease install
           export PATH="/usr/local/bin:${PATH}"
           echo "/usr/local/bin" >> "${GITHUB_PATH}"
           ACTUAL="$(git --version)"

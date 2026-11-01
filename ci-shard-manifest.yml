@@ -482,6 +482,14 @@ shards:
       - tests/prototypes/test_r27b_full_path_constraint_aware_sizing.py
     timeout: 7200
 
+  - name: v07-r27c-nozzle-cooptimization
+    job: shard-v07-r27c-nozzle-cooptimization
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r27c_nozzle_cooptimization_sizing.py
+      - tests/prototypes/test_r27c_p0_nozzle_bisect.py
+    timeout: 7200
+
   - name: v07-r26f-hydraulic-path
     job: shard-v07-r26f-hydraulic-path
     python: ["3.11", "3.12"]
