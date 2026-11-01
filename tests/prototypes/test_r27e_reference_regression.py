@@ -19,8 +19,7 @@ _FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/r27e_r27d_seven_refer
 
 @pytest.mark.slow
 def test_r27e_seven_reference_candidates_match_r27d_baseline() -> None:
-    if not _FIXTURE.is_file():
-        pytest.skip("R27D exact-head baseline missing: P0-2 NOT VERIFIED")
+    assert _FIXTURE.is_file(), "R27D exact-head baseline missing: P0-2 NOT VERIFIED"
     baseline = load_reference_fixture(_FIXTURE)
     current = capture_reference_metrics(shared_r26e_engineering_case())
     deltas = compare_reference_metrics(baseline, current)

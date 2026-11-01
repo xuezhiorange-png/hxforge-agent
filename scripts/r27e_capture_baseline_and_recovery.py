@@ -62,8 +62,8 @@ def main() -> None:
         "regression_delta_count": len(deltas),
         "recovery_candidate_count": len(report["recovery_candidates"]),
     }, indent=2))
-    if regression_status == "FAIL":
-        raise SystemExit("R27E numerical regression against verified R27D baseline failed")
+    if regression_status != "PASS":
+        raise SystemExit("R27E numerical regression is unverified or failed; see regression report")
 
 
 if __name__ == "__main__":
