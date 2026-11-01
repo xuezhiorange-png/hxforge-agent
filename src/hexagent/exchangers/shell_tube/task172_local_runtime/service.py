@@ -743,6 +743,27 @@ def _tube_base_htc(
         tube_inner_diameter,
         ThermalBoundaryCondition.CWT,
     )
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    experimental_mvp = _etb.active_experimental_thermal_boundary() is not None
+    if output.flow_regime is FlowRegime.TRANSITION:
+        raise _RuntimeFailure("THERMAL_CORRELATION_UNAVAILABLE", "tube_correlation.transition")
+    if output.flow_regime is FlowRegime.LAMINAR:
+        if not experimental_mvp:
+            raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
+        if not check_pr_envelope(output.flow_regime, output.prandtl_number):
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PRANDTL_OUT_OF_DOMAIN", "tube_correlation.prandtl"
+            )
+        return (
+            output.tube_side_heat_transfer_coefficient_w_m2_k,
+            output.reynolds_number,
+            output.prandtl_number,
+            output.correlation_id,
+            output.correlation_version,
+        )
     if output.flow_regime is not FlowRegime.TURBULENT:
         raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
     if not _TUBE_C3_RE_MIN < output.reynolds_number < _TUBE_C3_RE_MAX:

@@ -579,6 +579,49 @@ def _initial_q_guess(
     return np.full(n, total_est / n, dtype=float)
 
 
+def _conductance_weighted_q_guess(
+    *,
+    grid: list[_GlobalCellBinding],
+    provider: CoolPropProvider,
+    base_request: CandidateTask172LocalRequest,
+    tube_inlet_t_k: float,
+    shell_inlet_t_k: float,
+    m_tube: float,
+    h_t_in: float,
+    h_s_in: float,
+) -> np.ndarray:
+    n = len(grid)
+    weights = np.zeros(n, dtype=float)
+    conductance_cache: dict[tuple[Any, ...], float] = {}
+    for binding in grid:
+        req = base_request.model_copy(update={"support": binding.support})
+        try:
+            closure = _cell_thermal_closure(
+                req,
+                provider,
+                tube_inlet_t_k,
+                shell_inlet_t_k,
+                conductance_cache=conductance_cache,
+            )
+            weights[binding.global_index] = max(float(closure.q_thermal_w), 1.0)
+        except (ValueError, TypeError):
+            weights[binding.global_index] = 1.0
+    if float(weights.sum()) <= 0.0:
+        return _initial_q_guess(
+            n,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            delta_t_in=abs(tube_inlet_t_k - shell_inlet_t_k),
+            q_seed=None,
+        )
+    delta_h = max(h_t_in - h_s_in, 0.0)
+    total_est = max(m_tube * delta_h * 0.15, float(weights.sum()), 8000.0)
+    if abs(tube_inlet_t_k - shell_inlet_t_k) > 8.0:
+        total_est = max(total_est, 280_000.0)
+    return total_est * weights / weights.sum()
+
+
 def _build_cells_from_q(
     q: np.ndarray,
     *,
@@ -668,14 +711,19 @@ def _solve_global_q_vector(
         if type(base_request) is not CandidateTask172LocalRequest:
             raise TypeError("expected candidate task172 request")
 
-        q0 = _initial_q_guess(
-            n,
-            h_t_in=h_t_in,
-            h_s_in=h_s_in,
-            m_tube=m_tube,
-            delta_t_in=abs(tube_inlet_t_k - shell_inlet_t_k),
-            q_seed=q_initial,
-        )
+        if q_initial is not None and q_initial.size == n:
+            q0 = np.maximum(q_initial.astype(float), 1.0)
+        else:
+            q0 = _conductance_weighted_q_guess(
+                grid=grid,
+                provider=provider,
+                base_request=base_request,
+                tube_inlet_t_k=tube_inlet_t_k,
+                shell_inlet_t_k=shell_inlet_t_k,
+                m_tube=m_tube,
+                h_t_in=h_t_in,
+                h_s_in=h_s_in,
+            )
 
         def residuals(q_raw: np.ndarray) -> np.ndarray:
             if time.perf_counter() - solver_t0 > _MAX_Q_SOLVER_WALL_S:
