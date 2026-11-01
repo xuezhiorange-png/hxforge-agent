@@ -46,6 +46,8 @@ def _classify_outcome(*, full_converged: bool, n1_status: str, diagnostics: list
     diag_text = " ".join(diagnostics)
     if "THERMAL_CORRELATION_UNAVAILABLE" in diag_text:
         return "MODEL_NOT_APPLICABLE"
+    if "enthalpy_domain_exit" in diag_text:
+        return "MODEL_NOT_APPLICABLE"
     if n1_status != ENGINEERING_NUMERIC_VALID:
         return "NUMERICAL_NONCONVERGENCE"
     return "NUMERICAL_NONCONVERGENCE"
