@@ -115,9 +115,7 @@ def _rank_candidates(
     *,
     scenario_key: LossScenarioKey = "mid_band",
 ) -> list[dict[str, Any]]:
-    feasible = [
-        row for row in sizing_rows if _scenario_recommendation_eligible(row, scenario_key)
-    ]
+    feasible = [row for row in sizing_rows if _scenario_recommendation_eligible(row, scenario_key)]
 
     def key(row: dict[str, Any]) -> tuple[float, float]:
         sc = row["loss_scenario_results"][scenario_key]

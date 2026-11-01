@@ -79,9 +79,7 @@ def test_bisect_selects_min_diameter_when_both_band_edges_feasible(
     assert result["selected_inside_diameter_m"] == pytest.approx(d_min, rel=0, abs=1e-9)
 
 
-def test_bisect_fails_when_max_diameter_still_exceeds_budget(
-    r26e_case, r26e_selection
-) -> None:
+def test_bisect_fails_when_max_diameter_still_exceeds_budget(r26e_case, r26e_selection) -> None:
     baseline = find_candidate_b_record(r26e_selection)
     assert baseline is not None
     postpass = _minimal_tube_postpass()
@@ -115,7 +113,9 @@ def test_candidate_b_mid_band_nozzle_pair_at_vmax_exceeds_tube_limit(
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS["mid_band"]
     rho = Decimal(str(_side_inlet_density_kg_m3(r26e_case, "tube_side")))
     m = Decimal(str(r26e_case.tube_side.mass_flow_kg_s))
-    d_min, _d_max = _search_nozzle_d_in_velocity_band(case=r26e_case, side="tube_side", velocity_rule=None)
+    d_min, _d_max = _search_nozzle_d_in_velocity_band(
+        case=r26e_case, side="tube_side", velocity_rule=None
+    )
     area = nozzle_flow_area_m2(Decimal(str(d_min)))
     nozzle_pair = _component_dp_pa(
         rho=rho,
@@ -127,14 +127,14 @@ def test_candidate_b_mid_band_nozzle_pair_at_vmax_exceeds_tube_limit(
     assert float(nozzle_pair) > 1150.0
 
 
-def test_candidate_b_tube_side_not_feasible_at_vmax_band_edge(
-    r26e_case, r26e_selection
-) -> None:
+def test_candidate_b_tube_side_not_feasible_at_vmax_band_edge(r26e_case, r26e_selection) -> None:
     baseline = find_candidate_b_record(r26e_selection)
     assert baseline is not None
     postpass = _minimal_tube_postpass()
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS["mid_band"]
-    d_min, _ = _search_nozzle_d_in_velocity_band(case=r26e_case, side="tube_side", velocity_rule=None)
+    d_min, _ = _search_nozzle_d_in_velocity_band(
+        case=r26e_case, side="tube_side", velocity_rule=None
+    )
     total, _ = _tube_path_dp_pa_for_nozzle_d(
         case=r26e_case,
         record=baseline,
