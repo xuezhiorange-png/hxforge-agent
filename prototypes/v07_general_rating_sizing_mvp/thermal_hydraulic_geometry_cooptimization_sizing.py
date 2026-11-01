@@ -169,6 +169,92 @@ def _pick_recommended(pareto: list[dict[str, Any]]) -> str | None:
     return str(best["candidate_id"])
 
 
+def classify_r27d_search_phases(
+    *,
+    candidate_space_count: int,
+    task174_ready_count: int,
+    distinct_task174_ready_geometry_count: int,
+    selected_for_full_mesh_rating_count: int,
+    full_mesh_rating_completed_count: int,
+    full_path_feasible_mid_band_among_fully_rated: int,
+    solver_budget_prevented_selecting_all_ready: bool,
+) -> dict[str, str]:
+    """Deterministic search-phase labels (unit-testable, no solver rerun)."""
+    phases: dict[str, str] = {}
+    phases["enumeration"] = (
+        "ENUMERATION_COMPLETE" if candidate_space_count > 0 else "ENUMERATION_NOT_RUN"
+    )
+    if solver_budget_prevented_selecting_all_ready:
+        phases["ready_geometry_selection"] = "PARTIAL_READY_GEOMETRY_SELECTION"
+    elif selected_for_full_mesh_rating_count >= distinct_task174_ready_geometry_count:
+        phases["ready_geometry_selection"] = "ALL_READY_GEOMETRIES_SELECTED"
+    else:
+        phases["ready_geometry_selection"] = "PARTIAL_READY_GEOMETRY_SELECTION"
+    if selected_for_full_mesh_rating_count == 0:
+        phases["full_mesh_rating"] = "FULL_MESH_RATING_NOT_STARTED"
+    elif full_mesh_rating_completed_count >= selected_for_full_mesh_rating_count:
+        phases["full_mesh_rating"] = "FULL_MESH_RATING_COMPLETE"
+    else:
+        phases["full_mesh_rating"] = "FULL_MESH_RATING_INCOMPLETE"
+    if full_mesh_rating_completed_count == 0:
+        phases["feasibility_among_fully_rated"] = "NO_FULL_MESH_RATING_TO_EVALUATE"
+    elif full_path_feasible_mid_band_among_fully_rated > 0:
+        phases["feasibility_among_fully_rated"] = "CONFIRMED_FEASIBLE_PRESENT_MID_BAND"
+    else:
+        phases["feasibility_among_fully_rated"] = (
+            "NO_CONFIRMED_FEASIBLE_AMONG_EVALUATED_CANDIDATES"
+        )
+    return phases
+
+
+def _mesh_rating_evidence_from_multi_row(row: dict[str, Any]) -> dict[str, Any]:
+    screening = row.get("screening_n1_status") or ""
+    n1_status = row.get("n1_thermal_numeric_status")
+    participation = row.get("rating_participation_status")
+    full_converged = row.get("FULL_RATING_CONVERGED") is True
+    entered_mesh_ladder = full_converged or (
+        participation == "FULLY_RATED"
+        or (
+            participation in {"FULLY_RATED", "SCREENED_N1_ONLY"}
+            and screening not in ("NOT_SELECTED_FOR_RATING",)
+            and n1_status == "ENGINEERING_NUMERIC_VALID"
+        )
+    )
+    if full_converged:
+        outcome = "FULL_MESH_RATING_CONVERGED"
+        classification = "FULL_MESH_COMPLETE"
+    elif n1_status != "ENGINEERING_NUMERIC_VALID":
+        outcome = "N1_THERMAL_SCREEN_BLOCKED"
+        classification = "NUMERIC_OR_INPUT_BLOCK_AT_N1"
+    elif participation == "SCREENED_N1_ONLY":
+        outcome = "MESH_LADDER_RAN_WITHOUT_FULL_RATING_CONVERGENCE"
+        classification = "MESH_LADDER_DID_NOT_CONVERGE"
+    else:
+        outcome = "NOT_SELECTED_OR_NOT_EVALUATED"
+        classification = "NOT_FORMALLY_RATED_THIS_RUN"
+    return {
+        "rating_participation_status": participation,
+        "task174_status": row.get("task174_status"),
+        "screening_n1_status": screening,
+        "n1_thermal_numeric_status": n1_status,
+        "n1_failure_code": (
+            screening.replace("BLOCKED_N1_", "")
+            if screening.startswith("BLOCKED_N1_")
+            else None
+        ),
+        "n1_duty_w": row.get("n1_duty_w"),
+        "entered_n2_n4_mesh_ladder": entered_mesh_ladder
+        and n1_status == "ENGINEERING_NUMERIC_VALID",
+        "full_rating_converged": full_converged,
+        "mesh_rating_outcome": outcome,
+        "mesh_rating_classification": classification,
+        "disclosure": (
+            "N1 thermal screen failure does not classify the candidate as thermally or "
+            "full-path infeasible—only that full mesh rating was not completed."
+        ),
+    }
+
+
 def _search_coverage_block(
     selection: CandidateSelectionOutcome,
     multi: dict[str, Any],
@@ -194,35 +280,63 @@ def _search_coverage_block(
         for row in sizing_rows
         if (row.get("loss_scenario_results") or {}).get("mid_band", {}).get("full_path_feasible")
     )
-    not_rated = sum(
-        1 for row in sizing_rows if row.get("rating_participation_status") != "FULLY_RATED"
+    full_path_among_fully_rated = sum(
+        1
+        for row in sizing_rows
+        if row.get("rating_participation_status") == "FULLY_RATED"
+        and (row.get("loss_scenario_results") or {}).get("mid_band", {}).get("full_path_feasible")
     )
-    incomplete = selected < distinct_ready
-    status = "SEARCH_INCOMPLETE" if incomplete else "SEARCH_COMPLETE"
+    selected_incomplete = selected - fully_rated
+    task174_not_ready = selection.candidate_space_count - selection.task174_ready_count
+    solver_budget_incomplete = selected < distinct_ready
+    phases = classify_r27d_search_phases(
+        candidate_space_count=selection.candidate_space_count,
+        task174_ready_count=selection.task174_ready_count,
+        distinct_task174_ready_geometry_count=distinct_ready,
+        selected_for_full_mesh_rating_count=selected,
+        full_mesh_rating_completed_count=fully_rated,
+        full_path_feasible_mid_band_among_fully_rated=full_path_among_fully_rated,
+        solver_budget_prevented_selecting_all_ready=solver_budget_incomplete,
+    )
+    if solver_budget_incomplete:
+        headline_status = "SEARCH_INCOMPLETE"
+        headline_reason = (
+            f"Solver budget selected {selected} of {distinct_ready} Task174-ready distinct geometries."
+        )
+    elif fully_rated < selected:
+        headline_status = "FULL_MESH_RATING_INCOMPLETE"
+        headline_reason = (
+            f"{selected_incomplete} of {selected} selected candidates did not reach "
+            "FULL_RATING_CONVERGED on the N1/N2/N4 mesh ladder."
+        )
+    else:
+        headline_status = "FULL_MESH_RATING_COMPLETE"
+        headline_reason = None
     return {
         "enumerated_candidate_space_count": selection.candidate_space_count,
         "structurally_admitted_count": selection.structurally_admitted_count,
         "task174_ready_count": selection.task174_ready_count,
+        "task174_not_ready_combination_count": task174_not_ready,
         "distinct_task174_ready_geometry_count": distinct_ready,
         "selected_for_full_mesh_rating_count": selected,
+        "selected_but_full_mesh_incomplete_count": selected_incomplete,
         "full_mesh_rating_completed_count": fully_rated,
         "duty_satisfied_count": duty_ok,
         "internal_hydraulic_satisfied_count": internal_ok,
         "full_path_feasible_mid_band_count": full_path_ok,
-        "not_fully_rated_this_run_count": not_rated,
-        "search_status": status,
-        "search_incomplete_reason": (
-            f"Solver budget selected {selected} of {distinct_ready} Task174-ready distinct geometries."
-            if incomplete
-            else None
-        ),
+        "full_path_feasible_mid_band_among_fully_rated_count": full_path_among_fully_rated,
+        "search_status": headline_status,
+        "search_incomplete_reason": headline_reason,
+        "search_phases": phases,
         "multi_candidate_summary": {
             "SCREENED_CANDIDATE_COUNT": multi.get("SCREENED_CANDIDATE_COUNT"),
             "FULLY_RATED_CANDIDATE_COUNT": multi.get("FULLY_RATED_CANDIDATE_COUNT"),
         },
         "disclosure": (
-            "SEARCH_INCOMPLETE means not every Task174-ready geometry received full mesh rating; "
-            "do not claim global infeasibility over the full discrete space."
+            "ALL_READY_GEOMETRIES_SELECTED means every Task174-ready distinct geometry was "
+            "queued for mesh rating—not that every queued geometry completed full mesh rating. "
+            "Task174-not-ready combinations are counted separately from selected-but-incomplete mesh runs. "
+            "N1 screen failure is a rating-completion blocker, not a formal thermal or full-path verdict."
         ),
     }
 
@@ -281,6 +395,7 @@ def run_thermal_hydraulic_geometry_cooptimization(
                 "candidate_id": row["candidate_id"],
                 "candidate_hash": row.get("candidate_hash"),
                 "rating_participation_status": row.get("rating_participation_status"),
+                "mesh_rating_evidence": _mesh_rating_evidence_from_multi_row(row),
                 "phase_a_screening": phase_a,
                 "geometry": geometry,
                 "thermal_rating": thermal,
@@ -347,6 +462,11 @@ def run_thermal_hydraulic_geometry_cooptimization(
             "recommended_candidate_id": recommended_id,
             "recommendation_basis": "MID_BAND_FULL_PATH_FEASIBLE_PARETO_THEN_MAX_HYDRAULIC_MARGIN",
             "pareto_mid_band_full_path_feasible": pareto,
+            "low_loss_sensitivity_note": (
+                "Candidate 9c4b84db-a0f6-58bb-b81c-3edffed9035a may appear under "
+                "per_scenario_feasible_candidate_ids for low_loss_sensitivity only; "
+                "shell full-path margin ~0.0005 Pa is numerical edge tolerance—not robust engineering margin."
+            ),
             "per_scenario_feasible_candidate_ids": {
                 key: [row["candidate_id"] for row in sizing_rows if _r27d_formal_feasible(row, key)]
                 for key in LOSS_SCENARIO_KEYS
@@ -362,6 +482,8 @@ def run_thermal_hydraulic_geometry_cooptimization(
             "Joint optimization reuses experimental Task168–174 enumeration and mesh rating authority.",
             "Nozzle co-optimization is assumption-based K scenarios within 1–3 m/s only.",
             "Mechanical clearance and tubesheet layout are not verified.",
+            "Full mesh rating incomplete among selected candidates does not prove design-space infeasibility.",
+            "low_loss_sensitivity-only feasibility with ~0.0005 Pa shell margin is numerically critical, not robust.",
         ],
     }
 
@@ -369,6 +491,7 @@ def run_thermal_hydraulic_geometry_cooptimization(
 def render_r27d_markdown(report: dict[str, Any]) -> str:
     title = "HXForge 330 kW 换热器自动联合选型结果"
     cov = report["search_coverage"]
+    phases = cov.get("search_phases") or {}
     lines = [
         f"# {title}",
         "",
@@ -376,9 +499,13 @@ def render_r27d_markdown(report: dict[str, Any]) -> str:
         "",
         f"- 结论: **{report['found_feasible_design']}**",
         f"- 推荐候选: `{report['recommendation']['recommended_candidate_id']}`",
-        f"- 搜索状态: **{cov['search_status']}** "
-        f"({cov['selected_for_full_mesh_rating_count']}/"
-        f"{cov['distinct_task174_ready_geometry_count']} Task174-ready 几何已全网格 Rating)",
+        f"- 搜索 headline: **{cov['search_status']}**",
+        f"- 阶段: 枚举 `{phases.get('enumeration')}` | Ready 选中 `{phases.get('ready_geometry_selection')}` | "
+        f"全网格 `{phases.get('full_mesh_rating')}` | 已评估可行 `{phases.get('feasibility_among_fully_rated')}`",
+        f"- 选中/完成全网格: {cov['selected_for_full_mesh_rating_count']}/"
+        f"{cov['full_mesh_rating_completed_count']} "
+        f"（未完成 {cov.get('selected_but_full_mesh_incomplete_count', 0)}）",
+        f"- Task174 未 Ready 组合（与选中队列分开）: {cov.get('task174_not_ready_combination_count', '—')}",
         "",
         "## 搜索覆盖",
         "",

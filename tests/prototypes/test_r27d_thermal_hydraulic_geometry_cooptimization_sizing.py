@@ -14,6 +14,7 @@ from prototypes.v07_general_rating_sizing_mvp.candidate_selection import (
 from prototypes.v07_general_rating_sizing_mvp.thermal_hydraulic_geometry_cooptimization_sizing import (
     _SCHEMA,
     _TASK_ID,
+    classify_r27d_search_phases,
     run_thermal_hydraulic_geometry_cooptimization,
     write_r27d_reports,
 )
@@ -53,6 +54,26 @@ def test_r27d_search_incomplete_when_budget_capped() -> None:
     assert cov["search_status"] == "SEARCH_INCOMPLETE"
     assert cov["selected_for_full_mesh_rating_count"] == 4
     assert cov["distinct_task174_ready_geometry_count"] == 12
+    assert cov["search_phases"]["ready_geometry_selection"] == "PARTIAL_READY_GEOMETRY_SELECTION"
+
+
+def test_r27d_search_phase_labels_full_mesh_incomplete_twelve_seven() -> None:
+    phases = classify_r27d_search_phases(
+        candidate_space_count=48,
+        task174_ready_count=12,
+        distinct_task174_ready_geometry_count=12,
+        selected_for_full_mesh_rating_count=12,
+        full_mesh_rating_completed_count=7,
+        full_path_feasible_mid_band_among_fully_rated=0,
+        solver_budget_prevented_selecting_all_ready=False,
+    )
+    assert phases["enumeration"] == "ENUMERATION_COMPLETE"
+    assert phases["ready_geometry_selection"] == "ALL_READY_GEOMETRIES_SELECTED"
+    assert phases["full_mesh_rating"] == "FULL_MESH_RATING_INCOMPLETE"
+    assert (
+        phases["feasibility_among_fully_rated"]
+        == "NO_CONFIRMED_FEASIBLE_AMONG_EVALUATED_CANDIDATES"
+    )
 
 
 @pytest.mark.slow
@@ -65,9 +86,14 @@ def test_r27d_330kw_joint_search_reports_coverage_and_references(
         rate_all_distinct_task174_ready=True,
     )
     cov = report["search_coverage"]
-    assert cov["search_status"] == "SEARCH_COMPLETE"
+    assert cov["search_phases"]["ready_geometry_selection"] == "ALL_READY_GEOMETRIES_SELECTED"
+    assert cov["search_phases"]["full_mesh_rating"] in {
+        "FULL_MESH_RATING_INCOMPLETE",
+        "FULL_MESH_RATING_COMPLETE",
+    }
     assert cov["enumerated_candidate_space_count"] == 48
     assert cov["task174_ready_count"] == 12
+    assert cov["task174_not_ready_combination_count"] == 36
     assert cov["selected_for_full_mesh_rating_count"] == 12
     refs = report["recommendation"]["reference_candidate_ids"]
     assert "candidate_b_baseline_id" in refs
