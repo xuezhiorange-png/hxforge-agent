@@ -616,27 +616,27 @@
       "mesh_rating_evidence": {
         "rating_participation_status": "FULLY_RATED",
         "task174_status": null,
-        "screening_n1_status": "",
-        "n1_thermal_numeric_status": null,
+        "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
         "n1_failure_code": null,
         "n1_duty_w": null,
         "entered_n2_n4_mesh_ladder": false,
-        "full_rating_converged": false,
-        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
-        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "full_rating_converged": true,
+        "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
+        "mesh_rating_classification": "FULL_MESH_COMPLETE",
         "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
       },
       "constraints": {
         "target_duty_w": "330000",
         "duty_w_at_finest_mesh": 430627.22830998746,
-        "duty_constraint": "NOT_FORMALLY_EVALUATED",
-        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint": "SATISFIED",
+        "duty_constraint_basis": "FULL_MESH_RATING",
         "tube_dp_constraint": "SATISFIED",
         "shell_dp_constraint": "SATISFIED",
         "tube_dp_margin_pa": null,
         "shell_dp_margin_pa": null,
         "hydraulic_constraint_status": "SATISFIED",
-        "nominal_experimental_sizing_feasible": null
+        "nominal_experimental_sizing_feasible": true
       },
       "loss_scenario_results": {
         "mid_band": {
@@ -1106,9 +1106,20 @@
         "sensitivity": {
           "mid_band_min_full_path_margin_pa": "-29.214358520776180312928569",
           "tube_side_margin_pa": "447.298",
-          "shell_side_margin_pa": "-29.214358520776180312928569"
+          "shell_side_margin_pa": "-29.214358520776180312928569",
+          "engineering_margin_ge_5pct_sensitivity": false,
+          "engineering_margin_ge_10pct_sensitivity": false,
+          "max_nozzle_velocity_audit": {
+            "velocity_m_s": 1.0,
+            "disclosure": "Side totals at band max diameter (v\u22481 m/s) from nozzle cooptimization path model; compare to authorized full_path_hydraulic_verification at optimized nozzles separately.",
+            "tube_full_path_modeled_dp_pa": 702.702,
+            "shell_full_path_modeled_dp_pa": 1209.2143585207762,
+            "tube_margin_pa": 447.298,
+            "shell_margin_pa": -29.21435852077616
+          }
         },
-        "pressure_gap_pa": "-29.214358520776180312928569"
+        "pressure_gap_pa": "-29.214358520776180312928569",
+        "full_path_feasible_flag": false
       }
     },
     {
@@ -1365,27 +1376,27 @@
       "mesh_rating_evidence": {
         "rating_participation_status": "FULLY_RATED",
         "task174_status": null,
-        "screening_n1_status": "",
-        "n1_thermal_numeric_status": null,
+        "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
         "n1_failure_code": null,
         "n1_duty_w": null,
         "entered_n2_n4_mesh_ladder": false,
-        "full_rating_converged": false,
-        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
-        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "full_rating_converged": true,
+        "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
+        "mesh_rating_classification": "FULL_MESH_COMPLETE",
         "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
       },
       "constraints": {
         "target_duty_w": "330000",
         "duty_w_at_finest_mesh": 437581.72322331334,
-        "duty_constraint": "NOT_FORMALLY_EVALUATED",
-        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint": "SATISFIED",
+        "duty_constraint_basis": "FULL_MESH_RATING",
         "tube_dp_constraint": "SATISFIED",
         "shell_dp_constraint": "SATISFIED",
         "tube_dp_margin_pa": null,
         "shell_dp_margin_pa": null,
         "hydraulic_constraint_status": "SATISFIED",
-        "nominal_experimental_sizing_feasible": null
+        "nominal_experimental_sizing_feasible": true
       },
       "loss_scenario_results": {
         "mid_band": {
@@ -1855,9 +1866,20 @@
         "sensitivity": {
           "mid_band_min_full_path_margin_pa": "-4.024788364334869193811084",
           "tube_side_margin_pa": "438.415",
-          "shell_side_margin_pa": "-4.024788364334869193811084"
+          "shell_side_margin_pa": "-4.024788364334869193811084",
+          "engineering_margin_ge_5pct_sensitivity": false,
+          "engineering_margin_ge_10pct_sensitivity": false,
+          "max_nozzle_velocity_audit": {
+            "velocity_m_s": 1.0,
+            "disclosure": "Side totals at band max diameter (v\u22481 m/s) from nozzle cooptimization path model; compare to authorized full_path_hydraulic_verification at optimized nozzles separately.",
+            "tube_full_path_modeled_dp_pa": 711.585,
+            "shell_full_path_modeled_dp_pa": 1184.0247883643349,
+            "tube_margin_pa": 438.41499999999996,
+            "shell_margin_pa": -4.024788364334881
+          }
         },
-        "pressure_gap_pa": "-4.024788364334869193811084"
+        "pressure_gap_pa": "-4.024788364334869193811084",
+        "full_path_feasible_flag": false
       }
     },
     {
@@ -2114,27 +2136,27 @@
       "mesh_rating_evidence": {
         "rating_participation_status": "FULLY_RATED",
         "task174_status": null,
-        "screening_n1_status": "",
-        "n1_thermal_numeric_status": null,
+        "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
         "n1_failure_code": null,
         "n1_duty_w": null,
         "entered_n2_n4_mesh_ladder": false,
-        "full_rating_converged": false,
-        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
-        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "full_rating_converged": true,
+        "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
+        "mesh_rating_classification": "FULL_MESH_COMPLETE",
         "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
       },
       "constraints": {
         "target_duty_w": "330000",
         "duty_w_at_finest_mesh": 442612.2206074065,
-        "duty_constraint": "NOT_FORMALLY_EVALUATED",
-        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint": "SATISFIED",
+        "duty_constraint_basis": "FULL_MESH_RATING",
         "tube_dp_constraint": "SATISFIED",
         "shell_dp_constraint": "SATISFIED",
         "tube_dp_margin_pa": null,
         "shell_dp_margin_pa": null,
         "hydraulic_constraint_status": "SATISFIED",
-        "nominal_experimental_sizing_feasible": null
+        "nominal_experimental_sizing_feasible": true
       },
       "loss_scenario_results": {
         "mid_band": {
@@ -2813,14 +2835,33 @@
         "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
       },
       "r27h_classification": {
-        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "outcome_class": "MID_BAND_AUTHORIZED_NUMERIC_EDGE",
         "geometry_role": "NEW_EXPERIMENTAL",
         "sensitivity": {
           "mid_band_min_full_path_margin_pa": "0.000",
           "tube_side_margin_pa": "0.000",
-          "shell_side_margin_pa": "0.000716796471019989001128"
+          "shell_side_margin_pa": "0.000716796471019989001128",
+          "engineering_margin_ge_5pct_sensitivity": false,
+          "engineering_margin_ge_10pct_sensitivity": false,
+          "max_nozzle_velocity_audit": {
+            "velocity_m_s": 1.0,
+            "disclosure": "Side totals at band max diameter (v\u22481 m/s) from nozzle cooptimization path model; compare to authorized full_path_hydraulic_verification at optimized nozzles separately.",
+            "tube_full_path_modeled_dp_pa": 718.25,
+            "shell_full_path_modeled_dp_pa": 1166.327283203529,
+            "tube_margin_pa": 431.75,
+            "shell_margin_pa": 13.672716796470922
+          }
         },
-        "pressure_gap_pa": "0.000"
+        "authorized_full_path": {
+          "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+          "full_path_feasible": true
+        },
+        "disclosure_layers": {
+          "thermal_and_hydraulic_numeric": true,
+          "assumption_k_full_path": true,
+          "engineering_robust_margin": false,
+          "manufacturing_design_approval": false
+        }
       }
     },
     {
@@ -2943,7 +2984,7 @@
   "engineering_answers": {
     "new_structurally_legal_distinct_geometries": 3,
     "completed_n1_n2_n4_count": 3,
-    "mid_band_full_path_feasible_count": 0,
+    "mid_band_full_path_feasible_count": 1,
     "best_candidate_id_prefix": "5e78f6a8",
     "best_geometry": {
       "shell_inside_diameter_m": "0.56",
@@ -2956,7 +2997,7 @@
     "best_mid_band_shell_margin_pa": "0.000716796471019989001128",
     "best_mid_band_min_margin_pa": "0.000",
     "joint_extension_delivers_mid_band_positive_margin": false,
-    "primary_blocker_if_infeasible": "FULL_PATH_NOT_FEASIBLE"
+    "primary_blocker_if_infeasible": null
   },
   "baffle_count_sensitivity_note": {
     "evaluated": false,

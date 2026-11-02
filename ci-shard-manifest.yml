@@ -507,6 +507,12 @@ shards:
       - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
       - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
     timeout: 7200
+  - name: v07-version-delivery-acceptance
+    job: shard-v07-version-delivery-acceptance
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v07_version_delivery_classification.py
+    timeout: 7200
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension
     python: ["3.11", "3.12"]
