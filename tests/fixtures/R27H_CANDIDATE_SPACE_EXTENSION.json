@@ -1,0 +1,2965 @@
+{
+  "schema_version": "hxforge.r27h-candidate-space-extension.v27h",
+  "TASK_ID": "V07_R27H_CANDIDATE_SPACE_EXTENSION_AND_SHELL_PRESSURE_OPTIMIZATION",
+  "generated_at_utc": "2026-11-02T07:17:06.252094+00:00",
+  "upstream_head": "3a0f1f97686103a2dbb0e408b2392d17058b07b2",
+  "experimental_case_id": "r27h-extended-shell-baffle-candidate-space",
+  "geometry_table": [
+    {
+      "shell_inside_diameter_m": "0.56",
+      "tube_length_m": "4.85",
+      "baffle_spacing_m": "0.97",
+      "role": "CONTROL"
+    },
+    {
+      "shell_inside_diameter_m": "0.56",
+      "tube_length_m": "5.15",
+      "baffle_spacing_m": "1.03",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.56",
+      "tube_length_m": "5.35",
+      "baffle_spacing_m": "1.07",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.56",
+      "tube_length_m": "5.50",
+      "baffle_spacing_m": "1.10",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.58",
+      "tube_length_m": "4.85",
+      "baffle_spacing_m": "0.97",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.58",
+      "tube_length_m": "5.15",
+      "baffle_spacing_m": "1.03",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.58",
+      "tube_length_m": "5.35",
+      "baffle_spacing_m": "1.07",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.60",
+      "tube_length_m": "4.85",
+      "baffle_spacing_m": "0.97",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.60",
+      "tube_length_m": "5.15",
+      "baffle_spacing_m": "1.03",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    {
+      "shell_inside_diameter_m": "0.60",
+      "tube_length_m": "5.35",
+      "baffle_spacing_m": "1.07",
+      "role": "NEW_EXPERIMENTAL"
+    }
+  ],
+  "r27g_065_classification_corrections": [
+    {
+      "corrected_outcome_class": "THERMAL_MODEL_BLOCKED",
+      "mechanism": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "frozen_r27g_label": "STRUCTURAL_BLOCKED",
+      "r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "disclosure": "Task174-ready; mesh rating blocked by tube-side regime gap\u2014not illegal Task168 geometry.",
+      "candidate_id_prefix": "6ec6323f"
+    },
+    {
+      "corrected_outcome_class": "THERMAL_MODEL_BLOCKED",
+      "mechanism": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "frozen_r27g_label": "STRUCTURAL_BLOCKED",
+      "r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "disclosure": "Task174-ready; mesh rating blocked by tube-side regime gap\u2014not illegal Task168 geometry.",
+      "candidate_id_prefix": "5b75a185"
+    },
+    {
+      "corrected_outcome_class": "THERMAL_MODEL_BLOCKED",
+      "mechanism": "THERMAL_CORRELATION_TRANSITION_GAP",
+      "frozen_r27g_label": "STRUCTURAL_BLOCKED",
+      "r27d_blocker": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+      "disclosure": "Task174-ready; mesh rating blocked by tube-side regime gap\u2014not illegal Task168 geometry.",
+      "candidate_id_prefix": "8988992a"
+    },
+    {
+      "corrected_outcome_class": "THERMAL_MODEL_BLOCKED",
+      "mechanism": "PROPERTY_ENTHALPY_DOMAIN_EXIT",
+      "frozen_r27g_label": "STRUCTURAL_BLOCKED",
+      "r27d_blocker": "MESH_TOPOLOGY_INVALID;enthalpy_domain_exit",
+      "candidate_id_prefix": "c20fb684"
+    }
+  ],
+  "stopped_after_phase_a": false,
+  "candidates": [
+    {
+      "candidate_id": "923f2ee6-4059-50cb-a288-66922a138f33",
+      "candidate_id_prefix": "923f2ee6",
+      "table_row": {
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "4.85",
+        "baffle_spacing_m": "0.97",
+        "role": "CONTROL"
+      },
+      "phase_a": {
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "geometry_role": "CONTROL",
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "4.85",
+        "baffle_spacing_m": "0.97",
+        "baffle_count": 4,
+        "physical_tube_count": 337,
+        "task025_total_parallel_flow_area_m2": "0.0656569794",
+        "tube_regime_inlet_scan": {
+          "candidate_id": "923f2ee6-4059-50cb-a288-66922a138f33",
+          "physical_tube_count": 337,
+          "inlet_bulk_task026": {
+            "tube_bulk_temperature_k": 310.0,
+            "reynolds": 4151.8479,
+            "prandtl": 4.6416,
+            "flow_regime": "TURBULENT",
+            "bulk_velocity_m_s": 0.18398539485199775
+          },
+          "first_laminar_sweep_point": null,
+          "first_transition_sweep_point": {
+            "tube_bulk_temperature_k": 293.3333333333333,
+            "tube_pressure_pa": 101325.0,
+            "density_kg_m3": 998.1691270482801,
+            "dynamic_viscosity_pa_s": 0.0009971143664999184,
+            "tube_mass_flow_kg_s": 12.0,
+            "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+            "parallel_flow_area_m2": 0.0656569794,
+            "tube_hydraulic_diameter_m": 0.015750000005646643,
+            "bulk_velocity_m_s": 0.183103317944475,
+            "reynolds": 2886.9279,
+            "prandtl": 6.9724,
+            "flow_regime": "TRANSITION",
+            "correlation_id": "",
+            "first_occurrence": true
+          },
+          "temperature_sweep": [
+            {
+              "tube_bulk_temperature_k": 310.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 993.3836279738581,
+              "dynamic_viscosity_pa_s": 0.0006933291594795042,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18398539485199775,
+              "reynolds": 4151.8479,
+              "prandtl": 4.6416,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 307.9166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.1133232233861,
+              "dynamic_viscosity_pa_s": 0.000722489755652439,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183850346597971,
+              "reynolds": 3984.2741,
+              "prandtl": 4.8594,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 305.8333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.8080598558506,
+              "dynamic_viscosity_pa_s": 0.0007536937354838812,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18372195241237163,
+              "reynolds": 3819.3196,
+              "prandtl": 5.0939,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 303.75,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 995.4666579680147,
+              "dynamic_viscosity_pa_s": 0.0007871414365566032,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18360040245381362,
+              "reynolds": 3657.0267,
+              "prandtl": 5.347,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 301.6666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.0878442375779,
+              "dynamic_viscosity_pa_s": 0.0008230590404076208,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18348590447077892,
+              "reynolds": 3497.4371,
+              "prandtl": 5.6207,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 299.5833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.6702418410093,
+              "dynamic_viscosity_pa_s": 0.0008617027430256965,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18337868570719884,
+              "reynolds": 3340.5919,
+              "prandtl": 5.9172,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 297.5,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.2123589090957,
+              "dynamic_viscosity_pa_s": 0.0009033637342534737,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18327899509009313,
+              "reynolds": 3186.5318,
+              "prandtl": 6.2392,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 295.4166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.7125752550304,
+              "dynamic_viscosity_pa_s": 0.0009483741696729306,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18318710575093436,
+              "reynolds": 3035.297,
+              "prandtl": 6.5898,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 293.3333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.1691270482801,
+              "dynamic_viscosity_pa_s": 0.0009971143664999184,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183103317944475,
+              "reynolds": 2886.9279,
+              "prandtl": 6.9724,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 291.25,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.5800890351957,
+              "dynamic_viscosity_pa_s": 0.001050021517220064,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18302796244301894,
+              "reynolds": 2741.465,
+              "prandtl": 7.3913,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 289.1666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.9433538082326,
+              "dynamic_viscosity_pa_s": 0.0011076002959619251,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18296140450358944,
+              "reynolds": 2598.9495,
+              "prandtl": 7.8512,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 287.0833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.2566075058636,
+              "dynamic_viscosity_pa_s": 0.0011704358395271872,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.182904048529104,
+              "reynolds": 2459.4234,
+              "prandtl": 8.3577,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 285.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.517301163144,
+              "dynamic_viscosity_pa_s": 0.0012392097267712751,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18285634357663652,
+              "reynolds": 2322.9298,
+              "prandtl": 8.9175,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            }
+          ]
+        },
+        "geometry_authority": "EXPERIMENTAL_TASK168_EXTENSION_NOT_OWNER_APPROVED"
+      },
+      "task174_ready": true,
+      "phase_b_n1": {
+        "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "duty_w": 419782.3989186106,
+        "failure_code": null
+      },
+      "outcome_class": "CONTROL_REFERENCE",
+      "disclosure": "R27H does not re-run full mesh on control; mid_band margin reference \u221270.87 Pa from R27G sealed 9c4b84db evidence.",
+      "r27h_classification": {
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry_role": "CONTROL",
+        "sensitivity": {
+          "mid_band_min_full_path_margin_pa": "-70.871512175899702992638898"
+        }
+      }
+    },
+    {
+      "candidate_id": "7b124afe-f23c-5efe-b649-1f6d510e9550",
+      "candidate_id_prefix": "7b124afe",
+      "table_row": {
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.15",
+        "baffle_spacing_m": "1.03",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.15",
+        "baffle_spacing_m": "1.03",
+        "baffle_count": 4,
+        "physical_tube_count": 337,
+        "task025_total_parallel_flow_area_m2": "0.0656569794",
+        "tube_regime_inlet_scan": {
+          "candidate_id": "7b124afe-f23c-5efe-b649-1f6d510e9550",
+          "physical_tube_count": 337,
+          "inlet_bulk_task026": {
+            "tube_bulk_temperature_k": 310.0,
+            "reynolds": 4151.8479,
+            "prandtl": 4.6416,
+            "flow_regime": "TURBULENT",
+            "bulk_velocity_m_s": 0.18398539485199775
+          },
+          "first_laminar_sweep_point": null,
+          "first_transition_sweep_point": {
+            "tube_bulk_temperature_k": 293.3333333333333,
+            "tube_pressure_pa": 101325.0,
+            "density_kg_m3": 998.1691270482801,
+            "dynamic_viscosity_pa_s": 0.0009971143664999184,
+            "tube_mass_flow_kg_s": 12.0,
+            "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+            "parallel_flow_area_m2": 0.0656569794,
+            "tube_hydraulic_diameter_m": 0.015750000005646643,
+            "bulk_velocity_m_s": 0.183103317944475,
+            "reynolds": 2886.9279,
+            "prandtl": 6.9724,
+            "flow_regime": "TRANSITION",
+            "correlation_id": "",
+            "first_occurrence": true
+          },
+          "temperature_sweep": [
+            {
+              "tube_bulk_temperature_k": 310.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 993.3836279738581,
+              "dynamic_viscosity_pa_s": 0.0006933291594795042,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18398539485199775,
+              "reynolds": 4151.8479,
+              "prandtl": 4.6416,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 307.9166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.1133232233861,
+              "dynamic_viscosity_pa_s": 0.000722489755652439,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183850346597971,
+              "reynolds": 3984.2741,
+              "prandtl": 4.8594,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 305.8333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.8080598558506,
+              "dynamic_viscosity_pa_s": 0.0007536937354838812,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18372195241237163,
+              "reynolds": 3819.3196,
+              "prandtl": 5.0939,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 303.75,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 995.4666579680147,
+              "dynamic_viscosity_pa_s": 0.0007871414365566032,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18360040245381362,
+              "reynolds": 3657.0267,
+              "prandtl": 5.347,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 301.6666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.0878442375779,
+              "dynamic_viscosity_pa_s": 0.0008230590404076208,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18348590447077892,
+              "reynolds": 3497.4371,
+              "prandtl": 5.6207,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 299.5833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.6702418410093,
+              "dynamic_viscosity_pa_s": 0.0008617027430256965,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18337868570719884,
+              "reynolds": 3340.5919,
+              "prandtl": 5.9172,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 297.5,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.2123589090957,
+              "dynamic_viscosity_pa_s": 0.0009033637342534737,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18327899509009313,
+              "reynolds": 3186.5318,
+              "prandtl": 6.2392,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 295.4166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.7125752550304,
+              "dynamic_viscosity_pa_s": 0.0009483741696729306,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18318710575093436,
+              "reynolds": 3035.297,
+              "prandtl": 6.5898,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 293.3333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.1691270482801,
+              "dynamic_viscosity_pa_s": 0.0009971143664999184,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183103317944475,
+              "reynolds": 2886.9279,
+              "prandtl": 6.9724,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 291.25,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.5800890351957,
+              "dynamic_viscosity_pa_s": 0.001050021517220064,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18302796244301894,
+              "reynolds": 2741.465,
+              "prandtl": 7.3913,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 289.1666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.9433538082326,
+              "dynamic_viscosity_pa_s": 0.0011076002959619251,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18296140450358944,
+              "reynolds": 2598.9495,
+              "prandtl": 7.8512,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 287.0833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.2566075058636,
+              "dynamic_viscosity_pa_s": 0.0011704358395271872,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.182904048529104,
+              "reynolds": 2459.4234,
+              "prandtl": 8.3577,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 285.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.517301163144,
+              "dynamic_viscosity_pa_s": 0.0012392097267712751,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18285634357663652,
+              "reynolds": 2322.9298,
+              "prandtl": 8.9175,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            }
+          ]
+        },
+        "geometry_authority": "EXPERIMENTAL_TASK168_EXTENSION_NOT_OWNER_APPROVED"
+      },
+      "task174_ready": true,
+      "phase_b_n1": {
+        "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "duty_w": 430797.9610714319,
+        "failure_code": null
+      },
+      "mesh_rating_evidence": {
+        "rating_participation_status": "FULLY_RATED",
+        "task174_status": null,
+        "screening_n1_status": "",
+        "n1_thermal_numeric_status": null,
+        "n1_failure_code": null,
+        "n1_duty_w": null,
+        "entered_n2_n4_mesh_ladder": false,
+        "full_rating_converged": false,
+        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
+        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
+      },
+      "constraints": {
+        "target_duty_w": "330000",
+        "duty_w_at_finest_mesh": 430627.22830998746,
+        "duty_constraint": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "tube_dp_constraint": "SATISFIED",
+        "shell_dp_constraint": "SATISFIED",
+        "tube_dp_margin_pa": null,
+        "shell_dp_margin_pa": null,
+        "hydraulic_constraint_status": "SATISFIED",
+        "nominal_experimental_sizing_feasible": null
+      },
+      "loss_scenario_results": {
+        "mid_band": {
+          "loss_scenario_key": "mid_band",
+          "scenario_id": "R27B-ASSUMPTION-K-MID-BAND",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Mid-band K values for R27B full-path sizing; not owner-verified design data.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4278.884",
+            "dp_at_max_diameter_min_velocity_pa": "702.702",
+            "dp_fixed_without_nozzle_pair_pa": "255.680",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.10427884281102136,
+            "selected_velocity_m_s": 1.4144316323595079,
+            "modeled_side_total_dp_pa": "1150.000",
+            "remaining_dp_margin_pa": "0.000"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5200.444358520776180312928569",
+            "dp_at_max_diameter_min_velocity_pa": "1209.214358520776180312928569",
+            "dp_fixed_without_nozzle_pair_pa": "710.3103585207761803129285686",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM",
+            "OUTSIDE_DESIGN_VELOCITY_RANGE": "At band minimum velocity (largest allowed nozzle), \u0394p still exceeds limit; a larger nozzle (lower velocity below the configured band) would be required.",
+            "theoretical_at_band_max_diameter_m": 0.1597521415058465,
+            "velocity_at_band_max_diameter_m_s": 0.9999999999999998
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.10427884281102136,
+            "shell_side_inside_diameter_m": null,
+            "tube_side_velocity_m_s": 1.4144316323595079,
+            "shell_side_velocity_m_s": null
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "226.223",
+              "tube_channel_head_dp_pa": "5.918",
+              "tube_bundle_entrance_dp_pa": "8.407",
+              "tube_bundle_exit_dp_pa": "15.132",
+              "tube_nozzle_pair_dp_pa": "894.320",
+              "tube_modeled_full_path_dp_pa": "1150.000"
+            },
+            "shell_side": {}
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": null,
+          "full_path_feasible": false,
+          "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+          "geometry_adaptation": {}
+        },
+        "low_loss_sensitivity": {
+          "loss_scenario_key": "low_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Lower-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "3378.717",
+            "dp_at_max_diameter_min_velocity_pa": "597.243",
+            "dp_fixed_without_nozzle_pair_pa": "249.559",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.09776189876647362,
+            "selected_velocity_m_s": 1.609292956922239,
+            "modeled_side_total_dp_pa": "1149.999",
+            "remaining_dp_margin_pa": "0.001"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4297.022358520776180312928569",
+            "dp_at_max_diameter_min_velocity_pa": "1104.038358520776180312928569",
+            "dp_fixed_without_nozzle_pair_pa": "704.9163585207761803129285686",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.15294349077887648,
+            "selected_velocity_m_s": 1.0910166558680277,
+            "modeled_side_total_dp_pa": "1179.998358520776180312928569",
+            "remaining_dp_margin_pa": "0.001641479223819687071431"
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.09776189876647362,
+            "shell_side_inside_diameter_m": 0.15294349077887648,
+            "tube_side_velocity_m_s": 1.609292956922239,
+            "shell_side_velocity_m_s": 1.0910166558680277
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "226.223",
+              "tube_channel_head_dp_pa": "4.842",
+              "tube_bundle_entrance_dp_pa": "6.725",
+              "tube_bundle_exit_dp_pa": "11.769",
+              "tube_nozzle_pair_dp_pa": "900.440",
+              "tube_modeled_full_path_dp_pa": "1149.999"
+            },
+            "shell_side": {
+              "shell_inlet_transition_dp_pa": "6.743",
+              "shell_outlet_transition_dp_pa": "6.743",
+              "shell_nozzle_pair_dp_pa": "475.082",
+              "shell_external_local_dp_pa": "488.568",
+              "shell_bell_delaware_internal_dp_pa": "691.43035852077618031292856860703833414857821141288"
+            }
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": {
+            "TASK_ID": "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION",
+            "PHYSICAL_CONSISTENCY_GATE": "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE",
+            "status": "COMPUTED",
+            "blockers": [],
+            "binding_validation_errors": [],
+            "physical_consistency": {
+              "PHYSICAL_CONSISTENCY_STATUS": "PASS",
+              "physical_consistency_errors": [],
+              "physical_consistency_warnings": [],
+              "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+              "input_authority_detail": {
+                "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+                "verified_authorized_component_count": 0,
+                "assumption_based_component_count": 9,
+                "disclosure": "All path components use configurable assumption-based loss coefficients and R27A preliminary nozzle geometry; not verified engineering design."
+              }
+            },
+            "upstream_postpass_assessment": {
+              "UPSTREAM_POSTPASS_STATUS": "USABLE",
+              "tube_side_numeric_usable": true,
+              "shell_side_numeric_usable": true,
+              "upstream_blockers": [],
+              "tube_upstream_blockers": [],
+              "shell_upstream_blockers": [],
+              "partial_model_tube_dp_constraint": "SATISFIED",
+              "partial_model_shell_dp_constraint": "SATISFIED",
+              "disclosure": "NOT_SATISFIED on partial dp_constraint does not block full-path \u0394p composition; BLOCKED recompute, correlation, CoolProp outlet domain, or missing upstream data does."
+            },
+            "path_completeness": {
+              "path_completeness_status": "DEMONSTRATION_FULL_PATH_DECLARED",
+              "FULL_PATH_VERIFICATION_STATUS": "NOT_VERIFIED",
+              "missing_tube_component_types": [],
+              "missing_shell_external_component_types": [],
+              "tube_sequence_covers_inlet_to_outlet": true,
+              "shell_external_sequence_covers_inlet_to_outlet": true,
+              "demonstration_input_present": true,
+              "authorized_input_present": false,
+              "double_counting_guard": "Shell-side Bell\u2013Delaware internal bundle pressure drop is taken from live rating post-pass; it must not be duplicated in shell_external_components.",
+              "engineering_limits_not_verified": "Mechanical strength, vibration, tubesheet, fabrication, and code compliance are not verified by hydraulic path completeness.",
+              "disclosure": "AUTHORIZED_INPUT_PRESENT does not upgrade to FULL_PATH_VERIFIED; two nozzle components alone do not imply equipment path completeness."
+            },
+            "tube_friction_separation_authority": "R20_TRANSITIONAL_FRICTION",
+            "TUBE_MODELED_PARTIAL_DP_PA": "812.855",
+            "SHELL_MODELED_PARTIAL_DP_PA": "691.43035852077618031292856860703833414857821141288",
+            "TUBE_INTERNAL_FRICTION_DP_PA": "226.223",
+            "TUBE_LOCAL_DP_PA": "923.776",
+            "TUBE_FULL_PATH_TOTAL_DP_PA": "1149.999",
+            "TUBE_FULL_PATH_STATUS": "COMPUTED",
+            "SHELL_BELL_DELAWARE_INTERNAL_DP_PA": "691.43035852077618031292856860703833414857821141288",
+            "SHELL_EXTERNAL_LOCAL_DP_PA": "488.568",
+            "SHELL_FULL_PATH_TOTAL_DP_PA": "1179.998358520776180312928569",
+            "SHELL_FULL_PATH_STATUS": "COMPUTED",
+            "TUBE_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-TUBE-INLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075063557",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "450.220"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-CHANNEL-HEAD",
+                "side": "TUBE",
+                "component_type": "CHANNEL_HEAD",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.082071224250",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.45",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "4.842"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE",
+                "side": "TUBE",
+                "component_type": "ENTRANCE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.725"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-EXIT",
+                "side": "TUBE",
+                "component_type": "EXIT",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.7",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "11.769"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-OUTLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075063557",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "450.220"
+              }
+            ],
+            "SHELL_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0183718072",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "237.541"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0183718072",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "237.541"
+              }
+            ],
+            "TUBE_FULL_PATH_DP_MARGIN_PA": "0.001",
+            "SHELL_FULL_PATH_DP_MARGIN_PA": "0.001641479223819687071431",
+            "FULL_PATH_TUBE_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+            "full_path_tube_outlet_pressure_pa": "100175.001",
+            "full_path_shell_outlet_pressure_pa": "100145.0016414792238196870714",
+            "partial_model_tube_dp_constraint": "SATISFIED",
+            "partial_model_shell_dp_constraint": "SATISFIED",
+            "disclosure": "Full-path constraint status is independent of partial-model nominal flags.",
+            "PRODUCTION_DESIGN_APPROVED": false,
+            "ENGINEERING_SIZING_ELIGIBILITY": "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE",
+            "reconciliation": {
+              "tube_full_equals_friction_plus_local": true,
+              "shell_full_equals_bd_plus_external": true
+            }
+          },
+          "full_path_feasible": true,
+          "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+          "geometry_adaptation": {
+            "PRELIMINARY_GEOMETRY_NOT_MECHANICALLY_VERIFIED": true,
+            "geometry_adaptation_risk_flags": [],
+            "disclosure": "Nozzles sized hydraulically only; mechanical clearance, reinforcement, and tubesheet layout are not verified."
+          }
+        },
+        "high_loss_sensitivity": {
+          "loss_scenario_key": "high_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-HIGH-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Upper-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5179.048",
+            "dp_at_max_diameter_min_velocity_pa": "808.160",
+            "dp_fixed_without_nozzle_pair_pa": "261.800",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.1098321004031571,
+            "selected_velocity_m_s": 1.2750164516610405,
+            "modeled_side_total_dp_pa": "1150.000",
+            "remaining_dp_margin_pa": "0.000"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "6103.864358520776180312928569",
+            "dp_at_max_diameter_min_velocity_pa": "1314.388358520776180312928569",
+            "dp_fixed_without_nozzle_pair_pa": "715.7043585207761803129285686",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM",
+            "OUTSIDE_DESIGN_VELOCITY_RANGE": "At band minimum velocity (largest allowed nozzle), \u0394p still exceeds limit; a larger nozzle (lower velocity below the configured band) would be required.",
+            "theoretical_at_band_max_diameter_m": 0.1597521415058465,
+            "velocity_at_band_max_diameter_m_s": 0.9999999999999998
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.1098321004031571,
+            "shell_side_inside_diameter_m": null,
+            "tube_side_velocity_m_s": 1.2750164516610405,
+            "shell_side_velocity_m_s": null
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "226.223",
+              "tube_channel_head_dp_pa": "6.994",
+              "tube_bundle_entrance_dp_pa": "10.088",
+              "tube_bundle_exit_dp_pa": "18.495",
+              "tube_nozzle_pair_dp_pa": "888.200",
+              "tube_modeled_full_path_dp_pa": "1150.000"
+            },
+            "shell_side": {}
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": null,
+          "full_path_feasible": false,
+          "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+          "geometry_adaptation": {}
+        }
+      },
+      "geometry": {
+        "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+        "shell_inside_diameter_m": null,
+        "physical_tube_count": null,
+        "tube_length_m": null,
+        "baffle_spacing_m": null,
+        "tube_pass_count": {
+          "value": 1,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "baffle_count": {
+          "value": 4,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "nominal_tube_outer_area_proxy_m2": null,
+        "task171_rated_outside_area_m2": null,
+        "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+      },
+      "r27h_classification": {
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "sensitivity": {
+          "mid_band_min_full_path_margin_pa": "-29.214358520776180312928569",
+          "tube_side_margin_pa": "447.298",
+          "shell_side_margin_pa": "-29.214358520776180312928569"
+        },
+        "pressure_gap_pa": "-29.214358520776180312928569"
+      }
+    },
+    {
+      "candidate_id": "90b9faad-08d4-5837-8b7b-6497dc92ac8f",
+      "candidate_id_prefix": "90b9faad",
+      "table_row": {
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.35",
+        "baffle_spacing_m": "1.07",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.35",
+        "baffle_spacing_m": "1.07",
+        "baffle_count": 4,
+        "physical_tube_count": 337,
+        "task025_total_parallel_flow_area_m2": "0.0656569794",
+        "tube_regime_inlet_scan": {
+          "candidate_id": "90b9faad-08d4-5837-8b7b-6497dc92ac8f",
+          "physical_tube_count": 337,
+          "inlet_bulk_task026": {
+            "tube_bulk_temperature_k": 310.0,
+            "reynolds": 4151.8479,
+            "prandtl": 4.6416,
+            "flow_regime": "TURBULENT",
+            "bulk_velocity_m_s": 0.18398539485199775
+          },
+          "first_laminar_sweep_point": null,
+          "first_transition_sweep_point": {
+            "tube_bulk_temperature_k": 293.3333333333333,
+            "tube_pressure_pa": 101325.0,
+            "density_kg_m3": 998.1691270482801,
+            "dynamic_viscosity_pa_s": 0.0009971143664999184,
+            "tube_mass_flow_kg_s": 12.0,
+            "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+            "parallel_flow_area_m2": 0.0656569794,
+            "tube_hydraulic_diameter_m": 0.015750000005646643,
+            "bulk_velocity_m_s": 0.183103317944475,
+            "reynolds": 2886.9279,
+            "prandtl": 6.9724,
+            "flow_regime": "TRANSITION",
+            "correlation_id": "",
+            "first_occurrence": true
+          },
+          "temperature_sweep": [
+            {
+              "tube_bulk_temperature_k": 310.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 993.3836279738581,
+              "dynamic_viscosity_pa_s": 0.0006933291594795042,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18398539485199775,
+              "reynolds": 4151.8479,
+              "prandtl": 4.6416,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 307.9166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.1133232233861,
+              "dynamic_viscosity_pa_s": 0.000722489755652439,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183850346597971,
+              "reynolds": 3984.2741,
+              "prandtl": 4.8594,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 305.8333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.8080598558506,
+              "dynamic_viscosity_pa_s": 0.0007536937354838812,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18372195241237163,
+              "reynolds": 3819.3196,
+              "prandtl": 5.0939,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 303.75,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 995.4666579680147,
+              "dynamic_viscosity_pa_s": 0.0007871414365566032,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18360040245381362,
+              "reynolds": 3657.0267,
+              "prandtl": 5.347,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 301.6666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.0878442375779,
+              "dynamic_viscosity_pa_s": 0.0008230590404076208,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18348590447077892,
+              "reynolds": 3497.4371,
+              "prandtl": 5.6207,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 299.5833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.6702418410093,
+              "dynamic_viscosity_pa_s": 0.0008617027430256965,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18337868570719884,
+              "reynolds": 3340.5919,
+              "prandtl": 5.9172,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 297.5,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.2123589090957,
+              "dynamic_viscosity_pa_s": 0.0009033637342534737,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18327899509009313,
+              "reynolds": 3186.5318,
+              "prandtl": 6.2392,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 295.4166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.7125752550304,
+              "dynamic_viscosity_pa_s": 0.0009483741696729306,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18318710575093436,
+              "reynolds": 3035.297,
+              "prandtl": 6.5898,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 293.3333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.1691270482801,
+              "dynamic_viscosity_pa_s": 0.0009971143664999184,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183103317944475,
+              "reynolds": 2886.9279,
+              "prandtl": 6.9724,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 291.25,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.5800890351957,
+              "dynamic_viscosity_pa_s": 0.001050021517220064,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18302796244301894,
+              "reynolds": 2741.465,
+              "prandtl": 7.3913,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 289.1666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.9433538082326,
+              "dynamic_viscosity_pa_s": 0.0011076002959619251,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18296140450358944,
+              "reynolds": 2598.9495,
+              "prandtl": 7.8512,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 287.0833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.2566075058636,
+              "dynamic_viscosity_pa_s": 0.0011704358395271872,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.182904048529104,
+              "reynolds": 2459.4234,
+              "prandtl": 8.3577,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 285.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.517301163144,
+              "dynamic_viscosity_pa_s": 0.0012392097267712751,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18285634357663652,
+              "reynolds": 2322.9298,
+              "prandtl": 8.9175,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            }
+          ]
+        },
+        "geometry_authority": "EXPERIMENTAL_TASK168_EXTENSION_NOT_OWNER_APPROVED"
+      },
+      "task174_ready": true,
+      "phase_b_n1": {
+        "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "duty_w": 437762.3813400462,
+        "failure_code": null
+      },
+      "mesh_rating_evidence": {
+        "rating_participation_status": "FULLY_RATED",
+        "task174_status": null,
+        "screening_n1_status": "",
+        "n1_thermal_numeric_status": null,
+        "n1_failure_code": null,
+        "n1_duty_w": null,
+        "entered_n2_n4_mesh_ladder": false,
+        "full_rating_converged": false,
+        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
+        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
+      },
+      "constraints": {
+        "target_duty_w": "330000",
+        "duty_w_at_finest_mesh": 437581.72322331334,
+        "duty_constraint": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "tube_dp_constraint": "SATISFIED",
+        "shell_dp_constraint": "SATISFIED",
+        "tube_dp_margin_pa": null,
+        "shell_dp_margin_pa": null,
+        "hydraulic_constraint_status": "SATISFIED",
+        "nominal_experimental_sizing_feasible": null
+      },
+      "loss_scenario_results": {
+        "mid_band": {
+          "loss_scenario_key": "mid_band",
+          "scenario_id": "R27B-ASSUMPTION-K-MID-BAND",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Mid-band K values for R27B full-path sizing; not owner-verified design data.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4287.767",
+            "dp_at_max_diameter_min_velocity_pa": "711.585",
+            "dp_fixed_without_nozzle_pair_pa": "264.563",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.10453943408572869,
+            "selected_velocity_m_s": 1.407388756249073,
+            "modeled_side_total_dp_pa": "1149.999",
+            "remaining_dp_margin_pa": "0.001"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5175.254788364334869193811084",
+            "dp_at_max_diameter_min_velocity_pa": "1184.024788364334869193811084",
+            "dp_fixed_without_nozzle_pair_pa": "685.1207883643348691938110844",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM",
+            "OUTSIDE_DESIGN_VELOCITY_RANGE": "At band minimum velocity (largest allowed nozzle), \u0394p still exceeds limit; a larger nozzle (lower velocity below the configured band) would be required.",
+            "theoretical_at_band_max_diameter_m": 0.1597521415058465,
+            "velocity_at_band_max_diameter_m_s": 0.9999999999999998
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.10453943408572869,
+            "shell_side_inside_diameter_m": null,
+            "tube_side_velocity_m_s": 1.407388756249073,
+            "shell_side_velocity_m_s": null
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "235.106",
+              "tube_channel_head_dp_pa": "5.918",
+              "tube_bundle_entrance_dp_pa": "8.407",
+              "tube_bundle_exit_dp_pa": "15.132",
+              "tube_nozzle_pair_dp_pa": "885.436",
+              "tube_modeled_full_path_dp_pa": "1149.999"
+            },
+            "shell_side": {}
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": null,
+          "full_path_feasible": false,
+          "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+          "geometry_adaptation": {}
+        },
+        "low_loss_sensitivity": {
+          "loss_scenario_key": "low_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Lower-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "3387.600",
+            "dp_at_max_diameter_min_velocity_pa": "606.126",
+            "dp_fixed_without_nozzle_pair_pa": "258.442",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.09800447824968972,
+            "selected_velocity_m_s": 1.6013362119427792,
+            "modeled_side_total_dp_pa": "1150.000",
+            "remaining_dp_margin_pa": "0.000"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4271.832788364334869193811084",
+            "dp_at_max_diameter_min_velocity_pa": "1078.848788364334869193811084",
+            "dp_fixed_without_nozzle_pair_pa": "679.7267883643348691938110844",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.150980759055315,
+            "selected_velocity_m_s": 1.1195672051000076,
+            "modeled_side_total_dp_pa": "1179.998788364334869193811084",
+            "remaining_dp_margin_pa": "0.001211635665130806188916"
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.09800447824968972,
+            "shell_side_inside_diameter_m": 0.150980759055315,
+            "tube_side_velocity_m_s": 1.6013362119427792,
+            "shell_side_velocity_m_s": 1.1195672051000076
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "235.106",
+              "tube_channel_head_dp_pa": "4.842",
+              "tube_bundle_entrance_dp_pa": "6.725",
+              "tube_bundle_exit_dp_pa": "11.769",
+              "tube_nozzle_pair_dp_pa": "891.558",
+              "tube_modeled_full_path_dp_pa": "1150.000"
+            },
+            "shell_side": {
+              "shell_inlet_transition_dp_pa": "6.743",
+              "shell_outlet_transition_dp_pa": "6.743",
+              "shell_nozzle_pair_dp_pa": "500.272",
+              "shell_external_local_dp_pa": "513.758",
+              "shell_bell_delaware_internal_dp_pa": "666.24078836433486919381108435305920410231656147557"
+            }
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": {
+            "TASK_ID": "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION",
+            "PHYSICAL_CONSISTENCY_GATE": "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE",
+            "status": "COMPUTED",
+            "blockers": [],
+            "binding_validation_errors": [],
+            "physical_consistency": {
+              "PHYSICAL_CONSISTENCY_STATUS": "PASS",
+              "physical_consistency_errors": [],
+              "physical_consistency_warnings": [],
+              "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+              "input_authority_detail": {
+                "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+                "verified_authorized_component_count": 0,
+                "assumption_based_component_count": 9,
+                "disclosure": "All path components use configurable assumption-based loss coefficients and R27A preliminary nozzle geometry; not verified engineering design."
+              }
+            },
+            "upstream_postpass_assessment": {
+              "UPSTREAM_POSTPASS_STATUS": "USABLE",
+              "tube_side_numeric_usable": true,
+              "shell_side_numeric_usable": true,
+              "upstream_blockers": [],
+              "tube_upstream_blockers": [],
+              "shell_upstream_blockers": [],
+              "partial_model_tube_dp_constraint": "SATISFIED",
+              "partial_model_shell_dp_constraint": "SATISFIED",
+              "disclosure": "NOT_SATISFIED on partial dp_constraint does not block full-path \u0394p composition; BLOCKED recompute, correlation, CoolProp outlet domain, or missing upstream data does."
+            },
+            "path_completeness": {
+              "path_completeness_status": "DEMONSTRATION_FULL_PATH_DECLARED",
+              "FULL_PATH_VERIFICATION_STATUS": "NOT_VERIFIED",
+              "missing_tube_component_types": [],
+              "missing_shell_external_component_types": [],
+              "tube_sequence_covers_inlet_to_outlet": true,
+              "shell_external_sequence_covers_inlet_to_outlet": true,
+              "demonstration_input_present": true,
+              "authorized_input_present": false,
+              "double_counting_guard": "Shell-side Bell\u2013Delaware internal bundle pressure drop is taken from live rating post-pass; it must not be duplicated in shell_external_components.",
+              "engineering_limits_not_verified": "Mechanical strength, vibration, tubesheet, fabrication, and code compliance are not verified by hydraulic path completeness.",
+              "disclosure": "AUTHORIZED_INPUT_PRESENT does not upgrade to FULL_PATH_VERIFIED; two nozzle components alone do not imply equipment path completeness."
+            },
+            "tube_friction_separation_authority": "R20_TRANSITIONAL_FRICTION",
+            "TUBE_MODELED_PARTIAL_DP_PA": "821.725",
+            "SHELL_MODELED_PARTIAL_DP_PA": "666.24078836433486919381108435305920410231656147557",
+            "TUBE_INTERNAL_FRICTION_DP_PA": "235.106",
+            "TUBE_LOCAL_DP_PA": "914.894",
+            "TUBE_FULL_PATH_TOTAL_DP_PA": "1150.000",
+            "TUBE_FULL_PATH_STATUS": "COMPUTED",
+            "SHELL_BELL_DELAWARE_INTERNAL_DP_PA": "666.24078836433486919381108435305920410231656147557",
+            "SHELL_EXTERNAL_LOCAL_DP_PA": "513.758",
+            "SHELL_FULL_PATH_TOTAL_DP_PA": "1179.998788364334869193811084",
+            "SHELL_FULL_PATH_STATUS": "COMPUTED",
+            "TUBE_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-TUBE-INLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075436534",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "445.779"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-CHANNEL-HEAD",
+                "side": "TUBE",
+                "component_type": "CHANNEL_HEAD",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.082071224250",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.45",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "4.842"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE",
+                "side": "TUBE",
+                "component_type": "ENTRANCE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.725"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-EXIT",
+                "side": "TUBE",
+                "component_type": "EXIT",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.7",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "11.769"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-OUTLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075436534",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "445.779"
+              }
+            ],
+            "SHELL_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0179033001",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "250.136"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0179033001",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "250.136"
+              }
+            ],
+            "TUBE_FULL_PATH_DP_MARGIN_PA": "0.000",
+            "SHELL_FULL_PATH_DP_MARGIN_PA": "0.001211635665130806188916",
+            "FULL_PATH_TUBE_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+            "full_path_tube_outlet_pressure_pa": "100175.000",
+            "full_path_shell_outlet_pressure_pa": "100145.0012116356651308061889",
+            "partial_model_tube_dp_constraint": "SATISFIED",
+            "partial_model_shell_dp_constraint": "SATISFIED",
+            "disclosure": "Full-path constraint status is independent of partial-model nominal flags.",
+            "PRODUCTION_DESIGN_APPROVED": false,
+            "ENGINEERING_SIZING_ELIGIBILITY": "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE",
+            "reconciliation": {
+              "tube_full_equals_friction_plus_local": true,
+              "shell_full_equals_bd_plus_external": true
+            }
+          },
+          "full_path_feasible": true,
+          "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+          "geometry_adaptation": {
+            "PRELIMINARY_GEOMETRY_NOT_MECHANICALLY_VERIFIED": true,
+            "geometry_adaptation_risk_flags": [],
+            "disclosure": "Nozzles sized hydraulically only; mechanical clearance, reinforcement, and tubesheet layout are not verified."
+          }
+        },
+        "high_loss_sensitivity": {
+          "loss_scenario_key": "high_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-HIGH-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Upper-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5187.931",
+            "dp_at_max_diameter_min_velocity_pa": "817.043",
+            "dp_fixed_without_nozzle_pair_pa": "270.683",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.11010847266866657,
+            "selected_velocity_m_s": 1.2686239018253835,
+            "modeled_side_total_dp_pa": "1149.999",
+            "remaining_dp_margin_pa": "0.001"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "6078.674788364334869193811084",
+            "dp_at_max_diameter_min_velocity_pa": "1289.198788364334869193811084",
+            "dp_fixed_without_nozzle_pair_pa": "690.5147883643348691938110844",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM",
+            "OUTSIDE_DESIGN_VELOCITY_RANGE": "At band minimum velocity (largest allowed nozzle), \u0394p still exceeds limit; a larger nozzle (lower velocity below the configured band) would be required.",
+            "theoretical_at_band_max_diameter_m": 0.1597521415058465,
+            "velocity_at_band_max_diameter_m_s": 0.9999999999999998
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.11010847266866657,
+            "shell_side_inside_diameter_m": null,
+            "tube_side_velocity_m_s": 1.2686239018253835,
+            "shell_side_velocity_m_s": null
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "235.106",
+              "tube_channel_head_dp_pa": "6.994",
+              "tube_bundle_entrance_dp_pa": "10.088",
+              "tube_bundle_exit_dp_pa": "18.495",
+              "tube_nozzle_pair_dp_pa": "879.316",
+              "tube_modeled_full_path_dp_pa": "1149.999"
+            },
+            "shell_side": {}
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": null,
+          "full_path_feasible": false,
+          "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+          "geometry_adaptation": {}
+        }
+      },
+      "geometry": {
+        "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+        "shell_inside_diameter_m": null,
+        "physical_tube_count": null,
+        "tube_length_m": null,
+        "baffle_spacing_m": null,
+        "tube_pass_count": {
+          "value": 1,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "baffle_count": {
+          "value": 4,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "nominal_tube_outer_area_proxy_m2": null,
+        "task171_rated_outside_area_m2": null,
+        "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+      },
+      "r27h_classification": {
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "sensitivity": {
+          "mid_band_min_full_path_margin_pa": "-4.024788364334869193811084",
+          "tube_side_margin_pa": "438.415",
+          "shell_side_margin_pa": "-4.024788364334869193811084"
+        },
+        "pressure_gap_pa": "-4.024788364334869193811084"
+      }
+    },
+    {
+      "candidate_id": "5e78f6a8-1a7b-5e9b-abf7-854d2eaf5bed",
+      "candidate_id_prefix": "5e78f6a8",
+      "table_row": {
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.50",
+        "baffle_spacing_m": "1.10",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "shell_inside_diameter_m": "0.56",
+        "tube_length_m": "5.50",
+        "baffle_spacing_m": "1.10",
+        "baffle_count": 4,
+        "physical_tube_count": 337,
+        "task025_total_parallel_flow_area_m2": "0.0656569794",
+        "tube_regime_inlet_scan": {
+          "candidate_id": "5e78f6a8-1a7b-5e9b-abf7-854d2eaf5bed",
+          "physical_tube_count": 337,
+          "inlet_bulk_task026": {
+            "tube_bulk_temperature_k": 310.0,
+            "reynolds": 4151.8479,
+            "prandtl": 4.6416,
+            "flow_regime": "TURBULENT",
+            "bulk_velocity_m_s": 0.18398539485199775
+          },
+          "first_laminar_sweep_point": null,
+          "first_transition_sweep_point": {
+            "tube_bulk_temperature_k": 293.3333333333333,
+            "tube_pressure_pa": 101325.0,
+            "density_kg_m3": 998.1691270482801,
+            "dynamic_viscosity_pa_s": 0.0009971143664999184,
+            "tube_mass_flow_kg_s": 12.0,
+            "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+            "parallel_flow_area_m2": 0.0656569794,
+            "tube_hydraulic_diameter_m": 0.015750000005646643,
+            "bulk_velocity_m_s": 0.183103317944475,
+            "reynolds": 2886.9279,
+            "prandtl": 6.9724,
+            "flow_regime": "TRANSITION",
+            "correlation_id": "",
+            "first_occurrence": true
+          },
+          "temperature_sweep": [
+            {
+              "tube_bulk_temperature_k": 310.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 993.3836279738581,
+              "dynamic_viscosity_pa_s": 0.0006933291594795042,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18398539485199775,
+              "reynolds": 4151.8479,
+              "prandtl": 4.6416,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 307.9166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.1133232233861,
+              "dynamic_viscosity_pa_s": 0.000722489755652439,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183850346597971,
+              "reynolds": 3984.2741,
+              "prandtl": 4.8594,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 305.8333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 994.8080598558506,
+              "dynamic_viscosity_pa_s": 0.0007536937354838812,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18372195241237163,
+              "reynolds": 3819.3196,
+              "prandtl": 5.0939,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 303.75,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 995.4666579680147,
+              "dynamic_viscosity_pa_s": 0.0007871414365566032,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18360040245381362,
+              "reynolds": 3657.0267,
+              "prandtl": 5.347,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 301.6666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.0878442375779,
+              "dynamic_viscosity_pa_s": 0.0008230590404076208,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18348590447077892,
+              "reynolds": 3497.4371,
+              "prandtl": 5.6207,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 299.5833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 996.6702418410093,
+              "dynamic_viscosity_pa_s": 0.0008617027430256965,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18337868570719884,
+              "reynolds": 3340.5919,
+              "prandtl": 5.9172,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 297.5,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.2123589090957,
+              "dynamic_viscosity_pa_s": 0.0009033637342534737,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18327899509009313,
+              "reynolds": 3186.5318,
+              "prandtl": 6.2392,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 295.4166666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 997.7125752550304,
+              "dynamic_viscosity_pa_s": 0.0009483741696729306,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18318710575093436,
+              "reynolds": 3035.297,
+              "prandtl": 6.5898,
+              "flow_regime": "TURBULENT",
+              "correlation_id": "tube_turbulent_gnielinski"
+            },
+            {
+              "tube_bulk_temperature_k": 293.3333333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.1691270482801,
+              "dynamic_viscosity_pa_s": 0.0009971143664999184,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.183103317944475,
+              "reynolds": 2886.9279,
+              "prandtl": 6.9724,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 291.25,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.5800890351957,
+              "dynamic_viscosity_pa_s": 0.001050021517220064,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18302796244301894,
+              "reynolds": 2741.465,
+              "prandtl": 7.3913,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 289.1666666666667,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 998.9433538082326,
+              "dynamic_viscosity_pa_s": 0.0011076002959619251,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18296140450358944,
+              "reynolds": 2598.9495,
+              "prandtl": 7.8512,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 287.0833333333333,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.2566075058636,
+              "dynamic_viscosity_pa_s": 0.0011704358395271872,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.182904048529104,
+              "reynolds": 2459.4234,
+              "prandtl": 8.3577,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            },
+            {
+              "tube_bulk_temperature_k": 285.0,
+              "tube_pressure_pa": 101325.0,
+              "density_kg_m3": 999.517301163144,
+              "dynamic_viscosity_pa_s": 0.0012392097267712751,
+              "tube_mass_flow_kg_s": 12.0,
+              "tube_mass_flow_per_physical_tube_kg_s": 0.03560830860534125,
+              "parallel_flow_area_m2": 0.0656569794,
+              "tube_hydraulic_diameter_m": 0.015750000005646643,
+              "bulk_velocity_m_s": 0.18285634357663652,
+              "reynolds": 2322.9298,
+              "prandtl": 8.9175,
+              "flow_regime": "TRANSITION",
+              "correlation_id": ""
+            }
+          ]
+        },
+        "geometry_authority": "EXPERIMENTAL_TASK168_EXTENSION_NOT_OWNER_APPROVED"
+      },
+      "task174_ready": true,
+      "phase_b_n1": {
+        "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+        "duty_w": 442800.3491931641,
+        "failure_code": null
+      },
+      "mesh_rating_evidence": {
+        "rating_participation_status": "FULLY_RATED",
+        "task174_status": null,
+        "screening_n1_status": "",
+        "n1_thermal_numeric_status": null,
+        "n1_failure_code": null,
+        "n1_duty_w": null,
+        "entered_n2_n4_mesh_ladder": false,
+        "full_rating_converged": false,
+        "mesh_rating_outcome": "N1_THERMAL_SCREEN_BLOCKED",
+        "mesh_rating_classification": "NUMERIC_OR_INPUT_BLOCK_AT_N1",
+        "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
+      },
+      "constraints": {
+        "target_duty_w": "330000",
+        "duty_w_at_finest_mesh": 442612.2206074065,
+        "duty_constraint": "NOT_FORMALLY_EVALUATED",
+        "duty_constraint_basis": "NOT_FORMALLY_EVALUATED",
+        "tube_dp_constraint": "SATISFIED",
+        "shell_dp_constraint": "SATISFIED",
+        "tube_dp_margin_pa": null,
+        "shell_dp_margin_pa": null,
+        "hydraulic_constraint_status": "SATISFIED",
+        "nominal_experimental_sizing_feasible": null
+      },
+      "loss_scenario_results": {
+        "mid_band": {
+          "loss_scenario_key": "mid_band",
+          "scenario_id": "R27B-ASSUMPTION-K-MID-BAND",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Mid-band K values for R27B full-path sizing; not owner-verified design data.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4294.432",
+            "dp_at_max_diameter_min_velocity_pa": "718.250",
+            "dp_fixed_without_nozzle_pair_pa": "271.228",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.10473706147500997,
+            "selected_velocity_m_s": 1.4020825894892093,
+            "modeled_side_total_dp_pa": "1150.000",
+            "remaining_dp_margin_pa": "0.000"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5157.557283203528980010998872",
+            "dp_at_max_diameter_min_velocity_pa": "1166.327283203528980010998872",
+            "dp_fixed_without_nozzle_pair_pa": "667.4232832035289800109988718",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.15867594534256146,
+            "selected_velocity_m_s": 1.0136107049082568,
+            "modeled_side_total_dp_pa": "1179.999283203528980010998872",
+            "remaining_dp_margin_pa": "0.000716796471019989001128"
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.10473706147500997,
+            "shell_side_inside_diameter_m": 0.15867594534256146,
+            "tube_side_velocity_m_s": 1.4020825894892093,
+            "shell_side_velocity_m_s": 1.0136107049082568
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "241.771",
+              "tube_channel_head_dp_pa": "5.918",
+              "tube_bundle_entrance_dp_pa": "8.407",
+              "tube_bundle_exit_dp_pa": "15.132",
+              "tube_nozzle_pair_dp_pa": "878.772",
+              "tube_modeled_full_path_dp_pa": "1150.000"
+            },
+            "shell_side": {
+              "shell_inlet_transition_dp_pa": "9.440",
+              "shell_outlet_transition_dp_pa": "9.440",
+              "shell_nozzle_pair_dp_pa": "512.576",
+              "shell_external_local_dp_pa": "531.456",
+              "shell_bell_delaware_internal_dp_pa": "648.54328320352898001099887184022460211653748190879"
+            }
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": {
+            "TASK_ID": "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION",
+            "PHYSICAL_CONSISTENCY_GATE": "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE",
+            "status": "COMPUTED",
+            "blockers": [],
+            "binding_validation_errors": [],
+            "physical_consistency": {
+              "PHYSICAL_CONSISTENCY_STATUS": "PASS",
+              "physical_consistency_errors": [],
+              "physical_consistency_warnings": [],
+              "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+              "input_authority_detail": {
+                "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+                "verified_authorized_component_count": 0,
+                "assumption_based_component_count": 9,
+                "disclosure": "All path components use configurable assumption-based loss coefficients and R27A preliminary nozzle geometry; not verified engineering design."
+              }
+            },
+            "upstream_postpass_assessment": {
+              "UPSTREAM_POSTPASS_STATUS": "USABLE",
+              "tube_side_numeric_usable": true,
+              "shell_side_numeric_usable": true,
+              "upstream_blockers": [],
+              "tube_upstream_blockers": [],
+              "shell_upstream_blockers": [],
+              "partial_model_tube_dp_constraint": "SATISFIED",
+              "partial_model_shell_dp_constraint": "SATISFIED",
+              "disclosure": "NOT_SATISFIED on partial dp_constraint does not block full-path \u0394p composition; BLOCKED recompute, correlation, CoolProp outlet domain, or missing upstream data does."
+            },
+            "path_completeness": {
+              "path_completeness_status": "DEMONSTRATION_FULL_PATH_DECLARED",
+              "FULL_PATH_VERIFICATION_STATUS": "NOT_VERIFIED",
+              "missing_tube_component_types": [],
+              "missing_shell_external_component_types": [],
+              "tube_sequence_covers_inlet_to_outlet": true,
+              "shell_external_sequence_covers_inlet_to_outlet": true,
+              "demonstration_input_present": true,
+              "authorized_input_present": false,
+              "double_counting_guard": "Shell-side Bell\u2013Delaware internal bundle pressure drop is taken from live rating post-pass; it must not be duplicated in shell_external_components.",
+              "engineering_limits_not_verified": "Mechanical strength, vibration, tubesheet, fabrication, and code compliance are not verified by hydraulic path completeness.",
+              "disclosure": "AUTHORIZED_INPUT_PRESENT does not upgrade to FULL_PATH_VERIFIED; two nozzle components alone do not imply equipment path completeness."
+            },
+            "tube_friction_separation_authority": "R20_TRANSITIONAL_FRICTION",
+            "TUBE_MODELED_PARTIAL_DP_PA": "828.380",
+            "SHELL_MODELED_PARTIAL_DP_PA": "648.54328320352898001099887184022460211653748190879",
+            "TUBE_INTERNAL_FRICTION_DP_PA": "241.771",
+            "TUBE_LOCAL_DP_PA": "908.229",
+            "TUBE_FULL_PATH_TOTAL_DP_PA": "1150.000",
+            "TUBE_FULL_PATH_STATUS": "COMPUTED",
+            "SHELL_BELL_DELAWARE_INTERNAL_DP_PA": "648.54328320352898001099887184022460211653748190879",
+            "SHELL_EXTERNAL_LOCAL_DP_PA": "531.456",
+            "SHELL_FULL_PATH_TOTAL_DP_PA": "1179.999283203528980010998872",
+            "SHELL_FULL_PATH_STATUS": "COMPUTED",
+            "TUBE_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-TUBE-INLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0086157017",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.45",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "439.386"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-CHANNEL-HEAD",
+                "side": "TUBE",
+                "component_type": "CHANNEL_HEAD",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.082071224250",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.55",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "5.918"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE",
+                "side": "TUBE",
+                "component_type": "ENTRANCE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.5",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "8.407"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-EXIT",
+                "side": "TUBE",
+                "component_type": "EXIT",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.9",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "15.132"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-OUTLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0086157017",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.45",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "439.386"
+              }
+            ],
+            "SHELL_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0197747987",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.5",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "256.288"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "9.440"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "9.440"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0197747987",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.5",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-MID-BAND",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "256.288"
+              }
+            ],
+            "TUBE_FULL_PATH_DP_MARGIN_PA": "0.000",
+            "SHELL_FULL_PATH_DP_MARGIN_PA": "0.000716796471019989001128",
+            "FULL_PATH_TUBE_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+            "full_path_tube_outlet_pressure_pa": "100175.000",
+            "full_path_shell_outlet_pressure_pa": "100145.0007167964710199890011",
+            "partial_model_tube_dp_constraint": "SATISFIED",
+            "partial_model_shell_dp_constraint": "SATISFIED",
+            "disclosure": "Full-path constraint status is independent of partial-model nominal flags.",
+            "PRODUCTION_DESIGN_APPROVED": false,
+            "ENGINEERING_SIZING_ELIGIBILITY": "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE",
+            "reconciliation": {
+              "tube_full_equals_friction_plus_local": true,
+              "shell_full_equals_bd_plus_external": true
+            }
+          },
+          "full_path_feasible": true,
+          "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+          "geometry_adaptation": {
+            "PRELIMINARY_GEOMETRY_NOT_MECHANICALLY_VERIFIED": true,
+            "geometry_adaptation_risk_flags": [],
+            "disclosure": "Nozzles sized hydraulically only; mechanical clearance, reinforcement, and tubesheet layout are not verified."
+          }
+        },
+        "low_loss_sensitivity": {
+          "loss_scenario_key": "low_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Lower-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "3394.265",
+            "dp_at_max_diameter_min_velocity_pa": "612.791",
+            "dp_fixed_without_nozzle_pair_pa": "265.107",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.09818852892499447,
+            "selected_velocity_m_s": 1.5953385503601722,
+            "modeled_side_total_dp_pa": "1149.999",
+            "remaining_dp_margin_pa": "0.001"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "4254.135283203528980010998872",
+            "dp_at_max_diameter_min_velocity_pa": "1061.151283203528980010998872",
+            "dp_fixed_without_nozzle_pair_pa": "662.0292832035289800109988718",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.14967422221729512,
+            "selected_velocity_m_s": 1.1391983763371494,
+            "modeled_side_total_dp_pa": "1179.999283203528980010998872",
+            "remaining_dp_margin_pa": "0.000716796471019989001128"
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.09818852892499447,
+            "shell_side_inside_diameter_m": 0.14967422221729512,
+            "tube_side_velocity_m_s": 1.5953385503601722,
+            "shell_side_velocity_m_s": 1.1391983763371494
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "241.771",
+              "tube_channel_head_dp_pa": "4.842",
+              "tube_bundle_entrance_dp_pa": "6.725",
+              "tube_bundle_exit_dp_pa": "11.769",
+              "tube_nozzle_pair_dp_pa": "884.892",
+              "tube_modeled_full_path_dp_pa": "1149.999"
+            },
+            "shell_side": {
+              "shell_inlet_transition_dp_pa": "6.743",
+              "shell_outlet_transition_dp_pa": "6.743",
+              "shell_nozzle_pair_dp_pa": "517.970",
+              "shell_external_local_dp_pa": "531.456",
+              "shell_bell_delaware_internal_dp_pa": "648.54328320352898001099887184022460211653748190879"
+            }
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": {
+            "TASK_ID": "V07_R26G_AUTHORIZED_FULL_PATH_HYDRAULIC_CALCULATION",
+            "PHYSICAL_CONSISTENCY_GATE": "V07_R26G_A_FULL_PATH_PHYSICAL_CONSISTENCY_GATE",
+            "status": "COMPUTED",
+            "blockers": [],
+            "binding_validation_errors": [],
+            "physical_consistency": {
+              "PHYSICAL_CONSISTENCY_STATUS": "PASS",
+              "physical_consistency_errors": [],
+              "physical_consistency_warnings": [],
+              "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+              "input_authority_detail": {
+                "INPUT_AUTHORITY_STATUS": "ASSUMPTION_BASED_ONLY",
+                "verified_authorized_component_count": 0,
+                "assumption_based_component_count": 9,
+                "disclosure": "All path components use configurable assumption-based loss coefficients and R27A preliminary nozzle geometry; not verified engineering design."
+              }
+            },
+            "upstream_postpass_assessment": {
+              "UPSTREAM_POSTPASS_STATUS": "USABLE",
+              "tube_side_numeric_usable": true,
+              "shell_side_numeric_usable": true,
+              "upstream_blockers": [],
+              "tube_upstream_blockers": [],
+              "shell_upstream_blockers": [],
+              "partial_model_tube_dp_constraint": "SATISFIED",
+              "partial_model_shell_dp_constraint": "SATISFIED",
+              "disclosure": "NOT_SATISFIED on partial dp_constraint does not block full-path \u0394p composition; BLOCKED recompute, correlation, CoolProp outlet domain, or missing upstream data does."
+            },
+            "path_completeness": {
+              "path_completeness_status": "DEMONSTRATION_FULL_PATH_DECLARED",
+              "FULL_PATH_VERIFICATION_STATUS": "NOT_VERIFIED",
+              "missing_tube_component_types": [],
+              "missing_shell_external_component_types": [],
+              "tube_sequence_covers_inlet_to_outlet": true,
+              "shell_external_sequence_covers_inlet_to_outlet": true,
+              "demonstration_input_present": true,
+              "authorized_input_present": false,
+              "double_counting_guard": "Shell-side Bell\u2013Delaware internal bundle pressure drop is taken from live rating post-pass; it must not be duplicated in shell_external_components.",
+              "engineering_limits_not_verified": "Mechanical strength, vibration, tubesheet, fabrication, and code compliance are not verified by hydraulic path completeness.",
+              "disclosure": "AUTHORIZED_INPUT_PRESENT does not upgrade to FULL_PATH_VERIFIED; two nozzle components alone do not imply equipment path completeness."
+            },
+            "tube_friction_separation_authority": "R20_TRANSITIONAL_FRICTION",
+            "TUBE_MODELED_PARTIAL_DP_PA": "828.380",
+            "SHELL_MODELED_PARTIAL_DP_PA": "648.54328320352898001099887184022460211653748190879",
+            "TUBE_INTERNAL_FRICTION_DP_PA": "241.771",
+            "TUBE_LOCAL_DP_PA": "908.228",
+            "TUBE_FULL_PATH_TOTAL_DP_PA": "1149.999",
+            "TUBE_FULL_PATH_STATUS": "COMPUTED",
+            "SHELL_BELL_DELAWARE_INTERNAL_DP_PA": "648.54328320352898001099887184022460211653748190879",
+            "SHELL_EXTERNAL_LOCAL_DP_PA": "531.456",
+            "SHELL_FULL_PATH_TOTAL_DP_PA": "1179.999283203528980010998872",
+            "SHELL_FULL_PATH_STATUS": "COMPUTED",
+            "TUBE_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-TUBE-INLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075720137",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "442.446"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-CHANNEL-HEAD",
+                "side": "TUBE",
+                "component_type": "CHANNEL_HEAD",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.082071224250",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.45",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "4.842"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE",
+                "side": "TUBE",
+                "component_type": "ENTRANCE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.725"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-BUNDLE-EXIT",
+                "side": "TUBE",
+                "component_type": "EXIT",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0656569794",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.7",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "11.769"
+              },
+              {
+                "component_id": "R27B-ASSUMP-TUBE-OUTLET-NOZZLE",
+                "side": "TUBE",
+                "component_type": "NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0075720137",
+                "mass_flow_kg_s": "12.000000",
+                "fluid_density_kg_m3": "993.3836279738581",
+                "loss_coefficient": "0.35",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "442.446"
+              }
+            ],
+            "SHELL_DP_COMPONENTS": [
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0175947825",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "258.985"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-INLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_INLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-TRANSITION",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_TRANSITION",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0862053024",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.25",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "6.743"
+              },
+              {
+                "component_id": "R27B-ASSUMP-SHELL-OUTLET-NOZZLE",
+                "side": "SHELL",
+                "component_type": "SHELL_OUTLET_NOZZLE",
+                "status": "COMPUTED",
+                "reference_flow_area_m2": "0.0175947825",
+                "mass_flow_kg_s": "20.000000",
+                "fluid_density_kg_m3": "997.8074379396465",
+                "loss_coefficient": "0.4",
+                "loss_coefficient_convention": "K_EQ_IRREVERSIBLE_DELTA_P_OVER_RHO_VREF_SQUARED_OVER_2",
+                "coefficient_source_id": "R27B-ASSUMPTION-K-LOW-SENSITIVITY",
+                "engineering_input_status": "ASSUMPTION_BASED",
+                "dp_pa": "258.985"
+              }
+            ],
+            "TUBE_FULL_PATH_DP_MARGIN_PA": "0.001",
+            "SHELL_FULL_PATH_DP_MARGIN_PA": "0.000716796471019989001128",
+            "FULL_PATH_TUBE_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_CONSTRAINT_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS": "SATISFIED",
+            "FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL": null,
+            "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+            "full_path_tube_outlet_pressure_pa": "100175.001",
+            "full_path_shell_outlet_pressure_pa": "100145.0007167964710199890011",
+            "partial_model_tube_dp_constraint": "SATISFIED",
+            "partial_model_shell_dp_constraint": "SATISFIED",
+            "disclosure": "Full-path constraint status is independent of partial-model nominal flags.",
+            "PRODUCTION_DESIGN_APPROVED": false,
+            "ENGINEERING_SIZING_ELIGIBILITY": "DEMONSTRATION_ONLY_NOT_ENGINEERING_SIZING_ELIGIBLE",
+            "reconciliation": {
+              "tube_full_equals_friction_plus_local": true,
+              "shell_full_equals_bd_plus_external": true
+            }
+          },
+          "full_path_feasible": true,
+          "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+          "geometry_adaptation": {
+            "PRELIMINARY_GEOMETRY_NOT_MECHANICALLY_VERIFIED": true,
+            "geometry_adaptation_risk_flags": [],
+            "disclosure": "Nozzles sized hydraulically only; mechanical clearance, reinforcement, and tubesheet layout are not verified."
+          }
+        },
+        "high_loss_sensitivity": {
+          "loss_scenario_key": "high_loss_sensitivity",
+          "scenario_id": "R27B-ASSUMPTION-K-HIGH-SENSITIVITY",
+          "ASSUMPTION_BASED": true,
+          "input_authority": "ASSUMPTION_BASED",
+          "disclosure": "Upper-bound sensitivity scenario for assumption-based K values.",
+          "tube_nozzle_solve": {
+            "side": "tube_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.07160223125843233,
+              "max": 0.12401870247490125
+            },
+            "dp_at_min_diameter_max_velocity_pa": "5194.596",
+            "dp_at_max_diameter_min_velocity_pa": "823.708",
+            "dp_fixed_without_nozzle_pair_pa": "277.348",
+            "allowed_total_dp_pa": "1150",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "HYDRAULICALLY_FEASIBLE_MECHANICAL_NOT_VERIFIED",
+            "selected_inside_diameter_m": 0.11031808364598095,
+            "selected_velocity_m_s": 1.2638075588011386,
+            "modeled_side_total_dp_pa": "1150.000",
+            "remaining_dp_margin_pa": "0.000"
+          },
+          "shell_nozzle_solve": {
+            "side": "shell_side",
+            "velocity_band_m_s": {
+              "min": 1.0,
+              "max": 3.0
+            },
+            "diameter_search_band_m": {
+              "min": 0.09223294190201965,
+              "max": 0.1597521415058465
+            },
+            "dp_at_min_diameter_max_velocity_pa": "6060.977283203528980010998872",
+            "dp_at_max_diameter_min_velocity_pa": "1271.501283203528980010998872",
+            "dp_fixed_without_nozzle_pair_pa": "672.8172832035289800109988718",
+            "allowed_total_dp_pa": "1180",
+            "optimization_objective": "MINIMUM_NOZZLE_INSIDE_DIAMETER_WITHIN_VELOCITY_BAND",
+            "status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "infeasibility_class": "NOZZLE_DIAMETER_FOR_BUDGET_REQUIRES_VELOCITY_BELOW_DESIGN_BAND_MINIMUM",
+            "OUTSIDE_DESIGN_VELOCITY_RANGE": "At band minimum velocity (largest allowed nozzle), \u0394p still exceeds limit; a larger nozzle (lower velocity below the configured band) would be required.",
+            "theoretical_at_band_max_diameter_m": 0.1597521415058465,
+            "velocity_at_band_max_diameter_m_s": 0.9999999999999998
+          },
+          "selected_nozzles": {
+            "tube_side_inside_diameter_m": 0.11031808364598095,
+            "shell_side_inside_diameter_m": null,
+            "tube_side_velocity_m_s": 1.2638075588011386,
+            "shell_side_velocity_m_s": null
+          },
+          "local_loss_breakdown_pa": {
+            "tube_side": {
+              "tube_internal_friction_dp_pa": "241.771",
+              "tube_channel_head_dp_pa": "6.994",
+              "tube_bundle_entrance_dp_pa": "10.088",
+              "tube_bundle_exit_dp_pa": "18.495",
+              "tube_nozzle_pair_dp_pa": "872.652",
+              "tube_modeled_full_path_dp_pa": "1150.000"
+            },
+            "shell_side": {}
+          },
+          "remaining_nozzle_budget_before_solve": {
+            "tube_side_partial_margin_pa": null,
+            "shell_side_partial_margin_pa": null,
+            "disclosure": "Partial-model margins are bundle-only; full-path nozzle budget is separate."
+          },
+          "full_path_hydraulic_verification": null,
+          "full_path_feasible": false,
+          "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+          "geometry_adaptation": {}
+        }
+      },
+      "geometry": {
+        "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+        "shell_inside_diameter_m": null,
+        "physical_tube_count": null,
+        "tube_length_m": null,
+        "baffle_spacing_m": null,
+        "tube_pass_count": {
+          "value": 1,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "baffle_count": {
+          "value": 4,
+          "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+        },
+        "nominal_tube_outer_area_proxy_m2": null,
+        "task171_rated_outside_area_m2": null,
+        "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+      },
+      "r27h_classification": {
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry_role": "NEW_EXPERIMENTAL",
+        "sensitivity": {
+          "mid_band_min_full_path_margin_pa": "0.000",
+          "tube_side_margin_pa": "0.000",
+          "shell_side_margin_pa": "0.000716796471019989001128"
+        },
+        "pressure_gap_pa": "0.000"
+      }
+    },
+    {
+      "candidate_id": "b978eafc-ab9a-5b81-a65a-fc2eda9ac47c",
+      "candidate_id_prefix": "b978eafc",
+      "table_row": {
+        "shell_inside_diameter_m": "0.58",
+        "tube_length_m": "4.85",
+        "baffle_spacing_m": "0.97",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    },
+    {
+      "candidate_id": "be2441cb-0663-59c8-b5cd-1696247a4cf2",
+      "candidate_id_prefix": "be2441cb",
+      "table_row": {
+        "shell_inside_diameter_m": "0.58",
+        "tube_length_m": "5.15",
+        "baffle_spacing_m": "1.03",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    },
+    {
+      "candidate_id": "57b64a03-6780-5333-8fe8-87cd370eb19f",
+      "candidate_id_prefix": "57b64a03",
+      "table_row": {
+        "shell_inside_diameter_m": "0.58",
+        "tube_length_m": "5.35",
+        "baffle_spacing_m": "1.07",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    },
+    {
+      "candidate_id": "4562adaa-08f7-50ff-801c-3608e7f5e092",
+      "candidate_id_prefix": "4562adaa",
+      "table_row": {
+        "shell_inside_diameter_m": "0.60",
+        "tube_length_m": "4.85",
+        "baffle_spacing_m": "0.97",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    },
+    {
+      "candidate_id": "40970973-2491-5e3c-b183-66f0e46a898e",
+      "candidate_id_prefix": "40970973",
+      "table_row": {
+        "shell_inside_diameter_m": "0.60",
+        "tube_length_m": "5.15",
+        "baffle_spacing_m": "1.03",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    },
+    {
+      "candidate_id": "412e7a1e-22a6-5e8a-9e15-d04fcc2ff1fa",
+      "candidate_id_prefix": "412e7a1e",
+      "table_row": {
+        "shell_inside_diameter_m": "0.60",
+        "tube_length_m": "5.35",
+        "baffle_spacing_m": "1.07",
+        "role": "NEW_EXPERIMENTAL"
+      },
+      "phase_a": {
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "stage": "BAFFLE_GEOMETRY",
+        "blocked_codes": [
+          "CANDIDATE_STAGE_FAILED"
+        ]
+      },
+      "task174_ready": false,
+      "outcome_class": "TASK168_CHAIN_BLOCKED"
+    }
+  ],
+  "mid_band_formal_pareto": [],
+  "mid_band_margin_pareto": [],
+  "engineering_answers": {
+    "new_structurally_legal_distinct_geometries": 3,
+    "completed_n1_n2_n4_count": 3,
+    "mid_band_full_path_feasible_count": 0,
+    "best_candidate_id_prefix": "5e78f6a8",
+    "best_geometry": {
+      "shell_inside_diameter_m": "0.56",
+      "tube_length_m": "5.50",
+      "baffle_spacing_m": "1.10",
+      "role": "NEW_EXPERIMENTAL"
+    },
+    "best_tube_count": 337,
+    "best_mid_band_tube_margin_pa": "0.000",
+    "best_mid_band_shell_margin_pa": "0.000716796471019989001128",
+    "best_mid_band_min_margin_pa": "0.000",
+    "joint_extension_delivers_mid_band_positive_margin": false,
+    "primary_blocker_if_infeasible": "FULL_PATH_NOT_FEASIBLE"
+  },
+  "baffle_count_sensitivity_note": {
+    "evaluated": false,
+    "disclosure": "baffle_count change requires Task024/support re-validation; not executed in this pass because extended ladder alone did not reach mid_band feasibility."
+  }
+}
