@@ -6,8 +6,6 @@ import json
 from decimal import Decimal
 from pathlib import Path
 
-import pytest
-
 from prototypes.v07_general_rating_sizing_mvp.v07_version_delivery import (
     ExecutionMode,
     acceptance_matrix_strict,

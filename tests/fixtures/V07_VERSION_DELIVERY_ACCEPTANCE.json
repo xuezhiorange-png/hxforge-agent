@@ -1,14 +1,23 @@
 {
-  "schema_version": "hxforge.v07-version-delivery-acceptance.v07",
-  "TASK_ID": "V07_VERSION_DELIVERY_AND_END_TO_END_ACCEPTANCE",
-  "generated_at_utc": "2026-11-02T07:53:37.351188+00:00",
-  "acceptance_case_id": "r27h-extended-shell-baffle-candidate-space",
+  "schema_version": "hxforge.v07-final-live-e2e-delivery.v07",
+  "TASK_ID": "V07_FINAL_LIVE_E2E_DELIVERY_ACCEPTANCE",
+  "generated_at_utc": "2026-11-02T08:40:21.858151+00:00",
+  "execution_mode": "LIVE_COMPUTE",
+  "evidence_source": "LIVE_R27H_PIPELINE",
+  "FIXTURE_REPLAY_USED_FOR_LIVE_ACCEPTANCE": false,
+  "acceptance_case_id": "v07-live-e2e-330kw-user-case",
+  "user_case_validation": {
+    "valid": true,
+    "errors": [],
+    "warnings": [],
+    "declared_applicability": "Experimental shell-and-tube sizing for water/water; Task168 discrete shells 0.56/0.58/0.60 and paired tube/baffle ladder."
+  },
   "r27h_search_report": {
     "schema_version": "hxforge.r27h-candidate-space-extension.v27h",
     "TASK_ID": "V07_R27H_CANDIDATE_SPACE_EXTENSION_AND_SHELL_PRESSURE_OPTIMIZATION",
-    "generated_at_utc": "2026-11-02T07:17:06.252094+00:00",
+    "generated_at_utc": "2026-11-02T08:40:21.857350+00:00",
     "upstream_head": "3a0f1f97686103a2dbb0e408b2392d17058b07b2",
-    "experimental_case_id": "r27h-extended-shell-baffle-candidate-space",
+    "experimental_case_id": "v07-live-e2e-330kw-user-case",
     "geometry_table": [
       {
         "shell_inside_diameter_m": "0.56",
@@ -620,11 +629,11 @@
         },
         "mesh_rating_evidence": {
           "rating_participation_status": "FULLY_RATED",
-          "task174_status": null,
+          "task174_status": "VALIDATED",
           "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_failure_code": null,
-          "n1_duty_w": null,
+          "n1_duty_w": 430797.9610714319,
           "entered_n2_n4_mesh_ladder": false,
           "full_rating_converged": true,
           "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
@@ -638,10 +647,10 @@
           "duty_constraint_basis": "FULL_MESH_RATING",
           "tube_dp_constraint": "SATISFIED",
           "shell_dp_constraint": "SATISFIED",
-          "tube_dp_margin_pa": null,
-          "shell_dp_margin_pa": null,
+          "tube_dp_margin_pa": "337.145",
+          "shell_dp_margin_pa": "488.5696414792238196870714314",
           "hydraulic_constraint_status": "SATISFIED",
-          "nominal_experimental_sizing_feasible": true
+          "nominal_experimental_sizing_feasible": false
         },
         "loss_scenario_results": {
           "mid_band": {
@@ -1089,10 +1098,10 @@
         },
         "geometry": {
           "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
-          "shell_inside_diameter_m": null,
-          "physical_tube_count": null,
-          "tube_length_m": null,
-          "baffle_spacing_m": null,
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.15",
+          "baffle_spacing_m": "1.03",
           "tube_pass_count": {
             "value": 1,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
@@ -1101,9 +1110,9 @@
             "value": 4,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
           },
-          "nominal_tube_outer_area_proxy_m2": null,
-          "task171_rated_outside_area_m2": null,
-          "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+          "nominal_tube_outer_area_proxy_m2": "103.8680510253144278439075",
+          "task171_rated_outside_area_m2": 103.86805102529051,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
         },
         "r27h_classification": {
           "outcome_class": "FULL_PATH_NOT_FEASIBLE",
@@ -1380,11 +1389,11 @@
         },
         "mesh_rating_evidence": {
           "rating_participation_status": "FULLY_RATED",
-          "task174_status": null,
+          "task174_status": "VALIDATED",
           "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_failure_code": null,
-          "n1_duty_w": null,
+          "n1_duty_w": 437762.3813400462,
           "entered_n2_n4_mesh_ladder": false,
           "full_rating_converged": true,
           "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
@@ -1398,10 +1407,10 @@
           "duty_constraint_basis": "FULL_MESH_RATING",
           "tube_dp_constraint": "SATISFIED",
           "shell_dp_constraint": "SATISFIED",
-          "tube_dp_margin_pa": null,
-          "shell_dp_margin_pa": null,
+          "tube_dp_margin_pa": "328.275",
+          "shell_dp_margin_pa": "513.7592116356651308061889156",
           "hydraulic_constraint_status": "SATISFIED",
-          "nominal_experimental_sizing_feasible": true
+          "nominal_experimental_sizing_feasible": false
         },
         "loss_scenario_results": {
           "mid_band": {
@@ -1849,10 +1858,10 @@
         },
         "geometry": {
           "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
-          "shell_inside_diameter_m": null,
-          "physical_tube_count": null,
-          "tube_length_m": null,
-          "baffle_spacing_m": null,
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.35",
+          "baffle_spacing_m": "1.07",
           "tube_pass_count": {
             "value": 1,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
@@ -1861,9 +1870,9 @@
             "value": 4,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
           },
-          "nominal_tube_outer_area_proxy_m2": null,
-          "task171_rated_outside_area_m2": null,
-          "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+          "nominal_tube_outer_area_proxy_m2": "107.9017617447441143621175",
+          "task171_rated_outside_area_m2": 107.90176174469813,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
         },
         "r27h_classification": {
           "outcome_class": "FULL_PATH_NOT_FEASIBLE",
@@ -2140,11 +2149,11 @@
         },
         "mesh_rating_evidence": {
           "rating_participation_status": "FULLY_RATED",
-          "task174_status": null,
+          "task174_status": "VALIDATED",
           "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
           "n1_failure_code": null,
-          "n1_duty_w": null,
+          "n1_duty_w": 442800.3491931641,
           "entered_n2_n4_mesh_ladder": false,
           "full_rating_converged": true,
           "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
@@ -2158,10 +2167,10 @@
           "duty_constraint_basis": "FULL_MESH_RATING",
           "tube_dp_constraint": "SATISFIED",
           "shell_dp_constraint": "SATISFIED",
-          "tube_dp_margin_pa": null,
-          "shell_dp_margin_pa": null,
+          "tube_dp_margin_pa": "321.620",
+          "shell_dp_margin_pa": "531.4567167964710199890011282",
           "hydraulic_constraint_status": "SATISFIED",
-          "nominal_experimental_sizing_feasible": true
+          "nominal_experimental_sizing_feasible": false
         },
         "loss_scenario_results": {
           "mid_band": {
@@ -2823,10 +2832,10 @@
         },
         "geometry": {
           "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
-          "shell_inside_diameter_m": null,
-          "physical_tube_count": null,
-          "tube_length_m": null,
-          "baffle_spacing_m": null,
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.50",
+          "baffle_spacing_m": "1.10",
           "tube_pass_count": {
             "value": 1,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
@@ -2835,9 +2844,9 @@
             "value": 4,
             "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
           },
-          "nominal_tube_outer_area_proxy_m2": null,
-          "task171_rated_outside_area_m2": null,
-          "task171_rated_outside_area_status": "NOT_AVAILABLE_UNTIL_FULL_RATING"
+          "nominal_tube_outer_area_proxy_m2": "110.9270447843163792507750",
+          "task171_rated_outside_area_m2": 110.92704478431432,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
         },
         "r27h_classification": {
           "outcome_class": "MID_BAND_AUTHORIZED_NUMERIC_EDGE",
@@ -2985,7 +2994,83 @@
       }
     ],
     "mid_band_formal_pareto": [],
-    "mid_band_margin_pareto": [],
+    "mid_band_margin_pareto": [
+      {
+        "candidate_id": "7b124afe-f23c-5efe-b649-1f6d510e9550",
+        "candidate_id_prefix": "7b124afe",
+        "task171_rated_outside_area_m2": "103.86805102529051",
+        "mid_band_min_full_path_margin_pa": "-29.214358520776180312928569",
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry": {
+          "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.15",
+          "baffle_spacing_m": "1.03",
+          "tube_pass_count": {
+            "value": 1,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "baffle_count": {
+            "value": 4,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "nominal_tube_outer_area_proxy_m2": "103.8680510253144278439075",
+          "task171_rated_outside_area_m2": 103.86805102529051,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
+        }
+      },
+      {
+        "candidate_id": "90b9faad-08d4-5837-8b7b-6497dc92ac8f",
+        "candidate_id_prefix": "90b9faad",
+        "task171_rated_outside_area_m2": "107.90176174469813",
+        "mid_band_min_full_path_margin_pa": "-4.024788364334869193811084",
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE",
+        "geometry": {
+          "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.35",
+          "baffle_spacing_m": "1.07",
+          "tube_pass_count": {
+            "value": 1,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "baffle_count": {
+            "value": 4,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "nominal_tube_outer_area_proxy_m2": "107.9017617447441143621175",
+          "task171_rated_outside_area_m2": 107.90176174469813,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
+        }
+      },
+      {
+        "candidate_id": "5e78f6a8-1a7b-5e9b-abf7-854d2eaf5bed",
+        "candidate_id_prefix": "5e78f6a8",
+        "task171_rated_outside_area_m2": "110.92704478431432",
+        "mid_band_min_full_path_margin_pa": "0.000",
+        "outcome_class": "MID_BAND_AUTHORIZED_NUMERIC_EDGE",
+        "geometry": {
+          "geometry_authority": "TASK168_TASK021_SELECTION_RECORD",
+          "shell_inside_diameter_m": "0.56",
+          "physical_tube_count": 337,
+          "tube_length_m": "5.50",
+          "baffle_spacing_m": "1.10",
+          "tube_pass_count": {
+            "value": 1,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "baffle_count": {
+            "value": 4,
+            "authority": "CASE_MANUFACTURING_SEARCH_CONSTRAINT"
+          },
+          "nominal_tube_outer_area_proxy_m2": "110.9270447843163792507750",
+          "task171_rated_outside_area_m2": 110.92704478431432,
+          "task171_rated_outside_area_status": "FROM_FULL_MESH_RATING"
+        }
+      }
+    ],
     "engineering_answers": {
       "new_structurally_legal_distinct_geometries": 3,
       "completed_n1_n2_n4_count": 3,
@@ -3008,18 +3093,6 @@
       "evaluated": false,
       "disclosure": "baffle_count change requires Task024/support re-validation; not executed in this pass because extended ladder alone did not reach mid_band feasibility."
     }
-  },
-  "acceptance_function_matrix": {
-    "user_case_input": "PASS",
-    "automatic_geometry_generation": "PASS",
-    "bundle_layout_traceability": "PASS",
-    "baffle_design_legality": "PASS",
-    "thermal_rating_n1_n2_n4": "PASS",
-    "internal_hydraulics": "PASS",
-    "nozzle_cooptimization": "PASS",
-    "full_path_assumption_k": "PASS",
-    "result_classification": "PASS",
-    "user_readable_design_report": "PASS"
   },
   "design_report": {
     "input_conditions": {
@@ -3053,27 +3126,159 @@
     },
     "thermal_results": {
       "duty_w_at_n4": 442612.2206074065,
-      "duty_constraint": "SATISFIED"
+      "duty_constraint": "SATISFIED",
+      "tube_outlet_k": null,
+      "shell_outlet_k": null,
+      "mesh_rating_outcome": "FULL_MESH_RATING_CONVERGED",
+      "full_rating_converged": true
     },
     "hydraulic_results": {
-      "authorized_mid_band_full_path": {
+      "internal_live_postpass": {
+        "tube_dp_pa": null,
+        "shell_dp_pa": null
+      },
+      "authorized_mid_band_optimized_nozzles": {
+        "verification_level": "AUTHORIZED_FULL_PATH_CALCULATOR",
         "tube_total_dp_pa": "1150.000",
         "shell_total_dp_pa": "1179.999283203528980010998872",
         "tube_margin_pa": "0.000",
         "shell_margin_pa": "0.000716796471019989001128",
-        "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED"
+        "FULL_PATH_HYDRAULIC_STATUS": "SATISFIED",
+        "component_rows": null
       },
-      "max_nozzle_velocity_1ms_audit": {
-        "velocity_m_s": 1.0,
+      "max_nozzle_velocity_1ms_band_edge_audit": {
+        "verification_level": "NOZZLE_BISECT_SIDE_TOTAL_AT_BAND_MAX_DIAMETER",
         "disclosure": "Side totals at band max diameter (v\u22481 m/s) from nozzle cooptimization path model; compare to authorized full_path_hydraulic_verification at optimized nozzles separately.",
+        "velocity_m_s": 1.0,
         "tube_full_path_modeled_dp_pa": 718.25,
         "shell_full_path_modeled_dp_pa": 1166.327283203529,
         "tube_margin_pa": 431.75,
         "shell_margin_pa": 13.672716796470922
       }
     },
+    "k_scenario_summary": {
+      "low_loss_sensitivity": {
+        "full_path_feasible": true,
+        "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+        "tube_margin_pa": "0.001",
+        "shell_margin_pa": "0.000716796471019989001128"
+      },
+      "mid_band": {
+        "full_path_feasible": true,
+        "overall_scenario_status": "FEASIBLE_FULL_PATH_VERIFIED",
+        "tube_margin_pa": "0.000",
+        "shell_margin_pa": "0.000716796471019989001128"
+      },
+      "high_loss_sensitivity": {
+        "full_path_feasible": false,
+        "overall_scenario_status": "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+        "tube_margin_pa": null,
+        "shell_margin_pa": null
+      }
+    },
+    "blocked_or_rejected_candidates": [
+      {
+        "candidate_id_prefix": "923f2ee6",
+        "table_row": {
+          "shell_inside_diameter_m": "0.56",
+          "tube_length_m": "4.85",
+          "baffle_spacing_m": "0.97",
+          "role": "CONTROL"
+        },
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE"
+      },
+      {
+        "candidate_id_prefix": "7b124afe",
+        "table_row": {
+          "shell_inside_diameter_m": "0.56",
+          "tube_length_m": "5.15",
+          "baffle_spacing_m": "1.03",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE"
+      },
+      {
+        "candidate_id_prefix": "90b9faad",
+        "table_row": {
+          "shell_inside_diameter_m": "0.56",
+          "tube_length_m": "5.35",
+          "baffle_spacing_m": "1.07",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "ELIGIBLE_FOR_N1_SCREEN",
+        "outcome_class": "FULL_PATH_NOT_FEASIBLE"
+      },
+      {
+        "candidate_id_prefix": "b978eafc",
+        "table_row": {
+          "shell_inside_diameter_m": "0.58",
+          "tube_length_m": "4.85",
+          "baffle_spacing_m": "0.97",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      },
+      {
+        "candidate_id_prefix": "be2441cb",
+        "table_row": {
+          "shell_inside_diameter_m": "0.58",
+          "tube_length_m": "5.15",
+          "baffle_spacing_m": "1.03",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      },
+      {
+        "candidate_id_prefix": "57b64a03",
+        "table_row": {
+          "shell_inside_diameter_m": "0.58",
+          "tube_length_m": "5.35",
+          "baffle_spacing_m": "1.07",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      },
+      {
+        "candidate_id_prefix": "4562adaa",
+        "table_row": {
+          "shell_inside_diameter_m": "0.60",
+          "tube_length_m": "4.85",
+          "baffle_spacing_m": "0.97",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      },
+      {
+        "candidate_id_prefix": "40970973",
+        "table_row": {
+          "shell_inside_diameter_m": "0.60",
+          "tube_length_m": "5.15",
+          "baffle_spacing_m": "1.03",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      },
+      {
+        "candidate_id_prefix": "412e7a1e",
+        "table_row": {
+          "shell_inside_diameter_m": "0.60",
+          "tube_length_m": "5.35",
+          "baffle_spacing_m": "1.07",
+          "role": "NEW_EXPERIMENTAL"
+        },
+        "phase_a_status": "TASK168_CHAIN_BLOCKED",
+        "outcome_class": "TASK168_CHAIN_BLOCKED"
+      }
+    ],
     "design_conclusion": {
-      "numeric_constraints_mid_band": "MID_BAND_AUTHORIZED_NUMERIC_EDGE",
+      "outcome_class": "MID_BAND_AUTHORIZED_NUMERIC_EDGE",
       "disclosure_layers": {
         "thermal_and_hydraulic_numeric": true,
         "assumption_k_full_path": true,
@@ -3085,10 +3290,34 @@
       "manufacturing_approval": false
     }
   },
+  "acceptance_function_matrix": {
+    "user_case_input": "PASS",
+    "automatic_geometry_generation": "PASS",
+    "bundle_layout_traceability": "PASS",
+    "baffle_design_legality": "PASS",
+    "thermal_rating_n1_n2_n4": "PASS",
+    "internal_hydraulics": "PASS",
+    "nozzle_cooptimization": "PASS",
+    "full_path_assumption_k": "PASS",
+    "result_classification": "PASS",
+    "user_readable_design_report": "PASS"
+  },
   "delivery_summary": {
     "passed": 10,
     "partial": 0,
     "failed": 0,
-    "delivery_status": "EXPERIMENTAL_E2E_COMPLETE_WITH_ASSUMPTION_K_DESIGN"
+    "replay_labeled": 0,
+    "delivery_status": "V07_LIVE_E2E_COMPLETE"
+  },
+  "independent_input_change_test": {
+    "base_tube_inlet_k": "310",
+    "modified_tube_inlet_k": "305.000000",
+    "base_target_duty_w": "330000",
+    "modified_target_duty_w": "330000",
+    "phase_a_status_base": "ELIGIBLE_FOR_N1_SCREEN",
+    "phase_a_status_modified": "ELIGIBLE_FOR_N1_SCREEN",
+    "tube_regime_scan_changed": true,
+    "input_change_reflected_in_computation": true,
+    "coverage": "Phase A Task174 + tube regime scan on one NEW_EXPERIMENTAL geometry row only."
   }
 }

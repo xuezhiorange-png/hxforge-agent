@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -28,7 +28,7 @@ _DEFAULT_LIVE_CASE = (
 )
 
 
-class ExecutionMode(str, Enum):
+class ExecutionMode(StrEnum):
     LIVE_COMPUTE = "LIVE_COMPUTE"
     FIXTURE_REPLAY = "FIXTURE_REPLAY"
 
@@ -348,9 +348,9 @@ def verify_independent_input_change(
     """Prove modified case inputs change computed screening (Phase A tube regime scan)."""
     from prototypes.v07_general_rating_sizing_mvp.r27h_candidate_space_extension import (
         R27H_EXPERIMENTAL_GEOMETRY_TABLE,
+        _record_for_fingerprint,
         build_r27h_selection,
         phase_a_r27h_screen,
-        _record_for_fingerprint,
     )
 
     row = R27H_EXPERIMENTAL_GEOMETRY_TABLE[1]
@@ -431,4 +431,7 @@ def write_v07_delivery_artifacts(report: dict[str, Any], output_dir: Path) -> tu
 
 # Backward-compatible aliases
 run_v07_end_to_end_acceptance = run_v07_live_e2e
-load_v07_acceptance_case = lambda: load_user_case_json(_DEFAULT_LIVE_CASE)
+
+
+def load_v07_acceptance_case() -> EngineeringCase:
+    return load_user_case_json(_DEFAULT_LIVE_CASE)
