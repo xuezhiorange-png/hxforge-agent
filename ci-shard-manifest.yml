@@ -507,6 +507,12 @@ shards:
       - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
       - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
     timeout: 7200
+  - name: v07-r27f-full-path-pressure-budget
+    job: shard-v07-r27f-full-path-pressure-budget
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_r27f_full_path_pressure_budget.py
+    timeout: 7200
 
   - name: v07-r26f-hydraulic-path
     job: shard-v07-r26f-hydraulic-path
