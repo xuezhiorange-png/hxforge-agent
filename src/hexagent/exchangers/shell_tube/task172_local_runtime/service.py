@@ -62,6 +62,8 @@ from .models import (
 
 Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
 
+PropertyEvalCacheKey = tuple[str, int] | tuple[str, int, bool]
+
 
 @dataclass(frozen=True)
 class TubeSideHtcResolution:
@@ -929,11 +931,11 @@ def _shell_outer_wall_conductance_w_per_k(
     shell_geometry_htc: Decimal,
     wall_outer_k: float,
     *,
-    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
     property_eval_counter: list[int] | None = None,
 ) -> float:
     """Shell-side film conductance g_o = h_o(Two) * Ao (W/K), matching _eval_trial()."""
-    cache_key = ("shell_g_o", _temperature_cache_key(wall_outer_k))
+    cache_key: PropertyEvalCacheKey = ("shell_g_o", _temperature_cache_key(wall_outer_k))
     if property_eval_cache is not None and cache_key in property_eval_cache:
         return property_eval_cache[cache_key]
     support = request.support
@@ -966,11 +968,15 @@ def _tube_inner_wall_conductance_w_per_k(
     wall_inner_k: float,
     *,
     apply_c3_wall_pr_correction: bool = True,
-    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
     property_eval_counter: list[int] | None = None,
 ) -> float:
     """Tube-side film conductance g_i = h_i(Twi) * Ai (W/K), matching _eval_trial()."""
-    cache_key = ("tube_g_i", _temperature_cache_key(wall_inner_k), apply_c3_wall_pr_correction)
+    cache_key: PropertyEvalCacheKey = (
+        "tube_g_i",
+        _temperature_cache_key(wall_inner_k),
+        apply_c3_wall_pr_correction,
+    )
     if property_eval_cache is not None and cache_key in property_eval_cache:
         return property_eval_cache[cache_key]
     support = request.support
@@ -1527,7 +1533,7 @@ def _solve_once(
             apply_c3_wall_pr_correction=tube_apply_c3,
         )
 
-    property_eval_cache: dict[tuple[str, int], float] = {}
+    property_eval_cache: dict[PropertyEvalCacheKey, float] = {}
     property_eval_counter = [0]
 
     def _twi_from_two(two_value: float) -> tuple[float, float]:

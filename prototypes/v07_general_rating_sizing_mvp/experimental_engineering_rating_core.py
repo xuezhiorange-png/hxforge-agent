@@ -565,6 +565,85 @@ def _check_enthalpy_domain(provider: CoolPropProvider, enthalpies: list[float]) 
             raise ValueError(f"enthalpy_domain_exit;h={value}")
 
 
+def _q_vector_in_admitted_enthalpy_domain(
+    q: np.ndarray,
+    *,
+    provider: CoolPropProvider,
+    h_t_in: float,
+    h_s_in: float,
+    m_tube: float,
+    m_shell: float,
+) -> bool:
+    """True when the enthalpy trace implied by q stays inside the rating-admitted domain."""
+    ht, hs = _enthalpies_from_q_vector(
+        q, h_t_in=h_t_in, h_s_in=h_s_in, m_tube=m_tube, m_shell=m_shell
+    )
+    try:
+        _check_enthalpy_domain(provider, ht + hs)
+    except ValueError:
+        return False
+    return True
+
+
+def _resolve_n1_q_initial(
+    n: int,
+    *,
+    provider: CoolPropProvider,
+    grid: list[_GlobalCellBinding],
+    base_request: CandidateTask172LocalRequest,
+    tube_inlet_t_k: float,
+    shell_inlet_t_k: float,
+    m_tube: float,
+    m_shell: float,
+    h_t_in: float,
+    h_s_in: float,
+    q_initial: np.ndarray | None,
+) -> np.ndarray:
+    """Pick deterministic N1 Q seed: mesh seed, conductance-weighted, else R27D uniform."""
+    delta_t_in = abs(tube_inlet_t_k - shell_inlet_t_k)
+    if q_initial is not None and q_initial.size == n:
+        q_seed = np.maximum(q_initial.astype(float), 1.0)
+        if _q_vector_in_admitted_enthalpy_domain(
+            q_seed,
+            provider=provider,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            m_shell=m_shell,
+        ):
+            return q_seed
+    q_cond = np.maximum(
+        _conductance_weighted_q_guess(
+            grid=grid,
+            provider=provider,
+            base_request=base_request,
+            tube_inlet_t_k=tube_inlet_t_k,
+            shell_inlet_t_k=shell_inlet_t_k,
+            m_tube=m_tube,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+        ).astype(float),
+        1.0,
+    )
+    if _q_vector_in_admitted_enthalpy_domain(
+        q_cond,
+        provider=provider,
+        h_t_in=h_t_in,
+        h_s_in=h_s_in,
+        m_tube=m_tube,
+        m_shell=m_shell,
+    ):
+        return q_cond
+    return _initial_q_guess(
+        n,
+        h_t_in=h_t_in,
+        h_s_in=h_s_in,
+        m_tube=m_tube,
+        delta_t_in=delta_t_in,
+        q_seed=None,
+    )
+
+
 def _initial_q_guess(
     n: int,
     *,
@@ -714,19 +793,19 @@ def _solve_global_q_vector(
         if type(base_request) is not CandidateTask172LocalRequest:
             raise TypeError("expected candidate task172 request")
 
-        if q_initial is not None and q_initial.size == n:
-            q0 = np.maximum(q_initial.astype(float), 1.0)
-        else:
-            q0 = _conductance_weighted_q_guess(
-                grid=grid,
-                provider=provider,
-                base_request=base_request,
-                tube_inlet_t_k=tube_inlet_t_k,
-                shell_inlet_t_k=shell_inlet_t_k,
-                m_tube=m_tube,
-                h_t_in=h_t_in,
-                h_s_in=h_s_in,
-            )
+        q0 = _resolve_n1_q_initial(
+            n,
+            provider=provider,
+            grid=grid,
+            base_request=base_request,
+            tube_inlet_t_k=tube_inlet_t_k,
+            shell_inlet_t_k=shell_inlet_t_k,
+            m_tube=m_tube,
+            m_shell=m_shell,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            q_initial=q_initial,
+        )
 
         def residuals(q_raw: np.ndarray) -> np.ndarray:
             if time.perf_counter() - solver_t0 > _MAX_Q_SOLVER_WALL_S:

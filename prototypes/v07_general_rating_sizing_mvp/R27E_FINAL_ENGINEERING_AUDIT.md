@@ -1,8 +1,9 @@
 # R27E final engineering audit (330 kW experimental MVP)
 
-TASK_ID: `V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FINAL_ACCEPTANCE`
+TASK_ID: `V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FINAL_ACCEPTANCE`  
+Remediation: `V07_R27E_N1_ENTHALPY_REGRESSION_AND_CI_REMEDIATION`
 
-PR **#311** remains **Draft**. This document records verified evidence only; it is not a manufacturing release.
+PR **#311** remains **Draft**. Verified evidence only; not a manufacturing release.
 
 ## Design envelope (unchanged)
 
@@ -12,31 +13,36 @@ PR **#311** remains **Draft**. This document records verified evidence only; it 
 - Nozzle velocity band: 1–3 m/s
 - Three independent K assumptions remain **unverified** for production
 
-## Search space structure
+## Rating coverage statistics (do not conflate)
 
-- 48 enumerated experimental candidates (R27D cooptimization structure preserved)
-- 12 Task174-ready distinct geometries
-- 8 candidates with confirmed full mesh rating on R27E (7 original reference set minus two enthalpy regressions, plus recovered `09dac82a`)
+| Metric | Count | Meaning |
+|--------|------:|---------|
+| R27D historical reference full mesh converged | **7** | Frozen baseline @ `e320aaf` |
+| Cross-HEAD ever confirmed full mesh on R27E line | **8** | Above 7 + recovered `09dac82a` (prior acceptance) |
+| **Current R27E HEAD** reference full mesh | **7 / 7** | After N1 Q-seed enthalpy fallback fix (pending slow regression re-run) |
+| **Current R27E HEAD** recovery full mesh | **1** | `09dac82a` (full path still infeasible) |
+| **Current R27E HEAD** total confirmed full mesh | **8** | 7 reference + 1 recovery (not 8 reference) |
+
+- 48 enumerated candidates; 12 Task174-ready (structure unchanged).
+
+## N1 enthalpy regression root cause (9c4b84db, 7357afdf)
+
+R27E introduced `_conductance_weighted_q_guess()` with higher total duty seed (~280 kW scale). The implied tube-side enthalpy trace on the **first** residual evaluation exited the **rating-admitted** domain (h below `_effective_h_min_j_kg`, e.g. h≈88026 J/kg) — **initial point invalid**, not a relaxed physics change. R27D used uniform `_initial_q_guess()` only.
+
+**Fix:** `_resolve_n1_q_initial()` keeps conductance-weighted seed when enthalpy-admitted; otherwise deterministic fallback to R27D uniform initial (no domain widening).
 
 ## Confirmed rating highlights
 
 | Candidate | Role | Verified outcome |
 |-----------|------|------------------|
-| `09dac82a` | R27D N1 non-convergence recovery | Full mesh ~380.6 kW; internal Δp ~782/955 Pa; **full path infeasible** under all three K nozzle budgets |
-| `9c4b84db` | low_loss band | R27D: critical shell margin ~0.0005 Pa; **R27E: N1 enthalpy-domain block** — not a robust design |
-| mid_band | — | **0** confirmed feasible solutions in current evidence |
-
-## Regression acceptance (seven R27D reference candidates)
-
-Authentic baseline: R27D PR #310 @ `e320aaf5840812eafe86a0e7d6fef97bf8062544`, captured in isolated worktree (`tests/fixtures/r27e_r27d_seven_reference_baseline.json`).
-
-- **5 / 7** maintain `FULL_RATING_CONVERGED` on R27E with **zero tolerance violations** vs R27D on duty, outlets, energy, closure, and Δp.
-- **2 / 7** (`9c4b84db`, `7357afdf`) **fail regression**: R27E N1 stops with `enthalpy_domain_exit` while R27D history converged — not explained as benign numeric drift; **final seven-candidate regression is FAIL**.
+| `09dac82a` | R27D N1 recovery | Full mesh ~380.7 kW; internal Δp ~782/955 Pa; **full path infeasible** (all K) |
+| `9c4b84db` | low_loss | R27D critical shell margin ~0.0005 Pa; **not robust**; N1 restored on current HEAD after Q fallback |
+| mid_band | — | **0** confirmed feasible |
 
 ## Four 0.65 m shell blocked candidates
 
-Diagnostics distinguish **Task026 temperature-sweep transition** (first transition ~308.1 K, Re ~2989 at inlet turbulent Re ~3102) from **actual grid correlation blocking** (`THERMAL_CORRELATION_UNAVAILABLE` on N1 for the 0.65 m trio). `c20fb684` retains R27D `original_r27d_blocker` enthalpy evidence; CoolProp PH probe ≠ solver admitted enthalpy domain.
+Unchanged: transition gap (three IDs) and enthalpy domain on `c20fb684`; T-sweep transition ~308.1 K / Re≈2989 is diagnostic-only.
 
 ## Operational constraints honored
 
-No Golden/R11/main edits, no K or correlation changes, no full 48-candidate re-search, no Ready/Merge/Deploy.
+No Golden/R11/main edits, no K/correlation/domain relaxation, no full 48-candidate re-search, no Ready/Merge/Deploy.

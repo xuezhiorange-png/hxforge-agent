@@ -505,6 +505,7 @@ shards:
       - tests/prototypes/test_r27e_physical_model_isolation.py
       - tests/prototypes/test_r27e_reference_regression.py
       - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
+      - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
     timeout: 7200
 
   - name: v07-r26f-hydraulic-path

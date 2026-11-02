@@ -1,7 +1,7 @@
 {
   "schema_version": "hxforge.r27e-targeted-recovery.v27e2",
   "TASK_ID": "V07_R27E_THERMAL_REGIME_AND_N1_CONVERGENCE_RECOVERY",
-  "generated_at_utc": "2026-11-01T15:30:27.097733+00:00",
+  "generated_at_utc": "2026-11-02T01:40:00.093099+00:00",
   "provenance": {
     "r27d_original_blocker_source": "R27D mesh-rating evidence (frozen)",
     "r27e_new_full_rating_candidate_ids": [
@@ -2149,16 +2149,16 @@
         "task025_total_parallel_flow_area_m2": "0.0878673522"
       },
       "original_r27d_blocker": "MESH_TOPOLOGY_INVALID;enthalpy_domain_exit",
-      "r27e_n1_failure_code": "MESH_TOPOLOGY_INVALID",
+      "r27e_n1_failure_code": "_RuntimeFailure",
       "r27e_n1_status": "EXPERIMENTAL_ENGINEERING_BLOCKED",
       "recovery_root_cause": "PROPERTY_ENTHALPY_DOMAIN_EXIT",
       "recovery_outcome_class": "MODEL_NOT_APPLICABLE",
       "mesh_rating_evidence": {
         "rating_participation_status": "NOT_EVALUATED",
         "task174_status": "VALIDATED",
-        "screening_n1_status": "BLOCKED_N1_MESH_TOPOLOGY_INVALID",
+        "screening_n1_status": "BLOCKED_N1__RuntimeFailure",
         "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_BLOCKED",
-        "n1_failure_code": "MESH_TOPOLOGY_INVALID",
+        "n1_failure_code": "_RuntimeFailure",
         "n1_duty_w": null,
         "entered_n2_n4_mesh_ladder": false,
         "full_rating_converged": false,
@@ -2167,7 +2167,7 @@
         "disclosure": "N1 thermal screen failure does not classify the candidate as thermally or full-path infeasible\u2014only that full mesh rating was not completed."
       },
       "n1_diagnostics_tail": [
-        "enthalpy_domain_exit;h=85139.62401371569"
+        "THERMAL_CORRELATION_UNAVAILABLE"
       ],
       "tube_side_regime_diagnostics": {
         "candidate_id": "c20fb684-9827-5cdb-9550-a4c5c03200c0",
@@ -2829,16 +2829,8 @@
           }
         ],
         "enthalpy_domain_probe": {
-          "side": "TUBE",
-          "enthalpy_j_kg": 85139.62401371569,
-          "pressure_pa": 101325.0,
-          "rating_admitted_h_min_j_kg": 91746.66945958413,
-          "rating_admitted_h_max_j_kg": 196248.58004450984,
-          "rating_admitted_enthalpy_domain_ok": false,
-          "rating_domain_is_not_coolprop_domain": true,
-          "property_domain_ok": true,
-          "temperature_k": 293.4206344906081,
-          "phase": "liquid"
+          "status": "NOT_EXECUTED_NO_RUNTIME_ENTHALPY_DIAGNOSTIC",
+          "disclosure": "Do not substitute a historical assumed enthalpy for an actual R27E solver diagnostic."
         }
       },
       "thermal_rating": {
