@@ -118,7 +118,11 @@ def _build_design_report(
     geom = (best_row or {}).get("geometry") or {}
     gf = (best_row or {}).get("geometry_fingerprint") or (best_row or {}).get("table_row") or {}
     shell_id = geom.get("shell_inside_diameter_m") or gf.get("shell_inside_diameter_m")
-    tube_count = geom.get("physical_tube_count") or gf.get("physical_tube_count")
+    tube_count = (
+        geom.get("physical_tube_count")
+        or gf.get("physical_tube_count")
+        or ((best_row or {}).get("phase_a") or {}).get("physical_tube_count")
+    )
     tube_len = geom.get("tube_length_m") or gf.get("tube_length_m")
     baffle_sp = geom.get("baffle_spacing_m") or gf.get("baffle_spacing_m")
     constraints = (best_row or {}).get("constraints") or {}

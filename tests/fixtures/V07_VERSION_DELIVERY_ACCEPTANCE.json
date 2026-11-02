@@ -1,7 +1,7 @@
 {
   "schema_version": "hxforge.v07-version-delivery-acceptance.v07",
   "TASK_ID": "V07_VERSION_DELIVERY_AND_END_TO_END_ACCEPTANCE",
-  "generated_at_utc": "2026-11-02T07:52:02.920347+00:00",
+  "generated_at_utc": "2026-11-02T07:53:37.351188+00:00",
   "acceptance_case_id": "r27h-extended-shell-baffle-candidate-space",
   "r27h_search_report": {
     "schema_version": "hxforge.r27h-candidate-space-extension.v27h",
@@ -3037,7 +3037,7 @@
     },
     "generated_structure": {
       "shell_inside_diameter_m": "0.56",
-      "physical_tube_count": null,
+      "physical_tube_count": 337,
       "tube_length_m": "5.50",
       "tube_outer_diameter_m": "0.01905",
       "tube_wall_thickness_m": "0.00165",
