@@ -127,6 +127,18 @@ def main() -> None:
     )
 
     case = load_user_case_json(args.case)
+
+    independent_sidecar: dict | None = None
+    if args.independent_input_test:
+        modified = case.model_copy(
+            update={
+                "tube_side": case.tube_side.model_copy(
+                    update={"inlet_temperature_k": Decimal("305.000000")}
+                )
+            }
+        )
+        independent_sidecar = verify_independent_input_change(case, modified)
+
     if args.reuse_r27h_fixture:
         r27h = _reclassify_r27h_fixture()
         report = run_v07_live_e2e(
@@ -137,19 +149,11 @@ def main() -> None:
     else:
         report = run_v07_live_e2e(case, mode=ExecutionMode.LIVE_COMPUTE)
 
-    if args.independent_input_test:
-        modified = case.model_copy(
-            update={
-                "tube_side": case.tube_side.model_copy(
-                    update={"inlet_temperature_k": Decimal("305.000000")}
-                )
-            }
-        )
-        sidecar = verify_independent_input_change(case, modified)
-        report["independent_input_change_test"] = sidecar
+    if independent_sidecar is not None:
+        report["independent_input_change_test"] = independent_sidecar
         side_path = args.output_dir / "INDEPENDENT_INPUT_CHANGE_TEST.json"
         args.output_dir.mkdir(parents=True, exist_ok=True)
-        side_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
+        side_path.write_text(json.dumps(independent_sidecar, indent=2) + "\n", encoding="utf-8")
 
     write_v07_delivery_artifacts(report, args.output_dir)
     fixture_out = Path("tests/fixtures/V07_VERSION_DELIVERY_ACCEPTANCE.json")
