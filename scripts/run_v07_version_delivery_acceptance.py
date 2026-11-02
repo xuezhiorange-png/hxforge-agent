@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""V07 version delivery end-to-end acceptance."""
+"""V07 final live E2E delivery acceptance CLI."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -14,8 +15,6 @@ if str(_ROOT) not in sys.path:
 
 
 def _reclassify_r27h_fixture() -> dict:
-    from decimal import Decimal
-
     from prototypes.v07_general_rating_sizing_mvp.calculation_first_automatic_sizing import (
         _constraint_summary,
         _geometry_report_block,
@@ -30,21 +29,31 @@ def _reclassify_r27h_fixture() -> dict:
     )
 
     fixture = Path("tests/fixtures/R27H_CANDIDATE_SPACE_EXTENSION.json")
-    raw = json.loads(fixture.read_text())
+    raw = json.loads(fixture.read_text(encoding="utf-8"))
     case = load_r27h_engineering_case()
     sel = build_r27h_selection(case)
     for row in raw.get("candidates") or []:
         if not row.get("loss_scenario_results"):
             continue
+        ev0 = row.get("mesh_rating_evidence") or {}
+        if ev0.get("full_rating_converged") is not True and not row.get(
+            "engineering_delivery_receipt"
+        ):
+            continue
         rec = next(r for r in sel.records if r.candidate_id == row["candidate_id"])
         gf = row.get("geometry_fingerprint") or {}
         multi_row = {
-            "FULL_RATING_CONVERGED": True,
-            "rating_participation_status": "FULLY_RATED",
-            "screening_n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
-            "n1_thermal_numeric_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+            "FULL_RATING_CONVERGED": ev0.get("full_rating_converged", True),
+            "rating_participation_status": row.get("rating_participation_status", "FULLY_RATED"),
+            "screening_n1_status": row.get(
+                "screening_n1_status", "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+            ),
+            "n1_thermal_numeric_status": row.get("n1_thermal_numeric_status"),
             "duty_w_at_finest_mesh": (row.get("constraints") or {}).get("duty_w_at_finest_mesh"),
-            "live_thermal_state_hydraulic_postpass": {
+            "live_thermal_state_hydraulic_postpass": row.get(
+                "live_thermal_state_hydraulic_postpass"
+            )
+            or {
                 "correlation_applicability_status": "APPLICABLE",
                 "tube_dp_constraint": (row.get("constraints") or {}).get("tube_dp_constraint"),
                 "shell_dp_constraint": (row.get("constraints") or {}).get("shell_dp_constraint"),
@@ -54,7 +63,9 @@ def _reclassify_r27h_fixture() -> dict:
             },
             "TUBE_DP_MARGIN_PA": (row.get("constraints") or {}).get("tube_dp_margin_pa"),
             "SHELL_DP_MARGIN_PA": (row.get("constraints") or {}).get("shell_dp_margin_pa"),
-            "NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE": True,
+            "NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE": row.get(
+                "NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE", True
+            ),
             "candidate_geometry_authority": {
                 "shell_inside_diameter_m": gf.get("shell_inside_diameter_m"),
                 "physical_tube_count": gf.get("physical_tube_count"),
@@ -85,75 +96,74 @@ def _reclassify_r27h_fixture() -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--case",
+        type=Path,
+        default=Path("tests/fixtures/v07_live_acceptance_user_case.json"),
+        help="User engineering case JSON (330 kW baseline by default).",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("/opt/cursor/artifacts/v07-version-delivery"),
+        default=Path("/opt/cursor/artifacts/v07-final-acceptance"),
     )
     parser.add_argument(
         "--reuse-r27h-fixture",
         action="store_true",
-        help="Reclassify sealed R27H mesh results (no remesh).",
+        help="REPLAY only: reclassify sealed R27H fixture; not live E2E.",
+    )
+    parser.add_argument(
+        "--independent-input-test",
+        action="store_true",
+        help="Run controlled input-change verification (Phase A); writes sidecar JSON.",
     )
     args = parser.parse_args()
 
     from prototypes.v07_general_rating_sizing_mvp.v07_version_delivery import (
-        load_v07_acceptance_case,
-        run_v07_end_to_end_acceptance,
+        ExecutionMode,
+        load_user_case_json,
+        run_v07_live_e2e,
+        verify_independent_input_change,
         write_v07_delivery_artifacts,
     )
 
+    case = load_user_case_json(args.case)
     if args.reuse_r27h_fixture:
         r27h = _reclassify_r27h_fixture()
-        case = load_v07_acceptance_case()
-        report = run_v07_end_to_end_acceptance(case, run_full_mesh=False)
-        report["r27h_search_report"] = r27h
-        from prototypes.v07_general_rating_sizing_mvp.v07_version_delivery import (
-            _acceptance_matrix,
-            _build_design_report,
-        )
-
-        answers = r27h.get("engineering_answers") or {}
-        best_row = next(
-            (
-                c
-                for c in r27h.get("candidates") or []
-                if c.get("candidate_id_prefix") == answers.get("best_candidate_id_prefix")
-            ),
-            None,
-        )
-        mid = ((best_row or {}).get("loss_scenario_results") or {}).get("mid_band") or {}
-        fp = mid.get("full_path_hydraulic_verification") or {}
-        sens = (best_row or {}).get("r27h_classification") or {}
-        report["acceptance_function_matrix"] = _acceptance_matrix(r27h)
-        report["design_report"] = _build_design_report(
+        report = run_v07_live_e2e(
             case,
-            best_row,
-            fp,
-            (sens.get("sensitivity") or {}).get("max_nozzle_velocity_audit") or {},
-            sens,
+            mode=ExecutionMode.FIXTURE_REPLAY,
+            r27h_precomputed=r27h,
         )
-        passed = sum(1 for v in report["acceptance_function_matrix"].values() if v == "PASS")
-        partial = sum(1 for v in report["acceptance_function_matrix"].values() if v == "PARTIAL")
-        failed = sum(1 for v in report["acceptance_function_matrix"].values() if v == "FAIL")
-        report["delivery_summary"] = {
-            "passed": passed,
-            "partial": partial,
-            "failed": failed,
-            "delivery_status": (
-                "EXPERIMENTAL_E2E_COMPLETE_WITH_ASSUMPTION_K_DESIGN"
-                if answers.get("mid_band_full_path_feasible_count", 0) > 0
-                else "EXPERIMENTAL_E2E_COMPLETE_NO_ROBUST_MID_BAND_MARGIN"
-            ),
-        }
     else:
-        case = load_v07_acceptance_case()
-        report = run_v07_end_to_end_acceptance(case, run_full_mesh=True)
+        report = run_v07_live_e2e(case, mode=ExecutionMode.LIVE_COMPUTE)
+
+    if args.independent_input_test:
+        modified = case.model_copy(
+            update={
+                "tube_side": case.tube_side.model_copy(
+                    update={"inlet_temperature_k": Decimal("305.000000")}
+                )
+            }
+        )
+        sidecar = verify_independent_input_change(case, modified)
+        report["independent_input_change_test"] = sidecar
+        side_path = args.output_dir / "INDEPENDENT_INPUT_CHANGE_TEST.json"
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+        side_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
     write_v07_delivery_artifacts(report, args.output_dir)
-    Path("tests/fixtures/V07_VERSION_DELIVERY_ACCEPTANCE.json").write_text(
-        json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8"
-    )
-    print(json.dumps(report["delivery_summary"], indent=2))
+    fixture_out = Path("tests/fixtures/V07_VERSION_DELIVERY_ACCEPTANCE.json")
+    if report.get("execution_mode") == ExecutionMode.LIVE_COMPUTE.value:
+        fixture_out.write_text(json.dumps(report, indent=2, default=str) + "\n", encoding="utf-8")
+
+    summary = {
+        **report.get("delivery_summary", {}),
+        "execution_mode": report.get("execution_mode"),
+        "FIXTURE_REPLAY_USED_FOR_LIVE_ACCEPTANCE": report.get(
+            "FIXTURE_REPLAY_USED_FOR_LIVE_ACCEPTANCE", False
+        ),
+    }
+    print(json.dumps(summary, indent=2))
 
 
 if __name__ == "__main__":
