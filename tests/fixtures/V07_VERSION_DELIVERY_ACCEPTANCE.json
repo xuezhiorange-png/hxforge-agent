@@ -1,7 +1,7 @@
 {
   "schema_version": "hxforge.v07-version-delivery-acceptance.v07",
   "TASK_ID": "V07_VERSION_DELIVERY_AND_END_TO_END_ACCEPTANCE",
-  "generated_at_utc": "2026-11-02T07:48:53.275038+00:00",
+  "generated_at_utc": "2026-11-02T07:52:02.920347+00:00",
   "acceptance_case_id": "r27h-extended-shell-baffle-candidate-space",
   "r27h_search_report": {
     "schema_version": "hxforge.r27h-candidate-space-extension.v27h",
@@ -3036,14 +3036,14 @@
       }
     },
     "generated_structure": {
-      "shell_inside_diameter_m": null,
+      "shell_inside_diameter_m": "0.56",
       "physical_tube_count": null,
-      "tube_length_m": null,
+      "tube_length_m": "5.50",
       "tube_outer_diameter_m": "0.01905",
       "tube_wall_thickness_m": "0.00165",
       "tube_pitch_m": "0.0254",
       "baffle_count": 4,
-      "baffle_spacing_m": null,
+      "baffle_spacing_m": "1.10",
       "nozzles_mid_band": {
         "tube_side_inside_diameter_m": 0.10473706147500997,
         "shell_side_inside_diameter_m": 0.15867594534256146,
