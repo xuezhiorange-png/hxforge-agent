@@ -275,9 +275,7 @@ def _max_nozzle_velocity_mid_band_audit(
     }
 
 
-def _attach_rating_package_fields(
-    row_entry: dict[str, Any], multi_row: dict[str, Any]
-) -> None:
+def _attach_rating_package_fields(row_entry: dict[str, Any], multi_row: dict[str, Any]) -> None:
     for key in (
         "engineering_delivery_receipt",
         "live_thermal_state_hydraulic_postpass",
@@ -541,9 +539,7 @@ def run_r27h_candidate_space_extension(
         )
         _attach_rating_package_fields(row_entry, multi_row)
         row_entry["mesh_rating_evidence"] = _mesh_rating_evidence_from_multi_row(multi_row)
-        row_entry["constraints"] = _constraint_summary(
-            multi_row, target_duty_w=case.target_duty_w
-        )
+        row_entry["constraints"] = _constraint_summary(multi_row, target_duty_w=case.target_duty_w)
         scenario_results: dict[str, Any] = {}
         if multi_row.get("FULL_RATING_CONVERGED") is True:
             postpass = multi_row.get("live_thermal_state_hydraulic_postpass") or {}

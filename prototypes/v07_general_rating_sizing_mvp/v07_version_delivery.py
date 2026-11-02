@@ -121,9 +121,13 @@ def _report_field_complete(design_report: dict[str, Any]) -> tuple[bool, list[st
     opt = hyd.get("authorized_mid_band_optimized_nozzles") or {}
     comp = opt.get("component_rows") or {}
     if not comp.get("TUBE_DP_COMPONENTS"):
-        missing.append("hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.TUBE_DP_COMPONENTS")
+        missing.append(
+            "hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.TUBE_DP_COMPONENTS"
+        )
     if not comp.get("SHELL_DP_COMPONENTS"):
-        missing.append("hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.SHELL_DP_COMPONENTS")
+        missing.append(
+            "hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.SHELL_DP_COMPONENTS"
+        )
     if comp.get("SHELL_BELL_DELAWARE_INTERNAL_DP_PA") is None:
         missing.append(
             "hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.SHELL_BELL_DELAWARE_INTERNAL_DP_PA"
@@ -162,9 +166,9 @@ def acceptance_matrix_strict(
     rated_rows = [c for c in candidates if _mesh_converged_evidence(c)]
     has_feasible = int(answers.get("mid_band_full_path_feasible_count") or 0) > 0
     new_legal = int(answers.get("new_structurally_legal_distinct_geometries") or 0)
-    mid_fp = (
-        ((best or {}).get("loss_scenario_results") or {}).get("mid_band") or {}
-    ).get("full_path_hydraulic_verification") or {}
+    mid_fp = (((best or {}).get("loss_scenario_results") or {}).get("mid_band") or {}).get(
+        "full_path_hydraulic_verification"
+    ) or {}
     target_ok = ((best or {}).get("constraints") or {}).get("target_duty_w") == str(
         case.target_duty_w
     )
@@ -206,7 +210,11 @@ def acceptance_matrix_strict(
         "internal_hydraulics": _status(
             best is not None
             and (best.get("constraints") or {}).get("hydraulic_constraint_status") == "SATISFIED"
-            and (best.get("LIVE_TUBE_DP_PA") is not None or (best.get("engineering_delivery_receipt") or {}).get("LIVE_TUBE_DP_PA") is not None),
+            and (
+                best.get("LIVE_TUBE_DP_PA") is not None
+                or (best.get("engineering_delivery_receipt") or {}).get("LIVE_TUBE_DP_PA")
+                is not None
+            ),
             partial=best is not None,
         ),
         "nozzle_cooptimization": _status(

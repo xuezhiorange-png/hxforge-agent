@@ -112,10 +112,11 @@ def test_design_report_from_fixture_has_geometry_and_components() -> None:
     dr = build_full_design_report(case, r27h)
     assert dr["generated_structure"]["physical_tube_count"] == 337
     mid = (
-        ((next(c for c in r27h["candidates"] if c["candidate_id_prefix"] == "5e78f6a8"))
-        .get("loss_scenario_results") or {})
-        .get("mid_band") or {}
-    )
+        (next(c for c in r27h["candidates"] if c["candidate_id_prefix"] == "5e78f6a8")).get(
+            "loss_scenario_results"
+        )
+        or {}
+    ).get("mid_band") or {}
     fp = mid.get("full_path_hydraulic_verification") or {}
     comp = dr["hydraulic_results"]["authorized_mid_band_optimized_nozzles"]["component_rows"]
     assert comp["TUBE_DP_COMPONENTS"] == fp.get("TUBE_DP_COMPONENTS")

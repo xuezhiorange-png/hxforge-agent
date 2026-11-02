@@ -71,9 +71,7 @@ def _reclassify_r27h_fixture() -> dict:
                 "baffle_spacing_m": gf.get("baffle_spacing_m"),
             },
         }
-        multi_row["constraints"] = _constraint_summary(
-            multi_row, target_duty_w=case.target_duty_w
-        )
+        multi_row["constraints"] = _constraint_summary(multi_row, target_duty_w=case.target_duty_w)
         row["constraints"] = multi_row["constraints"]
         row["mesh_rating_evidence"] = _mesh_rating_evidence_from_multi_row(multi_row)
         row["geometry"] = _geometry_report_block(row=multi_row, case=case)
