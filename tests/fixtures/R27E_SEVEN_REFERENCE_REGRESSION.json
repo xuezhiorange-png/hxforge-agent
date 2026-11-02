@@ -1,0 +1,8 @@
+{
+  "TASK_ID": "V07_R27E_PHYSICAL_MODEL_ISOLATION_AND_REGRESSION_FINAL_ACCEPTANCE",
+  "status": "PASS",
+  "reference_candidate_count": 7,
+  "baseline_path": "/workspace/tests/fixtures/r27e_r27d_seven_reference_baseline.json",
+  "current_path": "/opt/cursor/artifacts/r27e-recovery/R27E_SEVEN_REFERENCE_CURRENT.json",
+  "deltas": []
+}

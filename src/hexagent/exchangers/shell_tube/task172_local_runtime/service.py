@@ -62,6 +62,22 @@ from .models import (
 
 Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
 
+PropertyEvalCacheKey = tuple[str, int] | tuple[str, int, bool]
+
+
+@dataclass(frozen=True)
+class TubeSideHtcResolution:
+    """Resolved tube-side film HTC at bulk state (before optional C3 wall-Pr correction)."""
+
+    htc_w_m2_k: Decimal
+    reynolds_number: Decimal
+    prandtl_number: Decimal
+    correlation_id: str
+    correlation_version: str
+    flow_regime: FlowRegime
+    apply_c3_wall_pr_correction: bool
+
+
 _T_MIN = Decimal("298.15")
 _T_MAX = Decimal("300.00")
 
@@ -723,9 +739,46 @@ def _snapshot(
     return snapshot, identity, state
 
 
-def _tube_base_htc(
+def _cell_flow_length_m(request: Task172Request) -> Decimal:
+    support = request.support
+    segment_length = support.physical_segment_end_m - support.physical_segment_start_m
+    n = Decimal(support.subdivisions_per_physical_interval_per_side)
+    return segment_length / n
+
+
+def _assert_experimental_laminar_development_applicable(
+    *,
+    reynolds: Decimal,
+    prandtl: Decimal,
+    length_m: Decimal,
+    hydraulic_diameter_m: Decimal,
+) -> None:
+    """Fully developed laminar Nu basis (Task026 / Incropera Table 8.1 scope)."""
+    if hydraulic_diameter_m <= 0 or length_m <= 0:
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_DEVELOPMENT_GEOMETRY", "tube_correlation.development"
+        )
+    ld = length_m / hydraulic_diameter_m
+    re_f = float(reynolds)
+    pr_f = float(prandtl)
+    ld_f = float(ld)
+    hydro_min = 0.05 * re_f
+    thermal_min = 0.05 * re_f * pr_f
+    if ld_f < max(10.0, hydro_min):
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_HYDRODYNAMIC_DEVELOPMENT",
+            f"tube_correlation.ld={ld_f};hydro_min={hydro_min}",
+        )
+    if ld_f < thermal_min:
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_THERMAL_DEVELOPMENT",
+            f"tube_correlation.ld={ld_f};thermal_min={thermal_min}",
+        )
+
+
+def _resolve_tube_side_htc(
     request: Task172Request, snapshot: PropertySnapshot, mass_flow: Decimal
-) -> tuple[Decimal, Decimal, Decimal, str, str]:
+) -> TubeSideHtcResolution:
     if type(request) is CandidateTask172LocalRequest:
         task025 = request.candidate_binding.task025_result
         parallel_area = task025.total_parallel_flow_area_m2
@@ -743,18 +796,63 @@ def _tube_base_htc(
         tube_inner_diameter,
         ThermalBoundaryCondition.CWT,
     )
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    experimental_mvp = _etb.active_experimental_thermal_boundary() is not None
+    if output.flow_regime is FlowRegime.TRANSITION:
+        raise _RuntimeFailure("THERMAL_CORRELATION_UNAVAILABLE", "tube_correlation.transition")
+    if output.flow_regime is FlowRegime.LAMINAR:
+        if not experimental_mvp:
+            raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
+        if not check_pr_envelope(output.flow_regime, output.prandtl_number):
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PRANDTL_OUT_OF_DOMAIN", "tube_correlation.prandtl"
+            )
+        if type(request) is CandidateTask172LocalRequest:
+            _assert_experimental_laminar_development_applicable(
+                reynolds=output.reynolds_number,
+                prandtl=output.prandtl_number,
+                length_m=_cell_flow_length_m(request),
+                hydraulic_diameter_m=tube_inner_diameter,
+            )
+        return TubeSideHtcResolution(
+            htc_w_m2_k=output.tube_side_heat_transfer_coefficient_w_m2_k,
+            reynolds_number=output.reynolds_number,
+            prandtl_number=output.prandtl_number,
+            correlation_id=output.correlation_id,
+            correlation_version=output.correlation_version,
+            flow_regime=FlowRegime.LAMINAR,
+            apply_c3_wall_pr_correction=False,
+        )
     if output.flow_regime is not FlowRegime.TURBULENT:
         raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
     if not _TUBE_C3_RE_MIN < output.reynolds_number < _TUBE_C3_RE_MAX:
         raise _RuntimeFailure("BLOCKED_TUBE_C3_REYNOLDS_OUT_OF_DOMAIN", "tube_correlation.reynolds")
     if not check_pr_envelope(output.flow_regime, output.prandtl_number):
         raise _RuntimeFailure("BLOCKED_TUBE_C3_PRANDTL_OUT_OF_DOMAIN", "tube_correlation.prandtl")
+    return TubeSideHtcResolution(
+        htc_w_m2_k=output.tube_side_heat_transfer_coefficient_w_m2_k,
+        reynolds_number=output.reynolds_number,
+        prandtl_number=output.prandtl_number,
+        correlation_id=output.correlation_id,
+        correlation_version=output.correlation_version,
+        flow_regime=FlowRegime.TURBULENT,
+        apply_c3_wall_pr_correction=True,
+    )
+
+
+def _tube_base_htc(
+    request: Task172Request, snapshot: PropertySnapshot, mass_flow: Decimal
+) -> tuple[Decimal, Decimal, Decimal, str, str]:
+    resolved = _resolve_tube_side_htc(request, snapshot, mass_flow)
     return (
-        output.tube_side_heat_transfer_coefficient_w_m2_k,
-        output.reynolds_number,
-        output.prandtl_number,
-        output.correlation_id,
-        output.correlation_version,
+        resolved.htc_w_m2_k,
+        resolved.reynolds_number,
+        resolved.prandtl_number,
+        resolved.correlation_id,
+        resolved.correlation_version,
     )
 
 
@@ -833,11 +931,11 @@ def _shell_outer_wall_conductance_w_per_k(
     shell_geometry_htc: Decimal,
     wall_outer_k: float,
     *,
-    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
     property_eval_counter: list[int] | None = None,
 ) -> float:
     """Shell-side film conductance g_o = h_o(Two) * Ao (W/K), matching _eval_trial()."""
-    cache_key = ("shell_g_o", _temperature_cache_key(wall_outer_k))
+    cache_key: PropertyEvalCacheKey = ("shell_g_o", _temperature_cache_key(wall_outer_k))
     if property_eval_cache is not None and cache_key in property_eval_cache:
         return property_eval_cache[cache_key]
     support = request.support
@@ -869,11 +967,16 @@ def _tube_inner_wall_conductance_w_per_k(
     tube_htc_base: Decimal,
     wall_inner_k: float,
     *,
-    property_eval_cache: dict[tuple[str, int], float] | None = None,
+    apply_c3_wall_pr_correction: bool = True,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
     property_eval_counter: list[int] | None = None,
 ) -> float:
     """Tube-side film conductance g_i = h_i(Twi) * Ai (W/K), matching _eval_trial()."""
-    cache_key = ("tube_g_i", _temperature_cache_key(wall_inner_k))
+    cache_key: PropertyEvalCacheKey = (
+        "tube_g_i",
+        _temperature_cache_key(wall_inner_k),
+        apply_c3_wall_pr_correction,
+    )
     if property_eval_cache is not None and cache_key in property_eval_cache:
         return property_eval_cache[cache_key]
     support = request.support
@@ -887,25 +990,30 @@ def _tube_inner_wall_conductance_w_per_k(
     )
     if property_eval_counter is not None:
         property_eval_counter[0] += 1
-    tube_pr_wall = (
-        tube_wall.dynamic_viscosity_pa_s
-        * tube_wall.specific_heat_capacity_j_kg_k
-        / tube_wall.thermal_conductivity_w_m_k
-    )
-    tube_pr_bulk = (
-        tube_bulk_snapshot.dynamic_viscosity_pa_s
-        * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
-        / tube_bulk_snapshot.thermal_conductivity_w_m_k
-    )
-    if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
-        raise _RuntimeFailure(
-            "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+    if apply_c3_wall_pr_correction:
+        tube_pr_wall = (
+            tube_wall.dynamic_viscosity_pa_s
+            * tube_wall.specific_heat_capacity_j_kg_k
+            / tube_wall.thermal_conductivity_w_m_k
         )
-    pr_ratio = tube_pr_bulk / tube_pr_wall
-    if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
-        raise _RuntimeFailure("BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio")
-    tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
-    tube_htc = tube_htc_base * tube_factor
+        tube_pr_bulk = (
+            tube_bulk_snapshot.dynamic_viscosity_pa_s
+            * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
+            / tube_bulk_snapshot.thermal_conductivity_w_m_k
+        )
+        if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+            )
+        pr_ratio = tube_pr_bulk / tube_pr_wall
+        if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio"
+            )
+        tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
+        tube_htc = tube_htc_base * tube_factor
+    else:
+        tube_htc = tube_htc_base
     g_i = float(tube_htc) * float(support.inside_area_m2)
     if g_i <= 0.0 or not math.isfinite(g_i):
         raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "tube_wall_conductance")
@@ -969,6 +1077,8 @@ def _eval_trial(
     q_hc: float,
     wall_inner: float,
     wall_outer: float,
+    *,
+    apply_c3_wall_pr_correction: bool = True,
 ) -> dict[str, Any]:
     values = (q_hc, wall_inner, wall_outer)
     if any(not math.isfinite(value) for value in values):
@@ -992,25 +1102,30 @@ def _eval_trial(
         to,
         request.shell_bulk_state.pressure_pa,
     )
-    tube_pr_wall = (
-        tube_wall.dynamic_viscosity_pa_s
-        * tube_wall.specific_heat_capacity_j_kg_k
-        / tube_wall.thermal_conductivity_w_m_k
-    )
-    tube_pr_bulk = (
-        tube_bulk_snapshot.dynamic_viscosity_pa_s
-        * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
-        / tube_bulk_snapshot.thermal_conductivity_w_m_k
-    )
-    if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
-        raise _RuntimeFailure(
-            "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+    if apply_c3_wall_pr_correction:
+        tube_pr_wall = (
+            tube_wall.dynamic_viscosity_pa_s
+            * tube_wall.specific_heat_capacity_j_kg_k
+            / tube_wall.thermal_conductivity_w_m_k
         )
-    pr_ratio = tube_pr_bulk / tube_pr_wall
-    if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
-        raise _RuntimeFailure("BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio")
-    tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
-    tube_htc = tube_htc_base * tube_factor
+        tube_pr_bulk = (
+            tube_bulk_snapshot.dynamic_viscosity_pa_s
+            * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
+            / tube_bulk_snapshot.thermal_conductivity_w_m_k
+        )
+        if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+            )
+        pr_ratio = tube_pr_bulk / tube_pr_wall
+        if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio"
+            )
+        tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
+        tube_htc = tube_htc_base * tube_factor
+    else:
+        tube_htc = tube_htc_base
 
     shell_jmu_ratio = shell_bulk_snapshot.dynamic_viscosity_pa_s / shell_wall.dynamic_viscosity_pa_s
     shell_jmu = _decimal_power(shell_jmu_ratio, _JMU_EXPONENT)
@@ -1205,9 +1320,15 @@ def _solve_once(
         request.shell_bulk_state.temperature_k,
         request.shell_bulk_state.pressure_pa,
     )
-    tube_h_base, tube_re, tube_pr, tube_corr_id, tube_corr_version = _tube_base_htc(
+    tube_resolution = _resolve_tube_side_htc(
         request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
     )
+    tube_h_base = tube_resolution.htc_w_m2_k
+    tube_apply_c3 = tube_resolution.apply_c3_wall_pr_correction
+    tube_re = tube_resolution.reynolds_number
+    tube_pr = tube_resolution.prandtl_number
+    tube_corr_id = tube_resolution.correlation_id
+    tube_corr_version = tube_resolution.correlation_version
     shell_h_base, shell_re, shell_pr, _shell_calculation = _shell_base_htc(
         request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
     )
@@ -1256,6 +1377,7 @@ def _solve_once(
             shell_h_base,
             wall_resistance,
             *zero_solution,
+            apply_c3_wall_pr_correction=tube_apply_c3,
         )
         zero_residuals = cast(tuple[float, float, float], zero_final["residuals"])
         zero_bounds = cast(tuple[float, float, float], zero_final["bounds"])
@@ -1349,6 +1471,7 @@ def _solve_once(
             q,
             twi,
             two,
+            apply_c3_wall_pr_correction=tube_apply_c3,
         )
         return np.asarray(evaluated["residuals"], dtype=float) / residual_scale
 
@@ -1368,6 +1491,7 @@ def _solve_once(
             q_value,
             twi_value,
             two_value,
+            apply_c3_wall_pr_correction=tube_apply_c3,
         )
         residual_values = cast(tuple[float, float, float], evaluated["residuals"])
         acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
@@ -1406,9 +1530,10 @@ def _solve_once(
             q_hc,
             wall_inner,
             wall_outer,
+            apply_c3_wall_pr_correction=tube_apply_c3,
         )
 
-    property_eval_cache: dict[tuple[str, int], float] = {}
+    property_eval_cache: dict[PropertyEvalCacheKey, float] = {}
     property_eval_counter = [0]
 
     def _twi_from_two(two_value: float) -> tuple[float, float]:
@@ -1441,6 +1566,7 @@ def _solve_once(
             tube_bulk_snapshot,
             tube_h_base,
             twi_value,
+            apply_c3_wall_pr_correction=tube_apply_c3,
             property_eval_cache=property_eval_cache,
             property_eval_counter=property_eval_counter,
         )

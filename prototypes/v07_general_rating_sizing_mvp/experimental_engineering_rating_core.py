@@ -425,9 +425,11 @@ def _cell_thermal_closure(
         req.shell_bulk_state.temperature_k,
         req.shell_bulk_state.pressure_pa,
     )
-    tube_h_base, _, _, _, _ = task172_service._tube_base_htc(
+    tube_resolution = task172_service._resolve_tube_side_htc(
         req, tube_bulk_snapshot, req.tube_mass_flow_kg_s
     )
+    tube_h_base = tube_resolution.htc_w_m2_k
+    tube_apply_c3 = tube_resolution.apply_c3_wall_pr_correction
     shell_h_base, _, _, _ = task172_service._shell_base_htc(
         req, shell_bulk_snapshot, req.shell_mass_flow_kg_s
     )
@@ -471,6 +473,7 @@ def _cell_thermal_closure(
                 tube_bulk_snapshot,
                 tube_h_base,
                 twi_value,
+                apply_c3_wall_pr_correction=tube_apply_c3,
                 property_eval_cache=None,
                 property_eval_counter=None,
             )
@@ -562,6 +565,85 @@ def _check_enthalpy_domain(provider: CoolPropProvider, enthalpies: list[float]) 
             raise ValueError(f"enthalpy_domain_exit;h={value}")
 
 
+def _q_vector_in_admitted_enthalpy_domain(
+    q: np.ndarray,
+    *,
+    provider: CoolPropProvider,
+    h_t_in: float,
+    h_s_in: float,
+    m_tube: float,
+    m_shell: float,
+) -> bool:
+    """True when the enthalpy trace implied by q stays inside the rating-admitted domain."""
+    ht, hs = _enthalpies_from_q_vector(
+        q, h_t_in=h_t_in, h_s_in=h_s_in, m_tube=m_tube, m_shell=m_shell
+    )
+    try:
+        _check_enthalpy_domain(provider, ht + hs)
+    except ValueError:
+        return False
+    return True
+
+
+def _resolve_n1_q_initial(
+    n: int,
+    *,
+    provider: CoolPropProvider,
+    grid: list[_GlobalCellBinding],
+    base_request: CandidateTask172LocalRequest,
+    tube_inlet_t_k: float,
+    shell_inlet_t_k: float,
+    m_tube: float,
+    m_shell: float,
+    h_t_in: float,
+    h_s_in: float,
+    q_initial: np.ndarray | None,
+) -> np.ndarray:
+    """Pick deterministic N1 Q seed: mesh seed, conductance-weighted, else R27D uniform."""
+    delta_t_in = abs(tube_inlet_t_k - shell_inlet_t_k)
+    if q_initial is not None and q_initial.size == n:
+        q_seed = np.maximum(q_initial.astype(float), 1.0)
+        if _q_vector_in_admitted_enthalpy_domain(
+            q_seed,
+            provider=provider,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            m_shell=m_shell,
+        ):
+            return q_seed
+    q_cond = np.maximum(
+        _conductance_weighted_q_guess(
+            grid=grid,
+            provider=provider,
+            base_request=base_request,
+            tube_inlet_t_k=tube_inlet_t_k,
+            shell_inlet_t_k=shell_inlet_t_k,
+            m_tube=m_tube,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+        ).astype(float),
+        1.0,
+    )
+    if _q_vector_in_admitted_enthalpy_domain(
+        q_cond,
+        provider=provider,
+        h_t_in=h_t_in,
+        h_s_in=h_s_in,
+        m_tube=m_tube,
+        m_shell=m_shell,
+    ):
+        return q_cond
+    return _initial_q_guess(
+        n,
+        h_t_in=h_t_in,
+        h_s_in=h_s_in,
+        m_tube=m_tube,
+        delta_t_in=delta_t_in,
+        q_seed=None,
+    )
+
+
 def _initial_q_guess(
     n: int,
     *,
@@ -577,6 +659,49 @@ def _initial_q_guess(
     if delta_t_in > 8.0:
         total_est = max(total_est, 250_000.0 / max(n / 5.0, 1.0))
     return np.full(n, total_est / n, dtype=float)
+
+
+def _conductance_weighted_q_guess(
+    *,
+    grid: list[_GlobalCellBinding],
+    provider: CoolPropProvider,
+    base_request: CandidateTask172LocalRequest,
+    tube_inlet_t_k: float,
+    shell_inlet_t_k: float,
+    m_tube: float,
+    h_t_in: float,
+    h_s_in: float,
+) -> np.ndarray:
+    n = len(grid)
+    weights = np.zeros(n, dtype=float)
+    conductance_cache: dict[tuple[Any, ...], float] = {}
+    for binding in grid:
+        req = base_request.model_copy(update={"support": binding.support})
+        try:
+            closure = _cell_thermal_closure(
+                req,
+                provider,
+                tube_inlet_t_k,
+                shell_inlet_t_k,
+                conductance_cache=conductance_cache,
+            )
+            weights[binding.global_index] = max(float(closure.q_thermal_w), 1.0)
+        except (ValueError, TypeError):
+            weights[binding.global_index] = 1.0
+    if float(weights.sum()) <= 0.0:
+        return _initial_q_guess(
+            n,
+            h_t_in=h_t_in,
+            h_s_in=h_s_in,
+            m_tube=m_tube,
+            delta_t_in=abs(tube_inlet_t_k - shell_inlet_t_k),
+            q_seed=None,
+        )
+    delta_h = max(h_t_in - h_s_in, 0.0)
+    total_est = max(m_tube * delta_h * 0.15, float(weights.sum()), 8000.0)
+    if abs(tube_inlet_t_k - shell_inlet_t_k) > 8.0:
+        total_est = max(total_est, 280_000.0)
+    return total_est * weights / weights.sum()
 
 
 def _build_cells_from_q(
@@ -668,13 +793,18 @@ def _solve_global_q_vector(
         if type(base_request) is not CandidateTask172LocalRequest:
             raise TypeError("expected candidate task172 request")
 
-        q0 = _initial_q_guess(
+        q0 = _resolve_n1_q_initial(
             n,
+            provider=provider,
+            grid=grid,
+            base_request=base_request,
+            tube_inlet_t_k=tube_inlet_t_k,
+            shell_inlet_t_k=shell_inlet_t_k,
+            m_tube=m_tube,
+            m_shell=m_shell,
             h_t_in=h_t_in,
             h_s_in=h_s_in,
-            m_tube=m_tube,
-            delta_t_in=abs(tube_inlet_t_k - shell_inlet_t_k),
-            q_seed=q_initial,
+            q_initial=q_initial,
         )
 
         def residuals(q_raw: np.ndarray) -> np.ndarray:

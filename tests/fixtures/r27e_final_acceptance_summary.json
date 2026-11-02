@@ -1,0 +1,68 @@
+{
+  "TASK_ID": "V07_R27E_N1_ENTHALPY_REGRESSION_AND_CI_REMEDIATION",
+  "regression_status": "PASS",
+  "regression_delta_count": 0,
+  "r27d_reference_converged_historical": 7,
+  "cross_head_ever_confirmed_full_mesh": 8,
+  "current_head_reference_full_mesh_converged": 7,
+  "current_head_recovery_full_mesh_converged": 1,
+  "current_head_total_full_mesh_converged": 8,
+  "per_candidate_deltas": [
+    {
+      "candidate_id_prefix": "3c129a7f",
+      "n1_duty_delta_w": -5.07105141878128e-07,
+      "n4_duty_delta_w": 3.491295501589775e-07,
+      "n4_tube_outlet_delta_k": -1.3983481039758772e-11,
+      "n4_shell_outlet_delta_k": -8.009237717487849e-11,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "40d78e67",
+      "n1_duty_delta_w": -1.934240572154522e-07,
+      "n4_duty_delta_w": 2.4103792384266853e-07,
+      "n4_tube_outlet_delta_k": -7.389644451905042e-12,
+      "n4_shell_outlet_delta_k": -4.320099833421409e-12,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "580fc128",
+      "n1_duty_delta_w": 0.00010694528464227915,
+      "n4_duty_delta_w": 3.7759309634566307e-07,
+      "n4_tube_outlet_delta_k": -2.9331204132176936e-11,
+      "n4_shell_outlet_delta_k": 4.3996806198265404e-11,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "7357afdf",
+      "n1_duty_delta_w": 0.0,
+      "n4_duty_delta_w": 0.0,
+      "n4_tube_outlet_delta_k": 0.0,
+      "n4_shell_outlet_delta_k": 0.0,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "8b05db3b",
+      "n1_duty_delta_w": -9.457580745220184e-07,
+      "n4_duty_delta_w": 2.0087463781237602e-07,
+      "n4_tube_outlet_delta_k": -9.492850949754938e-12,
+      "n4_shell_outlet_delta_k": -6.116351869422942e-11,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "9aba0e5c",
+      "n1_duty_delta_w": 1.3399403542280197e-07,
+      "n4_duty_delta_w": 4.280591383576393e-07,
+      "n4_tube_outlet_delta_k": -5.4569682106375694e-12,
+      "n4_shell_outlet_delta_k": 1.1311840353300795e-11,
+      "full_rating_converged": true
+    },
+    {
+      "candidate_id_prefix": "9c4b84db",
+      "n1_duty_delta_w": 0.0,
+      "n4_duty_delta_w": 0.0,
+      "n4_tube_outlet_delta_k": 0.0,
+      "n4_shell_outlet_delta_k": 0.0,
+      "full_rating_converged": true
+    }
+  ]
+}

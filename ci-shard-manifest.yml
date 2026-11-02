@@ -497,6 +497,17 @@ shards:
       - tests/prototypes/test_r27d_thermal_hydraulic_geometry_cooptimization_sizing.py
     timeout: 7200
 
+  - name: v07-r27e-thermal-regime-n1-recovery
+    job: shard-v07-r27e-thermal-regime-n1-recovery
+    python: ["3.11", "3.12"]
+    files:
+      - tests/exchangers/shell_tube/test_task172_tube_regime_isolation_r27e.py
+      - tests/prototypes/test_r27e_physical_model_isolation.py
+      - tests/prototypes/test_r27e_reference_regression.py
+      - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
+      - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
+    timeout: 7200
+
   - name: v07-r26f-hydraulic-path
     job: shard-v07-r26f-hydraulic-path
     python: ["3.11", "3.12"]
