@@ -11,7 +11,6 @@ from prototypes.v07_general_rating_sizing_mvp.calculation_first_automatic_sizing
     _constraint_summary,
 )
 from prototypes.v07_general_rating_sizing_mvp.r27h_candidate_space_extension import (
-    _DESIGN_DUTY_W,
     _classify_r27h_final,
     build_r27h_selection,
     load_r27h_engineering_case,
@@ -37,7 +36,7 @@ def test_5e78f6a8_mid_band_not_mislabeled_infeasible() -> None:
         "NOMINAL_EXPERIMENTAL_SIZING_FEASIBLE": True,
         "candidate_geometry_authority": gf,
     }
-    constraints = _constraint_summary(multi_row, target_duty_w=_DESIGN_DUTY_W)
+    constraints = _constraint_summary(multi_row, target_duty_w=case.target_duty_w)
     assert constraints["duty_constraint"] == "SATISFIED"
     cls = _classify_r27h_final(
         record=rec,

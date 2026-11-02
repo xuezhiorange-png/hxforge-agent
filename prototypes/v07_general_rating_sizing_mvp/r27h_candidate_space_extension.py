@@ -60,7 +60,6 @@ from prototypes.v07_general_rating_sizing_mvp.thermal_hydraulic_geometry_cooptim
 
 _TASK_ID = "V07_R27H_CANDIDATE_SPACE_EXTENSION_AND_SHELL_PRESSURE_OPTIMIZATION"
 _SCHEMA = "hxforge.r27h-candidate-space-extension.v27h"
-_DESIGN_DUTY_W = Decimal("330000")
 _BAFFLE_COUNT = 4
 
 R27H_CASE_FIXTURE = (
@@ -276,6 +275,30 @@ def _max_nozzle_velocity_mid_band_audit(
     }
 
 
+def _attach_rating_package_fields(
+    row_entry: dict[str, Any], multi_row: dict[str, Any]
+) -> None:
+    for key in (
+        "engineering_delivery_receipt",
+        "live_thermal_state_hydraulic_postpass",
+        "hydraulic_dp_breakdown",
+        "LIVE_TUBE_DP_PA",
+        "LIVE_SHELL_DP_PA",
+        "tube_outlet_temperature_k_n4",
+        "shell_outlet_temperature_k_n4",
+        "FULL_RATING_CONVERGED",
+        "rating_participation_status",
+        "screening_n1_status",
+        "n1_thermal_numeric_status",
+        "n1_duty_w",
+        "duty_w_at_finest_mesh",
+        "mesh_ladder_levels_completed",
+        "entered_n2_n4_mesh_ladder",
+    ):
+        if key in multi_row:
+            row_entry[key] = multi_row[key]
+
+
 def _multi_row_from_rating_package(
     *,
     case: EngineeringCase,
@@ -315,7 +338,8 @@ def _classify_r27h_final(
             "detail": multi_row.get("rating_participation_status"),
         }
     duty = multi_row.get("duty_w_at_finest_mesh")
-    if duty is None or Decimal(str(duty)) < _DESIGN_DUTY_W:
+    target = case.target_duty_w
+    if duty is None or Decimal(str(duty)) < target:
         return {"outcome_class": "THERMAL_DUTY_NOT_MET", "detail": f"duty={duty}"}
     mid = scenario_results.get("mid_band") or {}
     fp = mid.get("full_path_hydraulic_verification") or {}
@@ -515,8 +539,11 @@ def run_r27h_candidate_space_extension(
             package=package,
             screening_status=screening,
         )
+        _attach_rating_package_fields(row_entry, multi_row)
         row_entry["mesh_rating_evidence"] = _mesh_rating_evidence_from_multi_row(multi_row)
-        row_entry["constraints"] = _constraint_summary(multi_row, target_duty_w=_DESIGN_DUTY_W)
+        row_entry["constraints"] = _constraint_summary(
+            multi_row, target_duty_w=case.target_duty_w
+        )
         scenario_results: dict[str, Any] = {}
         if multi_row.get("FULL_RATING_CONVERGED") is True:
             postpass = multi_row.get("live_thermal_state_hydraulic_postpass") or {}
@@ -574,7 +601,8 @@ def _finalize_report(
         if raw is None:
             continue
         duty_raw = (r.get("constraints") or {}).get("duty_w_at_finest_mesh")
-        if duty_raw is None or Decimal(str(duty_raw)) < _DESIGN_DUTY_W:
+        target = case.target_duty_w
+        if duty_raw is None or Decimal(str(duty_raw)) < target:
             continue
         m = Decimal(str(raw))
         if best_margin is None or m > best_margin:

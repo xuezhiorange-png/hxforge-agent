@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from decimal import Decimal
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +19,6 @@ def _reclassify_r27h_fixture() -> dict:
         _geometry_report_block,
     )
     from prototypes.v07_general_rating_sizing_mvp.r27h_candidate_space_extension import (
-        _DESIGN_DUTY_W,
         _classify_r27h_final,
         _finalize_report,
         _mesh_rating_evidence_from_multi_row,
@@ -73,7 +71,9 @@ def _reclassify_r27h_fixture() -> dict:
                 "baffle_spacing_m": gf.get("baffle_spacing_m"),
             },
         }
-        multi_row["constraints"] = _constraint_summary(multi_row, target_duty_w=_DESIGN_DUTY_W)
+        multi_row["constraints"] = _constraint_summary(
+            multi_row, target_duty_w=case.target_duty_w
+        )
         row["constraints"] = multi_row["constraints"]
         row["mesh_rating_evidence"] = _mesh_rating_evidence_from_multi_row(multi_row)
         row["geometry"] = _geometry_report_block(row=multi_row, case=case)
@@ -122,7 +122,7 @@ def main() -> None:
         ExecutionMode,
         load_user_case_json,
         run_v07_live_e2e,
-        verify_independent_input_change,
+        verify_independent_input_effects,
         write_v07_delivery_artifacts,
     )
 
@@ -130,14 +130,7 @@ def main() -> None:
 
     independent_sidecar: dict | None = None
     if args.independent_input_test:
-        modified = case.model_copy(
-            update={
-                "tube_side": case.tube_side.model_copy(
-                    update={"inlet_temperature_k": Decimal("305.000000")}
-                )
-            }
-        )
-        independent_sidecar = verify_independent_input_change(case, modified)
+        independent_sidecar = verify_independent_input_effects(case)
 
     if args.reuse_r27h_fixture:
         r27h = _reclassify_r27h_fixture()

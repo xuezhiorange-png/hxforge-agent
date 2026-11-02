@@ -21,8 +21,8 @@ from prototypes.v07_general_rating_sizing_mvp.r27h_candidate_space_extension imp
     write_r27h_reports,
 )
 
-_TASK_ID = "V07_FINAL_LIVE_E2E_DELIVERY_ACCEPTANCE"
-_SCHEMA = "hxforge.v07-final-live-e2e-delivery.v07"
+_TASK_ID = "V07_FINAL_DELIVERY_DEFECT_CLOSURE"
+_SCHEMA = "hxforge.v07-final-delivery-defect-closure.v07"
 _DEFAULT_LIVE_CASE = (
     Path(__file__).resolve().parents[2] / "tests/fixtures/v07_live_acceptance_user_case.json"
 )
@@ -67,13 +67,34 @@ def validate_user_case(case: EngineeringCase) -> dict[str, Any]:
     }
 
 
+def mesh_rating_evidence_consistent(ev: dict[str, Any]) -> bool:
+    from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
+        ENGINEERING_NUMERIC_VALID,
+    )
+
+    if ev.get("full_rating_converged") is not True:
+        return False
+    if ev.get("entered_n2_n4_mesh_ladder") is not True:
+        return False
+    if ev.get("mesh_rating_outcome") != "FULL_MESH_RATING_CONVERGED":
+        return False
+    return ev.get("n1_thermal_numeric_status") == ENGINEERING_NUMERIC_VALID
+
+
 def _mesh_converged_evidence(row: dict[str, Any]) -> bool:
     ev = row.get("mesh_rating_evidence") or {}
-    if ev.get("full_rating_converged") is True:
-        return True
-    return row.get("rating_participation_status") == "FULLY_RATED" and bool(
-        row.get("loss_scenario_results")
-    )
+    if not mesh_rating_evidence_consistent(ev):
+        return False
+    return bool(row.get("loss_scenario_results")) and row.get("engineering_delivery_receipt")
+
+
+def _full_path_components_present(fp: dict[str, Any]) -> bool:
+    if not fp:
+        return False
+    tube = fp.get("TUBE_DP_COMPONENTS")
+    shell = fp.get("SHELL_DP_COMPONENTS")
+    bd = fp.get("SHELL_BELL_DELAWARE_INTERNAL_DP_PA")
+    return tube is not None and shell is not None and bd is not None
 
 
 def _report_field_complete(design_report: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -89,8 +110,24 @@ def _report_field_complete(design_report: dict[str, Any]) -> tuple[bool, list[st
         if gen.get(key) is None:
             missing.append(f"generated_structure.{key}")
     therm = design_report.get("thermal_results") or {}
-    if therm.get("duty_w_at_n4") is None:
-        missing.append("thermal_results.duty_w_at_n4")
+    for key in ("duty_w_at_n4", "tube_outlet_k", "shell_outlet_k"):
+        if therm.get(key) is None:
+            missing.append(f"thermal_results.{key}")
+    hyd = design_report.get("hydraulic_results") or {}
+    internal = hyd.get("internal_live_postpass") or {}
+    for key in ("tube_dp_pa", "shell_dp_pa"):
+        if internal.get(key) is None:
+            missing.append(f"hydraulic_results.internal_live_postpass.{key}")
+    opt = hyd.get("authorized_mid_band_optimized_nozzles") or {}
+    comp = opt.get("component_rows") or {}
+    if not comp.get("TUBE_DP_COMPONENTS"):
+        missing.append("hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.TUBE_DP_COMPONENTS")
+    if not comp.get("SHELL_DP_COMPONENTS"):
+        missing.append("hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.SHELL_DP_COMPONENTS")
+    if comp.get("SHELL_BELL_DELAWARE_INTERNAL_DP_PA") is None:
+        missing.append(
+            "hydraulic_results.authorized_mid_band_optimized_nozzles.component_rows.SHELL_BELL_DELAWARE_INTERNAL_DP_PA"
+        )
     return len(missing) == 0, missing
 
 
@@ -125,11 +162,25 @@ def acceptance_matrix_strict(
     rated_rows = [c for c in candidates if _mesh_converged_evidence(c)]
     has_feasible = int(answers.get("mid_band_full_path_feasible_count") or 0) > 0
     new_legal = int(answers.get("new_structurally_legal_distinct_geometries") or 0)
+    mid_fp = (
+        ((best or {}).get("loss_scenario_results") or {}).get("mid_band") or {}
+    ).get("full_path_hydraulic_verification") or {}
+    target_ok = ((best or {}).get("constraints") or {}).get("target_duty_w") == str(
+        case.target_duty_w
+    )
 
     def _status(ok: bool, partial: bool = False) -> str:
         if ok:
             return "PASS"
         return "PARTIAL" if partial else "FAIL"
+
+    classification_ok = False
+    if best is not None:
+        oc = (best.get("r27h_classification") or {}).get("outcome_class")
+        if has_feasible:
+            classification_ok = oc not in ("FULL_PATH_NOT_FEASIBLE", "RATING_INCOMPLETE")
+        else:
+            classification_ok = True
 
     return {
         "user_case_input": _status(validation["valid"]),
@@ -145,25 +196,27 @@ def acceptance_matrix_strict(
             ),
             partial=True,
         ),
-        "thermal_rating_n1_n2_n4": _status(len(rated_rows) >= 1),
+        "thermal_rating_n1_n2_n4": _status(
+            len(rated_rows) >= 1
+            and all(
+                mesh_rating_evidence_consistent(c.get("mesh_rating_evidence") or {})
+                for c in rated_rows
+            )
+        ),
         "internal_hydraulics": _status(
             best is not None
-            and (best.get("constraints") or {}).get("hydraulic_constraint_status") == "SATISFIED",
+            and (best.get("constraints") or {}).get("hydraulic_constraint_status") == "SATISFIED"
+            and (best.get("LIVE_TUBE_DP_PA") is not None or (best.get("engineering_delivery_receipt") or {}).get("LIVE_TUBE_DP_PA") is not None),
             partial=best is not None,
         ),
         "nozzle_cooptimization": _status(
             best is not None and bool((best.get("loss_scenario_results") or {}).get("mid_band"))
         ),
-        "full_path_assumption_k": _status(has_feasible, partial=bool(rated_rows)),
-        "result_classification": _status(
-            best is not None
-            and (best.get("r27h_classification") or {}).get("outcome_class")
-            not in ("FULL_PATH_NOT_FEASIBLE", "RATING_INCOMPLETE")
-            if has_feasible
-            else best is not None,
-            partial=not has_feasible,
+        "full_path_assumption_k": _status(
+            has_feasible and _full_path_components_present(mid_fp), partial=bool(rated_rows)
         ),
-        "user_readable_design_report": _status(complete, partial=not missing),
+        "result_classification": _status(classification_ok and target_ok, partial=not has_feasible),
+        "user_readable_design_report": _status(complete, partial=bool(missing)),
     }
 
 
@@ -249,6 +302,20 @@ def build_full_design_report(case: EngineeringCase, r27h: dict[str, Any]) -> dic
     pa = (best or {}).get("phase_a") or {}
     mesh_ev = (best or {}).get("mesh_rating_evidence") or {}
     receipt = (best or {}).get("engineering_delivery_receipt") or {}
+    tube_out = receipt.get("N4_TUBE_OUTLET_K") or best.get("tube_outlet_temperature_k_n4")
+    shell_out = receipt.get("N4_SHELL_OUTLET_K") or best.get("shell_outlet_temperature_k_n4")
+    live_tube = (best or {}).get("LIVE_TUBE_DP_PA") or receipt.get("LIVE_TUBE_DP_PA")
+    live_shell = (best or {}).get("LIVE_SHELL_DP_PA") or receipt.get("LIVE_SHELL_DP_PA")
+    component_rows = None
+    if fp:
+        component_rows = {
+            "TUBE_DP_COMPONENTS": fp.get("TUBE_DP_COMPONENTS"),
+            "SHELL_DP_COMPONENTS": fp.get("SHELL_DP_COMPONENTS"),
+            "SHELL_BELL_DELAWARE_INTERNAL_DP_PA": fp.get("SHELL_BELL_DELAWARE_INTERNAL_DP_PA"),
+            "TUBE_INTERNAL_FRICTION_DP_PA": fp.get("TUBE_INTERNAL_FRICTION_DP_PA"),
+            "TUBE_LOCAL_DP_PA": fp.get("TUBE_LOCAL_DP_PA"),
+            "source": "authorized_full_path_hydraulic_calculation.mid_band",
+        }
 
     k_summary = {}
     for key in ("low_loss_sensitivity", "mid_band", "high_loss_sensitivity"):
@@ -305,15 +372,22 @@ def build_full_design_report(case: EngineeringCase, r27h: dict[str, Any]) -> dic
         "thermal_results": {
             "duty_w_at_n4": constraints.get("duty_w_at_finest_mesh"),
             "duty_constraint": constraints.get("duty_constraint"),
-            "tube_outlet_k": receipt.get("N4_TUBE_OUTLET_K") if receipt else None,
-            "shell_outlet_k": receipt.get("N4_SHELL_OUTLET_K") if receipt else None,
+            "target_duty_w_from_case": str(case.target_duty_w),
+            "tube_outlet_k": tube_out,
+            "shell_outlet_k": shell_out,
             "mesh_rating_outcome": mesh_ev.get("mesh_rating_outcome"),
             "full_rating_converged": mesh_ev.get("full_rating_converged"),
+            "entered_n2_n4_mesh_ladder": mesh_ev.get("entered_n2_n4_mesh_ladder"),
+            "provenance": {
+                "outlet_temperatures": "engineering_delivery_receipt.N4_*",
+                "duty": "constraints.duty_w_at_finest_mesh",
+            },
         },
         "hydraulic_results": {
             "internal_live_postpass": {
-                "tube_dp_pa": (best or {}).get("LIVE_TUBE_DP_PA"),
-                "shell_dp_pa": (best or {}).get("LIVE_SHELL_DP_PA"),
+                "tube_dp_pa": live_tube,
+                "shell_dp_pa": live_shell,
+                "provenance": "engineering_delivery_receipt LIVE_* from rating postpass",
             },
             "authorized_mid_band_optimized_nozzles": {
                 "verification_level": "AUTHORIZED_FULL_PATH_CALCULATOR",
@@ -322,7 +396,7 @@ def build_full_design_report(case: EngineeringCase, r27h: dict[str, Any]) -> dic
                 "tube_margin_pa": fp.get("TUBE_FULL_PATH_DP_MARGIN_PA"),
                 "shell_margin_pa": fp.get("SHELL_FULL_PATH_DP_MARGIN_PA"),
                 "FULL_PATH_HYDRAULIC_STATUS": fp.get("FULL_PATH_HYDRAULIC_STATUS"),
-                "component_rows": fp.get("component_rows"),
+                "component_rows": component_rows,
             },
             "max_nozzle_velocity_1ms_band_edge_audit": {
                 "verification_level": "NOZZLE_BISECT_SIDE_TOTAL_AT_BAND_MAX_DIAMETER",
@@ -342,43 +416,90 @@ def build_full_design_report(case: EngineeringCase, r27h: dict[str, Any]) -> dic
     }
 
 
-def verify_independent_input_change(
-    base: EngineeringCase, modified: EngineeringCase
-) -> dict[str, Any]:
-    """Prove modified case inputs change computed screening (Phase A tube regime scan)."""
+def verify_independent_input_effects(base: EngineeringCase) -> dict[str, Any]:
+    """Controlled proof that user target duty and inlet temperature change formal results."""
+    from prototypes.v07_general_rating_sizing_mvp.calculation_first_automatic_sizing import (
+        _constraint_summary,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
+        ENGINEERING_NUMERIC_VALID,
+        run_experimental_engineering_rating,
+    )
+    from prototypes.v07_general_rating_sizing_mvp.experimental_multi_candidate_engineering_sizing import (
+        build_native_cell_context,
+    )
     from prototypes.v07_general_rating_sizing_mvp.r27h_candidate_space_extension import (
         R27H_EXPERIMENTAL_GEOMETRY_TABLE,
         _record_for_fingerprint,
         build_r27h_selection,
-        phase_a_r27h_screen,
     )
 
-    row = R27H_EXPERIMENTAL_GEOMETRY_TABLE[1]
-    sel_a = build_r27h_selection(base)
-    sel_b = build_r27h_selection(modified)
-    rec_a = _record_for_fingerprint(
-        sel_a, row["shell_inside_diameter_m"], row["tube_length_m"], row["baffle_spacing_m"]
+    row = next(r for r in R27H_EXPERIMENTAL_GEOMETRY_TABLE if r["tube_length_m"] == "5.50")
+    sel = build_r27h_selection(base)
+    rec = _record_for_fingerprint(
+        sel, row["shell_inside_diameter_m"], row["tube_length_m"], row["baffle_spacing_m"]
     )
-    rec_b = _record_for_fingerprint(
-        sel_b, row["shell_inside_diameter_m"], row["tube_length_m"], row["baffle_spacing_m"]
+    assert rec is not None
+    native = build_native_cell_context(base, selection=sel, candidate_id=rec.candidate_id)
+    cache: dict[int, Any] = {}
+    n1_base = run_experimental_engineering_rating(
+        base, subdivisions=1, native=native, mesh_result_cache=cache
     )
-    assert rec_a and rec_b
-    pa_a = phase_a_r27h_screen(case=base, record=rec_a, table_row=row, selection=sel_a)
-    pa_b = phase_a_r27h_screen(case=modified, record=rec_b, table_row=row, selection=sel_b)
-    scan_a = pa_a.get("tube_regime_inlet_scan") or {}
-    scan_b = pa_b.get("tube_regime_inlet_scan") or {}
-    changed = pa_a != pa_b or scan_a != scan_b
-    return {
-        "base_tube_inlet_k": str(base.tube_side.inlet_temperature_k),
-        "modified_tube_inlet_k": str(modified.tube_side.inlet_temperature_k),
-        "base_target_duty_w": str(base.target_duty_w),
-        "modified_target_duty_w": str(modified.target_duty_w),
-        "phase_a_status_base": pa_a.get("phase_a_status"),
-        "phase_a_status_modified": pa_b.get("phase_a_status"),
-        "tube_regime_scan_changed": scan_a != scan_b,
-        "input_change_reflected_in_computation": changed,
-        "coverage": "Phase A Task174 + tube regime scan on one NEW_EXPERIMENTAL geometry row only.",
+    case_hot = base.model_copy(
+        update={
+            "tube_side": base.tube_side.model_copy(
+                update={"inlet_temperature_k": Decimal("305.000000")}
+            )
+        }
+    )
+    native_cold = build_native_cell_context(
+        case_hot, selection=build_r27h_selection(case_hot), candidate_id=rec.candidate_id
+    )
+    n1_cold = run_experimental_engineering_rating(
+        case_hot, subdivisions=1, native=native_cold, mesh_result_cache={}
+    )
+    case_high_duty = base.model_copy(update={"target_duty_w": Decimal("500000")})
+    multi_stub = {
+        "duty_w_at_finest_mesh": n1_base.duty_w,
+        "FULL_RATING_CONVERGED": True,
+        "rating_participation_status": "FULLY_RATED",
+        "screening_n1_status": ENGINEERING_NUMERIC_VALID,
+        "n1_thermal_numeric_status": ENGINEERING_NUMERIC_VALID,
     }
+    duty_judgment_base = _constraint_summary(multi_stub, target_duty_w=base.target_duty_w)[
+        "duty_constraint"
+    ]
+    duty_judgment_high = _constraint_summary(
+        multi_stub, target_duty_w=case_high_duty.target_duty_w
+    )["duty_constraint"]
+    thermal_changed = (
+        n1_base.status == ENGINEERING_NUMERIC_VALID
+        and n1_cold.status == ENGINEERING_NUMERIC_VALID
+        and n1_base.duty_w != n1_cold.duty_w
+    )
+    return {
+        "geometry_row": row,
+        "candidate_id_prefix": rec.candidate_id[:8],
+        "base_target_duty_w": str(base.target_duty_w),
+        "elevated_target_duty_w": str(case_high_duty.target_duty_w),
+        "duty_constraint_at_base_target": duty_judgment_base,
+        "duty_constraint_at_elevated_target": duty_judgment_high,
+        "target_duty_constraint_judgment_changed": duty_judgment_base != duty_judgment_high,
+        "n1_duty_w_at_310k_inlet": n1_base.duty_w,
+        "n1_duty_w_at_305k_inlet": n1_cold.duty_w,
+        "thermal_n1_changed_with_inlet_temperature": thermal_changed,
+        "coverage": (
+            "Single NEW_EXPERIMENTAL geometry (0.56 m, L=5.50 m): N1 rating at two inlets; "
+            "duty constraint re-evaluated at two user target_duty_w values on same N1 duty."
+        ),
+        "independent_input_change_pass": (
+            duty_judgment_base != duty_judgment_high and thermal_changed
+        ),
+    }
+
+
+# Backward-compatible alias
+verify_independent_input_change = verify_independent_input_effects
 
 
 def write_v07_delivery_artifacts(report: dict[str, Any], output_dir: Path) -> tuple[Path, Path]:
@@ -392,6 +513,9 @@ def write_v07_delivery_artifacts(report: dict[str, Any], output_dir: Path) -> tu
     hyd = dr.get("hydraulic_results") or {}
     opt = hyd.get("authorized_mid_band_optimized_nozzles") or {}
     audit = hyd.get("max_nozzle_velocity_1ms_band_edge_audit") or {}
+    therm = dr.get("thermal_results") or {}
+    internal = hyd.get("internal_live_postpass") or {}
+    comp = (opt.get("component_rows") or {}) if opt else {}
     lines = [
         "# V07 final live design report",
         "",
@@ -409,7 +533,24 @@ def write_v07_delivery_artifacts(report: dict[str, Any], output_dir: Path) -> tu
         f"- L={gen.get('tube_length_m')} m, baffles={gen.get('baffle_count')} @ {gen.get('baffle_spacing_m')} m",
         f"- Nozzles (mid_band opt): {gen.get('nozzles_mid_band')}",
         "",
+        "## Thermal (N4)",
+        "",
+        f"- Duty @ N4: {therm.get('duty_w_at_n4')} W ({therm.get('duty_constraint')})",
+        f"- Tube outlet: {therm.get('tube_outlet_k')} K",
+        f"- Shell outlet: {therm.get('shell_outlet_k')} K",
+        "",
+        "## Internal hydraulics (live postpass)",
+        "",
+        f"- Tube Δp {internal.get('tube_dp_pa')} Pa",
+        f"- Shell Δp {internal.get('shell_dp_pa')} Pa",
+        "",
         "## Full path mid_band @ optimized nozzles (authorized)",
+        "",
+        f"- Tube Δp {opt.get('tube_total_dp_pa')} Pa, margin {opt.get('tube_margin_pa')} Pa",
+        f"- Shell Δp {opt.get('shell_total_dp_pa')} Pa, margin {opt.get('shell_margin_pa')} Pa",
+        f"- Bell-Delaware internal: {comp.get('SHELL_BELL_DELAWARE_INTERNAL_DP_PA')} Pa",
+        "",
+        "## Band-edge v≈1 m/s audit (not optimized selection)",
         "",
         f"- Tube Δp {opt.get('tube_total_dp_pa')} Pa, margin {opt.get('tube_margin_pa')} Pa",
         f"- Shell Δp {opt.get('shell_total_dp_pa')} Pa, margin {opt.get('shell_margin_pa')} Pa",
