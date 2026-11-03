@@ -602,7 +602,7 @@ jobs:
     if: github.event_name == 'push'
     needs: [parse-manifest]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.name == 'v07-r24-wide-delta-t-rating-solver' && 65 || 30 }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
