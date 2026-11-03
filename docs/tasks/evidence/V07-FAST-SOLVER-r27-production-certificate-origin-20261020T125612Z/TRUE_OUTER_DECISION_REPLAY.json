@@ -1,0 +1,26 @@
+{
+  "certificate_replays": [
+    {
+      "certificate_hash": "bc1bbdf975352fac70f53d6e7a854028c505b792d5fd559ff52d425f553ed8c7",
+      "event_projections_present": false,
+      "replay_code": "PASS",
+      "replay_pass": true
+    },
+    {
+      "certificate_hash": "e295c535aa7ffc7827ffd4edc1834ad20142296915a20e1fe0ce6c9c23ade224",
+      "event_projections_present": false,
+      "replay_code": "R2A_PRODUCTION_MESH_RUN_HASH_REQUIRED_FOR_CONTINUATION",
+      "replay_pass": false
+    },
+    {
+      "certificate_hash": "10730157843cdb6142c5908ceaceb87e19e2029c7dd45766938f87fc07279760",
+      "event_projections_present": false,
+      "replay_code": "R2A_PRODUCTION_MESH_RUN_HASH_REQUIRED_FOR_CONTINUATION",
+      "replay_pass": false
+    }
+  ],
+  "event_projection_status": "MISSING",
+  "full_production_replay_blocked": true,
+  "production_certificate_origin": "EVIDENCE_MISSING",
+  "schema_version": "task173.r2a-true-outer-decision-replay.v1"
+}

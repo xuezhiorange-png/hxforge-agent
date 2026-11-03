@@ -1,0 +1,8 @@
+{
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "pareto_frontier_candidate_ids": [
+    "5a73903d-3325-5604-be3b-ba5950299893",
+    "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee"
+  ],
+  "schema_version": "hxforge.experimental-pareto-result.v1"
+}

@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.0",
+  "task_id": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_R2_INDEPENDENT_REVIEW",
+  "mode": "INDEPENDENT_AUTHORITY_REVIEW_ONLY",
+  "result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "reviewed_head": "717c2d07e676231fbcd3b4ea474a9bd5475b4320"
+  },
+  "review": {
+    "review_source": "Fresh-context Codex sub-agent reviewer Harvey; no inherited conversation context",
+    "reviewer_agent_id": "01a0fc1e-fd29-71c3-8f05-0616c6e754f5",
+    "reviewer_context": "Fresh independent read-only review with no candidate-author conversation context",
+    "self_approval": false,
+    "candidate_author_self_approval": false,
+    "reviewer_raw_verdict": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_R2_AUTHORITY_INDEPENDENT_REVIEW",
+    "scope": "Locked R2 authority projection, R2 evidence, R1 review finding, and cited portability/characterization lineage; no numerical experiment or repository candidate modification."
+  },
+  "review_object": {
+    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R2",
+    "authority_canonical_hash": "a3e04e95965d6432d4d54aa2dfed7bf5b9d5995ef98c4bbb7e87208545160318",
+    "r2_evidence_hash": "3ea204e2d1ae3a887fa8e001c3bb767d97b8b1632c9734df058783a90af0d6a9",
+    "predecessor_r1_review_result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_INDEPENDENT_REVIEW",
+    "predecessor_r1_finding": "NUMERICAL_OUTPUT_PORTABILITY_ENVELOPE_NOT_FROZEN",
+    "predecessor_r1_review_evidence_hash": "1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e"
+  },
+  "findings": [
+    {
+      "finding_id": "EXACT_ZERO_Q_PORTABILITY_STATUS_UNSPECIFIED",
+      "severity": "BLOCKING",
+      "location": "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r2-portability-field-recovery-and-candidate-closeout.json:portability_comparison_policy",
+      "authority_basis": "The frozen policy defines an absolute q floor of 1e-8 W and separately specifies only that both values preserve exact-zero semantics when both are zero; it does not state the required cross-platform status when exactly one q is zero.",
+      "observed_candidate_state": "A pair q_A=0 W and q_B=1e-9 W satisfies abs(q_A-q_B) <= max(1e-8 W, 1e-8*max(abs(q_A),abs(q_B))). The six target and n=16 comparisons are nonzero and do not exercise this boundary.",
+      "required_resolution": "Explicitly require matching exact-zero status across platforms or explicitly define and justify the permitted zero/nonzero case. This changes authority semantics and cannot be made in this review.",
+      "consequence": "R2 authority is not accepted; candidate remains proposed and unchanged."
+    }
+  ],
+  "finding_closure": {
+    "r1_numerical_output_portability_envelope_finding_closed": true,
+    "prospective_projection_and_limits_declared": true,
+    "observed_deltas_used_to_select_limits": false,
+    "owner_scoped_task172_policy": true,
+    "remaining_blocking_finding_count": 1
+  },
+  "review_checks": {
+    "candidate_authority_hash_reproduced": true,
+    "r2_evidence_hash_reproduced": true,
+    "local_raw_artifact_hash_references_match": true,
+    "linux_junit_run_and_artifact_provenance_present": true,
+    "linux_py311_py312_target_projection_equal": true,
+    "six_target_full_projection_and_semantics_recorded_pass": "6/6",
+    "n16_upper_portability_and_final_semantics_recorded_pass": true,
+    "corpus_68_maximum_bound_proof_recorded_pass": "68/68",
+    "representative_corpus_is_not_full_production_domain_proof": true,
+    "r94_primary_unchanged": true,
+    "r98_and_c_round_unchanged": true,
+    "baseline_valid_bypass_and_non_residual_bypass_recorded": true,
+    "fallback_original_seed_and_fail_closed_recorded": true,
+    "same_environment_exact_replay_recorded": true,
+    "cross_platform_exact_hash_required": false,
+    "resource_budget_bounded": true,
+    "portability_envelope_used_as_solver_stopping": false,
+    "portability_envelope_used_as_r98_acceptance": false,
+    "portability_envelope_used_to_accept_blocked_result": false
+  },
+  "validation": {
+    "focused_task172_task173": "PASS; excluded proposed candidate characterization-matrix test",
+    "ruff": "PASS",
+    "format": "PASS; 777 files",
+    "mypy": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; 259/259",
+    "pip_audit": "PASS; no known vulnerabilities; unpublished local package skipped",
+    "uv_lock_check": "PASS",
+    "git_diff_check": "PASS",
+    "duplicate_key_audit": "PASS; review receipt and cited R2 candidate evidence JSON checked",
+    "full_shell_tube_and_http_api_local": "NOT_RUN; exact-head CI required after receipt commit",
+    "exact_head_ci": "PENDING_AT_REVIEW_RECEIPT_COMMIT"
+  },
+  "disposition": {
+    "authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "authority_accepted": false,
+    "candidate_modified": false,
+    "correction_implemented": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task175_release_acceptance_performed": false,
+    "next_gate": "OWNER_DIRECTION_REQUIRED_BEFORE_ANY_CANDIDATE_AMENDMENT",
+    "next_gate_executed": false,
+    "stop": true
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "fixtures_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "registry_changed": false,
+    "numerical_experiments_run": false
+  },
+  "canonical_hash": "8a2943ab1db04e2551fd766f916dc3fd09981f6e37894fa8b61d6d013184f5ff"
+}

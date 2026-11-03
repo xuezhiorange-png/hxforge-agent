@@ -1,0 +1,8 @@
+{
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "conditional_preference_status": "PARETO_FRONTIER_ONLY",
+  "engineering_case_id": "mvp-multi-candidate-r10",
+  "experimental_comparison_status": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+  "experimental_ranking_status": "COMPARISON_ONLY",
+  "schema_version": "hxforge.engineering-report.v1"
+}

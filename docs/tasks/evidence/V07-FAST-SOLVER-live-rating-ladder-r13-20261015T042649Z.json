@@ -1,0 +1,68 @@
+{
+  "acceptance": {
+    "accepted_cell_count_verified": true,
+    "compact_result_hash": "5229c58110b633114132501829fb942a2ac76591ca999e0a190c0782a26e8041",
+    "compact_result_hash_parity": "PASS",
+    "compact_result_hash_recomputed": "5229c58110b633114132501829fb942a2ac76591ca999e0a190c0782a26e8041",
+    "full_trajectory_fail_closed": true,
+    "r11_artifact_roundtrip_pass": true,
+    "r11_ci_format_fixed": true,
+    "r11_result_hash_parity": "PASS",
+    "ruff_format_check": {
+      "pass": true,
+      "stderr": "",
+      "stdout": "872 files already formatted\n"
+    },
+    "wall_extrema_recomputed": true
+  },
+  "arbitrary_candidate_full_rating_verified": false,
+  "fail_closed_pytest": {
+    "cell_count": true,
+    "trajectory": true,
+    "wall_extrema": true
+  },
+  "live_mesh_stage_persistence_pass": true,
+  "live_n1_n2_comparison": {
+    "coarse_subdivisions": 1,
+    "duty_difference_w": "12.077780792347",
+    "duty_metric": "0.0002326341389901647480275204451",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.072924619264683294499082828E-12",
+    "duty_precision_floor_w": "2.114560268272230380E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 2,
+    "interval_duty_differences_w": [
+      "3.725729925354",
+      "2.969503815244",
+      "2.321585332427",
+      "1.767215014982",
+      "1.293746704340"
+    ],
+    "overall_status": "FAIL",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.0471376512014",
+      "T_wall_inner_min": "0.03491148859596",
+      "T_wall_outer_max": "0.04531160269380",
+      "T_wall_outer_min": "0.03360412837213"
+    },
+    "wall_precision_floor_k": "3.4892668672623790E-13",
+    "wall_status": "FAIL"
+  },
+  "live_n1_status": "TERMINAL_ACCEPTED",
+  "live_n2_status": "TERMINAL_ACCEPTED",
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-20261015T042649Z.live-orchestrator.json",
+  "live_rating_orchestrator_implemented": true,
+  "live_request_authority_gate": true,
+  "live_worker_hard_timeout_implemented": true,
+  "numerical_authority_status": "CANDIDATE",
+  "production_integration": false,
+  "r12_acceptance_flags_corrected": true,
+  "r12_format_fixed": true,
+  "real_geometry_summary_implemented": true,
+  "result": "R13_LIVE_RATING_LADDER_PARTIAL",
+  "source_head_sha": "df32bf2de95c937b588ed5589d00c100ac8ef7a9",
+  "stage_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-stages-20261015T042649Z",
+  "task_id": "V07_FAST_SOLVER_LIVE_RATING_LADDER_R13",
+  "total_runner_wall_seconds": 484.34283741700347
+}

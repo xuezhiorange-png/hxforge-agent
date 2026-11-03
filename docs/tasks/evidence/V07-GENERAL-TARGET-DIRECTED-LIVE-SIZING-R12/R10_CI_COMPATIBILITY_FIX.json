@@ -1,0 +1,7 @@
+{
+  "MESH_RESULT_STATUS_SCHEMA_FIXED": true,
+  "low_mesh_result_contract": "hxforge.low-mesh-result.v1",
+  "mesh_status_compat_field": true,
+  "schema_version": "hxforge.r10-ci-compatibility-fix.v1",
+  "status_field_source": "solver_mesh_status"
+}

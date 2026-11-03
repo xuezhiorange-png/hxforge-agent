@@ -1,0 +1,435 @@
+{
+  "alternative_candidate_ids": [],
+  "blocked_count": 1,
+  "candidate_count": 1,
+  "candidate_records": [
+    {
+      "accepted_mesh_identity": null,
+      "accepted_subdivisions_per_interval": null,
+      "blockers": [
+        "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE"
+      ],
+      "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+      "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate_rating_request_hash": "76a67f92102002798ba650534fb12651e6c922e7b979ca2dab2b2a67fa76b21f",
+      "candidate_rating_result_hash": "46f67ad170c18e55ddf1b0bf880704256aa5124ede480c15b85e38d4573b9c2c",
+      "candidate_rating_result_id": "urn:hxforge:task173:blocked:46f67ad170c18e55ddf1b0bf880704256aa5124ede480c15b85e38d4573b9c2c",
+      "dimension_authority_hashes": [
+        [
+          "BAFFLE_COUNT",
+          "e1c104e172ee36ab0f8196ee8491b4f7e38e336b6e0c21635ff54afa8a84e4fe"
+        ],
+        [
+          "BAFFLE_CUT",
+          "81500dd753bcbfb3aa84f2a6420ddeab95ba37aafe8d3d9074fb6db5f3a59b90"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "2442ac95117267a705f80bdfbb9010fa524209b6b3570895fb03f3ba87e28bbc"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "19047ce55268d30fed9c0cac36f84de86842daf10d3348f9bdc3413f0a08089b"
+        ],
+        [
+          "CONSTRUCTION_FAMILY",
+          "1a44bd7c0eb5dd4ca2f42e34475b8f054b394c51c8f376dd93c382b492fefe88"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "a7ce08f456dab36dcb898cfc73eb7b8d3789d83ca2b6064fa5ea4ecb1901d50b"
+        ],
+        [
+          "TUBE_LENGTH",
+          "02022ed0556b238e31e254c5d2ebea96b3363543b8f860f7dfc2ba8b48955a6b"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "6dcbbe4804e517d81841ed5ff3e0b094548cccd5aa9a597afac4f39edc111998"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "9bb470d9546f4d3834af834ab3cc337a4bac69fdcc5def0f07fb7666586bca4a"
+        ],
+        [
+          "TUBE_PITCH",
+          "1503e8008293c926aa76e84438c49d90d7c287cd458e1ae9cf3be8ff97a348ae"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "7081ecbb45810cddaa9e4ffb6451f1c777ff8026e0b2812faa8ac8c06a1208e9"
+        ]
+      ],
+      "disposition": "BLOCKED",
+      "duty_constraint": null,
+      "headroom_subdivisions_per_interval": null,
+      "native_identities": [
+        [
+          "TASK020",
+          "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+        ],
+        [
+          "TASK021",
+          "ecc6e3552137f64dd3de8202643611b3697390144d435408242809ced5afd330"
+        ],
+        [
+          "TASK022",
+          "fedfabd8d4b0ecb8cc37255b159cd5077c7c76be7dae578b1553b08d775a978e"
+        ],
+        [
+          "TASK024",
+          "dc515de8c6ff736d3cd773109bb34cca5483617329e0442cb7bb94d3628a2050"
+        ],
+        [
+          "TASK025",
+          "9d3b5709c41711fd54a8f04c41f003378e047b669e3ca40b0559b0a670ab664c"
+        ],
+        [
+          "TASK031",
+          "2dd7c5c06f22e798c10fd3f4fc8b98f34439d0de634a66b11ddeb7069151a651"
+        ],
+        [
+          "TASK032",
+          "f6bb5508e9853dac057f26bb80410011eebef7f58e5f6c3f9b8e13c69a2a5aaf"
+        ],
+        [
+          "TASK029",
+          "ed29020d120dc713eabc706a7028583fd21e58dd72012ba27d239697b289af7d"
+        ],
+        [
+          "TASK166",
+          "0ea00af8e393ccf590ab89ea09fa2399ed2d22ecc21308a7c22e31d0a3d2c42b"
+        ],
+        [
+          "TASK171",
+          "3c2c815fefbb4845dec8e4afaf8e91c89c2f9be2bdcd517a35510492bb209a9b"
+        ],
+        [
+          "TASK174",
+          "0449efde89fec337615888d2ffe52ccf4df4b7be4f525477729f3f2c6f1e0f72"
+        ]
+      ],
+      "provenance_hash": "471cbc25cf15e91613c2759f76e1ba28f8639c6a51afad3fa3001e5d039d7f4e",
+      "rank": null,
+      "ranking_score": null,
+      "rated_duty_w": null,
+      "selected_dimensions": [
+        [
+          "CONSTRUCTION_FAMILY",
+          "FIXED_TUBESHEET"
+        ],
+        [
+          "SHELL_GEOMETRY_ID",
+          "shell-1"
+        ],
+        [
+          "TUBE_OUTER_DIAMETER",
+          "0.01905"
+        ],
+        [
+          "TUBE_WALL_THICKNESS",
+          "0.00165"
+        ],
+        [
+          "TUBE_LENGTH",
+          "4.85"
+        ],
+        [
+          "TUBE_PITCH",
+          "0.0254"
+        ],
+        [
+          "TUBE_LAYOUT",
+          "LAYOUT_30_DEG"
+        ],
+        [
+          "TUBE_PASS_COUNT",
+          "1"
+        ],
+        [
+          "BAFFLE_TYPE",
+          "SINGLE_SEGMENTAL"
+        ],
+        [
+          "BAFFLE_CUT",
+          "0.30"
+        ],
+        [
+          "BAFFLE_SPACING",
+          "0.97"
+        ],
+        [
+          "BAFFLE_COUNT",
+          "4"
+        ]
+      ],
+      "shell_dp_constraint": null,
+      "shell_dp_pa": null,
+      "stage": "TASK173_CANDIDATE_RATING",
+      "status": "BLOCKED",
+      "tube_dp_constraint": null,
+      "tube_dp_pa": null,
+      "warnings": []
+    }
+  ],
+  "candidate_space_hash": "f52842793cba22d6a0c532c09f48743da7bf5f7397bf1d0efcc6a4b1154abb24",
+  "excluded_count": 1,
+  "exclusion_reason_codes": [
+    [
+      "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      [
+        "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE"
+      ]
+    ]
+  ],
+  "orphan_recommendation": false,
+  "pass_count": 0,
+  "provenance_cycle_count": 0,
+  "provenance_edges": [
+    [
+      "candidate-space",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e"
+    ],
+    [
+      "candidate-space",
+      "ranking-policy"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK020"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK021"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK022"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK025"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK029"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK031"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK032"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK166"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK020",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK021"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK020",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK021",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK022"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK021",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK022",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK022",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK025"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK031"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK025",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK029"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK025",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK029",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK031",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK032"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK032",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK166"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK166",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK173_RATING"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK173_RATING",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:disposition"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174",
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK173_RATING"
+    ],
+    [
+      "ranking-policy",
+      "sizing-selection"
+    ],
+    [
+      "request",
+      "candidate-space"
+    ],
+    [
+      "request",
+      "ranking-policy"
+    ],
+    [
+      "request",
+      "requirement"
+    ],
+    [
+      "sizing-selection",
+      "sizing-result"
+    ]
+  ],
+  "provenance_nodes": [
+    [
+      "candidate-space",
+      "f52842793cba22d6a0c532c09f48743da7bf5f7397bf1d0efcc6a4b1154abb24"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK020",
+      "95f40b04da37bde23a2d9b2f8294b0236d3771a66ca3e274dd387db839c71298"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK021",
+      "ecc6e3552137f64dd3de8202643611b3697390144d435408242809ced5afd330"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK022",
+      "fedfabd8d4b0ecb8cc37255b159cd5077c7c76be7dae578b1553b08d775a978e"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK024",
+      "dc515de8c6ff736d3cd773109bb34cca5483617329e0442cb7bb94d3628a2050"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK025",
+      "9d3b5709c41711fd54a8f04c41f003378e047b669e3ca40b0559b0a670ab664c"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK029",
+      "ed29020d120dc713eabc706a7028583fd21e58dd72012ba27d239697b289af7d"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK031",
+      "2dd7c5c06f22e798c10fd3f4fc8b98f34439d0de634a66b11ddeb7069151a651"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK032",
+      "f6bb5508e9853dac057f26bb80410011eebef7f58e5f6c3f9b8e13c69a2a5aaf"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK166",
+      "0ea00af8e393ccf590ab89ea09fa2399ed2d22ecc21308a7c22e31d0a3d2c42b"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK171",
+      "3c2c815fefbb4845dec8e4afaf8e91c89c2f9be2bdcd517a35510492bb209a9b"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK173_RATING",
+      "46f67ad170c18e55ddf1b0bf880704256aa5124ede480c15b85e38d4573b9c2c"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:TASK174",
+      "0449efde89fec337615888d2ffe52ccf4df4b7be4f525477729f3f2c6f1e0f72"
+    ],
+    [
+      "candidate:82f370ff-73cd-5d71-aaf9-efc51645d22e:disposition",
+      "08800c42440cc833c2211bd578b1093acdf17854f54eaa3c3ba0d41f5d754d43"
+    ],
+    [
+      "ranking-policy",
+      "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6"
+    ],
+    [
+      "request",
+      "af3d6345992d58b350bc7be4dd5d14af32f804253bcaf5e9aeb787a97d7f51a0"
+    ],
+    [
+      "requirement",
+      "853b665895fc36626d34fee3f8364a8d0473ab4d25eb02d940290701b3ffc8e6"
+    ],
+    [
+      "sizing-result",
+      "RESULT_PROJECTION_BOUND_BY_CANONICAL_RESULT_HASH"
+    ],
+    [
+      "sizing-selection",
+      "115f318a43b41f52d35f5d88afbcc65c2a9f7e351b63cc223bd1097e4b3bc4aa"
+    ]
+  ],
+  "provenance_self_edge_count": 0,
+  "ranked_candidate_ids": [],
+  "ranking_policy_hash": "0d9f6c410414f5a556e92dad15b86fabc4c28c07416513a71645160a0349fba6",
+  "ranking_policy_id": "V07-T173-SIZING-RANKING-POLICY-R1",
+  "ranking_trace": [],
+  "recommendable_count": 0,
+  "recommended_candidate_id": null,
+  "request_hash": "af3d6345992d58b350bc7be4dd5d14af32f804253bcaf5e9aeb787a97d7f51a0",
+  "result_hash": "4b6c7a94b5f2b81b3e9872f03fa6bd1b8aade95f7e3eb51dc3887b7d3b187877",
+  "result_id": "urn:hxforge:task173-sizing:4b6c7a94b5f2b81b3e9872f03fa6bd1b8aade95f7e3eb51dc3887b7d3b187877",
+  "schema_version": "task173.sizing-result.v1",
+  "selection_status": "NO_RECOMMENDABLE_CANDIDATE",
+  "stale_reference_binding": false,
+  "status": "VALIDATED",
+  "warn_count": 0
+}

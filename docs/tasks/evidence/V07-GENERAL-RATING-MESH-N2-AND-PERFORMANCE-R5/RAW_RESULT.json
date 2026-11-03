@@ -1,0 +1,50 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "candidate_rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r5",
+  "mesh_comparison_status": "PASS",
+  "milestones": {
+    "CANDIDATE_SELECTED": true,
+    "FULL_RATING_CONVERGED": false,
+    "LOW_MESH_NUMERIC_VALID": true,
+    "MESH_COMPARISON_AVAILABLE": true,
+    "MESH_N2_NUMERIC_VALID": true,
+    "PREFLIGHT_COMPLETE": true,
+    "SIZING_EVALUATED": false
+  },
+  "n2_duty_w": "45868.2439988560625",
+  "n2_energy_residual_w": "1.375E-10",
+  "n2_mesh_result_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+  "n2_numerical_seconds": 437.427,
+  "n2_status": "NUMERIC_VALID",
+  "n2_task172_evaluations": 8055,
+  "n2_terminal_residual_k": "6.11116E-9",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "r4_n1_mesh_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+  "report_json_path": "docs/tasks/evidence/V07-GENERAL-RATING-MESH-N2-AND-PERFORMANCE-R5/ENGINEERING_REPORT.json",
+  "report_md_path": "docs/tasks/evidence/V07-GENERAL-RATING-MESH-N2-AND-PERFORMANCE-R5/ENGINEERING_REPORT.md",
+  "schema_version": "hxforge.general-r5-raw-result.v1",
+  "solver_performance_profile": {
+    "cell_root_trial_receipt_count": 0,
+    "mesh_run_metadata": {
+      "bisection_iterations": 24,
+      "mesh_result_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+      "outer_action_count": 26
+    },
+    "mesh_subdivisions": 2,
+    "outer_trial_count": 26,
+    "property_provider_state_lookup_count": 290586,
+    "schema_version": "hxforge.solver-performance-profile.v1",
+    "task172_local_evaluation_count": 8055,
+    "task172_request_hash_duplicate": 0,
+    "task172_request_hash_total": 0,
+    "task172_request_hash_unique": 0,
+    "timing_seconds": {
+      "outer_solver_estimated": 0.578,
+      "task172_evaluations": 436.849,
+      "total_wall": 437.427
+    }
+  },
+  "total_numerical_seconds": 439.54
+}

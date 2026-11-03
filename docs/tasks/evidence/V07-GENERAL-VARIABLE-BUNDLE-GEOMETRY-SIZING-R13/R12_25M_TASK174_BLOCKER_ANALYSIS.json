@@ -1,0 +1,24 @@
+{
+  "baffle_spacing_m": "0.5",
+  "blockers": [
+    {
+      "code": "BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT",
+      "consumer": "candidate water-property domain guard",
+      "missing_bindings": [
+        "candidate outlet pressures within 100000..101325 Pa"
+      ],
+      "scope": "CANDIDATE_PRESSURE_PATH"
+    }
+  ],
+  "engineering_interpretation": "Task174 reference hydraulic preview blocked because candidate outlet pressures left the CoolProp water-property domain (100000\u2013101325 Pa). This is not a silent override of Task174 validation.",
+  "hydraulic_model_scope": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+  "physical_tube_count": 253,
+  "schema_version": "hxforge.r12-25m-task174-blocker-analysis.v1",
+  "shell_geometry_id": "shell-1::SHELL_D_0.5",
+  "shell_inside_diameter_m": "0.5",
+  "task025_total_parallel_flow_area_m2": "0.0492914415",
+  "task168_chain_status": "CHAIN_COMPLETE",
+  "task174_result_hash": "81712db0cbc3e1601401bccbb026f26af7fa52b1dad707b76ed06d48089168eb",
+  "task174_status": "BLOCKED",
+  "tube_length_m": "2.5"
+}

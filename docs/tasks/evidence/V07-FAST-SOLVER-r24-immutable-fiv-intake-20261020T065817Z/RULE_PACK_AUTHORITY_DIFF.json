@@ -1,0 +1,11 @@
+{
+  "authority_intake_status": "FIV_AUTHORITY_MISSING",
+  "configuration_rule_pack_approved": true,
+  "fiv_numeric_limit_authority": "MISSING",
+  "missing_for_fiv_numeric_screening": [
+    "Approved FIV numeric limit coefficients with validity envelope",
+    "Tube layout / span / support applicability binding on live rating requests",
+    "Task167 approved_rule_pack_authority on R19/R21E frozen snapshots",
+    "Licensed engineering sign-off for production numeric limits"
+  ]
+}

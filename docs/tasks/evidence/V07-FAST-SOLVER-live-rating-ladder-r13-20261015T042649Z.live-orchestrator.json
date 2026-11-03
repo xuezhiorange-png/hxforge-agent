@@ -1,0 +1,92 @@
+{
+  "blocked_code": "MESH_COMPARISON_FAILED",
+  "blocked_diagnostics": [],
+  "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+  "experimental_rating_authority_id": "V07-FAST-SOLVER-RATING-AUTHORITY-ADMISSION-R11",
+  "mesh_comparisons": [
+    {
+      "coarse_subdivisions": 1,
+      "duty_difference_w": "12.077780792347",
+      "duty_metric": "0.0002326341389901647480275204451",
+      "duty_metric_threshold": "0.01",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "duty_precision_floor_metric": "4.072924619264683294499082828E-12",
+      "duty_precision_floor_w": "2.114560268272230380E-7",
+      "duty_status": "PASS",
+      "fine_subdivisions": 2,
+      "interval_duty_differences_w": [
+        "3.725729925354",
+        "2.969503815244",
+        "2.321585332427",
+        "1.767215014982",
+        "1.293746704340"
+      ],
+      "overall_status": "FAIL",
+      "wall_extrema_differences_k": {
+        "T_wall_inner_max": "0.0471376512014",
+        "T_wall_inner_min": "0.03491148859596",
+        "T_wall_outer_max": "0.04531160269380",
+        "T_wall_outer_min": "0.03360412837213"
+      },
+      "wall_precision_floor_k": "3.4892668672623790E-13",
+      "wall_status": "FAIL"
+    }
+  ],
+  "mesh_stages": [
+    {
+      "blocked_code": null,
+      "blocked_diagnostics": [],
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "cell_closure_pass": true,
+      "energy_balance_pass": true,
+      "energy_balance_residual_w": "2.04E-10",
+      "mesh_n": 1,
+      "mesh_result_hash": "5aebddd6094f9b037f68d57289d36afd8607ea75751d77cb6d74c4e4c01d55c2",
+      "outer_iterations_for_rehydrate": 25,
+      "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+      "shooting_enthalpy_for_rehydrate": "107515.99436211517692599833011627197265625",
+      "shooting_enthalpy_j_kg": "107515.99436211517692599833011627197265625",
+      "stage_status": "MESH_TERMINAL_ACCEPTED",
+      "terminal_boundary_residual_k": "1.9803E-9",
+      "terminal_tolerance_pass": true,
+      "worker_status": "TERMINAL_ACCEPTED",
+      "worker_wall_seconds": 72.31343374100106
+    },
+    {
+      "blocked_code": null,
+      "blocked_diagnostics": [],
+      "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+      "cell_closure_pass": true,
+      "energy_balance_pass": true,
+      "energy_balance_residual_w": "7.6E-10",
+      "mesh_n": 2,
+      "mesh_result_hash": "f408506a557f5ecd15910767156cfb2d75c30bb8f910a727365b750d2ea3adac",
+      "outer_iterations_for_rehydrate": 27,
+      "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+      "shooting_enthalpy_for_rehydrate": "107515.3904720090986076171696186065673828125",
+      "shooting_enthalpy_j_kg": "107515.3904720090986076171696186065673828125",
+      "stage_status": "MESH_TERMINAL_ACCEPTED",
+      "terminal_boundary_residual_k": "1.7105E-9",
+      "terminal_tolerance_pass": true,
+      "worker_status": "TERMINAL_ACCEPTED",
+      "worker_wall_seconds": 158.46772374200373
+    }
+  ],
+  "numerical_authority_status": "CANDIDATE",
+  "orchestrator_authority_id": "V07-FAST-SOLVER-LIVE-RATING-LADDER-R13",
+  "production_integration": false,
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "schema_version": "task173.experimental-live-rating-orchestrator-outcome.v1",
+  "stage_artifacts": [
+    {
+      "path": "/workspace/docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-stages-20261015T042649Z/live-mesh-n1-receipt.json",
+      "sha256": "8c4e18c0f8286d356acb6a5502f09c68a42e242ded7c41838cbfc76fadd1fe95"
+    },
+    {
+      "path": "/workspace/docs/tasks/evidence/V07-FAST-SOLVER-live-rating-ladder-r13-stages-20261015T042649Z/live-mesh-n2-receipt.json",
+      "sha256": "1cb23fc1805f7946c453eb546a9e41df52d1c1c12e17ec8ea80360487f8c593c"
+    }
+  ],
+  "status": "MESH_COMPARISON_FAIL",
+  "total_wall_seconds": 251.9683055610003
+}

@@ -1,0 +1,33 @@
+{
+  "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "candidates": [
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "nominal_geometry": null,
+      "task168_blocked_codes": [],
+      "tube_length_m": "4.85"
+    },
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "nominal_geometry": null,
+      "task168_blocked_codes": [],
+      "tube_length_m": "4.90"
+    }
+  ],
+  "schema_version": "hxforge.experimental-candidate-eligibility.v1"
+}

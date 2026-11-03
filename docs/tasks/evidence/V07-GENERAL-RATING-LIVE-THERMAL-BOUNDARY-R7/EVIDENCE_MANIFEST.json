@@ -1,0 +1,14 @@
+{
+  "files": {
+    "CASE_A_CASE_B_INPUT_PARITY.json": "b1a493ed206a8e14abdb5abc3e1753efb682ebdd3241345f430bb0153e2dca38",
+    "CASE_B_REAL_CELL_RESULT.json": "382e32ad1655266b2279c0e5c5be092032d2c854cfccb78a01f5e560b2f2feba",
+    "ENGINEERING_REPORT.json": "ed737d987e812f2cc902e36aafc9b4cabbdd2c5a05d2f58c9fa7efc263d98f9f",
+    "ENGINEERING_REPORT.md": "6b6f8a06bd8aa9dac2904228ad59cf75c8f723b7ec9256a9045c48e4b5299b26",
+    "NATIVE_THERMAL_BOUNDARY_BINDING.json": "a3c87485c2614d44adb571f2dfe9331c2a5fed99e82fcbbac0aaf3e330ba7e1f",
+    "RAW_RESULT.json": "ced35ba9c79cf313d76d4b86c572f85fea4964ad736a5decf8214ba1f1cc8ba5",
+    "SAFE_PROVIDER_CACHE_RESULT.json": "1bb5e07c30893dbbc156aa78fb004e0e29397f04e3f507fd7c5691f5d86cb7a6"
+  },
+  "schema_version": "hxforge.evidence-manifest.v1",
+  "task_id": "V07_GENERAL_RATING_LIVE_THERMAL_BOUNDARY_R7",
+  "total_numerical_seconds": 7.105
+}

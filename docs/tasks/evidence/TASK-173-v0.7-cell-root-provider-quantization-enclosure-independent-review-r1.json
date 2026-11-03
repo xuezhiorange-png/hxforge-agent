@@ -1,0 +1,235 @@
+{
+  "schema_version": "task173.cell_root.provider_quantization_enclosure.independent_review.r1",
+  "task_id": "STAGE3_TASK173_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_INDEPENDENT_REVIEW_R1_RETRY_AFTER_HASH_CONTRACT_RECOVERY",
+  "retry_after_hash_contract_recovery": true,
+  "review_protocol": "EXACT_GIT_ARTIFACT_BACKED_FRESH_CONTEXT",
+  "reviewer": {
+    "name": "Codex",
+    "model": "GPT-6",
+    "model_variant": "NOT_EXPOSED_IN_THIS_CONTEXT",
+    "id": "01a10c3e-8a69-7383-8760-e24db6982f3f",
+    "context": "FRESH",
+    "self_approval": false,
+    "candidate_author_self_approval": false,
+    "prior_blocked_reviewer_reused": false
+  },
+  "pr": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true,
+    "reviewed_head": "4736d65288f706e3fc1c3348255afdfc3cb389ef"
+  },
+  "review_bundle": {
+    "file_count": 1412,
+    "bundle_sha256": "6df43fdbe8ff4f6e090276970dd34d6969f245309fb09722da70e7f37d3f3d8c",
+    "manifest_sha256": "fb3155556517bdd3f3d0ba2fe537f4770cc742a009e03a3a903ffa56cd520b5d",
+    "manifest_paths_equal_pinned_tree": true,
+    "raw_lengths_sha256_and_git_blobs_verified": true,
+    "archive_payload_bytes_verified": true,
+    "macos_metadata_members": 1559
+  },
+  "review_object": {
+    "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+    "authority_canonical_hash": "c95b5bf23b15a9c93b6ef47c3ad2043708bef9ae66429116855a4306f8102ab2",
+    "lifecycle_in_projection": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "authority_accepted_in_projection": false,
+    "candidate_modified": false
+  },
+  "hash_replay": {
+    "recovery_head": "4736d65288f706e3fc1c3348255afdfc3cb389ef",
+    "script_path": "docs/tasks/evidence/TASK-173-v0.7-provider-quantization-enclosure-hash-replay-r1.py",
+    "script_sha256": "0fb641c78c1358d4af7cc3b1cd99c860652a114ce01e5bea5fac39470fef6196",
+    "artifact_file_integrity": "PASS",
+    "authority_hash_replay": "PASS",
+    "qualification_matrix_hash": "92cb9fa0a65041199f67ebe588b460bcef868c64fdd6044e990f4309b6af8840",
+    "qualification_matrix_hash_replay": "PASS",
+    "enclosure_event_hash_replay_count": 8,
+    "enclosure_event_hash_replay_pass_count": 8,
+    "enclosure_event_hash_replay": "PASS",
+    "replay_output_exact": true,
+    "canonicalization": {
+      "implementation": "hexagent.canonical_json.canonical_sha256",
+      "rfc": "RFC 8785 / JCS",
+      "rfc8785_version": "0.1.4",
+      "recursive_exclusions": [
+        "canonical_hash",
+        "mutable_review_comments"
+      ],
+      "nfc_normalization": true,
+      "digest": "SHA256"
+    },
+    "prior_direct_json_dumps_hash": "acade14b5227cbf6149e2bfbb521a8709b3f2465e1068e4672d759dc6fea8d0c",
+    "prior_direct_hash_reproduced": true,
+    "prior_reviewer_fault_inferred": false
+  },
+  "a_r_review": {
+    "A_point_root_contract": "PASS",
+    "B_enclosure_semantics": "PASS",
+    "C_q1_q15": "FAIL_Q15_COMPLETE_REQUEST_REPLAY_NOT_ESTABLISHED",
+    "D_provider_state_exhaustion": "PASS_CAPTURED_COORDINATES",
+    "E_representative_rule": "PASS",
+    "F_duty_uncertainty": "PASS_8_OF_8",
+    "G_wall_uncertainty": "PASS_8_OF_8",
+    "H_local_floor_combination": "PASS_CAPTURED_ARITHMETIC",
+    "I_mesh_precision_semantics": "PASS",
+    "J_transient_outer_search_effect": "FAIL",
+    "K_transient_vs_accepted_uncertainty": "FAIL",
+    "L_outer_boundary_decision_uncertainty": "FAIL",
+    "M_final_accepted_trajectory_uncertainty": "FAIL",
+    "N_uncertainty_aggregation": "FAIL",
+    "O_energy_balance": "FAIL_ENCLOSURE_SUFFICIENCY_UNBOUND",
+    "P_train_holdout_integrity": "PASS",
+    "Q_five_n1_trajectories": "FAIL_COMPLETE_CELL_FACE_EVIDENCE_ABSENT",
+    "R_eight_enclosure_events": "FAIL_COMPLETE_REQUEST_IDENTITY_REPLAY_ABSENT",
+    "reference_n1_dormant_fallback": "PASS_LIMITED_TO_N1_OBSERVATION",
+    "task174_canonical_reduction": "FAIL_NOT_PRESENT_AT_REVIEWED_HEAD",
+    "scope_containment": "PASS",
+    "focused_regressions": {
+      "passed": 19,
+      "deselected": 42,
+      "result": "PASS"
+    }
+  },
+  "findings": [
+    {
+      "finding_id": "TRANSIENT_OUTER_BOUNDARY_DECISION_UNCERTAINTY_NOT_BOUND",
+      "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+      "classification": "FAIL_CLOSED_DOMAIN_HOLE",
+      "existing_authority_basis": "Cell and outer-boundary runtime use trajectory validity and terminal classification to update the shooting-enthalpy bracket; enclosure may replace a precision-floor block with a representative endpoint result.",
+      "source_locations": [
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "authority_candidate.projection.downstream_propagation"
+        },
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "authority_candidate.projection.qualification_binding"
+        },
+        {
+          "path": "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py",
+          "lines": "1815-1819, 2053-2104, 2237-2268, 2304-2385"
+        }
+      ],
+      "exact_contract_conflict": "Transient enclosure representative can affect trial validity, low-side feasibility, outer bisection updates, and selected shooting enthalpy, but the candidate supplies no uncertainty-bound decision rule or fail-closed straddle disposition. Zero final accepted-mesh enclosure count does not bound transient decisions.",
+      "minimum_correction": "Owner-directed candidate contract must explicitly govern uncertainty in outer-boundary decisions; do not infer or implement a rule during this review."
+    },
+    {
+      "finding_id": "ACCEPTED_TRAJECTORY_ENCLOSURE_UNCERTAINTY_PROPAGATION_NOT_BOUND",
+      "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+      "classification": "FAIL_CLOSED_DOMAIN_HOLE",
+      "existing_authority_basis": "The candidate adds local duty and wall precision floors, while the accepted Rating chain propagates face states into later cells and evaluates mesh/energy acceptance on the trajectory.",
+      "source_locations": [
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "authority_candidate.projection.uncertainty_model"
+        },
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "authority_candidate.projection.existing_roundoff_floor_combination"
+        },
+        {
+          "path": "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py",
+          "lines": "1210-1234, 1780-1784, 2132-2140, 2365-2399, 2617-2623"
+        }
+      ],
+      "exact_contract_conflict": "The candidate does not coherently bind how enclosure uncertainty propagates through downstream constitutive states into accepted duty, wall observables, mesh comparisons, energy closure, and final physical uncertainty. Summing transient events across different trial states is provenance, not an established physical uncertainty for one accepted trajectory.",
+      "minimum_correction": "Explicitly separate transient provenance from accepted-trajectory uncertainty and bind the accepted-path propagation/acceptance semantics before authority acceptance."
+    },
+    {
+      "finding_id": "COMPLETE_ENDPOINT_REQUEST_IDENTITY_REPLAY_NOT_ESTABLISHED",
+      "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+      "classification": "UNBOUND_IDENTITY_OR_PROVENANCE",
+      "existing_authority_basis": "Q15 requires exact Task172 request/result identity replay for each endpoint.",
+      "source_locations": [
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "qualification.qualification_matrix.all_trigger_events[*].left_task172_request_projection/right_task172_request_projection"
+        },
+        {
+          "path": "src/hexagent/exchangers/shell_tube/task172_local_runtime/service.py",
+          "lines": "121-189"
+        }
+      ],
+      "exact_contract_conflict": "Stored endpoint projections are compact diagnostic projections rather than complete native candidate request-hash preimages; the candidate request/runtime modules used by the external diagnostic are absent at the reviewed head. Recorded request/result bindings can be checked, but native endpoint request hashes cannot be independently recomputed from this packet.",
+      "minimum_correction": "Preserve the complete committed candidate request schema/projection and exact endpoint preimages or equivalent source-bound replay contract; do not substitute direct hashing of the diagnostic projection."
+    },
+    {
+      "finding_id": "FULL_FIVE_CASE_N1_TRAJECTORY_EVIDENCE_NOT_PRESERVED",
+      "authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R1",
+      "classification": "UNBOUND_IDENTITY_OR_PROVENANCE",
+      "existing_authority_basis": "Qualification requires complete n=1 trajectories and auditable per-cell/event closure evidence for TRAIN_A, TRAIN_B, H1, H2, and H3.",
+      "source_locations": [
+        {
+          "path": "docs/tasks/evidence/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.json",
+          "section": "qualification.qualification_matrix.cases"
+        }
+      ],
+      "exact_contract_conflict": "The matrix and raw log preserve case summaries and mesh hashes but omit complete final cell/face states and identities, including the detailed H2 numerical-hole recovery trace. The required final paired support closures cannot be independently replayed.",
+      "minimum_correction": "Preserve full typed final n=1 cell/face trajectory and recovery evidence for all five cases without changing frozen geometry or enclosure policy."
+    },
+    {
+      "finding_id": "TASK174_CANONICAL_REDUCTION_FIX_NOT_PRESENT_AT_REVIEWED_HEAD",
+      "authority_id": "V07-T173-SIZING-TASK174-CANDIDATE-PROJECT-TRANSFER-R1",
+      "classification": "UNBOUND_IDENTITY_OR_PROVENANCE",
+      "existing_authority_basis": "The candidate qualification claims H1 Task174 validation using the native TASK166 decomposition; TASK166 is the numeric producer and TASK174 must verify its canonical reduction.",
+      "source_locations": [
+        {
+          "path": "src/hexagent/exchangers/shell_tube/task174_hydraulic_orchestration/service.py",
+          "lines": "132-140"
+        },
+        {
+          "path": "src/hexagent/exchangers/shell_tube/bell_delaware/pressure_drop.py",
+          "lines": "164-165"
+        },
+        {
+          "path": "docs/tasks/TASK-173-v0.7-task174-native-bell-canonical-reduction-parity-and-enclosure-qualification-resume-r1.md",
+          "section": "TASK174 canonical reduction correction"
+        }
+      ],
+      "exact_contract_conflict": "At the reviewed source head TASK174 still uses the flat four-term reduction, while the receipt says the grouped correction and regression remain only in the dirty parent implementation. Captured grouped arithmetic is not proof that the reviewed committed runtime used it.",
+      "minimum_correction": "Bind the claimed H1 qualification to the exact committed TASK174 implementation that performs grouped native reduction; no tolerance or formula change is authorized by this review."
+    }
+  ],
+  "task174_reduction_audit": {
+    "root_cause_claim": "DECIMAL_FINITE_PRECISION_REDUCTION_GROUPING_MISMATCH",
+    "legacy_flat_h1_difference_pa": "1E-47",
+    "captured_grouped_end_zone_difference_pa": "0",
+    "captured_grouped_total_difference_pa": "0",
+    "task166_formula_changed": false,
+    "tolerance_added": false,
+    "grouped_runtime_fix_present_at_reviewed_head": false,
+    "frozen_reference_task174_result_hash_claim": "ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419",
+    "reference_hash_independently_reproduced_in_review": false
+  },
+  "qualification_summary": {
+    "training_cuts": ["0.215", "0.220"],
+    "holdout_cuts": ["0.225", "0.275", "0.350"],
+    "holdout_values_reselected": false,
+    "performance_output_used_for_selection": false,
+    "endpoint_result_hashes_replayed": 16,
+    "enclosure_event_hashes_replayed": 8,
+    "event_arithmetic_and_floor_replay": "PASS_8_OF_8",
+    "total_outer_search_enclosure_triggers": 8,
+    "final_n1_accepted_mesh_enclosures": 0,
+    "reference_n1_enclosure_trigger_count": 0,
+    "reference_full_rating_identity_claimed": false,
+    "n1_case_summaries_match_raw_log": true,
+    "complete_five_case_final_cell_face_payloads_present": false,
+    "relevant_focused_tests": "19 passed, 42 deselected"
+  },
+  "review_decision": "FAIL_TASK173_CELL_ROOT_PROVIDER_QUANTIZATION_ENCLOSURE_INDEPENDENT_REVIEW",
+  "effective_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "authority_accepted": false,
+  "production_code_changed_by_review": false,
+  "parent_dirty_implementation_committed": false,
+  "enclosure_implemented": false,
+  "candidate_full_rating_executed": false,
+  "sizing_executed": false,
+  "task175_release_acceptance_performed": false,
+  "next_gate": "OWNER_DIRECTION_REQUIRED_AFTER_PROVIDER_QUANTIZATION_ENCLOSURE_REVIEW_FAILURE",
+  "next_gate_executed": false,
+  "ready_authorized": false,
+  "merge_authorized": false,
+  "stop": true,
+  "canonical_hash": "7c09c7e1151a3d2911c37e997616e244e0a141131053ad52a2e6f54cbb56820f"
+}

@@ -1,0 +1,33 @@
+{
+  "diagnostics": [
+    "full_task173_rating_skipped"
+  ],
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r3",
+  "experimental_ranking_status": "PREFLIGHT_ONLY",
+  "preflight": {
+    "candidate_count": 1,
+    "candidate_space_hash": "f52842793cba22d6a0c532c09f48743da7bf5f7397bf1d0efcc6a4b1154abb24",
+    "candidates": [
+      {
+        "baffle_spacing_m": "0.97",
+        "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+        "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+        "disposition": "BLOCKED",
+        "status": "BLOCKED",
+        "tube_length_m": "4.85"
+      }
+    ],
+    "distinct_geometry_count": 1,
+    "status": "VALID",
+    "structurally_admitted_count": 0
+  },
+  "production_design_approved": false,
+  "rating_solver_calls": 0,
+  "report_json_path": "/workspace/docs/tasks/evidence/V07-GENERAL-RATING-FIRST-ACCEPTED-MESH-R3/ENGINEERING_REPORT.json",
+  "report_md_path": "/workspace/docs/tasks/evidence/V07-GENERAL-RATING-FIRST-ACCEPTED-MESH-R3/ENGINEERING_REPORT.md",
+  "schema_version": "hxforge.general-workflow-outcome.v1",
+  "sizing_outcome_type": "SKIPPED",
+  "sizing_result": null,
+  "status": "PREFLIGHT_COMPLETE",
+  "total_wall_seconds": 0.4662197589932475
+}

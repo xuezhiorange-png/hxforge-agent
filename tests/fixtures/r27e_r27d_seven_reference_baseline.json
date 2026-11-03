@@ -1,0 +1,379 @@
+{
+  "schema_version": "hxforge.r27e-r27d-seven-reference-regression.v27e",
+  "reference_candidate_count": 7,
+  "candidates": [
+    {
+      "candidate_id": "9aba0e5c-b8d5-53bd-b35d-92410c85efef",
+      "candidate_hash": "c61918c5848ac51b88e97219ec639fdb943a6fb56be4ea116d1180c6a0df480b",
+      "geometry_projection_hash": "7d707c5a98f375b3e3324ff5c94a76aeff97d3d46b31e23c66a528bef0ea9837",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 331524.25844924094,
+      "energy_balance_relative_error_n1": 3.5115174488734694e-16,
+      "max_cell_thermal_residual_w_n1": 4.279791028238833e-07,
+      "max_closure_residual_w_n1": 4.306202754378319e-07,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 331524.25844924094,
+          "tube_outlet_temperature_k": 303.38970842890694,
+          "shell_outlet_temperature_k": 298.963833529294,
+          "max_cell_thermal_residual_w": 4.279791028238833e-07,
+          "max_inner_wall_outer_closure_residual_w": 4.306202754378319e-07,
+          "min_cell_approach_temperature_k": 8.618394383772454,
+          "energy_balance_relative_error": 3.5115174488734694e-16,
+          "wall_seconds": 17.940596221014857,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 331468.02394544525,
+          "tube_outlet_temperature_k": 303.3908295922453,
+          "shell_outlet_temperature_k": 298.96316102826836,
+          "max_cell_thermal_residual_w": 2.191954990848899e-07,
+          "max_inner_wall_outer_closure_residual_w": 2.1931555238552392e-07,
+          "min_cell_approach_temperature_k": 8.503206509114875,
+          "energy_balance_relative_error": 1.2292396157685851e-15,
+          "wall_seconds": 49.942020523012616,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 331453.9724514267,
+          "tube_outlet_temperature_k": 303.3911097408949,
+          "shell_outlet_temperature_k": 298.962992988113,
+          "max_cell_thermal_residual_w": 4.820030881091952e-07,
+          "max_inner_wall_outer_closure_residual_w": 4.820030881091952e-07,
+          "min_cell_approach_temperature_k": 8.446819124361014,
+          "energy_balance_relative_error": 1.0536786236043237e-15,
+          "wall_seconds": 215.9587526009418,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 331453.9724514267,
+      "N4_TUBE_OUTLET_K": 303.3911097408949,
+      "N4_SHELL_OUTLET_K": 298.962992988113,
+      "LIVE_TUBE_DP_PA": "717.823",
+      "LIVE_SHELL_DP_PA": "1174.2016697779067231700668548068167977062202535808",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "9c4b84db-a0f6-58bb-b81c-3edffed9035a",
+      "candidate_hash": "87f8fe043c443229e0d258d9b96e2c8055c09271e407076f7d9ecd575e224c43",
+      "geometry_projection_hash": "3fa42bd093ebe937438f9e63cefb41963afd51f12d1debf6c51f065838dc432e",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 419782.3989186106,
+      "energy_balance_relative_error_n1": 6.933075453308009e-16,
+      "max_cell_thermal_residual_w_n1": 2.424494596198201e-07,
+      "max_closure_residual_w_n1": 2.4458859115839005e-07,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 419782.3989186106,
+          "tube_outlet_temperature_k": 301.63015865566655,
+          "shell_outlet_temperature_k": 300.01934868664443,
+          "max_cell_thermal_residual_w": 2.424494596198201e-07,
+          "max_inner_wall_outer_closure_residual_w": 2.4458859115839005e-07,
+          "min_cell_approach_temperature_k": 6.901146636939075,
+          "energy_balance_relative_error": 6.933075453308009e-16,
+          "wall_seconds": 15.77344690891914,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 419657.62127782917,
+          "tube_outlet_temperature_k": 301.63264615129276,
+          "shell_outlet_temperature_k": 300.0178563559674,
+          "max_cell_thermal_residual_w": 2.0639708964154124e-07,
+          "max_inner_wall_outer_closure_residual_w": 2.0639708964154124e-07,
+          "min_cell_approach_temperature_k": 6.764845516012201,
+          "energy_balance_relative_error": 4.161082127108452e-16,
+          "wall_seconds": 56.943629691028036,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 419626.4567201932,
+          "tube_outlet_temperature_k": 301.63326743011345,
+          "shell_outlet_temperature_k": 300.0174836303406,
+          "max_cell_thermal_residual_w": 7.394373824354261e-07,
+          "max_inner_wall_outer_closure_residual_w": 7.404451025649905e-07,
+          "min_cell_approach_temperature_k": 6.6985708791928005,
+          "energy_balance_relative_error": 2.6355477345255294e-15,
+          "wall_seconds": 215.13539476401638,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 419626.4567201932,
+      "N4_TUBE_OUTLET_K": 301.63326743011345,
+      "N4_SHELL_OUTLET_K": 300.0174836303406,
+      "LIVE_TUBE_DP_PA": "799.557",
+      "LIVE_SHELL_DP_PA": "733.08751217589970299263889844663819297473034714648",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "7357afdf-292e-5e64-99d1-28931d01fbf7",
+      "candidate_hash": "98ee229c074a6bb1458ebd39160735ab8a484c5dcd41052c1a948e7e899e5399",
+      "geometry_projection_hash": "b4fc203374a050febb56d2421c591b1aea57e68c1c12b043ee8a273de6c5a1d5",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 415979.0391913209,
+      "energy_balance_relative_error_n1": 0.0,
+      "max_cell_thermal_residual_w_n1": 5.055189831182361e-07,
+      "max_closure_residual_w_n1": 5.074834916740656e-07,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 415979.0391913209,
+          "tube_outlet_temperature_k": 301.7059804238229,
+          "shell_outlet_temperature_k": 299.97386088380483,
+          "max_cell_thermal_residual_w": 5.055189831182361e-07,
+          "max_inner_wall_outer_closure_residual_w": 5.074834916740656e-07,
+          "min_cell_approach_temperature_k": 6.976008232716879,
+          "energy_balance_relative_error": 0.0,
+          "wall_seconds": 17.974568250006996,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 415859.9874002895,
+          "tube_outlet_temperature_k": 301.7083537831371,
+          "shell_outlet_temperature_k": 299.97243703885545,
+          "max_cell_thermal_residual_w": 5.442115798359737e-05,
+          "max_inner_wall_outer_closure_residual_w": 5.442253313958645e-05,
+          "min_cell_approach_temperature_k": 6.840159021999511,
+          "energy_balance_relative_error": 9.797855978918062e-16,
+          "wall_seconds": 105.9124589660205,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 415830.2518736894,
+          "tube_outlet_temperature_k": 301.70894657632425,
+          "shell_outlet_temperature_k": 299.9720814055794,
+          "max_cell_thermal_residual_w": 7.122143870219588e-07,
+          "max_inner_wall_outer_closure_residual_w": 7.122143870219588e-07,
+          "min_cell_approach_temperature_k": 6.7740731271466075,
+          "energy_balance_relative_error": 4.1993814051182756e-16,
+          "wall_seconds": 188.25816021696664,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 415830.2518736894,
+      "N4_TUBE_OUTLET_K": 301.70894657632425,
+      "N4_SHELL_OUTLET_K": 299.9720814055794,
+      "LIVE_TUBE_DP_PA": "823.857",
+      "LIVE_SHELL_DP_PA": "792.48538586903042488540773757468980089455846203831",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "580fc128-a517-5c52-82d6-97c327049928",
+      "candidate_hash": "e97673dd565261f51886495fc7dbd59dd63a621f92db7b83fb10aa28c6483c7b",
+      "geometry_projection_hash": "9635569a99a27c473e2421986a890a090a15364dd9c5ef34aef0f587411dec75",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 384224.3185650776,
+      "energy_balance_relative_error_n1": 9.08963718863753e-16,
+      "max_cell_thermal_residual_w_n1": 0.00017618491256143898,
+      "max_closure_residual_w_n1": 0.0001761875464580953,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 384224.3185650776,
+          "tube_outlet_temperature_k": 302.3390389179301,
+          "shell_outlet_temperature_k": 299.59408398447357,
+          "max_cell_thermal_residual_w": 0.00017618491256143898,
+          "max_inner_wall_outer_closure_residual_w": 0.0001761875464580953,
+          "min_cell_approach_temperature_k": 7.594422866061109,
+          "energy_balance_relative_error": 9.08963718863753e-16,
+          "wall_seconds": 43.6978881029645,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 384132.277336214,
+          "tube_outlet_temperature_k": 302.3408738742888,
+          "shell_outlet_temperature_k": 299.59298321604285,
+          "max_cell_thermal_residual_w": 4.520334186963737e-07,
+          "max_inner_wall_outer_closure_residual_w": 4.530083970166743e-07,
+          "min_cell_approach_temperature_k": 7.465855559079614,
+          "energy_balance_relative_error": 3.030605046631932e-16,
+          "wall_seconds": 50.226349537028,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 384109.28429039224,
+          "tube_outlet_temperature_k": 302.341332269286,
+          "shell_outlet_temperature_k": 299.5927082303267,
+          "max_cell_thermal_residual_w": 1.466250978410244e-07,
+          "max_inner_wall_outer_closure_residual_w": 1.4698525774292648e-07,
+          "min_cell_approach_temperature_k": 7.4031658654094485,
+          "energy_balance_relative_error": 7.576966151833701e-16,
+          "wall_seconds": 214.6650414239848,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 384109.28429039224,
+      "N4_TUBE_OUTLET_K": 302.341332269286,
+      "N4_SHELL_OUTLET_K": 299.5927082303267,
+      "LIVE_TUBE_DP_PA": "761.938",
+      "LIVE_SHELL_DP_PA": "884.93763424789544961423808669927342855727426482475",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "8b05db3b-dbbb-5cb4-9b2e-e8981a10417e",
+      "candidate_hash": "b72c008ca5a69254e4a9e2438f63d0d0a6842fed845e7c50b8f2346ad9cb1cc1",
+      "geometry_projection_hash": "92c79d2ab6c645297901e1cd9dced918bb230c42a842acdf44d39f14ee3d6c07",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 359621.03267780493,
+      "energy_balance_relative_error_n1": 9.71149998875911e-16,
+      "max_cell_thermal_residual_w_n1": 2.9898365028202534e-07,
+      "max_closure_residual_w_n1": 3.023305907845497e-07,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 359621.03267780493,
+          "tube_outlet_temperature_k": 302.8295423720141,
+          "shell_outlet_temperature_k": 299.2998441952658,
+          "max_cell_thermal_residual_w": 2.9898365028202534e-07,
+          "max_inner_wall_outer_closure_residual_w": 3.023305907845497e-07,
+          "min_cell_approach_temperature_k": 8.072946100800777,
+          "energy_balance_relative_error": 9.71149998875911e-16,
+          "wall_seconds": 15.813997164950706,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 359547.38520854013,
+          "tube_outlet_temperature_k": 302.83101066351026,
+          "shell_outlet_temperature_k": 299.29896342890487,
+          "max_cell_thermal_residual_w": 4.1833118302747607e-07,
+          "max_inner_wall_outer_closure_residual_w": 4.196263034828007e-07,
+          "min_cell_approach_temperature_k": 7.950367226957724,
+          "energy_balance_relative_error": 3.2378297441771964e-16,
+          "wall_seconds": 56.988613302935846,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 359528.984854659,
+          "tube_outlet_temperature_k": 302.83137750687735,
+          "shell_outlet_temperature_k": 299.2987433750212,
+          "max_cell_thermal_residual_w": 5.391120794229209e-07,
+          "max_inner_wall_outer_closure_residual_w": 5.391848389990628e-07,
+          "min_cell_approach_temperature_k": 7.89048575195892,
+          "energy_balance_relative_error": 2.266596817271829e-15,
+          "wall_seconds": 186.13297937100288,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 359528.984854659,
+      "N4_TUBE_OUTLET_K": 302.83137750687735,
+      "N4_SHELL_OUTLET_K": 299.2987433750212,
+      "LIVE_TUBE_DP_PA": "739.858",
+      "LIVE_SHELL_DP_PA": "1008.7622357605952126484437215401990479526095898775",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "3c129a7f-eba7-5b5a-9b86-5b2ce9629dae",
+      "candidate_hash": "166a9c7a305501bf794cf3796cade7e5e5991715f8d340baf4fef1b57e532d19",
+      "geometry_projection_hash": "b6bd00ec378922310c2e5a7d368508303227cdbb02d7a744f4c628e9841e98f5",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 356314.94338712393,
+      "energy_balance_relative_error_n1": 4.900804358089477e-16,
+      "max_cell_thermal_residual_w_n1": 1.587832230143249e-06,
+      "max_closure_residual_w_n1": 1.590611645951867e-06,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 356314.94338712393,
+          "tube_outlet_temperature_k": 302.89545516830924,
+          "shell_outlet_temperature_k": 299.2603060077096,
+          "max_cell_thermal_residual_w": 1.587832230143249e-06,
+          "max_inner_wall_outer_closure_residual_w": 1.590611645951867e-06,
+          "min_cell_approach_temperature_k": 8.137638542795344,
+          "energy_balance_relative_error": 4.900804358089477e-16,
+          "wall_seconds": 16.031918599968776,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 356244.76278498507,
+          "tube_outlet_temperature_k": 302.89685434633304,
+          "shell_outlet_temperature_k": 299.25946670529754,
+          "max_cell_thermal_residual_w": 0.0004010605698567815,
+          "max_inner_wall_outer_closure_residual_w": 0.0004010610864497721,
+          "min_cell_approach_temperature_k": 8.015665716302635,
+          "energy_balance_relative_error": 1.1437462917600684e-15,
+          "wall_seconds": 56.60703541303519,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 356227.2281084834,
+          "tube_outlet_temperature_k": 302.89720393202265,
+          "shell_outlet_temperature_k": 299.2592570049326,
+          "max_cell_thermal_residual_w": 5.292131390888244e-07,
+          "max_inner_wall_outer_closure_residual_w": 5.2983159548603e-07,
+          "min_cell_approach_temperature_k": 7.956054998682248,
+          "energy_balance_relative_error": 1.143802590716585e-15,
+          "wall_seconds": 157.02799728699028,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 356227.2281084834,
+      "N4_TUBE_OUTLET_K": 302.89720393202265,
+      "N4_SHELL_OUTLET_K": 299.2592570049326,
+      "LIVE_TUBE_DP_PA": "757.368",
+      "LIVE_SHELL_DP_PA": "1087.9466220214434377623475283815480367108081431035",
+      "experimental_mesh_result_hash": null
+    },
+    {
+      "candidate_id": "40d78e67-23b2-5913-8890-9c3af2fc8434",
+      "candidate_hash": "6938660954524dbdfbd2539881b149755e50aa14b590bdabe0fea247e3910855",
+      "geometry_projection_hash": "c8b27a7e86268b0adfee8c17148ccaaf56c195972c2f186f90354220d6aadfa8",
+      "n1_status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID",
+      "n1_duty_w": 328471.2548227544,
+      "energy_balance_relative_error_n1": 1.772077771154639e-16,
+      "max_cell_thermal_residual_w_n1": 3.9199949242174625e-07,
+      "max_closure_residual_w_n1": 3.9249425753951073e-07,
+      "FULL_RATING_CONVERGED": true,
+      "mesh_ladder": {
+        "1": {
+          "duty_w": 328471.2548227544,
+          "tube_outlet_temperature_k": 303.45057711431207,
+          "shell_outlet_temperature_k": 298.9273231104128,
+          "max_cell_thermal_residual_w": 3.9199949242174625e-07,
+          "max_inner_wall_outer_closure_residual_w": 3.9249425753951073e-07,
+          "min_cell_approach_temperature_k": 8.677994137172277,
+          "energy_balance_relative_error": 1.772077771154639e-16,
+          "wall_seconds": 15.798815584974363,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "2": {
+          "duty_w": 328417.693294082,
+          "tube_outlet_temperature_k": 303.4516449887003,
+          "shell_outlet_temperature_k": 298.92668257724574,
+          "max_cell_thermal_residual_w": 3.5946140997111797e-07,
+          "max_inner_wall_outer_closure_residual_w": 3.5946140997111797e-07,
+          "min_cell_approach_temperature_k": 8.563443072368614,
+          "energy_balance_relative_error": 7.089467114836018e-16,
+          "wall_seconds": 43.0672461980721,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        },
+        "4": {
+          "duty_w": 328404.30941027147,
+          "tube_outlet_temperature_k": 303.4519118277497,
+          "shell_outlet_temperature_k": 298.92652252165146,
+          "max_cell_thermal_residual_w": 1.0076291800942272e-07,
+          "max_inner_wall_outer_closure_residual_w": 1.00793840829283e-07,
+          "min_cell_approach_temperature_k": 8.507345060112698,
+          "energy_balance_relative_error": 1.595195109229651e-15,
+          "wall_seconds": 187.57743105804548,
+          "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+        }
+      },
+      "N4_DUTY_W": 328404.30941027147,
+      "N4_TUBE_OUTLET_K": 303.4519118277497,
+      "N4_SHELL_OUTLET_K": 298.92652252165146,
+      "LIVE_TUBE_DP_PA": "732.822",
+      "LIVE_SHELL_DP_PA": "1264.6795869757057682440162049025430979045374332151",
+      "experimental_mesh_result_hash": null
+    }
+  ],
+  "baseline_provenance": {
+    "source_pr_number": 310,
+    "source_commit_sha": "e320aaf5840812eafe86a0e7d6fef97bf8062544",
+    "capture_mode": "ISOLATED_R27D_WORKTREE"
+  },
+  "model_identity": {
+    "task172_implementation": "task172_local_runtime.service",
+    "tube_regime_isolation": "R27D_ORIGINAL"
+  }
+}

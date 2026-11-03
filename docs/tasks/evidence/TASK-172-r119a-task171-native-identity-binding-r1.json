@@ -1,0 +1,105 @@
+{
+  "schema_version": "task172.r119a.task171-native-identity-binding.v1",
+  "task_id": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+  "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+  "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+  "task014_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+  "accepted_by": "R118-D",
+  "task171_native_identity_candidate": {
+    "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+    "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+    "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+    "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+    "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+    "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+    "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+    "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+    "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+    "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a"
+  },
+  "accepted_native_identity_chain": {
+    "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "root_case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "TASK014": {
+      "revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "status": "committed",
+      "payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+      "domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+      "audit_event_types": [
+        "revision_created",
+        "revision_validated",
+        "revision_committed"
+      ],
+      "case_root_status": "active",
+      "case_root_first_revision_id_matches": true
+    },
+    "TASK020": {
+      "status": "VALID",
+      "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "standard_claim_status": "NO_STANDARD_CLAIM",
+      "committed_TASK014_revision_binding_matches": true
+    },
+    "TASK021": {
+      "status": "VALID",
+      "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+      "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "position_count": 253,
+      "physical_tube_count": 253,
+      "limiting_position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "limiting_position_x_m": "-0.1524",
+      "limiting_position_y_m": "-0.131982271537",
+      "TASK020_binding_matches": true
+    },
+    "TASK022": {
+      "status": "VALID",
+      "bundle_geometry_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "bundle_geometry_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "shell_inside_diameter_m": "0.5",
+      "bare_tube_bundle_diameter_m": "0.43486592081130829065079429561196969724856074243842",
+      "bundle_outer_envelope_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+      "shell_to_bundle_radial_clearance_m": "0.02256703959434585467460285219401515137571962878079",
+      "radial_clearance_margin_m": "0.01256703959434585467460285219401515137571962878079",
+      "TASK020_TASK021_bindings_match": true
+    },
+    "TASK024": {
+      "status": "VALID",
+      "baffle_geometry_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "baffle_geometry_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "baffle_diameter_m": "0.497000000000",
+      "baffle_hole_diameter_m": "0.020050000000",
+      "baffle_center_sequence_m": [
+        "1.200000000000",
+        "2.400000000000",
+        "3.600000000000",
+        "4.800000000000"
+      ],
+      "limiting_cut_boundary_margin_m": "0.000972561537",
+      "TASK020_TASK021_TASK022_bindings_match": true
+    },
+    "TASK025": {
+      "native_result_type": "Task025ValidResult",
+      "result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "request_hash": "ee0625273153d7a487f141fc153464d9e94132f5e280ad5e257b45473fcb84b8",
+      "hydraulic_authority_hash": "2fb039ad6bc5a398ec75911c5b05b36e889d7d37a307ea424c4c7a15884365e5",
+      "active_position_count": 253,
+      "inactive_position_count": 0,
+      "active_position_ids_equal_TASK021_order": true,
+      "engineering_decimal_outputs": {
+        "single_tube_flow_area_m2": "0.0001948278",
+        "total_parallel_flow_area_m2": "0.0492914415",
+        "flow_cross_section_wetted_perimeter_m": "0.04948008",
+        "total_flow_cross_section_wetted_perimeter_m": "12.51846133",
+        "hydraulic_diameter_m": "0.01575000",
+        "internal_volume_m3": "0.295748648836",
+        "internal_heat_transfer_surface_area_m2": "75.1107679584",
+        "future_pressure_drop_length_m": null
+      }
+    }
+  },
+  "aggregate_geometry_id": "UNBOUND",
+  "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+  "task171_result_identity_exists": false,
+  "canonical_hash": "8fa35eaf694439ee5d5375e45bc1b7df753af2982910350531d0e9fe241235e4"
+}

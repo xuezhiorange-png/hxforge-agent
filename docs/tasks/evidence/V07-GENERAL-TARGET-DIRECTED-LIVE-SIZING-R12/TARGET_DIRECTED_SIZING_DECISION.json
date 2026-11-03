@@ -1,0 +1,32 @@
+{
+  "AREA_REDUCTION_VS_R10_A_PERCENT": "38.14432989690721649484536082",
+  "BEST_EVALUATED_CANDIDATE_ID": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+  "BEST_EVALUATED_DUTY_W": "29882.751196130037",
+  "BEST_EVALUATED_NOMINAL_AREA_M2": "45.424131098622137497350",
+  "DUTY_OVERSHOOT_RATIO_VS_TARGET": "3.145552757487372315789473684",
+  "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+  "R10_BASELINE_CANDIDATE_A": {
+    "baffle_spacing_m": "0.97",
+    "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+    "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+    "nominal_tube_outer_area_m2": "73.4356786094391222873825",
+    "total_duty_w": "38387.018185484473",
+    "tube_length_m": "4.85"
+  },
+  "TARGET_CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED_IN_EVALUATED_SET",
+  "TARGET_DUTY_W": "9500",
+  "feasible_evaluated_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "full_rating_converged": false,
+  "production_design_approved": false,
+  "production_sizing_verified": false,
+  "rated_candidate_ids": [
+    "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+    "071b9c82-f24a-53dd-b03b-a267f5f8d3c3"
+  ],
+  "schema_version": "hxforge.target-directed-sizing-decision.v1",
+  "scope_disclaimer": "Preference among live-rated candidates in this run only; not a global optimum over the full discrete candidate space.",
+  "selection_reason": "MIN_NOMINAL_TUBE_AREA_SEARCH_EXCLUDING_BASELINE_GEOMETRIES"
+}

@@ -1,0 +1,65 @@
+{
+  "optimization_implemented": true,
+  "optimization_numerical_parity": true,
+  "provider_call_reduction_percent": 49.31506849315068,
+  "r5_baseline_n2_wall_seconds": "437.427",
+  "r5_baseline_property_provider_state_lookups": 290586,
+  "r5_baseline_task172_evaluations": 8055,
+  "r5_unique_task172_request_count": "NOT_MEASURED",
+  "representative_cell_tp_profile": {
+    "exact_duplicate_rate": 0.5,
+    "exact_duplicate_tp_queries": 109,
+    "mean_state_tp_seconds": 0.0008266672977714142,
+    "property_provider_state_tp_calls": 218,
+    "q_trials_w": [
+      0.0,
+      50.0,
+      500.0,
+      2000.0,
+      8000.0,
+      12000.0
+    ],
+    "schema_version": "hxforge.property-provider-call-profile.v1",
+    "task172_constitutive_evaluations": 6,
+    "task172_request_hash_collection": "NOT_MEASURED",
+    "task172_result_hashes_sampled": [
+      "43866dc8f4a37b0f5952f30e786a9e552c61b5e486e0781e86ad7b422502fcb6",
+      "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+      "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+      "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+      "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576",
+      "fbedbf4d9a6f2fc416534385b8d00d362e8daaa48fda7aedc9b702bc23ae903e"
+    ],
+    "unique_tp_keys": 109
+  },
+  "schema_version": "hxforge.performance-baseline-and-optimization.v1",
+  "tp_cache_ab_parity": {
+    "baseline_task172_result_hashes": [
+      "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+      "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+      "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+      "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+    ],
+    "baseline_wall_seconds": 0.202748,
+    "cache_stats": {
+      "cache_hits": 72,
+      "cache_misses": 74,
+      "exact_duplicate_rate": 0.4931506849315068,
+      "exact_duplicate_tp_queries": 72,
+      "provider_calls": 146,
+      "unique_tp_keys": 74
+    },
+    "cached_task172_result_hashes": [
+      "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+      "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+      "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+      "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+    ],
+    "cached_wall_seconds": 0.166989,
+    "numerical_parity": true,
+    "provider_call_reduction_percent": 49.31506849315068,
+    "schema_version": "hxforge.tp-cache-ab-parity.v1",
+    "wall_time_reduction_percent": 17.63722690121877
+  },
+  "wall_time_reduction_percent": 17.63722690121877
+}

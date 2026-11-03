@@ -1,0 +1,52 @@
+{
+  "schema_version": "hxforge.task172.stage2.case-revision.v1",
+  "task_id": "TASK172_V0_7_STAGE2_TASK029_ZERO_COMPONENT_REPLAY_CORRECTION_AND_FINAL_CLOSEOUT_R1",
+  "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2",
+  "result": "AUTHORIZED_STAGE2_CASE_REVISION_REPLAYED",
+  "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+  "case_class": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+  "external_as_built_case": false,
+  "measured_plant_case": false,
+  "synthetic_test_fixture": false,
+  "supersedes_for_stage2_execution": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+  "change": {
+    "field": "tube_mass_flow_kg_s",
+    "previous_value": "10.000000",
+    "effective_value": "12.000000",
+    "reason": "TASK027_FROZEN_REYNOLDS_REGIME_COMPATIBILITY",
+    "shell_flow_changed": false,
+    "temperature_changed": false,
+    "pressure_changed": false,
+    "fluid_changed": false,
+    "material_changed": false,
+    "mesh_policy_changed": false
+  },
+  "effective_operating_point": {
+    "tube_mass_flow_kg_s": "12.000000",
+    "shell_mass_flow_kg_s": "20.000000",
+    "tube_inlet_temperature_k": "300.000000",
+    "shell_inlet_temperature_k": "298.150000",
+    "tube_inlet_pressure_pa_abs": "101325",
+    "shell_inlet_pressure_pa_abs": "101325",
+    "tube_fluid_id": "PURE_ORDINARY_WATER",
+    "shell_fluid_id": "PURE_ORDINARY_WATER",
+    "tube_role": "HOT",
+    "shell_role": "COLD"
+  },
+  "native_regime_replay": {
+    "task026_result_hash": "7db1335a06af5e2bbb7b80d575b4c185ee72a0f35f390fde786220c106f8c7e0",
+    "tube_reynolds_number": "4491.2103",
+    "tube_prandtl_number": "5.8559",
+    "tube_regime": "TURBULENT",
+    "task027_status": "VALID",
+    "task027_result_id": "e6ce1d69-c75d-5f6b-84aa-6be87615767d",
+    "task027_result_hash": "8cb6c87957db144730f0aeda4a362095e514216f1b4c8783fc9966ccaaa97e26",
+    "task027_reynolds_regime": "TURBULENT"
+  },
+  "historical_stage1_immutability": {
+    "stage1_r1_authority_rewritten": false,
+    "r2_is_stage2_execution_revision_only": true,
+    "prior_task172_result_identity_reused": false
+  },
+  "canonical_hash": "e03eae4db750bdbfff96d055e6065a37dbfa62a07687792193a609c2cc560bec"
+}

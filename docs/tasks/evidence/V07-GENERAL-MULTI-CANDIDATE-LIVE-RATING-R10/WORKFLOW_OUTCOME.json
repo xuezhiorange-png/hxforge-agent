@@ -1,0 +1,15 @@
+{
+  "blocked_rating_count": 0,
+  "blocker_code": null,
+  "cli_success": true,
+  "engineering_case_id": "mvp-multi-candidate-r10",
+  "mesh_status": "NUMERIC_VALID",
+  "multi_candidate_mode": true,
+  "numeric_valid_count": 2,
+  "raw_result_path": "docs/tasks/evidence/V07-GENERAL-MULTI-CANDIDATE-LIVE-RATING-R10/RAW_RESULT.json",
+  "raw_result_sha256": "bffc95417d51468e8fcdee7ba70f4f7ee03baee54fc55a4cd7b9142abc740feb",
+  "schema_version": "hxforge.experimental-live-workflow-outcome.v2",
+  "selected_for_rating_count": 2,
+  "status": "EXPERIMENTAL_COMPLETE",
+  "total_numerical_seconds": 442.191
+}

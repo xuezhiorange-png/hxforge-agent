@@ -1,0 +1,103 @@
+{
+  "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+  "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+  "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+  "canonical_evidence_hash": "caaf0356bcf6dd41f6e2e461c6020e29877f00349123a0b60fa898a6ea740faa",
+  "completion_sizing_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+  "diagnostic_execution": {
+    "attempt_status": "INCOMPLETE_DIAGNOSTIC_OBSERVER_FAILURE",
+    "decimal_probe_count": 0,
+    "elapsed_wall_seconds": 7145.600296166958,
+    "exact_target_cell_reconstructed": false,
+    "candidate_rating_request_identity_reconstructed": true,
+    "candidate_rating_request_hash_reconstructed": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "last_task172_progress_logged": 140000,
+    "task172_validation_call_count_lower_bound": 140001,
+    "task172_validation_call_count_exact": null,
+    "expected_frozen_n32_task172_validation_count": 144217,
+    "target_cell_endpoint_preimages_persisted": false,
+    "decimal_probes_started": false,
+    "min_abs_f_w": null,
+    "point_root_recovered": false,
+    "point_root_status": "NOT_ESTABLISHED_OBSERVER_ABORTED_BEFORE_CAPTURE",
+    "provider_ph_plateau_confirmed": null,
+    "task172_discontinuity_observed": null,
+    "production_code_changed": false,
+    "r2a_authority_changed": false,
+    "public_candidate_full_rating_reexecuted": false,
+    "public_sizing_reexecuted": false,
+    "fatal_exception": {
+      "text": "'Task172BlockedResult' object has no attribute 'result_id'",
+      "type": "AttributeError"
+    },
+    "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+    "start_head": "b3df78adf32b5469bdac5f6f41a50f2f0e94e8da",
+    "task_id": "STAGE3_TASK173_CANDIDATE_A_EXACT_CELL_DECIMAL_Q_RECOVERY_DIAGNOSTIC_R1"
+  },
+  "pr_number": 283,
+  "pr_state_required": "OPEN_DRAFT",
+  "result": "BLOCKED_DIAGNOSTIC_RUNNER_OBSERVER_FAILURE",
+  "exact_target_cell_reconstructed": false,
+  "decimal_q_probe_count": 0,
+  "validated_task172_probe_count": 0,
+  "min_abs_f_w": null,
+  "provider_ph_plateau_confirmed": null,
+  "task172_discontinuity_observed": null,
+  "proposed_production_fix_scope": null,
+  "new_numerical_authority_required": null,
+  "runtime_binding": {
+    "current_head": "b3df78adf32b5469bdac5f6f41a50f2f0e94e8da",
+    "current_tree": "d73bde65b8a017d223bbea1548d7fc8d93683441",
+    "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+    "runtime_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952",
+    "runtime_paths_byte_identical": true,
+    "bound_runtime_worktree_clean": true
+  },
+  "production_code_changed": false,
+  "public_candidate_full_rating_reexecuted": false,
+  "public_sizing_reexecuted": false,
+  "r2a_authority_changed": false,
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "reviewed_r2a_authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+  "runtime_source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+  "runtime_source_tree": "ce61a818b82f908729d2bdf4553cc27012354952",
+  "schema_version": "task173.candidate-a-exact-cell-decimal-q-diagnostic.v1",
+  "start_head": "b3df78adf32b5469bdac5f6f41a50f2f0e94e8da",
+  "target": {
+    "left_q_w": "268.4228547695099",
+    "mesh_subdivisions": 32,
+    "physical_support_id": "urn:hxforge:task171:candidate:f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767:support:2",
+    "right_q_w": "268.42285476950997"
+  },
+  "validation_results": {
+    "completion_request_replay": "PASS",
+    "failed_diagnostic_attempt_receipt_replay": "PASS",
+    "focused_q13_and_endpoint_regression_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "task172_identity_test_file": {
+      "passed": 33,
+      "failed": 0
+    },
+    "r2a_replay_at_current_start_head": "BLOCKED_RUNTIME_BOUND_PATHS_CHANGED_FROM_5BD19_SOURCE",
+    "r2a_replay_at_original_evidence_head": {
+      "result": "PASS",
+      "head": "6a3b0c47d1af2e16f9e0a8d225b6d8265a6ffe3a",
+      "event_hash_replay_count": 16,
+      "endpoint_request_result_replay_count": 57,
+      "continuation_hash_replay_count": 16,
+      "outer_decision_certificate_hash_replay_count": 8,
+      "trajectory_hash_replay_count": 5
+    },
+    "r2a_h2_hole_replay_at_original_evidence_head": {
+      "result": "PASS",
+      "head": "6a3b0c47d1af2e16f9e0a8d225b6d8265a6ffe3a",
+      "h2_hole_evidence_hash": "df9c3ec6230f5c7261371dbf3194d70f63556441cb61756f88ea572d063c8e20",
+      "endpoint_identity_replay_count": 3
+    }
+  },
+  "task168_candidate_space_hash": "aeb350ec6759c388122fd9a00c5d8cc962768ddcc46162e6af3bff38c11b74ea",
+  "task175_executed": false,
+  "task_id": "STAGE3_TASK173_CANDIDATE_A_EXACT_CELL_DECIMAL_Q_RECOVERY_DIAGNOSTIC_R1"
+}

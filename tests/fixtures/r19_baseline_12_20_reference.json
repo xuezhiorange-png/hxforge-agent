@@ -1,0 +1,19 @@
+{
+  "schema_version": "hxforge.r19-baseline-reference.v1",
+  "source": "R18_E2E_PINNED_GEOMETRY_12_20",
+  "engineering_case_id": "r16-pinned-multi-mesh",
+  "tube_mass_flow_kg_s": "12.000000",
+  "shell_mass_flow_kg_s": "20.000000",
+  "duty_w": "32528.427903428549",
+  "tube_outlet_temperature_k": "299.05163815440915",
+  "shell_outlet_temperature_k": "298.53898098805473",
+  "energy_balance_residual_w": "2.1100000E-10",
+  "rating_status": "NUMERIC_VALID",
+  "tube_reynolds_number": "138.2702",
+  "shell_reynolds_number": null,
+  "shell_side_heat_transfer_coefficient_w_m2_k": null,
+  "tube_dp_pa": "3.567",
+  "shell_dp_pa": "1172.9898826029598667940202383314340443039618393996",
+  "correlation_applicability": "APPLICABLE",
+  "live_hydraulic_constraint_status": "SATISFIED"
+}

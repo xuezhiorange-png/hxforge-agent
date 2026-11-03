@@ -1,0 +1,21 @@
+{
+  "schema_version": "hxforge.r19a-postpass-outlet-states.v1",
+  "candidate_id": "39681fe8-bbde-5e5e-97ac-5341c239a776",
+  "cases": {
+    "tube_12_shell_20": {
+      "case_fixture": "tests/fixtures/r16_pinned_multi_mesh_case.json",
+      "tube_outlet_temperature_k": "299.05163815440915",
+      "shell_outlet_temperature_k": "298.53898098805473"
+    },
+    "tube_11_shell_20": {
+      "case_fixture": "tests/fixtures/r18_variable_tube_flow_case.json",
+      "tube_outlet_temperature_k": "299.0400769519665",
+      "shell_outlet_temperature_k": "298.51292370381213"
+    },
+    "tube_12_shell_19": {
+      "case_fixture": "tests/fixtures/r19_variable_shell_flow_case.json",
+      "tube_outlet_temperature_k": "299.05888906494755",
+      "shell_outlet_temperature_k": "298.5548747554276"
+    }
+  }
+}

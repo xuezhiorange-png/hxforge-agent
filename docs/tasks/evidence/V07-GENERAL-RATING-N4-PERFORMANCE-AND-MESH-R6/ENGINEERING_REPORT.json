@@ -1,0 +1,282 @@
+{
+  "candidate_generation": {
+    "candidate_count": 1,
+    "candidate_space_hash": null,
+    "distinct_geometry_count": null,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97"
+      ],
+      "shell_inside_diameter_m": "0.5",
+      "tube_lengths_m": [
+        "4.85"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidates": [],
+  "design_conditions": {
+    "engineering_case_schema": "hxforge.general-engineering-case.v2",
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "heat_transfer_convention": {
+      "kernel_shell_inlet_temperature_k": "298.15",
+      "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "kernel_tube_inlet_temperature_k": "300.00",
+      "shell_equipment_side": "shell_side",
+      "shell_mass_flow_kg_s": "20.000000",
+      "shell_thermal_role": "COLD",
+      "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+      "tube_equipment_side": "tube_side",
+      "tube_mass_flow_kg_s": "12.000000",
+      "tube_thermal_role": "HOT",
+      "user_shell_inlet_temperature_k": "298.15",
+      "user_tube_inlet_temperature_k": "300.00"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "shell_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "target_duty_w": "9500",
+    "tube_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "300.00",
+      "mass_flow_kg_s": "12.000000"
+    }
+  },
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r6",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_low_mesh_rating": {
+    "engineering_gates_not_met": [
+      "FULL_MESH_LADDER_CONVERGENCE",
+      "PRODUCTION_SIZING_AND_RANKING",
+      "WALL_EXTREMA_MESH_COMPARISON_WITHOUT_ARCHIVED_OBSERVABLES"
+    ],
+    "frozen_r4_n1": {
+      "energy_balance_residual_w": "1.6E-10",
+      "mesh_level": 1,
+      "mesh_result_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+      "source": "R4_FROZEN",
+      "task172_local_evaluation_count": 4580,
+      "terminal_boundary_residual_k": "2.4524E-9",
+      "total_duty_w": "45875.884128245187",
+      "wall_seconds": "229.68"
+    },
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": true,
+    "mesh_comparison": {
+      "coarse_mesh_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+      "coarse_mesh_level": 2,
+      "comparable": true,
+      "duty_comparison_status": "PASS",
+      "duty_delta_percent": "0.004161920016323951193306497190",
+      "duty_delta_w": "1.9089996281247",
+      "duty_metric": "0.00004161920016323951193306497190",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "fine_mesh_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+      "fine_mesh_level": 4,
+      "full_mesh_comparison_status": "NOT_AVAILABLE_WALL_EXTREMA_NOT_ARCHIVED",
+      "schema_version": "hxforge.mesh-duty-comparison.v1",
+      "terminal_boundary_residual_delta_k": "2.81881E-9",
+      "wall_comparison": "WALL_EXTREMA_NOT_COMPARED_WITHOUT_COARSE_ARCHIVED_OBSERVABLES"
+    },
+    "mesh_comparison_available": true,
+    "mesh_levels": [
+      {
+        "energy_balance_residual_w": "1.6E-10",
+        "mesh_level": 1,
+        "mesh_result_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+        "source": "R4_FROZEN",
+        "task172_local_evaluation_count": 4580,
+        "terminal_boundary_residual_k": "2.4524E-9",
+        "total_duty_w": "45875.884128245187",
+        "wall_seconds": "229.68"
+      },
+      {
+        "energy_balance_residual_w": "1.375E-10",
+        "mesh_level": 2,
+        "mesh_result_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+        "source": "R5_FROZEN",
+        "task172_local_evaluation_count": 8055,
+        "terminal_boundary_residual_k": "6.11116E-9",
+        "total_duty_w": "45868.2439988560625",
+        "wall_seconds": "437.427"
+      },
+      {
+        "energy_balance_residual_w": "2.4E-10",
+        "mesh_level": 4,
+        "mesh_result_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+        "source": "R6_NATIVE_RUN",
+        "task172_local_evaluation_count": 19142,
+        "terminal_boundary_residual_k": "3.29235E-9",
+        "total_duty_w": "45866.3349992279378",
+        "wall_seconds": 808.408
+      }
+    ],
+    "performance_optimization": {
+      "optimization_implemented": true,
+      "optimization_numerical_parity": true,
+      "provider_call_reduction_percent": 49.31506849315068,
+      "r5_baseline_n2_wall_seconds": "437.427",
+      "r5_baseline_property_provider_state_lookups": 290586,
+      "r5_baseline_task172_evaluations": 8055,
+      "r5_unique_task172_request_count": "NOT_MEASURED",
+      "representative_cell_tp_profile": {
+        "exact_duplicate_rate": 0.5,
+        "exact_duplicate_tp_queries": 109,
+        "mean_state_tp_seconds": 0.0008266672977714142,
+        "property_provider_state_tp_calls": 218,
+        "q_trials_w": [
+          0.0,
+          50.0,
+          500.0,
+          2000.0,
+          8000.0,
+          12000.0
+        ],
+        "schema_version": "hxforge.property-provider-call-profile.v1",
+        "task172_constitutive_evaluations": 6,
+        "task172_request_hash_collection": "NOT_MEASURED",
+        "task172_result_hashes_sampled": [
+          "43866dc8f4a37b0f5952f30e786a9e552c61b5e486e0781e86ad7b422502fcb6",
+          "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+          "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+          "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+          "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576",
+          "fbedbf4d9a6f2fc416534385b8d00d362e8daaa48fda7aedc9b702bc23ae903e"
+        ],
+        "unique_tp_keys": 109
+      },
+      "schema_version": "hxforge.performance-baseline-and-optimization.v1",
+      "tp_cache_ab_parity": {
+        "baseline_task172_result_hashes": [
+          "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+          "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+          "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+          "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+        ],
+        "baseline_wall_seconds": 0.202748,
+        "cache_stats": {
+          "cache_hits": 72,
+          "cache_misses": 74,
+          "exact_duplicate_rate": 0.4931506849315068,
+          "exact_duplicate_tp_queries": 72,
+          "provider_calls": 146,
+          "unique_tp_keys": 74
+        },
+        "cached_task172_result_hashes": [
+          "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+          "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+          "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+          "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+        ],
+        "cached_wall_seconds": 0.166989,
+        "numerical_parity": true,
+        "provider_call_reduction_percent": 49.31506849315068,
+        "schema_version": "hxforge.tp-cache-ab-parity.v1",
+        "wall_time_reduction_percent": 17.63722690121877
+      },
+      "wall_time_reduction_percent": 17.63722690121877
+    }
+  },
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-21T07:45:56.272518+00:00",
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "R6: physical parity with R4/R5 C3 reference; bounded n=4 mesh and TP cache evidence.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": {
+    "experimental_ranking_status": "NOT_YET_AVAILABLE",
+    "frozen_r4_n1": {
+      "energy_balance_residual_w": "1.6E-10",
+      "mesh_level": 1,
+      "mesh_result_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+      "source": "R4_FROZEN",
+      "task172_local_evaluation_count": 4580,
+      "terminal_boundary_residual_k": "2.4524E-9",
+      "total_duty_w": "45875.884128245187",
+      "wall_seconds": "229.68"
+    },
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": true,
+    "mesh_comparison": {
+      "coarse_mesh_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+      "coarse_mesh_level": 2,
+      "comparable": true,
+      "duty_comparison_status": "PASS",
+      "duty_delta_percent": "0.004161920016323951193306497190",
+      "duty_delta_w": "1.9089996281247",
+      "duty_metric": "0.00004161920016323951193306497190",
+      "duty_metric_units": "RELATIVE_FRACTION",
+      "fine_mesh_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+      "fine_mesh_level": 4,
+      "full_mesh_comparison_status": "NOT_AVAILABLE_WALL_EXTREMA_NOT_ARCHIVED",
+      "schema_version": "hxforge.mesh-duty-comparison.v1",
+      "terminal_boundary_residual_delta_k": "2.81881E-9",
+      "wall_comparison": "WALL_EXTREMA_NOT_COMPARED_WITHOUT_COARSE_ARCHIVED_OBSERVABLES"
+    },
+    "mesh_comparison_available": true,
+    "mesh_levels": [
+      {
+        "energy_balance_residual_w": "1.6E-10",
+        "mesh_level": 1,
+        "mesh_result_hash": "4783f217d659e86290a8ae1aa9d9f062d9c327b8be61c0a4969949e3411df46a",
+        "source": "R4_FROZEN",
+        "task172_local_evaluation_count": 4580,
+        "terminal_boundary_residual_k": "2.4524E-9",
+        "total_duty_w": "45875.884128245187",
+        "wall_seconds": "229.68"
+      },
+      {
+        "energy_balance_residual_w": "1.375E-10",
+        "mesh_level": 2,
+        "mesh_result_hash": "d6c6f4d17bd9d023dda36501b712e05015ceb369916e06da1fde995deac10a7e",
+        "source": "R5_FROZEN",
+        "task172_local_evaluation_count": 8055,
+        "terminal_boundary_residual_k": "6.11116E-9",
+        "total_duty_w": "45868.2439988560625",
+        "wall_seconds": "437.427"
+      },
+      {
+        "energy_balance_residual_w": "2.4E-10",
+        "mesh_level": 4,
+        "mesh_result_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+        "source": "R6_NATIVE_RUN",
+        "task172_local_evaluation_count": 19142,
+        "terminal_boundary_residual_k": "3.29235E-9",
+        "total_duty_w": "45866.3349992279378",
+        "wall_seconds": 808.408
+      }
+    ],
+    "mode": "EXPERIMENTAL_LOW_MESH_ONLY",
+    "sizing_evaluated": false
+  },
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "workflow_status": "PARTIAL_RATING_ACCEPTED"
+}

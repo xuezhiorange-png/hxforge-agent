@@ -1,0 +1,229 @@
+{
+  "schema_version": "hxforge.task172.stage2.hydraulic-closeout-evidence.v1",
+  "task_id": "TASK172_V0_7_STAGE2_TASK029_ZERO_COMPONENT_REPLAY_CORRECTION_AND_FINAL_CLOSEOUT_R1",
+  "short_name": "STAGE2 TASK029 ZERO-COMPONENT REPLAY AND HYDRAULIC CLOSEOUT",
+  "result": "STAGE2_COMPLETE",
+  "predecessor_head": "6dd39fa77caab8f9a10879281021ba6bf7145c58",
+  "case_revision_evidence": {
+    "path": "docs/tasks/evidence/TASK-172-stage2-case-revision-r2.json",
+    "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2",
+    "canonical_hash": "e03eae4db750bdbfff96d055e6065a37dbfa62a07687792193a609c2cc560bec"
+  },
+  "task172_r2_replay": {
+    "status": "VALIDATED",
+    "run_count": 2,
+    "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2",
+    "request_hash": "14f5496a3d8312b5373b79728666a0524ae38cb6a6991cfc745c70ce64d053c9",
+    "result_id": "urn:hxforge:task172:59cfd30e3cf7d4a199744824c26daf61a85f668daad20b8a5c5861755ff5e50e",
+    "result_hash": "59cfd30e3cf7d4a199744824c26daf61a85f668daad20b8a5c5861755ff5e50e",
+    "tube": {
+      "reynolds_number": "4491.2103",
+      "prandtl_number": "5.8559",
+      "correlation": "tube_turbulent_gnielinski",
+      "c3_applicability": "PASS"
+    },
+    "shell": {
+      "reynolds_number": "2740.5066088396428172796798450599375449393604657674",
+      "prandtl_number": "6.1358049639094794150526865914303242471116943093648",
+      "j_mu": "1.0016075365777240247529623936452021919077630575866434744022984503513935388810855"
+    },
+    "wall": {
+      "inner_temperature_k": "298.82000808269237",
+      "outer_temperature_k": "298.6553006286871",
+      "signed_q_hot_to_cold_w": "23123.38278012509"
+    },
+    "same_input_same_result_bytes_and_hash": true,
+    "property_domain_pass": true,
+    "typed_fail_closed_behavior_retained": true
+  },
+  "task028_contract_correction": {
+    "owner_authorized": true,
+    "scope": "TASK028_COMPONENT_AUTHORITIES_COLLECTION_CARDINALITY_ONLY",
+    "previous_behavior": "EMPTY_SET_BLOCKED",
+    "new_behavior": "EMPTY_SET_VALID",
+    "empty_component_authorities_is_explicit": true,
+    "status": "VALID",
+    "component_count": 0,
+    "component_results": [],
+    "component_authority_hashes": [],
+    "pseudo_zero_component_forbidden": true,
+    "task028_formula_change": false,
+    "task028_coefficient_semantics_change": false,
+    "task028_source_authority_change": false,
+    "task028_component_schema_change": false,
+    "task028_collection_cardinality_contract_changed": true,
+    "request_hash_and_result_identity_generated_normally": true,
+    "result_id": "17471762-3843-5045-8a3d-b5ac848de8dc",
+    "result_hash": "7d35aa16a57746e6d2a9354a50870ccf1723712ca139acb44c20f8870de8dbc7",
+    "request_hash_deterministic": true,
+    "result_hash_id_replay": "PASS",
+    "deterministic_public_result_projection": true
+  },
+  "task029_replay_correction": {
+    "owner_authorized": true,
+    "scope": "TASK029_UPSTREAM_TASK028_REPLAY_CARDINALITY_COMPATIBILITY_ONLY",
+    "empty_task028_result_replayable": true,
+    "replay_requires_exact_tuple_type": true,
+    "normal_task028_result_hash_replay": true,
+    "normal_task028_result_id_replay": true,
+    "task028_replay_evidence_component_results": [],
+    "task028_replay_evidence_components_by_id": {},
+    "task029_formula_change": false,
+    "task029_pressure_composition_change": false,
+    "task029_identity_algorithm_change": false,
+    "task029_completeness_algorithm_change": false,
+    "task029_exclusion_semantics_change": false,
+    "task029_upstream_replay_cardinality_contract_changed": true
+  },
+  "task027": {
+    "status": "VALID",
+    "roughness_mode": "EXPLICIT_SMOOTH_PIPE_ASSERTION",
+    "roughness_authority_id": "V07-T174-TUBE-SMOOTH-PIPE-ROUGHNESS-R1",
+    "roughness_authority_hash": "7e0011c3859eab08cbc031c1bbc2e371906c101e30f69741a30eca33c937f5a4",
+    "result_id": "e6ce1d69-c75d-5f6b-84aa-6be87615767d",
+    "result_hash": "8cb6c87957db144730f0aeda4a362095e514216f1b4c8783fc9966ccaaa97e26",
+    "reynolds_number": "4491.2103",
+    "regime": "TURBULENT",
+    "modeled_pressure_drop_pa": "436.958"
+  },
+  "task029": {
+    "status": "VALID",
+    "result_id": "24c0a795-1991-5e08-9a9b-437e2bf16b8b",
+    "result_hash": "d6eee3e044adbde20a45d63be283abe4bb8b701ce2cbe7d2b2eea4ee6d7d30c7",
+    "bound_member_count": 1,
+    "task027_member_count": 1,
+    "task028_member_count": 0,
+    "exactly_one_task027_member": true,
+    "non_empty_bound_member_rule_preserved": true,
+    "partial_modeled_total_allowed": false,
+    "completeness": "COMPLETE_WITHIN_EXPLICIT_MODELED_BOUNDARY",
+    "modeled_path_id": "V07-T174-TUBE-INTERNAL-MODELED-BOUNDARY-R1",
+    "start_reference_plane": "TUBE_INTERNAL_FLOW_START_PLANE",
+    "end_reference_plane": "TUBE_INTERNAL_FLOW_END_PLANE",
+    "ordered_contribution_member_count": 1,
+    "ordered_contribution_sum_pa": "436.958",
+    "modeled_total_tube_side_pressure_drop_pa": "436.958",
+    "modeled_total_equals_native_ordered_contribution_sum": true,
+    "exclusions": {
+      "physically_absent_within_modeled_boundary": [
+        "ENTRANCE",
+        "EXIT",
+        "CHANNEL_HEAD",
+        "NOZZLE",
+        "CONTRACTION",
+        "EXPANSION"
+      ],
+      "v0_2_out_of_scope": [
+        "PASS_PARTITION",
+        "RETURN_HEADER",
+        "RETURN_BEND",
+        "U_BEND"
+      ]
+    }
+  },
+  "shell_hydraulics": {
+    "primary_model": "TASK166_BELL_DELAWARE",
+    "task166_status": "VALID",
+    "task166_result_id": "ed3c9b1d-b303-5b50-9faf-ba1a1fd927df",
+    "task166_result_hash": "3b639d0523b799f92bdf59ebee415dc263dac5164ab816cb5fb7df5b3ed37cb7",
+    "bell_total_shell_pressure_drop_pa": "695.60879452416523317091096373830961547685621804079",
+    "bell_central_crossflow_contribution_pa": "32.992464635993103996510123239521830321057632525251",
+    "bell_window_contribution_pa": "624.90008927235976996430422197827264605171414839876",
+    "bell_inlet_end_zone_contribution_pa": "18.858120307906179605048309260257569552042218558392",
+    "bell_outlet_end_zone_contribution_pa": "18.858120307906179605048309260257569552042218558392",
+    "decomposition_reconciliation": "PASS_EXACT_NATIVE_DECIMAL",
+    "task034_role": "OPTIONAL_DIAGNOSTIC_ONLY",
+    "task034_screening_status": "NOT_RUN_NOT_REQUIRED"
+  },
+  "bell_event_ownership": {
+    "authority_id": "V07-T174-BELL-EVENT-REGION-ALLOCATION-R1",
+    "task171_event_count": 19,
+    "additive_event_count": 9,
+    "support_event_count": 10,
+    "unallocated_event_count": 0,
+    "duplicated_event_count": 0,
+    "additive_roles": {
+      "CENTRAL_CROSSFLOW": 3,
+      "WINDOW": 4,
+      "INLET_END_ZONE": 1,
+      "OUTLET_END_ZONE": 1
+    },
+    "support_roles": {
+      "BAFFLE": 4,
+      "LEAKAGE_GEOMETRY": 4,
+      "BYPASS_GEOMETRY": 1,
+      "TUBE_ROW_OR_CROSSED_ROW": 1
+    },
+    "support_events_have_standalone_pressure_drop": false
+  },
+  "pressure_coupling": {
+    "authority_id": "V07-T174-REFERENCE-PRESSURE-COUPLING-R1",
+    "mode": "ONE_WAY_FROZEN_REFERENCE_PRESSURE",
+    "tube_reference_pressure_pa": "101325",
+    "shell_reference_pressure_pa": "101325",
+    "pressure_iteration": false,
+    "pressure_clamping": false,
+    "pressure_extrapolation": false,
+    "tube_outlet_pressure_pa": "100888.042",
+    "shell_outlet_pressure_pa": "100629.39120547583476682908903626169038452314378196",
+    "domain_pa": ["100000", "101325"],
+    "pressure_domain_pass": true
+  },
+  "task174": {
+    "status": "VALIDATED",
+    "result_id": "urn:hxforge:task174:e8ce04e6e48120ff8d655c16a4aa07a1ddd32f8bc22afbc1bb750291a35dae0e",
+    "result_hash": "e8ce04e6e48120ff8d655c16a4aa07a1ddd32f8bc22afbc1bb750291a35dae0e",
+    "tube_dp_status": "VALIDATED",
+    "shell_dp_status": "VALIDATED",
+    "bell_aggregation_status": "VALIDATED",
+    "pressure_coupling_status": "VALIDATED",
+    "closure": true,
+    "fiv_mode": "DIAGNOSTIC_SCREENING_ONLY",
+    "fiv_numeric_pass_fail_required": false,
+    "fiv_numeric_limit_not_guessed": true,
+    "fiv_status": "WARN_MISSING_NUMERIC_LIMIT"
+  },
+  "determinism": {
+    "independent_native_replay_runs": 2,
+    "same_task172_request": true,
+    "same_task172_engineering_identities": true,
+    "same_task172_outputs": true,
+    "same_task027_task028_task029_task166_task174_identities": true,
+    "same_task027_task028_task029_task166_task174_outputs": true
+  },
+  "tests": {
+    "focused_task028_task029_task027_task172_task174": "PASS",
+    "full_shell_tube_regression": "1_FAILURE_4_SKIPPED",
+    "known_environment_only_failure": "test_a01_no_upstream_repo_external_import rejects checkout path containing /private/tmp; test was run, not deselected",
+    "explicit_skips": [
+      "TASK169 trusted dual-runtime executables not provisioned (2 tests)",
+      "Python 3.11-only and Python 3.12-only tests skipped under Python 3.14 (2 tests)"
+    ]
+  },
+  "change_boundary": {
+    "task028_formula_change": false,
+    "task028_source_authority_change": false,
+    "task028_pseudo_zero_component_forbidden": true,
+    "task029_formula_change": false,
+    "task029_completeness_algorithm_change": false,
+    "task029_identity_algorithm_change": false,
+    "task029_replay_cardinality_change": true,
+    "production_code_changed": true,
+    "existing_tests_changed": true,
+    "dependencies_changed": false,
+    "workflows_changed": false,
+    "task172_runtime_code_redesign": false
+  },
+  "downstream_boundary": {
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "task172_real_case_mesh_convergence_executed": false,
+    "real_case_mesh_admissible": false,
+    "real_case_mesh_admission_defer_reason": "DEFERRED_TO_STAGE3_INTEGRATED_BOUNDARY_SOLUTION",
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "next_major_stage": "STAGE_3_TASK173_RATING_SIZING_INTEGRATION",
+  "stop": true,
+  "canonical_hash": "778f0417f82e59a2a3d5b04f344bc052a473a486454cbfba138b6d26a261041d"
+}

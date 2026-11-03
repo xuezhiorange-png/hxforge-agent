@@ -1,0 +1,29 @@
+{
+  "elapsed_seconds": 30728.228776708012,
+  "execution_head": "7d9b98ebd5aab3108b7637a63c32000c27ce6697",
+  "execution_kind": "ONE_PUBLIC_SIZING_INVOCATION",
+  "execution_tree": "ec83f926e71ba33839f6fbdb197fe6091d5cf4ce",
+  "failure_code": "BLOCKED_SIZING_RUNTIME_FAILURE",
+  "failure_stage": "RUNTIME",
+  "frozen_request_evidence_sha256": "30525364e8e917d22822e8e223fc54d3058055fcdf552871c2f09250e7b5216a",
+  "outcome_status": "BLOCKED",
+  "outcome_type": "Task173SizingBlockedResult",
+  "public_sizing_invocation_count": 1,
+  "rating_or_sizing_result_projection": {
+    "blockers": [
+      "PydanticSerializationError",
+      "Unable to serialize unknown type: <class 'hexagent.exchangers.shell_tube.tube_side.owned_enums.ReferencePlanePair'>"
+    ],
+    "failure_code": "BLOCKED_SIZING_RUNTIME_FAILURE",
+    "failure_stage": "RUNTIME",
+    "request_hash": "e5b085d238b2b1d9d7bcf23873c3ef04650135785fa4e6be1598aed3b8a9ab1e",
+    "result_hash": "d170e8abddb9ce3322ec02e9f6f04d97b8604fd0095ae00ea1f5badace00547b",
+    "result_id": "urn:hxforge:task173-sizing:blocked:d170e8abddb9ce3322ec02e9f6f04d97b8604fd0095ae00ea1f5badace00547b",
+    "schema_version": "task173.sizing-blocked.v1",
+    "status": "BLOCKED"
+  },
+  "result_hash": "d170e8abddb9ce3322ec02e9f6f04d97b8604fd0095ae00ea1f5badace00547b",
+  "result_id": "urn:hxforge:task173-sizing:blocked:d170e8abddb9ce3322ec02e9f6f04d97b8604fd0095ae00ea1f5badace00547b",
+  "schema_version": "task173.supplemental-functional-acceptance-r2-execution.v1",
+  "sizing_request_hash": "e5b085d238b2b1d9d7bcf23873c3ef04650135785fa4e6be1598aed3b8a9ab1e"
+}

@@ -1,0 +1,5 @@
+{
+  "MESH_RESULT_STATUS_SCHEMA_FIXED": true,
+  "schema_version": "hxforge.r10-ci-compatibility-fix.v1",
+  "status_field_source": "solver_mesh_status"
+}

@@ -615,13 +615,72 @@ def test_T028_RAW_INPUT_BOUNDARY_MALFORMED() -> None:
     assert Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED in codes
 
 
-def test_T028_COMPONENT_AUTHORITY_SET_SHAPE_BLOCKED() -> None:
-    """R05: empty list → BL_T028_COMPONENT_AUTHORITY_SET_INVALID."""
+def test_T028_COMPONENT_AUTHORITY_SET_EMPTY_ACCEPTED() -> None:
+    """Empty component collection is valid; TASK029 owns modeled-path completeness."""
     raw = _make_raw_request(component_authorities=[])
     result = validate_raw_boundary(raw)
+    assert result.blocked is False
+    assert result.blockers == ()
+    assert result.typed_data is not None
+    assert result.typed_data["component_authorities"] == []
+
+
+def test_T028_COMPONENT_AUTHORITY_SET_MISSING_STILL_BLOCKED() -> None:
+    raw = _make_raw_request()
+    del raw["component_authorities"]
+    result = validate_raw_boundary(raw)
     assert result.blocked is True
-    codes = [e.code for e in result.blockers]
-    assert Task028BlockerCode.BL_T028_COMPONENT_AUTHORITY_SET_INVALID in codes
+    assert Task028BlockerCode.BL_T028_COMPONENT_AUTHORITY_SET_INVALID in {
+        entry.code for entry in result.blockers
+    }
+
+
+def test_T028_COMPONENT_AUTHORITY_SET_NON_SEQUENCE_STILL_BLOCKED() -> None:
+    raw = _make_raw_request(component_authorities={"component_id": "not-a-sequence"})
+    result = validate_raw_boundary(raw)
+    assert result.blocked is True
+    assert Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED in {
+        entry.code for entry in result.blockers
+    }
+
+
+def test_T028_ZERO_COMPONENT_PIPELINE_SUCCEEDS_AND_REPLAYS_IDENTITY() -> None:
+    """Empty TASK028 membership is valid; completeness remains downstream in TASK029."""
+    import json
+    from dataclasses import asdict
+
+    task025_valid = _make_valid_task025_result()
+    task026_valid = _make_valid_thermal_result()
+    raw = _build_pipeline_raw_request(component_authorities=[])
+
+    first = _run_pipeline(raw, task025_valid, task026_valid)
+    second = _run_pipeline(raw, task025_valid, task026_valid)
+
+    assert isinstance(first, Task028SuccessResult)
+    assert isinstance(second, Task028SuccessResult)
+    assert first.component_results == ()
+    assert first.warnings == ()
+    assert first.blockers == ()
+    assert first.request_hash == second.request_hash
+    assert first.result_hash == second.result_hash
+    assert first.result_id == second.result_id
+    assert json.dumps(asdict(first), default=str, sort_keys=True) == json.dumps(
+        asdict(second), default=str, sort_keys=True
+    )
+
+    expected_request_hash = compute_request_hash(
+        schema_version=TASK028_REQUEST_SCHEMA_VERSION,
+        profile_id="profile-001",
+        task025_hydraulic_authority_hash=task025_valid.hydraulic_authority_hash,
+        task025_result_hash=task025_valid.result_hash,
+        task026_result_hash=task026_valid.result_hash,
+        property_snapshot_hash=task026_valid.property_snapshot_hash,
+        constant_density_assertion="TRUE",
+        zero_elevation_assertion="TRUE",
+        flow_direction_assertion="START_TO_END",
+        component_authority_hashes=(),
+    )
+    assert first.request_hash == expected_request_hash
 
 
 def test_T028_COMPONENT_AUTHORITY_UNKNOWN_FIELD_BLOCKED() -> None:

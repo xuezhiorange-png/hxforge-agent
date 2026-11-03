@@ -1,0 +1,14 @@
+{
+  "energy_balance_residual_w": "3.2E-10",
+  "full_rating_converged": false,
+  "low_mesh_numeric_valid": true,
+  "mesh_level": 1,
+  "mesh_result_hash": "a9c3d42eb0dc73655bd6c8cf6349c3a5f78f2e0469557e46360322e4673ad70e",
+  "schema_version": "hxforge.low-mesh-result.v1",
+  "status": "NUMERIC_VALID",
+  "task172_local_evaluation_count": 4492,
+  "terminal_boundary_residual_j_kg": "0.00003235550",
+  "terminal_boundary_residual_k": "7.73034E-9",
+  "total_duty_w": "40881.216702017436",
+  "wall_seconds": 237.326
+}

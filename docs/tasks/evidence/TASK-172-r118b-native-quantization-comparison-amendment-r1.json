@@ -1,0 +1,163 @@
+{
+  "task_id": "TASK172_V0_7_R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDMENT_AND_R118C_ATTEMPT1_INCIDENT_R1",
+  "short_name": "R118B-NATIVE-QUANTIZATION-AMENDMENT",
+  "result": "R118B_NATIVE_QUANTIZATION_COMPARISON_AMENDED",
+  "predecessor": {
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "head_sha": "b6a9181656b1034c3c0c328195ecc4198a919089",
+    "r118b_review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+    "r118b_result": "PASS",
+    "r118b_effective_lifecycle": "REVIEWED_AUTHORITY",
+    "document_sha256": "2860616063e437f7a993dcfb5e9dbf2cff15615555ff869b4520633dbf05020c",
+    "evidence_file_sha256": "8d193b44995a1a30061d3567136942cc304dd4ce874de8f760504c6266951774",
+    "evidence_canonical_hash": "604b6162561be3fdb93b8047500ba40c24f866cc8464f77fac82694aeb99f4c9",
+    "extension_canonical_hash": "5e0cdf6c7e0be245eff82f80a2738867a769a7baf25fb6d2efa4d46c176a2581",
+    "registry_root_canonical_hash": "faa66c9adbe4129a8b05e18f7d11065a1d0990961613380af0dee1b3f701dd40",
+    "candidate_payload_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "historical_receipt_rewritten": false
+  },
+  "reviewed_authority": {
+    "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+    "review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+    "effective_lifecycle": "REVIEWED_AUTHORITY",
+    "reviewed_engineering_value_change_count": 0,
+    "scope_widening": false,
+    "self_approval": false
+  },
+  "amendment": {
+    "field": "TASK024.cut_to_hole_margin_m",
+    "old_exact_expectation_m": "0.00097256153674844976679141122274747436104176034035",
+    "old_value_classification": "PRE_NATIVE_ANALYTIC_REFERENCE",
+    "native_pipeline_exact_expectation_m": "0.000972561537",
+    "task024_cut_to_hole_margin_pre_native_analytic_reference_m": "0.00097256153674844976679141122274747436104176034035",
+    "task024_cut_to_hole_margin_native_expectation_m": "0.000972561537",
+    "comparison_basis": "EXACT_NATIVE_TASK021_PUBLIC_PROJECTION_THEN_TASK024_DECIMAL_PIPELINE",
+    "comparison": "EXACT_DECIMAL_EQUALITY",
+    "tolerance": "NONE",
+    "difference_cause": "TASK021_PUBLIC_COORDINATE_QUANTIZATION_PROPAGATED_INTO_TASK024",
+    "engineering_input_mismatch": false,
+    "task024_formula_mismatch": false,
+    "task024_native_contract_violation": false,
+    "cross_stage_native_comparison_rule": "WHEN A DOWNSTREAM NATIVE OUTPUT DEPENDS ON AN UPSTREAM PUBLIC QUANTIZED VALUE, THE EXACT EXPECTATION MUST BE DERIVED FROM THE UPSTREAM NATIVE PUBLIC PROJECTION, NOT FROM A PRE-PROJECTION HIGHER-PRECISION INTERMEDIATE.",
+    "r118b_comparison_semantics_amended": true
+  },
+  "native_quantization_causal_replay": {
+    "result": "PASS",
+    "execution_mode": "PURE_CANONICAL_AND_DECIMAL_QUANTIZATION_REPLAY_ONLY",
+    "task_producers_invoked": [],
+    "task021_public_coordinate_quantization_m": "0.000000000001",
+    "task021_decimal_precision": 50,
+    "task021_public_coordinate_rounding": "ROUND_HALF_EVEN",
+    "task024_consumes_task021_public_coordinates": true,
+    "task021_position_id_request_hash_replayed": "91d326b044874d44ee790f00e7373bf06169db3ef5f8b234d47448251ffba232",
+    "task020_identity_used_only_to_reconstruct_task021_request_hash": {
+      "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "status": "PURE_CANONICAL_REPLAY_ONLY_NOT_A_MATERIALIZED_OR_PROMOTED_OBJECT"
+    },
+    "limiting_position": {
+      "position_id": "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+      "u": -3,
+      "v": -6,
+      "tie_set_size": 13,
+      "tie_set_position_ids": [
+        "3cfc4c3a-119a-5168-b3e7-c5a9292f00cd",
+        "bde0fca5-a6b7-53f5-bbd2-701199acbe26",
+        "cc27a9c7-48aa-5e26-81b7-6ee6b134c5f5",
+        "0bdf4126-ef20-5290-9760-3cfbace9e5c5",
+        "baaf2f28-6945-5f71-9785-93617d702650",
+        "ed73d950-da17-56c9-b292-fbcab01d5051",
+        "bfefc891-00c9-5c2b-ae4d-418631e73058",
+        "fe34ee85-bc24-5bed-999c-06c882f21d36",
+        "7c64b033-942a-51ff-b275-4279e8888e38",
+        "3cd4a8bc-4d6e-598d-9057-91225deddb60",
+        "2dd27da5-bec1-599d-82b8-55b8c461271f",
+        "8cf5c731-d006-57b4-ab02-f841920f131f",
+        "dd25f0b7-bec1-599d-82b8-55b8c461271f"
+      ],
+      "unquantized_x_m": "-0.1524",
+      "task021_public_x_m": "-0.152400000000",
+      "unquantized_y_m": "-0.13198227153674844976679141122274747436104176034035",
+      "task021_public_y_m": "-0.131982271537",
+      "task024_orientation": "BOTTOM",
+      "task024_normal": [0, -1],
+      "task024_chord_offset_m": "0.12098471",
+      "task024_signed_window_distance_m": "0.010997561537",
+      "task024_baffle_hole_radius_m": "0.010025",
+      "task024_cut_boundary_margin_m": "0.000972561537",
+      "neighboring_row_v_minus_5_native_margin_m": "0.000974483719",
+      "native_minus_pre_native_analytic_delta_m": "0.00000000000025155023320858877725252563895823965965"
+    },
+    "native_contract_sources": [
+      {
+        "path": "src/hexagent/exchangers/shell_tube/tube_layout/canonical.py",
+        "lines": "55-60,281-286",
+        "claim": "TASK021 coordinate quantum, Decimal precision, ROUND_HALF_EVEN quantization, and position-ID namespace."
+      },
+      {
+        "path": "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md",
+        "lines": "690-696,698-710",
+        "claim": "TASK021 quantizes accepted coordinates as public representation and freezes accepted-position order and ID semantics."
+      },
+      {
+        "path": "src/hexagent/exchangers/shell_tube/baffle_geometry/geometry.py",
+        "lines": "788-796,1105-1118",
+        "claim": "TASK024 derives chord offset from reviewed inputs and computes signed window distance and cut-boundary margin from supplied public coordinates."
+      }
+    ],
+    "attempt1_observed_native_margin_source": "Prior R118-C attempt execution context; no persisted attempt-1 native snapshot was created."
+  },
+  "other_reviewed_preflight_expectations": {
+    "retained_unchanged_from_r118b": true,
+    "task021_position_count": 253,
+    "task022_bare_bundle_diameter_m": "0.43486592081130829065079429561196969724856074243842",
+    "task022_bundle_outer_envelope_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+    "task022_shell_radial_clearance_m": "0.02256703959434585467460285219401515137571962878079",
+    "task022_radial_clearance_margin_m": "0.01256703959434585467460285219401515137571962878079",
+    "task024_baffle_diameter_m": "0.497",
+    "task024_baffle_hole_diameter_m": "0.02005",
+    "task024_baffle_center_sequence_m": ["1.2", "2.4", "3.6", "4.8"],
+    "task025_expected_active_position_count": 253,
+    "task025_internal_flow_length_m": "6",
+    "task025_heat_transfer_length_m": "6",
+    "recomputed_by_task_producers_in_this_amendment": false
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-r118b-native-quantization-comparison-amendment-r1.md",
+    "document_sha256": "f1efc55d1f731d8f75d49c79d0aed20a2650cec1a702222827b406b5218737fc",
+    "evidence_path": "docs/tasks/evidence/TASK-172-r118b-native-quantization-comparison-amendment-r1.json",
+    "incident_document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt1-blocked-incident-r1.md",
+    "incident_document_sha256": "4dccd5d98a6df824f99e96c22f4ec68e9f1277b7ffe686c18446388c00c4167f",
+    "incident_evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt1-blocked-incident-r1.json",
+    "registry_extension_keys": [
+      "r118b_native_quantization_comparison_amendment_extension",
+      "r118c_attempt1_blocked_incident_extension"
+    ]
+  },
+  "incident_link": {
+    "incident_document_path": "docs/tasks/TASK-172-v0.7-r118c-attempt1-blocked-incident-r1.md",
+    "incident_document_sha256": "4dccd5d98a6df824f99e96c22f4ec68e9f1277b7ffe686c18446388c00c4167f",
+    "incident_evidence_path": "docs/tasks/evidence/TASK-172-r118c-attempt1-blocked-incident-r1.json",
+    "incident_evidence_file_sha256": "a57eb0d94a0bd10ff54f94c33964566ad4b53ca9a465a5ab344ae3e32bae9dba",
+    "incident_evidence_canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668"
+  },
+  "governance": {
+    "engineering_value_change_authorized": false,
+    "authority_scope_change_authorized": false,
+    "production_code_changed": false,
+    "r118c_retry_authorized": false,
+    "r118c_retry_started": false,
+    "task171_execution_authorized": false,
+    "task171_executed": false,
+    "production_mesh_admission_performed": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "stop": true
+  },
+  "canonical_hash": "d1bb31697a0efa61299b402333adeec2f54292cd0b1f45e88927a21f0f0f1226"
+}

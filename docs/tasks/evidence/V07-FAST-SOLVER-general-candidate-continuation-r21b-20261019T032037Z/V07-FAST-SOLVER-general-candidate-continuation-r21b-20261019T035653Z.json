@@ -1,0 +1,32 @@
+{
+  "base_head": "e86c7ff02cfd5513812fad7656ee5ed07cfd6a4f",
+  "final_head": "d4e532b9a47ab42a4a10d6b6a6226ebcd1017ddd",
+  "general_live_rating_verified": false,
+  "headroom_status": "MESH_COMPARISON_FAIL_CONTINUE",
+  "live_rating_blocked": {
+    "blocked_code": "WORKER_HARD_TIMEOUT",
+    "blocked_diagnostics": [],
+    "execution_mode": "LIVE_NUMERICAL_SOLVE",
+    "experimental_rating_authority_id": "V07-FAST-SOLVER-GENERAL-CANDIDATE-LIVE-RATING-R21",
+    "schema_version": "task173.experimental-candidate-rating-blocked.v1",
+    "status": "BLOCKED"
+  },
+  "mesh_sequence_gate": "FAIL",
+  "multi_candidate_sizing_verified": false,
+  "n16_status": "TIMEOUT",
+  "n1_evidence_admitted": true,
+  "n1_n2_mesh_replay": true,
+  "n2_evidence_admitted": true,
+  "n32_status": "NOT_REACHED",
+  "n4_new_worker_status": "TERMINAL_ACCEPTED",
+  "n4_original_timeout_preserved": true,
+  "n4_terminal_tolerance": true,
+  "n64_status": "NOT_REACHED",
+  "n8_status": "TERMINAL_ACCEPTED",
+  "next_action": "STOP_FOR_ENGINEERING_REVIEW",
+  "numerical_authority_status": "CANDIDATE",
+  "pr_state": "DRAFT",
+  "production_integration": false,
+  "task_id": "V07_FAST_SOLVER_GENERAL_CANDIDATE_CONTINUATION_R21B",
+  "wall_seconds": 2239.226392633005
+}

@@ -1,0 +1,108 @@
+{
+  "arbitrary_candidate_full_rating_verified": false,
+  "headroom_n": 64,
+  "headroom_status": "NOT_EXECUTED",
+  "ladder_continuation_status": "MESH_CANDIDATE_IDENTIFIED",
+  "live_full_rating_completed": false,
+  "live_n32": {
+    "bracket_establishment_trial_count": 2,
+    "bracket_meta": {
+      "endpoint_audit": {
+        "authority_id": "V07-FAST-SOLVER-LIVE-N32-CANDIDATE-R17",
+        "h_high_j_kg": "107515.2207701873719039190187",
+        "h_low_j_kg": "107515.1453343491376717631893",
+        "high_classification": "VALID_TRAJECTORY",
+        "high_endpoint_mesh_hash": "e2435843cc18627e78959a303367db406dbd2c75431deed6c9344cc6ac1eb690",
+        "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "low_endpoint_mesh_hash": null,
+        "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "run_session_id": "3f38b338-734d-478d-b742-e9a6808d0d36",
+        "subdivisions": 32
+      },
+      "establishment_probes": [
+        {
+          "expansion": 0,
+          "h_high": "107515.2207701873719039190187",
+          "h_low": "107515.1453343491376717631893",
+          "high_classification": "VALID_TRAJECTORY",
+          "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE"
+        }
+      ],
+      "expansions_used": 0,
+      "extrapolated_center": "107515.1830522682547878411040",
+      "h_coarse_j_kg": "107515.2019112278133458800613880157470703125",
+      "h_fine_j_kg": "107515.19248174803406686058271875",
+      "initial_span": "0.03771791911711607791467706299",
+      "mesh_delta_fine_minus_coarse": "-0.009429479779279019478669265747",
+      "outer_trials_for_establishment": 2,
+      "proposed_high_j_kg": "107515.2207701873719039190187",
+      "proposed_low_j_kg": "107515.1453343491376717631893"
+    },
+    "duty_w": "51901.40592651570346",
+    "energy_balance_residual_w": "1.09654E-9",
+    "n32_bracket_established": true,
+    "n32_high_endpoint_verified": true,
+    "n32_low_endpoint_verified": true,
+    "narrow_solve_trial_count": 3,
+    "outer_status": "TERMINAL_ACCEPTED",
+    "outer_trial_count": 5,
+    "same_run_endpoint_reuse": true,
+    "shooting_enthalpy_j_kg": "107515.19012437808924710571300625",
+    "terminal_boundary_residual_k": "4.4968E-9"
+  },
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-candidate-r17-20261018T082904Z.live-orchestrator.json",
+  "mesh_candidate_n": 32,
+  "n16_n32_compare_amendment": {
+    "compare_elapsed_s": 129.21812483499525,
+    "compare_status": "OK",
+    "reason": "INITIAL_RUN_COMPARE_BUDGET_120S_INSUFFICIENT"
+  },
+  "n16_n32_comparison": {
+    "coarse_subdivisions": 16,
+    "duty_difference_w": "0.04712741654754",
+    "duty_metric": "9.080172861166060960339662314E-7",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.074190096238486934420733207E-12",
+    "duty_precision_floor_w": "2.1145638601271754931E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 32,
+    "interval_duty_differences_w": [
+      "0.01453515229318",
+      "0.01158549281016",
+      "0.00905968663820",
+      "0.00689613112699",
+      "0.00505095367901"
+    ],
+    "overall_status": "PASS",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.0031312072550",
+      "T_wall_inner_min": "0.00206229204446",
+      "T_wall_outer_max": "0.00301056630715",
+      "T_wall_outer_min": "0.00198441299944"
+    },
+    "wall_precision_floor_k": "3.4896124112666376E-13",
+    "wall_status": "PASS"
+  },
+  "n32_mesh_hash_replay": "PASS",
+  "numerical_authority_status": "CANDIDATE",
+  "prior_comparison_history_admitted": true,
+  "prior_rehydrate_return_gate_fixed": true,
+  "production_integration": false,
+  "r16_n16_stage_admission": "VERIFIED_PRIOR_LIVE_STAGE",
+  "r16_rolling_state_fixed": true,
+  "remote_persistence_verified": true,
+  "result": "R17_LIVE_N32_EXECUTED",
+  "source_head_sha": "0d4c4b50d2ee1bfed9fe11d709365571fe1aa7cf",
+  "task_id": "V07_FAST_SOLVER_LIVE_N32_CANDIDATE_R17",
+  "timing_breakdown": {
+    "compare_wall_seconds": 130.09219247100555,
+    "n32_bracket_establishment_wall_seconds": 206.72659922199819,
+    "n32_full_worker_wall_seconds": 695.119311800001,
+    "n32_narrow_solve_wall_seconds": 488.3794013049992,
+    "rehydrate_wall_seconds": 206.3451202840006
+  },
+  "total_runner_wall_seconds": 1050.260199848999,
+  "trials_jsonl_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n32-r17-stages-20261018T082904Z/live-n32-outer-trials.jsonl",
+  "two_consecutive_passing_pairs": true
+}

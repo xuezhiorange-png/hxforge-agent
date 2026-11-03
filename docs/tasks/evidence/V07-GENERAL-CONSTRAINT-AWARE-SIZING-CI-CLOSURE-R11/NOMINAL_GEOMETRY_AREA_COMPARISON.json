@@ -1,0 +1,30 @@
+{
+  "OFFLINE_SCREENING_USING_R10_FROZEN_MESH": true,
+  "candidates": [
+    {
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "4.85",
+        "nominal_tube_outer_area_m2": "73.4356786094391222873825",
+        "physical_tube_count": 253,
+        "tube_outer_diameter_m": "0.01905"
+      }
+    },
+    {
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "4.90",
+        "nominal_tube_outer_area_m2": "74.1927474610828245790050",
+        "physical_tube_count": 253,
+        "tube_outer_diameter_m": "0.01905"
+      }
+    }
+  ],
+  "schema_version": "hxforge.nominal-geometry-area-comparison.v1"
+}

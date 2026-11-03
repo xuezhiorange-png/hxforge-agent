@@ -1,0 +1,14 @@
+{
+  "engineering_owner_approval_required": [
+    "Authorize FIV numeric limit rule pack version and applicability envelope",
+    "Bind Task167 screening bundle to live rating admission without mutating R19/R21E goldens",
+    "Re-execute mandatory screening under Task173 policy after authority binding"
+  ],
+  "missing_for_fiv_numeric_screening": [
+    "Approved FIV numeric limit coefficients with validity envelope",
+    "Tube layout / span / support applicability binding on live rating requests",
+    "Task167 approved_rule_pack_authority on R19/R21E frozen snapshots",
+    "Licensed engineering sign-off for production numeric limits"
+  ],
+  "status": "FIV_AUTHORITY_MISSING"
+}

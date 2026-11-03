@@ -186,7 +186,7 @@ def replay_task028_success(result: object) -> Task028ReplayEvidence | Task029Blo
             "task028_success_result.schema_version",
         )
 
-    if type(result.component_results) is not tuple or len(result.component_results) == 0:
+    if type(result.component_results) is not tuple:
         return _blocker(
             Task029BlockerCode.BL_T029_UPSTREAM_TASK028_RESULT_IDENTITY_INVALID,
             "task028_success_result.result_hash",

@@ -1,0 +1,123 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "mesh_feasible_face_probe": {
+    "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+    "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+    "physical_support_id": "urn:hxforge:task171:candidate:bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea:support:2",
+    "positive_duty_task172_validated_count": 5,
+    "positive_duty_trial_count": 5,
+    "rating_request_hash": "68a84ce8f4fd3c4af3c6dea8f31929f4781add2403251b02c25ac355456403e4",
+    "schema_version": "hxforge.positive-duty-cell-trials.v1",
+    "trials": [
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 50.0,
+        "residual_f_q_w": "-12418.596481668917",
+        "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+        "shell_physical_left_temperature_k": 298.5,
+        "task172_request_hash": "2c85d04399e6f28ebee0d3d905912802d7192224d79a6038d280edeeed613c7c",
+        "task172_result_hash": "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+        "task172_signed_q_hot_to_cold_w": "12468.596481668917",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.050955
+      },
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 500.0,
+        "residual_f_q_w": "-11953.057948702604",
+        "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+        "shell_physical_left_temperature_k": 298.5,
+        "task172_request_hash": "01b10790f5a4845060159bbbed87a030ac38da71a068821fc674cbcdd31453d3",
+        "task172_result_hash": "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+        "task172_signed_q_hot_to_cold_w": "12453.057948702604",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.054741
+      },
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 2000.0,
+        "residual_f_q_w": "-10401.27335373615",
+        "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+        "shell_physical_left_temperature_k": 298.5,
+        "task172_request_hash": "9f0da4372f02cd746041ac81193426f59d3cfe0459c36a30d262122263e498e3",
+        "task172_result_hash": "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+        "task172_signed_q_hot_to_cold_w": "12401.27335373615",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.054204
+      },
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 4000.0,
+        "residual_f_q_w": "-8332.252376983774",
+        "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+        "shell_physical_left_temperature_k": 298.5,
+        "task172_request_hash": "6f3432077c58d5e43f47c1f808de15d0a57edee34a9002312d93a77cb7d368bb",
+        "task172_result_hash": "a1ef2090340b455951d3b6cbca96d97e4ee97c7f5900f08485dd57c73fbbae64",
+        "task172_signed_q_hot_to_cold_w": "12332.252376983774",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.050957
+      },
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 8000.0,
+        "residual_f_q_w": "-4194.296695607927",
+        "shell_physical_left_basis": "MESH_INTERVAL_0_FEASIBLE_SHELL_FACE",
+        "shell_physical_left_temperature_k": 298.5,
+        "task172_request_hash": "0fc01d78fd5951f9725ab8c2f67a3b73393fd1e1a2bdeb8383bc9365380fd770",
+        "task172_result_hash": "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576",
+        "task172_signed_q_hot_to_cold_w": "12194.296695607927",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.052728
+      }
+    ]
+  },
+  "positive_duty_original_blocker": "LOW_SIDE_DOMAIN_INFEASIBLE_AT_SHELL_COLD_INLET_WHEN_F0_POSITIVE",
+  "schema_version": "hxforge.positive-duty-cell-trials-bundle.v1",
+  "shell_cold_inlet_probe": {
+    "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+    "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+    "physical_support_id": "urn:hxforge:task171:candidate:bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea:support:2",
+    "positive_duty_task172_validated_count": 0,
+    "positive_duty_trial_count": 3,
+    "rating_request_hash": "68a84ce8f4fd3c4af3c6dea8f31929f4781add2403251b02c25ac355456403e4",
+    "schema_version": "hxforge.positive-duty-cell-trials.v1",
+    "trials": [
+      {
+        "outcome": "VALIDATED",
+        "q_trial_w": 0.0,
+        "residual_f_q_w": "-15361.266317620733",
+        "shell_physical_left_basis": "SHELL_COLD_INLET_BOUNDARY_NOT_CELL_FACE",
+        "shell_physical_left_temperature_k": 298.15,
+        "task172_request_hash": "7a043fed9050d38fcacfab3ae976acffcb86c784f3aa340ae20fe8eb803e7d85",
+        "task172_result_hash": "1f97bdf590619ea217ba609596029d37fd36723140920646900632e0d3fadae5",
+        "task172_signed_q_hot_to_cold_w": "15361.266317620733",
+        "task172_status": "VALIDATED",
+        "wall_seconds": 0.044385
+      },
+      {
+        "original_failure_code": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "outcome": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "q_trial_w": 1.0,
+        "shell_physical_left_basis": "SHELL_COLD_INLET_BOUNDARY_NOT_CELL_FACE",
+        "shell_physical_left_temperature_k": 298.15,
+        "wall_seconds": 1.8e-05
+      },
+      {
+        "original_failure_code": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "outcome": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "q_trial_w": 10.0,
+        "shell_physical_left_basis": "SHELL_COLD_INLET_BOUNDARY_NOT_CELL_FACE",
+        "shell_physical_left_temperature_k": 298.15,
+        "wall_seconds": 9e-06
+      },
+      {
+        "original_failure_code": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "outcome": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "q_trial_w": 100.0,
+        "shell_physical_left_basis": "SHELL_COLD_INLET_BOUNDARY_NOT_CELL_FACE",
+        "shell_physical_left_temperature_k": 298.15,
+        "wall_seconds": 6e-06
+      }
+    ]
+  }
+}

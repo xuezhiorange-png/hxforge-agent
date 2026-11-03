@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "task_id": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_INDEPENDENT_REVIEW_R1",
+  "mode": "INDEPENDENT_AUTHORITY_REVIEW_ONLY",
+  "result": "FAIL_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_INDEPENDENT_REVIEW",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "reviewed_head": "04fd92450905a640bb3c228f982e31e7b1bd9b95"
+  },
+  "review": {
+    "review_source": "Fresh-context Codex sub-agent reviewer Popper; no inherited conversation context",
+    "reviewer_agent_id": "01a0fbbd-8fa7-7610-8a19-6abc04ca7dbb",
+    "self_approval": false,
+    "candidate_author_self_approval": false,
+    "reviewer_raw_verdict": "BLOCKED_REVIEW_EVIDENCE_DEFECT",
+    "final_review_disposition": "FAIL",
+    "disposition_reason": "The reviewer identified a missing required numerical-output portability envelope and stated that substantive candidate change is required. The task requires FAIL, rather than an in-task candidate revision, when substantive modification is needed.",
+    "scope": "Read-only review of the locked authority projection, candidate evidence, portability adjudication, and lineage; no solver or numerical experiment was run."
+  },
+  "review_object": {
+    "candidate_task": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_AUTHORITY_REASSESSMENT_UNDER_ADJUDICATED_PORTABILITY_CONTRACT_R1",
+    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R1",
+    "authority_canonical_hash": "e72efc573a39710584bd342a6287655056525b3dc38e3e81bca100844b4f81f0",
+    "candidate_evidence_hash": "1e8b01c007b7b44abe9d7b12415ba95c54146b0ad7cf47eaf965e2a7e1ad3c9e",
+    "identity_contract_evidence_hash": "d9c44837a38bc66a6372e32b3d7a5dfba7a8a09ca049dc29dab06fa968b3d7b2",
+    "characterization_evidence_hash": "15f43a15896081839a6607b7bf45c4834b3273a55c704ba8835eb8ea2edf9e58",
+    "candidate_hash_verification": {
+      "canonicalization": "Python JSON: sort_keys=true, separators=(',', ':'), ensure_ascii=false, allow_nan=false; evidence digest excludes its canonical_hash field.",
+      "candidate_authority_hash": "PASS",
+      "candidate_evidence_hash": "PASS",
+      "identity_contract_evidence_hash": "PASS"
+    }
+  },
+  "lineage_review": {
+    "characterization": {
+      "head": "86849841a5314f6ee82eebc117ece8f969829e06",
+      "exact_head_ci_run": 36962301921,
+      "ci_result": "SUCCESS",
+      "purpose": "Candidate numerical characterization, Linux matrix, 68-request corpus, and guard cases."
+    },
+    "dogbox_portability_adjudication": {
+      "head": "8d8666826f222f052270ec7fa5d2e8111c853969",
+      "exact_head_ci_run": 36965219941,
+      "ci_result": "SUCCESS",
+      "historical_result": "BLOCKED_PORTABILITY",
+      "superseded_by_identity_contract": true
+    },
+    "platform_native_identity_contract": {
+      "head": "dc2eac0cf39d73645cab170673dbfdd6ed065886",
+      "exact_head_ci_run": 36973198114,
+      "ci_result": "SUCCESS",
+      "result": "PASS_PLATFORM_NATIVE_IDENTITY_CONTRACT",
+      "cross_platform_exact_result_identity_preexisting_requirement": false,
+      "result_identity_scope": "PLATFORM_NATIVE_RESULT_IDENTITY"
+    },
+    "exact_head_ci_lineages_verified": true
+  },
+  "findings": [
+    {
+      "finding_id": "PORTABILITY_ENVELOPE_MISSING",
+      "severity": "BLOCKING",
+      "location": "docs/tasks/evidence/TASK-172-stage3-task172-fail-only-dogbox-fallback-authority-reassessment-r1.json:proposed_authority.portability",
+      "authority_basis": "docs/tasks/TASK-172-v0.7-stage3-task172-result-identity-and-numerical-portability-contract-adjudication-r1.md:16,101",
+      "required_contract": "Cross-platform portability requires numerical outputs inside a prospectively reviewed, explicitly declared portability envelope; observed characterization deltas are not adopted as tolerances.",
+      "observed_candidate_state": "The candidate lists semantic invariants and rejects rounding/quantization, but declares no numerical-output envelope or bound.",
+      "consequence": "The candidate cannot be accepted without a substantive authority-projection change and a new canonical hash. No such change is made in this review."
+    }
+  ],
+  "candidate_controls_review": {
+    "narrow_fail_only_overlay": true,
+    "r94_primary_unchanged": true,
+    "fallback_trigger_is_replay_valid_residual_acceptance_only": true,
+    "fallback_uses_original_r94_deterministic_seed": true,
+    "fallback_dogbox_budget": {
+      "max_nfev": 6,
+      "callback_cap": 24
+    },
+    "baseline_valid_bypasses_fallback": true,
+    "original_r98_required": true,
+    "r98_c_round_and_physics_unchanged": true,
+    "fail_closed_semantics": true,
+    "bounded_resource_budget": true,
+    "same_environment_exact_replay_required": true,
+    "cross_platform_exact_result_hash_required": false,
+    "cross_platform_engineering_semantic_portability_required": true,
+    "portability_contract_fully_satisfied": false
+  },
+  "validation": {
+    "focused_task172_task173": "PASS; focused production tests run, excluding the candidate characterization-matrix test to avoid repeating numerical characterization.",
+    "ruff": "PASS",
+    "format": "PASS; 777 files already formatted",
+    "mypy": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; 259/259",
+    "pip_audit": "PASS; no known vulnerabilities; unpublished local package skipped.",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS; 71 packages",
+    "duplicate_key_audit": "PASS; review, candidate, and identity-contract evidence JSON files",
+    "git_diff_check": "PASS before staging; staged receipt diff rechecked before commit.",
+    "requests": "2.34.2",
+    "urllib3": "2.8.0",
+    "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "full_shell_tube_and_http_api_local": "NOT_RUN; exact-head CI is required after the review-receipt commit.",
+    "exact_head_ci": "PENDING_AT_EVIDENCE_COMMIT; record in PR closeout, no follow-up repository commit."
+  },
+  "disposition": {
+    "authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "authority_accepted": false,
+    "candidate_modified": false,
+    "r2_created": false,
+    "correction_implemented": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task175_release_acceptance_performed": false,
+    "next_implementation_gate_authorized": false,
+    "stop": true
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "tests_changed": false,
+    "fixtures_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "registry_changed": false,
+    "new_numerical_experiments": false
+  },
+  "canonical_hash": "1741d3883ed986bbc2a71e672118376395f68def1bc8e11c9997d162f821980e"
+}

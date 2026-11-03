@@ -1,0 +1,63 @@
+{
+  "case_a_tube_inlet_k": "300.00",
+  "case_b_cell_root": {
+    "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+    "cell_root_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+    "positive_duty_cell_root_accepted": true,
+    "q_root_w": "10430.77217887273",
+    "residual_f_q_w": "7.76477E-7",
+    "schema_version": "hxforge.cell-root-result.v1",
+    "shell_physical_left_basis": "feasible_shell_left_face",
+    "shell_physical_left_temperature_k": 298.5,
+    "status": "ACCEPTED",
+    "task172_request_hash": "cbbbf564f2e8cffdee4345a867361301004193028866171f6d8cd5b576570e24",
+    "task172_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+    "task172_signed_q_hot_to_cold_w": "10430.772178096253",
+    "task172_status": "VALIDATED",
+    "wall_seconds": 1.812
+  },
+  "case_b_mesh": {
+    "diagnostics": [
+      "T=298.14999999999714",
+      "P=101325.0",
+      "h=104920.11980931147",
+      "query=PH"
+    ],
+    "failure_code": "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": false,
+    "mesh_level": 1,
+    "schema_version": "hxforge.low-mesh-result.v1",
+    "status": "BLOCKED",
+    "wall_seconds": 0.06
+  },
+  "case_b_shell_inlet_k": "298.15",
+  "case_b_tube_inlet_k": "299.80",
+  "milestones": {
+    "CASE_A_B_NUMERIC_DIFFERENCE": true,
+    "CASE_B_N1_MESH": false,
+    "LIVE_THERMAL_BOUNDARY": true,
+    "SAFE_TP_CACHE": true
+  },
+  "native_thermal_boundary_binding": {
+    "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+    "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+    "participates_in_task173_mesh": true,
+    "participates_via": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+    "reference_pressure_pa": "101325",
+    "schema_version": "hxforge.experimental-thermal-boundary.v1",
+    "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+    "shell_inlet_temperature_k": "298.15",
+    "shell_mass_flow_kg_s": "20",
+    "thermal_variant": "TUBE_HOT_SHELL_COLD",
+    "tube_inlet_enthalpy_j_kg": "111818.76594515475",
+    "tube_inlet_temperature_k": "299.80",
+    "tube_mass_flow_kg_s": "12"
+  },
+  "report_json_path": "docs/tasks/evidence/V07-GENERAL-RATING-LIVE-THERMAL-BOUNDARY-R7/ENGINEERING_REPORT.json",
+  "report_md_path": "docs/tasks/evidence/V07-GENERAL-RATING-LIVE-THERMAL-BOUNDARY-R7/ENGINEERING_REPORT.md",
+  "safe_tp_cache_gate": true,
+  "schema_version": "hxforge.general-r7-raw-result.v1",
+  "task_id": "V07_GENERAL_RATING_LIVE_THERMAL_BOUNDARY_R7",
+  "total_numerical_seconds": 7.105
+}

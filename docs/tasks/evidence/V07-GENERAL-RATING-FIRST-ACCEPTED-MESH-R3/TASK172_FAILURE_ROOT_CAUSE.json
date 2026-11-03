@@ -1,0 +1,30 @@
+{
+  "candidate_hash": "65622a77bfb4f0963dd3d881edeb6d963baab9313f1510200b3def589f7a52ee",
+  "candidate_id": "4070a34b-80b4-50fa-9630-5278bf9fe08d",
+  "diagnostics": [
+    "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+    "task172_numerical_hole_count_by_mesh=[{\"subdivisions_per_interval\":1,\"task172_local_evaluation_count\":1,\"task172_numerical_hole_count\":0,\"task172_numerical_hole_counts_by_code\":{}}]",
+    "mesh_subdivisions=1"
+  ],
+  "failed_mesh_subdivisions": 1,
+  "native_identities": [
+    [
+      "TASK171",
+      "5c6cbb5f0d6c61f2bc732783bf2c245be392366cdaf97b66cf74f8bae00bf29a"
+    ],
+    [
+      "TASK174",
+      "f9c8b1e8c946074ad08b941aeab7bdb3b4645c906a684a083ba406e9d9cd9fea"
+    ],
+    [
+      "TASK025",
+      "53ebd128034c6a909bbaf6fafc872a7d8bfecefc9e87281d0e5272a2071987f3"
+    ]
+  ],
+  "rating_request_hash": "d3b5c1d4fe11fede355fc8e38add5cef59bf71be445160439f428d627a38c8f0",
+  "rating_result_hash": "6f62c47ca45a26b9bccfa80e2a979713b98b28148e3bf6798e97b445838b8d42",
+  "schema_version": "hxforge.task172-failure-root-cause.v1",
+  "task172_failure_field_path": null,
+  "task172_original_failure_code": "BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE",
+  "task173_failure_code": "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE"
+}

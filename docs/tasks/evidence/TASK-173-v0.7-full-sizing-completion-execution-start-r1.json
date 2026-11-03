@@ -1,0 +1,11 @@
+{
+  "completion_request_public_sizing_invocation_count": 1,
+  "completion_sizing_request_hash": "5cd05f7d390718e11e2209d83f8eef0e35bc6f33afe9217e5d8a425b1c17daae",
+  "execution_status": "STARTED",
+  "historical_r4_public_sizing_invocation_count": 2,
+  "request_freeze_head": "75a795f676e8cc3b1d2e7e0f89377684c3a78650",
+  "runtime_source_head": "b1da0536d34ff174c825e9862d7e29cf2d087785",
+  "schema_version": "task173.full-sizing-completion-execution-start.v1",
+  "started_at_utc": "2026-10-07T00:13:35.132133+00:00",
+  "total_recorded_task173_public_sizing_invocations": 3
+}

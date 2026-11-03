@@ -1,0 +1,59 @@
+{
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r6",
+  "full_mesh_comparison": "NOT_AVAILABLE",
+  "milestones": {
+    "FULL_RATING_CONVERGED": false,
+    "MESH_N2_N4_COMPARISON_AVAILABLE": true,
+    "MESH_N4_EXECUTED": true,
+    "MESH_N4_NUMERIC_VALID": true,
+    "PERFORMANCE_ANALYSIS_COMPLETE": true,
+    "PHYSICAL_MODEL_PARITY_DOCUMENTED": true
+  },
+  "n2_n4_duty_comparison": "PASS",
+  "n4_duty_w": "45866.3349992279378",
+  "n4_energy_residual_w": "2.4E-10",
+  "n4_mesh_result_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+  "n4_numerical_seconds": 808.408,
+  "n4_solver_profile": {
+    "cell_root_trial_receipt_count": 0,
+    "ephemeral_tp_cache": {
+      "cache_hits": 357816,
+      "cache_misses": 332514,
+      "exact_duplicate_rate": 0.5183260179913954,
+      "exact_duplicate_tp_queries": 357816,
+      "provider_calls": 690330,
+      "unique_tp_keys": 332514
+    },
+    "mesh_run_metadata": {
+      "bisection_iterations": 28,
+      "mesh_result_hash": "4bf4a8ed8dda8a24a63fccbd370aecd2e821d4b52082c2b8021277cb0533bba8",
+      "outer_action_count": 30
+    },
+    "mesh_subdivisions": 4,
+    "outer_trial_count": 30,
+    "property_provider_state_lookup_count": 690330,
+    "schema_version": "hxforge.solver-performance-profile.v1",
+    "task172_local_evaluation_count": 19142,
+    "task172_request_hash_duplicate": "NOT_MEASURED",
+    "task172_request_hash_total": "NOT_MEASURED",
+    "task172_request_hash_unique": "NOT_MEASURED",
+    "timing_seconds": {
+      "outer_solver_estimated": 1.211,
+      "task172_evaluations": 807.197,
+      "total_wall": 808.408
+    }
+  },
+  "n4_status": "NUMERIC_VALID",
+  "n4_task172_evaluations": 19142,
+  "n4_terminal_residual_k": "3.29235E-9",
+  "numerical_authority_status": "CANDIDATE",
+  "optimization_implemented": true,
+  "physical_model_fingerprint": "6c2c1ed98741a2ba8b1015522e92f1d1a438ff3e33769c05ea941974e1338f36",
+  "production_design_approved": false,
+  "r4_r5_physical_parity": true,
+  "report_json_path": "docs/tasks/evidence/V07-GENERAL-RATING-N4-PERFORMANCE-AND-MESH-R6/ENGINEERING_REPORT.json",
+  "report_md_path": "docs/tasks/evidence/V07-GENERAL-RATING-N4-PERFORMANCE-AND-MESH-R6/ENGINEERING_REPORT.md",
+  "schema_version": "hxforge.general-r6-raw-result.v1",
+  "total_numerical_seconds": 814.555
+}

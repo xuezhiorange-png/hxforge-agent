@@ -1,0 +1,10 @@
+{
+  "mesh_n": 1,
+  "receipt": {
+    "blocked_code": "WORKER_EMPTY_RECEIPT",
+    "mesh_n": 1,
+    "stage_status": "BLOCKED",
+    "worker_status": "BLOCKED"
+  },
+  "schema_version": "task173.experimental-live-mesh-stage-receipt.v1"
+}

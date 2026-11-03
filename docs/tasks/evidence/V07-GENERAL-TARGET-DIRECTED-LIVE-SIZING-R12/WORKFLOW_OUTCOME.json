@@ -1,0 +1,15 @@
+{
+  "blocked_rating_count": 0,
+  "blocker_code": null,
+  "cli_success": true,
+  "engineering_case_id": "mvp-target-directed-r12",
+  "mesh_status": "NUMERIC_VALID",
+  "multi_candidate_mode": true,
+  "numeric_valid_count": 2,
+  "raw_result_path": "/tmp/r12-e2e-out/RAW_RESULT.json",
+  "raw_result_sha256": "468da92cdf64bbab91c688af2ff4b711bc2c04828343b790b2fc48e03d2117cc",
+  "schema_version": "hxforge.experimental-live-workflow-outcome.v2",
+  "selected_for_rating_count": 2,
+  "status": "EXPERIMENTAL_COMPLETE",
+  "total_numerical_seconds": 508.182
+}

@@ -1,0 +1,10 @@
+{
+  "command": "python prototypes/v07_fast_solver_n32_convergence_r9/run_r9.py",
+  "global_deadline_s": 960.0,
+  "h16_shooting_enthalpy_j_kg": "107515.1924758120554776870251486453611278193420730531215667724609375",
+  "h8_shooting_enthalpy_j_kg": "107515.2019112278133458800613880157470703125",
+  "n32_worker_budget_s": 840.0,
+  "r8_evidence_gate_fixed": true,
+  "source_head_sha": "2b3ed5a8c86dcd5092251eaa593ce2b5198bea4b",
+  "task_id": "V07_FAST_SOLVER_N32_CONVERGENCE_R9"
+}

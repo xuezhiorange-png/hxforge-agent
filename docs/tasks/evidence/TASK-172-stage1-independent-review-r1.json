@@ -1,0 +1,31 @@
+{
+  "schema_version": "task172.stage1-independent-review.v1",
+  "task_id": "TASK172_V0_7_STAGE1_SINGLE_INDEPENDENT_REVIEW_R1",
+  "result": "PASS",
+  "independent_review_result": "PASS",
+  "review_source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+  "self_approval": false,
+  "codex_self_approval_claimed": false,
+  "reviewed_head_sha": "31bf0429eea3f65f744367b3a5f36e982f07cd41",
+  "stage1_authority_bundle_accepted": true,
+  "case_stream_authority_accepted": true,
+  "property_package_accepted": true,
+  "material_wall_constitutive_authority_accepted": true,
+  "case_executable_numerical_profile_accepted": true,
+  "real_case_production_mesh_profile_accepted": true,
+  "reference_policy_binding_accepted": true,
+  "structured_geometry_reference_correction_accepted": true,
+  "project_owner_decision_count": 12,
+  "project_owner_decision_count_remaining": 0,
+  "production_mesh_profile_authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+  "real_case_mesh_admissible": false,
+  "stage1_complete": true,
+  "next_major_stage": "STAGE_2_TASK172_RUNTIME_AND_TASK174_HYDRAULICS",
+  "downstream_boundary": {
+    "task173_solve_performed": false,
+    "task174_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "task172_runtime_implementation": false
+  },
+  "canonical_hash": "d9515fa45cb99aff93cb53ede7aee44cbb0f47c8c392285109d2eed5fef6199f"
+}

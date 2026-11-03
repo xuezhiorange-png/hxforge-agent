@@ -1,0 +1,195 @@
+{
+  "schema_version": "task172.stage3.tmax-zero-q-state-identity-portability-correction.r1",
+  "task_id": "TASK172_V0_7_STAGE3_TMAX_ZERO_Q_STATE_IDENTITY_PORTABILITY_CORRECTION_R1",
+  "mode": "NARROW_ZERO_Q_PRODUCTION_PORTABILITY_CORRECTION",
+  "predecessor_head": "9cb5beb428039fa889d4242d05dcd5ed3cae91f0",
+  "predecessor_adjudication": {
+    "task_id": "TASK172_V0_7_STAGE3_TMAX_TP_OUTPUT_BOUNDARY_PORTABILITY_ADJUDICATION_R1",
+    "evidence_path": "docs/tasks/evidence/TASK-172-stage3-tmax-tp-output-boundary-portability-adjudication-r1.json",
+    "evidence_canonical_hash": "e5ae2d80d34d73a672c4f674219634610da1f39f25f18af62203466aea91362f",
+    "h_max_role": "PH_INPUT_COORDINATE_BOUND_ONLY",
+    "h_max_is_universal_provider_output_bound": false,
+    "tp_provider_output_allowed_to_differ_from_frozen_hmax": true,
+    "ph_input_above_hmax_rejected_pre_backend": true,
+    "zero_q_state_is_identity_transform": true,
+    "zero_q_should_require_new_ph_reconstruction": false,
+    "recommended_correction_option": "D",
+    "option_d_scope": "EXACT_Q_ZERO_IDENTITY_ONLY",
+    "option_d_solves_all_small_positive_q_exposure": false,
+    "tmax_linux_h_minus_hmax_j_kg": "1.879E-8",
+    "tmin_linux_h_minus_hmin_j_kg": "8.725E-8",
+    "q_to_enter_frozen_hmax_w": "2.2548E-7"
+  },
+  "authority_ids": {
+    "local_state_reconstruction": "V07-T173-ENTHALPY-MIDPOINT-LOCAL-STATE-R2",
+    "zero_q_state_identity_portability": "V07-T173-ZERO-Q-STATE-IDENTITY-PORTABILITY-R1",
+    "cell_root_solver_unchanged": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3",
+    "endpoint_hole_low_side_classification_unchanged": "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1"
+  },
+  "authority_hashes": {
+    "local_state_reconstruction": "9abef953ce251628b73370f08337efbe7938ed33509a2a99c878eade2bb8b366",
+    "zero_q_state_identity_portability": "81903b49fcf6c9e41ff8f296da921e25ca116727b846e01f9e07e257dd4531fd",
+    "cell_root_solver_unchanged": "eafe8bc53769d1648ac2f918045cececfd3870d618ff6273c523fe185a6683ef",
+    "endpoint_hole_low_side_classification_unchanged": "60c8fe2957c5906704b796a779b88845ddb3e59934d8576c93e0589ea2084f74"
+  },
+  "zero_q_identity_contract": {
+    "trigger": "EXACT_DECIMAL_ZERO_ONLY",
+    "zero_tolerance_defined": false,
+    "tube_downstream_reuses_tube_upstream_thermo_state": true,
+    "tube_local_reuses_tube_upstream_thermo_state": true,
+    "shell_next_reuses_shell_physical_left_thermo_state": true,
+    "shell_local_reuses_shell_physical_left_thermo_state": true,
+    "same_property_snapshot_and_thermodynamic_identity": true,
+    "new_ph_reconstruction_for_unchanged_state": false,
+    "provider_output_compared_against_ph_input_bounds": false,
+    "provider_output_clipped_or_rounded": false,
+    "ph_input_above_hmax_still_rejected_pre_backend": true
+  },
+  "positive_q_non_scope": {
+    "all_nonzero_q_use_existing_enthalpy_propagation_and_ph_reconstruction": true,
+    "small_positive_q_behavior_changed": false,
+    "small_positive_q_exposure_resolved": false,
+    "q_to_enter_frozen_hmax_w_reference_only": "2.2548E-7",
+    "option_d_solves_all_small_positive_q_exposure": false,
+    "epsilon_or_tolerance_added": false,
+    "hmax_or_hmin_changed": false
+  },
+  "state_identity_validation": {
+    "exact_zero_branch_uses_validated_existing_thermo_state": true,
+    "property_snapshot_identity_preserved": true,
+    "thermodynamic_state_identity_preserved": true,
+    "ph_backend_calls_at_exact_zero": 0,
+    "task172_receives_real_local_property_states": true
+  },
+  "face_identity_validation": {
+    "same_thermodynamic_snapshot_can_have_distinct_face_ids": true,
+    "face_identity_binds_side_index_coordinate_count_producer_and_thermo_identity": true,
+    "contextual_face_identity_reused_across_distinct_faces": false
+  },
+  "task172_boundary": {
+    "task172_acceptance_policy_changed": false,
+    "r98_changed": false,
+    "r98_c_round": "1.0",
+    "request_validation_changed": false,
+    "physical_support_changed": false
+  },
+  "r3_boundary": {
+    "cell_root_solver_authority_id": "V07-T173-VALID-POINT-CELL-ROOT-BRACKETING-R3",
+    "endpoint_hole_low_side_classification_authority_id": "V07-T173-SHELL-CAPACITY-ENDPOINT-HOLE-LOW-SIDE-CLASSIFICATION-R1",
+    "r3_endpoint_hole_rule_reevaluated": false,
+    "r3_endpoint_hole_rule_changed": false,
+    "r3_portable_status": "NOT_YET_EVALUATED_AFTER_PRE_TARGET_BOUNDARY_FIX",
+    "portable_injected_r3_contract_tests_retained": true,
+    "native_historical_classification_hashes_and_call_counts_frozen": false
+  },
+  "native_replay_characterization": {
+    "mesh_subdivisions": 16,
+    "outer_iteration": 2,
+    "shooting_enthalpy_j_kg": "106853.814770607445",
+    "local_runtime": "CPython 3.14.5; macOS-27.2-arm64-arm-64bit-Mach-O",
+    "first_support_q0_classification": "VALID_CELL_EVALUATION",
+    "first_support_tmax_q0_blocker_removed": true,
+    "target_support_reached": true,
+    "target_cell_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+    "isolated_target_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+    "outer_trial_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+    "partial_mesh_returned": false,
+    "classification_is_cross_platform_invariant": false
+  },
+  "ci_matrix": {
+    "required_environments": [
+      "PR_HEAD_PY311",
+      "PR_HEAD_PY312",
+      "MERGE_REF_PY311",
+      "MERGE_REF_PY312"
+    ],
+    "first_support_q0_domain_blocker_must_be_absent": true,
+    "junit_runtime_properties": [
+      "r3_runtime_python",
+      "r3_runtime_platform",
+      "r3_first_support_q0_classification",
+      "r3_first_support_q0_failure_code",
+      "r3_first_support_q0_tmax_blocker_removed",
+      "r3_target_support_reached",
+      "r3_target_cell_classification",
+      "r3_target_upper_classification",
+      "r3_target_upper_failure_code",
+      "r3_target_upper_request_hash",
+      "r3_target_upper_result_hash",
+      "r3_target_upstream_tube_enthalpy_j_kg",
+      "r3_target_upstream_shell_enthalpy_j_kg",
+      "r3_target_capacity_binding_side",
+      "r3_target_production_q_upper_w",
+      "r3_isolated_target_classification",
+      "r3_integrated_isolated_classification_match",
+      "r3_outer_trial_classification",
+      "r3_first_hard_blocker_code",
+      "r3_first_hard_blocker_location",
+      "r3_first_hard_blocker_support_id",
+      "r3_first_hard_blocker_search_phase",
+      "r3_first_hard_blocker_search_level",
+      "r3_first_hard_blocker_q_w"
+    ],
+    "exact_head_ci_record_location": "FINAL_TASK_CLOSEOUT_RECEIPT_AND_GITHUB_JUNIT_ARTIFACTS",
+    "candidate_ci_status": "REQUIRED_AFTER_CANDIDATE_COMMIT"
+  },
+  "security_gate_status": {
+    "pip_audit": "FAIL_KNOWN_URLLIB3_VULNERABILITIES",
+    "dependency": "urllib3==2.7.0",
+    "reported_cves": [
+      "CVE-2026-97687",
+      "CVE-2026-97688",
+      "CVE-2026-97689"
+    ],
+    "fix_version": "2.8.0",
+    "dependencies_changed": false,
+    "lockfiles_changed": false
+  },
+  "change_boundary": {
+    "production_code_changed": true,
+    "tests_changed": true,
+    "task172_source_changed": false,
+    "task171_changed": false,
+    "task174_changed": false,
+    "r98_changed": false,
+    "property_constants_changed": false,
+    "r3_classification_logic_changed": false,
+    "production_mesh_policy_changed": false,
+    "dependencies_changed": false,
+    "lockfiles_changed": false,
+    "workflows_changed": false,
+    "full_production_mesh_executed": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false
+  },
+  "validation": {
+    "focused_task173_tests": "PASS; 53 collected; focused zero-q and R3 characterization selection passed",
+    "full_task173_file": "PASS",
+    "full_shell_tube_suite": "PASS; 2254 tests, 0 failures, 0 errors, 4 skipped",
+    "ruff_check": "PASS",
+    "ruff_format_check": "PASS",
+    "mypy_ci_scope": "PASS; 450 source files",
+    "manifest_d_equals_m": "PASS; discovered=259; manifest=259",
+    "uv_lock_check": "PASS",
+    "git_diff_check": "PASS",
+    "pip_audit": "FAIL; urllib3==2.7.0; CVE-2026-97687, CVE-2026-97688, CVE-2026-97689; dependency remediation out of scope",
+    "exact_head_ci": "REQUIRED_AFTER_CANDIDATE_COMMIT; exact run and matrix results in final task receipt"
+  },
+  "lifecycle": {
+    "result": "ZERO_Q_CORRECTION_CANDIDATE_PENDING_EXACT_HEAD_CI",
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "next_gate_after_functional_ci": "SECURITY_DEPENDENCY_REMEDIATION_URLLIB3_2_8_0",
+    "stop": true
+  },
+  "canonical_hash": "f87255f6743171fdce9d6be53889069ac17cc3f464b483e2c8e4e71a5ebf5aa0"
+}

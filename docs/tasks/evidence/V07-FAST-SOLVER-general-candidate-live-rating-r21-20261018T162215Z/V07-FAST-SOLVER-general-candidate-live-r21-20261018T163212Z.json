@@ -1,0 +1,56 @@
+{
+  "base_head": "22268bb5b88dec6ed0d96c942ba17c0d00e913f4",
+  "final_head": "56305793d68fde52394db762bf0978ed0e40bc9b",
+  "general_live_rating_verified": false,
+  "live_rating_blocked": {
+    "blocked_code": "OUTER_BOUNDARY_WALL_CLOCK_EXCEEDED",
+    "blocked_diagnostics": [],
+    "execution_mode": "LIVE_NUMERICAL_SOLVE",
+    "experimental_rating_authority_id": "V07-FAST-SOLVER-RATING-AUTHORITY-ADMISSION-R11",
+    "schema_version": "task173.experimental-candidate-rating-blocked.v1",
+    "status": "BLOCKED"
+  },
+  "multi_candidate_sizing_verified": false,
+  "next_action": "STOP_FOR_ENGINEERING_REVIEW",
+  "numerical_authority_status": "CANDIDATE",
+  "phase_a_gate_tests": "PASS",
+  "pr_state": "DRAFT",
+  "production_integration": false,
+  "second_candidate_discovery": {
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+    "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+    "geometry_summary": {
+      "interval_count": "5",
+      "task171_mesh_identity": "20856e2dc622a99d32f662f4985d3c9efcefb6a6904ad40c75f59c5d61fbcc77",
+      "task171_topology_id": "urn:hxforge:task171:a9f5ad76d059e68a813ab8b8d5e113d90e048dd53feb2ca5afb7e78f7c66c688"
+    },
+    "rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "status": "DISCOVERED",
+    "upstream_authority_checks": [
+      [
+        "candidate_id_distinct_from_b",
+        "PASS"
+      ],
+      [
+        "candidate_hash_pinned",
+        "PASS"
+      ],
+      [
+        "rating_request_hash_pinned",
+        "PASS"
+      ],
+      [
+        "task171_validated",
+        "PASS"
+      ],
+      [
+        "task174_binding",
+        "PASS"
+      ]
+    ]
+  },
+  "task_id": "V07_FAST_SOLVER_GENERAL_CANDIDATE_LIVE_RATING_R21",
+  "wall_seconds": 614.2521941750019
+}

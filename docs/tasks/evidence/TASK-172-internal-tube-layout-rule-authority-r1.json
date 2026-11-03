@@ -1,0 +1,88 @@
+{
+  "schema_version": "task172.project-internal-layout-rule-candidate.r1",
+  "authority_bundle_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+  "authority_id": "V07-T172-INTERNAL-TUBE-LAYOUT-RULE-R1",
+  "authority_class": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY",
+  "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "profile_id": "hxforge.shell_tube.tube_layout.v1",
+  "authority_mode": "INTERNAL_GENERIC",
+  "rule_id": "V07-T172-LAYOUT-TRIANGULAR-02540-R1",
+  "rule_version": "R1",
+  "rule_pack_identity": null,
+  "source_class": "INTERNAL_ENGINEERING_RULE",
+  "standard_family": "INTERNAL",
+  "standard_claim_status": "NO_STANDARD_CLAIM",
+  "license_evidence": {
+    "form": "project_internal_authority",
+    "value": "project_internal_authority",
+    "authority_class": "PROJECT_INTERNAL_ENGINEERING_RULE",
+    "standard_claim_status": "NO_STANDARD_CLAIM",
+    "external_standard_content_used": false,
+    "restricted_source_content_used": false,
+    "vendor_proprietary_content_used": false
+  },
+  "task012_license_evidence_value": "project_internal_authority",
+  "rule": {
+    "pattern_family": "TRIANGULAR",
+    "pitch_m": "0.0254",
+    "edge_clearance_m": "0.003175",
+    "allowed_origin_modes": [
+      "CENTER_ON_LATTICE_POINT"
+    ],
+    "allowed_axis_orientations": [
+      "PRIMARY_AXIS_X"
+    ],
+    "allowed_exclusion_zone_types": [
+      "AXIS_ALIGNED_RECTANGLE",
+      "CIRCLE"
+    ],
+    "maximum_candidate_positions": 10000,
+    "pitch_must_be_greater_than_or_equal_to_outer_diameter_m": true
+  },
+  "design_provenance": {
+    "design_authority_id": "V07-T172-INTERNAL-GEOMETRY-SOURCE-RULE-BUNDLE-R1",
+    "design_revision": "R1",
+    "design_algorithm_version": "R115_FIXED_RULE_DECLARATION_V1",
+    "base_repository_sha": "15ff79ee39bbf6d162cc50e14a95f682a2f8b8a8",
+    "selection_rule": "FREEZE_EXPLICIT_PROJECT_RULE_VALUES_WITHOUT_CASE_LAYOUT_EXECUTION",
+    "external_source_claimed": false
+  },
+  "provenance_edge_ids": [
+    "R115-EDGE-LAYOUT-OWNER-DESIGN",
+    "R115-EDGE-LAYOUT-TASK012-LICENSE",
+    "R115-EDGE-LAYOUT-TASK021-SCHEMA"
+  ],
+  "evidence_refs": [
+    "docs/tasks/TASK-012-standards-rule-pack-license-boundary.md#rule-artifact-fields",
+    "docs/tasks/TASK-021-shell-and-tube-tube-layout-and-count.md#layout-rule-authority-snapshot",
+    "docs/tasks/TASK-172-v0.7-project-internal-geometry-source-rule-authority-bundle-r1.md#task-021-layout-rule",
+    "docs/tasks/evidence/TASK-172-internal-tube-layout-rule-authority-r1.json#/rule"
+  ],
+  "candidate_approval_status": "under_review",
+  "approval_effective": false,
+  "future_runtime_materialization": {
+    "approval_status": "approved",
+    "approved_by_source": "R116_INDEPENDENT_REVIEW_RECEIPT_ID",
+    "approved_at_source": "R116_REVIEW_RECEIPT_TIMESTAMP",
+    "rule_artifact_canonical_hash_source": "this_candidate_payload_canonical_hash",
+    "rule_pack_identity": null
+  },
+  "scope": {
+    "case_family": "TASK172_PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE_FAMILY",
+    "topology_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "construction": "FIXED_TUBESHEET",
+    "shell_type": "E_SHELL",
+    "shell_pass_count": 1,
+    "tube_path_type": "STRAIGHT_THROUGH",
+    "declared_tube_pass_count": 1,
+    "flow_arrangement": "COUNTERCURRENT",
+    "steady_state": true,
+    "single_phase": true,
+    "newtonian": true,
+    "global_geometry_standard_created": false,
+    "tema_compliance_claimed": false,
+    "asme_compliance_claimed": false,
+    "manufacturer_catalog_equivalence_claimed": false
+  },
+  "canonical_hash": "74929cd8ce3396580757d4e941c0df7a9bccc78b0da6d7fad0fcb44eb56e39d0"
+}

@@ -1,0 +1,281 @@
+{
+  "schema_version": "task173.candidate-a-point-root-interval-reachability.v1",
+  "task_id": "STAGE3_TASK173_CANDIDATE_A_POINT_ROOT_INTERVAL_REACHABILITY_CERTIFICATE_R1",
+  "repository": "xuezhiorange-png/hxforge-agent",
+  "pr": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true,
+    "source_head": "edc2dd877f98f72bf042ad348d68a07d30b34988"
+  },
+  "classification": "CERTIFIED_NO_ORDINARY_POINT_ROOT_UNDER_FROZEN_NUMERICAL_MAPPING",
+  "scope": {
+    "candidate_id": "adeab5b1-a339-5eb3-aa66-011ffe49bac0",
+    "candidate_hash": "f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767",
+    "candidate_rating_request_hash": "1c1c98cb0ce304957479e31d3a9f7adb38e41c2b6bb7240e37a9face758171d7",
+    "mesh_subdivisions": 32,
+    "outer_iteration": 24,
+    "shooting_enthalpy_j_kg": "107518.9165931962933844840526580810546875",
+    "support_id": "urn:hxforge:task171:candidate:f272f9b04087d400d8fc554619d34e9193fc77c481f995addf3cf4b7a7bf4767:support:2",
+    "subdivision_index": 21,
+    "tube_cell_id": "urn:hxforge:task173:candidate-cell:tube:e9548de1732d080e5843b5f1c8ef85bd85e73efd593ed68cdbfe21b75deb2b07",
+    "shell_cell_id": "urn:hxforge:task173:candidate-cell:shell:42c2126675fde297b6f4474e16add0f8200d308d1ce2b600c0ca620a69b02fae",
+    "wall_interface_id": "urn:hxforge:task173:candidate-wall-interface:a22cf4ea8e56f7eeb5f05bd1e118fc78574b639aac96e687642841b8a242f519",
+    "tube_upstream_enthalpy_j_kg": "108566.4322063246",
+    "tube_upstream_snapshot_hash": "b335dae1d8e93a7216e89a4ff58b605c757bbb09132a0153b830daaa3463ba11",
+    "shell_physical_left_enthalpy_j_kg": "105065.83612421532",
+    "shell_physical_left_snapshot_hash": "5c494d381d97fa46f5da7f25d356a54f6eae1d9529328deeff6ce452b69212a1",
+    "point_root_tolerance_w": "0.000001",
+    "ordinary_root_predicate": "Task172 status == VALIDATED and abs(q - signed_q_hot_to_cold_w) <= 1e-6 W",
+    "accepted_trajectory_enclosure_allowed": false,
+    "reviewed_r2a_authority_id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+    "reviewed_r2a_authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e"
+  },
+  "source_bindings": {
+    "r2_compact_execution_summary": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-exact-cell-decimal-q-recovery-diagnostic-r2-execution-summary.json",
+      "git_blob_at_source_head": "7a4f1c9099b65aa479cd5fd5d1ce7726f268fc35",
+      "raw_bytes": 3393635,
+      "raw_sha256": "a38eeabe19758e6bc851756b636d8046cdcecd0cb493a1abad1aa45807cf1d81",
+      "canonical_summary_hash": "fb70762421a71d985e481b1a40753d0f13d0e50d8f05031917759a255d953c99",
+      "target_cell_trial_count": 749,
+      "target_endpoint_request_result_identity_replay": "PASS",
+      "raw_full_execution_checkpoint_trace_in_git": false
+    },
+    "r3_decimal_q_evidence": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-candidate-a-r2-snapshot-decimal-q-probe-only-r1.json",
+      "git_blob_at_source_head": "8bdf02995df72d41da44c350ba6b50ac3c7246f0",
+      "raw_bytes": 15785230,
+      "raw_sha256": "1c325d57ddbd30282851d84a87aac358beae38fb146989d1d10c62119ebde8ac",
+      "canonical_evidence_hash": "1e6b545eed5080b15b70143d33dc5f2fdd1e940e2d1298aab70bc6da6f441538",
+      "probe_count": 65,
+      "provider_ph_signature_count": 1,
+      "all_probes_use_right_endpoint_signature": true,
+      "role_in_this_certificate": "CORROBORATING_ONLY_NOT_INTERVAL_COVERAGE"
+    },
+    "decimal_context_adjudication": {
+      "path": "docs/tasks/evidence/TASK-173-v0.7-task172-decimal-context-adjudication-r1.json",
+      "git_blob_at_source_head": "ba89e015d7331f9b40c82114ee78a3ce9249ef13",
+      "raw_bytes": 162258,
+      "raw_sha256": "ad333f383431be03683f55b8ad2f78dcd6ff116572e4fe8bccf8aabe1aa77b15",
+      "canonical_evidence_hash": "d4c08a11b45d7aebdda6c6402d4ec55ccd7ca7acdc5381382ba6ed440148ca31",
+      "controlled_baseline_result_hashes": [
+        "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573",
+        "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573"
+      ],
+      "controlled_precision_100_result_hashes": [
+        "7e0512079ac5f28765f5685ff9ba761d56e0db277698b25ae6c26dc9984b8acc",
+        "7e0512079ac5f28765f5685ff9ba761d56e0db277698b25ae6c26dc9984b8acc"
+      ],
+      "task172_baseline_context": {
+        "precision": 28,
+        "rounding": "ROUND_HALF_EVEN",
+        "actual_r2_call_flags": "NOT_ESTABLISHED",
+        "flags_affecting_numeric_mapping": false
+      },
+      "context_causality": "CONFIRMED"
+    },
+    "runtime": {
+      "source_head": "21386a88f8290538172e9389ed46f50c3697a426",
+      "source_tree": "ce61a818b82f908729d2bdf4553cc27012354952",
+      "rating_service_blob": "21f0eea0ceab099237ebc6af140858e65ab0fdf9",
+      "task172_service_blob": "b6a1cfab5ca2c083c9ad8b39925934574b957b29",
+      "bound_rating_and_task172_paths_unchanged_at_source_head": true
+    }
+  },
+  "captured_r2_endpoints": {
+    "left": {
+      "q_input_to_production_decimal": "268.4228547695099",
+      "q_binary64_hex": "0x1.0c6c4035ce00bp+8",
+      "q_exact_binary64_decimal": "268.42285476950991096600773744285106658935546875",
+      "task172_status": "VALIDATED",
+      "task172_request_hash": "4fa675e1a36bd49c67957d2ed0a9dbef808529ffef7f2bdc6b51153da421c754",
+      "task172_result_hash": "748819390174c8a2fa88f980b5073366817cce9d158c8bf9c56c52dd66e07ee9",
+      "task172_signed_q_w": "268.4228600873843",
+      "production_F_w": "-0.0000053178744",
+      "F_if_exact_binary64_q_w": "-0.00000531787438903399226255714893341064453125",
+      "provider_enthalpy_decimal_p70": [
+        "108544.0636350938075083333333333333333333333333333333333333333333333333",
+        "105052.414981476844505",
+        "108555.2479207092037541666666666666666666666666666666666666666666666666",
+        "105059.1255528460822525"
+      ],
+      "provider_input_binary64_hex": [
+        "0x1.a800104a63b6cp+16",
+        "0x1.9a5c6a3c39df8p+16",
+        "0x1.a80b3f77bb4a1p+16",
+        "0x1.9a6320243b37dp+16"
+      ],
+      "provider_output_snapshot_hashes": [
+        "3b6a2cf26a1621b029e13ee8d5cd33d26fe1db77d301e91e3914f5694e2b4586",
+        "ede1a0ac73d96125be0f5e8150fe11a96174c59ffd466fc9c6fa128b5b5d8ee8",
+        "24417dd3dcdb2a75185a8ba5b04a9649c50b8b2879c710dd58dda73a902a75e2",
+        "57b22b54c855444e376c0ecd29a1e4fe1a5766ee675ccfd1f28a59d97d038160"
+      ],
+      "control_mode": "DISABLED"
+    },
+    "right": {
+      "q_input_to_production_decimal": "268.42285476950997",
+      "q_binary64_hex": "0x1.0c6c4035ce00cp+8",
+      "q_exact_binary64_decimal": "268.422854769509967809426598250865936279296875",
+      "task172_status": "VALIDATED",
+      "task172_request_hash": "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072",
+      "task172_result_hash": "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573",
+      "task172_signed_q_w": "268.4228395792577",
+      "production_F_w": "0.00001519025227",
+      "F_if_exact_binary64_q_w": "0.000015190252267809426598250865936279296875",
+      "provider_enthalpy_decimal_p70": [
+        "108544.0636350938075025",
+        "105052.4149814768445015",
+        "108555.24792070920375125",
+        "105059.12555284608225075"
+      ],
+      "provider_input_binary64_hex": [
+        "0x1.a800104a63b6cp+16",
+        "0x1.9a5c6a3c39df8p+16",
+        "0x1.a80b3f77bb4a0p+16",
+        "0x1.9a6320243b37dp+16"
+      ],
+      "provider_output_snapshot_hashes": [
+        "3b6a2cf26a1621b029e13ee8d5cd33d26fe1db77d301e91e3914f5694e2b4586",
+        "ede1a0ac73d96125be0f5e8150fe11a96174c59ffd466fc9c6fa128b5b5d8ee8",
+        "c00d98a8f78f1b8683ee6ce568b438334bc564c9e123f27d8715407c7da64b0f",
+        "57b22b54c855444e376c0ecd29a1e4fe1a5766ee675ccfd1f28a59d97d038160"
+      ],
+      "control_mode": "DISABLED"
+    }
+  },
+  "provider_mapping": {
+    "role_order": [
+      "tube_downstream",
+      "shell_next_physical",
+      "tube_midpoint",
+      "shell_midpoint"
+    ],
+    "task172_q_dependent_request_projection_binding": {
+      "only_endpoint_projection_delta": "tube_bulk_state.temperature_k",
+      "delta_is_exact_tube_midpoint_ph_snapshot_output": true,
+      "no_independent_q_field": true
+    },
+    "enthalpy_formulae": [
+      "h_tube_upstream - q/12",
+      "h_shell_physical_left - q/20",
+      "h_tube_upstream - q/24",
+      "h_shell_physical_left - q/40"
+    ],
+    "monotone_direction_in_q": "NONINCREASING_FOR_ALL_FOUR_COORDINATES",
+    "decimal_propagation_precision": 70,
+    "decimal_rounding": "ROUND_HALF_EVEN",
+    "provider_boundary": "binary64 PH input; fixed pressure 101325 Pa; CoolProp HEOS::Water v8.0.0; reference state DEF",
+    "tube_midpoint_transition": {
+      "binary64_low": "0x1.a80b3f77bb4a0p+16",
+      "binary64_high": "0x1.a80b3f77bb4a1p+16",
+      "adjacent": true,
+      "exact_affine_rounding_boundary_q": "268.4228547695099019348621368408203125",
+      "boundary_fraction": "45033882138046978389/167772160000000000",
+      "tie_rounds_to_even_low": true,
+      "coverage_uses_endpoint_monotonicity_and_adjacency_not_ideal_threshold_location": true
+    },
+    "reachable_signatures": {
+      "A_original_binary64_float_q": 2,
+      "B_decimal_from_float_interval": 1,
+      "C_decimal_string_interval": 2
+    }
+  },
+  "coordinate_domains": {
+    "A_original_binary64_float_q": {
+      "domain": "two adjacent float values only; production _d(float) uses Decimal(str(float))",
+      "left_q_input": "268.4228547695099",
+      "right_q_input": "268.42285476950997",
+      "left_signature_endpoint": "left",
+      "right_signature_endpoint": "right",
+      "reachable_task172_signatures": [
+        "left",
+        "right"
+      ],
+      "f_values_w": [
+        "-0.0000053178744",
+        "0.00001519025227"
+      ],
+      "minimum_abs_f_w": "0.0000053178744",
+      "ordinary_point_root_reachable": false
+    },
+    "B_decimal_from_float_interval": {
+      "interval_closed": [
+        "268.42285476950991096600773744285106658935546875",
+        "268.422854769509967809426598250865936279296875"
+      ],
+      "all_four_endpoint_provider_coordinates_equal": true,
+      "reachable_task172_signature": "right",
+      "task172_request_hash": "b2472ec62e4a9e53517cdb5cc3a3f6c8d70106cd2cf34663ed2191bdaa9ce072",
+      "task172_result_hash_p28": "ea8869a56cdd300ba42631aa967958aa01daa7e462ed7e5134b10d3d19893573",
+      "f_interval_w": [
+        "0.00001519025221096600773744285106658935546875",
+        "0.000015190252267809426598250865936279296875"
+      ],
+      "minimum_abs_f_lower_bound_w": "0.00001519025221096600773744285106658935546875",
+      "ordinary_point_root_reachable": false
+    },
+    "C_decimal_string_interval": {
+      "interval_closed": [
+        "268.4228547695099",
+        "268.42285476950997"
+      ],
+      "endpoint_signature_difference": "tube_midpoint_only; adjacent binary64 values",
+      "reachable_task172_signatures": [
+        "left",
+        "right"
+      ],
+      "left_signature_f_interval_over_full_q_domain_w": [
+        "-0.0000053178744",
+        "-0.00000531787433"
+      ],
+      "right_signature_f_interval_over_full_q_domain_w": [
+        "0.0000151902522",
+        "0.00001519025227"
+      ],
+      "minimum_abs_f_lower_bound_w": "0.00000531787433",
+      "ordinary_point_root_reachable": false
+    }
+  },
+  "coverage_and_replay": {
+    "endpoint_provider_snapshots_replayed": true,
+    "left_right_task172_request_preimages_replayed": true,
+    "left_right_task172_result_preimages_replayed": true,
+    "p28_right_request_result_controlled_repeat_count": 2,
+    "target_trial_provider_mapping_audit": {
+      "provider_trial_count": 727,
+      "unique_provider_signature_count": 719,
+      "repeated_signature_snapshot_conflicts": 0,
+      "repeated_signature_task172_request_conflicts": 0,
+      "repeated_signature_task172_result_conflicts": 0
+    },
+    "r3_p100_probe_count_used_as_interval_coverage": 0,
+    "r2_endpoint_monotonicity_proof_covers_all_intermediate_decimal_q": true,
+    "hidden_q_input_to_task172_request": false,
+    "task172_context_bound_to_p28_round_half_even": true,
+    "this_certificate_native_task172_validation_count": 0,
+    "this_certificate_provider_call_count": 0,
+    "rating_or_sizing_invoked": false
+  },
+  "result_boundary": {
+    "point_root_reachable_under_all_three_frozen_coordinate_definitions": false,
+    "minimum_conservative_abs_f_lower_bound_w": "0.00000531787433",
+    "tolerance_w": "0.000001",
+    "strict_margin_over_tolerance_w": "0.00000431787433",
+    "interpretation": "local impossibility under this exact provider, binary64 PH interface, Task172 p28 ROUND_HALF_EVEN mapping, fixed target-cell state, and the three specified q coordinate definitions; not a statement that the continuous physical equation has no root",
+    "new_numerical_authority_required_for_a_different_production_mapping": true,
+    "production_code_changed": false,
+    "task172_contract_changed": false,
+    "r2a_authority_changed": false,
+    "numerical_tolerance_changed": false,
+    "candidate_space_changed": false,
+    "full_n32_reconstruction_executed": false,
+    "candidate_full_rating_reexecuted": false,
+    "public_sizing_reexecuted": false,
+    "task175_executed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "canonical_certificate_hash": "8d8b51cd03900582e3d7af125bf4a1675120c4e2c2f4b4258694e3380637ba37"
+}

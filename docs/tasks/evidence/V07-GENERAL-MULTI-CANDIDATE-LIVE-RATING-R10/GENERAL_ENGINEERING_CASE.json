@@ -1,0 +1,43 @@
+{
+  "schema_version": "hxforge.general-engineering-case.v2",
+  "engineering_case_id": "mvp-multi-candidate-r10",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "299.70",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "12.000000"
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "298.15",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "20.000000"
+  },
+  "bind_task172_c3_reference_geometry": true,
+  "target_duty_w": "9500",
+  "max_tube_side_pressure_drop_pa": "1150",
+  "max_shell_side_pressure_drop_pa": "1180",
+  "candidate_constraints": {
+    "shell_inside_diameter_m": "0.5",
+    "tube_outer_diameter_m": "0.01905",
+    "tube_wall_thickness_m": "0.00165",
+    "tube_pitch_m": "0.0254",
+    "tube_lengths_m": [
+      "4.85",
+      "4.90"
+    ],
+    "baffle_spacings_m": [
+      "0.97",
+      "0.98"
+    ],
+    "baffle_count": 4,
+    "tube_pass_count": 1
+  },
+  "solver_budget": {
+    "total_budget_s": 1200.0,
+    "max_candidates_to_rate": 2,
+    "enable_full_task173_rating": false
+  },
+  "notes": "R10: two tube lengths at shared baffle spacing; 299.70 K tube / 298.15 K shell."
+}

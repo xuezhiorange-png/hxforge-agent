@@ -1,0 +1,29 @@
+{
+  "schema_version": "task173.reference-rating-identity-replay-capture.v1",
+  "projection": {
+    "schema_version": "task173.reference-rating-identity-replay-capture.v1",
+    "task_id": "STAGE3_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2A_PARITY_AND_REPLAY_CORRECTION_R1",
+    "runtime_source_head": "5bd19b1829f2fea7757c3efb3398e9aab17c8a3d",
+    "runtime_source_tree": "64fc2c4b5e1776610aa8a5e39bf0666455648f73",
+    "input_path": "docs/tasks/evidence/TASK-172-stage2-native-shell-flow-replay-correction-r1.json",
+    "input_raw_sha256": "d8ecebcd891b9646826cd362069d0859aafeae0c01c6baa8b3a0dd4917955d92",
+    "case_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R2",
+    "case_mode": "RATING_FIXED_GEOMETRY",
+    "method": "native Task173Request construction and service.validate_request(request, CoolPropProvider()) after native TASK174 shell-flow replay",
+    "task174_result_hash": "ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419",
+    "task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "task173_result_type": "Task173SuccessResult",
+    "task173_result_hash": "fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "task173_status": "VALIDATED",
+    "process_exit_code": 0,
+    "actual_stdout": [
+      "REQUEST_HASH=77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+      "RESULT_TYPE=Task173SuccessResult",
+      "RESULT_HASH=fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+      "STATUS=VALIDATED"
+    ],
+    "working_tree_source_committed_as_runtime_head": true,
+    "production_source_files_edited_after_run": false
+  },
+  "canonical_hash": "e8ff2a8a3da42032231b4876fc5c59cabcf5f6fa735f5a25df0e3b7e7a79cac0"
+}

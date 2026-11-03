@@ -1,0 +1,62 @@
+{
+  "exact_head_ci_ruff_local": "LINT_FAIL",
+  "ladder_continuation_status": "MESH_COMPARISON_FAIL_CONTINUE",
+  "live_full_rating_completed": false,
+  "live_n8": {
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "cell_closure_pass": true,
+    "energy_balance_pass": true,
+    "energy_balance_residual_w": "8.8E-10",
+    "mesh_n": 8,
+    "mesh_result_hash": "6de283cf8249b228db00a7404c4c5fc0bab08c61c6c2ee2a4cbfd145433fcb9c",
+    "outer_iterations_for_rehydrate": 27,
+    "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+    "request_snapshot_sha256": "9e59a4606e794b4968e541bef42b66a85766ed6d189bf78aaf2425f167daff57",
+    "shooting_enthalpy_for_rehydrate": "107515.2019112278133458800613880157470703125",
+    "shooting_enthalpy_j_kg": "107515.2019112278133458800613880157470703125",
+    "stage_status": "MESH_TERMINAL_ACCEPTED",
+    "terminal_boundary_residual_k": "5.6941E-9",
+    "terminal_tolerance_pass": true,
+    "worker_status": "TERMINAL_ACCEPTED",
+    "worker_wall_seconds": 523.7897690840036
+  },
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-continuation-r15-20261015T075153Z.live-orchestrator.json",
+  "n4_n8_comparison": {
+    "coarse_subdivisions": 4,
+    "duty_difference_w": "0.7540887021151",
+    "duty_metric": "0.00001452897679684518151711053590",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.074117883385649495320725672E-12",
+    "duty_precision_floor_w": "2.1145647831258905774E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 8,
+    "interval_duty_differences_w": [
+      "0.2325802235342",
+      "0.1853899399847",
+      "0.1449563533664",
+      "0.1103578396772",
+      "0.0808043455526"
+    ],
+    "overall_status": "FAIL",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.01237168565185",
+      "T_wall_inner_min": "0.00834190982954",
+      "T_wall_outer_max": "0.0118945378261",
+      "T_wall_outer_min": "0.00802744631380"
+    },
+    "wall_precision_floor_k": "3.4895449119374870E-13",
+    "wall_status": "FAIL"
+  },
+  "numerical_authority_status": "CANDIDATE",
+  "pr298_state": "DRAFT_UNCHANGED",
+  "production_integration": false,
+  "result": "R15_LIVE_N8_EXECUTED",
+  "snapshot_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-r15-snapshot-20261015T075153Z",
+  "source_head_sha": "31ad91b5a717b83a21adf6b7c3bc88436c7647ba",
+  "stage_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-n8-r15-stages-20261015T075153Z",
+  "task_id": "V07_FAST_SOLVER_LIVE_N8_CONTINUATION_R15",
+  "total_runner_wall_seconds": 679.2078207930026
+}

@@ -1,0 +1,29 @@
+{
+  "EXPERIMENTAL_COMPARISON_STATUS": "EXPERIMENTAL_COMPARISON_AVAILABLE",
+  "EXPERIMENTAL_RANKING_STATUS": "EXPERIMENTAL_RANKING_AVAILABLE",
+  "preferred_candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+  "production_design_approved": false,
+  "production_sizing_verified": false,
+  "ranked_candidate_ids": [
+    "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+    "5a73903d-3325-5604-be3b-ba5950299893"
+  ],
+  "ranking_policy_id": "EXPERIMENTAL_MVP_DUTY_THEN_HEADROOM",
+  "schema_version": "hxforge.experimental-ranking-result.v1",
+  "trace": [
+    {
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "meets_target_duty": true,
+      "mesh_result_hash": "4a6e6ef511cb49d4f9deedd255eeba233184b19128b80e019504a0b7d697009d",
+      "rank": 1,
+      "total_duty_w": "38571.727035218992"
+    },
+    {
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "meets_target_duty": true,
+      "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+      "rank": 2,
+      "total_duty_w": "38387.018185484473"
+    }
+  ]
+}

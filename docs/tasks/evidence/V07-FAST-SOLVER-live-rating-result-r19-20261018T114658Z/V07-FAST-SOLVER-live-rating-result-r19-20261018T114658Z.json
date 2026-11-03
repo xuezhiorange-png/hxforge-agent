@@ -1,0 +1,28 @@
+{
+  "compact_live_rating_hash": "6d5db332a064b81bbc0437590aa64e64687cfd54f921920c68ebb2b5a32d6396",
+  "compact_live_rating_json_sha256": "525597b2954f9691af4be56d65654a9150aabfdbddbaa93d352988a96edc2d55",
+  "full_live_rating_api_implemented": true,
+  "full_live_rating_json_sha256": "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172",
+  "live_rating_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+  "live_result_status": "CANDIDATE_UNAPPROVED",
+  "n32_n64_independent_compare_parity": true,
+  "r11_engineering_diff": {
+    "duty_delta_w": "0.00007545635047",
+    "duty_relative_delta": "1.453840199765165296686974544E-9",
+    "duty_within_engineering_tol": true,
+    "live_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+    "note": "Hash mismatch expected; engineering tol is advisory not pass/fail",
+    "r11_result_hash": "c8846bb514e002bb2f56ccc46461d0cb1cfb95ca52a3e298edf49070eb075c2f",
+    "shell_outlet_delta_k": "1.77534E-9",
+    "tube_outlet_delta_k": "1.50717E-9"
+  },
+  "r18_amendment_manifest": "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-headroom-r18-amendment-20261018T115924Z.json",
+  "r18_ci_format_fixed": true,
+  "r18_index_amendment_appended": true,
+  "r18_result_amendment_persisted": true,
+  "remote_persistence_verified": true,
+  "result": "CANDIDATE_B_LIVE_RATING_RESULT_COMPLETED",
+  "source_head_sha": "871716f7eba776651050f2b428ea9b901f10f325",
+  "task_id": "V07_FAST_SOLVER_LIVE_RATING_RESULT_R19",
+  "total_runner_wall_seconds": 1016.4364914379985
+}

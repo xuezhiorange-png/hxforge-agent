@@ -1,0 +1,208 @@
+{
+  "candidate_generation": {
+    "candidate_count": 1,
+    "candidate_space_hash": null,
+    "distinct_geometry_count": null,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97"
+      ],
+      "shell_inside_diameter_m": "0.5",
+      "tube_lengths_m": [
+        "4.85"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidates": [],
+  "design_conditions": {
+    "engineering_case_schema": "hxforge.general-engineering-case.v2",
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "heat_transfer_convention": {
+      "kernel_shell_inlet_temperature_k": "298.15",
+      "kernel_thermal_variant": "TUBE_HOT_SHELL_COLD",
+      "kernel_tube_inlet_temperature_k": "300.00",
+      "shell_equipment_side": "shell_side",
+      "shell_mass_flow_kg_s": "20.000000",
+      "shell_thermal_role": "COLD",
+      "target_duty_sign": "POSITIVE_WHEN_HEAT_FLOWS_TUBE_TO_SHELL",
+      "tube_equipment_side": "tube_side",
+      "tube_mass_flow_kg_s": "12.000000",
+      "tube_thermal_role": "HOT",
+      "user_shell_inlet_temperature_k": "298.15",
+      "user_tube_inlet_temperature_k": "299.80"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "shell_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "target_duty_w": "9500",
+    "tube_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "299.80",
+      "mass_flow_kg_s": "12.000000"
+    }
+  },
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_low_mesh_rating": {
+    "cell_root": {
+      "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "cell_root_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+      "positive_duty_cell_root_accepted": true,
+      "q_root_w": "10430.77217887273",
+      "residual_f_q_w": "7.76477E-7",
+      "schema_version": "hxforge.cell-root-result.v1",
+      "shell_physical_left_basis": "feasible_shell_left_face",
+      "shell_physical_left_temperature_k": 298.5,
+      "status": "ACCEPTED",
+      "task172_request_hash": "cbbbf564f2e8cffdee4345a867361301004193028866171f6d8cd5b576570e24",
+      "task172_result_hash": "f8a118a7193d8b7370f5255abe6624f00a577d57402a4801bb47b5d81a2a244a",
+      "task172_signed_q_hot_to_cold_w": "10430.772178096253",
+      "task172_status": "VALIDATED",
+      "wall_seconds": 1.825
+    },
+    "ephemeral_tp_cache_enabled": false,
+    "live_boundary_n1_numeric_valid": true,
+    "mesh_result": {
+      "energy_balance_residual_w": "3.2E-10",
+      "full_rating_converged": false,
+      "low_mesh_numeric_valid": true,
+      "mesh_level": 1,
+      "mesh_result_hash": "a9c3d42eb0dc73655bd6c8cf6349c3a5f78f2e0469557e46360322e4673ad70e",
+      "schema_version": "hxforge.low-mesh-result.v1",
+      "status": "NUMERIC_VALID",
+      "task172_local_evaluation_count": 4492,
+      "terminal_boundary_residual_j_kg": "0.00003235550",
+      "terminal_boundary_residual_k": "7.73034E-9",
+      "total_duty_w": "40881.216702017436",
+      "wall_seconds": 237.326
+    },
+    "ph_boundary_diagnostics": {
+      "boundary_precision_handling": "TP_REMATERIALIZE_ON_PH_BELOW_T_MIN_COLD_ISOTHERM",
+      "cell_face_mean_enthalpy_j_kg": "104920.119809311465",
+      "engineering_case_id": "mvp-tube-hot-shell-cold-r7",
+      "experimental_binding": {
+        "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+        "shell_inlet_temperature_k": "298.15",
+        "tube_inlet_temperature_k": "299.80"
+      },
+      "math_ulp_t_min_k": 5.684341886080802e-14,
+      "ph_provider_result": {
+        "enthalpy_j_kg": 104920.11980931147,
+        "provider": "CoolProp",
+        "temperature_k": 298.14999999999714
+      },
+      "ph_query_inputs": {
+        "enthalpy_j_kg": "104920.119809311465",
+        "pressure_pa": "101325",
+        "reference_state": "DEF"
+      },
+      "r6_frozen_reference_note": "Frozen 300 K tube inlet keeps H_MAX hot-end shooting aligned with tube face; R7 live tube 299.8 K required effective_hot_ceiling_enthalpy_j_kg for outer trials.",
+      "real_out_of_domain_still_blocked": true,
+      "rematerialized_state": {
+        "query_type": "TP",
+        "snapshot_hash": "635b1e9c4473e98d70c3cb04fe0a5f47ef48994e13bb50daaf1a2f34726aa3d6",
+        "temperature_k": 298.15
+      },
+      "reviewed_constants": {
+        "H_MIN_J_KG": "104920.11980926784",
+        "T_MIN_K": "298.15"
+      },
+      "root_cause_summary": "Cell constitutive shell_mid_h is the arithmetic mean of cold-end enthalpies on the T_MIN_K isotherm. Native PH inversion returns T epsilon below T_MIN_K; R8 re-materializes with the TP producer when h lies in [H_MIN, shell_inlet_h] and shell inlet temperature equals T_MIN_K.",
+      "schema_version": "hxforge.boundary-ph-reconstruction-diagnostics.v1",
+      "shell_inlet_tp_state_hash": {
+        "backend": "HEOS::Water",
+        "conductivity_w_m_k": "0.6065160802197994",
+        "configuration_fingerprint": "56026a4893a04f66",
+        "cp_j_kg_k": "4181.314990770664",
+        "density_kg_m3": "997.047636760347",
+        "enthalpy_j_kg": "104920.11980935509",
+        "entropy_j_kg_k": "367.1996421055717",
+        "inputs": {
+          "pressure_pa": "101325.0",
+          "temperature_k": "298.15"
+        },
+        "phase": "liquid",
+        "pressure_pa": "101325.0",
+        "provider": "CoolProp",
+        "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "provider_version": "8.0.0",
+        "query_type": "TP",
+        "reference_state": "DEF",
+        "temperature_k": "298.15",
+        "viscosity_pa_s": "0.0008900224890776964"
+      },
+      "temperature_delta_below_t_min_k": 2.8421709430404007e-12
+    },
+    "property_provider_identity": "CoolPropProvider",
+    "solver_performance_profile": {
+      "cell_root_trial_receipt_count": 0,
+      "ephemeral_tp_cache": null,
+      "mesh_run_metadata": {
+        "bisection_iterations": 28,
+        "mesh_result_hash": "a9c3d42eb0dc73655bd6c8cf6349c3a5f78f2e0469557e46360322e4673ad70e",
+        "outer_action_count": 30
+      },
+      "mesh_subdivisions": 1,
+      "outer_trial_count": 30,
+      "property_provider_state_lookup_count": 161851,
+      "schema_version": "hxforge.solver-performance-profile.v1",
+      "task172_local_evaluation_count": 4492,
+      "task172_request_hash_duplicate": "NOT_MEASURED",
+      "task172_request_hash_total": "NOT_MEASURED",
+      "task172_request_hash_unique": "NOT_MEASURED",
+      "timing_seconds": {
+        "outer_solver_estimated": 0.384,
+        "task172_evaluations": 236.943,
+        "total_wall": 237.326
+      }
+    }
+  },
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-21T09:22:31.493900+00:00",
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "R7: experimental live tube inlet 299.80 K (shell 298.15 K); same C3 geometry as R4\u2013R6.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": {
+    "experimental_ranking_status": "NOT_YET_AVAILABLE",
+    "frozen_r4_n1": null,
+    "full_rating_converged": false,
+    "low_mesh_numeric_valid": false,
+    "mesh_comparison": null,
+    "mesh_comparison_available": false,
+    "mesh_levels": [],
+    "mode": "EXPERIMENTAL_LOW_MESH_ONLY",
+    "sizing_evaluated": false
+  },
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "workflow_status": "PARTIAL_RATING_ACCEPTED"
+}

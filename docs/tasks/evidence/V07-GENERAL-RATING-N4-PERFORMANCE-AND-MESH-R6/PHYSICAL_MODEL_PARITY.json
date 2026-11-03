@@ -1,0 +1,30 @@
+{
+  "interpretation": "Matching physical_model_fingerprint_sha256 implies comparable thermal/geometry solver inputs; differing full_sizing_request_hash alone is metadata-only when parity is true.",
+  "metadata_only_differences": {
+    "candidate_rating_request_hash": {
+      "left": "68a84ce8f4fd3c4af3c6dea8f31929f4781add2403251b02c25ac355456403e4",
+      "right": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28"
+    },
+    "engineering_case_id": {
+      "left": "mvp-tube-hot-shell-cold-r4",
+      "right": "mvp-tube-hot-shell-cold-r5"
+    },
+    "full_sizing_request_hash": {
+      "left": "78bf2e9a46281ffd63758796e5e1bf2e9ae3748b91cd361d334197381c06ab78",
+      "right": "32fbb31063ced6dce735904b01522a6c231ede4cb56b3aae26b5fbffeff63648"
+    }
+  },
+  "physical_model_fingerprint_match": true,
+  "physical_model_fingerprint_r4": "6c2c1ed98741a2ba8b1015522e92f1d1a438ff3e33769c05ea941974e1338f36",
+  "physical_model_fingerprint_r5": "6c2c1ed98741a2ba8b1015522e92f1d1a438ff3e33769c05ea941974e1338f36",
+  "physical_model_fingerprint_r6": "6c2c1ed98741a2ba8b1015522e92f1d1a438ff3e33769c05ea941974e1338f36",
+  "r4_built_rating_request_hash": "68a84ce8f4fd3c4af3c6dea8f31929f4781add2403251b02c25ac355456403e4",
+  "r4_frozen_rating_request_hash": "68a84ce8f4fd3c4af3c6dea8f31929f4781add2403251b02c25ac355456403e4",
+  "r4_r5_physical_parity": true,
+  "r4_r5_r6_physical_match": true,
+  "r5_built_rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+  "r5_frozen_rating_request_hash": "68c58febc2ad50e0266cc03811ce3c6ff59ef5bdbfbe3f0b4e322f92836f9c28",
+  "r5_n1_n2_duty_comparison_clarification": "Historical R5 mesh_comparison_status PASS is duty-only; full_mesh_comparison_status was NOT_AVAILABLE_WALL_EXTREMA_NOT_ARCHIVED.",
+  "r6_built_rating_request_hash": "cad6cee1a54c8bfa660bfc45e8ec93ab55d4bf05e7c6e54d0461735deaad863d",
+  "schema_version": "hxforge.physical-model-parity.v1"
+}

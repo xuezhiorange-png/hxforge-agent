@@ -1,0 +1,93 @@
+{
+  "authority_open_items": [
+    {
+      "item": "NUMERICAL_AUTHORITY_STATUS",
+      "note": "Live rating is experimental; not promoted to production VALIDATED.",
+      "state": "CANDIDATE"
+    },
+    {
+      "item": "PRODUCTION_VALIDATE_CANDIDATE_RATING",
+      "note": "Sizing orchestrator requires production CandidateRatingSuccessResult.",
+      "state": "NOT_USABLE_FOR_LIVE_RATING"
+    },
+    {
+      "item": "SIZING_RESULT_VALIDATED",
+      "note": "Adapter outcome is EXPERIMENTAL_EVALUATED only.",
+      "state": "NOT_CLAIMED"
+    },
+    {
+      "item": "R19_LEGACY_COMPACT_AUTHORITY",
+      "note": "Legacy COMPACT_LIVE_RATING.json retained; use live compact v1 for sizing.",
+      "state": "R11_AUTHORITY_ID_ON_DISK"
+    }
+  ],
+  "compact_live_rating_v1_json_sha256": "ef389e5a66859680b9b241fff3f9e32492efcdc78f9c0217df1602e32dd45f51",
+  "live_compact_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+  "live_compact_v1_hash": "d86b0490c43cb15580c2977cc9d5a56ff81c635a658561716a029984faab37e7",
+  "r19_full_file_audit": {
+    "accepted_mesh_result_hash": "42fa6dfaadbee5d35c20714fe56af8b1c1c33e7e70597994b8c2e5dcc0502838",
+    "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+    "full_file_sha256": "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172",
+    "full_git_blob_content_sha256": "e5e3b2901ddb2eda5cb631573d44a74e08ffe01e144c753e150f8c725e6fc172",
+    "full_git_blob_id": "33067b2edf90feb4df2eea9d993530e79c13adb8",
+    "full_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-rating-result-r19-20261018T114658Z/FULL_LIVE_RATING.json",
+    "full_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+    "full_result_hash_recomputed": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+    "headroom_mesh_result_hash": "efd84469bcbcaca1ff093b970b2551be866bcd06de12a69c3e2709e5a3ac3c68",
+    "r19_source_commit": "2af26727205b76520c890c1229a1173c2c61953c",
+    "schema_version": "task173.experimental-candidate-rating-result.v1",
+    "task174_result_hash": "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+  },
+  "remote_persistence_verified": true,
+  "result": "R20_LIVE_COMPACT_AND_SIZING_ADAPTER_COMPLETED",
+  "sizing_adapter_outcome": {
+    "candidate_hash": "53e0d9af366a51c915a9a369a74f7563560359dc2b562e413f4674dcb520c489",
+    "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "duty_constraint": "PASS",
+    "experimental_rating_authority_id": "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19",
+    "full_rating_result_hash": "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3",
+    "geometry_task171_topology_id": "urn:hxforge:task171:6716758ab0a3b29b3c7efbb813864dd62d5c9097ccd7c5733fc8d45a34400a63",
+    "mesh_sequence_gate": "PASS",
+    "minimum_approach_temperature_k": "0.8154838760050",
+    "numerical_authority_status": "CANDIDATE",
+    "production_integration": false,
+    "production_validate_candidate_rating_usable": false,
+    "rated_duty_w": "51901.40592651570346",
+    "result_provenance": [
+      [
+        "adapter",
+        "experimental_sizing_rating_adapter.v1"
+      ],
+      [
+        "rating_execution_mode",
+        "LIVE_NUMERICAL_SOLVE"
+      ],
+      [
+        "experimental_rating_authority_id",
+        "V07-FAST-SOLVER-LIVE-RATING-RESULT-R19"
+      ],
+      [
+        "full_rating_result_hash",
+        "144d4e0b35fd59e669b343792dfff95e13dec74d0e90b61f0e89d0b3e9d96ee3"
+      ],
+      [
+        "task174_result_hash",
+        "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb"
+      ],
+      [
+        "production_rating_gaps",
+        "PRODUCTION_VALIDATE_CANDIDATE_RATING_NOT_INVOKED_FOR_LIVE_EXPERIMENTAL;PRODUCTION_RATING_REQUIRES_R2A_MESH_SEQUENCE_AND_VALIDATED_AUTHORITY;experimental_rating_authority_id=V07-FAST-SOLVER-LIVE-RATING-RESULT-R19;numerical_authority_status=CANDIDATE"
+      ]
+    ],
+    "shell_dp_constraint": "PASS",
+    "shell_dp_pa": "694.24546095293507320377321910399584157123514346183",
+    "sizing_blockers": [],
+    "status": "EXPERIMENTAL_EVALUATED",
+    "task174_result_hash": "d988828e01a1fcec07ddb691519a20b3b76da1bdd56cdbad5d7f077ae4a3c4bb",
+    "tube_dp_constraint": "PASS",
+    "tube_dp_pa": "8.878"
+  },
+  "source_head_sha": "2af26727205b76520c890c1229a1173c2c61953c",
+  "task_id": "V07_FAST_SOLVER_RATING_SIZING_BRIDGE_R20",
+  "total_runner_wall_seconds": 14.243287466000766
+}

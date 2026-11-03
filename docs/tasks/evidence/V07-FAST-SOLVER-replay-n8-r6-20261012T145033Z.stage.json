@@ -1,0 +1,8 @@
+{
+  "command": "python prototypes/v07_fast_solver_replay_n8_r6/run_r6.py",
+  "n8_worker_budget_s": 900.0,
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "source_head_sha": "65c8e49360a8a5d57acfd89d12fcc7128e9a34e0",
+  "stage": "pre_replay_and_n8",
+  "task_id": "V07_FAST_SOLVER_REPLAY_N8_R6"
+}

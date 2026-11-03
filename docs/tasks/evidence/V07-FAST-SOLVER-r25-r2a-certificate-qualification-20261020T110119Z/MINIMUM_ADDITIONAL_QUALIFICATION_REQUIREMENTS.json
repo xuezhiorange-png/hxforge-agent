@@ -1,0 +1,57 @@
+{
+  "acceptance_criteria": [
+    "verify_r2a_certificate_evidence returns CERTIFICATE_PRESENT_VERIFIED or NO_TRIGGER_PROVEN with documented acceptance path",
+    "Event and certificate hash replay passes",
+    "Q1 and Q15 predicates recompute from endpoint projections",
+    "Candidate/request/mesh hash binding matches frozen CandidateRatingRequest"
+  ],
+  "affected_meshes": [
+    {
+      "admission_status": "NO_TRIGGER_PROVEN",
+      "label": "CANDIDATE_B_R19",
+      "mesh_n": 32,
+      "mesh_role": "ACCEPTED"
+    },
+    {
+      "admission_status": "NO_TRIGGER_PROVEN",
+      "label": "CANDIDATE_B_R19",
+      "mesh_n": 64,
+      "mesh_role": "HEADROOM"
+    },
+    {
+      "admission_status": "NO_TRIGGER_PROVEN",
+      "label": "SECOND_CANDIDATE_R21E",
+      "mesh_n": 32,
+      "mesh_role": "ACCEPTED"
+    },
+    {
+      "admission_status": "NO_TRIGGER_PROVEN",
+      "label": "SECOND_CANDIDATE_R21E",
+      "mesh_n": 64,
+      "mesh_role": "HEADROOM"
+    }
+  ],
+  "budget_constraints": {
+    "allowed_mesh_levels": [
+      32,
+      64
+    ],
+    "forbidden_in_this_task": [
+      "Full heat exchanger re-solve beyond pinned replay",
+      "Outer boundary re-execution for R19/R21E goldens"
+    ],
+    "max_wall_seconds_per_mesh": 1800
+  },
+  "expected_evidence_artifacts": [
+    "R2A_CERTIFICATE_ADMISSION_RESULT.json per candidate mesh",
+    "Pinned certificate projection JSON with git blob SHA256"
+  ],
+  "required_inputs": [
+    "Production Task173 rating replay bundle per mesh_n with transient_provider_enclosure_event projections",
+    "outer_decision_certificate_projections matching service.py production schema",
+    "Endpoint Task172 request/result rehydration records for Q1-Q15 replay",
+    "Outer trial JSONL binding certificate trigger_support_id to recorded outer iteration"
+  ],
+  "schema_version": "task173.r2a-minimum-qualification-requirements.v1",
+  "trigger": "Frozen R19/R21E live mesh receipts lack production R2A event/certificate projections."
+}

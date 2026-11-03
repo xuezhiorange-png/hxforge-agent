@@ -1,0 +1,33 @@
+{
+  "candidate_count": 3,
+  "candidate_space_hash": "4f62998894be1ad4286f586e7547f2ac5a212c96a5d7064f7b9d77a225010820",
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "a8de03e48402f71d04d2ae4c57f117f39d50f49c9b0f3c87de31ac59b0ea600e",
+      "candidate_id": "68d18c9e-55e5-5040-b7a7-3dab0ae69e50",
+      "disposition": "EVALUATED",
+      "status": "WARN",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "586270fe34e2c56036e8fb9ce0e308c34a026b35c641e7754ed616ec9ec56dca",
+      "candidate_id": "a901a6df-1698-521b-ac09-cf9abd4b7c1d",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "5.00"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "c00cf08d073f98b65bf75769166f2b4b83b5b118997930e168bd033591a2b638",
+      "candidate_id": "b4c1636a-731e-5057-b605-5a3dd1ded86b",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "5.15"
+    }
+  ],
+  "distinct_geometry_count": 3,
+  "status": "VALID",
+  "structurally_admitted_count": 1
+}

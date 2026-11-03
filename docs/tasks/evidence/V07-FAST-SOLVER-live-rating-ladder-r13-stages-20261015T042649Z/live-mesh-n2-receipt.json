@@ -1,0 +1,23 @@
+{
+  "mesh_n": 2,
+  "receipt": {
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "cell_closure_pass": true,
+    "energy_balance_pass": true,
+    "energy_balance_residual_w": "7.6E-10",
+    "mesh_n": 2,
+    "mesh_result_hash": "f408506a557f5ecd15910767156cfb2d75c30bb8f910a727365b750d2ea3adac",
+    "outer_iterations_for_rehydrate": 27,
+    "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+    "shooting_enthalpy_for_rehydrate": "107515.3904720090986076171696186065673828125",
+    "shooting_enthalpy_j_kg": "107515.3904720090986076171696186065673828125",
+    "stage_status": "MESH_TERMINAL_ACCEPTED",
+    "terminal_boundary_residual_k": "1.7105E-9",
+    "terminal_tolerance_pass": true,
+    "worker_status": "TERMINAL_ACCEPTED",
+    "worker_wall_seconds": 158.46772374200373
+  },
+  "schema_version": "task173.experimental-live-mesh-stage-receipt.v1"
+}

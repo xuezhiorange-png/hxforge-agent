@@ -1,0 +1,1076 @@
+{
+  "schema_version": "task172.r119d.case-bound-task171-native-materialization.v1",
+  "task_id": "TASK172_V0_7_R119D_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_R1",
+  "short_name": "R119-D",
+  "mode": "R119D_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_ONLY",
+  "result": "CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_COMPLETE",
+  "review_target": {
+    "repository": "xuezhiorange-png/hxforge-agent",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "authorized_predecessor_head": "3df4df347933688e38a27861916f15845ede0bbe",
+    "materialization_code_sha": "3df4df347933688e38a27861916f15845ede0bbe",
+    "package_version": "0.6.0"
+  },
+  "predecessor_gate": {
+    "head_sha": "3df4df347933688e38a27861916f15845ede0bbe",
+    "pr_state": "OPEN_DRAFT",
+    "r119c_result": "EXPLICIT_THERMAL_ROLE_SELECTION_AUTHORITY_RECORDED",
+    "r119c_evidence_path": "docs/tasks/evidence/TASK-172-r119c-explicit-thermal-role-selection-authority-r1.json",
+    "r119c_evidence_file_sha256": "526e1c9634ef402330fd55d9007697fe7d44ad6a5162e7e3ca5bb7b7bdeace27",
+    "r119c_evidence_canonical_hash": "3ba7cdcf2c438570328ecb8cb9ddc591b05b01b04bf4a5832a71e6a77aeed5fb",
+    "r119c_extension_canonical_hash": "1c80c016f3c770a8f1f9c60200d9c6cf8ad40fb1fc4d25e4fd8056e6c9ee9cfb",
+    "pre_r119d_registry_root_canonical_hash": "346cc4e29e1fb42bcb4e89cc5f27679f7eb4f16b7ec6d90b35563a35356a7d7d",
+    "variant_a_source": {
+      "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json",
+      "file_sha256": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+      "canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc",
+      "effective": true
+    },
+    "variant_b_source": {
+      "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-b-r1.json",
+      "file_sha256": "a6a418787cb6857e580387519bdd04260e8ff944dfb3a8b17947204d63c424e7",
+      "canonical_hash": "85f0199bb3beef1ba297736126cd08ba059391ba9e13a30bea9e1a15111a00fe",
+      "selected_variant": "TUBE_COLD_SHELL_HOT",
+      "disposition": "REVIEWED_SELECTABLE_VARIANT_NOT_EFFECTIVE"
+    }
+  },
+  "effective_thermal_role_selection": {
+    "authority_id": "V07-T172-R119C-THERMAL-ROLE-SELECTION-R1",
+    "selected_variant": "TUBE_HOT_SHELL_COLD",
+    "tube_side_role": "HOT",
+    "shell_side_role": "COLD",
+    "hot_stream_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+    "cold_stream_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+    "case_bound_task171_definition_effective": true,
+    "unselected_variant": "TUBE_COLD_SHELL_HOT",
+    "unselected_variant_disposition": "REVIEWED_SELECTABLE_VARIANT_NOT_EFFECTIVE",
+    "tube_path_direction": "0_TO_6",
+    "shell_path_direction": "6_TO_0",
+    "path_orientation_scope": "PROJECT_INTERNAL_CANONICAL_SIDE_PATH_ORIENTATION",
+    "physical_plant_nozzle_direction_claim": false,
+    "nozzle_location_authority_created": false
+  },
+  "reviewed_authority_bindings": {
+    "task171_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "implementation_version": "task171.v1",
+    "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+    "authority_ids": [
+      "V07-T171-TOPOLOGY-R4-V1",
+      "V07-T171-CELL-COMPARTMENT-R4-V1",
+      "V07-T171-CONSERVATION-R4-V1"
+    ],
+    "envelope": {
+      "steady_state": true,
+      "single_phase": true,
+      "newtonian": true,
+      "construction_family": "FIXED_TUBESHEET",
+      "shell_type": "E",
+      "shell_pass_count": 1,
+      "tube_pass_count": 1,
+      "tube_path": "STRAIGHT_THROUGH",
+      "flow_arrangement": "COUNTERCURRENT"
+    },
+    "flow_path_mapping_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+    "physical_compartment_map_id": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+    "area_ownership_map_id": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+    "length_ownership_map_id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+    "task171_structural_mesh_authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+    "r119a_reviewed_core_lifecycle": "REVIEWED_AUTHORITY",
+    "scope": "UNCHANGED_REVIEWED_CASE_BOUND_AUTHORITIES"
+  },
+  "native_task171_contract": {
+    "producer_api": "hexagent.exchangers.shell_tube.segmented_thermal_state_topology.validate_request",
+    "module": "hexagent.exchangers.shell_tube.segmented_thermal_state_topology.service",
+    "invocation_count_per_clean_run": 1,
+    "total_invocation_count": 2,
+    "invocation_semantics": "one public TASK171 validate_request call per independent process; the native TASK171 replay implementation internally validates its committed TASK024/TASK025 inputs",
+    "native_result_type": "Result",
+    "native_status": "VALIDATED",
+    "native_result_field_names": [
+      "topology_definition",
+      "bookkeeping_observations",
+      "warnings",
+      "status",
+      "blocker_code",
+      "blocker_field",
+      "topology_id",
+      "result_hash",
+      "mesh_identity",
+      "physical_ownership_hash",
+      "native_identity",
+      "provenance_edges",
+      "residuals",
+      "global_energy_residual_w",
+      "bookkeeping_status"
+    ],
+    "non_native_output_fields": {
+      "topology_authority_id": "NOT_NATIVE_OUTPUT; reviewed authority IDs remain in topology_definition.authority_ids",
+      "request_hash": "NOT_NATIVE_OUTPUT",
+      "geometry_id": "NOT_NATIVE_OUTPUT; aggregate GEOMETRY_ID remains UNBOUND"
+    }
+  },
+  "run_a": {
+    "run": "RUN_A",
+    "clean_independent_process": true,
+    "mutable_native_objects_shared_with_other_run": false,
+    "producer_api": "hexagent.exchangers.shell_tube.segmented_thermal_state_topology.validate_request",
+    "producer_invocation_count": 1,
+    "native_request_projection": {
+      "projection_contract": "r119d.runtime-native-request-evidence-projection.v1",
+      "full_request_projection_canonical_hash": "2acbbfe7f7d27bc1166f1220e081abcd38651bba5b94dae59ba0d8e4185acdb1",
+      "definition_projection_canonical_hash": "ce64a3faa26541dfad089f022b6b868178b7110b10d2536bc3f073a71c36ee3d",
+      "baffle_request_projection_canonical_hash": "0ea3558f42cfa1485464ba7e7c2dcbea7a812157ed77b2de7d2721c59531c131",
+      "area_request_projection_canonical_hash": "699c7d4328ae7c00e19c44ea0e136ca09428409161bcb019219ed3a917601cd8",
+      "native_identity_projection_canonical_hash": "b6a76886bc0e76265fa8fae1f60289f2daee74329b24d18b653af640b8980561",
+      "raw_request_fields": [
+        "definition",
+        "baffle_request",
+        "area_request",
+        "native_identity",
+        "bookkeeping"
+      ],
+      "source_artifact_refs": [
+        {
+          "canonical_hash": "0ead1bf29020140558471439fda6791dac6d24d0afb420170363a6ed96eb63dd",
+          "file_sha256": "8ac024cea6f8795ca2f458c00ea87a34c44180a517aa103a9c391304392cb73a",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task020-configuration-r1.json"
+        },
+        {
+          "canonical_hash": "1ff10418d0eed1303f55a31fb4dbaebde43240ebec04a19ec4f74085bfee064b",
+          "file_sha256": "222f94c09327ea4071073ea08730645b7ef3f6b5319c9c92dbcf05b195b3339d",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task021-layout-r1.json"
+        },
+        {
+          "canonical_hash": "1c354ba8f851c15467b8a392350063f461a0bb0ccfdc6d032a70d1cfdd38e11c",
+          "file_sha256": "0c1fda6f39fd692b439843aa23fe6cc2cb91711663ddc349acb120f6d3aa8c74",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task022-bundle-geometry-r1.json"
+        },
+        {
+          "canonical_hash": "2092926bbf26f1d7d5e22edd1ded4d38072fab900c641206130bf3c5d2378bf4",
+          "file_sha256": "0809fe7b36017412949eb8dd2d8afa9b8bd6d86c2701ad3e86fc0d57316a113e",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        },
+        {
+          "canonical_hash": "8ef4cef8542067f16d08559435ea555084835bbfb57361249de9350d280c6131",
+          "file_sha256": "597a4dceae635415534f2d82e14c11c2e0e2ff02a23bce69814b2b82e40501c9",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json"
+        }
+      ],
+      "selected_definition_source": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json",
+        "file_sha256": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+        "canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc"
+      },
+      "typed_input_contract": {
+        "definition": "Definition",
+        "native_identity": "NativeIdentity",
+        "baffle_request": "exact dict; configuration=ShellAndTubeConfiguration; tube_layout=TubeLayout; shell_bundle_geometry=ShellBundleGeometry; design_authority.baffle_type=BaffleType; design_authority.orientation_sequence=list[BaffleOrientation]",
+        "area_request": "exact dict; task020_configuration=ShellAndTubeConfiguration; task021_layout=TubeLayout; internal/heat length authorities typed; participation authority typed; TASK025 evidence_refs=tuple",
+        "bookkeeping": "None"
+      },
+      "input_identity": {
+        "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+        "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+        "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+        "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+        "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+        "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+        "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+        "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+        "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+      }
+    },
+    "native_result": {
+      "native_object_type": "Result",
+      "native_field_names": [
+        "topology_definition",
+        "bookkeeping_observations",
+        "warnings",
+        "status",
+        "blocker_code",
+        "blocker_field",
+        "topology_id",
+        "result_hash",
+        "mesh_identity",
+        "physical_ownership_hash",
+        "native_identity",
+        "provenance_edges",
+        "residuals",
+        "global_energy_residual_w",
+        "bookkeeping_status"
+      ],
+      "status": "VALIDATED",
+      "blocker_code": null,
+      "blocker_field": null,
+      "warnings": [],
+      "bookkeeping_status": "NOT_REQUESTED",
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "native_identity": {
+        "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+        "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+        "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+        "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+        "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+        "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+        "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+        "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+        "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+      },
+      "topology_definition_projection_canonical_hash": "342c1865b8292050c472b6be822a5f86ba00b0cab5e654554d7f16458603d55c",
+      "topology_definition_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "authority_ids": [
+        "V07-T171-TOPOLOGY-R4-V1",
+        "V07-T171-CELL-COMPARTMENT-R4-V1",
+        "V07-T171-CONSERVATION-R4-V1"
+      ],
+      "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+      "mapping_authority": {
+        "authority_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+        "evidence_refs": [
+          "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+          "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+          "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+          "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+          "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        ],
+        "revision": "R1",
+        "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+      },
+      "mesh_authority": {
+        "authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+        "evidence_refs": [
+          "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+          "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+          "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+          "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+          "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        ],
+        "revision": "R1",
+        "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+      },
+      "path_identities": {
+        "SHELL": {
+          "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "stream_id": "urn:hxforge:r119a:stream:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "role": "COLD",
+          "physical_inlet_m": "6",
+          "physical_outlet_m": "0",
+          "tube_position_count": 0,
+          "tube_position_membership_canonical_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "TUBE": {
+          "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+          "stream_id": "urn:hxforge:r119a:stream:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+          "role": "HOT",
+          "physical_inlet_m": "0",
+          "physical_outlet_m": "6",
+          "tube_position_count": 253,
+          "tube_position_membership_canonical_hash": "b61ba20bbe79e4f325589581ac535be65a308dd70c9684a4c947bb409bc15727"
+        }
+      },
+      "identity_inventory": {
+        "physical_segment_ids": [
+          "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+          "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+          "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+          "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+          "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760"
+        ],
+        "flow_path_ids": [
+          "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76"
+        ],
+        "numerical_cell_ids": [
+          "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818",
+          "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6",
+          "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d",
+          "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75",
+          "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65",
+          "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357",
+          "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014",
+          "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32",
+          "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03",
+          "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed"
+        ],
+        "wall_interface_ids": [
+          "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+          "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+          "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+          "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+          "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979"
+        ],
+        "physical_event_ids": [
+          "urn:hxforge:r119a:physical-event:d03db5365d9de2f61e40894e0532170838a32e73d16a570cd80dff39d58d4fd6",
+          "urn:hxforge:r119a:physical-event:58085598406aae8b61896f64fc2eaa2ae144e093fda8d42034ab4c91ed3add14",
+          "urn:hxforge:r119a:physical-event:9d457af63207c6273e2d1b339ca64d615023adb0b5e6ec2c55574bc0ab35d0fa",
+          "urn:hxforge:r119a:physical-event:a7af778620c26f9a237db33590120b24128d982df76aa7842271e39f322ffcff",
+          "urn:hxforge:r119a:physical-event:ad4f8d6afb68e4b0edfcbf0e56980b86dcee6e1619235ea566f08c29519b7e5f",
+          "urn:hxforge:r119a:physical-event:a3261824dd4addfb478e94df82a7f8645b4a75ae6b84f07bd524f0b87e65ddd4",
+          "urn:hxforge:r119a:physical-event:f003c4d81a27a1ec0459563a9add9c56b4ec1cec2890db40ac1334ac488dc99b",
+          "urn:hxforge:r119a:physical-event:0f29b1dae7bcf881b511e5547f9683a3936ea8f61a5d5a5b314903a302177af2",
+          "urn:hxforge:r119a:physical-event:3b33a6d55c16a850e2d2e40b6424d519b51c417ea7b25ab811e5faaf289f8acf",
+          "urn:hxforge:r119a:physical-event:ed2f7de25f2cc4f96798f6179eb0f1d97a1f951befcaba452a171dd8dc8958dc",
+          "urn:hxforge:r119a:physical-event:259a2f8390bda93e5a764ddd465427a9e6f54d71179a89491f5244c9c9605f61",
+          "urn:hxforge:r119a:physical-event:e27204e650d7bb4f5706d18ffa6f9e45355509bbee6c070ca2655100c40e338d",
+          "urn:hxforge:r119a:physical-event:66f21b559b5aecebfd7b213cb43e88c9cc3792e6f8e1a4de8ac5d2f475dc5429",
+          "urn:hxforge:r119a:physical-event:b7f839e14a0c0d6a5a1d1e270805d3cdd7b2bb60b1af773d1c9b00bf27d63f5c",
+          "urn:hxforge:r119a:physical-event:98c626de06d38eab210a3962ce79c3a9692b236efd90c3e1b9917180f2f8e166",
+          "urn:hxforge:r119a:physical-event:43df03a2a6aee2a13f3ebc9dd7e692401f09e30f21147a8bc89b1c8078e30f28",
+          "urn:hxforge:r119a:physical-event:9f5cc6d74c180a86ef8caba2789cfd4afc03a572f870231cae2d55d61f973aba",
+          "urn:hxforge:r119a:physical-event:e89b9fa57bb171e23736dd4276be672555dcff857408449259a6c1c4e17a2348",
+          "urn:hxforge:r119a:physical-event:07639f681839431043253f60cce624e04a40051fb716742e298284f30ae4ae5a"
+        ],
+        "physical_compartment_ids": [
+          "urn:hxforge:r119a:physical-compartment:1a0033496cd726cb5b78a4205c83190fea346d7e2002577bea246df2cd384dfd",
+          "urn:hxforge:r119a:physical-compartment:c97197ddfd70d2a4774b6ccc24f07458937b95c309363777e42150712befb595",
+          "urn:hxforge:r119a:physical-compartment:091a321f9075f458f16bcc87cf376c41a06d69309cb9b7d2c240ee0c8428b986",
+          "urn:hxforge:r119a:physical-compartment:770859901a3cdbcae0d18872ed7cb26ac51bfc436a9a90dfaacad70411271b23",
+          "urn:hxforge:r119a:physical-compartment:6a1b35325467a07110bb24291c2c273159737018191dbe5d6ad8e875e24cfc1e",
+          "urn:hxforge:r119a:physical-compartment:0a5d39f34543cba706ac1ba63bd5712f10b7677679829fd295c7c00563397cee",
+          "urn:hxforge:r119a:physical-compartment:48bee6d2eecdf723e3a89bd135cea200d9deaacb4b15108d1acf4444b180b0ee",
+          "urn:hxforge:r119a:physical-compartment:5305509561650668818f7cd8f65e13325ae870d33850cb68d0ce3ef9976f8e22",
+          "urn:hxforge:r119a:physical-compartment:a91c04e1fad73c612884a12c4e89cf21c5996b99e0513be32543ad03bca2a62f",
+          "urn:hxforge:r119a:physical-compartment:026eb84c673fe45fd0ac439843753c91f50f3ba2259f41bfb91f5ca3cfc549bf",
+          "urn:hxforge:r119a:physical-compartment:df9a2ae79970497218db0c945b35a9db61d9cbde7442427cad7c7f6222428a3e",
+          "urn:hxforge:r119a:physical-compartment:58f1a7c6a6cef8cea583974e12bca6eb426652ab91151be337632a47b0ad9969",
+          "urn:hxforge:r119a:physical-compartment:5270bbc8170345d1262a437680512ddf9fff5c5ac24b132d2a4f1a8599623c4b",
+          "urn:hxforge:r119a:physical-compartment:3213e9fb4e9088ae76daa0943c26848c6cec5f593c95abc93f1de37fd6b8e3f4",
+          "urn:hxforge:r119a:physical-compartment:4bc003028fd4bb55ead3261a28380f7076fd9a6f37c192afdde2944ae6b42f96",
+          "urn:hxforge:r119a:physical-compartment:4a607fe271b57e6fde4dad9c12bc8858aa62a845ba3cddde22ff4c06392b9f30",
+          "urn:hxforge:r119a:physical-compartment:1b6741b78bae7bd68a2e1bb97a9ee99769d5130d2bbb255ef072c76e64d70adc",
+          "urn:hxforge:r119a:physical-compartment:bb8b6231a761f9a45e91ba5cf958682dd94385810ca18e8613185678217fd309",
+          "urn:hxforge:r119a:physical-compartment:8a6413c8a8033845f9420cdff6dac2d21b0fabd3b259ba7e8849df337476de57"
+        ],
+        "state_ids": [
+          "urn:hxforge:r119a:state:dbedc66cb47cfe19f52305ce8e5190b20bf825dd6b81105a89b5696e74db9177",
+          "urn:hxforge:r119a:state:20c628d0fd22b4e03abe515ca474460a2ff962b5bbe6a4f7d598a3655ca8fc41",
+          "urn:hxforge:r119a:state:6b6c2407d705618d0fd8a0334a450adedcb47a121f60018547fd4accaf91df76",
+          "urn:hxforge:r119a:state:70e7c698932c1ba3a47c3e063c8dcc4a84d25dbeaa84ff7920ebd52e974b7700",
+          "urn:hxforge:r119a:state:f804eec33522fe4ef6e013fe2532da1b5d18b39c6cc2b344bb113f5b433e7e45",
+          "urn:hxforge:r119a:state:95e2a086a3c4416d54762d4e65de6eea8908214c3a85bf6dc73cf8b6cde59fa6",
+          "urn:hxforge:r119a:state:291b5d6d69622e70c2f3ff70a4585cc3ebe718798dc6a1550ca1d3eab04f3662",
+          "urn:hxforge:r119a:state:8767bcaa97fef22e1644d9395fa679223c6d0a65c07edae10eb541e734397ef5",
+          "urn:hxforge:r119a:state:ed4cf5389e2f429fdf1a229b14446b96c69e07aa628db915451d93ea5145a138",
+          "urn:hxforge:r119a:state:228367b3141335e513e7e660114304fa2432d53a439690b5e60c7f0c1eb22896",
+          "urn:hxforge:r119a:state:a2e3f8d308959471515ed81e0fac204527114cf161e096052970fabfe2dbadcc",
+          "urn:hxforge:r119a:state:3f56885c6e54ae03904a22648abd387630bfcef47dc3fa6916ad58c6f5d3a4e2",
+          "urn:hxforge:r119a:state:29feb53714e2be7760df6faa3a6a7f4263981b77e4f96c728e6b82b11aa9ac0b",
+          "urn:hxforge:r119a:state:f718685c97fd61385c6f54ce0621a42fb57461b1859f9c7d0e4326be88c6e57d",
+          "urn:hxforge:r119a:state:99f2a30c4de7e531f25449896abfd3ce829572ce38f669125bd11882197cfc06",
+          "urn:hxforge:r119a:state:144dd2d34b160113b19d3f42fb69f907fa15af04ec415a77609feea865c37626",
+          "urn:hxforge:r119a:state:6e25905ceb4527f81d2437771e578514e29a1b40e0e6110b888d4348f75a8dc6",
+          "urn:hxforge:r119a:state:5b9d726e067ac6afc8afbf1f91b2cdfd6599910b464d37ea5a1626af825b5c9f",
+          "urn:hxforge:r119a:state:5bfbbcf12043d8ffaa1477ab1ad8eb94eb72603098c38645743e115771440ef5",
+          "urn:hxforge:r119a:state:b2655c66f7d1d76949528e2d7aba43d1c0a681904bf5d17022454c9263e83ea0",
+          "urn:hxforge:r119a:state:24a3e73aa1b4f42f493ce4c86a1a9cdf60d7687e04335ffb3420eac1738d3033",
+          "urn:hxforge:r119a:state:f4f0c89b84fcec470c18ff11e39f3dc17bdc044b9c171082473002ae0d65781f",
+          "urn:hxforge:r119a:state:1c750fd57752fbe7f62507d2e48491d1b9b197a0e80049a40a99055e3597eaba",
+          "urn:hxforge:r119a:state:7bef1ff4907884647d1d4d16754997b6fc065da67e6dcf469ecfe984223cce38",
+          "urn:hxforge:r119a:state:eff730d5947c3d00d2c3867b01f18572414553d774f2416f0682ae115f716bcf",
+          "urn:hxforge:r119a:state:4b1a9f4db19dbeb920b444460fe4c2270328f520c8eb0719e9e1774d628ec3a2",
+          "urn:hxforge:r119a:state:7ea8106d032ea52f42fe7b37e7a882f8085d17b2f5c2a203118b10eeedcc78d7",
+          "urn:hxforge:r119a:state:23601dfe9523675c7f2cb2a2cd5e103bdf73a26f0bdaf02dae1215a229c9f049",
+          "urn:hxforge:r119a:state:cafb1c2db30aa545dc92f98f4dc1ef16c9aff8016a0f66aba3cf7cdc7c62c8cc",
+          "urn:hxforge:r119a:state:a44ef2a3140670c3f08b77d396af0a4d98cbf79214b6743bac4633d23fc8b34c",
+          "urn:hxforge:r119a:state:6399f2b7593e965a39ee367f4b8448356153cfba824ad035807ecf52471f9e3f",
+          "urn:hxforge:r119a:state:9704061e8fc3d16aa1f0538afda4f64aca27cd91a6f4546662d61ba57eb66b7e",
+          "urn:hxforge:r119a:state:1a635d160ddbf5cf76a9e75b28c12ace073391d2ef980702f457d00760b8259a",
+          "urn:hxforge:r119a:state:4d2cb0ba2a8b6ba6dd7e0cc162f6d26a3d66254e454dd0d19b54afd5a8989898",
+          "urn:hxforge:r119a:state:46fbb957fa7683f805705ab6cbbacadac6beaaeeef45b7036c5a5e33887f2198",
+          "urn:hxforge:r119a:state:57be1c2b53bee8497295462159a24a1fddb6287a770ee7ec58020cb9f18e5626",
+          "urn:hxforge:r119a:state:d14622e59d494c2277613d5834f0030f33583bfa1098de1c9b5984ddea71fb72",
+          "urn:hxforge:r119a:state:95322b689c80a4c70fb4761d28bbc0cf28fa57d71d008f46d6fabfb69f89dd22",
+          "urn:hxforge:r119a:state:e169fd77e5fe42f24ece56c040285e9ffbc624306b0a5e068e08b3aa6d2e94e9",
+          "urn:hxforge:r119a:state:1a2b04fec26177cea6af134d34208955b0c147717ea22ef715336ba53486370c"
+        ],
+        "tube_position_count": 253,
+        "tube_position_membership_canonical_hash": "b61ba20bbe79e4f325589581ac535be65a308dd70c9684a4c947bb409bc15727"
+      },
+      "interval_count": 5,
+      "path_count": 2,
+      "cell_count": 10,
+      "wall_interface_count": 5,
+      "physical_event_count": 19,
+      "event_role_counts": {
+        "LEAKAGE_GEOMETRY": 4,
+        "BAFFLE": 4,
+        "CENTRAL_CROSSFLOW": 3,
+        "TUBE_ROW_OR_CROSSED_ROW": 1,
+        "WINDOW": 4,
+        "BYPASS_GEOMETRY": 1,
+        "INLET_END_ZONE": 1,
+        "OUTLET_END_ZONE": 1
+      },
+      "state_count": 40,
+      "compartment_mixed_state_count": 0,
+      "result_projection_canonical_hash": "a7fbfcb93f68f60e04eee3072305aec75581e916fdeb974038eb6af9d2046536"
+    },
+    "native_hash_replay": {
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "mesh_identity_match": true,
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "physical_ownership_hash_match": true,
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash_match": true,
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "topology_id_match": true
+    }
+  },
+  "run_b": {
+    "run": "RUN_B",
+    "clean_independent_process": true,
+    "mutable_native_objects_shared_with_other_run": false,
+    "producer_api": "hexagent.exchangers.shell_tube.segmented_thermal_state_topology.validate_request",
+    "producer_invocation_count": 1,
+    "native_request_projection": {
+      "projection_contract": "r119d.runtime-native-request-evidence-projection.v1",
+      "full_request_projection_canonical_hash": "2acbbfe7f7d27bc1166f1220e081abcd38651bba5b94dae59ba0d8e4185acdb1",
+      "definition_projection_canonical_hash": "ce64a3faa26541dfad089f022b6b868178b7110b10d2536bc3f073a71c36ee3d",
+      "baffle_request_projection_canonical_hash": "0ea3558f42cfa1485464ba7e7c2dcbea7a812157ed77b2de7d2721c59531c131",
+      "area_request_projection_canonical_hash": "699c7d4328ae7c00e19c44ea0e136ca09428409161bcb019219ed3a917601cd8",
+      "native_identity_projection_canonical_hash": "b6a76886bc0e76265fa8fae1f60289f2daee74329b24d18b653af640b8980561",
+      "raw_request_fields": [
+        "definition",
+        "baffle_request",
+        "area_request",
+        "native_identity",
+        "bookkeeping"
+      ],
+      "source_artifact_refs": [
+        {
+          "canonical_hash": "0ead1bf29020140558471439fda6791dac6d24d0afb420170363a6ed96eb63dd",
+          "file_sha256": "8ac024cea6f8795ca2f458c00ea87a34c44180a517aa103a9c391304392cb73a",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task020-configuration-r1.json"
+        },
+        {
+          "canonical_hash": "1ff10418d0eed1303f55a31fb4dbaebde43240ebec04a19ec4f74085bfee064b",
+          "file_sha256": "222f94c09327ea4071073ea08730645b7ef3f6b5319c9c92dbcf05b195b3339d",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task021-layout-r1.json"
+        },
+        {
+          "canonical_hash": "1c354ba8f851c15467b8a392350063f461a0bb0ccfdc6d032a70d1cfdd38e11c",
+          "file_sha256": "0c1fda6f39fd692b439843aa23fe6cc2cb91711663ddc349acb120f6d3aa8c74",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task022-bundle-geometry-r1.json"
+        },
+        {
+          "canonical_hash": "2092926bbf26f1d7d5e22edd1ded4d38072fab900c641206130bf3c5d2378bf4",
+          "file_sha256": "0809fe7b36017412949eb8dd2d8afa9b8bd6d86c2701ad3e86fc0d57316a113e",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        },
+        {
+          "canonical_hash": "8ef4cef8542067f16d08559435ea555084835bbfb57361249de9350d280c6131",
+          "file_sha256": "597a4dceae635415534f2d82e14c11c2e0e2ff02a23bce69814b2b82e40501c9",
+          "path": "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json"
+        }
+      ],
+      "selected_definition_source": {
+        "path": "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json",
+        "file_sha256": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+        "canonical_hash": "062f7110f5a9ac14ff0a5f9272008cef2682ba244d40ce9c7656863b44c0ffcc"
+      },
+      "typed_input_contract": {
+        "definition": "Definition",
+        "native_identity": "NativeIdentity",
+        "baffle_request": "exact dict; configuration=ShellAndTubeConfiguration; tube_layout=TubeLayout; shell_bundle_geometry=ShellBundleGeometry; design_authority.baffle_type=BaffleType; design_authority.orientation_sequence=list[BaffleOrientation]",
+        "area_request": "exact dict; task020_configuration=ShellAndTubeConfiguration; task021_layout=TubeLayout; internal/heat length authorities typed; participation authority typed; TASK025 evidence_refs=tuple",
+        "bookkeeping": "None"
+      },
+      "input_identity": {
+        "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+        "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+        "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+        "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+        "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+        "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+        "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+        "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+        "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+      }
+    },
+    "native_result": {
+      "native_object_type": "Result",
+      "native_field_names": [
+        "topology_definition",
+        "bookkeeping_observations",
+        "warnings",
+        "status",
+        "blocker_code",
+        "blocker_field",
+        "topology_id",
+        "result_hash",
+        "mesh_identity",
+        "physical_ownership_hash",
+        "native_identity",
+        "provenance_edges",
+        "residuals",
+        "global_energy_residual_w",
+        "bookkeeping_status"
+      ],
+      "status": "VALIDATED",
+      "blocker_code": null,
+      "blocker_field": null,
+      "warnings": [],
+      "bookkeeping_status": "NOT_REQUESTED",
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "native_identity": {
+        "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+        "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+        "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+        "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+        "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+        "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+        "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+        "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+        "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+      },
+      "topology_definition_projection_canonical_hash": "342c1865b8292050c472b6be822a5f86ba00b0cab5e654554d7f16458603d55c",
+      "topology_definition_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+      "authority_ids": [
+        "V07-T171-TOPOLOGY-R4-V1",
+        "V07-T171-CELL-COMPARTMENT-R4-V1",
+        "V07-T171-CONSERVATION-R4-V1"
+      ],
+      "review_receipt_id": "TASK170-R4-INDEPENDENT-ENTRY-REVIEW-R5",
+      "mapping_authority": {
+        "authority_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+        "evidence_refs": [
+          "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+          "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+          "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+          "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+          "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        ],
+        "revision": "R1",
+        "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+      },
+      "mesh_authority": {
+        "authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+        "evidence_refs": [
+          "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+          "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+          "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+          "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+          "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+          "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+        ],
+        "revision": "R1",
+        "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+      },
+      "path_identities": {
+        "SHELL": {
+          "flow_path_id": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "stream_id": "urn:hxforge:r119a:stream:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "role": "COLD",
+          "physical_inlet_m": "6",
+          "physical_outlet_m": "0",
+          "tube_position_count": 0,
+          "tube_position_membership_canonical_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "TUBE": {
+          "flow_path_id": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+          "stream_id": "urn:hxforge:r119a:stream:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+          "role": "HOT",
+          "physical_inlet_m": "0",
+          "physical_outlet_m": "6",
+          "tube_position_count": 253,
+          "tube_position_membership_canonical_hash": "b61ba20bbe79e4f325589581ac535be65a308dd70c9684a4c947bb409bc15727"
+        }
+      },
+      "identity_inventory": {
+        "physical_segment_ids": [
+          "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+          "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+          "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+          "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+          "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760"
+        ],
+        "flow_path_ids": [
+          "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+          "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76"
+        ],
+        "numerical_cell_ids": [
+          "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818",
+          "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6",
+          "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d",
+          "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75",
+          "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65",
+          "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357",
+          "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014",
+          "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32",
+          "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03",
+          "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed"
+        ],
+        "wall_interface_ids": [
+          "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+          "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+          "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+          "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+          "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979"
+        ],
+        "physical_event_ids": [
+          "urn:hxforge:r119a:physical-event:d03db5365d9de2f61e40894e0532170838a32e73d16a570cd80dff39d58d4fd6",
+          "urn:hxforge:r119a:physical-event:58085598406aae8b61896f64fc2eaa2ae144e093fda8d42034ab4c91ed3add14",
+          "urn:hxforge:r119a:physical-event:9d457af63207c6273e2d1b339ca64d615023adb0b5e6ec2c55574bc0ab35d0fa",
+          "urn:hxforge:r119a:physical-event:a7af778620c26f9a237db33590120b24128d982df76aa7842271e39f322ffcff",
+          "urn:hxforge:r119a:physical-event:ad4f8d6afb68e4b0edfcbf0e56980b86dcee6e1619235ea566f08c29519b7e5f",
+          "urn:hxforge:r119a:physical-event:a3261824dd4addfb478e94df82a7f8645b4a75ae6b84f07bd524f0b87e65ddd4",
+          "urn:hxforge:r119a:physical-event:f003c4d81a27a1ec0459563a9add9c56b4ec1cec2890db40ac1334ac488dc99b",
+          "urn:hxforge:r119a:physical-event:0f29b1dae7bcf881b511e5547f9683a3936ea8f61a5d5a5b314903a302177af2",
+          "urn:hxforge:r119a:physical-event:3b33a6d55c16a850e2d2e40b6424d519b51c417ea7b25ab811e5faaf289f8acf",
+          "urn:hxforge:r119a:physical-event:ed2f7de25f2cc4f96798f6179eb0f1d97a1f951befcaba452a171dd8dc8958dc",
+          "urn:hxforge:r119a:physical-event:259a2f8390bda93e5a764ddd465427a9e6f54d71179a89491f5244c9c9605f61",
+          "urn:hxforge:r119a:physical-event:e27204e650d7bb4f5706d18ffa6f9e45355509bbee6c070ca2655100c40e338d",
+          "urn:hxforge:r119a:physical-event:66f21b559b5aecebfd7b213cb43e88c9cc3792e6f8e1a4de8ac5d2f475dc5429",
+          "urn:hxforge:r119a:physical-event:b7f839e14a0c0d6a5a1d1e270805d3cdd7b2bb60b1af773d1c9b00bf27d63f5c",
+          "urn:hxforge:r119a:physical-event:98c626de06d38eab210a3962ce79c3a9692b236efd90c3e1b9917180f2f8e166",
+          "urn:hxforge:r119a:physical-event:43df03a2a6aee2a13f3ebc9dd7e692401f09e30f21147a8bc89b1c8078e30f28",
+          "urn:hxforge:r119a:physical-event:9f5cc6d74c180a86ef8caba2789cfd4afc03a572f870231cae2d55d61f973aba",
+          "urn:hxforge:r119a:physical-event:e89b9fa57bb171e23736dd4276be672555dcff857408449259a6c1c4e17a2348",
+          "urn:hxforge:r119a:physical-event:07639f681839431043253f60cce624e04a40051fb716742e298284f30ae4ae5a"
+        ],
+        "physical_compartment_ids": [
+          "urn:hxforge:r119a:physical-compartment:1a0033496cd726cb5b78a4205c83190fea346d7e2002577bea246df2cd384dfd",
+          "urn:hxforge:r119a:physical-compartment:c97197ddfd70d2a4774b6ccc24f07458937b95c309363777e42150712befb595",
+          "urn:hxforge:r119a:physical-compartment:091a321f9075f458f16bcc87cf376c41a06d69309cb9b7d2c240ee0c8428b986",
+          "urn:hxforge:r119a:physical-compartment:770859901a3cdbcae0d18872ed7cb26ac51bfc436a9a90dfaacad70411271b23",
+          "urn:hxforge:r119a:physical-compartment:6a1b35325467a07110bb24291c2c273159737018191dbe5d6ad8e875e24cfc1e",
+          "urn:hxforge:r119a:physical-compartment:0a5d39f34543cba706ac1ba63bd5712f10b7677679829fd295c7c00563397cee",
+          "urn:hxforge:r119a:physical-compartment:48bee6d2eecdf723e3a89bd135cea200d9deaacb4b15108d1acf4444b180b0ee",
+          "urn:hxforge:r119a:physical-compartment:5305509561650668818f7cd8f65e13325ae870d33850cb68d0ce3ef9976f8e22",
+          "urn:hxforge:r119a:physical-compartment:a91c04e1fad73c612884a12c4e89cf21c5996b99e0513be32543ad03bca2a62f",
+          "urn:hxforge:r119a:physical-compartment:026eb84c673fe45fd0ac439843753c91f50f3ba2259f41bfb91f5ca3cfc549bf",
+          "urn:hxforge:r119a:physical-compartment:df9a2ae79970497218db0c945b35a9db61d9cbde7442427cad7c7f6222428a3e",
+          "urn:hxforge:r119a:physical-compartment:58f1a7c6a6cef8cea583974e12bca6eb426652ab91151be337632a47b0ad9969",
+          "urn:hxforge:r119a:physical-compartment:5270bbc8170345d1262a437680512ddf9fff5c5ac24b132d2a4f1a8599623c4b",
+          "urn:hxforge:r119a:physical-compartment:3213e9fb4e9088ae76daa0943c26848c6cec5f593c95abc93f1de37fd6b8e3f4",
+          "urn:hxforge:r119a:physical-compartment:4bc003028fd4bb55ead3261a28380f7076fd9a6f37c192afdde2944ae6b42f96",
+          "urn:hxforge:r119a:physical-compartment:4a607fe271b57e6fde4dad9c12bc8858aa62a845ba3cddde22ff4c06392b9f30",
+          "urn:hxforge:r119a:physical-compartment:1b6741b78bae7bd68a2e1bb97a9ee99769d5130d2bbb255ef072c76e64d70adc",
+          "urn:hxforge:r119a:physical-compartment:bb8b6231a761f9a45e91ba5cf958682dd94385810ca18e8613185678217fd309",
+          "urn:hxforge:r119a:physical-compartment:8a6413c8a8033845f9420cdff6dac2d21b0fabd3b259ba7e8849df337476de57"
+        ],
+        "state_ids": [
+          "urn:hxforge:r119a:state:dbedc66cb47cfe19f52305ce8e5190b20bf825dd6b81105a89b5696e74db9177",
+          "urn:hxforge:r119a:state:20c628d0fd22b4e03abe515ca474460a2ff962b5bbe6a4f7d598a3655ca8fc41",
+          "urn:hxforge:r119a:state:6b6c2407d705618d0fd8a0334a450adedcb47a121f60018547fd4accaf91df76",
+          "urn:hxforge:r119a:state:70e7c698932c1ba3a47c3e063c8dcc4a84d25dbeaa84ff7920ebd52e974b7700",
+          "urn:hxforge:r119a:state:f804eec33522fe4ef6e013fe2532da1b5d18b39c6cc2b344bb113f5b433e7e45",
+          "urn:hxforge:r119a:state:95e2a086a3c4416d54762d4e65de6eea8908214c3a85bf6dc73cf8b6cde59fa6",
+          "urn:hxforge:r119a:state:291b5d6d69622e70c2f3ff70a4585cc3ebe718798dc6a1550ca1d3eab04f3662",
+          "urn:hxforge:r119a:state:8767bcaa97fef22e1644d9395fa679223c6d0a65c07edae10eb541e734397ef5",
+          "urn:hxforge:r119a:state:ed4cf5389e2f429fdf1a229b14446b96c69e07aa628db915451d93ea5145a138",
+          "urn:hxforge:r119a:state:228367b3141335e513e7e660114304fa2432d53a439690b5e60c7f0c1eb22896",
+          "urn:hxforge:r119a:state:a2e3f8d308959471515ed81e0fac204527114cf161e096052970fabfe2dbadcc",
+          "urn:hxforge:r119a:state:3f56885c6e54ae03904a22648abd387630bfcef47dc3fa6916ad58c6f5d3a4e2",
+          "urn:hxforge:r119a:state:29feb53714e2be7760df6faa3a6a7f4263981b77e4f96c728e6b82b11aa9ac0b",
+          "urn:hxforge:r119a:state:f718685c97fd61385c6f54ce0621a42fb57461b1859f9c7d0e4326be88c6e57d",
+          "urn:hxforge:r119a:state:99f2a30c4de7e531f25449896abfd3ce829572ce38f669125bd11882197cfc06",
+          "urn:hxforge:r119a:state:144dd2d34b160113b19d3f42fb69f907fa15af04ec415a77609feea865c37626",
+          "urn:hxforge:r119a:state:6e25905ceb4527f81d2437771e578514e29a1b40e0e6110b888d4348f75a8dc6",
+          "urn:hxforge:r119a:state:5b9d726e067ac6afc8afbf1f91b2cdfd6599910b464d37ea5a1626af825b5c9f",
+          "urn:hxforge:r119a:state:5bfbbcf12043d8ffaa1477ab1ad8eb94eb72603098c38645743e115771440ef5",
+          "urn:hxforge:r119a:state:b2655c66f7d1d76949528e2d7aba43d1c0a681904bf5d17022454c9263e83ea0",
+          "urn:hxforge:r119a:state:24a3e73aa1b4f42f493ce4c86a1a9cdf60d7687e04335ffb3420eac1738d3033",
+          "urn:hxforge:r119a:state:f4f0c89b84fcec470c18ff11e39f3dc17bdc044b9c171082473002ae0d65781f",
+          "urn:hxforge:r119a:state:1c750fd57752fbe7f62507d2e48491d1b9b197a0e80049a40a99055e3597eaba",
+          "urn:hxforge:r119a:state:7bef1ff4907884647d1d4d16754997b6fc065da67e6dcf469ecfe984223cce38",
+          "urn:hxforge:r119a:state:eff730d5947c3d00d2c3867b01f18572414553d774f2416f0682ae115f716bcf",
+          "urn:hxforge:r119a:state:4b1a9f4db19dbeb920b444460fe4c2270328f520c8eb0719e9e1774d628ec3a2",
+          "urn:hxforge:r119a:state:7ea8106d032ea52f42fe7b37e7a882f8085d17b2f5c2a203118b10eeedcc78d7",
+          "urn:hxforge:r119a:state:23601dfe9523675c7f2cb2a2cd5e103bdf73a26f0bdaf02dae1215a229c9f049",
+          "urn:hxforge:r119a:state:cafb1c2db30aa545dc92f98f4dc1ef16c9aff8016a0f66aba3cf7cdc7c62c8cc",
+          "urn:hxforge:r119a:state:a44ef2a3140670c3f08b77d396af0a4d98cbf79214b6743bac4633d23fc8b34c",
+          "urn:hxforge:r119a:state:6399f2b7593e965a39ee367f4b8448356153cfba824ad035807ecf52471f9e3f",
+          "urn:hxforge:r119a:state:9704061e8fc3d16aa1f0538afda4f64aca27cd91a6f4546662d61ba57eb66b7e",
+          "urn:hxforge:r119a:state:1a635d160ddbf5cf76a9e75b28c12ace073391d2ef980702f457d00760b8259a",
+          "urn:hxforge:r119a:state:4d2cb0ba2a8b6ba6dd7e0cc162f6d26a3d66254e454dd0d19b54afd5a8989898",
+          "urn:hxforge:r119a:state:46fbb957fa7683f805705ab6cbbacadac6beaaeeef45b7036c5a5e33887f2198",
+          "urn:hxforge:r119a:state:57be1c2b53bee8497295462159a24a1fddb6287a770ee7ec58020cb9f18e5626",
+          "urn:hxforge:r119a:state:d14622e59d494c2277613d5834f0030f33583bfa1098de1c9b5984ddea71fb72",
+          "urn:hxforge:r119a:state:95322b689c80a4c70fb4761d28bbc0cf28fa57d71d008f46d6fabfb69f89dd22",
+          "urn:hxforge:r119a:state:e169fd77e5fe42f24ece56c040285e9ffbc624306b0a5e068e08b3aa6d2e94e9",
+          "urn:hxforge:r119a:state:1a2b04fec26177cea6af134d34208955b0c147717ea22ef715336ba53486370c"
+        ],
+        "tube_position_count": 253,
+        "tube_position_membership_canonical_hash": "b61ba20bbe79e4f325589581ac535be65a308dd70c9684a4c947bb409bc15727"
+      },
+      "interval_count": 5,
+      "path_count": 2,
+      "cell_count": 10,
+      "wall_interface_count": 5,
+      "physical_event_count": 19,
+      "event_role_counts": {
+        "LEAKAGE_GEOMETRY": 4,
+        "BAFFLE": 4,
+        "CENTRAL_CROSSFLOW": 3,
+        "TUBE_ROW_OR_CROSSED_ROW": 1,
+        "WINDOW": 4,
+        "BYPASS_GEOMETRY": 1,
+        "INLET_END_ZONE": 1,
+        "OUTLET_END_ZONE": 1
+      },
+      "state_count": 40,
+      "compartment_mixed_state_count": 0,
+      "result_projection_canonical_hash": "a7fbfcb93f68f60e04eee3072305aec75581e916fdeb974038eb6af9d2046536"
+    },
+    "native_hash_replay": {
+      "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "mesh_identity_match": true,
+      "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "physical_ownership_hash_match": true,
+      "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "result_hash_match": true,
+      "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "topology_id_match": true
+    }
+  },
+  "native_request_replay": {
+    "same_native_request": true,
+    "request_projection_contract": "r119d.runtime-native-request-evidence-projection.v1",
+    "request_projection_canonical_hash": "2acbbfe7f7d27bc1166f1220e081abcd38651bba5b94dae59ba0d8e4185acdb1",
+    "definition_projection_canonical_hash": "ce64a3faa26541dfad089f022b6b868178b7110b10d2536bc3f073a71c36ee3d",
+    "baffle_request_projection_canonical_hash": "0ea3558f42cfa1485464ba7e7c2dcbea7a812157ed77b2de7d2721c59531c131",
+    "area_request_projection_canonical_hash": "699c7d4328ae7c00e19c44ea0e136ca09428409161bcb019219ed3a917601cd8",
+    "native_identity_projection_canonical_hash": "b6a76886bc0e76265fa8fae1f60289f2daee74329b24d18b653af640b8980561",
+    "source_artifact_refs": [
+      {
+        "canonical_hash": "0ead1bf29020140558471439fda6791dac6d24d0afb420170363a6ed96eb63dd",
+        "file_sha256": "8ac024cea6f8795ca2f458c00ea87a34c44180a517aa103a9c391304392cb73a",
+        "path": "docs/tasks/evidence/TASK-172-r118c-r9-task020-configuration-r1.json"
+      },
+      {
+        "canonical_hash": "1ff10418d0eed1303f55a31fb4dbaebde43240ebec04a19ec4f74085bfee064b",
+        "file_sha256": "222f94c09327ea4071073ea08730645b7ef3f6b5319c9c92dbcf05b195b3339d",
+        "path": "docs/tasks/evidence/TASK-172-r118c-r9-task021-layout-r1.json"
+      },
+      {
+        "canonical_hash": "1c354ba8f851c15467b8a392350063f461a0bb0ccfdc6d032a70d1cfdd38e11c",
+        "file_sha256": "0c1fda6f39fd692b439843aa23fe6cc2cb91711663ddc349acb120f6d3aa8c74",
+        "path": "docs/tasks/evidence/TASK-172-r118c-r9-task022-bundle-geometry-r1.json"
+      },
+      {
+        "canonical_hash": "2092926bbf26f1d7d5e22edd1ded4d38072fab900c641206130bf3c5d2378bf4",
+        "file_sha256": "0809fe7b36017412949eb8dd2d8afa9b8bd6d86c2701ad3e86fc0d57316a113e",
+        "path": "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+      },
+      {
+        "canonical_hash": "8ef4cef8542067f16d08559435ea555084835bbfb57361249de9350d280c6131",
+        "file_sha256": "597a4dceae635415534f2d82e14c11c2e0e2ff02a23bce69814b2b82e40501c9",
+        "path": "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json"
+      }
+    ]
+  },
+  "native_identity_replay": {
+    "same_native_engineering_identities": true,
+    "native_identity": {
+      "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+    },
+    "same_topology_id": true,
+    "same_result_hash": true,
+    "same_mesh_identity": true,
+    "same_physical_ownership_hash": true
+  },
+  "native_output_replay": {
+    "same_native_engineering_outputs": true,
+    "run_a_result_projection_canonical_hash": "a7fbfcb93f68f60e04eee3072305aec75581e916fdeb974038eb6af9d2046536",
+    "run_b_result_projection_canonical_hash": "a7fbfcb93f68f60e04eee3072305aec75581e916fdeb974038eb6af9d2046536",
+    "canonical_topology_definition_matches_effective_variant_a": true
+  },
+  "determinism": {
+    "same_native_request": true,
+    "same_native_engineering_identities": true,
+    "same_native_engineering_outputs": true,
+    "run_a_and_run_b_shared_mutable_native_objects": false
+  },
+  "materialized_task171_identity": {
+    "native_result_type": "Result",
+    "status": "VALIDATED",
+    "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+    "result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+    "mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+    "physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+    "native_identity": {
+      "area_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "area_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "baffle_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "baffle_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "bundle_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "bundle_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8"
+    },
+    "topology_definition_profile_id": "V07-T171-STRAIGHT-COUNTERCURRENT-ENTRY-R4-V1",
+    "topology_definition_authority_ids": [
+      "V07-T171-TOPOLOGY-R4-V1",
+      "V07-T171-CELL-COMPARTMENT-R4-V1",
+      "V07-T171-CONSERVATION-R4-V1"
+    ],
+    "topology_definition_projection_canonical_hash": "342c1865b8292050c472b6be822a5f86ba00b0cab5e654554d7f16458603d55c",
+    "native_identity_inventory": {
+      "physical_segment_ids": [
+        "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+        "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+        "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+        "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+        "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760"
+      ],
+      "flow_path_ids": [
+        "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+        "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76"
+      ],
+      "numerical_cell_ids": [
+        "urn:hxforge:r119a:numerical-cell:d9d22ac64a704ddfdb7ff2b931728153ed6d55f9536abea29205dc6b3a84c818",
+        "urn:hxforge:r119a:numerical-cell:38e1ccbce2b4442911b80c258daaa1f43ae72b2cca995219a6255a530eb58ca6",
+        "urn:hxforge:r119a:numerical-cell:1c028f15876625cc0a442e3bcc01e7c815abcacfb953316f6571a4855e1ccb5d",
+        "urn:hxforge:r119a:numerical-cell:f555fe2c66213773a6aae4ff12c84f5306c5c35f36c6203a48adefe7b79fdd75",
+        "urn:hxforge:r119a:numerical-cell:8e70fe7d96ca0fc82c1bd4c63bff8c4fde56c1879e660f5696e3b74e4fa4da65",
+        "urn:hxforge:r119a:numerical-cell:379c03488cbea7ea91ba9fde18fe826ee6c0ff160754fdee18bc87ea4200d357",
+        "urn:hxforge:r119a:numerical-cell:9d847c4e0fa998122d708f3a0c2f55674cef585de40971904e37b8f65e361014",
+        "urn:hxforge:r119a:numerical-cell:a16f17102928ef9cd99296847cec571d6989d5e0c1f5155ff7a3544f183c7a32",
+        "urn:hxforge:r119a:numerical-cell:cbeeeeb5c694cc2b2a12f0962be69e0bef8f97be1cabc79665fe5cfb1b535e03",
+        "urn:hxforge:r119a:numerical-cell:10327796363b028262320a7c6e1ef04c0423a05360e60133babd753a869745ed"
+      ],
+      "wall_interface_ids": [
+        "urn:hxforge:r119a:wall-interface:80feff81b47b435a6f4c5b6f31a97fa891a01fa756f13a1647d91b94407ab0cc",
+        "urn:hxforge:r119a:wall-interface:161e41118cff41324674f64e7986bf77062d8d775f716b62832640c8d42b9f40",
+        "urn:hxforge:r119a:wall-interface:8109450c6472418558bf583f09e953f6abc011e12078038964f832694cb4140c",
+        "urn:hxforge:r119a:wall-interface:824812ab42761cfceaf681309cf344377383911855da4d38ec7268d57cf0d733",
+        "urn:hxforge:r119a:wall-interface:df4f611255619a3f93d88878fbe1468817e3773bbcc3f39af1cb9ef6025f7979"
+      ],
+      "physical_event_ids": [
+        "urn:hxforge:r119a:physical-event:d03db5365d9de2f61e40894e0532170838a32e73d16a570cd80dff39d58d4fd6",
+        "urn:hxforge:r119a:physical-event:58085598406aae8b61896f64fc2eaa2ae144e093fda8d42034ab4c91ed3add14",
+        "urn:hxforge:r119a:physical-event:9d457af63207c6273e2d1b339ca64d615023adb0b5e6ec2c55574bc0ab35d0fa",
+        "urn:hxforge:r119a:physical-event:a7af778620c26f9a237db33590120b24128d982df76aa7842271e39f322ffcff",
+        "urn:hxforge:r119a:physical-event:ad4f8d6afb68e4b0edfcbf0e56980b86dcee6e1619235ea566f08c29519b7e5f",
+        "urn:hxforge:r119a:physical-event:a3261824dd4addfb478e94df82a7f8645b4a75ae6b84f07bd524f0b87e65ddd4",
+        "urn:hxforge:r119a:physical-event:f003c4d81a27a1ec0459563a9add9c56b4ec1cec2890db40ac1334ac488dc99b",
+        "urn:hxforge:r119a:physical-event:0f29b1dae7bcf881b511e5547f9683a3936ea8f61a5d5a5b314903a302177af2",
+        "urn:hxforge:r119a:physical-event:3b33a6d55c16a850e2d2e40b6424d519b51c417ea7b25ab811e5faaf289f8acf",
+        "urn:hxforge:r119a:physical-event:ed2f7de25f2cc4f96798f6179eb0f1d97a1f951befcaba452a171dd8dc8958dc",
+        "urn:hxforge:r119a:physical-event:259a2f8390bda93e5a764ddd465427a9e6f54d71179a89491f5244c9c9605f61",
+        "urn:hxforge:r119a:physical-event:e27204e650d7bb4f5706d18ffa6f9e45355509bbee6c070ca2655100c40e338d",
+        "urn:hxforge:r119a:physical-event:66f21b559b5aecebfd7b213cb43e88c9cc3792e6f8e1a4de8ac5d2f475dc5429",
+        "urn:hxforge:r119a:physical-event:b7f839e14a0c0d6a5a1d1e270805d3cdd7b2bb60b1af773d1c9b00bf27d63f5c",
+        "urn:hxforge:r119a:physical-event:98c626de06d38eab210a3962ce79c3a9692b236efd90c3e1b9917180f2f8e166",
+        "urn:hxforge:r119a:physical-event:43df03a2a6aee2a13f3ebc9dd7e692401f09e30f21147a8bc89b1c8078e30f28",
+        "urn:hxforge:r119a:physical-event:9f5cc6d74c180a86ef8caba2789cfd4afc03a572f870231cae2d55d61f973aba",
+        "urn:hxforge:r119a:physical-event:e89b9fa57bb171e23736dd4276be672555dcff857408449259a6c1c4e17a2348",
+        "urn:hxforge:r119a:physical-event:07639f681839431043253f60cce624e04a40051fb716742e298284f30ae4ae5a"
+      ],
+      "physical_compartment_ids": [
+        "urn:hxforge:r119a:physical-compartment:1a0033496cd726cb5b78a4205c83190fea346d7e2002577bea246df2cd384dfd",
+        "urn:hxforge:r119a:physical-compartment:c97197ddfd70d2a4774b6ccc24f07458937b95c309363777e42150712befb595",
+        "urn:hxforge:r119a:physical-compartment:091a321f9075f458f16bcc87cf376c41a06d69309cb9b7d2c240ee0c8428b986",
+        "urn:hxforge:r119a:physical-compartment:770859901a3cdbcae0d18872ed7cb26ac51bfc436a9a90dfaacad70411271b23",
+        "urn:hxforge:r119a:physical-compartment:6a1b35325467a07110bb24291c2c273159737018191dbe5d6ad8e875e24cfc1e",
+        "urn:hxforge:r119a:physical-compartment:0a5d39f34543cba706ac1ba63bd5712f10b7677679829fd295c7c00563397cee",
+        "urn:hxforge:r119a:physical-compartment:48bee6d2eecdf723e3a89bd135cea200d9deaacb4b15108d1acf4444b180b0ee",
+        "urn:hxforge:r119a:physical-compartment:5305509561650668818f7cd8f65e13325ae870d33850cb68d0ce3ef9976f8e22",
+        "urn:hxforge:r119a:physical-compartment:a91c04e1fad73c612884a12c4e89cf21c5996b99e0513be32543ad03bca2a62f",
+        "urn:hxforge:r119a:physical-compartment:026eb84c673fe45fd0ac439843753c91f50f3ba2259f41bfb91f5ca3cfc549bf",
+        "urn:hxforge:r119a:physical-compartment:df9a2ae79970497218db0c945b35a9db61d9cbde7442427cad7c7f6222428a3e",
+        "urn:hxforge:r119a:physical-compartment:58f1a7c6a6cef8cea583974e12bca6eb426652ab91151be337632a47b0ad9969",
+        "urn:hxforge:r119a:physical-compartment:5270bbc8170345d1262a437680512ddf9fff5c5ac24b132d2a4f1a8599623c4b",
+        "urn:hxforge:r119a:physical-compartment:3213e9fb4e9088ae76daa0943c26848c6cec5f593c95abc93f1de37fd6b8e3f4",
+        "urn:hxforge:r119a:physical-compartment:4bc003028fd4bb55ead3261a28380f7076fd9a6f37c192afdde2944ae6b42f96",
+        "urn:hxforge:r119a:physical-compartment:4a607fe271b57e6fde4dad9c12bc8858aa62a845ba3cddde22ff4c06392b9f30",
+        "urn:hxforge:r119a:physical-compartment:1b6741b78bae7bd68a2e1bb97a9ee99769d5130d2bbb255ef072c76e64d70adc",
+        "urn:hxforge:r119a:physical-compartment:bb8b6231a761f9a45e91ba5cf958682dd94385810ca18e8613185678217fd309",
+        "urn:hxforge:r119a:physical-compartment:8a6413c8a8033845f9420cdff6dac2d21b0fabd3b259ba7e8849df337476de57"
+      ],
+      "state_ids": [
+        "urn:hxforge:r119a:state:dbedc66cb47cfe19f52305ce8e5190b20bf825dd6b81105a89b5696e74db9177",
+        "urn:hxforge:r119a:state:20c628d0fd22b4e03abe515ca474460a2ff962b5bbe6a4f7d598a3655ca8fc41",
+        "urn:hxforge:r119a:state:6b6c2407d705618d0fd8a0334a450adedcb47a121f60018547fd4accaf91df76",
+        "urn:hxforge:r119a:state:70e7c698932c1ba3a47c3e063c8dcc4a84d25dbeaa84ff7920ebd52e974b7700",
+        "urn:hxforge:r119a:state:f804eec33522fe4ef6e013fe2532da1b5d18b39c6cc2b344bb113f5b433e7e45",
+        "urn:hxforge:r119a:state:95e2a086a3c4416d54762d4e65de6eea8908214c3a85bf6dc73cf8b6cde59fa6",
+        "urn:hxforge:r119a:state:291b5d6d69622e70c2f3ff70a4585cc3ebe718798dc6a1550ca1d3eab04f3662",
+        "urn:hxforge:r119a:state:8767bcaa97fef22e1644d9395fa679223c6d0a65c07edae10eb541e734397ef5",
+        "urn:hxforge:r119a:state:ed4cf5389e2f429fdf1a229b14446b96c69e07aa628db915451d93ea5145a138",
+        "urn:hxforge:r119a:state:228367b3141335e513e7e660114304fa2432d53a439690b5e60c7f0c1eb22896",
+        "urn:hxforge:r119a:state:a2e3f8d308959471515ed81e0fac204527114cf161e096052970fabfe2dbadcc",
+        "urn:hxforge:r119a:state:3f56885c6e54ae03904a22648abd387630bfcef47dc3fa6916ad58c6f5d3a4e2",
+        "urn:hxforge:r119a:state:29feb53714e2be7760df6faa3a6a7f4263981b77e4f96c728e6b82b11aa9ac0b",
+        "urn:hxforge:r119a:state:f718685c97fd61385c6f54ce0621a42fb57461b1859f9c7d0e4326be88c6e57d",
+        "urn:hxforge:r119a:state:99f2a30c4de7e531f25449896abfd3ce829572ce38f669125bd11882197cfc06",
+        "urn:hxforge:r119a:state:144dd2d34b160113b19d3f42fb69f907fa15af04ec415a77609feea865c37626",
+        "urn:hxforge:r119a:state:6e25905ceb4527f81d2437771e578514e29a1b40e0e6110b888d4348f75a8dc6",
+        "urn:hxforge:r119a:state:5b9d726e067ac6afc8afbf1f91b2cdfd6599910b464d37ea5a1626af825b5c9f",
+        "urn:hxforge:r119a:state:5bfbbcf12043d8ffaa1477ab1ad8eb94eb72603098c38645743e115771440ef5",
+        "urn:hxforge:r119a:state:b2655c66f7d1d76949528e2d7aba43d1c0a681904bf5d17022454c9263e83ea0",
+        "urn:hxforge:r119a:state:24a3e73aa1b4f42f493ce4c86a1a9cdf60d7687e04335ffb3420eac1738d3033",
+        "urn:hxforge:r119a:state:f4f0c89b84fcec470c18ff11e39f3dc17bdc044b9c171082473002ae0d65781f",
+        "urn:hxforge:r119a:state:1c750fd57752fbe7f62507d2e48491d1b9b197a0e80049a40a99055e3597eaba",
+        "urn:hxforge:r119a:state:7bef1ff4907884647d1d4d16754997b6fc065da67e6dcf469ecfe984223cce38",
+        "urn:hxforge:r119a:state:eff730d5947c3d00d2c3867b01f18572414553d774f2416f0682ae115f716bcf",
+        "urn:hxforge:r119a:state:4b1a9f4db19dbeb920b444460fe4c2270328f520c8eb0719e9e1774d628ec3a2",
+        "urn:hxforge:r119a:state:7ea8106d032ea52f42fe7b37e7a882f8085d17b2f5c2a203118b10eeedcc78d7",
+        "urn:hxforge:r119a:state:23601dfe9523675c7f2cb2a2cd5e103bdf73a26f0bdaf02dae1215a229c9f049",
+        "urn:hxforge:r119a:state:cafb1c2db30aa545dc92f98f4dc1ef16c9aff8016a0f66aba3cf7cdc7c62c8cc",
+        "urn:hxforge:r119a:state:a44ef2a3140670c3f08b77d396af0a4d98cbf79214b6743bac4633d23fc8b34c",
+        "urn:hxforge:r119a:state:6399f2b7593e965a39ee367f4b8448356153cfba824ad035807ecf52471f9e3f",
+        "urn:hxforge:r119a:state:9704061e8fc3d16aa1f0538afda4f64aca27cd91a6f4546662d61ba57eb66b7e",
+        "urn:hxforge:r119a:state:1a635d160ddbf5cf76a9e75b28c12ace073391d2ef980702f457d00760b8259a",
+        "urn:hxforge:r119a:state:4d2cb0ba2a8b6ba6dd7e0cc162f6d26a3d66254e454dd0d19b54afd5a8989898",
+        "urn:hxforge:r119a:state:46fbb957fa7683f805705ab6cbbacadac6beaaeeef45b7036c5a5e33887f2198",
+        "urn:hxforge:r119a:state:57be1c2b53bee8497295462159a24a1fddb6287a770ee7ec58020cb9f18e5626",
+        "urn:hxforge:r119a:state:d14622e59d494c2277613d5834f0030f33583bfa1098de1c9b5984ddea71fb72",
+        "urn:hxforge:r119a:state:95322b689c80a4c70fb4761d28bbc0cf28fa57d71d008f46d6fabfb69f89dd22",
+        "urn:hxforge:r119a:state:e169fd77e5fe42f24ece56c040285e9ffbc624306b0a5e068e08b3aa6d2e94e9",
+        "urn:hxforge:r119a:state:1a2b04fec26177cea6af134d34208955b0c147717ea22ef715336ba53486370c"
+      ],
+      "tube_position_count": 253,
+      "tube_position_membership_canonical_hash": "b61ba20bbe79e4f325589581ac535be65a308dd70c9684a4c947bb409bc15727"
+    },
+    "aggregate_geometry_id": "UNBOUND",
+    "aggregate_geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT"
+  },
+  "retained_authorities": {
+    "flow_path_mapping_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+    "physical_compartment_map_id": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+    "area_ownership_map_id": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+    "length_ownership_map_id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+    "task171_structural_mesh_authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+    "native_definition_mapping_authority": {
+      "authority_id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+      "evidence_refs": [
+        "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+        "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+        "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+        "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+        "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+        "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+        "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+      ],
+      "revision": "R1",
+      "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+    },
+    "native_definition_mesh_authority": {
+      "authority_id": "V07-T172-R119A-TASK171-MESH-R1",
+      "evidence_refs": [
+        "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+        "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+        "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+        "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+        "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json",
+        "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+        "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json"
+      ],
+      "revision": "R1",
+      "source_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+    },
+    "event_authority_ids": [
+      "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1"
+    ]
+  },
+  "unbound_authorities": {
+    "topology_authority_id": "NOT_NATIVE_OUTPUT_AS_A_SEPARATE_SCALAR; reviewed profile authority_ids are present in the native Definition",
+    "geometry_id": "UNBOUND",
+    "geometry_id_unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "fluid_identity_bound": false,
+    "property_profile_authority_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "reference_policy_resolution_valid": false,
+    "real_case_mesh_admissible": false,
+    "production_mesh_admission_enabled": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "task171_structural_mesh_is_production_mesh_admission": false
+  },
+  "downstream_boundary": {
+    "task171_executed": true,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "immutability_audit": {
+    "r119a_artifacts_rewritten": false,
+    "r119b_artifacts_rewritten": false,
+    "r119c_artifacts_rewritten": false,
+    "protected_preexisting_file_sha256": {
+      "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md": "74e1a648c7d668426558493d662161e0abeda96e8415e4857961696f7dff6a46",
+      "docs/tasks/TASK-172-v0.7-r119b-case-bound-task171-definition-authority-independent-review-r1.md": "6f49348e4ff0e3db43924036bbc03395beaa8b7e2d2f6cbaba91768bdbf73fa7",
+      "docs/tasks/TASK-172-v0.7-r119c-explicit-thermal-role-selection-authority-r1.md": "ec5e8717398736c022cbd2a1ed59d9e153216a33f537ad07128b119d4739fd0b",
+      "docs/tasks/evidence/TASK-172-r119a-area-ownership-candidate-r1.json": "5a254de747695a46f63fa20dab704a0573d8edc18d4db83da50d735b817ca0e5",
+      "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json": "62964d674034e25662217a269299663f0e48583dc5110c11f544817c973c5d33",
+      "docs/tasks/evidence/TASK-172-r119a-flow-path-mapping-candidate-r1.json": "c3e075f912e45ff8246d7f9902b342a4edc81c33fa40f90462d8cbeee63a9408",
+      "docs/tasks/evidence/TASK-172-r119a-length-ownership-candidate-r1.json": "22c6a0069dc525d7cce9d78a9c7c2362313a727b60d6c352673157f4fb0ac543",
+      "docs/tasks/evidence/TASK-172-r119a-mesh-authority-candidate-r1.json": "512d7c759696ff74d81f0dd7130dc705c4154c92296a80ac4d430e8a627bb4ec",
+      "docs/tasks/evidence/TASK-172-r119a-physical-compartment-mapping-candidate-r1.json": "03f3aed7525f2cebaae3b4697ec0d255c77ee59a7a2fa32b723e566e7261839d",
+      "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-a-r1.json": "8de50b4f08bbfe1ae67b5bea557f2957552f349c6f9cb246e777f7114f4af84c",
+      "docs/tasks/evidence/TASK-172-r119a-task171-definition-variant-b-r1.json": "a6a418787cb6857e580387519bdd04260e8ff944dfb3a8b17947204d63c424e7",
+      "docs/tasks/evidence/TASK-172-r119a-task171-native-identity-binding-r1.json": "0af775c4f7c5631c7c19475dcdc5c6f1cabea484140db093025b8878b407303b",
+      "docs/tasks/evidence/TASK-172-r119b-case-bound-task171-definition-authority-independent-review-r1.json": "4934bb0deb1506e14287db91b45be0d7dc1b1f4fb6a990d6f40536c97b96ffe7",
+      "docs/tasks/evidence/TASK-172-r119c-explicit-thermal-role-selection-authority-r1.json": "526e1c9634ef402330fd55d9007697fe7d44ad6a5162e7e3ca5bb7b7bdeace27"
+    }
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "existing_tests_changed": false,
+    "dependencies_changed": false,
+    "workflows_changed": false,
+    "reviewed_authorities_changed": false,
+    "engineering_values_changed": false,
+    "authority_scope_changed": false,
+    "registry_append_only": true
+  },
+  "validation": {
+    "predecessor_head_replay": "PASS",
+    "pr_open_draft_replay": "PASS",
+    "r119c_selection_authority_replay": "PASS",
+    "variant_a_canonical_hash_replay": "PASS",
+    "variant_b_non_effective_replay": "PASS",
+    "native_task171_invocation_count": 2,
+    "run_a_validated": true,
+    "run_b_validated": true,
+    "same_native_request": true,
+    "same_native_engineering_identities": true,
+    "same_native_engineering_outputs": true,
+    "native_hash_replay_run_a": "PASS",
+    "native_hash_replay_run_b": "PASS",
+    "fluid_identity_unbound": true,
+    "aggregate_geometry_id_not_invented": true,
+    "production_mesh_not_admitted": true,
+    "downstream_runtime_not_invoked": true,
+    "exact_final_head_ci": "REQUIRED_AFTER_COMMIT"
+  },
+  "next_gate": "R119E_CASE_BOUND_TASK171_NATIVE_MATERIALIZATION_INDEPENDENT_REVIEW_ONLY",
+  "stop": true,
+  "canonical_hash": "7a76c7cc118c88a5ef7d1e40add66915e6b93190bfae15a31aee4687ab01e1af"
+}

@@ -1,0 +1,37 @@
+{
+  "all_misclassifications_fixed": true,
+  "correction_rule": "Remove inference of NO_TRIGGER_PROVEN from fast-solver provider id or empty R2A event lists; require evaluate_no_trigger_producer_witness bundle.",
+  "mesh_corrections": [
+    {
+      "label": "CANDIDATE_B_R19",
+      "mesh_n": 32,
+      "misclassification_fixed": true,
+      "r25_admission_status": "NO_TRIGGER_PROVEN",
+      "r26_admission_status": "FROZEN_EVIDENCE_INSUFFICIENT"
+    },
+    {
+      "label": "CANDIDATE_B_R19",
+      "mesh_n": 64,
+      "misclassification_fixed": true,
+      "r25_admission_status": "NO_TRIGGER_PROVEN",
+      "r26_admission_status": "FROZEN_EVIDENCE_INSUFFICIENT"
+    },
+    {
+      "label": "SECOND_CANDIDATE_R21E",
+      "mesh_n": 32,
+      "misclassification_fixed": true,
+      "r25_admission_status": "NO_TRIGGER_PROVEN",
+      "r26_admission_status": "FROZEN_EVIDENCE_INSUFFICIENT"
+    },
+    {
+      "label": "SECOND_CANDIDATE_R21E",
+      "mesh_n": 64,
+      "misclassification_fixed": true,
+      "r25_admission_status": "NO_TRIGGER_PROVEN",
+      "r26_admission_status": "FROZEN_EVIDENCE_INSUFFICIENT"
+    }
+  ],
+  "r25_evidence_unchanged": true,
+  "r25_ledger_rel": "docs/tasks/evidence/V07-FAST-SOLVER-r25-r2a-certificate-qualification-20261020T110119Z/CANDIDATE_CERTIFICATE_LEDGER.json",
+  "schema_version": "task173.r2a-r25-no-trigger-correction.v1"
+}

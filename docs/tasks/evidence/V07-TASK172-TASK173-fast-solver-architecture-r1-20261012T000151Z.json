@@ -1,0 +1,299 @@
+{
+  "authority_status": "CANDIDATE_AUTHORITY_V07_FAST_SOLVER_COUPLED_CELL_R1_NOT_PRODUCTION",
+  "candidate_b_n1": {
+    "comparison": {
+      "duty_delta_w": 6.123845e-07,
+      "local_task172_hash_parity": false,
+      "mesh_hash_parity": false,
+      "shell_outlet_delta_k": 0.0,
+      "tube_outlet_delta_k": 1.0107e-10
+    },
+    "fast_solver": {
+      "authority_candidate": "V07-FAST-SOLVER-COUPLED-CELL-R1",
+      "mesh_stats": {
+        "cell_count": 5,
+        "coupled_fallback_count": 1,
+        "total_eval_trial_calls": 127,
+        "total_least_squares_nfev": 40
+      },
+      "observables": {
+        "energy_balance_residual_w": "1.78E-10",
+        "local_task172_result_hashes": [
+          "18b7e9bd6d727a5f7add60f3e3579a71f0f820b30372dd1c124e078074f9939d",
+          "a86572a36ddafb4c9d0db639f2840527863d96fdf5f73b253152709e08fd8f2e",
+          "1f5ff5d5eb9fdbd980e5b3bcafe189eeef17782769009b22d514824b6c855fdc",
+          "f676a1e30627d4cfa3d91bef8b476fdb103b9355bf87695aba0bd210f71e47ba",
+          "68c2c17e7d7ebb8f4575b7600b28625b6920a11c1d9857177a60c524b8f9c5f6"
+        ],
+        "mesh_result_hash": "afb531b4c02a95b81e566a09a8799b7c4fb67ea403643e76391fe013fc394f4e",
+        "shell_outlet_temperature_k": "299.07496245212",
+        "task172_local_evaluation_count": 0,
+        "terminal_boundary_residual_j_kg": "1909.66925013317",
+        "terminal_boundary_residual_k": "0.4567250620031",
+        "total_duty_w": "39154.413450920622",
+        "tube_outlet_temperature_k": "299.2195528345045"
+      },
+      "status": "COMPLETED",
+      "wall_seconds": 3.673546792999332
+    },
+    "production": {
+      "observables": {
+        "energy_balance_residual_w": "1.625E-10",
+        "local_task172_result_hashes": [
+          "dc37ee1eadba99dbe05b6e38c50d074f94ed28b89415cdc501c8d2240d87b508",
+          "2d12948663a53c7fbcc017bdfabdd2d7e031bcb25ca26d88854bcc7860da46d9",
+          "168a495b4f0d936b92e51ac611bea530d5c38c8159b7d37f9ce1a3137d88fd77",
+          "304f428d897172991bedba2ee0fdf15fe8470587ab5d6c01ab829ec3e3d2d56b",
+          "bde87535b9e40d9924b1638fe265a35b53c544cebf85a3d5b21d2ce8a358eb40"
+        ],
+        "mesh_result_hash": "80a165879afb8403ab597fad73bf6784a25ba110692110a4da256a420d451c38",
+        "shell_outlet_temperature_k": "299.07496245212",
+        "task172_local_evaluation_count": 177,
+        "terminal_boundary_residual_j_kg": "1909.66925016379",
+        "terminal_boundary_residual_k": "0.4567250620423",
+        "total_duty_w": "39154.4134503082375",
+        "tube_outlet_temperature_k": "299.21955283440343"
+      },
+      "status": "COMPLETED",
+      "wall_seconds": 8.479261754999243
+    },
+    "shooting_enthalpy_j_kg": "108787.509731947050",
+    "speedup": 2.308194840789329,
+    "subdivisions_per_interval": 1
+  },
+  "cases": [
+    {
+      "comparison": {
+        "duty_delta_w": 6.123845e-07,
+        "local_task172_hash_parity": false,
+        "mesh_hash_parity": false,
+        "shell_outlet_delta_k": 0.0,
+        "tube_outlet_delta_k": 1.0107e-10
+      },
+      "fast_solver": {
+        "authority_candidate": "V07-FAST-SOLVER-COUPLED-CELL-R1",
+        "mesh_stats": {
+          "cell_count": 5,
+          "coupled_fallback_count": 1,
+          "total_eval_trial_calls": 127,
+          "total_least_squares_nfev": 40
+        },
+        "observables": {
+          "energy_balance_residual_w": "1.78E-10",
+          "local_task172_result_hashes": [
+            "18b7e9bd6d727a5f7add60f3e3579a71f0f820b30372dd1c124e078074f9939d",
+            "a86572a36ddafb4c9d0db639f2840527863d96fdf5f73b253152709e08fd8f2e",
+            "1f5ff5d5eb9fdbd980e5b3bcafe189eeef17782769009b22d514824b6c855fdc",
+            "f676a1e30627d4cfa3d91bef8b476fdb103b9355bf87695aba0bd210f71e47ba",
+            "68c2c17e7d7ebb8f4575b7600b28625b6920a11c1d9857177a60c524b8f9c5f6"
+          ],
+          "mesh_result_hash": "afb531b4c02a95b81e566a09a8799b7c4fb67ea403643e76391fe013fc394f4e",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 0,
+          "terminal_boundary_residual_j_kg": "1909.66925013317",
+          "terminal_boundary_residual_k": "0.4567250620031",
+          "total_duty_w": "39154.413450920622",
+          "tube_outlet_temperature_k": "299.2195528345045"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 3.673546792999332
+      },
+      "production": {
+        "observables": {
+          "energy_balance_residual_w": "1.625E-10",
+          "local_task172_result_hashes": [
+            "dc37ee1eadba99dbe05b6e38c50d074f94ed28b89415cdc501c8d2240d87b508",
+            "2d12948663a53c7fbcc017bdfabdd2d7e031bcb25ca26d88854bcc7860da46d9",
+            "168a495b4f0d936b92e51ac611bea530d5c38c8159b7d37f9ce1a3137d88fd77",
+            "304f428d897172991bedba2ee0fdf15fe8470587ab5d6c01ab829ec3e3d2d56b",
+            "bde87535b9e40d9924b1638fe265a35b53c544cebf85a3d5b21d2ce8a358eb40"
+          ],
+          "mesh_result_hash": "80a165879afb8403ab597fad73bf6784a25ba110692110a4da256a420d451c38",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 177,
+          "terminal_boundary_residual_j_kg": "1909.66925016379",
+          "terminal_boundary_residual_k": "0.4567250620423",
+          "total_duty_w": "39154.4134503082375",
+          "tube_outlet_temperature_k": "299.21955283440343"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 8.479261754999243
+      },
+      "shooting_enthalpy_j_kg": "108787.509731947050",
+      "speedup": 2.308194840789329,
+      "subdivisions_per_interval": 1
+    },
+    {
+      "comparison": {
+        "duty_delta_w": 1.8672224e-06,
+        "local_task172_hash_parity": false,
+        "mesh_hash_parity": false,
+        "shell_outlet_delta_k": 0.0,
+        "tube_outlet_delta_k": -1.3211e-10
+      },
+      "fast_solver": {
+        "authority_candidate": "V07-FAST-SOLVER-COUPLED-CELL-R1",
+        "mesh_stats": {
+          "cell_count": 10,
+          "coupled_fallback_count": 8,
+          "total_eval_trial_calls": 251,
+          "total_least_squares_nfev": 77
+        },
+        "observables": {
+          "energy_balance_residual_w": "3.208E-10",
+          "local_task172_result_hashes": [
+            "cfdc2cc3d7ab8c37a1187ce391669e0aa628ee09c1d2c9202c0d05a2f23f9b33",
+            "4fe30695eeaf202db23d0753f7fe6980845d488bea860827bc413ebe9deb930f",
+            "2b879b5523fa13efe09dd1975c053090053922d47f86f21781b7b8e0e52a1721",
+            "e63604dc65bbf7c144038c19bdb15fba0dc43165f6352058b6a690382196dc21",
+            "e1805adce12001e9ea23e139ab3770f7d148072563fc9267965172d61926906b",
+            "c96a6c1dd6d533aac2349683387d08d161dcac4ea23a769c0f37ffe6a3a8b810",
+            "f67560f4edd2068e54eec579626c22ec175b308e0e54f58db7c64eb0cbee6819",
+            "e0d7b9be46b72aca67f15d15aa4a4a49d0526636f568152eb19ec5825a1a34f6",
+            "9b941e5ec567a0c32de6701f3d28c253686156bc5847f12e5a019c0773844aa9",
+            "9af637ee5f7814fe6565d403a48c3714c0966f0f96bfec596458b4cf395fbf82"
+          ],
+          "mesh_result_hash": "0386a5b41db1da6efa2b48f9d74047ab77e32b6903c657044f761bd0a3340650",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 0,
+          "terminal_boundary_residual_j_kg": "1910.35160662666",
+          "terminal_boundary_residual_k": "0.4568882609766",
+          "total_duty_w": "39140.7663210512008",
+          "tube_outlet_temperature_k": "299.21982484761173"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 16.515744353000628
+      },
+      "production": {
+        "observables": {
+          "energy_balance_residual_w": "8E-11",
+          "local_task172_result_hashes": [
+            "cfdc2cc3d7ab8c37a1187ce391669e0aa628ee09c1d2c9202c0d05a2f23f9b33",
+            "4fe30695eeaf202db23d0753f7fe6980845d488bea860827bc413ebe9deb930f",
+            "2b879b5523fa13efe09dd1975c053090053922d47f86f21781b7b8e0e52a1721",
+            "e63604dc65bbf7c144038c19bdb15fba0dc43165f6352058b6a690382196dc21",
+            "faf93e4f40d8491ec50354bf4c5524bc6aa0dd0c51becd5a21a04c1955a5afca",
+            "befb166d6f81e3dc53eeb046969e3e3dd0515b1642e8cf61640668d885fac017",
+            "fbdfd5cf26cc6ea1f9a38831a6cd6c8ad1dac578bbe212216baa399992eb39ac",
+            "431b3a65a290fc5631e92ab51ff2baa5ecdcce8fc1b0312c8d578193216dd062",
+            "418af9557b1f541a2f02fe3a5e10e83643d31db5189c5878fb290fd9e4250baa",
+            "6bd2c2e5bfbaa833ed9eb6e66e98408f10234d81bb56ca5091ec8d25dd6b80ed"
+          ],
+          "mesh_result_hash": "b6924ae63a42386d9d1aae65370780418d6f9d53501f290730f4c806a3ba8d7f",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 350,
+          "terminal_boundary_residual_j_kg": "1910.35160672001",
+          "terminal_boundary_residual_k": "0.4568882610024",
+          "total_duty_w": "39140.7663191839784",
+          "tube_outlet_temperature_k": "299.21982484774384"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 16.640932763999444
+      },
+      "shooting_enthalpy_j_kg": "108787.509731947050",
+      "speedup": 1.0075799436176227,
+      "subdivisions_per_interval": 2
+    },
+    {
+      "comparison": {
+        "duty_delta_w": -8.744857e-07,
+        "local_task172_hash_parity": false,
+        "mesh_hash_parity": false,
+        "shell_outlet_delta_k": 0.0,
+        "tube_outlet_delta_k": 1.1496e-10
+      },
+      "fast_solver": {
+        "authority_candidate": "V07-FAST-SOLVER-COUPLED-CELL-R1",
+        "mesh_stats": {
+          "cell_count": 20,
+          "coupled_fallback_count": 13,
+          "total_eval_trial_calls": 510,
+          "total_least_squares_nfev": 156
+        },
+        "observables": {
+          "energy_balance_residual_w": "1.6E-10",
+          "local_task172_result_hashes": [
+            "1adf5ea39a146a39393b44018e0b8ba38ad8ae4bbb858593cbac38ebf664c944",
+            "916234934ffe05ada7c54f5dda39464cc5ab6708b17f5007ac04aca8d0010872",
+            "2ffa51fd191623775b4ac803a4386dfb677c6b51c9622aef3d42681f4270d0e0",
+            "fc8b9e3a3aca7573b47eebd7c561947d21141fd64cc70fb59677707fad041ff8",
+            "6169d22998cb874997da72d8563064e412c8834cb03a4ecbf5615a1ab5f9f43a",
+            "f3a901a667093d912ae86491d0f0407b28da4aa434053fb04ae3de5729028f2c",
+            "8b04d749f16353c090556cbae226132cbca99bf561b410c30160203f715aacc8",
+            "e1f8f44eaaf86663a49e9f596af95f21f7ccf3bbb2f5065d223839250569abc3",
+            "4e7d6882e771c75a527ca7349ee6eb36006deddffabc0d1785ddbb6e11aa4fbc",
+            "77c09118776e8a95774dec8025d629a4739833d2f8b50288e4530399c44d0a25",
+            "d1c05944a6fd45b003d6f498c24213838190cd396f8202bf16eb7effe3d1c8c0",
+            "a1f99359e4922ee3bf101a061daf7e6d96e05f4ac54677a35fef585b36a84e13",
+            "7f296dcb7a7cfd4e00331f2648b20d06d1d7e65505f876974b4e674dec8e788b",
+            "b1e440842a55c62a51f19abeb9a38476cf143a263ac31734e2060a712e4f00eb",
+            "4e9be2dd1e9d22bb9ad8bae08f17ae3a92f303470fcff69cb4b3b161353f2638",
+            "693f4faaa405a041f591475109701a78c356bc5e9a68335b91a61aebdca0865b",
+            "30ac0bae4e691a3491927fbdeaa23ca84800072bbf906e8f4f81b9be9cf6da02",
+            "e3d3ba6cfbb05ed5cedd6266a69ec79d930b93ee46592c63e9eb6468f83ee4d8",
+            "66bf4974aa57df5d8957868b387214ff92667d6e296b6ccf42fd592dfce36ef8",
+            "c181b6e7bce22b00d8bdd53b6ffe7113303db8eb362b03e2ac45ef33284bd168"
+          ],
+          "mesh_result_hash": "46af9567c7b3982b384945f3eb7db7ff15003b4c891f136cadab428c4acbc902",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 0,
+          "terminal_boundary_residual_j_kg": "1910.52204785285",
+          "terminal_boundary_residual_k": "0.4569290253424",
+          "total_duty_w": "39137.3574965271071",
+          "tube_outlet_temperature_k": "299.21989279205536"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 29.334550829000364
+      },
+      "production": {
+        "observables": {
+          "energy_balance_residual_w": "4.072E-10",
+          "local_task172_result_hashes": [
+            "1adf5ea39a146a39393b44018e0b8ba38ad8ae4bbb858593cbac38ebf664c944",
+            "916234934ffe05ada7c54f5dda39464cc5ab6708b17f5007ac04aca8d0010872",
+            "8dc1ac112bda06c89a3c75ef4c56071a47300d5579efb8ba06c5102a66b828f2",
+            "040e86a7c21b8e59fc1f3021926bbff01ef801220d1c5c211a9845b705bfc80f",
+            "94007ced34672586ae476e3f1828a6d03b096c7e5e9c20416dd28b2c91231ada",
+            "cacd23f0110807b3dbd15286c356d53e3b3857298e149b72f8c085ceaf6a8959",
+            "291bb68f91a4c82d3e3af4226fa45c816bfd8280c634fc4c7fc25a7919d7b578",
+            "35714969115edf5333ebf3205f663ac3e55acf127ff13e0e72d1797a032f193b",
+            "0486dc7f60b8506ec28df6291d4b3ac785123ad7b8804d21b9ba36311f020f60",
+            "f5ee91d9c217a7c9187cf7be1e17a11b2d8738f6fec14463dab8eeab5985778b",
+            "ca7943d3bc81a754665069a099243bbe2f8647a381483f99ee41b7c0aa5fbbd0",
+            "b77d01a42fc1900cb3927d7ac088b0c7193aca2868cad43fbd7df9ef63fe9615",
+            "5b6147d0aa02aa1278fd3fc3900c28f9bfd610d54d41865ca4f3296cb66ba99b",
+            "ca0392dfbe2a6dd1c6061821f5393ee10e495b11a56a6d329df806ceee0e2bf9",
+            "3d2143632851ae3ca208f7668470c58941177ac99b9972bb569263cb737410b6",
+            "179e9adcc3aa3d72aa5de0e93c8ed128e85e0e80693eb78a3b9e083b77d7979d",
+            "f36df6ea65a629e95492827f9a00848d91af7fb8fffe638a2f09f70a4442f6c6",
+            "06d1019deaf9a87f056e84783d66e0af9282283d021ca5961419e20c699d5a8d",
+            "fb4fab02cfbfb609456a70db3cc7a498c890860391badcd2574c3b5802270f60",
+            "2cdadc8f819f6c27bc2316087b1f4cc3106ac90abe01245c958380a7a477e1c7"
+          ],
+          "mesh_result_hash": "fa1d958b66d814c5d8019d38f54bb6f533e588533ae530a65d92e66910533a03",
+          "shell_outlet_temperature_k": "299.07496245212",
+          "task172_local_evaluation_count": 725,
+          "terminal_boundary_residual_j_kg": "1910.52204780911",
+          "terminal_boundary_residual_k": "0.45692902535254",
+          "total_duty_w": "39137.3574974015928",
+          "tube_outlet_temperature_k": "299.2198927919404"
+        },
+        "status": "COMPLETED",
+        "wall_seconds": 34.460336918000394
+      },
+      "shooting_enthalpy_j_kg": "108787.509731947050",
+      "speedup": 1.1747354550911562,
+      "subdivisions_per_interval": 4
+    }
+  ],
+  "fast_solver_implemented": true,
+  "historic_candidate_b_rating_hash_reference": "1cecb402cc44ec2690918b3479cf6c7e4e1079eb290835122ad53ddfce657743",
+  "physical_equations_preserved": "Production _eval_trial constitutive residuals + production _cell_evaluation propagation; no tolerance relaxation",
+  "production_integration": false,
+  "shooting_enthalpy_frac": "0.5",
+  "shooting_enthalpy_j_kg": "108787.509731947050",
+  "shooting_note": "Frozen in-domain shooting enthalpy (50% of [H_MIN,H_MAX]) for non-zero duty; not converged outer-boundary enthalpy; not full Candidate B Rating replay",
+  "solver_method": "Coupled (q,Twi,Two) TRF per cell; enthalpy-linked bulk states",
+  "source_head_sha": "84c5f38b74fd26eacefee260af7be26c12cb2e31",
+  "task_id": "V07_TASK172_TASK173_FAST_SOLVER_ARCHITECTURE_R1"
+}

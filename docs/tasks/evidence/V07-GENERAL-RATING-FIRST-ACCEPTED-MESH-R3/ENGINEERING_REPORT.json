@@ -1,0 +1,78 @@
+{
+  "candidate_generation": {
+    "candidate_count": 1,
+    "candidate_space_hash": "f52842793cba22d6a0c532c09f48743da7bf5f7397bf1d0efcc6a4b1154abb24",
+    "distinct_geometry_count": 1,
+    "geometry_constraints": {
+      "baffle_count": 4,
+      "baffle_spacings_m": [
+        "0.97"
+      ],
+      "shell_inside_diameter_m": "0.5",
+      "tube_lengths_m": [
+        "4.85"
+      ],
+      "tube_outer_diameter_m": "0.01905",
+      "tube_pass_count": 1,
+      "tube_pitch_m": "0.0254",
+      "tube_wall_thickness_m": "0.00165"
+    },
+    "preflight_status": "VALID"
+  },
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+      "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    }
+  ],
+  "design_conditions": {
+    "cold_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "300.00",
+      "mass_flow_kg_s": "12.000000"
+    },
+    "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+    "hot_side": {
+      "fluid": "PURE_ORDINARY_WATER",
+      "inlet_pressure_pa": "101325",
+      "inlet_temperature_k": "298.15",
+      "mass_flow_kg_s": "20.000000"
+    },
+    "max_shell_dp_pa": "1180",
+    "max_tube_dp_pa": "1150",
+    "target_duty_w": "9500"
+  },
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r3",
+  "engineering_warnings": [
+    "EXPERIMENTAL_MVP \u2014 not production design approval.",
+    "FIV numeric limits not verified (FIV_NUMERIC_LIMIT_AUTHORITY=MISSING).",
+    "R2A production certificate authority not verified for this workflow.",
+    "Task167 configuration rule pack approval not claimed."
+  ],
+  "experimental_ranking_status": "NOT_AVAILABLE",
+  "fiv_numeric_limit_authority": "MISSING",
+  "generated_at_utc": "2026-10-20T15:46:17.209817+00:00",
+  "model_applicability": {
+    "construction": "FIXED_TUBESHEET E-shell one shell pass",
+    "fluid": "PURE_ORDINARY_WATER single-phase",
+    "service_envelope": "Tube 12 kg/s, shell 20 kg/s, 298.15\u2013300 K, 100\u2013101325 Pa"
+  },
+  "notes": "TUBE_HOT_SHELL_COLD with kernel-matched mass flows; C3-qualified reference geometry; single candidate for R3 mesh/cell evidence.",
+  "numerical_authority_status": "CANDIDATE",
+  "production_design_approved": false,
+  "production_integration": false,
+  "r2a_production_authority_verified": false,
+  "ranking": null,
+  "rating_and_sizing": null,
+  "schema_version": "hxforge.engineering-report.v1",
+  "solver": {
+    "mesh_profile": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1 (full ladder when rated)",
+    "task173_integrated_sizing": false
+  },
+  "workflow_status": "PREFLIGHT_COMPLETE"
+}

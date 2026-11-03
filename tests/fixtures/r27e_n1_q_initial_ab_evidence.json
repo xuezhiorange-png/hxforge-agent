@@ -1,0 +1,28 @@
+{
+  "TASK_ID": "V07_R27E_N1_ENTHALPY_REGRESSION_AND_CI_REMEDIATION",
+  "root_cause_class": "initial_point_invalid_conductance_weighted_q_guess",
+  "mechanism": "R27E _conductance_weighted_q_guess() scaled total Q to ~280 kW; _enthalpies_from_q_vector() on that seed produced tube-side h below rating-admitted h_min on the first least_squares residual evaluation (before iteration). R27D used uniform _initial_q_guess() only.",
+  "fix": "_resolve_n1_q_initial() uses conductance-weighted seed only when _q_vector_in_admitted_enthalpy_domain() passes; otherwise deterministic R27D uniform fallback.",
+  "candidates": [
+    {
+      "candidate_id_prefix": "9c4b84db",
+      "r27e_pre_fix_n1": "MESH_TOPOLOGY_INVALID; enthalpy_domain_exit; h≈88026.20 J/kg",
+      "r27e_post_fix_n1_duty_w": 419782.3989186106,
+      "r27d_baseline_n4_duty_w": 419626.457,
+      "conductance_weighted_seed_admitted": false,
+      "legacy_uniform_seed_admitted": true
+    },
+    {
+      "candidate_id_prefix": "7357afdf",
+      "r27e_pre_fix_n1": "MESH_TOPOLOGY_INVALID; enthalpy_domain_exit; h≈89339.30 J/kg",
+      "r27e_post_fix_n1_duty_w": 415979.0391913209,
+      "r27d_baseline_n4_duty_w": 415830.252,
+      "conductance_weighted_seed_admitted": false,
+      "legacy_uniform_seed_admitted": true
+    }
+  ],
+  "recovery_check": {
+    "09dac82a_n1_duty_w_post_fix": 380706.455310371,
+    "status": "EXPERIMENTAL_ENGINEERING_NUMERIC_VALID"
+  }
+}

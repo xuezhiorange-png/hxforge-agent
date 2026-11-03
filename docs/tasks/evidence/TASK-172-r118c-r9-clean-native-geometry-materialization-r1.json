@@ -1,0 +1,202 @@
+{
+  "schema_version": "task172.r118c-r9.materialization-evidence.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "short_name": "R118C-R9",
+  "attempt_number": 9,
+  "result": "TASK014_AND_NATIVE_GEOMETRY_MATERIALIZATION_COMPLETED_CLEAN_R9",
+  "predecessor_head_sha": "ff8f703e6204faa257eb4c4e4090f4bee8bf4be8",
+  "pull_request": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "is_draft": true
+  },
+  "materialization_provenance": {
+    "code_sha": "ff8f703e6204faa257eb4c4e4090f4bee8bf4be8",
+    "software_version": "0.6.0",
+    "version_source": "pyproject.toml [project].version"
+  },
+  "reviewed_authority": {
+    "authority_bundle_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-BUNDLE-R1",
+    "review_receipt_id": "V07-T172-PROJECT-ENGINEERING-NATIVE-GEOMETRY-INPUT-REVIEW-R118B",
+    "effective_lifecycle": "REVIEWED_AUTHORITY",
+    "reviewed_values_reused_exactly": true,
+    "new_engineering_authority_created": false,
+    "new_engineering_value_created": false,
+    "numeric_engineering_value_change_count": 0,
+    "scope_widening": false,
+    "standard_claim_status": "NO_STANDARD_CLAIM",
+    "candidate_payload_hash": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+    "candidate_domain_snapshot_hash": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802"
+  },
+  "review_lineage": {
+    "r118b_review_evidence_canonical_hash": "604b6162561be3fdb93b8047500ba40c24f866cc8464f77fac82694aeb99f4c9",
+    "r118b_extension_canonical_hash": "5e0cdf6c7e0be245eff82f80a2738867a769a7baf25fb6d2efa4d46c176a2581",
+    "r118b_quantization_amendment_evidence_canonical_hash": "d1bb31697a0efa61299b402333adeec2f54292cd0b1f45e88927a21f0f0f1226",
+    "r118b_public_projection_amendment_evidence_canonical_hash": "a01bdc446922c489f5b530681d871c6597c18ac7cf169f1d7cbbd7d84bfdf9a1",
+    "r118c_attempt1_incident_evidence_canonical_hash": "b69f6a1f685068d07930770dc9691b766a57fd68a0918452ac786a0d1f872668",
+    "r118c_attempt2_incident_evidence_canonical_hash": "21561b2c8d6adeeb0d84136d057c5897cefc53c373dae4513ba6538fd91d587d"
+  },
+  "candidate_case_identity": {
+    "CASE_ID": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "ROOT_CASE_ID": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+    "TASK014_REVISION_ID": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+    "TASK014_REVISION_STATUS": "committed",
+    "TASK014_PAYLOAD_HASH": "255365138682a00c7a95dda46c8dd9ab4808a22cbde70bae32754644224a1817",
+    "TASK014_DOMAIN_SNAPSHOT_HASH": "376a90ca7b141ef2eec4699d196f548d0c0e7124f74aea8e8aca2a8e72b7a802",
+    "TASK014_AUDIT_EVENT_TYPES": [
+      "revision_created",
+      "revision_validated",
+      "revision_committed"
+    ]
+  },
+  "native_identity_chain": {
+    "TASK020_CONFIGURATION_ID": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+    "TASK020_CONFIGURATION_HASH": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+    "TASK021_LAYOUT_ID": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+    "TASK021_LAYOUT_HASH": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+    "TASK022_BUNDLE_GEOMETRY_ID": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+    "TASK022_BUNDLE_GEOMETRY_HASH": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+    "TASK024_BAFFLE_GEOMETRY_ID": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+    "TASK024_BAFFLE_GEOMETRY_HASH": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+    "TASK025_RESULT_ID": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+    "TASK025_RESULT_HASH": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+    "TASK025_REQUEST_HASH": "ee0625273153d7a487f141fc153464d9e94132f5e280ad5e257b45473fcb84b8",
+    "TASK025_HYDRAULIC_AUTHORITY_HASH": "2fb039ad6bc5a398ec75911c5b05b36e889d7d37a307ea424c4c7a15884365e5"
+  },
+  "stage_statuses": {
+    "TASK014": "committed",
+    "TASK020": "VALID",
+    "TASK021": "VALID",
+    "TASK022": "VALID",
+    "TASK024": "VALID",
+    "TASK025": "VALID"
+  },
+  "run_a_oracle_accounting": {
+    "static_pass": 60,
+    "same_run_pass": 7,
+    "baseline_bound": 20,
+    "immediate_pass": 67,
+    "immediate_fail": 0
+  },
+  "run_b_oracle_accounting": {
+    "static_pass": 60,
+    "same_run_pass": 7,
+    "replay_pass": 20,
+    "replay_fail": 0,
+    "immediate_pass": 67,
+    "immediate_fail": 0
+  },
+  "final_oracle_matrix_pass_count": 87,
+  "final_oracle_matrix_fail_count": 0,
+  "all_87_native_oracles_pass": true,
+  "determinism": {
+    "same_native_engineering_identities": true,
+    "same_native_engineering_outputs": true,
+    "shared_native_object_count": 0,
+    "stage_snapshot_equalities": {
+      "TASK020": true,
+      "TASK021": true,
+      "TASK022": true,
+      "TASK024": true,
+      "TASK025": true
+    },
+    "task014_deterministic_projection_equal": true
+  },
+  "task025_evidence_projection": {
+    "projected_field_count": 27,
+    "projection_gate_pass": true,
+    "run_a_run_b_projection_equal": true,
+    "native_result_hash_replay": true,
+    "native_result_id_replay": true,
+    "internal_flow_length_hash_replay": true,
+    "heat_transfer_length_hash_replay": true,
+    "evidence_projection_used_to_compute_result_hash": false
+  },
+  "request_shape_gate_count_per_run": 5,
+  "request_shape_gate_fail_count": 0,
+  "downstream_producer_invocation_before_gate_pass_count": 0,
+  "r118c_attempts_1_through_8_reused": false,
+  "historical_boundary": {
+    "r1_r118b_and_amendments_immutable": true,
+    "prior_registry_extensions_rewritten": false,
+    "registry_preexisting_duplicate_keys": 2,
+    "new_duplicate_json_keys": 0
+  },
+  "downstream_scope": {
+    "TASK171_EXECUTED": false,
+    "TOPOLOGY_AUTHORITY_ID": "UNBOUND",
+    "FLOW_PATH_MAPPING_ID": "UNBOUND",
+    "PHYSICAL_COMPARTMENT_MAP_ID": "UNBOUND",
+    "AREA_OWNERSHIP_MAP_ID": "UNBOUND",
+    "LENGTH_OWNERSHIP_MAP_ID": "UNBOUND",
+    "GEOMETRY_ID": "UNBOUND",
+    "GEOMETRY_ID_UNBOUND_REASON": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "PRODUCTION_MESH_PROFILE_AUTHORITY_ID": "UNBOUND",
+    "REAL_CASE_MESH_ADMISSIBLE": false,
+    "TASK172_RUNTIME_IMPLEMENTATION": false,
+    "TASK174_SOLVE_PERFORMED": false,
+    "TASK173_SOLVE_PERFORMED": false,
+    "TASK175_RELEASE_ACCEPTANCE_PERFORMED": false,
+    "READY_AUTHORIZED": false,
+    "MERGE_AUTHORIZED": false
+  },
+  "exact_head_ci": {
+    "status": "REQUIRED_AFTER_FINAL_COMMIT",
+    "conclusion": "PENDING"
+  },
+  "artifacts": {
+    "docs/tasks/evidence/TASK-172-r118c-r9-task014-case-revision-r1.json": {
+      "file_sha256": "50ab2df758b768d85f9f95c08f0b2d1d3ae621c0ecd57fd685369f2aec9e63b4",
+      "canonical_hash": "2d5a304cef1461aef23b2a2ff4a2e30c90e7109c947ae90462dc4e3303ae15c3"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task020-configuration-r1.json": {
+      "file_sha256": "8ac024cea6f8795ca2f458c00ea87a34c44180a517aa103a9c391304392cb73a",
+      "canonical_hash": "0ead1bf29020140558471439fda6791dac6d24d0afb420170363a6ed96eb63dd"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task021-layout-r1.json": {
+      "file_sha256": "222f94c09327ea4071073ea08730645b7ef3f6b5319c9c92dbcf05b195b3339d",
+      "canonical_hash": "1ff10418d0eed1303f55a31fb4dbaebde43240ebec04a19ec4f74085bfee064b"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task022-bundle-geometry-r1.json": {
+      "file_sha256": "0c1fda6f39fd692b439843aa23fe6cc2cb91711663ddc349acb120f6d3aa8c74",
+      "canonical_hash": "1c354ba8f851c15467b8a392350063f461a0bb0ccfdc6d032a70d1cfdd38e11c"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json": {
+      "file_sha256": "0809fe7b36017412949eb8dd2d8afa9b8bd6d86c2701ad3e86fc0d57316a113e",
+      "canonical_hash": "2092926bbf26f1d7d5e22edd1ded4d38072fab900c641206130bf3c5d2378bf4"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json": {
+      "file_sha256": "597a4dceae635415534f2d82e14c11c2e0e2ff02a23bce69814b2b82e40501c9",
+      "canonical_hash": "8ef4cef8542067f16d08559435ea555084835bbfb57361249de9350d280c6131"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-native-replay-manifest-r1.json": {
+      "file_sha256": "f2cbffa17c8ef22f0164bd4972e14f9446fe5e2749bb89112df278992076c7bd",
+      "canonical_hash": "cf527b455fd17ecfa18f6a2d93610cbcf03ecf8e71f3dbd6203a0a13719b506e"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-stage-gate-ledger-r1.json": {
+      "file_sha256": "aceb334745ad2c33f55aca941c2e51a968355c25333645b38d2a3ca83168d9c7",
+      "canonical_hash": "5fab39b7574293021b7e6104950413ab167b38e5b77db89761a25ca299f4328f"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-oracle-evaluation-r1.json": {
+      "file_sha256": "ba543aac1ac40fef82370b71d5d2f085bb58db5d23bf8924884cb43c1d32ed2c",
+      "canonical_hash": "7ebf45d3badd0c09373c97d8df2aa93b09bf9edaf6d1927387f146276732bbf9"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-request-shape-evaluation-r1.json": {
+      "file_sha256": "e78a5b46079df5776ddfdb4cf2ef91aeeb5ff902b74c6e5a3a3b7fc8ff902789",
+      "canonical_hash": "7ca17c51cf908ab834fb84f431d8b8e2bf4f019136b1f573975ade954361a190"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-runtime-authority-binding-evaluation-r1.json": {
+      "file_sha256": "763d75b1a0beb60230d3c788d44ba9a8a586174c38d5108a14c87a69abb93a25",
+      "canonical_hash": "06d7b4042252adc3a52e0f3cd1e55abb6f298e21fc060ed81b2100faa328e4b8"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-dynamic-resolver-evaluation-r1.json": {
+      "file_sha256": "dd12a9f3881f50526960801bd70378486a8df501255afa3e415e6a4a27dee27f",
+      "canonical_hash": "5f35f0a77b8980b4c024886d937d485e51e523539f26dca876aa61c217009c42"
+    },
+    "docs/tasks/evidence/TASK-172-r118c-r9-task025-evidence-projection-evaluation-r1.json": {
+      "file_sha256": "1f8e147399c25fd6b5e2d03a0109190b6851f13a94576eaca27abff21391bf84",
+      "canonical_hash": "23139f9b1f6b5061e675e3d66c30621080976ca432db752af06d05804257e5e9"
+    }
+  },
+  "canonical_hash": "3e46bc040dd4f4b4af539320cda68a5cba2ff9815d1f4a3063917641e5ef3361"
+}

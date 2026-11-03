@@ -1,0 +1,13 @@
+{
+  "files": {
+    "BOUNDARY_PH_RECONSTRUCTION_DIAGNOSTICS.json": "874a0a9b10e1024f148f6c4862f5cd2abdbc5149ff707d3206127f09c1b0ee35",
+    "ENGINEERING_REPORT.json": "a6dbd0c3aee8bca37d898712ba8efcb90f2f87f229c7979644bb46addb8d75d7",
+    "ENGINEERING_REPORT.md": "992d366436354d6fb1cebd9671578e75ef24afdd543f3a25b84fdd632a3eb333",
+    "LIVE_N1_MESH_RESULT.json": "43cf8d9cdee780bc0ed76d15c03e5f0c922d2db4e789818ee64f5222634cc389",
+    "RAW_RESULT.json": "57d0560f95a672ebf84c62551950ee87912ad8587f45c87b2783a0d609013013",
+    "THERMAL_BOUNDARY_BINDING.json": "a3c87485c2614d44adb571f2dfe9331c2a5fed99e82fcbbac0aaf3e330ba7e1f"
+  },
+  "schema_version": "hxforge.evidence-manifest.v1",
+  "task_id": "V07_GENERAL_RATING_LIVE_BOUNDARY_N1_CLOSURE_R8",
+  "total_numerical_seconds": 240.73
+}

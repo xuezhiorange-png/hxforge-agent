@@ -1,0 +1,7 @@
+{
+  "n4_worker_budget_s": 600.0,
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "source_head_sha": "7b954f6e86bf5ab2db5c206adfe977942c2782ad",
+  "stage": "pre_n4_compute",
+  "task_id": "V07_FAST_SOLVER_N4_MESH_CONVERGENCE_R5"
+}

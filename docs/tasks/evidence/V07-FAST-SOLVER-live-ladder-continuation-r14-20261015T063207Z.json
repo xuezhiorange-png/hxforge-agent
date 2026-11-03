@@ -1,0 +1,52 @@
+{
+  "arbitrary_candidate_full_rating_verified": false,
+  "exact_head_ci_ruff_pass": false,
+  "ladder_continuation_status": "MESH_COMPARISON_FAIL_CONTINUE",
+  "live_full_rating_completed": false,
+  "live_n4": {
+    "mesh_result_hash": "6b20ea36786e817fe83b92876e8b3768d703e2262f68a913243d2196d4c43f2e",
+    "outer_status": "TERMINAL_ACCEPTED",
+    "shooting_enthalpy_j_kg": "107515.23962914693046195797622203826904296875",
+    "terminal_residual_k": "8.93497E-9",
+    "worker_seconds": 353.6832337769956
+  },
+  "live_orchestrator_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-ladder-continuation-r14-20261015T063207Z.live-orchestrator.json",
+  "n2_n4_comparison": {
+    "coarse_subdivisions": 2,
+    "duty_difference_w": "3.0174608101593",
+    "duty_metric": "0.00005813383670899939104282122696",
+    "duty_metric_threshold": "0.01",
+    "duty_metric_units": "RELATIVE_FRACTION",
+    "duty_precision_floor_metric": "4.073879941750552883618140300E-12",
+    "duty_precision_floor_w": "2.114564213447719368E-7",
+    "duty_status": "PASS",
+    "fine_subdivisions": 4,
+    "interval_duty_differences_w": [
+      "0.9306637630913",
+      "0.7418300874586",
+      "0.5800328825610",
+      "0.4415912703932",
+      "0.3233428066552"
+    ],
+    "overall_status": "FAIL",
+    "wall_extrema_differences_k": {
+      "T_wall_inner_max": "0.02434305645665",
+      "T_wall_inner_min": "0.01693567499083",
+      "T_wall_outer_max": "0.02340287663665",
+      "T_wall_outer_min": "0.01629870924046"
+    },
+    "wall_precision_floor_k": "3.4894536809635012E-13",
+    "wall_status": "FAIL"
+  },
+  "numerical_authority_status": "CANDIDATE",
+  "prior_n1_replay_parity": true,
+  "prior_n2_replay_parity": true,
+  "production_integration": false,
+  "r13_result_sha256_verified": true,
+  "result": "R14_LIVE_N4_PARTIAL",
+  "snapshot_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-ladder-r14-snapshot-20261015T063207Z",
+  "source_head_sha": "21cff09c176f48621fba55e1f52a8f27cb2bdaa9",
+  "stage_dir": "docs/tasks/evidence/V07-FAST-SOLVER-live-ladder-r14-stages-20261015T063207Z",
+  "task_id": "V07_FAST_SOLVER_LIVE_LADDER_CONTINUATION_R14",
+  "total_runner_wall_seconds": 392.46728448299837
+}

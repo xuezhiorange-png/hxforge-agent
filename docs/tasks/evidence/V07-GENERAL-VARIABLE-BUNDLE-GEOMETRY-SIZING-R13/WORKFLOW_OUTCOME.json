@@ -1,0 +1,15 @@
+{
+  "blocked_rating_count": 0,
+  "blocker_code": null,
+  "cli_success": true,
+  "engineering_case_id": "mvp-variable-bundle-r13",
+  "mesh_status": "NUMERIC_VALID",
+  "multi_candidate_mode": true,
+  "numeric_valid_count": 2,
+  "raw_result_path": "docs/tasks/evidence/V07-GENERAL-VARIABLE-BUNDLE-GEOMETRY-SIZING-R13/RAW_RESULT.json",
+  "raw_result_sha256": "414e28c1686fc72a24fba848f5370045569dee361b3251b57858f3ec4583e117",
+  "schema_version": "hxforge.experimental-live-workflow-outcome.v2",
+  "selected_for_rating_count": 2,
+  "status": "EXPERIMENTAL_COMPLETE",
+  "total_numerical_seconds": 571.067
+}

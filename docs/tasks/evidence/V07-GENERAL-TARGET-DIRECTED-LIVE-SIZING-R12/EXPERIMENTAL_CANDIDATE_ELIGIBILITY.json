@@ -1,0 +1,49 @@
+{
+  "HYDRAULIC_MODEL_SCOPE": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+  "candidates": [
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.6",
+      "candidate_hash": "5458e3f125923aa1c63211e1be4d5176a9957498d938ba42b3cc432dd4911039",
+      "candidate_id": "f288aa61-0725-5942-a4fa-d5e16e1cd706",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.0",
+        "nominal_tube_outer_area_m2": "45.424131098622137497350",
+        "physical_tube_count": 253,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "task168_blocked_codes": [],
+      "tube_length_m": "3.0"
+    },
+    {
+      "CONSTRAINT_STATUS": "PRELIMINARY_CONSTRAINT_SATISFIED",
+      "PRODUCTION_QUALIFICATION": "PRODUCTION_NOT_QUALIFIED",
+      "RATING_STATUS": "NUMERIC_VALID",
+      "STRUCTURAL_STATUS": "ADMITTED",
+      "TASK174_STATUS": "VALIDATED",
+      "baffle_spacing_m": "0.7",
+      "candidate_hash": "fd8a0e69a5bc131c1da9d4c3208cfb0124d11299a8ae0002e3c99c3a14de8087",
+      "candidate_id": "071b9c82-f24a-53dd-b03b-a267f5f8d3c3",
+      "nominal_geometry": {
+        "actual_effective_area_available": false,
+        "area_kind": "NOMINAL_TUBE_OUTER_AREA_PROXY",
+        "disclaimer": "\u03c0 \u00d7 tube_OD \u00d7 nominal_tube_length \u00d7 physical_tube_count; not verified effective heat-transfer area or manufacturing cost.",
+        "nominal_tube_length_m": "3.5",
+        "nominal_tube_outer_area_m2": "52.994819615059160413575",
+        "physical_tube_count": 253,
+        "tube_outer_diameter_m": "0.01905"
+      },
+      "task168_blocked_codes": [],
+      "tube_length_m": "3.5"
+    }
+  ],
+  "production_qualification": "PRODUCTION_NOT_QUALIFIED",
+  "schema_version": "hxforge.experimental-candidate-eligibility.v1"
+}

@@ -1,0 +1,2973 @@
+{
+  "schema_version": "task172.stage1-pre-runtime-authority-bundle.v1",
+  "task_id": "TASK172_V0_7_STAGE1_REAL_CASE_PRODUCTION_MESH_POLICY_CLOSURE_R1",
+  "mode": "CONSOLIDATED_STAGE1_OWNER_AUTHORITY_BINDING_AND_REAL_CASE_MESH_POLICY_CLOSURE",
+  "result": "STAGE1_AUTHORITY_BUNDLE_COMPLETE_PENDING_SINGLE_INDEPENDENT_REVIEW",
+  "predecessor_state": {
+    "authorized_head": "5905e262172a4660f1fe53823af79c090e46883f",
+    "pr_number": 283,
+    "pr_state": "OPEN_DRAFT",
+    "task171_status": "VALIDATED",
+    "selected_variant": "TUBE_HOT_SHELL_COLD",
+    "tube_side_role": "HOT",
+    "shell_side_role": "COLD",
+    "topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+    "task171_mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+    "task171_physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+    "r119e_review": {
+      "result": "PASS",
+      "review_source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION",
+      "self_approval": false,
+      "codex_self_approval_claimed": false,
+      "evidence_canonical_hash": "5ad8343e342ad2bc4f1c3560fa9dc47e97b61f9b4e37e21ede2e35f63c63fbda",
+      "extension_canonical_hash": "7c6d4eea7accd5c1771c7cdefa3a6fecd32b810f68c6d5301a1aa3ca39daa7e2"
+    }
+  },
+  "frozen_audit_conclusions": {
+    "aggregate_geometry_id_required_before_task172_runtime": false,
+    "fluid_identity_required_for_runtime": true,
+    "fluid_identity_required_for_thermal_solve": true,
+    "property_profile_required_for_task172_runtime": true,
+    "property_profile_required_for_task173": true,
+    "property_profile_required_for_task174": true,
+    "production_mesh_admission_required_for_task172_implementation": false,
+    "production_mesh_admission_required_for_task172_real_case_execution": true,
+    "reference_policy_required_for_task172_runtime": false,
+    "reference_policy_resolution_required_for_real_case_mesh_admission": true,
+    "online_continuous_reference_oracle_required_for_reviewed_scope": false
+  },
+  "authority_matrix_classifications": [
+    "REUSED_REVIEWED_AUTHORITY",
+    "PROJECT_OWNER_DECISION_REQUIRED",
+    "NATIVE_CONTRACT_CONSTANT",
+    "NOT_APPLICABLE",
+    "DERIVED_FROM_REVIEWED_INPUTS",
+    "REUSED_REVIEWED_CASE_VALUE"
+  ],
+  "authority_matrix_summary": {
+    "field_count": 96,
+    "classification_counts": {
+      "REUSED_REVIEWED_AUTHORITY": 23,
+      "PROJECT_OWNER_DECISION_REQUIRED": 58,
+      "NATIVE_CONTRACT_CONSTANT": 2,
+      "NOT_APPLICABLE": 3,
+      "DERIVED_FROM_REVIEWED_INPUTS": 1,
+      "REUSED_REVIEWED_CASE_VALUE": 9
+    },
+    "reused_reviewed_value_count": 32,
+    "derived_binding_count": 1,
+    "project_owner_decision_count": 12,
+    "project_owner_decision_matrix_field_count": 58,
+    "unresolved_project_owner_decision_field_count": 0,
+    "classification_semantics": "PROJECT_OWNER_DECISION_REQUIRED marks owner-origin fields; resolution_state=SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW records that the value was supplied and no decision remains outstanding."
+  },
+  "authority_matrix": [
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "thermal_role.tube_side",
+      "current_value": "HOT",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-C explicit project decision and R119-E accepted effective Variant A",
+      "native_consumer": "effective TASK171 Definition / future TASK172 stream binding"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "thermal_role.shell_side",
+      "current_value": "COLD",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-C explicit project decision and R119-E accepted effective Variant A",
+      "native_consumer": "effective TASK171 Definition / future TASK172 stream binding"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "side_path_direction.tube",
+      "current_value": "0_TO_6",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-A/B reviewed side-path mapping; R119-C retains canonical project-internal orientation",
+      "native_consumer": "TASK171 Definition path mapping"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "side_path_direction.shell",
+      "current_value": "6_TO_0",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-A/B reviewed side-path mapping; R119-C retains canonical project-internal orientation",
+      "native_consumer": "TASK171 Definition path mapping"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "side_path_identity.tube",
+      "current_value": "urn:hxforge:r119a:flow-path:tube:88243c8545466b6536a6101ac505f149b0fd6c6f3adaf562a3ceb77090d17e76",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-A/B reviewed flow-path mapping and R119-C selected Variant A",
+      "native_consumer": "effective TASK171 Definition tube path"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "side_path_identity.shell",
+      "current_value": "urn:hxforge:r119a:flow-path:shell:7032f11f5e02a4547ab0c463ed22235db7b0779066f39887b79f66ac3abab3ed",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-A/B reviewed flow-path mapping and R119-C selected Variant A",
+      "native_consumer": "effective TASK171 Definition shell path"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "stream_identity.tube_fluid_or_service",
+      "current_value": {
+        "fluid_id": "PURE_ORDINARY_WATER",
+        "service": "HOT_WATER"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R117 through R119-E contain no case fluid/service identity; resolved by explicit owner decision A1",
+      "native_consumer": "Task160RawStreamInput.fluid_or_service_identity",
+      "owner_decision_id": "A1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "stream_identity.shell_fluid_or_service",
+      "current_value": {
+        "fluid_id": "PURE_ORDINARY_WATER",
+        "service": "COLD_WATER"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R117 through R119-E contain no case fluid/service identity; resolved by explicit owner decision A1",
+      "native_consumer": "Task160RawStreamInput.fluid_or_service_identity and shell flow-state authority",
+      "owner_decision_id": "A1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "phase.tube_and_shell",
+      "current_value": {
+        "tube": "SINGLE_PHASE_LIQUID",
+        "shell": "SINGLE_PHASE_LIQUID"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed TASK171 steady/single-phase envelope does not bind actual side phase; resolved by explicit owner decision A1",
+      "native_consumer": "Task160PhaseAssertion and selected property-source domain",
+      "owner_decision_id": "A1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "inlet_temperature.tube",
+      "current_value": "300.000000 K",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case operating record supplies inlet states; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.inlet_temperature_K",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "inlet_temperature.shell",
+      "current_value": "298.150000 K",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case operating record supplies inlet states; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.inlet_temperature_K",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "inlet_pressure.tube",
+      "current_value": "101325 Pa absolute",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case operating record supplies pressure states; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.inlet_pressure_Pa_absolute and T/P property evaluation context",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "inlet_pressure.shell",
+      "current_value": "101325 Pa absolute",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case operating record supplies pressure states; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.inlet_pressure_Pa_absolute and T/P property evaluation context",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "outlet_and_boundary_conditions.tube",
+      "current_value": {
+        "outlet_temperature": "SOLVE_OUTPUT",
+        "heat_duty": "SOLVE_OUTPUT",
+        "local_heat_rate": "SOLVE_OUTPUT",
+        "pressure_drop": "TASK174_OUTPUT"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No independent outlet, duty, or boundary-condition evidence exists; calculated TASK162 outlets are not input authority; resolved by explicit owner decision A3",
+      "native_consumer": "future TASK172 state/boundary closure and applicable stream contract",
+      "owner_decision_id": "A3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "outlet_and_boundary_conditions.shell",
+      "current_value": {
+        "outlet_temperature": "SOLVE_OUTPUT",
+        "heat_duty": "SOLVE_OUTPUT",
+        "local_heat_rate": "SOLVE_OUTPUT",
+        "pressure_drop": "TASK174_OUTPUT"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No independent outlet, duty, or boundary-condition evidence exists; calculated TASK162 outlets are not input authority; resolved by explicit owner decision A3",
+      "native_consumer": "future TASK172 state/boundary closure and applicable stream contract",
+      "owner_decision_id": "A3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "mass_flow_magnitude.tube",
+      "current_value": "10.000000 kg/s; positive magnitude along reviewed tube path; negative encoding=false",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case mass-flow authority exists; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.mass_flow_kg_s and shell mass-flow authority",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "mass_flow_magnitude.shell",
+      "current_value": "20.000000 kg/s; positive magnitude along reviewed shell path; negative encoding=false",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No reviewed case mass-flow authority exists; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawStreamInput.mass_flow_kg_s and shell mass-flow authority",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "mass_flow_sign_convention",
+      "current_value": "POSITIVE_MAGNITUDE_WITH_DIRECTION_BOUND_BY_REVIEWED_SIDE_PATH",
+      "classification": "NATIVE_CONTRACT_CONSTANT",
+      "evidence": "Task160 typed stream input requires positive mass-flow magnitude; R119-C separately fixes path directions",
+      "native_consumer": "RatingStreamInput.mass_flow_kg_s and TASK171 side paths"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "temperature_validity_domain.tube",
+      "current_value": "298.15..300.00 K",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "temperature_validity_domain.shell",
+      "current_value": "298.15..300.00 K",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "pressure_validity_domain.tube",
+      "current_value": "100000..101325 Pa absolute",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "pressure_validity_domain.shell",
+      "current_value": "100000..101325 Pa absolute",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "phase_validity_domain.tube",
+      "current_value": "SINGLE_PHASE_LIQUID; phase crossing BLOCKED",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "phase_validity_domain.shell",
+      "current_value": "SINGLE_PHASE_LIQUID; phase crossing BLOCKED",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed water domain is conditional model authority and no case source/fluid is selected; resolved by explicit owner decision B2",
+      "native_consumer": "selected property snapshot/evaluation context",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "operating_point_source_and_provenance.tube",
+      "current_value": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION; PROJECT_DESIGN_INPUT; uncertainty NOT_APPLICABLE",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No source-bound measured/design operating point was accepted; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawProvenance and case authority evidence",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "field": "operating_point_source_and_provenance.shell",
+      "current_value": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION; PROJECT_DESIGN_INPUT; uncertainty NOT_APPLICABLE",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No source-bound measured/design operating point was accepted; resolved by explicit owner decision A2",
+      "native_consumer": "Task160RawProvenance and case authority evidence",
+      "owner_decision_id": "A2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "property_snapshot_contract_shape",
+      "current_value": "TYPED_SNAPSHOT_SOURCE_VERSION_IDENTITY_AND_EVALUATION_CONTEXT",
+      "classification": "NATIVE_CONTRACT_CONSTANT",
+      "evidence": "Task160PropertySnapshot and PropertyEvaluationContext",
+      "native_consumer": "TASK160 thermal stream construction"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "reviewed_water_model_profile",
+      "current_value": "V07-T172-WATER-PROPERTY-PROFILE-R2; MODEL_LEVEL_CONDITIONAL_ONLY",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "Canonical hash 8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de; domain proof 0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53; backend qualification 4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+      "native_consumer": "property source contract; case applicability remains unbound"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "property_source_identity_version_and_method.per_side",
+      "current_value": {
+        "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "fluid": "Water",
+        "composition": "PURE_ORDINARY_WATER",
+        "backend": "HEOS",
+        "provider": "CoolProp",
+        "version": "8.0.0",
+        "git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "reference_state": "DEF"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No fluid identity or case-specific source/profile binding; reviewed water authority is conditional; resolved by explicit owner decision B2",
+      "native_consumer": "Task160PropertySnapshot and local tube/shell property states",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "property_evaluation_context_reference_state_and_snapshot_semantics.per_side",
+      "current_value": "Task026 native PropertySnapshot; TP evaluation; DEF; provider-generated canonical snapshot hash; same selected authority for local states",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No case property snapshots or state-specific source provenance are accepted; resolved by explicit owner decision B2",
+      "native_consumer": "Task160PropertySnapshot.property_evaluation_context and snapshot identity",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "density_cp_viscosity_conductivity_snapshots.per_side",
+      "current_value": {
+        "tube_hash": "984b3e72893b357535ed500294453b5e6b1f902a71a3c93357fe1a9978947819",
+        "shell_hash": "e48b6a28f999e9cffc3cd873eeaede338c4de6ee16c897802bb19eeb41f23c19"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No state snapshots exist for the selected streams; resolved by explicit owner decision B2",
+      "native_consumer": "Task160 cp snapshot; tube-local and shell hydraulic property-state contracts rho/mu/k/cp",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "enthalpy_entropy_and_other_provider_outputs",
+      "current_value": "NOT_ESTABLISHED_AS_UNIVERSAL_TASK172_INPUTS",
+      "classification": "NOT_APPLICABLE",
+      "evidence": "The provider FluidState exposes enthalpy/entropy, but no implemented TASK172 request contract identifies them as universal authority inputs; bind only if the selected consumer requires them",
+      "native_consumer": "property provider output contract; no universal TASK172 input consumer exists yet"
+    },
+    {
+      "bundle": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "field": "property_temperature_pressure_phase_domain_and_failure_behavior.per_side",
+      "current_value": {
+        "T_K": [
+          "298.15",
+          "300.00"
+        ],
+        "P_Pa_abs": [
+          "100000",
+          "101325"
+        ],
+        "phase": "SINGLE_PHASE_LIQUID",
+        "extrapolation": false,
+        "clipping": false,
+        "fallback": false,
+        "out_of_domain": "BLOCKED"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Reviewed water domain is conditional and no case source/state selection exists; resolved by explicit owner decision B2",
+      "native_consumer": "property source validity contract and runtime property evaluation",
+      "owner_decision_id": "B2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "reviewed_clean_wall_and_local_mapping_models",
+      "current_value": "MODEL_REVIEWED_CONDITIONAL",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "Clean wall network hash e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29; local cylindrical mapping hash 49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+      "native_consumer": "TASK172 local wall network; not case material/surface state"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "material_identity_property_body_and_source",
+      "current_value": {
+        "material": "316L_AUSTENITIC_STAINLESS_STEEL",
+        "designation": "316L",
+        "component_role": "TUBE_WALL_METAL",
+        "PDF_SHA256": "eda6e84f95c4cc2a46bb8c902cf066c4f51b9108d951d5490222cb365219ac48"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Material review defines authority shape but no real case material record is bound; resolved by explicit owner decision C1",
+      "native_consumer": "material authority and wall conductivity evaluation",
+      "owner_decision_id": "C1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "wall_thermal_conductivity_and_temperature_domain",
+      "current_value": {
+        "model": "PROJECT_OWNER_CONSERVATIVE_CONSTANT_K",
+        "k_W_m_K": "14.0",
+        "valid_T_K": [
+          "298.15",
+          "300.00"
+        ],
+        "manufacturer_exact_constant": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Constant-k/model authority is not a case-specific material property body or domain proof; resolved by explicit owner decision C1",
+      "native_consumer": "TASK172 wall resistance network",
+      "owner_decision_id": "C1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "tube_wall_geometry_linkage",
+      "current_value": "DERIVED_FROM_ACCEPTED_TUBE_INNER_AND_OUTER_DIAMETERS_BUT_MATERIAL_LINK_UNBOUND",
+      "classification": "DERIVED_FROM_REVIEWED_INPUTS",
+      "evidence": "Accepted R118-D TASK020/TASK021/TASK025 geometry snapshots; derivation is only geometric correspondence, not material identity",
+      "native_consumer": "tube-wall resistance geometry input"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "tube_and_shell_surface_condition_and_fouling_resistance",
+      "current_value": {
+        "profile": "CLEAN",
+        "tube_Rf": "0",
+        "shell_Rf": "0",
+        "deposit": false,
+        "contact_resistance": false,
+        "extra_layer": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Reviewed clean-wall network is conditional and contains no case evidence of zero fouling; resolved by explicit owner decision C2",
+      "native_consumer": "TASK172 series wall/surface resistance network",
+      "owner_decision_id": "C2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "tube_htc_correlation_model_authority",
+      "current_value": "REVIEWED_MODEL_BRANCHES_EXIST; CASE_APPLICABILITY_UNBOUND",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "Reviewed tube C3/correction authorities and their explicit domains; no case state is bound",
+      "native_consumer": "tube-side local HTC branch"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "shell_htc_correlation_model_authority",
+      "current_value": "REVIEWED_JMU_MODEL_AUTHORITY; CASE_APPLICABILITY_UNBOUND",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R91 JMu model authority canonical hash ea6041287c407afe735148e12866f02026d23ba6e9c881ba22c076c032b5cac6",
+      "native_consumer": "shell-side local HTC branch"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "correlation_and_wall_correction_case_applicability",
+      "current_value": {
+        "tube": {
+          "branch": "TURBULENT_GNIELINSKI_C3",
+          "Re": "3742.675244246214513402808173",
+          "Pr": "5.855926514898839169263267261",
+          "Pr_envelope": "PASS",
+          "Nu": "27.61898513931272019827155622"
+        },
+        "shell": {
+          "method": "central-crossflow screen",
+          "Re": "2740.5066088396428172796798450599375449393604657674",
+          "Pr": "6.1358049639094794150526865914303242471116943093648",
+          "screening": "PASS",
+          "J_mu": "(mu_bulk/mu_wall)^0.14",
+          "state_mapping": "located local bulk and fluid-wall state"
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Model envelopes are reviewed but actual case flow/properties/wall state are unavailable; resolved by explicit owner decision C3",
+      "native_consumer": "tube C3, shell JMu, wall correction and local constitutive branch guards",
+      "owner_decision_id": "C3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "field": "source_license_and_case_provenance_for_material_and_constitutive_inputs",
+      "current_value": {
+        "source_family": "Alleima Sanmac 316/316L",
+        "PDF_SHA256": "eda6e84f95c4cc2a46bb8c902cf066c4f51b9108d951d5490222cb365219ac48",
+        "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No case material or case correlation-applicability evidence package exists; resolved by explicit owner decision C1",
+      "native_consumer": "authority provenance and source/license audit",
+      "owner_decision_id": "C1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "r94_solver_controls",
+      "current_value": "REVIEWED_MODEL_PROFILE; METHOD_TRF; FTOL_1E-6; XTOL_GTOL_1E-12; MAX_NFEV_6; CALLBACK_CAP_24; DIFF_STEP_1E-5; EXACT_TR_SOLVER",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R94 extension canonical hash 81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+      "native_consumer": "reviewed numerical profile for TASK172 model closure"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "effective_residual_rounding_overlay",
+      "current_value": "C_ROUND_1.0_MESH_CELL_SCALE",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R98 overlay canonical hash 54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+      "native_consumer": "reviewed residual-acceptance model profile; not proof of case mesh convergence"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "initialization_policy",
+      "current_value": "R88_STAGED_I0_INPUT_DOMAIN_ADMISSION_I1_NEUTRAL_BASE_FILM_AND_DETERMINISTIC_ALGEBRAIC_SEED_I2_FULL_EQUATION_RESTORE; R94_INITIALIZATION_DERIVED_X_SCALE",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88 initialization contract and R94 profile; J_mu=1.0 is initialization seed only, never accepted production physics",
+      "native_consumer": "TASK172 nonlinear residual solver model"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "determinism_requirement",
+      "current_value": "DETERMINISTIC_DIRECT_INITIALIZATION_AND_REPLAYABLE_REVIEWED_PROFILE",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R94 reviewed profile and repository canonical identity/replay contracts",
+      "native_consumer": "TASK172 numerical profile and output identity validation"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "residual_definitions_and_scales",
+      "current_value": "x=[q_hc,T_wall_inner,T_wall_outer]; q_ts=s_ts*q_hc; r_i=q_ts-h_i*A_i*(T_tube_bulk-T_wall_inner); r_w=q_ts-(T_wall_inner-T_wall_outer)/R_wall; r_o=q_ts-h_o*A_o*(T_wall_outer-T_shell_bulk); scale=abs(q_ts_seed), exact-zero-separate",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88/R94 reviewed profile and R98 residual-scale overlay",
+      "native_consumer": "TASK172 numerical residual system"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "residual_tolerances_and_iteration_limits",
+      "current_value": "R94_FROZEN_CONTROLS; CASE_APPLICABILITY_NOT_BOUND",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R94 exact solver controls; R103 qualification is synthetic scope only",
+      "native_consumer": "TASK172 numerical profile"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "solver_work_caps",
+      "current_value": "MAX_NFEV_6; RESIDUAL_CALLBACK_CAP_24; NOT_REAL_CASE_MESH_RESOURCE_CAPS",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R94 reviewed solver work caps; R103 production-resource transfer explicitly prohibited",
+      "native_consumer": "TASK172 solver profile only"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "separate_under_relaxation_or_damping",
+      "current_value": "NOT_SPECIFIED_BY_REVIEWED_TRF_PROFILE",
+      "classification": "NOT_APPLICABLE",
+      "evidence": "Reviewed deterministic direct trust-region profile does not define a separate under-relaxation control",
+      "native_consumer": "none in the reviewed R94 solver contract"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "invalid_trial_and_failure_policy",
+      "current_value": "TYPED_FAILURE; NO_FAKE_PENALTY_RESIDUAL; NO_AUTHORITATIVE_PARTIAL_RESULT",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88 domain/failure contract and R94 solver-success-versus-physical-acceptance separation",
+      "native_consumer": "TASK172 residual evaluator and result acceptance boundary"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "nonconvergence_and_cap_exhaustion_policy",
+      "current_value": "NO_AUTHORITATIVE_RESULT; LAST_ITERATE_DIAGNOSTIC_ONLY",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88 failure contract and R94 cap-hit typed non-authoritative failure",
+      "native_consumer": "TASK172 nonlinear solver acceptance boundary"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "property_evaluation_failure_policy",
+      "current_value": "TYPED_FAILURE; NO_EXTRAPOLATION; NO_CLIPPING; NO_DEFAULT",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88/R94 reviewed property-domain contract",
+      "native_consumer": "property callback used by TASK172 residual evaluation"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "domain_exit_policy",
+      "current_value": "FAIL_CLOSED_TYPED_INVALID_TRIAL; NO_CLAMP_OR_PENALTY_RESIDUAL",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R88/R94 domain and failure contract",
+      "native_consumer": "TASK172 local property/correlation trial domain"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "signed_negative_local_heat_rate_case_applicability",
+      "current_value": {
+        "negative_q_numeric_variable_allowed": true,
+        "negative_q_accepted_physical_case_result": false,
+        "failure": "typed BLOCKED; no clamp, abs direction, role swap"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R88/R94 explicitly leave negative-q applicability unbound; no clamp or role reassignment is allowed; resolved by explicit owner decision D1",
+      "native_consumer": "TASK172 signed q_hc local constitutive branch and case applicability gate",
+      "owner_decision_id": "D1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "case_executable_numerical_profile_binding",
+      "current_value": {
+        "R94_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+        "R98_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+        "accepted_unchanged": true,
+        "C_round": "1.0"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R94 is model-reviewed but its registry records executable_production_profile_bound=false; R103 evidence is synthetic only; resolved by explicit owner decision D1",
+      "native_consumer": "real-case TASK172 runtime and mesh admission numerical-profile slot",
+      "owner_decision_id": "D1",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task171_structural_mesh_identity",
+      "current_value": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R119-E external independent review and accepted R119-D native materialization",
+      "native_consumer": "TASK171 structural cell mapping; not production-mesh admission"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "production_case_mesh_profile_and_policy_slots",
+      "current_value": {
+        "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+        "scope": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+        "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+        "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+        "physical_support": {
+          "immutable": true,
+          "intervals_m": [
+            [
+              "0.0",
+              "1.2"
+            ],
+            [
+              "1.2",
+              "2.4"
+            ],
+            [
+              "2.4",
+              "3.6"
+            ],
+            [
+              "3.6",
+              "4.8"
+            ],
+            [
+              "4.8",
+              "6.0"
+            ]
+          ],
+          "interval_count": 5,
+          "interval_length_m": "1.2",
+          "inside_area_per_interval_m2": "15.02215359168",
+          "outside_area_per_interval_m2": "18.1696524394605785819779008",
+          "sides": [
+            "TUBE",
+            "SHELL"
+          ]
+        },
+        "count_semantics": {
+          "n": "SUBDIVISIONS_PER_PHYSICAL_INTERVAL_PER_SIDE",
+          "tube_cells": "5*n",
+          "shell_cells": "5*n",
+          "total_numerical_cells": "10*n",
+          "wall_interfaces": "5*n",
+          "n_is_global_cell_count": false
+        },
+        "base_mesh_equivalence": {
+          "n": 1,
+          "total_numerical_cell_count": 10,
+          "wall_interface_count": 5,
+          "equivalent_to_accepted_TASK171_base": true,
+          "physical_interval_ownership_reproduced_exactly": true,
+          "synthetic_R103_identity_reused": false
+        },
+        "refinement_operator": {
+          "operator": "MIDPOINT_BISECTION_INDEPENDENTLY_WITHIN_EACH_EXISTING_PHYSICAL_INTERVAL",
+          "step": "n -> 2*n",
+          "applies_to": [
+            "TUBE",
+            "SHELL"
+          ],
+          "invariants": {
+            "physical_event_boundary_moved": false,
+            "physical_interval_merged": false,
+            "physical_interval_split_across_event": false,
+            "physical_event_created": false,
+            "physical_event_deleted": false,
+            "flow_path_owner_changed": false,
+            "physical_support_owner_changed": false,
+            "area_ownership_changed": false,
+            "length_ownership_changed": false,
+            "paired_tube_shell_cells_share_exact_axial_support_and_wall_interface": true
+          }
+        },
+        "production_sequence": {
+          "subdivisions_per_interval_per_side": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64
+          ],
+          "total_numerical_cells": [
+            10,
+            20,
+            40,
+            80,
+            160,
+            320,
+            640
+          ],
+          "wall_interfaces": [
+            5,
+            10,
+            20,
+            40,
+            80,
+            160,
+            320
+          ],
+          "project_real_case_sequence_new_owner_authority": true,
+          "R103_primary_cell_counts_transferred": false,
+          "secondary_alignment_sequence_required": false,
+          "R103_secondary_sequence_transferred": false
+        },
+        "observables": {
+          "extensive": "TOTAL_WALL_DUTY",
+          "duty_aggregation": "EXACT_CHILD_TO_PARENT_SUM_PER_INTERVAL_THEN_SUM_INTERVALS",
+          "wall_extrema": [
+            "T_wall_inner_min",
+            "T_wall_inner_max",
+            "T_wall_outer_min",
+            "T_wall_outer_max"
+          ],
+          "extrema_support": "EXACT_CASE_WALL_SUPPORT_SET"
+        },
+        "cross_mesh_mapping": {
+          "extensive": "EXACT_CHILD_TO_PARENT_CONSERVATIVE_SUM",
+          "intensive_extrema": "COMMON_PHYSICAL_SUPPORT_EXTREMA_REDUCTION",
+          "forbidden": [
+            "ARRAY_INDEX_PAIRING",
+            "CELL_POSITION_PAIRING",
+            "LINEAR_INTERPOLATION",
+            "NEAREST_NEIGHBOR_INTERPOLATION",
+            "AVERAGING_HTC_ACROSS_MESHES",
+            "AVERAGING_WALL_TEMPERATURE_ACROSS_MESHES",
+            "DIVIDING_TOTAL_DUTY_BY_CELL_COUNT"
+          ]
+        },
+        "metrics": {
+          "duty": {
+            "D": "max(abs(Q_c),abs(Q_f))",
+            "near_zero_switch_W": "0.01",
+            "when_D_le_switch": "abs(Q_f-Q_c) <= 0.01 W",
+            "otherwise": "abs(Q_f-Q_c)/D <= 0.01",
+            "zero_division_allowed": false
+          },
+          "wall_extrema": {
+            "metric": "absolute difference fine versus coarse",
+            "threshold_K": "0.01",
+            "all_four_must_pass": true
+          }
+        },
+        "thresholds": {
+          "duty_relative": "0.01",
+          "near_zero_duty_absolute_W": "0.01",
+          "wall_extrema_absolute_K": "0.01",
+          "source": "PROJECT_OWNER_REAL_CASE_PRODUCTION_POLICY_INFORMED_BY_R103",
+          "R103_thresholds_automatically_transferred": false
+        },
+        "convergence_evidence": {
+          "required_consecutive_passing_pairs": 2,
+          "required_later_headroom_levels": 1,
+          "headroom_level": "2*n_candidate",
+          "headroom_must_pass_against_candidate": true,
+          "accepted_mesh_is_candidate_not_headroom": true
+        },
+        "resource_policy": {
+          "max_subdivisions_per_physical_interval_per_side": 64,
+          "max_total_numerical_cells": 640,
+          "max_wall_interfaces": 320,
+          "latest_acceptable_candidate_subdivisions": 32,
+          "n64_reserved_for_headroom": true,
+          "cap_increase_allowed": false,
+          "failure_result": [
+            "MESH_RESOURCE_EXHAUSTED",
+            "MESH_NOT_CONVERGED"
+          ]
+        },
+        "precision_floor": {
+          "duty": "SUM_LOCAL_WALL_DUTY_ERROR_ROUNDOFF_BOUNDS_OVER_ADMITTED_WALL_SUPPORTS",
+          "wall_extrema": "MAX_LOCAL_WALL_TEMPERATURE_NUMERICAL_BOUND_OVER_SUPPORT_SET",
+          "pass": "difference + floor <= threshold",
+          "fail": "difference - floor > threshold",
+          "otherwise": "PRECISION_FLOOR_UNRESOLVED",
+          "bound_source": "REVIEWED_R94_R98_LOCAL_BOUNDS",
+          "R102_synthetic_Qref_UQ_transferred": false
+        },
+        "R98_case_applicability": {
+          "C_round": "1.0",
+          "formula_semantics_changed": false,
+          "source": "PROJECT_OWNER_EXPLICIT_CASE_APPLICABILITY_DECISION",
+          "universal_theorem_claimed": false
+        },
+        "reference_oracle": {
+          "production_reference_oracle_required": false,
+          "online_continuous_required": false,
+          "specific_online_execution_required": false,
+          "R102_real_case_reference_required": false,
+          "R102_synthetic_Qref_transferred": false,
+          "R102_synthetic_UQ_transferred": false
+        },
+        "R103_scope": {
+          "supporting_qualification_evidence": true,
+          "absolute_cell_counts_transferred": false,
+          "secondary_sequence_transferred": false,
+          "synthetic_resource_cap_transferred": false,
+          "synthetic_reference_values_transferred": false,
+          "threshold_values_automatically_transferred": false,
+          "real_case_policy_values_selected_by_project_owner": true
+        },
+        "native_schema_resource_check": {
+          "producer_invoked": false,
+          "n64_cells": 640,
+          "n64_walls": 320,
+          "state_records": 2560,
+          "intervals": 5,
+          "paths": 2,
+          "events": 19,
+          "provenance_edges": 3,
+          "native_max_records": 4096,
+          "safe_model_max_nodes": 262144,
+          "safe_model_max_depth": 16,
+          "observed_nodes": 51327,
+          "result": "PASS_SCHEMA_CAPACITY_ONLY"
+        },
+        "failure_semantics": [
+          "INVALID_PARENT_CHILD_RELATION",
+          "PHYSICAL_BOUNDARY_CROSSED",
+          "INCOMPLETE_PARENT_COVERAGE",
+          "OVERLAPPING_CHILDREN",
+          "INVALID_COMMON_SUPPORT_MAPPING",
+          "MISSING_OBSERVABLE_AUTHORITY",
+          "NONFINITE_COMPARISON",
+          "PRECISION_FLOOR_UNRESOLVED",
+          "REFINEMENT_SEQUENCE_INSUFFICIENT",
+          "RESOURCE_EXHAUSTION",
+          "MESH_NOT_CONVERGED"
+        ],
+        "admission_status": {
+          "candidate_profile_bound": true,
+          "reviewed_effective": false,
+          "real_case_mesh_admissible": false,
+          "production_mesh_admission_enabled": false,
+          "convergence_run_performed": false
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R103 synthetic qualification does not transfer case thresholds, refinement, resource caps or wall policy; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh-admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "case_bound_production_mesh_profile",
+      "current_value": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The admission contract profile schema is a candidate, not a case-bound reviewed profile; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh-admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "initial_mesh_policy",
+      "current_value": {
+        "n": 1,
+        "total_numerical_cell_count": 10,
+        "wall_interface_count": 5,
+        "equivalent_to_accepted_TASK171_base": true,
+        "physical_interval_ownership_reproduced_exactly": true,
+        "synthetic_R103_identity_reused": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R103 sequences are synthetic only; no real-case starting partition authority exists; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh-profile admission",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "refinement_policy",
+      "current_value": {
+        "operator": "MIDPOINT_BISECTION_INDEPENDENTLY_WITHIN_EACH_EXISTING_PHYSICAL_INTERVAL",
+        "step": "n -> 2*n",
+        "applies_to": [
+          "TUBE",
+          "SHELL"
+        ],
+        "invariants": {
+          "physical_event_boundary_moved": false,
+          "physical_interval_merged": false,
+          "physical_interval_split_across_event": false,
+          "physical_event_created": false,
+          "physical_event_deleted": false,
+          "flow_path_owner_changed": false,
+          "physical_support_owner_changed": false,
+          "area_ownership_changed": false,
+          "length_ownership_changed": false,
+          "paired_tube_shell_cells_share_exact_axial_support_and_wall_interface": true
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "No real-case split operator or refinement schedule is reviewed; R103 sequences do not transfer; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh-profile admission",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_convergence_policy",
+      "current_value": {
+        "sequence": {
+          "subdivisions_per_interval_per_side": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64
+          ],
+          "total_numerical_cells": [
+            10,
+            20,
+            40,
+            80,
+            160,
+            320,
+            640
+          ],
+          "wall_interfaces": [
+            5,
+            10,
+            20,
+            40,
+            80,
+            160,
+            320
+          ],
+          "project_real_case_sequence_new_owner_authority": true,
+          "R103_primary_cell_counts_transferred": false,
+          "secondary_alignment_sequence_required": false,
+          "R103_secondary_sequence_transferred": false
+        },
+        "metrics": {
+          "duty": {
+            "D": "max(abs(Q_c),abs(Q_f))",
+            "near_zero_switch_W": "0.01",
+            "when_D_le_switch": "abs(Q_f-Q_c) <= 0.01 W",
+            "otherwise": "abs(Q_f-Q_c)/D <= 0.01",
+            "zero_division_allowed": false
+          },
+          "wall_extrema": {
+            "metric": "absolute difference fine versus coarse",
+            "threshold_K": "0.01",
+            "all_four_must_pass": true
+          }
+        },
+        "thresholds": {
+          "duty_relative": "0.01",
+          "near_zero_duty_absolute_W": "0.01",
+          "wall_extrema_absolute_K": "0.01",
+          "source": "PROJECT_OWNER_REAL_CASE_PRODUCTION_POLICY_INFORMED_BY_R103",
+          "R103_thresholds_automatically_transferred": false
+        },
+        "evidence": {
+          "required_consecutive_passing_pairs": 2,
+          "required_later_headroom_levels": 1,
+          "headroom_level": "2*n_candidate",
+          "headroom_must_pass_against_candidate": true,
+          "accepted_mesh_is_candidate_not_headroom": true
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R103 validates only six frozen synthetic fixtures and does not establish case thresholds/headroom; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh convergence and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "production_mesh_resource_policy",
+      "current_value": {
+        "max_subdivisions_per_physical_interval_per_side": 64,
+        "max_total_numerical_cells": 640,
+        "max_wall_interfaces": 320,
+        "latest_acceptable_candidate_subdivisions": 32,
+        "n64_reserved_for_headroom": true,
+        "cap_increase_allowed": false,
+        "failure_result": [
+          "MESH_RESOURCE_EXHAUSTED",
+          "MESH_NOT_CONVERGED"
+        ]
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R94 solver work caps and TASK171 raw-record guard are not a production mesh cell/resource cap; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh-profile admission/resource guard",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_wall_acceptance_policy",
+      "current_value": {
+        "extensive": "TOTAL_WALL_DUTY",
+        "duty_aggregation": "EXACT_CHILD_TO_PARENT_SUM_PER_INTERVAL_THEN_SUM_INTERVALS",
+        "wall_extrema": [
+          "T_wall_inner_min",
+          "T_wall_inner_max",
+          "T_wall_outer_min",
+          "T_wall_outer_max"
+        ],
+        "extrema_support": "EXACT_CASE_WALL_SUPPORT_SET"
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Synthetic wall extrema/tolerances are not real-case acceptance thresholds; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh convergence/admission; distinct from material/wall physics authority",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "production_cell_mapping_policy",
+      "current_value": {
+        "extensive": "EXACT_CHILD_TO_PARENT_CONSERVATIVE_SUM",
+        "intensive_extrema": "COMMON_PHYSICAL_SUPPORT_EXTREMA_REDUCTION",
+        "forbidden": [
+          "ARRAY_INDEX_PAIRING",
+          "CELL_POSITION_PAIRING",
+          "LINEAR_INTERPOLATION",
+          "NEAREST_NEIGHBOR_INTERPOLATION",
+          "AVERAGING_HTC_ACROSS_MESHES",
+          "AVERAGING_WALL_TEMPERATURE_ACROSS_MESHES",
+          "DIVIDING_TOTAL_DUTY_BY_CELL_COUNT"
+        ]
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R119-A/B reviewed physical topology/structural map, but no production numerical cell partition/admission policy is bound; resolved by explicit owner decision D2",
+      "native_consumer": "real-case mesh profile and physical-to-cell admission mapping",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "online_continuous_reference_oracle_required",
+      "current_value": false,
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R110 independent review canonical hash 2f80e41406be2ee3bec40de448af115ac9458c61845ac27cba6e2056b8e69058; scoped requirement only",
+      "native_consumer": "production reference-oracle requirement predicate"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "case_reference_policy_applicability",
+      "current_value": {
+        "authority_id": "V07-T172-REAL-CASE-REFERENCE-POLICY-R1",
+        "comparison_allowed": true,
+        "mandatory": false,
+        "forbidden": false,
+        "owner_confirmed_case_applicability": true
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R107 requires both applicability and requirement resolution; R112 is profile-scoped with real_case_binding_present=false; resolved by explicit owner decision D3",
+      "native_consumer": "reference_policy_resolution_valid composite admission predicate",
+      "owner_decision_id": "D3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "production_reference_oracle_requirement_resolution_for_case",
+      "current_value": {
+        "authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+        "production_reference_oracle_required": false,
+        "online_continuous_required": false,
+        "specific_online_execution_required": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "R110 online-oracle=false is scoped and reviewed; it does not resolve this case/profile predicate; resolved by explicit owner decision D3",
+      "native_consumer": "production_reference_oracle_requirement_resolution_valid admission predicate",
+      "owner_decision_id": "D3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "aggregate_geometry_id_for_task172_runtime",
+      "current_value": "UNBOUND; NOT_REQUIRED_BY_REVIEWED_RUNTIME_AUDIT",
+      "classification": "NOT_APPLICABLE",
+      "evidence": "Consolidated closeout audit; R119-D states there is no reviewed aggregate native contract",
+      "native_consumer": "none before TASK172 runtime"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "aggregate_geometry_scalar_prerequisite_in_admission_contract",
+      "current_value": {
+        "disposition": "C_ADMISSION_CONTRACT_CORRECTED_TO_STRUCTURED_NATIVE_REFERENCES",
+        "scalar_prerequisite_removed": true,
+        "structured_role_labelled_bundle": "USE",
+        "synthetic_id_created": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Admission checklist lists GEOMETRY_ID; TASK171 output has no aggregate geometry ID; R119-D explicitly forbids inventing one; resolved by explicit owner decision D4",
+      "native_consumer": "real-case mesh-admission identity prerequisite",
+      "owner_decision_id": "D4",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "case_and_task014_revision_identity",
+      "current_value": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1 / V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independently accepted native materialization identity chain",
+      "native_consumer": "case binding and TASK171 NativeIdentity"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task020_configuration_identity",
+      "current_value": "96637b2b-3583-5fdd-8645-bb2b5526996a / 04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independent review of the R9 native identity chain",
+      "native_consumer": "TASK171 NativeIdentity and downstream case binding"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task021_layout_identity",
+      "current_value": "55b3085c-6a2a-5394-8617-7102e7eb66a8 / 1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independent review of the R9 native identity chain",
+      "native_consumer": "TASK171 tube-position membership and downstream mapping"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task022_bundle_geometry_identity",
+      "current_value": "cbacec31-31fa-5e14-aa1b-be05e04b96dc / 2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independent review of the R9 native identity chain",
+      "native_consumer": "TASK171 accepted bundle geometry binding"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task024_baffle_geometry_identity",
+      "current_value": "279ed479-378d-5ea5-b2f0-8926133bf4dd / 68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independent review of the R9 native identity chain",
+      "native_consumer": "TASK171 physical events and native geometry support"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task025_tube_side_result_identity",
+      "current_value": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9 / b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R118-D independent review of the R9 native identity chain",
+      "native_consumer": "TASK171 area/length/position binding"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task171_topology_and_result_identity",
+      "current_value": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7 / 98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R119-E user-supplied external independent review of R119-D",
+      "native_consumer": "TASK171 Result topology_id/result_hash"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "task171_physical_ownership_hash",
+      "current_value": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe",
+      "classification": "REUSED_REVIEWED_CASE_VALUE",
+      "evidence": "R119-E user-supplied external independent review of R119-D",
+      "native_consumer": "TASK171 Result physical_ownership_hash and accepted Definition mapping"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "r119a_reviewed_mapping_authority_ids",
+      "current_value": "FLOW_PATH_MAPPING; PHYSICAL_COMPARTMENT_MAPPING; AREA_OWNERSHIP; LENGTH_OWNERSHIP; TASK171_STRUCTURAL_MESH",
+      "classification": "REUSED_REVIEWED_AUTHORITY",
+      "evidence": "R119-B review and R119-E accepted unchanged R119-A/B authorities",
+      "native_consumer": "effective TASK171 Definition and real-case admission mappings"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "reference_policy_resolution_valid",
+      "current_value": true,
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The reviewed online-oracle=false decision is not case-policy applicability and does not satisfy R107 composite predicate; resolved by explicit owner decision D3",
+      "native_consumer": "real-case mesh-admission predicate",
+      "owner_decision_id": "D3",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "production_mesh_profile_authority_and_admission",
+      "current_value": {
+        "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+        "candidate_bound": true,
+        "review_pending": true,
+        "admission_prerequisites_resolved": true,
+        "real_case_mesh_admissible": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "The accepted TASK171 mesh identity is structural only; production profile and policy package are absent; resolved by explicit owner decision D2",
+      "native_consumer": "real-case production mesh admission",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_count_semantics",
+      "current_value": "SUBDIVISIONS_PER_PHYSICAL_INTERVAL_PER_SIDE",
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_base_equivalence",
+      "current_value": {
+        "n": 1,
+        "total_numerical_cell_count": 10,
+        "wall_interface_count": 5,
+        "equivalent_to_accepted_TASK171_base": true,
+        "physical_interval_ownership_reproduced_exactly": true,
+        "synthetic_R103_identity_reused": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_primary_sequence",
+      "current_value": {
+        "subdivisions_per_interval_per_side": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64
+        ],
+        "total_numerical_cells": [
+          10,
+          20,
+          40,
+          80,
+          160,
+          320,
+          640
+        ],
+        "wall_interfaces": [
+          5,
+          10,
+          20,
+          40,
+          80,
+          160,
+          320
+        ],
+        "project_real_case_sequence_new_owner_authority": true,
+        "R103_primary_cell_counts_transferred": false,
+        "secondary_alignment_sequence_required": false,
+        "R103_secondary_sequence_transferred": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_refinement_operator",
+      "current_value": {
+        "operator": "MIDPOINT_BISECTION_INDEPENDENTLY_WITHIN_EACH_EXISTING_PHYSICAL_INTERVAL",
+        "step": "n -> 2*n",
+        "applies_to": [
+          "TUBE",
+          "SHELL"
+        ],
+        "invariants": {
+          "physical_event_boundary_moved": false,
+          "physical_interval_merged": false,
+          "physical_interval_split_across_event": false,
+          "physical_event_created": false,
+          "physical_event_deleted": false,
+          "flow_path_owner_changed": false,
+          "physical_support_owner_changed": false,
+          "area_ownership_changed": false,
+          "length_ownership_changed": false,
+          "paired_tube_shell_cells_share_exact_axial_support_and_wall_interface": true
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_observables_and_common_support",
+      "current_value": {
+        "observables": {
+          "extensive": "TOTAL_WALL_DUTY",
+          "duty_aggregation": "EXACT_CHILD_TO_PARENT_SUM_PER_INTERVAL_THEN_SUM_INTERVALS",
+          "wall_extrema": [
+            "T_wall_inner_min",
+            "T_wall_inner_max",
+            "T_wall_outer_min",
+            "T_wall_outer_max"
+          ],
+          "extrema_support": "EXACT_CASE_WALL_SUPPORT_SET"
+        },
+        "mapping": {
+          "extensive": "EXACT_CHILD_TO_PARENT_CONSERVATIVE_SUM",
+          "intensive_extrema": "COMMON_PHYSICAL_SUPPORT_EXTREMA_REDUCTION",
+          "forbidden": [
+            "ARRAY_INDEX_PAIRING",
+            "CELL_POSITION_PAIRING",
+            "LINEAR_INTERPOLATION",
+            "NEAREST_NEIGHBOR_INTERPOLATION",
+            "AVERAGING_HTC_ACROSS_MESHES",
+            "AVERAGING_WALL_TEMPERATURE_ACROSS_MESHES",
+            "DIVIDING_TOTAL_DUTY_BY_CELL_COUNT"
+          ]
+        }
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_duty_metric",
+      "current_value": {
+        "D": "max(abs(Q_c),abs(Q_f))",
+        "near_zero_switch_W": "0.01",
+        "when_D_le_switch": "abs(Q_f-Q_c) <= 0.01 W",
+        "otherwise": "abs(Q_f-Q_c)/D <= 0.01",
+        "zero_division_allowed": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_wall_extrema_metric",
+      "current_value": {
+        "metric": "absolute difference fine versus coarse",
+        "threshold_K": "0.01",
+        "all_four_must_pass": true
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_convergence_thresholds",
+      "current_value": {
+        "duty_relative": "0.01",
+        "near_zero_duty_absolute_W": "0.01",
+        "wall_extrema_absolute_K": "0.01",
+        "source": "PROJECT_OWNER_REAL_CASE_PRODUCTION_POLICY_INFORMED_BY_R103",
+        "R103_thresholds_automatically_transferred": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_consecutive_evidence_rule",
+      "current_value": {
+        "required_consecutive_passing_pairs": 2,
+        "required_later_headroom_levels": 1,
+        "headroom_level": "2*n_candidate",
+        "headroom_must_pass_against_candidate": true,
+        "accepted_mesh_is_candidate_not_headroom": true
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_resource_policy",
+      "current_value": {
+        "max_subdivisions_per_physical_interval_per_side": 64,
+        "max_total_numerical_cells": 640,
+        "max_wall_interfaces": 320,
+        "latest_acceptable_candidate_subdivisions": 32,
+        "n64_reserved_for_headroom": true,
+        "cap_increase_allowed": false,
+        "failure_result": [
+          "MESH_RESOURCE_EXHAUSTED",
+          "MESH_NOT_CONVERGED"
+        ]
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_precision_floor",
+      "current_value": {
+        "duty": "SUM_LOCAL_WALL_DUTY_ERROR_ROUNDOFF_BOUNDS_OVER_ADMITTED_WALL_SUPPORTS",
+        "wall_extrema": "MAX_LOCAL_WALL_TEMPERATURE_NUMERICAL_BOUND_OVER_SUPPORT_SET",
+        "pass": "difference + floor <= threshold",
+        "fail": "difference - floor > threshold",
+        "otherwise": "PRECISION_FLOOR_UNRESOLVED",
+        "bound_source": "REVIEWED_R94_R98_LOCAL_BOUNDS",
+        "R102_synthetic_Qref_UQ_transferred": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_failure_semantics",
+      "current_value": [
+        "INVALID_PARENT_CHILD_RELATION",
+        "PHYSICAL_BOUNDARY_CROSSED",
+        "INCOMPLETE_PARENT_COVERAGE",
+        "OVERLAPPING_CHILDREN",
+        "INVALID_COMMON_SUPPORT_MAPPING",
+        "MISSING_OBSERVABLE_AUTHORITY",
+        "NONFINITE_COMPARISON",
+        "PRECISION_FLOOR_UNRESOLVED",
+        "REFINEMENT_SEQUENCE_INSUFFICIENT",
+        "RESOURCE_EXHAUSTION",
+        "MESH_NOT_CONVERGED"
+      ],
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_R103_nontransfer_boundary",
+      "current_value": {
+        "supporting_qualification_evidence": true,
+        "absolute_cell_counts_transferred": false,
+        "secondary_sequence_transferred": false,
+        "synthetic_resource_cap_transferred": false,
+        "synthetic_reference_values_transferred": false,
+        "threshold_values_automatically_transferred": false,
+        "real_case_policy_values_selected_by_project_owner": true
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_R98_case_applicability",
+      "current_value": {
+        "C_round": "1.0",
+        "formula_semantics_changed": false,
+        "source": "PROJECT_OWNER_EXPLICIT_CASE_APPLICABILITY_DECISION",
+        "universal_theorem_claimed": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "bundle": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "field": "mesh_reference_oracle_boundary",
+      "current_value": {
+        "production_reference_oracle_required": false,
+        "online_continuous_required": false,
+        "specific_online_execution_required": false,
+        "R102_real_case_reference_required": false,
+        "R102_synthetic_Qref_transferred": false,
+        "R102_synthetic_UQ_transferred": false
+      },
+      "classification": "PROJECT_OWNER_DECISION_REQUIRED",
+      "evidence": "Explicit owner production-policy decision; not an R103 synthetic transfer",
+      "native_consumer": "real-case mesh-profile binding and admission predicate",
+      "owner_decision_id": "D2",
+      "resolution_state": "SUPPLIED_PENDING_SINGLE_INDEPENDENT_REVIEW",
+      "decision_source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    }
+  ],
+  "case_stream_authority": {
+    "bound_as_candidate": true,
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "source_class": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+    "case_class": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+    "external_as_built_case": false,
+    "measured_plant_case": false,
+    "synthetic_test_fixture": false,
+    "tube": {
+      "fluid_id": "PURE_ORDINARY_WATER",
+      "service": "HOT_WATER",
+      "phase": "SINGLE_PHASE_LIQUID",
+      "role": "HOT",
+      "path_direction": "0_TO_6",
+      "inlet_temperature_K": "300.000000",
+      "inlet_pressure_Pa_absolute": "101325",
+      "mass_flow_kg_s": "10.000000",
+      "outlet_temperature": "SOLVE_OUTPUT",
+      "pressure_drop": "TASK174_OUTPUT"
+    },
+    "shell": {
+      "fluid_id": "PURE_ORDINARY_WATER",
+      "service": "COLD_WATER",
+      "phase": "SINGLE_PHASE_LIQUID",
+      "role": "COLD",
+      "path_direction": "6_TO_0",
+      "inlet_temperature_K": "298.150000",
+      "inlet_pressure_Pa_absolute": "101325",
+      "mass_flow_kg_s": "20.000000",
+      "outlet_temperature": "SOLVE_OUTPUT",
+      "pressure_drop": "TASK174_OUTPUT"
+    },
+    "heat_duty": "SOLVE_OUTPUT",
+    "task172_local_heat_rate": "SOLVE_OUTPUT",
+    "task173_exchanger_duty": "SOLVE_OUTPUT",
+    "positive_mass_flow_magnitude": true,
+    "negative_mass_flow_encoding": false,
+    "uncertainty": "NOT_APPLICABLE_PROJECT_DESIGN_VALUE"
+  },
+  "property_authority": {
+    "package_bound_as_candidate": true,
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+    "profile_canonical_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+    "fluid": "Water",
+    "composition": "PURE_ORDINARY_WATER",
+    "backend": "HEOS",
+    "provider": "CoolProp",
+    "provider_version": "8.0.0",
+    "provider_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+    "configuration_fingerprint": "8d37dea32044ee8d",
+    "reference_state": "DEF",
+    "phase": "SINGLE_PHASE_LIQUID",
+    "domain": {
+      "temperature_K": [
+        "298.15",
+        "300.00"
+      ],
+      "pressure_Pa_absolute": [
+        "100000",
+        "101325"
+      ],
+      "phase": "SINGLE_PHASE_LIQUID"
+    },
+    "failure_policy": {
+      "extrapolation": false,
+      "clipping": false,
+      "silent_backend_fallback": false,
+      "silent_reference_mutation": false,
+      "out_of_domain": "BLOCKED",
+      "phase_boundary_crossing": "BLOCKED"
+    },
+    "native_task026_snapshots": {
+      "tube_inlet": {
+        "density_kg_m3": "996.556935265198",
+        "dynamic_viscosity_pa_s": "0.0008537424862859429",
+        "thermal_conductivity_w_m_k": "0.6094998584856292",
+        "specific_heat_capacity_j_kg_k": "4180.635776556238",
+        "bulk_temperature_k": "300.0",
+        "bulk_pressure_pa": "101325.0",
+        "phase_region": "SINGLE_PHASE_LIQUID",
+        "property_source_id": "CoolProp:HEOS:Water",
+        "property_source_version": "8.0.0+ae81610e7d23efc57f9d051c8e70a4d66e87537f;reference=DEF",
+        "property_snapshot_hash": "984b3e72893b357535ed500294453b5e6b1f902a71a3c93357fe1a9978947819"
+      },
+      "shell_inlet": {
+        "density_kg_m3": "997.047636760353",
+        "dynamic_viscosity_pa_s": "0.0008900224890776955",
+        "thermal_conductivity_w_m_k": "0.6065160802198025",
+        "specific_heat_capacity_j_kg_k": "4181.31499077066",
+        "bulk_temperature_k": "298.15",
+        "bulk_pressure_pa": "101325.0",
+        "phase_region": "SINGLE_PHASE_LIQUID",
+        "property_source_id": "CoolProp:HEOS:Water",
+        "property_source_version": "8.0.0+ae81610e7d23efc57f9d051c8e70a4d66e87537f;reference=DEF",
+        "property_snapshot_hash": "e48b6a28f999e9cffc3cd873eeaede338c4de6ee16c897802bb19eeb41f23c19"
+      }
+    },
+    "provider_observations": {
+      "tube_inlet": {
+        "density_kg_m3": "996.556935265198",
+        "specific_heat_capacity_j_kg_k": "4180.635776556238",
+        "dynamic_viscosity_pa_s": "0.0008537424862859429",
+        "thermal_conductivity_w_m_k": "0.6094998584856292",
+        "enthalpy_j_kg": "112654.89965462626",
+        "entropy_j_kg_k": "393.0620684406033",
+        "phase": "liquid",
+        "quality": null,
+        "provenance": {
+          "backend_name": "CoolProp",
+          "backend_version": "8.0.0",
+          "backend_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+          "fluid_identifier": "HEOS::Water",
+          "validation_level": "supported_tier_1",
+          "query_type": "TP",
+          "inputs": [
+            [
+              "temperature_k",
+              300.0
+            ],
+            [
+              "pressure_pa",
+              101325.0
+            ]
+          ],
+          "cache_policy_version": "1.0",
+          "validation_dataset_id": "HXFORGE-V01-WATER-TP-REGRESSION-001",
+          "validation_dataset_revision": "2026-06-21",
+          "validation_basis": "backend_regression",
+          "reference_state_policy": "DEF",
+          "configuration_fingerprint": "8d37dea32044ee8d",
+          "result_schema_version": "1.0"
+        }
+      },
+      "shell_inlet": {
+        "density_kg_m3": "997.047636760353",
+        "specific_heat_capacity_j_kg_k": "4181.31499077066",
+        "dynamic_viscosity_pa_s": "0.0008900224890776955",
+        "thermal_conductivity_w_m_k": "0.6065160802198025",
+        "enthalpy_j_kg": "104920.11980926784",
+        "entropy_j_kg_k": "367.1996421055897",
+        "phase": "liquid",
+        "quality": null,
+        "provenance": {
+          "backend_name": "CoolProp",
+          "backend_version": "8.0.0",
+          "backend_git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+          "fluid_identifier": "HEOS::Water",
+          "validation_level": "supported_tier_1",
+          "query_type": "TP",
+          "inputs": [
+            [
+              "temperature_k",
+              298.15
+            ],
+            [
+              "pressure_pa",
+              101325.0
+            ]
+          ],
+          "cache_policy_version": "1.0",
+          "validation_dataset_id": "HXFORGE-V01-WATER-TP-REGRESSION-001",
+          "validation_dataset_revision": "2026-06-21",
+          "validation_basis": "backend_regression",
+          "reference_state_policy": "DEF",
+          "configuration_fingerprint": "8d37dea32044ee8d",
+          "result_schema_version": "1.0"
+        }
+      }
+    },
+    "domain_grid": {
+      "temperatures_K": [
+        "298.15",
+        "299.075",
+        "300.0"
+      ],
+      "pressures_Pa_absolute": [
+        "100000",
+        "100662.5",
+        "101325"
+      ],
+      "all_nine_liquid": true,
+      "observations": [
+        {
+          "temperature_K": "298.15",
+          "pressure_Pa_absolute": "100000.0",
+          "phase": "liquid",
+          "density_kg_m3": "997.0470390177117",
+          "cp_J_kg_K": "4181.318830957573",
+          "viscosity_Pa_s": "0.0008900226737731598",
+          "conductivity_W_m_K": "0.6065153281526888"
+        },
+        {
+          "temperature_K": "298.15",
+          "pressure_Pa_absolute": "100662.5",
+          "phase": "liquid",
+          "density_kg_m3": "997.047337889216",
+          "cp_J_kg_K": "4181.316910860631",
+          "viscosity_Pa_s": "0.0008900225814246936",
+          "conductivity_W_m_K": "0.6065157041866177"
+        },
+        {
+          "temperature_K": "298.15",
+          "pressure_Pa_absolute": "101325.0",
+          "phase": "liquid",
+          "density_kg_m3": "997.047636760353",
+          "cp_J_kg_K": "4181.31499077066",
+          "viscosity_Pa_s": "0.0008900224890776955",
+          "conductivity_W_m_K": "0.6065160802198025"
+        },
+        {
+          "temperature_K": "299.075",
+          "pressure_Pa_absolute": "100000.0",
+          "phase": "liquid",
+          "density_kg_m3": "996.8056969879248",
+          "cp_J_kg_K": "4180.959218907962",
+          "viscosity_Pa_s": "0.0008715779195240792",
+          "conductivity_W_m_K": "0.6080177256579152"
+        },
+        {
+          "temperature_K": "299.075",
+          "pressure_Pa_absolute": "100662.5",
+          "phase": "liquid",
+          "density_kg_m3": "996.8059951254812",
+          "cp_J_kg_K": "4180.9573230090855",
+          "viscosity_Pa_s": "0.0008715778438753712",
+          "conductivity_W_m_K": "0.6080180994624396"
+        },
+        {
+          "temperature_K": "299.075",
+          "pressure_Pa_absolute": "101325.0",
+          "phase": "liquid",
+          "density_kg_m3": "996.8062932626253",
+          "cp_J_kg_K": "4180.955427118845",
+          "viscosity_Pa_s": "0.0008715777682280554",
+          "conductivity_W_m_K": "0.6080184732661732"
+        },
+        {
+          "temperature_K": "300.0",
+          "pressure_Pa_absolute": "100000.0",
+          "phase": "liquid",
+          "density_kg_m3": "996.5563403888945",
+          "cp_J_kg_K": "4180.63952202256",
+          "viscosity_Pa_s": "0.0008537426062537251",
+          "conductivity_W_m_K": "0.6094991151038326"
+        },
+        {
+          "temperature_K": "300.0",
+          "pressure_Pa_absolute": "100662.5",
+          "phase": "liquid",
+          "density_kg_m3": "996.556637827273",
+          "cp_J_kg_K": "4180.637649284224",
+          "viscosity_Pa_s": "0.0008537425462691775",
+          "conductivity_W_m_K": "0.6094994867951465"
+        },
+        {
+          "temperature_K": "300.0",
+          "pressure_Pa_absolute": "101325.0",
+          "phase": "liquid",
+          "density_kg_m3": "996.556935265198",
+          "cp_J_kg_K": "4180.635776556238",
+          "viscosity_Pa_s": "0.0008537424862859429",
+          "conductivity_W_m_K": "0.6094998584856292"
+        }
+      ]
+    },
+    "domain_proof_hash": "0111a6353000159977ae7271a9f397d280ca88e25ece3714b6d2d5c9bd530d53",
+    "backend_qualification_hash": "4cccb3122a6ae03badd1bc814523338435977c8324333c804fc1c96b8de10884",
+    "local_states": "same selected authority; native provider snapshots required; fail closed outside domain"
+  },
+  "material_wall_constitutive_authority": {
+    "bound_as_candidate": true,
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "material": "316L_AUSTENITIC_STAINLESS_STEEL",
+    "designation": "316L",
+    "component_role": "TUBE_WALL_METAL",
+    "tube_geometry": {
+      "OD_m": "0.01905",
+      "ID_m": "0.01575",
+      "wall_thickness_m": "0.00165"
+    },
+    "material_source": {
+      "family": "Alleima Sanmac 316/316L material datasheet",
+      "url": "https://www.alleima.com/en/technical-center/material-datasheets/tube-and-pipe-seamless/sanmac-316316l/",
+      "downloaded_PDF_SHA256": "eda6e84f95c4cc2a46bb8c902cf066c4f51b9108d951d5490222cb365219ac48",
+      "approx_k_20C_W_m_K": "14",
+      "approx_k_100C_W_m_K": "15"
+    },
+    "wall_k_model": "PROJECT_OWNER_CONSERVATIVE_CONSTANT_K",
+    "wall_k_W_m_K": "14.0",
+    "wall_valid_T_K": [
+      "298.15",
+      "300.00"
+    ],
+    "source_exact_constant_over_interval": false,
+    "owner_conservative_case_value": true,
+    "surface_profile": "CLEAN",
+    "tube_fouling_Rf_m2_K_W": "0",
+    "shell_fouling_Rf_m2_K_W": "0",
+    "deposit": false,
+    "contact_resistance": false,
+    "extra_interface_layer": false,
+    "clean_wall_authority_hash": "e493999a1a6f8e83140e62ed71755af877a451bb9525f1e0791cddf174150b29",
+    "local_cylindrical_mapping_hash": "49f902ce096f57381057a6d3631ef4b30355526dae8187112ae04fa703dda63c",
+    "tube_case_applicability": {
+      "selector": "native TURBULENT",
+      "branch": "Gnielinski/C3",
+      "Re": "3742.675244246214513402808173",
+      "Pr": "5.855926514898839169263267261",
+      "Re_envelope": "3000 < Re < 5e6",
+      "Pr_envelope": "0.5 <= Pr <= 2000",
+      "Pr_pass": true,
+      "Nu": "27.61898513931272019827155622",
+      "wall_correction": "reviewed C3"
+    },
+    "shell_case_applicability": {
+      "screen": "TASK031 central crossflow",
+      "area_m2": "0.150000000000000000000000",
+      "Dh_public_m": "0.018293343850",
+      "Re": "2740.5066088396428172796798450599375449393604657674",
+      "Pr": "6.1358049639094794150526865914303242471116943093648",
+      "screen_pass": true,
+      "Jmu_profile": "CLEAN_PROFILE",
+      "Jmu_formula": "(mu_bulk/mu_wall)^0.14",
+      "mu_bulk": "LOCATED_LOCAL_SHELL_BULK_PROPERTY_STATE",
+      "mu_wall": "LOCATED_LOCAL_SHELL_FLUID_WALL_INTERFACE_PROPERTY_STATE",
+      "authority_chain": "reviewed Jmu/Bayram/Jamil/R90 composite"
+    },
+    "task037_ratio": "1.209523809523810",
+    "total_inside_area_m2": "75.1107679584",
+    "total_outside_area_m2": "90.848262197302892909889504"
+  },
+  "numerical_profile_authority": {
+    "case_executable_profile_bound": true,
+    "r94_model_profile_canonical_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+    "r98_residual_overlay_canonical_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+    "r103_qualification_canonical_hash": "331bb73c09f0b2ec00260886abb1ceec65b3a2996dcb02a17d144e252ef51ac9",
+    "r88_unknown_vector": [
+      "q_hc",
+      "T_wall_inner",
+      "T_wall_outer"
+    ],
+    "stream_oriented_heat_rate_relation": "q_ts=s_ts*q_hc",
+    "physical_residuals": {
+      "r_i": "q_ts-h_i(T_wall_inner,located_tube_state,admitted_tube_profile)*A_i*(T_tube_bulk-T_wall_inner)",
+      "r_w": "q_ts-(T_wall_inner-T_wall_outer)/R_wall",
+      "r_o": "q_ts-h_o(T_wall_outer,located_shell_state,admitted_shell_profile)*A_o*(T_wall_outer-T_shell_bulk)",
+      "units": "W"
+    },
+    "initialization_stages": [
+      "I0_INPUT_AND_DOMAIN_ADMISSION",
+      "I1_NEUTRAL_BASE_FILM_AND_DETERMINISTIC_ALGEBRAIC_SEED",
+      "I2_RESTORE_FULL_ACTIVE_EQUATIONS_BEFORE_ACCEPTED_RESULT"
+    ],
+    "neutral_jmu_seed": {
+      "value": 1.0,
+      "initialization_only": true,
+      "accepted_physics": false
+    },
+    "r94_controls_reused_if_case_scope_matches": {
+      "method": "trf",
+      "loss": "linear",
+      "ftol": 1e-06,
+      "xtol": 1e-12,
+      "gtol": 1e-12,
+      "jacobian": "2-point",
+      "diff_step": 1e-05,
+      "x_scale": "INITIALIZATION_DERIVED",
+      "residual_scale": "abs(q_ts_seed)",
+      "max_nfev": 6,
+      "residual_callback_cap": 24,
+      "tr_solver": "exact",
+      "tr_options": {},
+      "f_scale": 1,
+      "jac_sparsity": null,
+      "effective_c_round": 1.0,
+      "separate_under_relaxation": "NOT_SPECIFIED_NOT_APPLICABLE"
+    },
+    "failure_domain_and_nonconvergence": "FAIL_CLOSED_NO_FALLBACK",
+    "failure_semantics": {
+      "invalid_trial": "TYPED_FAILURE_NO_FAKE_PENALTY_RESIDUAL",
+      "solver_success_is_engineering_acceptance": false,
+      "nonconvergence_or_cap_hit": "NO_AUTHORITATIVE_RESULT_LAST_ITERATE_DIAGNOSTIC_ONLY",
+      "property_failure": "TYPED_FAILURE_NO_EXTRAPOLATION_OR_CLIPPING",
+      "domain_exit": "TYPED_FAIL_CLOSED_NO_CLAMP",
+      "negative_q_model_semantics": "SIGNED_VALUE_NUMERICALLY_ALLOWED; NEGATIVE_PHYSICAL_RESULT_BLOCKED_FOR_THIS_CASE"
+    },
+    "real_case_fit_and_profile_binding": "BOUND_BY_PROJECT_OWNER_D1_PENDING_SINGLE_INDEPENDENT_REVIEW",
+    "owner_decision_ids": [
+      "D1"
+    ],
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "r98_real_case_applicability_bound": true,
+    "effective_c_round": "1.0",
+    "c_round_source": "PROJECT_OWNER_EXPLICIT_CASE_APPLICABILITY_DECISION",
+    "negative_q_numeric_variable_allowed": true,
+    "negative_q_accepted_physical_case_result": false,
+    "negative_q_case_disposition": "typed BLOCKED applicability result; no clamp, absolute direction, or role swap"
+  },
+  "real_case_mesh_admission_authority": {
+    "task171_structural_mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+    "production_mesh_profile_authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+    "production_mesh_profile_authority_bound": true,
+    "profile_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "profile": {
+      "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+      "scope": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+      "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+      "physical_support": {
+        "immutable": true,
+        "intervals_m": [
+          [
+            "0.0",
+            "1.2"
+          ],
+          [
+            "1.2",
+            "2.4"
+          ],
+          [
+            "2.4",
+            "3.6"
+          ],
+          [
+            "3.6",
+            "4.8"
+          ],
+          [
+            "4.8",
+            "6.0"
+          ]
+        ],
+        "interval_count": 5,
+        "interval_length_m": "1.2",
+        "inside_area_per_interval_m2": "15.02215359168",
+        "outside_area_per_interval_m2": "18.1696524394605785819779008",
+        "sides": [
+          "TUBE",
+          "SHELL"
+        ]
+      },
+      "count_semantics": {
+        "n": "SUBDIVISIONS_PER_PHYSICAL_INTERVAL_PER_SIDE",
+        "tube_cells": "5*n",
+        "shell_cells": "5*n",
+        "total_numerical_cells": "10*n",
+        "wall_interfaces": "5*n",
+        "n_is_global_cell_count": false
+      },
+      "base_mesh_equivalence": {
+        "n": 1,
+        "total_numerical_cell_count": 10,
+        "wall_interface_count": 5,
+        "equivalent_to_accepted_TASK171_base": true,
+        "physical_interval_ownership_reproduced_exactly": true,
+        "synthetic_R103_identity_reused": false
+      },
+      "refinement_operator": {
+        "operator": "MIDPOINT_BISECTION_INDEPENDENTLY_WITHIN_EACH_EXISTING_PHYSICAL_INTERVAL",
+        "step": "n -> 2*n",
+        "applies_to": [
+          "TUBE",
+          "SHELL"
+        ],
+        "invariants": {
+          "physical_event_boundary_moved": false,
+          "physical_interval_merged": false,
+          "physical_interval_split_across_event": false,
+          "physical_event_created": false,
+          "physical_event_deleted": false,
+          "flow_path_owner_changed": false,
+          "physical_support_owner_changed": false,
+          "area_ownership_changed": false,
+          "length_ownership_changed": false,
+          "paired_tube_shell_cells_share_exact_axial_support_and_wall_interface": true
+        }
+      },
+      "production_sequence": {
+        "subdivisions_per_interval_per_side": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64
+        ],
+        "total_numerical_cells": [
+          10,
+          20,
+          40,
+          80,
+          160,
+          320,
+          640
+        ],
+        "wall_interfaces": [
+          5,
+          10,
+          20,
+          40,
+          80,
+          160,
+          320
+        ],
+        "project_real_case_sequence_new_owner_authority": true,
+        "R103_primary_cell_counts_transferred": false,
+        "secondary_alignment_sequence_required": false,
+        "R103_secondary_sequence_transferred": false
+      },
+      "observables": {
+        "extensive": "TOTAL_WALL_DUTY",
+        "duty_aggregation": "EXACT_CHILD_TO_PARENT_SUM_PER_INTERVAL_THEN_SUM_INTERVALS",
+        "wall_extrema": [
+          "T_wall_inner_min",
+          "T_wall_inner_max",
+          "T_wall_outer_min",
+          "T_wall_outer_max"
+        ],
+        "extrema_support": "EXACT_CASE_WALL_SUPPORT_SET"
+      },
+      "cross_mesh_mapping": {
+        "extensive": "EXACT_CHILD_TO_PARENT_CONSERVATIVE_SUM",
+        "intensive_extrema": "COMMON_PHYSICAL_SUPPORT_EXTREMA_REDUCTION",
+        "forbidden": [
+          "ARRAY_INDEX_PAIRING",
+          "CELL_POSITION_PAIRING",
+          "LINEAR_INTERPOLATION",
+          "NEAREST_NEIGHBOR_INTERPOLATION",
+          "AVERAGING_HTC_ACROSS_MESHES",
+          "AVERAGING_WALL_TEMPERATURE_ACROSS_MESHES",
+          "DIVIDING_TOTAL_DUTY_BY_CELL_COUNT"
+        ]
+      },
+      "metrics": {
+        "duty": {
+          "D": "max(abs(Q_c),abs(Q_f))",
+          "near_zero_switch_W": "0.01",
+          "when_D_le_switch": "abs(Q_f-Q_c) <= 0.01 W",
+          "otherwise": "abs(Q_f-Q_c)/D <= 0.01",
+          "zero_division_allowed": false
+        },
+        "wall_extrema": {
+          "metric": "absolute difference fine versus coarse",
+          "threshold_K": "0.01",
+          "all_four_must_pass": true
+        }
+      },
+      "thresholds": {
+        "duty_relative": "0.01",
+        "near_zero_duty_absolute_W": "0.01",
+        "wall_extrema_absolute_K": "0.01",
+        "source": "PROJECT_OWNER_REAL_CASE_PRODUCTION_POLICY_INFORMED_BY_R103",
+        "R103_thresholds_automatically_transferred": false
+      },
+      "convergence_evidence": {
+        "required_consecutive_passing_pairs": 2,
+        "required_later_headroom_levels": 1,
+        "headroom_level": "2*n_candidate",
+        "headroom_must_pass_against_candidate": true,
+        "accepted_mesh_is_candidate_not_headroom": true
+      },
+      "resource_policy": {
+        "max_subdivisions_per_physical_interval_per_side": 64,
+        "max_total_numerical_cells": 640,
+        "max_wall_interfaces": 320,
+        "latest_acceptable_candidate_subdivisions": 32,
+        "n64_reserved_for_headroom": true,
+        "cap_increase_allowed": false,
+        "failure_result": [
+          "MESH_RESOURCE_EXHAUSTED",
+          "MESH_NOT_CONVERGED"
+        ]
+      },
+      "precision_floor": {
+        "duty": "SUM_LOCAL_WALL_DUTY_ERROR_ROUNDOFF_BOUNDS_OVER_ADMITTED_WALL_SUPPORTS",
+        "wall_extrema": "MAX_LOCAL_WALL_TEMPERATURE_NUMERICAL_BOUND_OVER_SUPPORT_SET",
+        "pass": "difference + floor <= threshold",
+        "fail": "difference - floor > threshold",
+        "otherwise": "PRECISION_FLOOR_UNRESOLVED",
+        "bound_source": "REVIEWED_R94_R98_LOCAL_BOUNDS",
+        "R102_synthetic_Qref_UQ_transferred": false
+      },
+      "R98_case_applicability": {
+        "C_round": "1.0",
+        "formula_semantics_changed": false,
+        "source": "PROJECT_OWNER_EXPLICIT_CASE_APPLICABILITY_DECISION",
+        "universal_theorem_claimed": false
+      },
+      "reference_oracle": {
+        "production_reference_oracle_required": false,
+        "online_continuous_required": false,
+        "specific_online_execution_required": false,
+        "R102_real_case_reference_required": false,
+        "R102_synthetic_Qref_transferred": false,
+        "R102_synthetic_UQ_transferred": false
+      },
+      "R103_scope": {
+        "supporting_qualification_evidence": true,
+        "absolute_cell_counts_transferred": false,
+        "secondary_sequence_transferred": false,
+        "synthetic_resource_cap_transferred": false,
+        "synthetic_reference_values_transferred": false,
+        "threshold_values_automatically_transferred": false,
+        "real_case_policy_values_selected_by_project_owner": true
+      },
+      "native_schema_resource_check": {
+        "producer_invoked": false,
+        "n64_cells": 640,
+        "n64_walls": 320,
+        "state_records": 2560,
+        "intervals": 5,
+        "paths": 2,
+        "events": 19,
+        "provenance_edges": 3,
+        "native_max_records": 4096,
+        "safe_model_max_nodes": 262144,
+        "safe_model_max_depth": 16,
+        "observed_nodes": 51327,
+        "result": "PASS_SCHEMA_CAPACITY_ONLY"
+      },
+      "failure_semantics": [
+        "INVALID_PARENT_CHILD_RELATION",
+        "PHYSICAL_BOUNDARY_CROSSED",
+        "INCOMPLETE_PARENT_COVERAGE",
+        "OVERLAPPING_CHILDREN",
+        "INVALID_COMMON_SUPPORT_MAPPING",
+        "MISSING_OBSERVABLE_AUTHORITY",
+        "NONFINITE_COMPARISON",
+        "PRECISION_FLOOR_UNRESOLVED",
+        "REFINEMENT_SEQUENCE_INSUFFICIENT",
+        "RESOURCE_EXHAUSTION",
+        "MESH_NOT_CONVERGED"
+      ],
+      "admission_status": {
+        "candidate_profile_bound": true,
+        "reviewed_effective": false,
+        "real_case_mesh_admissible": false,
+        "production_mesh_admission_enabled": false,
+        "convergence_run_performed": false
+      }
+    },
+    "real_case_mesh_admission_prerequisites_resolved": true,
+    "real_case_mesh_admissible": false,
+    "production_mesh_admission_enabled": false,
+    "policy_slots": {
+      "case_bound_mesh_profile": "BOUND_PENDING_REVIEW",
+      "initial_mesh_policy": "BOUND_PENDING_REVIEW",
+      "refinement_policy": "BOUND_PENDING_REVIEW",
+      "convergence_policy": "BOUND_PENDING_REVIEW",
+      "resource_policy": "BOUND_PENDING_REVIEW",
+      "wall_policy": "BOUND_PENDING_REVIEW",
+      "mapping_policy": "BOUND_PENDING_REVIEW",
+      "reference_policy_applicability": "BOUND_PENDING_REVIEW",
+      "production_reference_oracle_requirement": "RESOLVED_FALSE_PENDING_REVIEW"
+    },
+    "reference_policy_authority_id": "V07-T172-REAL-CASE-REFERENCE-POLICY-R1",
+    "reference_policy_resolution_valid": true,
+    "production_reference_oracle_authority_id": "V07-T172-PRODUCTION-REFERENCE-ORACLE-REQUIREMENT-R1",
+    "production_reference_oracle_required": false,
+    "production_reference_oracle_requirement_resolution_valid": true,
+    "online_continuous_reference_oracle_required": false,
+    "specific_online_reference_execution_required": false,
+    "geometry_id": "UNBOUND",
+    "geometry_id_contract_disposition": "C_ADMISSION_CONTRACT_CORRECTED_TO_STRUCTURED_NATIVE_REFERENCES",
+    "structured_native_identity_bundle": [
+      {
+        "role": "TASK020_CONFIGURATION",
+        "id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+        "hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125"
+      },
+      {
+        "role": "TASK021_LAYOUT",
+        "id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+        "hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550"
+      },
+      {
+        "role": "TASK022_BUNDLE_GEOMETRY",
+        "id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+        "hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4"
+      },
+      {
+        "role": "TASK024_BAFFLE_GEOMETRY",
+        "id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+        "hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994"
+      },
+      {
+        "role": "TASK025_RESULT",
+        "id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+        "hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a"
+      },
+      {
+        "role": "TASK171_TOPOLOGY",
+        "id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+        "hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7"
+      },
+      {
+        "role": "TASK171_MESH",
+        "id": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+        "hash": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607"
+      },
+      {
+        "role": "TASK171_PHYSICAL_OWNERSHIP",
+        "native_id": "NOT_NATIVE_OUTPUT",
+        "hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe"
+      },
+      {
+        "role": "FLOW_PATH_MAPPING_AUTHORITY",
+        "id": "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+        "canonical_hash": "c728a589460f9667bc38700700ffde670ff59042f021c66228b91b4567a8c61d"
+      },
+      {
+        "role": "PHYSICAL_COMPARTMENT_MAPPING_AUTHORITY",
+        "id": "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+        "canonical_hash": "57dcc49b31dafcb47178286247ec5bdb55d304b6e805162ada843d7db41c45b0"
+      },
+      {
+        "role": "AREA_OWNERSHIP_AUTHORITY",
+        "id": "V07-T172-R119A-AREA-OWNERSHIP-R1",
+        "canonical_hash": "ab5c9ede1064ee0c17d7d07ab5cf3f4a8326b53bbf08935d125fedefe7939c98"
+      },
+      {
+        "role": "LENGTH_OWNERSHIP_AUTHORITY",
+        "id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+        "canonical_hash": "eb9924e25bb68393642d4fa0e573fb58875bc0320d284e327f334acf0c8aa60b"
+      }
+    ],
+    "synthetic_aggregate_geometry_id_created": false,
+    "concatenated_or_aliased": false
+  },
+  "geometry_id_contract_resolution": {
+    "task172_runtime_requires_aggregate_geometry_id": false,
+    "real_case_admission_scalar_prerequisite_removed_in_candidate_overlay": true,
+    "disposition": "C_ADMISSION_CONTRACT_CORRECTED_TO_STRUCTURED_NATIVE_REFERENCES",
+    "current_geometry_id": "UNBOUND",
+    "unbound_reason": "NO_REVIEWED_NATIVE_AGGREGATE_CASE_GEOMETRY_ID_CONTRACT",
+    "structured_reference_bundle_path": "real_case_mesh_admission_authority.structured_native_identity_bundle",
+    "synthetic_id_created": false,
+    "concatenation_or_aliasing": false,
+    "historical_contract_rewritten": false,
+    "owner_decision_id": "D4"
+  },
+  "reused_reviewed_authorities": [
+    {
+      "authority": "R119-E external independent review",
+      "result": "PASS",
+      "canonical_hash": "5ad8343e342ad2bc4f1c3560fa9dc47e97b61f9b4e37e21ede2e35f63c63fbda",
+      "source": "USER_SUPPLIED_EXTERNAL_INDEPENDENT_REVIEW_DECISION"
+    },
+    {
+      "authority": "R119-C thermal role selection",
+      "authority_id": "V07-T172-R119C-THERMAL-ROLE-SELECTION-R1",
+      "selected_variant": "TUBE_HOT_SHELL_COLD"
+    },
+    {
+      "authority": "R119-A/B role-neutral structural mappings",
+      "ids": [
+        "V07-T172-R119A-FLOW-PATH-MAPPING-R1",
+        "V07-T172-R119A-PHYSICAL-COMPARTMENT-MAPPING-R1",
+        "V07-T172-R119A-AREA-OWNERSHIP-R1",
+        "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+        "V07-T172-R119A-TASK171-MESH-R1"
+      ]
+    },
+    {
+      "authority": "R118-D accepted native geometry identity chain",
+      "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+      "task014_revision_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-DESIGN-R1-REV-1",
+      "task020_configuration_id": "96637b2b-3583-5fdd-8645-bb2b5526996a",
+      "task020_configuration_hash": "04fbacd4037e4740328dd76b01caa0e85f22569924308d74b35bb13f0beb9125",
+      "task021_layout_id": "55b3085c-6a2a-5394-8617-7102e7eb66a8",
+      "task021_layout_hash": "1dabd4362cc0c446da892bfe92b48fc6066b01ab3ca037d31ff4213e91fcc550",
+      "task022_bundle_geometry_id": "cbacec31-31fa-5e14-aa1b-be05e04b96dc",
+      "task022_bundle_geometry_hash": "2384f3b31b279dac696951372d4b4781c58b8594c4d09091ec1a5cdaab7049f4",
+      "task024_baffle_geometry_id": "279ed479-378d-5ea5-b2f0-8926133bf4dd",
+      "task024_baffle_geometry_hash": "68efd0e8dc69f203d49b73b2a87106863725d9a1b4a9bf1282cc1f650942d994",
+      "task025_result_id": "6ff54552-d44e-50d2-bdf2-fe5b766c6ff9",
+      "task025_result_hash": "b74a037507e525e1ec647ac6a594e3723f0de07965e916b7a2eb1bb9de4dfc2a",
+      "task171_topology_id": "urn:hxforge:task171:98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "task171_result_hash": "98b4bb0ce1d209b6e19ae313330b1a8d5692b2398967586d4edc1e368e9345a7",
+      "task171_mesh_identity": "ec4a01bbfe81cd6b12ede63c6f4e4aa05372414868cee54a54fb7c98aaffd607",
+      "task171_physical_ownership_hash": "63ea9cb1d10037dde273fc40746d6cf98604a40e41d91705f640031e5b6ec7fe"
+    },
+    {
+      "authority": "R94 reviewed numerical profile",
+      "canonical_hash": "81ae446af5e0009ce85c5fcb89d80534f9e2eaf36942b9d3a35aa0ff10a86aec",
+      "scope": "MODEL_LEVEL_CASE_BINDING_PENDING"
+    },
+    {
+      "authority": "R110 online reference-oracle requirement decision",
+      "canonical_hash": "2f80e41406be2ee3bec40de448af115ac9458c61845ac27cba6e2056b8e69058",
+      "production_reference_oracle_required": false,
+      "scope": "REVIEWED_PROFILE_SCOPE_ONLY"
+    },
+    {
+      "authority": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+      "canonical_hash": "8407227452b519483fbccbc686d3e8fcb2ca54866a8a8f01114addb5ca5a37de",
+      "case_binding": "B1/B2"
+    },
+    {
+      "authority": "R98 reviewed numerical overlay",
+      "canonical_hash": "54c63a6c1178650e3164dd9f6cd7417ba044f2ec4b2f6b1b6a28accc19955a78",
+      "case_binding": "explicit D1 applicability"
+    },
+    {
+      "authority": "R103 supporting qualification",
+      "absolute_cell_counts_transferred": false,
+      "secondary_sequence_transferred": false,
+      "synthetic_caps_or_reference_values_transferred": false
+    },
+    {
+      "authority": "R112/R110 real-case reference/oracle policy",
+      "evidence_hash": "ed7586cfa7ceb1f9972be35e863f7626bc3a45006b1960ad83661aab81f24959",
+      "production_reference_oracle_required": false,
+      "case_binding": "explicit D3"
+    }
+  ],
+  "derived_bindings": [
+    {
+      "binding": "tube wall geometric correspondence to accepted tube ID/OD",
+      "status": "DERIVED_GEOMETRIC_LINK_ONLY",
+      "does_not_bind": "material identity or material property"
+    },
+    {
+      "binding": "native Task026 inlet property snapshots",
+      "status": "NATIVE_PROVIDER_GENERATED_AND_TASK026_HASHED",
+      "tube_hash": "984b3e72893b357535ed500294453b5e6b1f902a71a3c93357fe1a9978947819",
+      "shell_hash": "e48b6a28f999e9cffc3cd873eeaede338c4de6ee16c897802bb19eeb41f23c19"
+    },
+    {
+      "binding": "TASK037 outer/inner ratio and outside area",
+      "status": "NATIVE_RATIO_AND_DECIMAL_DERIVED",
+      "ratio": "1.209523809523810",
+      "inside_area_m2": "75.1107679584",
+      "outside_area_m2": "90.848262197302892909889504"
+    },
+    {
+      "binding": "real-case mesh totals",
+      "status": "DERIVED_FROM_FIVE_INTERVALS_AND_OWNER_n",
+      "formula": "cells=10*n; wall interfaces=5*n"
+    }
+  ],
+  "project_owner_decisions_required": [],
+  "runtime_readiness_after_stage1": {
+    "task172_runtime_ready": false,
+    "task172_runtime_implementation": false,
+    "blockers": [
+      "single consolidated Stage-1 independent review pending",
+      "runtime implementation not authorized/performed"
+    ]
+  },
+  "real_case_admission_readiness_after_stage1": {
+    "admission_prerequisites_resolved": true,
+    "reference_policy_resolution_valid": true,
+    "production_reference_oracle_requirement_resolved": true,
+    "production_mesh_profile_authority_bound_as_candidate": true,
+    "real_case_mesh_admissible": false,
+    "reason": "No production convergence/admission run occurred; mesh authority remains review pending."
+  },
+  "change_boundary": {
+    "production_code_changed": false,
+    "existing_tests_changed": false,
+    "dependencies_changed": false,
+    "workflows_changed": false,
+    "lockfiles_changed": false,
+    "r119a_through_r119e_artifacts_rewritten": false,
+    "native_producer_execution_performed": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "registry_append_only": true,
+    "self_approval": false
+  },
+  "validation": {
+    "predecessor_head_and_pr_state": "PASS",
+    "r119e_external_review_provenance": "PASS",
+    "reused_authority_identity_replay": "PASS",
+    "stale_fixture_or_default_promotion": "NONE",
+    "canonical_hash_audit": "PASS_SHARED_CANONICAL_SHA256_REPLAY",
+    "registry_duplicate_key_audit": {
+      "preexisting_duplicate_keys": 2,
+      "new_duplicate_keys": 0,
+      "status": "PASS_PREEXISTING_DUPLICATES_PRESERVED"
+    },
+    "static_repository_validation": {
+      "git_diff_check": "PASS",
+      "uv_lock_check": "PASS",
+      "uv_sync_locked_all_extras": "PASS",
+      "ruff_check": "PASS",
+      "ruff_format_check": "PASS",
+      "mypy_ci_scope": "PASS",
+      "manifest_discovered_equals_manifest": "PASS_256_EQUALS_256",
+      "pip_audit_ci_command": "BLOCKED_LOCAL_PYPI_503_FOR_EDITABLE_PROJECT_DISTRIBUTION",
+      "pip_audit_skip_editable_retry": "PASS_NO_KNOWN_VULNERABILITIES; editable local project excluded from this retry"
+    },
+    "exact_final_head_ci": "REQUIRED_AFTER_COMMIT",
+    "native_property_provider_replay": "PASS",
+    "task026_snapshot_hash_replay": "PASS",
+    "property_domain_phase_grid": "PASS_9_OF_9_LIQUID",
+    "tube_c3_case_applicability": "PASS_NATIVE_SCREENING",
+    "shell_jmu_case_applicability": "PASS_NATIVE_SCREENING",
+    "task037_area_ratio_replay": "PASS",
+    "n64_task171_schema_resource_check": "PASS_SCHEMA_CAPACITY_ONLY",
+    "production_mesh_convergence_admission": "NOT_RUN_BY_SCOPE"
+  },
+  "next_stage": "STAGE1_SINGLE_INDEPENDENT_REVIEW",
+  "stop": true,
+  "canonical_hash": "60d1270c52ea226df28634003b4beaf6a8d006915d6454fe7e55dfaaca8771c1",
+  "project_owner_decisions_supplied": [
+    {
+      "id": "A1",
+      "section": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "decision": "fluid/service identity and phase",
+      "value": {
+        "tube": [
+          "PURE_ORDINARY_WATER",
+          "HOT_WATER",
+          "SINGLE_PHASE_LIQUID"
+        ],
+        "shell": [
+          "PURE_ORDINARY_WATER",
+          "COLD_WATER",
+          "SINGLE_PHASE_LIQUID"
+        ]
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "A2",
+      "section": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "decision": "inlet states, positive flow magnitudes and sign convention",
+      "value": {
+        "tube": {
+          "T_K": "300.000000",
+          "P_Pa_abs": "101325",
+          "mass_flow_kg_s": "10.000000"
+        },
+        "shell": {
+          "T_K": "298.150000",
+          "P_Pa_abs": "101325",
+          "mass_flow_kg_s": "20.000000"
+        },
+        "positive_magnitude": true,
+        "negative_encoding": false
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "A3",
+      "section": "A_CASE_STREAMS_AND_OPERATING_POINT",
+      "decision": "outlet/terminal boundaries",
+      "value": "outlet temperatures and duties are solve outputs; pressure drops are TASK174 outputs",
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "B1",
+      "section": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "decision": "property source/profile",
+      "value": {
+        "profile": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+        "backend": "HEOS",
+        "CoolProp_version": "8.0.0",
+        "git_revision": "ae81610e7d23efc57f9d051c8e70a4d66e87537f",
+        "reference_state": "DEF"
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "B2",
+      "section": "B_PROPERTY_SOURCE_AND_CASE_DOMAIN",
+      "decision": "property domain and failure policy",
+      "value": {
+        "T_K": [
+          "298.15",
+          "300.00"
+        ],
+        "P_Pa_abs": [
+          "100000",
+          "101325"
+        ],
+        "phase": "SINGLE_PHASE_LIQUID",
+        "out_of_domain": "BLOCKED"
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "C1",
+      "section": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "decision": "316L wall and conservative constant k",
+      "value": {
+        "material": "316L",
+        "k_W_m_K": "14.0",
+        "T_K": [
+          "298.15",
+          "300.00"
+        ],
+        "source_exact_constant": false
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "C2",
+      "section": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "decision": "clean wall/fouling state",
+      "value": {
+        "profile": "CLEAN",
+        "tube_Rf": "0",
+        "shell_Rf": "0",
+        "deposits": false,
+        "contact_resistance": false
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "C3",
+      "section": "C_MATERIAL_WALL_AND_LOCAL_CONSTITUTIVE",
+      "decision": "case applicability of reviewed HTC/correction authorities",
+      "value": {
+        "tube": "TURBULENT_GNIELINSKI_C3",
+        "shell": "CLEAN_JMU",
+        "fail_closed": true
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "D1",
+      "section": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "decision": "R94/R98 case binding and negative q disposition",
+      "value": {
+        "controls": "ACCEPT_UNCHANGED",
+        "C_round": "1.0",
+        "negative_q_numeric": true,
+        "negative_q_physical_result": "BLOCKED"
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "D2",
+      "section": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "decision": "new real-case production mesh policy",
+      "value": {
+        "authority_id": "V07-T172-REAL-CASE-PRODUCTION-MESH-PROFILE-R1",
+        "scope": "PROJECT_DESIGNED_ENGINEERING_REFERENCE_CASE",
+        "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+        "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+        "physical_support": {
+          "immutable": true,
+          "intervals_m": [
+            [
+              "0.0",
+              "1.2"
+            ],
+            [
+              "1.2",
+              "2.4"
+            ],
+            [
+              "2.4",
+              "3.6"
+            ],
+            [
+              "3.6",
+              "4.8"
+            ],
+            [
+              "4.8",
+              "6.0"
+            ]
+          ],
+          "interval_count": 5,
+          "interval_length_m": "1.2",
+          "inside_area_per_interval_m2": "15.02215359168",
+          "outside_area_per_interval_m2": "18.1696524394605785819779008",
+          "sides": [
+            "TUBE",
+            "SHELL"
+          ]
+        },
+        "count_semantics": {
+          "n": "SUBDIVISIONS_PER_PHYSICAL_INTERVAL_PER_SIDE",
+          "tube_cells": "5*n",
+          "shell_cells": "5*n",
+          "total_numerical_cells": "10*n",
+          "wall_interfaces": "5*n",
+          "n_is_global_cell_count": false
+        },
+        "base_mesh_equivalence": {
+          "n": 1,
+          "total_numerical_cell_count": 10,
+          "wall_interface_count": 5,
+          "equivalent_to_accepted_TASK171_base": true,
+          "physical_interval_ownership_reproduced_exactly": true,
+          "synthetic_R103_identity_reused": false
+        },
+        "refinement_operator": {
+          "operator": "MIDPOINT_BISECTION_INDEPENDENTLY_WITHIN_EACH_EXISTING_PHYSICAL_INTERVAL",
+          "step": "n -> 2*n",
+          "applies_to": [
+            "TUBE",
+            "SHELL"
+          ],
+          "invariants": {
+            "physical_event_boundary_moved": false,
+            "physical_interval_merged": false,
+            "physical_interval_split_across_event": false,
+            "physical_event_created": false,
+            "physical_event_deleted": false,
+            "flow_path_owner_changed": false,
+            "physical_support_owner_changed": false,
+            "area_ownership_changed": false,
+            "length_ownership_changed": false,
+            "paired_tube_shell_cells_share_exact_axial_support_and_wall_interface": true
+          }
+        },
+        "production_sequence": {
+          "subdivisions_per_interval_per_side": [
+            1,
+            2,
+            4,
+            8,
+            16,
+            32,
+            64
+          ],
+          "total_numerical_cells": [
+            10,
+            20,
+            40,
+            80,
+            160,
+            320,
+            640
+          ],
+          "wall_interfaces": [
+            5,
+            10,
+            20,
+            40,
+            80,
+            160,
+            320
+          ],
+          "project_real_case_sequence_new_owner_authority": true,
+          "R103_primary_cell_counts_transferred": false,
+          "secondary_alignment_sequence_required": false,
+          "R103_secondary_sequence_transferred": false
+        },
+        "observables": {
+          "extensive": "TOTAL_WALL_DUTY",
+          "duty_aggregation": "EXACT_CHILD_TO_PARENT_SUM_PER_INTERVAL_THEN_SUM_INTERVALS",
+          "wall_extrema": [
+            "T_wall_inner_min",
+            "T_wall_inner_max",
+            "T_wall_outer_min",
+            "T_wall_outer_max"
+          ],
+          "extrema_support": "EXACT_CASE_WALL_SUPPORT_SET"
+        },
+        "cross_mesh_mapping": {
+          "extensive": "EXACT_CHILD_TO_PARENT_CONSERVATIVE_SUM",
+          "intensive_extrema": "COMMON_PHYSICAL_SUPPORT_EXTREMA_REDUCTION",
+          "forbidden": [
+            "ARRAY_INDEX_PAIRING",
+            "CELL_POSITION_PAIRING",
+            "LINEAR_INTERPOLATION",
+            "NEAREST_NEIGHBOR_INTERPOLATION",
+            "AVERAGING_HTC_ACROSS_MESHES",
+            "AVERAGING_WALL_TEMPERATURE_ACROSS_MESHES",
+            "DIVIDING_TOTAL_DUTY_BY_CELL_COUNT"
+          ]
+        },
+        "metrics": {
+          "duty": {
+            "D": "max(abs(Q_c),abs(Q_f))",
+            "near_zero_switch_W": "0.01",
+            "when_D_le_switch": "abs(Q_f-Q_c) <= 0.01 W",
+            "otherwise": "abs(Q_f-Q_c)/D <= 0.01",
+            "zero_division_allowed": false
+          },
+          "wall_extrema": {
+            "metric": "absolute difference fine versus coarse",
+            "threshold_K": "0.01",
+            "all_four_must_pass": true
+          }
+        },
+        "thresholds": {
+          "duty_relative": "0.01",
+          "near_zero_duty_absolute_W": "0.01",
+          "wall_extrema_absolute_K": "0.01",
+          "source": "PROJECT_OWNER_REAL_CASE_PRODUCTION_POLICY_INFORMED_BY_R103",
+          "R103_thresholds_automatically_transferred": false
+        },
+        "convergence_evidence": {
+          "required_consecutive_passing_pairs": 2,
+          "required_later_headroom_levels": 1,
+          "headroom_level": "2*n_candidate",
+          "headroom_must_pass_against_candidate": true,
+          "accepted_mesh_is_candidate_not_headroom": true
+        },
+        "resource_policy": {
+          "max_subdivisions_per_physical_interval_per_side": 64,
+          "max_total_numerical_cells": 640,
+          "max_wall_interfaces": 320,
+          "latest_acceptable_candidate_subdivisions": 32,
+          "n64_reserved_for_headroom": true,
+          "cap_increase_allowed": false,
+          "failure_result": [
+            "MESH_RESOURCE_EXHAUSTED",
+            "MESH_NOT_CONVERGED"
+          ]
+        },
+        "precision_floor": {
+          "duty": "SUM_LOCAL_WALL_DUTY_ERROR_ROUNDOFF_BOUNDS_OVER_ADMITTED_WALL_SUPPORTS",
+          "wall_extrema": "MAX_LOCAL_WALL_TEMPERATURE_NUMERICAL_BOUND_OVER_SUPPORT_SET",
+          "pass": "difference + floor <= threshold",
+          "fail": "difference - floor > threshold",
+          "otherwise": "PRECISION_FLOOR_UNRESOLVED",
+          "bound_source": "REVIEWED_R94_R98_LOCAL_BOUNDS",
+          "R102_synthetic_Qref_UQ_transferred": false
+        },
+        "R98_case_applicability": {
+          "C_round": "1.0",
+          "formula_semantics_changed": false,
+          "source": "PROJECT_OWNER_EXPLICIT_CASE_APPLICABILITY_DECISION",
+          "universal_theorem_claimed": false
+        },
+        "reference_oracle": {
+          "production_reference_oracle_required": false,
+          "online_continuous_required": false,
+          "specific_online_execution_required": false,
+          "R102_real_case_reference_required": false,
+          "R102_synthetic_Qref_transferred": false,
+          "R102_synthetic_UQ_transferred": false
+        },
+        "R103_scope": {
+          "supporting_qualification_evidence": true,
+          "absolute_cell_counts_transferred": false,
+          "secondary_sequence_transferred": false,
+          "synthetic_resource_cap_transferred": false,
+          "synthetic_reference_values_transferred": false,
+          "threshold_values_automatically_transferred": false,
+          "real_case_policy_values_selected_by_project_owner": true
+        },
+        "native_schema_resource_check": {
+          "producer_invoked": false,
+          "n64_cells": 640,
+          "n64_walls": 320,
+          "state_records": 2560,
+          "intervals": 5,
+          "paths": 2,
+          "events": 19,
+          "provenance_edges": 3,
+          "native_max_records": 4096,
+          "safe_model_max_nodes": 262144,
+          "safe_model_max_depth": 16,
+          "observed_nodes": 51327,
+          "result": "PASS_SCHEMA_CAPACITY_ONLY"
+        },
+        "failure_semantics": [
+          "INVALID_PARENT_CHILD_RELATION",
+          "PHYSICAL_BOUNDARY_CROSSED",
+          "INCOMPLETE_PARENT_COVERAGE",
+          "OVERLAPPING_CHILDREN",
+          "INVALID_COMMON_SUPPORT_MAPPING",
+          "MISSING_OBSERVABLE_AUTHORITY",
+          "NONFINITE_COMPARISON",
+          "PRECISION_FLOOR_UNRESOLVED",
+          "REFINEMENT_SEQUENCE_INSUFFICIENT",
+          "RESOURCE_EXHAUSTION",
+          "MESH_NOT_CONVERGED"
+        ],
+        "admission_status": {
+          "candidate_profile_bound": true,
+          "reviewed_effective": false,
+          "real_case_mesh_admissible": false,
+          "production_mesh_admission_enabled": false,
+          "convergence_run_performed": false
+        }
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "D3",
+      "section": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "decision": "case binding of reference policy and oracle requirement",
+      "value": {
+        "reference_policy": "V07-T172-REAL-CASE-REFERENCE-POLICY-R1",
+        "production_oracle_required": false,
+        "online_continuous_required": false
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    },
+    {
+      "id": "D4",
+      "section": "D_NUMERICAL_AND_REAL_CASE_ADMISSION",
+      "decision": "remove scalar aggregate geometry prerequisite in favor of structured native references",
+      "value": {
+        "disposition": "C_ADMISSION_CONTRACT_CORRECTED_TO_STRUCTURED_NATIVE_REFERENCES",
+        "GEOMETRY_ID": "UNBOUND"
+      },
+      "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION"
+    }
+  ],
+  "project_owner_decision_package": {
+    "complete": true,
+    "decision_count": 12,
+    "remaining_count": 0,
+    "source": "USER_SUPPLIED_PROJECT_OWNER_ENGINEERING_DECISION",
+    "self_approval": false,
+    "codex_self_approval_claimed": false,
+    "record_path": "docs/tasks/TASK-172-v0.7-stage1-project-owner-decision-package-r1.md"
+  },
+  "stage1_closure": {
+    "case_stream_authority_bound": true,
+    "property_package_bound": true,
+    "material_wall_constitutive_authority_bound": true,
+    "case_executable_numerical_profile_bound": true,
+    "real_case_mesh_profile_bound": true,
+    "reference_policy_resolution_valid": true,
+    "production_reference_oracle_requirement_resolved": true,
+    "real_case_mesh_admission_prerequisites_resolved": true,
+    "real_case_mesh_admissible": false,
+    "project_owner_decision_count_remaining": 0,
+    "lifecycle": "COMPLETE_PENDING_SINGLE_INDEPENDENT_REVIEW"
+  },
+  "artifacts": {
+    "stage1_authority_bundle_document_path": "docs/tasks/TASK-172-v0.7-stage1-pre-runtime-authority-bundle-r1.md",
+    "stage1_authority_bundle_document_sha256": "27574fc3b9d47a6445ef611a24b9bcb06eebdcee8eb20bf5a0bd7166909c2947",
+    "owner_decision_record_path": "docs/tasks/TASK-172-v0.7-stage1-project-owner-decision-package-r1.md",
+    "owner_decision_record_sha256": "c0130cff38faa9cd34c72ce422bb823f93d7ef4dc7951e48cc79f853654d557b",
+    "evidence_path": "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json"
+  }
+}

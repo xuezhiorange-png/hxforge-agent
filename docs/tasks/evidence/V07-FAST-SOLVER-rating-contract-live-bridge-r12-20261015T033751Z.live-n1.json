@@ -1,0 +1,18 @@
+{
+  "blocked_code": null,
+  "blocked_diagnostics": [],
+  "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+  "execution_mode": "LIVE_NUMERICAL_SOLVE",
+  "experimental_rating_authority_id": "V07-FAST-SOLVER-RATING-AUTHORITY-ADMISSION-R11",
+  "mesh_n": 1,
+  "mesh_result_hash": "5aebddd6094f9b037f68d57289d36afd8607ea75751d77cb6d74c4e4c01d55c2",
+  "numerical_authority_status": "CANDIDATE",
+  "outer_boundary_authority_id": "V07-FAST-SOLVER-OUTER-BOUNDARY-R3",
+  "production_integration": false,
+  "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+  "schema_version": "task173.experimental-live-mesh-outcome.v1",
+  "shooting_enthalpy_j_kg": "107515.99436211517692599833011627197265625",
+  "status": "TERMINAL_ACCEPTED",
+  "terminal_boundary_residual_k": "1.9803E-9",
+  "worker_wall_seconds": 73.21145288700063
+}

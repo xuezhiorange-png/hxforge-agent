@@ -1,0 +1,50 @@
+{
+  "cache_configuration_drift_blocked": true,
+  "cache_numerical_parity": true,
+  "configuration_verification_on_cache_hits": true,
+  "safe_tp_cache_gate": true,
+  "schema_version": "hxforge.safe-provider-cache-result.v1",
+  "task172_request_hash_parity": true,
+  "tp_cache_ab_parity": {
+    "baseline_task172_request_hashes": [
+      "2c85d04399e6f28ebee0d3d905912802d7192224d79a6038d280edeeed613c7c",
+      "01b10790f5a4845060159bbbed87a030ac38da71a068821fc674cbcdd31453d3",
+      "9f0da4372f02cd746041ac81193426f59d3cfe0459c36a30d262122263e498e3",
+      "0fc01d78fd5951f9725ab8c2f67a3b73393fd1e1a2bdeb8383bc9365380fd770"
+    ],
+    "baseline_task172_result_hashes": [
+      "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+      "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+      "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+      "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+    ],
+    "baseline_wall_seconds": 0.204853,
+    "cache_stats": {
+      "cache_hits": 72,
+      "cache_misses": 74,
+      "configuration_verifications": 146,
+      "exact_duplicate_rate": 0.4931506849315068,
+      "exact_duplicate_tp_queries": 72,
+      "provider_calls": 146,
+      "unique_tp_keys": 74
+    },
+    "cached_task172_request_hashes": [
+      "2c85d04399e6f28ebee0d3d905912802d7192224d79a6038d280edeeed613c7c",
+      "01b10790f5a4845060159bbbed87a030ac38da71a068821fc674cbcdd31453d3",
+      "9f0da4372f02cd746041ac81193426f59d3cfe0459c36a30d262122263e498e3",
+      "0fc01d78fd5951f9725ab8c2f67a3b73393fd1e1a2bdeb8383bc9365380fd770"
+    ],
+    "cached_task172_result_hashes": [
+      "b216883bd1284e42ad2cba7c5fa4e24d3b2444d746562afe6863698eb616fdd9",
+      "b0b3ed52a0fc13737cf8fbed2e0306e26bb0d258f3428fd5ce405bbc18e318ec",
+      "0fae8b1797d33291a06201f072d3d767f2fbf3d6d300ee21761af2706039e125",
+      "2a44290bac30251602eb52c6127a955e8e1a157ef28eb47ae6a6cc5d66420576"
+    ],
+    "cached_wall_seconds": 0.213559,
+    "numerical_parity": true,
+    "provider_call_reduction_percent": 49.31506849315068,
+    "schema_version": "hxforge.tp-cache-ab-parity.v1",
+    "task172_request_hash_parity": true,
+    "wall_time_reduction_percent": -4.250192553144793
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "energy_balance_residual_w": "4.0E-10",
+  "full_rating_converged": false,
+  "low_mesh_numeric_valid": true,
+  "mesh_level": 1,
+  "mesh_result_hash": "c3f6af1cddb5d075202a11875d08397637cb94ab9b0ac397f4fe998deaf10ac8",
+  "mesh_status": "NUMERIC_VALID",
+  "schema_version": "hxforge.low-mesh-result.v1",
+  "shell_outlet_temperature_k": "298.53659431025187",
+  "status": "NUMERIC_VALID",
+  "task172_local_evaluation_count": 4375,
+  "terminal_boundary_residual_k": "6.6676E-9",
+  "total_duty_w": "32328.8461907676175",
+  "tube_outlet_temperature_k": "299.05561613945537",
+  "wall_seconds": 255.835
+}

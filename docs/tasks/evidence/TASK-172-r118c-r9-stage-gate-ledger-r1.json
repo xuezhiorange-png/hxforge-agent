@@ -1,0 +1,115 @@
+{
+  "schema_version": "task172.r118c-r9.stage-gate-ledger.v1",
+  "task_id": "TASK172_V0_7_R118C_R9_EXPLICIT_TASK025_PROJECTION_CLEAN_NATIVE_MATERIALIZATION_REPLAY_R1",
+  "attempt_number": 9,
+  "primary_run": "A",
+  "events": [
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 1,
+      "stage": "TASK014"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 2,
+      "stage": "TASK014"
+    },
+    {
+      "event": "REQUEST_SHAPE_GATE_PASS",
+      "sequence_number": 3,
+      "stage": "TASK020"
+    },
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 4,
+      "stage": "TASK020"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 5,
+      "stage": "TASK020"
+    },
+    {
+      "event": "REQUEST_SHAPE_GATE_PASS",
+      "sequence_number": 6,
+      "stage": "TASK021"
+    },
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 7,
+      "stage": "TASK021"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 8,
+      "stage": "TASK021"
+    },
+    {
+      "event": "REQUEST_SHAPE_GATE_PASS",
+      "sequence_number": 9,
+      "stage": "TASK022"
+    },
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 10,
+      "stage": "TASK022"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 11,
+      "stage": "TASK022"
+    },
+    {
+      "event": "REQUEST_SHAPE_GATE_PASS",
+      "sequence_number": 12,
+      "stage": "TASK024"
+    },
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 13,
+      "stage": "TASK024"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 14,
+      "stage": "TASK024"
+    },
+    {
+      "event": "REQUEST_SHAPE_GATE_PASS",
+      "sequence_number": 15,
+      "stage": "TASK025"
+    },
+    {
+      "event": "PRODUCER_INVOKED",
+      "sequence_number": 16,
+      "stage": "TASK025"
+    },
+    {
+      "event": "GATE_PASS",
+      "sequence_number": 17,
+      "stage": "TASK025"
+    },
+    {
+      "event": "EVIDENCE_PROJECTION_GATE_PASS",
+      "sequence_number": 18,
+      "stage": "TASK025"
+    }
+  ],
+  "sequence_valid": true,
+  "request_shape_gate_count": 5,
+  "request_shape_gate_fail_count": 0,
+  "producer_invocation_without_request_shape_gate_count": 0,
+  "downstream_producer_invocation_before_gate_pass_count": 0,
+  "task025_evidence_projection_gate_pass": true,
+  "previous_attempts_are_not_reused": {
+    "1": true,
+    "2": true,
+    "3": true,
+    "4": true,
+    "5": true,
+    "6": true,
+    "7": true,
+    "8": true
+  },
+  "canonical_hash": "5fab39b7574293021b7e6104950413ab167b38e5b77db89761a25ca299f4328f"
+}

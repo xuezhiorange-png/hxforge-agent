@@ -194,7 +194,8 @@ def validate_raw_boundary(
                 ze_val
             )
 
-    # R05: Validate component_authorities tuple shape
+    # R05: Validate component_authorities collection shape. An empty collection
+    # is an explicit no-modeled-components value; TASK029 owns path completeness.
     if "component_authorities" in raw_input:
         ca = raw_input["component_authorities"]
         if not isinstance(ca, (list, tuple)):
@@ -203,14 +204,6 @@ def validate_raw_boundary(
                     Task028BlockerCode.BL_T028_RAW_INPUT_BOUNDARY_MALFORMED,
                     "component_authorities",
                     "The component authorities set is invalid (not a sequence).",
-                )
-            )
-        elif len(ca) == 0:
-            pending_blockers.append(
-                emit_blocker(
-                    Task028BlockerCode.BL_T028_COMPONENT_AUTHORITY_SET_INVALID,
-                    "component_authorities",
-                    "The component authorities set is invalid (empty).",
                 )
             )
         else:

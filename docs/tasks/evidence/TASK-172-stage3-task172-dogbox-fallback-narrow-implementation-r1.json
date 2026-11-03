@@ -1,0 +1,154 @@
+{
+  "schema_version": "task172.dogbox-fallback-narrow-implementation-evidence.v1",
+  "task_id": "STAGE3_TASK172_FAIL_ONLY_DOGBOX_FALLBACK_NARROW_IMPLEMENTATION_R1",
+  "local_result": "IMPLEMENTATION_AND_LOCAL_VALIDATION_PASS_PENDING_EXACT_HEAD_CI",
+  "source_head": "74221db2ab43a7d61ef2dd94a79da81a866d117b",
+  "reviewed_authority": {
+    "authority_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3",
+    "canonical_hash": "9a226f98de9dc40025fd4e26f83ce22f29df0b6ba10542ac282cc97f739b4b6b",
+    "lifecycle": "REVIEWED_AUTHORITY",
+    "review_result": "PASS_FAIL_ONLY_DOGBOX_FALLBACK_R3_AUTHORITY_INDEPENDENT_REVIEW",
+    "candidate_evidence_canonical_hash": "e9677c64a5e7d0d32f3129228bcf4bf17098a73ea2339a442d030c9acd01ac5c",
+    "review_evidence_canonical_hash": "2a6c9f398c9483d8a2e95bf10c91c540453b537b28969b602189dac3267bfc07"
+  },
+  "architecture": {
+    "kind": "FAIL_ONLY_ORIGINAL_SEED_DOGBOX_FALLBACK",
+    "primary": {
+      "authority": "R94_UNCHANGED",
+      "method": "trf",
+      "loss": "linear",
+      "ftol": 1e-6,
+      "xtol": 1e-12,
+      "gtol": 1e-12,
+      "jac": "2-point",
+      "diff_step": 1e-5,
+      "max_nfev": 6,
+      "callback_cap": 24,
+      "tr_solver": "exact",
+      "tr_options": {},
+      "f_scale": 1.0,
+      "jac_sparsity": null,
+      "x_scale": "R94_CURRENT_X_SCALE",
+      "seed": "R94_DETERMINISTIC_SEED"
+    },
+    "fallback": {
+      "trigger": "REPLAY_VALID_BLOCKED_RESIDUAL_ACCEPTANCE_ONLY",
+      "method": "dogbox",
+      "initialization": "ORIGINAL_R94_DETERMINISTIC_SEED",
+      "max_nfev": 6,
+      "callback_cap": 24,
+      "only_control_changed": "method",
+      "independent_budget_per_attempt": true,
+      "original_r98_required": true,
+      "c_round": 1.0,
+      "failure_is_fail_closed": true,
+      "diagnostic_last_iterate_accepted": false
+    },
+    "trigger_requires": [
+      "PRIMARY_TYPED_BLOCKER_FAILURE_CODE_IS_BLOCKED_RESIDUAL_ACCEPTANCE",
+      "REQUEST_HASH_REPLAYS",
+      "BLOCKED_RESULT_HASH_REPLAYS"
+    ],
+    "non_residual_blockers_bypass": true,
+    "invalid_identity_bypasses": true,
+    "primary_valid_returned_unchanged": true,
+    "exact_zero_branch_unchanged_and_bypasses_nonlinear_solver": true,
+    "fallback_result_solver_status_pattern": "R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_<dogbox_status>",
+    "fallback_numerical_profile_id": "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3",
+    "fallback_only_provenance_refs": [
+      "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-exact-zero-portability-amendment.json",
+      "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-independent-review.json"
+    ],
+    "primary_profile_status_provenance_and_hash_projection_unchanged": true,
+    "theoretical_total_max_nfev_per_request": 12,
+    "theoretical_total_callback_cap_per_request": 48
+  },
+  "local_runtime_evidence": {
+    "environment": {
+      "python": "3.14.5",
+      "platform": "macOS-27.2-arm64-arm-64bit-Mach-O",
+      "coolprop": "8.0.0",
+      "scipy": "1.18.0"
+    },
+    "n32_fixed_targets": {
+      "count": 6,
+      "primary_residual_acceptance_holes": 6,
+      "production_fallback_invocations": 6,
+      "final_validated": 6,
+      "original_r98_pass": 6
+    },
+    "n16_upper_endpoint": {
+      "fallback_invoked": true,
+      "final_validated": true,
+      "r3_cell_root_authority_changed": false
+    },
+    "frozen_corpus": {
+      "size": 68,
+      "primary_valid": 68,
+      "fallback_invocations_on_primary_valid": 0,
+      "baseline_native_result_hashes_preserved": 68,
+      "same_environment_replay": "EXACT_RESULT_PROJECTION_HASH_AND_ID_MATCH"
+    }
+  },
+  "regression_guards": {
+    "non_residual_blocker_cases": 7,
+    "non_residual_fallback_invocations": 0,
+    "invalid_request_hash_fallback_invocations": 0,
+    "invalid_blocked_result_hash_fallback_invocations": 0,
+    "invalid_fallback_result_identity_fails_closed": true,
+    "fallback_solver_failure_and_nonconvergence_fail_closed": true,
+    "fallback_resource_exhaustion_fails_closed": true,
+    "fallback_property_domain_failure_fails_closed": true,
+    "fallback_negative_q_fails_closed": true,
+    "fallback_wall_ordering_failure_fails_closed": true,
+    "fallback_r98_failure_fails_closed": true
+  },
+  "validation": {
+    "focused_task172": "PASS",
+    "focused_task173": "PASS",
+    "full_shell_tube": "PASS",
+    "http_api_regression": "PASS_21_TESTS",
+    "ruff": "PASS",
+    "format": "PASS",
+    "mypy": "PASS_450_FILES",
+    "manifest_d_equals_m": "PASS_259_OF_259",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES",
+    "uv_lock_check": "PASS",
+    "uv_sync_locked_all_extras": "PASS",
+    "git_diff_check": "PASS",
+    "uv_lock_sha256": "4783f2a07cd28b5a5c46402101f0570d3060f464fe850c63fc7ad5e069e68464",
+    "requests": "2.34.2",
+    "urllib3": "2.8.0",
+    "lockfile_changed": false,
+    "duplicate_key_audit_changed_evidence": "PASS_NO_DUPLICATE_KEYS",
+    "preexisting_historical_duplicate_access_path_unchanged": true
+  },
+  "change_boundary": {
+    "production_code_changed": true,
+    "tests_changed": true,
+    "fixtures_changed": false,
+    "models_changed": false,
+    "request_schema_changed": false,
+    "result_schema_changed": false,
+    "blocked_schema_changed": false,
+    "implementation_version_changed": false,
+    "dependencies_changed": false,
+    "lockfile_changed": false,
+    "workflows_changed": false,
+    "registry_changed": false,
+    "task173_production_code_changed": false,
+    "portability_runtime_comparator_added": false,
+    "production_mesh_policy_changed": false,
+    "r94_changed": false,
+    "r98_changed": false,
+    "c_round_changed": false,
+    "production_mesh_reexecuted": false,
+    "real_case_mesh_admissible": false,
+    "task173_result_id": "UNAVAILABLE",
+    "task173_result_hash": "UNAVAILABLE",
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false
+  },
+  "canonical_hash": "47f179ccb335158568e22ae2582b2ec48cd6237ceb18427b7c1275460f11556f"
+}

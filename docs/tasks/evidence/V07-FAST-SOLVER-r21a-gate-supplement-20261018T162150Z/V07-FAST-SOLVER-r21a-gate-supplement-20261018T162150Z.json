@@ -1,0 +1,8 @@
+{
+  "base_head": "22268bb5b88dec6ed0d96c942ba17c0d00e913f4",
+  "final_head": "388a4b6b7c49e3614f56cfef9fb3bf47d410496e",
+  "gate_tests": "PASS",
+  "phase": "A",
+  "task_id": "V07_FAST_SOLVER_GENERAL_CANDIDATE_LIVE_RATING_R21A",
+  "wall_seconds": 31.06966841200483
+}

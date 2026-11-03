@@ -1,0 +1,234 @@
+{
+  "schema_version": "task172.r118a.independent-review-native-binding-correction.r1",
+  "task_id": "TASK172_V0_7_R118A_INDEPENDENT_REVIEW_NATIVE_BINDING_CORRECTION_R1",
+  "result": "R118A_INDEPENDENT_REVIEW_NATIVE_BINDING_FINDINGS_CORRECTED",
+  "mode": "R118A_REVIEW_FINDINGS_CORRECTION_ONLY",
+  "pr": {
+    "number": 283,
+    "state": "OPEN_DRAFT",
+    "predecessor_head_sha": "ea44d10b8eadc25f8d86d533a173a16c5b346f02"
+  },
+  "review_disposition": {
+    "r118a_engineering_scope": "PASS",
+    "r118a_runtime_authority_materialization": "PASS",
+    "r118a_governance_boundary": "PASS",
+    "r118a_case_design_semantic_linkage": "CORRECTION_REQUIRED_TWO_FINDINGS",
+    "engineering_value_change_authorized": false,
+    "authority_scope_change_authorized": false,
+    "production_code_change_authorized": false
+  },
+  "findings": [
+    {
+      "finding_id": "R118A-TASK025-NATIVE-SHAPE-01",
+      "finding": "TASK025_LENGTH_AUTHORITY_MACHINE_READABLE_SHAPE",
+      "old_internal_flow_fields": ["start_plane_pair", "end_plane_pair"],
+      "old_heat_transfer_fields": ["start_plane_pair", "end_plane_pair"],
+      "new_internal_flow_fields": ["start_plane", "end_plane"],
+      "new_heat_transfer_fields": ["start_plane", "end_plane"],
+      "native_object": "ReferencePlanePair",
+      "native_projection": {
+        "start": "<ReferencePlaneToken>",
+        "end": "<ReferencePlaneToken>"
+      },
+      "actual_native_pairs": {
+        "internal_flow": {
+          "start": "TUBE_INTERNAL_FLOW_START_PLANE",
+          "end": "TUBE_INTERNAL_FLOW_END_PLANE"
+        },
+        "heat_transfer": {
+          "start": "TUBE_HEAT_TRANSFER_START_PLANE",
+          "end": "TUBE_HEAT_TRANSFER_END_PLANE"
+        }
+      },
+      "native_source_files": [
+        "src/hexagent/exchangers/shell_tube/tube_side/length_authorities.py",
+        "src/hexagent/exchangers/shell_tube/tube_side/owned_enums.py",
+        "src/hexagent/exchangers/shell_tube/tube_side/hash_dag.py"
+      ],
+      "internal_flow_length_hash_before": "90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35",
+      "internal_flow_length_hash_after": "90be8f8eea712434cb3372c9b46d04020153d2d6c1595e3b4d56617ce4549b35",
+      "heat_transfer_length_hash_before": "e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da",
+      "heat_transfer_length_hash_after": "e57442dd4c4d23e10578899639c3694f311ee64fb9eda196d288df3d1eb173da",
+      "length_hash_semantics_changed": false,
+      "native_field_name_mismatch_count": 0,
+      "native_object_shape_mismatch_count": 0,
+      "task025_result_producer_invoked": false
+    },
+    {
+      "finding_id": "R118A-TASK024-ORIENTATION-ORDER-02",
+      "finding": "TASK024_ORIENTATION_SEQUENCE_RATIONALE",
+      "orientation_sequence_before": ["BOTTOM", "BOTTOM", "BOTTOM", "BOTTOM"],
+      "orientation_sequence_after": ["BOTTOM", "BOTTOM", "BOTTOM", "BOTTOM"],
+      "orientation_sequence_changed": false,
+      "orientation_ordering_semantics": "BAFFLE_INDEX_SEMANTIC_ORDER",
+      "lexical_sort_claim_removed": true,
+      "rationale": "Explicit project-design orientation sequence in baffle-index semantic order. All four candidate baffles intentionally use BOTTOM orientation. No automatic alternation, lexical sorting, or inference from equipment orientation is applied.",
+      "native_sorted_token_guard": "The repeated BOTTOM tokens satisfy the native sorted-token guard; sorting is not used as the engineering selection rule."
+    }
+  ],
+  "task025_profile_classification": {
+    "profile_id": "profile-001",
+    "native_supported": true,
+    "native_source": "src/hexagent/exchangers/shell_tube/tube_side/request.py::SUPPORTED_PROFILE_IDS",
+    "review_authority_status": "NATIVE_CONTRACT_CONSTANT_ONLY",
+    "separate_reviewed_engineering_profile_authority_found": false,
+    "matrix_classification_corrected": true
+  },
+  "candidate_artifacts": {
+    "document": {
+      "path": "docs/tasks/TASK-172-v0.7-r118a-project-engineering-native-geometry-input-authority-candidate-r1.md",
+      "sha256_before": "52499a0efb981d5b1e2eebcbcb1177293a6ae3cc160437ad4f125e183665f524",
+      "sha256_after": "5925b703def5e03f428e38e356e7fe3767e30908a6721fa9cfa813ddc66ee07c"
+    },
+    "evidence": {
+      "path": "docs/tasks/evidence/TASK-172-r118a-project-engineering-native-geometry-input-authority-candidate-r1.json",
+      "file_sha256_before": "0b12afeefd0b4c10af122832f3de8546bb3a403ed3d3ee40c5fea3cef11d84c1",
+      "canonical_hash_before": "eb29486815c9313857882339854e897ae8891b8298b1ed5c627010aa26098dae",
+      "file_sha256_after": "8553ed8eb19f3a30b5c9854ae461fb2aa7fd1ea7ad2d33a8711363b8b495c03f",
+      "canonical_hash_after": "c5c063bcee24fdacdf1c097aa220b6ce52ba1f3628b1ddae3021fb0a648f2ddc"
+    },
+    "matrix": {
+      "path": "docs/tasks/evidence/TASK-172-r118a-native-input-completeness-matrix-r1.json",
+      "file_sha256_before": "3ca3fb7768ecb0eb1e0533a43ac4cbd243a1d0017f8ef07a0cc5b811450d4857",
+      "canonical_hash_before": "5bc67c2134aa0451aeb970675d12d38e26e1a3754efec5faf37735f5d5b8fe80",
+      "file_sha256_after": "83c41b6f789e1743b36cbf4020bf2b630f9c3c45ac599550965bb308a522d825",
+      "canonical_hash_after": "c59de2f6d1065164c965348cb82685cc2ef21b47b63a0a2bd73bcc02ca968379"
+    },
+    "previous_r118a_extension_canonical_hash": "543dd09597b2c8dde686f6015f7a7cca07bae5b42723d08b937b447929cc9921",
+    "previous_registry_root_canonical_hash": "fb0062b27af2aae19b87ad1592aaa2be7aa7d80076768112e5fe94dc1d0a5069"
+  },
+  "preserved_design_values": {
+    "engineering_value_change_count": 0,
+    "values_unchanged": {
+      "orientation": "HORIZONTAL",
+      "tube_center_envelope_diameter_m": "0.45",
+      "origin_mode": "CENTER_ON_LATTICE_POINT",
+      "axis_orientation": "PRIMARY_AXIS_X",
+      "exclusion_zones": [],
+      "shell_inside_diameter_m": "0.500",
+      "bundle_peripheral_allowance_m": "0.010",
+      "required_minimum_radial_clearance_m": "0.010",
+      "axial_span_m": ["0", "6"],
+      "baffle_type": "SINGLE_SEGMENTAL",
+      "baffle_count": 4,
+      "baffle_thickness_m": "0.006",
+      "spacing_sequence_m": ["1.2", "1.2", "1.2", "1.2", "1.2"],
+      "baffle_cut_fraction": "0.25657",
+      "orientation_sequence": ["BOTTOM", "BOTTOM", "BOTTOM", "BOTTOM"],
+      "shell_to_baffle_diametral_clearance_m": "0.003",
+      "tube_to_baffle_hole_diametral_clearance_m": "0.001",
+      "internal_flow_length_m": "6",
+      "heat_transfer_length_m": "6",
+      "hydraulic_authority_mode": "INTERNAL_ARITHMETIC_FROM_LENGTH",
+      "hydraulic_participation_rule": "ALL_ACCEPTED_STRAIGHT_THROUGH_LAYOUT_POSITIONS_ACTIVE"
+    },
+    "prospective_geometry_replay": {
+      "layout_position_count": 253,
+      "bare_bundle_diameter_m": "0.43486592081130829065079429561196969724856074243842",
+      "bundle_outer_envelope_diameter_m": "0.45486592081130829065079429561196969724856074243842",
+      "shell_radial_clearance_m": "0.02256703959434585467460285219401515137571962878079",
+      "radial_clearance_margin_m": "0.01256703959434585467460285219401515137571962878079",
+      "baffle_diameter_m": "0.497",
+      "tube_hole_diameter_m": "0.02005",
+      "cut_to_hole_margin_m": "0.00097256153674844976679141122274747436104176034035"
+    }
+  },
+  "ci_history": {
+    "predecessor_run_id": 36242834553,
+    "attempt_1": {
+      "conclusion": "cancelled",
+      "total_jobs": 49,
+      "success": 39,
+      "skipped": 8,
+      "failed": 1,
+      "cancelled": 1,
+      "cancelled_job": "shard-merge-ref (tests/ci/test_benchmark_authority.py tests/benchmark/test_task011_corpus.py …)",
+      "cancelled_job_id": 108406681318,
+      "cancelled_job_started_at": "2026-09-26T12:45:58Z",
+      "cancelled_job_completed_at": "2026-09-26T13:20:59Z",
+      "cancelled_step": "Run shard with real telemetry",
+      "cancelled_step_status_at_job_end": "in_progress",
+      "cancelled_step_started_at": "2026-09-26T12:47:24Z",
+      "job_timeout_minutes": 30,
+      "final_gate_failure_is_downstream": true
+    },
+    "attempt_2": {
+      "conclusion": "success",
+      "head_sha": "ea44d10b8eadc25f8d86d533a173a16c5b346f02",
+      "total_jobs": 50,
+      "success": 45,
+      "skipped": 5,
+      "failed": 0,
+      "cancelled": 0,
+      "final_gate": "success"
+    },
+    "correction_exact_head_ci": "RECORDED_AFTER_FINAL_HEAD"
+  },
+  "validation": {
+    "predecessor_head_replay": "PASS",
+    "r118a_attempt2_ci_replay": "PASS",
+    "task025_native_model_replay": "PASS",
+    "task025_length_authority_field_names": "PASS",
+    "task025_reference_plane_pair_shape": "PASS",
+    "task025_internal_flow_length_hash_replay": "PASS",
+    "task025_heat_transfer_length_hash_replay": "PASS",
+    "task025_native_field_name_mismatch_count": 0,
+    "task025_native_object_shape_mismatch_count": 0,
+    "task024_orientation_ordering_semantics": "PASS",
+    "lexical_sort_requirement_claim_present": false,
+    "engineering_value_change_count": 0,
+    "r118a_prospective_layout_replay": "PASS_253_QUANTIZED_POSITION_PREFLIGHT_ONLY",
+    "r118a_prospective_bundle_replay": "PASS_EXPECTED_DIMENSIONS_AND_RADIAL_CLEARANCE_REPLAYED",
+    "r118a_prospective_baffle_arithmetic_replay": "PASS_BAFFLE_AND_CUT_HOLE_ARITHMETIC_REPLAYED",
+    "native_geometry_execution_count": 0,
+    "r1_r117_historical_immutability": "PASS",
+    "registry_append_only": "PASS_WITH_CURRENT_R118A_BINDING_UPDATE_AND_CORRECTION_APPEND",
+    "new_duplicate_json_keys": 0,
+    "git_diff_check": "PASS",
+    "ruff": "PASS",
+    "ruff_format": "PASS_764_FILES",
+    "mypy_ci_scope": "PASS_440_SOURCE_FILES",
+    "manifest_d_equals_m": "PASS_256_DISCOVERED_256_MANIFEST",
+    "lock_sync": "PASS_UV_LOCK_CHECK_AND_LOCKED_ALL_EXTRAS_SYNC",
+    "pip_audit": "PASS_NO_KNOWN_VULNERABILITIES_LOCAL_PROJECT_SKIPPED_BY_PYPI_AUDIT",
+    "local_full_regression": "NOT_EXECUTED",
+    "exact_final_head_ci": "RECORDED_AFTER_FINAL_HEAD"
+  },
+  "governance": {
+    "r118a_input_authority_candidate_present": true,
+    "r118a_authority_lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "independent_review_complete": false,
+    "codex_self_approval": false,
+    "production_code_changed": false,
+    "task020_configuration_materialized": false,
+    "task021_layout_executed_as_authority": false,
+    "task022_bundle_geometry_executed_as_authority": false,
+    "task024_baffle_geometry_executed": false,
+    "task025_area_length_executed": false,
+    "native_geometry_execution_count": 0,
+    "case_id": "UNBOUND",
+    "configuration_id": "UNBOUND",
+    "geometry_id": "UNBOUND",
+    "production_mesh_profile_authority_id": "UNBOUND",
+    "reference_policy_resolution_valid": false,
+    "real_case_mesh_admissible": false,
+    "task172_runtime_implementation": false,
+    "task174_solve_performed": false,
+    "task173_solve_performed": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "r118b_started": false,
+    "next_gate": "R118B_INPUT_AUTHORITY_INDEPENDENT_REVIEW_ONLY",
+    "stop": true
+  },
+  "artifacts": {
+    "document_path": "docs/tasks/TASK-172-v0.7-r118a-independent-review-native-binding-correction-r1.md",
+    "document_sha256": "51bb4d2011f0f22c61af99243d2517d1158979178a6d9304b3105058c3f78422",
+    "evidence_path": "docs/tasks/evidence/TASK-172-r118a-independent-review-native-binding-correction-r1.json",
+    "evidence_file_sha256": "BOUND_BY_R118A_CORRECTION_EXTENSION",
+    "r118a_extension_canonical_hash": "e503b5c6c87d9d177d5d931e82d3bcae9a4ad4cbde846361118d2bcfac64d9e5",
+    "registry_root_canonical_hash": "BOUND_BY_TOP_LEVEL_REGISTRY"
+  },
+  "canonical_hash": "d906412c99c4701e4c86f5a154329a842a04d02d9fa585d0dbf379fe0fc862ed"
+}

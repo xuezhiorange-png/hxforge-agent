@@ -1,0 +1,76 @@
+{
+  "mesh_n": 64,
+  "receipt": {
+    "bisection_iterations": 5,
+    "blocked_code": null,
+    "blocked_diagnostics": [],
+    "bracket_establishment_trial_count": 2,
+    "bracket_establishment_wall_seconds": 314.03296799500094,
+    "bracket_meta": {
+      "endpoint_audit": {
+        "authority_id": "V07-FAST-SOLVER-LIVE-N64-HEADROOM-R18",
+        "h_high_j_kg": "107515.1971964879237063703222",
+        "h_low_j_kg": "107515.1783375283651483313644",
+        "high_classification": "VALID_TRAJECTORY",
+        "high_endpoint_mesh_hash": "b19e375826c3fe61e62811e7c29b1c03280bb6645a62a744b85f380980fd7105",
+        "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE",
+        "low_endpoint_mesh_hash": null,
+        "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+        "run_session_id": "43d70627-42a0-469a-80b3-2974ef7c4ec4",
+        "subdivisions": 64
+      },
+      "establishment_probes": [
+        {
+          "expansion": 0,
+          "h_high": "107515.1971964879237063703222",
+          "h_low": "107515.1783375283651483313644",
+          "high_classification": "VALID_TRAJECTORY",
+          "low_classification": "LOW_SIDE_DOMAIN_INFEASIBLE"
+        }
+      ],
+      "expansions_used": 0,
+      "extrapolated_center": "107515.1877670081444273508433",
+      "h_coarse_j_kg": "107515.19248174803406686058271875",
+      "h_fine_j_kg": "107515.19012437808924710571300625",
+      "initial_span": "0.00942947977927901947885000",
+      "mesh_delta_fine_minus_coarse": "-0.00235736994481975486971250",
+      "outer_trials_for_establishment": 2,
+      "proposed_high_j_kg": "107515.1971964879237063703222",
+      "proposed_low_j_kg": "107515.1783375283651483313644"
+    },
+    "candidate_id": "e152cca9-fd5d-59ca-9b46-1df574eee841",
+    "cell_closure_pass": true,
+    "energy_balance_pass": true,
+    "energy_balance_residual_w": "6.0643E-10",
+    "mesh_n": 64,
+    "mesh_result_hash": "efd84469bcbcaca1ff093b970b2551be866bcd06de12a69c3e2709e5a3ac3c68",
+    "narrow_solve_trial_count": 5,
+    "narrow_solve_wall_seconds": 871.1356113250004,
+    "outer_iterations_for_rehydrate": 5,
+    "outer_trial_count": 7,
+    "rating_request_hash": "56ecf30ceb6beb4528c772962f1e7a49e22d43f1010ae4f079bd80228fc6f5f8",
+    "revalidation": {
+      "duplicate_endpoint_solves_removed": true,
+      "endpoint_receipt_hashes": {
+        "high_endpoint_mesh_hash": "b19e375826c3fe61e62811e7c29b1c03280bb6645a62a744b85f380980fd7105",
+        "low_endpoint_mesh_hash": null
+      },
+      "high_endpoint_revalidated": true,
+      "low_endpoint_revalidated": true,
+      "same_run_endpoint_reuse": true,
+      "true_narrow_bracket_used": true
+    },
+    "same_run_endpoint_reuse": true,
+    "shooting_enthalpy_for_rehydrate": "107515.18953503560304216699559375",
+    "shooting_enthalpy_j_kg": "107515.18953503560304216699559375",
+    "stage_status": "MESH_TERMINAL_ACCEPTED",
+    "terminal_boundary_residual_k": "4.39716E-9",
+    "terminal_tolerance_pass": true,
+    "total_duty_w": "51901.39414574820643",
+    "total_physical_trial_count": 7,
+    "trials_jsonl_rel_path": "docs/tasks/evidence/V07-FAST-SOLVER-live-n64-r18-stages-20261018T092028Z/live-n64-outer-trials.jsonl",
+    "worker_status": "TERMINAL_ACCEPTED",
+    "worker_wall_seconds": 1185.1824622549975
+  },
+  "schema_version": "task173.experimental-live-mesh-stage-receipt.v1"
+}

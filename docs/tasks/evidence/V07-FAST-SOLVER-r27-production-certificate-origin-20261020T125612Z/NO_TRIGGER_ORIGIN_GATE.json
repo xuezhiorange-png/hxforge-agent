@@ -1,0 +1,8 @@
+{
+  "gate_rule": "NO_TRIGGER_PROVEN requires trusted producer raw evidence, trial coverage, trigger detection proof, and SHA256/git binding; self-recomputed witness hashes rejected.",
+  "schema_version": "task173.r2a-no-trigger-origin-gate.v1",
+  "without_immutable_producer_trace": {
+    "detail": "no_producer_non_trigger_witness_supplied",
+    "status": "FROZEN_EVIDENCE_INSUFFICIENT"
+  }
+}

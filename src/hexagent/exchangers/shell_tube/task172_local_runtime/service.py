@@ -1,0 +1,1993 @@
+"""TASK172 local wall/film closure using the reviewed native component APIs."""
+
+from __future__ import annotations
+
+import math
+import struct
+import sys
+from dataclasses import dataclass, fields
+from decimal import Decimal, localcontext
+from typing import Any, Literal, cast
+
+import numpy as np
+from pydantic import ValidationError
+from scipy.optimize import brentq, least_squares
+
+from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.bell_delaware.heat_transfer import calculate_heat_transfer
+from hexagent.exchangers.shell_tube.bell_delaware.models import BellGeometry
+from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.engineering import (
+    compute_wall_resistance,
+)
+from hexagent.exchangers.shell_tube.shell_side_flow_state.formulas import (
+    evaluate_raw as evaluate_shell_flow_raw,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    FlowRegime,
+    ThermalBoundaryCondition,
+    check_pr_envelope,
+    compute_single_phase,
+    recompute_property_snapshot_hash,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    PhaseRegion as Task026PhaseRegion,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal.property_snapshot import PropertySnapshot
+from hexagent.properties.base import (
+    FluidIdentifier,
+    FluidState,
+    PhaseRegion,
+    PropertyProvider,
+    ReferenceStatePolicy,
+)
+from hexagent.properties.coolprop_provider import CoolPropProvider
+
+from .models import (
+    COOLPROP_GIT_REVISION,
+    COOLPROP_VERSION,
+    MATERIAL_SOURCE_SHA256,
+    PROFILE_ID,
+    TASK172_IMPLEMENTATION_VERSION,
+    TASK172_RESULT_SCHEMA,
+    TOTAL_PARALLEL_FLOW_AREA_M2,
+    TUBE_ID_M,
+    TUBE_OD_M,
+    WALL_CONDUCTIVITY_W_M_K,
+    CandidateTask172LocalRequest,
+    Task172BlockedResult,
+    Task172LocalOutcome,
+    Task172LocalRequest,
+    Task172LocalResult,
+)
+
+Task172Request = Task172LocalRequest | CandidateTask172LocalRequest
+
+PropertyEvalCacheKey = tuple[str, int] | tuple[str, int, bool]
+
+
+@dataclass(frozen=True)
+class TubeSideHtcResolution:
+    """Resolved tube-side film HTC at bulk state (before optional C3 wall-Pr correction)."""
+
+    htc_w_m2_k: Decimal
+    reynolds_number: Decimal
+    prandtl_number: Decimal
+    correlation_id: str
+    correlation_version: str
+    flow_regime: FlowRegime
+    apply_c3_wall_pr_correction: bool
+
+
+_T_MIN = Decimal("298.15")
+_T_MAX = Decimal("300.00")
+
+
+def _admitted_temperature_bounds() -> tuple[Decimal, Decimal]:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.admitted_bulk_temperature_min_k(bound), _etb.admitted_bulk_temperature_max_k(bound)
+
+
+_P_MIN = Decimal("100000")
+_P_MAX = Decimal("101325")
+_TUBE_C3_RE_MIN = Decimal("3000")
+_TUBE_C3_RE_MAX = Decimal("5000000")
+_PR_MIN = Decimal("0.5")
+_PR_MAX = Decimal("2000")
+_PR_RATIO_MIN = Decimal("0.05")
+_PR_RATIO_MAX = Decimal("20")
+_C3_EXPONENT = Decimal("0.11")
+_JMU_EXPONENT = Decimal("0.14")
+_C_ROUND = 1.0
+_CALLBACK_CAP = 24
+_NUMERICAL_PROFILE_ID = "R94_R98_STAGE1_CASE_PROFILE_CROUND_1.0"
+_WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID = "V07-T172-R25D-PHYSICAL-TWO-SCALAR-BRACKET-V1"
+_FROZEN_MAX_NFEV = 6
+_WIDE_EXPERIMENTAL_MAX_NFEV = 24
+_WIDE_EXPERIMENTAL_CALLBACK_CAP = 48
+# SciPy least_squares: step h_i = |x_i| * diff_step_i (relative; see 1.17+ docs).
+_FROZEN_RELATIVE_DIFF_STEP = 1e-5
+# Wide q uses a larger relative step than temperature: |q|~50 kW with 1e-4 gives ~5 W perturbation.
+_WIDE_RELATIVE_DIFF_STEP_Q = 1e-4
+_WIDE_RELATIVE_DIFF_STEP_TEMPERATURE = 1e-5
+_WIDE_RELATIVE_DIFF_STEP_UV = 1e-5
+_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX = 24
+_WIDE_SCALAR_TWO_MAX_BRENT_ITER = 48
+_WIDE_SCALAR_TWO_BRENT_XTOL = 1e-12
+
+
+@dataclass(frozen=True)
+class _SolverBudget:
+    max_nfev: int
+    callback_cap: int
+    numerical_profile_id: str
+    wide_experimental: bool
+
+
+_FROZEN_SOLVER_BUDGET = _SolverBudget(
+    _FROZEN_MAX_NFEV,
+    _CALLBACK_CAP,
+    _NUMERICAL_PROFILE_ID,
+    False,
+)
+_WIDE_EXPERIMENTAL_SOLVER_BUDGET = _SolverBudget(
+    _WIDE_EXPERIMENTAL_MAX_NFEV,
+    _WIDE_EXPERIMENTAL_CALLBACK_CAP,
+    _WIDE_DELTA_T_EXPERIMENTAL_NUMERICAL_PROFILE_ID,
+    True,
+)
+
+
+def _relative_diff_step_vector(
+    *,
+    wide_experimental: bool,
+) -> tuple[float, float, float] | float:
+    if wide_experimental:
+        return (
+            _WIDE_RELATIVE_DIFF_STEP_Q,
+            _WIDE_RELATIVE_DIFF_STEP_TEMPERATURE,
+            _WIDE_RELATIVE_DIFF_STEP_TEMPERATURE,
+        )
+    return _FROZEN_RELATIVE_DIFF_STEP
+
+
+def _actual_jacobian_perturbations(
+    values: tuple[float, float, float],
+    diff_step: float | tuple[float, float, float],
+) -> tuple[float, float, float]:
+    """Return SciPy 2-point Jacobian step magnitudes h_i = |x_i| * diff_step_i."""
+    if type(diff_step) is float:
+        relative: tuple[float, float, float] = (diff_step, diff_step, diff_step)
+    else:
+        relative = cast(tuple[float, float, float], diff_step)
+    perturbations: list[float] = []
+    for value, step in zip(values, relative, strict=True):
+        magnitude = abs(value)
+        if magnitude == 0.0:
+            perturbations.append(math.sqrt(sys.float_info.epsilon))
+        else:
+            perturbations.append(magnitude * step)
+    return cast(tuple[float, float, float], tuple(perturbations))
+
+
+def _wall_temperatures_from_uv(
+    u: float,
+    v: float,
+    *,
+    shell_bulk_k: float,
+    tube_bulk_k: float,
+) -> tuple[float, float]:
+    """Map (u,v) in [0,1]^2 to wall temps with Tshell <= Two <= Twi <= Ttube."""
+    delta_t = tube_bulk_k - shell_bulk_k
+    if delta_t <= 0.0:
+        raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_mapping.delta_t")
+    u_value = min(max(float(u), 0.0), 1.0)
+    v_value = min(max(float(v), 0.0), 1.0)
+    two_value = shell_bulk_k + u_value * delta_t
+    twi_value = two_value + v_value * (tube_bulk_k - two_value)
+    return twi_value, two_value
+
+
+def _uv_from_wall_temperatures(
+    twi: float,
+    two: float,
+    *,
+    shell_bulk_k: float,
+    tube_bulk_k: float,
+) -> tuple[float, float]:
+    delta_t = tube_bulk_k - shell_bulk_k
+    if delta_t <= 0.0:
+        return (0.5, 0.5)
+    u_value = (two - shell_bulk_k) / delta_t
+    tube_gap = tube_bulk_k - two
+    v_value = 0.0 if tube_gap <= 0.0 else (twi - two) / tube_gap
+    return (min(max(u_value, 0.0), 1.0), min(max(v_value, 0.0), 1.0))
+
+
+def _select_wall_network_failure(failures: tuple[_RuntimeFailure, ...]) -> _RuntimeFailure:
+    if not failures:
+        return _RuntimeFailure("BLOCKED_NONCONVERGENCE", "wide.wall_network.no_attempt")
+    priority = (
+        "BLOCKED_RESIDUAL_ACCEPTANCE",
+        "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT",
+        "BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT",
+        "BLOCKED_PROPERTY_EVALUATION_FAILURE",
+        "BLOCKED_PROPERTY_PHASE",
+        "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN",
+        "BLOCKED_SHELL_BELL_REYNOLDS_OUT_OF_DOMAIN",
+        "BLOCKED_PHYSICAL_WALL_ORDERING",
+        "BLOCKED_SOLVER_RESOURCE_EXHAUSTION",
+        "BLOCKED_NONCONVERGENCE",
+        "BLOCKED_SOLVER_FAILURE",
+        "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN",
+    )
+    for code in priority:
+        for failure in failures:
+            if failure.code == code:
+                return failure
+    return failures[-1]
+
+
+def _residual_acceptance_ratios_from_diagnostics(
+    diagnostics: tuple[str, ...],
+) -> tuple[float, float, float] | None:
+    if len(diagnostics) < 9:
+        return None
+    try:
+        residuals = tuple(float(diagnostics[index]) for index in range(3, 6))
+        bounds = tuple(float(diagnostics[index]) for index in range(6, 9))
+    except ValueError:
+        return None
+    if any(bound <= 0.0 for bound in bounds):
+        return None
+    return cast(
+        tuple[float, float, float],
+        tuple(abs(residual) / bound for residual, bound in zip(residuals, bounds, strict=True)),
+    )
+
+
+def _warm_start_from_blocked(
+    blocked: Task172BlockedResult,
+) -> tuple[float, float, float] | None:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return None
+    if len(blocked.diagnostic_last_iterate) < 3:
+        return None
+    ratios = _residual_acceptance_ratios_from_diagnostics(blocked.diagnostic_last_iterate)
+    if ratios is None or max(ratios) > 2.0:
+        return None
+    try:
+        values = tuple(float(blocked.diagnostic_last_iterate[index]) for index in range(3))
+    except ValueError:
+        return None
+    if not all(math.isfinite(value) for value in values):
+        return None
+    return cast(tuple[float, float, float], values)
+
+
+def _experimental_wide_delta_t_solver_active() -> bool:
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    bound = _etb.active_experimental_thermal_boundary()
+    return _etb.variable_water_temperature_active(bound)
+
+
+_TASK026_PROPERTY_SOURCE_ID = "CoolProp::HEOS::Water"
+_TASK026_PROPERTY_SOURCE_VERSION = f"{COOLPROP_VERSION}+{COOLPROP_GIT_REVISION}"
+_DOGBOX_FALLBACK_AUTHORITY_ID = "V07-T172-R94-FAIL-ONLY-DOGBOX-FALLBACK-R3"
+_EVIDENCE_REFS = (
+    "docs/tasks/evidence/TASK-172-stage1-pre-runtime-authority-bundle-r1.json",
+    "docs/tasks/evidence/TASK-172-stage1-independent-review-r1.json",
+    "docs/tasks/evidence/TASK-172-r119d-case-bound-task171-native-materialization-r1.json",
+)
+_DOGBOX_FALLBACK_EVIDENCE_REFS = (
+    "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-exact-zero-portability-amendment.json",
+    "docs/tasks/evidence/TASK-172-stage3-task172-dogbox-r3-independent-review.json",
+)
+
+
+class _RuntimeFailure(Exception):
+    def __init__(self, code: str, field_path: str) -> None:
+        super().__init__(code)
+        self.code = code
+        self.field_path = field_path
+
+
+def _decimal(value: Decimal) -> str:
+    if type(value) is not Decimal or not value.is_finite():
+        raise TypeError("canonical TASK172 projections accept finite Decimal values only")
+    return str(value)
+
+
+def _bell_geometry_projection(geometry: BellGeometry) -> dict[str, str | int | list[str]]:
+    if type(geometry) is not BellGeometry:
+        raise TypeError("TASK172 requires the exact native TASK166 BellGeometry")
+    projected: dict[str, str | int | list[str]] = {}
+    for field in fields(BellGeometry):
+        value = getattr(geometry, field.name)
+        if type(value) is Decimal:
+            projected[field.name] = _decimal(value)
+        elif type(value) is int or type(value) is str:
+            projected[field.name] = value
+        elif type(value) is tuple and all(type(item) is str for item in value):
+            projected[field.name] = list(cast(tuple[str, ...], value))
+        else:
+            raise TypeError(f"unsupported native BellGeometry field type: {field.name}")
+    return projected
+
+
+def _request_projection(request: Task172Request) -> dict[str, Any]:
+    support = request.support
+    tube = request.tube_bulk_state
+    shell = request.shell_bulk_state
+    shell_flow = request.shell_flow_authority
+    task031 = shell_flow.task031_geometry
+    task166 = shell_flow.task166_result
+    bell_geometry = task166.bell_geometry
+    if bell_geometry is None:
+        raise TypeError("validated TASK166 result must carry BellGeometry")
+    projected: dict[str, Any] = {
+        "schema_version": request.schema_version,
+        "case_id": request.case_id,
+        "case_revision_id": request.case_revision_id,
+        "topology": request.topology.model_dump(mode="json"),
+        "support": {
+            "physical_segment_id": support.physical_segment_id,
+            "physical_segment_start_m": _decimal(support.physical_segment_start_m),
+            "physical_segment_end_m": _decimal(support.physical_segment_end_m),
+            "support_start_m": _decimal(support.support_start_m),
+            "support_end_m": _decimal(support.support_end_m),
+            "subdivisions_per_physical_interval_per_side": (
+                support.subdivisions_per_physical_interval_per_side
+            ),
+            "subdivision_index": support.subdivision_index,
+            "mesh_level_identity": support.mesh_level_identity,
+            "tube_cell_id": support.tube_cell_id,
+            "shell_cell_id": support.shell_cell_id,
+            "wall_interface_id": support.wall_interface_id,
+            "inside_area_m2": _decimal(support.inside_area_m2),
+            "outside_area_m2": _decimal(support.outside_area_m2),
+        },
+        "tube_bulk_state": {
+            "temperature_k": _decimal(tube.temperature_k),
+            "pressure_pa": _decimal(tube.pressure_pa),
+        },
+        "shell_bulk_state": {
+            "temperature_k": _decimal(shell.temperature_k),
+            "pressure_pa": _decimal(shell.pressure_pa),
+        },
+        "tube_mass_flow_kg_s": _decimal(request.tube_mass_flow_kg_s),
+        "shell_mass_flow_kg_s": _decimal(request.shell_mass_flow_kg_s),
+        "property_profile_id": request.property_profile_id,
+        "property_profile_canonical_hash": request.property_profile_canonical_hash,
+        "r94_model_profile_canonical_hash": request.r94_model_profile_canonical_hash,
+        "r98_overlay_canonical_hash": request.r98_overlay_canonical_hash,
+        "stage1_authority_evidence_canonical_hash": (
+            request.stage1_authority_evidence_canonical_hash
+        ),
+        "shell_jmu_model_authority_canonical_hash": (
+            request.shell_jmu_model_authority_canonical_hash
+        ),
+        "shell_flow_authority": {
+            "task031_geometry_id": task031.geometry_id,
+            "task031_geometry_hash": task031.geometry_hash,
+            "task031_crossflow_area_m2": task031.central_crossflow_flow_area_m2,
+            "task031_equivalent_hydraulic_diameter_m": (
+                task031.shell_side_equivalent_hydraulic_diameter_m
+            ),
+            "task166_result_id": task166.result_id,
+            "task166_result_hash": task166.result_hash,
+            "bell_geometry": _bell_geometry_projection(bell_geometry),
+        },
+        "material_source_sha256": request.material_source_sha256,
+        "clean_wall_authority_hash": request.clean_wall_authority_hash,
+        "cylindrical_mapping_hash": request.cylindrical_mapping_hash,
+        "tube_inside_fouling_m2_k_w": _decimal(request.tube_inside_fouling_m2_k_w),
+        "shell_outside_fouling_m2_k_w": _decimal(request.shell_outside_fouling_m2_k_w),
+    }
+    if type(request) is CandidateTask172LocalRequest:
+        binding = request.candidate_binding
+        task171 = binding.task171_result
+        task025 = binding.task025_result
+        projected["candidate_binding"] = {
+            "candidate_id": binding.candidate_id,
+            "candidate_hash": binding.candidate_hash,
+            "authority_package_id": binding.authority_package_id,
+            "authority_package_hash": binding.authority_package_hash,
+            "task172_candidate_authority_hash": binding.task172_candidate_authority_hash,
+            "jmu_transfer_authority_hash": binding.jmu_transfer_authority_hash,
+            "task171_topology_id": task171.topology_id,
+            "task171_result_hash": task171.result_hash,
+            "task171_mesh_identity": task171.mesh_identity,
+            "task171_physical_ownership_hash": task171.physical_ownership_hash,
+            "task025_result_id": task025.result_id,
+            "task025_result_hash": task025.result_hash,
+            "task166_result_id": binding.task166_result.result_id,
+            "task166_result_hash": binding.task166_result.result_hash,
+        }
+        projected["support"]["candidate_id"] = request.support.candidate_id
+        projected["support"]["candidate_hash"] = request.support.candidate_hash
+    return projected
+
+
+def _result_projection(fields: dict[str, Any]) -> dict[str, Any]:
+    omitted = {
+        "schema_version",
+        "status",
+        "request_hash",
+        "result_hash",
+        "result_id",
+        "warnings",
+        "blockers",
+    }
+    projected: dict[str, Any] = {}
+    for key, value in fields.items():
+        if key in omitted:
+            continue
+        if type(value) is Decimal:
+            projected[key] = _decimal(value)
+        elif type(value) is tuple and all(type(item) is Decimal for item in value):
+            projected[key] = [_decimal(item) for item in value]
+        elif type(value) is tuple and all(type(item) is str for item in value):
+            projected[key] = list(value)
+        else:
+            projected[key] = value
+    return projected
+
+
+def recompute_task172_request_hash(request: Task172Request) -> str:
+    """Replay the exact canonical request identity without invoking producers."""
+    if type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest):
+        raise TypeError("request hash replay requires an exact TASK172 request model")
+    return canonical_sha256(_request_projection(request))
+
+
+def recompute_task172_support_id(request: Task172Request) -> str:
+    """Replay the native TASK172 physical-support identity bound by a request."""
+    if type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest):
+        raise TypeError("support identity replay requires an exact TASK172 request model")
+    support = request.support
+    projection: dict[str, Any] = {
+        "topology_id": request.topology.topology_id,
+        "mesh_identity": request.topology.mesh_identity,
+        "physical_ownership_hash": request.topology.physical_ownership_hash,
+        "physical_segment_id": support.physical_segment_id,
+        "mesh_level_identity": support.mesh_level_identity,
+        "subdivisions_per_physical_interval_per_side": (
+            support.subdivisions_per_physical_interval_per_side
+        ),
+        "subdivision_index": support.subdivision_index,
+        "support_start_m": _decimal(support.support_start_m),
+        "support_end_m": _decimal(support.support_end_m),
+        "tube_cell_id": support.tube_cell_id,
+        "shell_cell_id": support.shell_cell_id,
+        "wall_interface_id": support.wall_interface_id,
+    }
+    if type(request) is CandidateTask172LocalRequest:
+        projection["candidate_id"] = request.support.candidate_id
+        projection["candidate_hash"] = request.support.candidate_hash
+    return canonical_sha256(projection)
+
+
+def recompute_task172_result_hash(result: Task172LocalResult) -> str:
+    """Replay the successful result identity from its closed public fields."""
+    if type(result) is not Task172LocalResult:
+        raise TypeError("result hash replay requires exact Task172LocalResult")
+    fields = result.model_dump(mode="python")
+    return canonical_sha256(
+        {
+            "schema_version": TASK172_RESULT_SCHEMA,
+            "request_hash": result.request_hash,
+            "result": _result_projection(fields),
+        }
+    )
+
+
+def recompute_task172_local_roundoff_bounds(
+    request: Task172Request,
+    result: Task172LocalResult,
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """Replay accepted R98 residual bounds and the published wall-value ULP floor.
+
+    The first three returned values are the existing inner-film, cylindrical
+    wall, and outer-film residual operation bounds. The fourth is a
+    componentwise inverse-Jacobian bound for both wall temperatures, plus the
+    representable spacing of the published values. This diagnostic replay
+    does not alter TASK172 physics or result IDs.
+    """
+    if (
+        type(request) not in (Task172LocalRequest, CandidateTask172LocalRequest)
+        or type(result) is not Task172LocalResult
+    ):
+        raise TypeError("roundoff replay requires exact TASK172 request/result models")
+    if (
+        recompute_task172_request_hash(request) != result.request_hash
+        or recompute_task172_result_hash(result) != result.result_hash
+        or request.support.tube_cell_id != result.tube_cell_id
+        or request.support.shell_cell_id != result.shell_cell_id
+        or request.support.wall_interface_id != result.wall_interface_id
+        or request.topology.topology_id != result.topology_id
+    ):
+        raise ValueError("TASK172 result does not bind the supplied request/support")
+
+    q = float(result.signed_q_hot_to_cold_w)
+    residuals = tuple(float(value) for value in result.residual_vector_w)
+    q_i, q_wall, q_o = (q - residual for residual in residuals)
+    g_i = float(result.tube_htc_w_m2_k) * float(request.support.inside_area_m2)
+    g_wall = 1.0 / float(result.wall_resistance_k_w)
+    g_o = float(result.shell_htc_w_m2_k) * float(request.support.outside_area_m2)
+    tube_bulk = float(request.tube_bulk_state.temperature_k)
+    shell_bulk = float(request.shell_bulk_state.temperature_k)
+    wall_inner = float(result.wall_temperature_inner_k)
+    wall_outer = float(result.wall_temperature_outer_k)
+    bounds = _c_residual_bounds(
+        q,
+        q_i,
+        q_wall,
+        q_o,
+        g_i,
+        g_wall,
+        g_o,
+        tube_bulk,
+        shell_bulk,
+        wall_inner,
+        wall_outer,
+    )
+    outward_bounds = tuple(math.nextafter(value, math.inf) for value in bounds)
+
+    def add_up(left: float, right: float) -> float:
+        return math.nextafter(left + right, math.inf)
+
+    def multiply_up(left: float, right: float) -> float:
+        return math.nextafter(left * right, math.inf)
+
+    def add_down(left: float, right: float) -> float:
+        return max(0.0, math.nextafter(left + right, -math.inf))
+
+    def multiply_down(left: float, right: float) -> float:
+        return max(0.0, math.nextafter(left * right, -math.inf))
+
+    def divide_up(numerator: float, denominator: float) -> float:
+        return math.nextafter(numerator / denominator, math.inf)
+
+    determinant_lower = add_down(
+        add_down(
+            multiply_down(g_i, g_wall),
+            multiply_down(g_i, g_o),
+        ),
+        multiply_down(g_wall, g_o),
+    )
+    if determinant_lower <= 0.0:
+        raise ValueError("TASK172 wall conductance Jacobian is not positively invertible")
+    inner_numerator_upper = add_up(
+        add_up(
+            multiply_up(add_up(g_wall, g_o), outward_bounds[0]),
+            multiply_up(g_o, outward_bounds[1]),
+        ),
+        multiply_up(g_wall, outward_bounds[2]),
+    )
+    outer_numerator_upper = add_up(
+        add_up(
+            multiply_up(g_wall, outward_bounds[0]),
+            multiply_up(g_i, outward_bounds[1]),
+        ),
+        multiply_up(add_up(g_i, g_wall), outward_bounds[2]),
+    )
+    temperature_floor = max(
+        math.ulp(wall_inner),
+        math.ulp(wall_outer),
+        divide_up(inner_numerator_upper, determinant_lower),
+        divide_up(outer_numerator_upper, determinant_lower),
+    )
+    temperature_floor = math.nextafter(temperature_floor, math.inf)
+    return (
+        Decimal(str(outward_bounds[0])),
+        Decimal(str(outward_bounds[1])),
+        Decimal(str(outward_bounds[2])),
+        Decimal(str(temperature_floor)),
+    )
+
+
+def recompute_task172_blocked_result_hash(result: Task172BlockedResult) -> str:
+    """Replay the fail-closed result identity without consulting runtime state."""
+    if type(result) is not Task172BlockedResult:
+        raise TypeError("blocked-result replay requires exact Task172BlockedResult")
+    return canonical_sha256(
+        {
+            "schema_version": "task172.local-constitutive-blocked.v1",
+            "failure_code": result.failure_code,
+            "field_path": result.field_path,
+            "request_hash": result.request_hash,
+            "diagnostic_last_iterate": list(result.diagnostic_last_iterate),
+        }
+    )
+
+
+def _blocked(
+    code: str,
+    field_path: str,
+    request_hash: str | None,
+    diagnostics: tuple[str, ...] = (),
+) -> Task172BlockedResult:
+    projection = {
+        "schema_version": "task172.local-constitutive-blocked.v1",
+        "failure_code": code,
+        "field_path": field_path,
+        "request_hash": request_hash,
+        "diagnostic_last_iterate": list(diagnostics),
+    }
+    digest = canonical_sha256(projection)
+    return Task172BlockedResult(
+        status="BLOCKED",
+        failure_code=code,
+        field_path=field_path,
+        request_hash=request_hash,
+        diagnostic_last_iterate=diagnostics,
+        blockers=(code,),
+        blocked_result_hash=digest,
+    )
+
+
+def _provider_state(provider: PropertyProvider, temperature: Decimal, pressure: Decimal) -> Any:
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= temperature <= t_max:
+        raise _RuntimeFailure(
+            "BLOCKED_PROPERTY_TEMPERATURE_DOMAIN_EXIT", "property_state.temperature_k"
+        )
+    if not _P_MIN <= pressure <= _P_MAX:
+        raise _RuntimeFailure("BLOCKED_PROPERTY_PRESSURE_DOMAIN_EXIT", "property_state.pressure_pa")
+    try:
+        state = provider.state_tp(
+            FluidIdentifier("Water", "HEOS"), float(temperature), float(pressure)
+        )
+    except Exception as exc:
+        raise _RuntimeFailure("BLOCKED_PROPERTY_EVALUATION_FAILURE", "property_state") from exc
+    provenance = state.provenance
+    if (
+        type(state) is not FluidState
+        or provenance.backend_name != "CoolProp"
+        or provenance.backend_version != COOLPROP_VERSION
+        or provenance.backend_git_revision != COOLPROP_GIT_REVISION
+        or provenance.reference_state_policy is not ReferenceStatePolicy.DEF
+    ):
+        raise _RuntimeFailure(
+            "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_state.provenance"
+        )
+    if state.phase is not PhaseRegion.LIQUID:
+        raise _RuntimeFailure("BLOCKED_PROPERTY_PHASE", "property_state.phase")
+    if state.temperature_k != float(temperature) or state.pressure_pa != float(pressure):
+        raise _RuntimeFailure("BLOCKED_PROPERTY_STATE_LOCATION_MISMATCH", "property_state")
+    numeric_values = (
+        state.density_kg_m3,
+        state.cp_j_kg_k,
+        state.viscosity_pa_s,
+        state.conductivity_w_m_k,
+        state.enthalpy_j_kg,
+    )
+    if any(not math.isfinite(value) or value <= 0.0 for value in numeric_values):
+        raise _RuntimeFailure("BLOCKED_PROPERTY_FIELD_INVALID", "property_state")
+    return state
+
+
+def _snapshot(
+    provider: PropertyProvider,
+    request: Task172Request,
+    side: str,
+    location_id: str,
+    temperature: Decimal,
+    pressure: Decimal,
+) -> tuple[PropertySnapshot, str, Any]:
+    state = _provider_state(provider, temperature, pressure)
+    try:
+        phase = Task026PhaseRegion.SINGLE_PHASE_LIQUID
+        provisional = PropertySnapshot(
+            density_kg_m3=Decimal(str(state.density_kg_m3)),
+            dynamic_viscosity_pa_s=Decimal(str(state.viscosity_pa_s)),
+            thermal_conductivity_w_m_k=Decimal(str(state.conductivity_w_m_k)),
+            specific_heat_capacity_j_kg_k=Decimal(str(state.cp_j_kg_k)),
+            bulk_temperature_k=temperature,
+            bulk_pressure_pa=pressure,
+            phase_region=phase,
+            property_source_id=_TASK026_PROPERTY_SOURCE_ID,
+            property_source_version=_TASK026_PROPERTY_SOURCE_VERSION,
+            property_snapshot_hash="0" * 64,
+        )
+        task026_hash = recompute_property_snapshot_hash(provisional)
+        snapshot = PropertySnapshot(
+            density_kg_m3=provisional.density_kg_m3,
+            dynamic_viscosity_pa_s=provisional.dynamic_viscosity_pa_s,
+            thermal_conductivity_w_m_k=provisional.thermal_conductivity_w_m_k,
+            specific_heat_capacity_j_kg_k=provisional.specific_heat_capacity_j_kg_k,
+            bulk_temperature_k=provisional.bulk_temperature_k,
+            bulk_pressure_pa=provisional.bulk_pressure_pa,
+            phase_region=provisional.phase_region,
+            property_source_id=provisional.property_source_id,
+            property_source_version=provisional.property_source_version,
+            property_snapshot_hash=task026_hash,
+        )
+        identity = canonical_sha256(
+            {
+                "profile_id": request.property_profile_id,
+                "case_id": request.case_id,
+                "side": side,
+                "location_id": location_id,
+                "temperature_k": _decimal(temperature),
+                "pressure_pa": _decimal(pressure),
+                "property_source_id": _TASK026_PROPERTY_SOURCE_ID,
+                "property_source_version": _TASK026_PROPERTY_SOURCE_VERSION,
+                "backend": "HEOS::Water",
+                "backend_version": provider.version,
+                "backend_git_revision": provider.git_revision,
+                "reference_state": "DEF",
+                "task026_property_snapshot_hash": task026_hash,
+                "density_kg_m3": _decimal(snapshot.density_kg_m3),
+                "specific_heat_capacity_j_kg_k": _decimal(snapshot.specific_heat_capacity_j_kg_k),
+                "dynamic_viscosity_pa_s": _decimal(snapshot.dynamic_viscosity_pa_s),
+                "thermal_conductivity_w_m_k": _decimal(snapshot.thermal_conductivity_w_m_k),
+                "enthalpy_j_kg": str(state.enthalpy_j_kg),
+            }
+        )
+    except _RuntimeFailure:
+        raise
+    except Exception as exc:
+        raise _RuntimeFailure("BLOCKED_PROPERTY_SNAPSHOT_CONSTRUCTION", location_id) from exc
+    return snapshot, identity, state
+
+
+def _cell_flow_length_m(request: Task172Request) -> Decimal:
+    support = request.support
+    segment_length = support.physical_segment_end_m - support.physical_segment_start_m
+    n = Decimal(support.subdivisions_per_physical_interval_per_side)
+    return segment_length / n
+
+
+def _assert_experimental_laminar_development_applicable(
+    *,
+    reynolds: Decimal,
+    prandtl: Decimal,
+    length_m: Decimal,
+    hydraulic_diameter_m: Decimal,
+) -> None:
+    """Fully developed laminar Nu basis (Task026 / Incropera Table 8.1 scope)."""
+    if hydraulic_diameter_m <= 0 or length_m <= 0:
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_DEVELOPMENT_GEOMETRY", "tube_correlation.development"
+        )
+    ld = length_m / hydraulic_diameter_m
+    re_f = float(reynolds)
+    pr_f = float(prandtl)
+    ld_f = float(ld)
+    hydro_min = 0.05 * re_f
+    thermal_min = 0.05 * re_f * pr_f
+    if ld_f < max(10.0, hydro_min):
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_HYDRODYNAMIC_DEVELOPMENT",
+            f"tube_correlation.ld={ld_f};hydro_min={hydro_min}",
+        )
+    if ld_f < thermal_min:
+        raise _RuntimeFailure(
+            "BLOCKED_TUBE_LAMINAR_THERMAL_DEVELOPMENT",
+            f"tube_correlation.ld={ld_f};thermal_min={thermal_min}",
+        )
+
+
+def _resolve_tube_side_htc(
+    request: Task172Request, snapshot: PropertySnapshot, mass_flow: Decimal
+) -> TubeSideHtcResolution:
+    if type(request) is CandidateTask172LocalRequest:
+        task025 = request.candidate_binding.task025_result
+        parallel_area = task025.total_parallel_flow_area_m2
+        tube_inner_diameter = task025.hydraulic_diameter_m
+    else:
+        parallel_area = TOTAL_PARALLEL_FLOW_AREA_M2
+        tube_inner_diameter = TUBE_ID_M
+    output = compute_single_phase(
+        mass_flow,
+        snapshot.density_kg_m3,
+        snapshot.dynamic_viscosity_pa_s,
+        snapshot.thermal_conductivity_w_m_k,
+        snapshot.specific_heat_capacity_j_kg_k,
+        parallel_area,
+        tube_inner_diameter,
+        ThermalBoundaryCondition.CWT,
+    )
+    from hexagent.exchangers.shell_tube.task173_integrated_rating import (
+        experimental_thermal_boundary as _etb,
+    )
+
+    experimental_mvp = _etb.active_experimental_thermal_boundary() is not None
+    if output.flow_regime is FlowRegime.TRANSITION:
+        raise _RuntimeFailure("THERMAL_CORRELATION_UNAVAILABLE", "tube_correlation.transition")
+    if output.flow_regime is FlowRegime.LAMINAR:
+        if not experimental_mvp:
+            raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
+        if not check_pr_envelope(output.flow_regime, output.prandtl_number):
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PRANDTL_OUT_OF_DOMAIN", "tube_correlation.prandtl"
+            )
+        if type(request) is CandidateTask172LocalRequest:
+            _assert_experimental_laminar_development_applicable(
+                reynolds=output.reynolds_number,
+                prandtl=output.prandtl_number,
+                length_m=_cell_flow_length_m(request),
+                hydraulic_diameter_m=tube_inner_diameter,
+            )
+        return TubeSideHtcResolution(
+            htc_w_m2_k=output.tube_side_heat_transfer_coefficient_w_m2_k,
+            reynolds_number=output.reynolds_number,
+            prandtl_number=output.prandtl_number,
+            correlation_id=output.correlation_id,
+            correlation_version=output.correlation_version,
+            flow_regime=FlowRegime.LAMINAR,
+            apply_c3_wall_pr_correction=False,
+        )
+    if output.flow_regime is not FlowRegime.TURBULENT:
+        raise _RuntimeFailure("BLOCKED_TUBE_C3_REGIME_NOT_APPLICABLE", "tube_correlation")
+    if not _TUBE_C3_RE_MIN < output.reynolds_number < _TUBE_C3_RE_MAX:
+        raise _RuntimeFailure("BLOCKED_TUBE_C3_REYNOLDS_OUT_OF_DOMAIN", "tube_correlation.reynolds")
+    if not check_pr_envelope(output.flow_regime, output.prandtl_number):
+        raise _RuntimeFailure("BLOCKED_TUBE_C3_PRANDTL_OUT_OF_DOMAIN", "tube_correlation.prandtl")
+    return TubeSideHtcResolution(
+        htc_w_m2_k=output.tube_side_heat_transfer_coefficient_w_m2_k,
+        reynolds_number=output.reynolds_number,
+        prandtl_number=output.prandtl_number,
+        correlation_id=output.correlation_id,
+        correlation_version=output.correlation_version,
+        flow_regime=FlowRegime.TURBULENT,
+        apply_c3_wall_pr_correction=True,
+    )
+
+
+def _tube_base_htc(
+    request: Task172Request, snapshot: PropertySnapshot, mass_flow: Decimal
+) -> tuple[Decimal, Decimal, Decimal, str, str]:
+    resolved = _resolve_tube_side_htc(request, snapshot, mass_flow)
+    return (
+        resolved.htc_w_m2_k,
+        resolved.reynolds_number,
+        resolved.prandtl_number,
+        resolved.correlation_id,
+        resolved.correlation_version,
+    )
+
+
+def _shell_base_htc(
+    request: Task172Request,
+    snapshot: PropertySnapshot,
+    mass_flow: Decimal,
+) -> tuple[Decimal, Decimal, Decimal, Any]:
+    geometry = request.shell_flow_authority
+    task031_geometry = geometry.task031_geometry
+    raw_flow = evaluate_shell_flow_raw(
+        mass_flow_rate=mass_flow,
+        flow_area=Decimal(task031_geometry.central_crossflow_flow_area_m2),
+        hydraulic_diameter=Decimal(task031_geometry.shell_side_equivalent_hydraulic_diameter_m),
+        density=snapshot.density_kg_m3,
+        dynamic_viscosity=snapshot.dynamic_viscosity_pa_s,
+        specific_heat_capacity=snapshot.specific_heat_capacity_j_kg_k,
+        thermal_conductivity=snapshot.thermal_conductivity_w_m_k,
+    )
+    mass_velocity = raw_flow.mass_velocity
+    reynolds = raw_flow.reynolds
+    prandtl = raw_flow.prandtl
+    if not Decimal("0") < reynolds <= Decimal("100000"):
+        raise _RuntimeFailure(
+            "BLOCKED_SHELL_BELL_REYNOLDS_OUT_OF_DOMAIN", "shell_correlation.reynolds"
+        )
+    if not _PR_MIN <= prandtl <= _PR_MAX:
+        raise _RuntimeFailure(
+            "BLOCKED_SHELL_BELL_PRANDTL_OUT_OF_DOMAIN", "shell_correlation.prandtl"
+        )
+    flow = {
+        "shell_side_reynolds_number": reynolds,
+        "shell_side_prandtl_number": prandtl,
+        "shell_side_mass_velocity_kg_m2_s": mass_velocity,
+        "property_snapshot": {
+            "density_kg_m3": snapshot.density_kg_m3,
+            "dynamic_viscosity_pa_s": snapshot.dynamic_viscosity_pa_s,
+            "thermal_conductivity_w_m_k": snapshot.thermal_conductivity_w_m_k,
+            "specific_heat_capacity_j_kg_k": snapshot.specific_heat_capacity_j_kg_k,
+        },
+    }
+    try:
+        bell_geometry = geometry.task166_result.bell_geometry
+        if bell_geometry is None:
+            raise _RuntimeFailure("BLOCKED_TASK166_GEOMETRY_MISSING", "shell_flow_authority")
+        calculation = calculate_heat_transfer(bell_geometry, flow)
+    except Exception as exc:
+        raise _RuntimeFailure(
+            "BLOCKED_SHELL_BELL_CORRELATION_FAILURE", "shell_correlation"
+        ) from exc
+    return (
+        calculation.corrected_shell_side_heat_transfer_coefficient,
+        reynolds,
+        prandtl,
+        calculation,
+    )
+
+
+def _decimal_power(value: Decimal, exponent: Decimal) -> Decimal:
+    with localcontext() as context:
+        context.prec = 80
+        result = value.__pow__(exponent)
+    if not result.is_finite() or result <= 0:
+        raise _RuntimeFailure("BLOCKED_CORRELATION_NONFINITE", "wall_correction")
+    return result
+
+
+def _temperature_cache_key(temperature_k: float) -> int:
+    return cast(int, struct.unpack("!q", struct.pack("!d", float(temperature_k)))[0])
+
+
+def _shell_outer_wall_conductance_w_per_k(
+    request: Task172Request,
+    provider: PropertyProvider,
+    shell_bulk_snapshot: PropertySnapshot,
+    shell_geometry_htc: Decimal,
+    wall_outer_k: float,
+    *,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
+    property_eval_counter: list[int] | None = None,
+) -> float:
+    """Shell-side film conductance g_o = h_o(Two) * Ao (W/K), matching _eval_trial()."""
+    cache_key: PropertyEvalCacheKey = ("shell_g_o", _temperature_cache_key(wall_outer_k))
+    if property_eval_cache is not None and cache_key in property_eval_cache:
+        return property_eval_cache[cache_key]
+    support = request.support
+    shell_wall, _shell_wall_id, _shell_wall_state = _snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{support.wall_interface_id}:SHELL_FLUID_WALL_INTERFACE",
+        Decimal(str(wall_outer_k)),
+        request.shell_bulk_state.pressure_pa,
+    )
+    if property_eval_counter is not None:
+        property_eval_counter[0] += 1
+    shell_jmu_ratio = shell_bulk_snapshot.dynamic_viscosity_pa_s / shell_wall.dynamic_viscosity_pa_s
+    shell_jmu = _decimal_power(shell_jmu_ratio, _JMU_EXPONENT)
+    shell_htc = shell_geometry_htc * shell_jmu
+    g_o = float(shell_htc) * float(support.outside_area_m2)
+    if g_o <= 0.0 or not math.isfinite(g_o):
+        raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "shell_wall_conductance")
+    if property_eval_cache is not None:
+        property_eval_cache[cache_key] = g_o
+    return g_o
+
+
+def _tube_inner_wall_conductance_w_per_k(
+    request: Task172Request,
+    provider: PropertyProvider,
+    tube_bulk_snapshot: PropertySnapshot,
+    tube_htc_base: Decimal,
+    wall_inner_k: float,
+    *,
+    apply_c3_wall_pr_correction: bool = True,
+    property_eval_cache: dict[PropertyEvalCacheKey, float] | None = None,
+    property_eval_counter: list[int] | None = None,
+) -> float:
+    """Tube-side film conductance g_i = h_i(Twi) * Ai (W/K), matching _eval_trial()."""
+    cache_key: PropertyEvalCacheKey = (
+        "tube_g_i",
+        _temperature_cache_key(wall_inner_k),
+        apply_c3_wall_pr_correction,
+    )
+    if property_eval_cache is not None and cache_key in property_eval_cache:
+        return property_eval_cache[cache_key]
+    support = request.support
+    tube_wall, _tube_wall_id, _tube_wall_state = _snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{support.wall_interface_id}:TUBE_FLUID_WALL_INTERFACE",
+        Decimal(str(wall_inner_k)),
+        request.tube_bulk_state.pressure_pa,
+    )
+    if property_eval_counter is not None:
+        property_eval_counter[0] += 1
+    if apply_c3_wall_pr_correction:
+        tube_pr_wall = (
+            tube_wall.dynamic_viscosity_pa_s
+            * tube_wall.specific_heat_capacity_j_kg_k
+            / tube_wall.thermal_conductivity_w_m_k
+        )
+        tube_pr_bulk = (
+            tube_bulk_snapshot.dynamic_viscosity_pa_s
+            * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
+            / tube_bulk_snapshot.thermal_conductivity_w_m_k
+        )
+        if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+            )
+        pr_ratio = tube_pr_bulk / tube_pr_wall
+        if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio"
+            )
+        tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
+        tube_htc = tube_htc_base * tube_factor
+    else:
+        tube_htc = tube_htc_base
+    g_i = float(tube_htc) * float(support.inside_area_m2)
+    if g_i <= 0.0 or not math.isfinite(g_i):
+        raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "tube_wall_conductance")
+    if property_eval_cache is not None:
+        property_eval_cache[cache_key] = g_i
+    return g_i
+
+
+def _neighbor_temperature_candidates(center_k: float) -> tuple[float, ...]:
+    center = float(center_k)
+    neighbors = {center, math.nextafter(center, math.inf), math.nextafter(center, -math.inf)}
+    return tuple(sorted(neighbors))
+
+
+def _c_residual_bounds(
+    q_ts: float,
+    q_i: float,
+    q_wall: float,
+    q_o: float,
+    g_i: float,
+    g_wall: float,
+    g_o: float,
+    tube_bulk: float,
+    shell_bulk: float,
+    wall_inner: float,
+    wall_outer: float,
+) -> tuple[float, float, float]:
+    eps = sys.float_info.epsilon
+    gamma_1 = eps / (1.0 - eps)
+    gamma_2 = 2.0 * eps / (1.0 - 2.0 * eps)
+    c = _C_ROUND
+    bound_i = c * (
+        math.ulp(q_ts)
+        + math.ulp(q_i)
+        + g_i * (math.ulp(tube_bulk) + math.ulp(wall_inner) + math.ulp(tube_bulk - wall_inner))
+        + gamma_2 * abs(q_i)
+    )
+    bound_wall = c * (
+        math.ulp(q_ts)
+        + math.ulp(q_wall)
+        + g_wall * (math.ulp(wall_inner) + math.ulp(wall_outer) + math.ulp(wall_inner - wall_outer))
+        + gamma_1 * abs(q_wall)
+    )
+    bound_o = c * (
+        math.ulp(q_ts)
+        + math.ulp(q_o)
+        + g_o * (math.ulp(wall_outer) + math.ulp(shell_bulk) + math.ulp(wall_outer - shell_bulk))
+        + gamma_2 * abs(q_o)
+    )
+    return bound_i, bound_wall, bound_o
+
+
+def _eval_trial(
+    request: Task172Request,
+    provider: PropertyProvider,
+    tube_bulk_snapshot: PropertySnapshot,
+    shell_bulk_snapshot: PropertySnapshot,
+    tube_htc_base: Decimal,
+    shell_geometry_htc: Decimal,
+    wall_resistance: Decimal,
+    q_hc: float,
+    wall_inner: float,
+    wall_outer: float,
+    *,
+    apply_c3_wall_pr_correction: bool = True,
+) -> dict[str, Any]:
+    values = (q_hc, wall_inner, wall_outer)
+    if any(not math.isfinite(value) for value in values):
+        raise _RuntimeFailure("BLOCKED_NONFINITE_TRIAL", "solver.variables")
+    ti = Decimal(str(wall_inner))
+    to = Decimal(str(wall_outer))
+    support = request.support
+    tube_wall, tube_wall_id, _tube_wall_state = _snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{support.wall_interface_id}:TUBE_FLUID_WALL_INTERFACE",
+        ti,
+        request.tube_bulk_state.pressure_pa,
+    )
+    shell_wall, shell_wall_id, _shell_wall_state = _snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{support.wall_interface_id}:SHELL_FLUID_WALL_INTERFACE",
+        to,
+        request.shell_bulk_state.pressure_pa,
+    )
+    if apply_c3_wall_pr_correction:
+        tube_pr_wall = (
+            tube_wall.dynamic_viscosity_pa_s
+            * tube_wall.specific_heat_capacity_j_kg_k
+            / tube_wall.thermal_conductivity_w_m_k
+        )
+        tube_pr_bulk = (
+            tube_bulk_snapshot.dynamic_viscosity_pa_s
+            * tube_bulk_snapshot.specific_heat_capacity_j_kg_k
+            / tube_bulk_snapshot.thermal_conductivity_w_m_k
+        )
+        if not _PR_MIN <= tube_pr_wall <= _PR_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_WALL_PR_OUT_OF_DOMAIN", "tube_correlation.wall_prandtl"
+            )
+        pr_ratio = tube_pr_bulk / tube_pr_wall
+        if not _PR_RATIO_MIN <= pr_ratio <= _PR_RATIO_MAX:
+            raise _RuntimeFailure(
+                "BLOCKED_TUBE_C3_PR_RATIO_OUT_OF_DOMAIN", "tube_correlation.pr_ratio"
+            )
+        tube_factor = _decimal_power(pr_ratio, _C3_EXPONENT)
+        tube_htc = tube_htc_base * tube_factor
+    else:
+        tube_htc = tube_htc_base
+
+    shell_jmu_ratio = shell_bulk_snapshot.dynamic_viscosity_pa_s / shell_wall.dynamic_viscosity_pa_s
+    shell_jmu = _decimal_power(shell_jmu_ratio, _JMU_EXPONENT)
+    shell_htc = shell_geometry_htc * shell_jmu
+
+    ai = support.inside_area_m2
+    ao = support.outside_area_m2
+    h_i = float(tube_htc)
+    h_o = float(shell_htc)
+    area_i = float(ai)
+    area_o = float(ao)
+    wall_r = float(wall_resistance)
+    if min(h_i, h_o, area_i, area_o, wall_r) <= 0.0:
+        raise _RuntimeFailure("BLOCKED_INVALID_CONDUCTANCE", "wall_network")
+    g_i = h_i * area_i
+    g_wall = 1.0 / wall_r
+    g_o = h_o * area_o
+    tube_bulk = float(request.tube_bulk_state.temperature_k)
+    shell_bulk = float(request.shell_bulk_state.temperature_k)
+    q_ts = q_hc  # reviewed effective sign is s_ts=+1 for tube HOT / shell COLD
+    q_i = g_i * (tube_bulk - wall_inner)
+    q_wall = g_wall * (wall_inner - wall_outer)
+    q_o = g_o * (wall_outer - shell_bulk)
+    residuals = (q_ts - q_i, q_ts - q_wall, q_ts - q_o)
+    if any(not math.isfinite(item) for item in (*residuals, g_i, g_wall, g_o)):
+        raise _RuntimeFailure("BLOCKED_NONFINITE_TRIAL", "solver.residual")
+    return {
+        "residuals": residuals,
+        "bounds": _c_residual_bounds(
+            q_ts,
+            q_i,
+            q_wall,
+            q_o,
+            g_i,
+            g_wall,
+            g_o,
+            tube_bulk,
+            shell_bulk,
+            wall_inner,
+            wall_outer,
+        ),
+        "tube_htc": tube_htc,
+        "shell_htc": shell_htc,
+        "tube_wall_snapshot_id": tube_wall_id,
+        "shell_wall_snapshot_id": shell_wall_id,
+        "tube_pr_wall": tube_pr_wall,
+        "shell_jmu": shell_jmu,
+        "g_i": g_i,
+        "g_wall": g_wall,
+        "g_o": g_o,
+    }
+
+
+def _build_valid_result(
+    request: Task172Request,
+    request_hash: str,
+    support_id: str,
+    tube_bulk_id: str,
+    shell_bulk_id: str,
+    tube_re: Decimal,
+    tube_pr: Decimal,
+    shell_re: Decimal,
+    shell_pr: Decimal,
+    tube_corr_id: str,
+    tube_corr_version: str,
+    final: dict[str, Any],
+    solution: tuple[float, float, float],
+    solver_status: str,
+    nfev: int,
+    callback_count: int,
+    *,
+    numerical_profile_id: str = _NUMERICAL_PROFILE_ID,
+    provenance_refs: tuple[str, ...] = _EVIDENCE_REFS,
+) -> Task172LocalResult:
+    q, twi, two = solution
+    residuals = cast(tuple[float, float, float], final["residuals"])
+    fields: dict[str, Any] = {
+        "schema_version": TASK172_RESULT_SCHEMA,
+        "implementation_version": TASK172_IMPLEMENTATION_VERSION,
+        "status": "VALIDATED",
+        "case_id": request.case_id,
+        "case_revision_id": request.case_revision_id,
+        "topology_id": request.topology.topology_id,
+        "task171_result_hash": request.topology.task171_result_hash,
+        "task171_mesh_identity": request.topology.mesh_identity,
+        "physical_ownership_hash": request.topology.physical_ownership_hash,
+        "definition_projection_hash": request.topology.definition_projection_hash,
+        "selected_thermal_role_variant": request.topology.selected_variant,
+        "thermal_role_selection_authority_id": (
+            request.topology.thermal_role_selection_authority_id
+        ),
+        "physical_support_id": support_id,
+        "physical_segment_id": request.support.physical_segment_id,
+        "mesh_level_identity": request.support.mesh_level_identity,
+        "subdivisions_per_physical_interval_per_side": (
+            request.support.subdivisions_per_physical_interval_per_side
+        ),
+        "subdivision_index": request.support.subdivision_index,
+        "tube_cell_id": request.support.tube_cell_id,
+        "shell_cell_id": request.support.shell_cell_id,
+        "wall_interface_id": request.support.wall_interface_id,
+        "tube_bulk_temperature_k": request.tube_bulk_state.temperature_k,
+        "shell_bulk_temperature_k": request.shell_bulk_state.temperature_k,
+        "tube_property_snapshot_identity": tube_bulk_id,
+        "shell_property_snapshot_identity": shell_bulk_id,
+        "tube_wall_property_snapshot_identity": final["tube_wall_snapshot_id"],
+        "shell_wall_property_snapshot_identity": final["shell_wall_snapshot_id"],
+        "tube_htc_w_m2_k": final["tube_htc"],
+        "shell_htc_w_m2_k": final["shell_htc"],
+        "wall_temperature_inner_k": Decimal(str(twi)),
+        "wall_temperature_outer_k": Decimal(str(two)),
+        "signed_q_hot_to_cold_w": Decimal(str(q)),
+        "inner_film_resistance_k_w": Decimal(str(1.0 / float(final["g_i"]))),
+        "wall_resistance_k_w": Decimal(str(1.0 / float(final["g_wall"]))),
+        "outer_film_resistance_k_w": Decimal(str(1.0 / float(final["g_o"]))),
+        "residual_vector_w": tuple(Decimal(str(value)) for value in residuals),
+        "residual_acceptance_state": "PASS_C_RESIDUAL_SPECIFIC_ULP_OPERATION_BOUND",
+        "solver_status": solver_status,
+        "solver_nfev": nfev,
+        "residual_callback_count": callback_count,
+        "tube_reynolds_number": tube_re,
+        "tube_prandtl_number_bulk": tube_pr,
+        "shell_reynolds_number": shell_re,
+        "shell_prandtl_number": shell_pr,
+        "shell_j_mu": final["shell_jmu"],
+        "tube_correlation_id": tube_corr_id,
+        "tube_correlation_version": tube_corr_version,
+        "shell_correlation_id": "TASK166_BELL_DELAWARE_WITH_REVIEWED_LOCAL_JMU",
+        "property_profile_id": PROFILE_ID,
+        "property_profile_canonical_hash": request.property_profile_canonical_hash,
+        "shell_jmu_model_authority_canonical_hash": (
+            request.shell_jmu_model_authority_canonical_hash
+        ),
+        "material_source_sha256": MATERIAL_SOURCE_SHA256,
+        "clean_wall_authority_hash": request.clean_wall_authority_hash,
+        "cylindrical_mapping_hash": request.cylindrical_mapping_hash,
+        "numerical_profile_id": numerical_profile_id,
+        "r94_model_profile_canonical_hash": request.r94_model_profile_canonical_hash,
+        "r98_overlay_canonical_hash": request.r98_overlay_canonical_hash,
+        "stage1_authority_evidence_canonical_hash": (
+            request.stage1_authority_evidence_canonical_hash
+        ),
+        "request_hash": request_hash,
+        "provenance_refs": provenance_refs,
+        "warnings": (),
+        "blockers": (),
+    }
+    projected = _result_projection(fields)
+    result_hash = canonical_sha256(
+        {
+            "schema_version": TASK172_RESULT_SCHEMA,
+            "request_hash": request_hash,
+            "result": projected,
+        }
+    )
+    fields["result_hash"] = result_hash
+    fields["result_id"] = f"urn:hxforge:task172:{result_hash}"
+    return Task172LocalResult(**fields)
+
+
+def _solve_once(
+    request: Task172Request,
+    provider: PropertyProvider,
+    *,
+    method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
+) -> Task172LocalResult:
+    if (
+        provider.name != "CoolProp"
+        or provider.version != COOLPROP_VERSION
+        or provider.git_revision != COOLPROP_GIT_REVISION
+        or provider.reference_state_policy is not ReferenceStatePolicy.DEF
+    ):
+        raise _RuntimeFailure("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider")
+
+    support = request.support
+    support_id = recompute_task172_support_id(request)
+    tube_bulk_snapshot, tube_bulk_id, _tube_state = _snapshot(
+        provider,
+        request,
+        "TUBE",
+        f"{support.tube_cell_id}:CELL_MEAN",
+        request.tube_bulk_state.temperature_k,
+        request.tube_bulk_state.pressure_pa,
+    )
+    shell_bulk_snapshot, shell_bulk_id, _shell_state = _snapshot(
+        provider,
+        request,
+        "SHELL",
+        f"{support.shell_cell_id}:CELL_MEAN",
+        request.shell_bulk_state.temperature_k,
+        request.shell_bulk_state.pressure_pa,
+    )
+    tube_resolution = _resolve_tube_side_htc(
+        request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
+    )
+    tube_h_base = tube_resolution.htc_w_m2_k
+    tube_apply_c3 = tube_resolution.apply_c3_wall_pr_correction
+    tube_re = tube_resolution.reynolds_number
+    tube_pr = tube_resolution.prandtl_number
+    tube_corr_id = tube_resolution.correlation_id
+    tube_corr_version = tube_resolution.correlation_version
+    shell_h_base, shell_re, shell_pr, _shell_calculation = _shell_base_htc(
+        request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
+    )
+    try:
+        if type(request) is CandidateTask172LocalRequest:
+            tube_inner_diameter = request.candidate_binding.task025_result.hydraulic_diameter_m
+            bell_geometry = request.candidate_binding.task166_result.bell_geometry
+            if bell_geometry is None:
+                raise ValueError("candidate TASK166 Bell geometry is missing")
+            tube_outer_diameter = bell_geometry.tube_outer_diameter_m
+        else:
+            tube_inner_diameter = TUBE_ID_M
+            tube_outer_diameter = TUBE_OD_M
+        wall_resistance_result = compute_wall_resistance(
+            tube_inner_diameter,
+            tube_outer_diameter,
+            WALL_CONDUCTIVITY_W_M_K,
+            support.inside_area_m2,
+        )
+    except Exception as exc:
+        raise _RuntimeFailure("BLOCKED_WALL_RESISTANCE_EVALUATION", "wall_resistance") from exc
+    wall_resistance = wall_resistance_result.wall_bundle_conduction_resistance_k_w
+    if wall_resistance <= 0:
+        raise _RuntimeFailure("BLOCKED_WALL_RESISTANCE_INVALID", "wall_resistance")
+
+    # I1: direct algebraic seed; C3 is evaluated at the bulk state and J_mu is
+    # neutral only for initialization. I2 below restores both active corrections.
+    tube_bulk_conductance = float(tube_h_base * support.inside_area_m2)
+    shell_seed_conductance = float(shell_h_base * support.outside_area_m2)
+    delta_t = float(request.tube_bulk_state.temperature_k - request.shell_bulk_state.temperature_k)
+    resistance_i_seed = 1.0 / tube_bulk_conductance
+    resistance_o_seed = 1.0 / shell_seed_conductance
+    resistance_wall = float(wall_resistance)
+    q_seed = delta_t / (resistance_i_seed + resistance_wall + resistance_o_seed)
+    if q_seed == 0.0 or delta_t == 0.0:
+        if delta_t != 0.0:
+            raise _RuntimeFailure("BLOCKED_ZERO_DUTY_SEED_INCONSISTENT", "initialization.zero_duty")
+        zero_temperature = float(request.tube_bulk_state.temperature_k)
+        zero_solution = (0.0, zero_temperature, zero_temperature)
+        zero_final = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            *zero_solution,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+        )
+        zero_residuals = cast(tuple[float, float, float], zero_final["residuals"])
+        zero_bounds = cast(tuple[float, float, float], zero_final["bounds"])
+        if any(
+            abs(value) > bound for value, bound in zip(zero_residuals, zero_bounds, strict=True)
+        ):
+            raise _RuntimeFailure(
+                "BLOCKED_ZERO_DUTY_RESIDUAL_ACCEPTANCE", "initialization.zero_duty"
+            )
+        return _build_valid_result(
+            request,
+            canonical_sha256(_request_projection(request)),
+            support_id,
+            tube_bulk_id,
+            shell_bulk_id,
+            tube_re,
+            tube_pr,
+            shell_re,
+            shell_pr,
+            tube_corr_id,
+            tube_corr_version,
+            zero_final,
+            zero_solution,
+            "EXACT_ZERO_DUTY_BRANCH",
+            0,
+            0,
+        )
+    wall_inner_seed = float(request.tube_bulk_state.temperature_k) - q_seed * resistance_i_seed
+    wall_outer_seed = float(request.shell_bulk_state.temperature_k) + q_seed * resistance_o_seed
+    if initial_guess is not None:
+        q_seed, wall_inner_seed, wall_outer_seed = initial_guess
+    if not all(math.isfinite(value) for value in (q_seed, wall_inner_seed, wall_outer_seed)):
+        raise _RuntimeFailure("BLOCKED_INITIALIZATION_FAILURE", "initialization.seed")
+    t_min, t_max = _admitted_temperature_bounds()
+    if not t_min <= Decimal(str(wall_inner_seed)) <= t_max:
+        raise _RuntimeFailure(
+            "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_inner"
+        )
+    if not t_min <= Decimal(str(wall_outer_seed)) <= t_max:
+        raise _RuntimeFailure(
+            "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_outer"
+        )
+
+    callback_count = 0
+    last_iterate: tuple[float, float, float] = (q_seed, wall_inner_seed, wall_outer_seed)
+
+    def _runtime_failure_from_trial(
+        trial_solution: tuple[float, float, float],
+        evaluated: dict[str, Any],
+    ) -> _RuntimeFailure:
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        diagnostics = tuple(
+            str(value)
+            for value in (
+                *trial_solution,
+                *residual_values,
+                *acceptance_bounds,
+            )
+        )
+        return _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+
+    residual_scale = max(abs(q_seed), 1.0)
+    temperature_scale = max(abs(delta_t), 1.0)
+    diff_step = _relative_diff_step_vector(wide_experimental=budget.wide_experimental)
+    if budget.wide_experimental:
+        ftol = 1e-8
+        xtol = 1e-10
+    else:
+        ftol = 1e-6
+        xtol = 1e-12
+    tube_bulk_k = float(request.tube_bulk_state.temperature_k)
+    shell_bulk_k = float(request.shell_bulk_state.temperature_k)
+    wall_resistance_k_w = float(wall_resistance)
+
+    def residual(values: np.ndarray) -> np.ndarray:
+        nonlocal callback_count, last_iterate
+        callback_count += 1
+        if callback_count > budget.callback_cap:
+            raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
+        q, twi, two = (float(value) for value in values)
+        last_iterate = (q, twi, two)
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q,
+            twi,
+            two,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+        )
+        return np.asarray(evaluated["residuals"], dtype=float) / residual_scale
+
+    def _accept_solution(
+        candidate_solution: tuple[float, float, float],
+        candidate_solver: Any,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        q_value, twi_value, two_value = candidate_solution
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_value,
+            twi_value,
+            two_value,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+        )
+        residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+        acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+        if any(
+            abs(value) > bound
+            for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+        ):
+            diagnostics = tuple(
+                str(value)
+                for value in (
+                    *candidate_solution,
+                    *residual_values,
+                    *acceptance_bounds,
+                )
+            )
+            raise _RuntimeFailure("BLOCKED_RESIDUAL_ACCEPTANCE", ";".join(diagnostics))
+        return evaluated, candidate_solution
+
+    def _counted_eval_trial(
+        q_hc: float,
+        wall_inner: float,
+        wall_outer: float,
+    ) -> dict[str, Any]:
+        nonlocal callback_count
+        callback_count += 1
+        if callback_count > budget.callback_cap:
+            raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
+        return _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_hc,
+            wall_inner,
+            wall_outer,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+        )
+
+    property_eval_cache: dict[PropertyEvalCacheKey, float] = {}
+    property_eval_counter = [0]
+
+    def _twi_from_two(two_value: float) -> tuple[float, float]:
+        two_value = float(two_value)
+        if two_value < shell_bulk_k:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower")
+        g_o = _shell_outer_wall_conductance_w_per_k(
+            request,
+            provider,
+            shell_bulk_snapshot,
+            shell_h_base,
+            two_value,
+            property_eval_cache=property_eval_cache,
+            property_eval_counter=property_eval_counter,
+        )
+        q_outer = g_o * (two_value - shell_bulk_k)
+        if q_outer < 0.0:
+            raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "scalar_two.q_outer")
+        twi_value = two_value + q_outer * wall_resistance_k_w
+        return q_outer, twi_value
+
+    def _scalar_F_two(two_value: float) -> float:
+        """F(Two) = Qi(Two) - Qo(Two) using shell/tube wall conductances only."""
+        q_outer, twi_value = _twi_from_two(two_value)
+        if twi_value > tube_bulk_k:
+            return -1.0
+        g_i = _tube_inner_wall_conductance_w_per_k(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            tube_h_base,
+            twi_value,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+            property_eval_cache=property_eval_cache,
+            property_eval_counter=property_eval_counter,
+        )
+        q_inner = g_i * (tube_bulk_k - twi_value)
+        return q_inner - q_outer
+
+    def _physical_two_upper_bound(two_low: float) -> float:
+        if _twi_from_two(two_low)[1] > tube_bulk_k:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower_twi")
+        two_hi = tube_bulk_k
+        if _twi_from_two(two_hi)[1] <= tube_bulk_k:
+            return two_hi
+        lo = two_low
+        hi = two_hi
+        for _ in range(_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX):
+            mid = 0.5 * (lo + hi)
+            if _twi_from_two(mid)[1] <= tube_bulk_k:
+                lo = mid
+            else:
+                hi = mid
+            if hi - lo <= max(math.ulp(tube_bulk_k), 1e-12):
+                break
+        return lo
+
+    def _accept_scalar_two_solution(
+        two_value: float,
+    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+        q_outer, twi_value = _twi_from_two(two_value)
+        evaluated = _counted_eval_trial(q_outer, twi_value, two_value)
+        q_inner = float(evaluated["g_i"]) * (tube_bulk_k - twi_value)
+        try:
+            return _accept_solution((q_inner, twi_value, two_value), two_value)
+        except _RuntimeFailure:
+            try:
+                return _accept_solution((q_outer, twi_value, two_value), two_value)
+            except _RuntimeFailure as residual_failure:
+                residual_values = cast(tuple[float, float, float], evaluated["residuals"])
+                acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
+                diagnostics = ";".join(
+                    str(item)
+                    for item in (
+                        q_inner,
+                        twi_value,
+                        two_value,
+                        *residual_values,
+                        *acceptance_bounds,
+                    )
+                )
+                raise _RuntimeFailure(
+                    "BLOCKED_RESIDUAL_ACCEPTANCE", diagnostics
+                ) from residual_failure
+
+    def _solve_wide_physical_two_scalar() -> tuple[dict[str, Any], tuple[float, float, float], int]:
+        nonlocal callback_count
+        evaluations_at_start = callback_count
+        two_low = shell_bulk_k
+        two_high = _physical_two_upper_bound(two_low)
+        span = two_high - two_low
+        if span <= 0.0:
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.span")
+
+        def _two_from_u(u_value: float) -> float:
+            u_clamped = min(max(float(u_value), 0.0), 1.0)
+            return two_low + u_clamped * span
+
+        def _scalar_F_u(u_value: float) -> float:
+            return _scalar_F_two(_two_from_u(u_value))
+
+        f_lower = _scalar_F_u(0.0)
+        f_upper = _scalar_F_u(1.0)
+        if f_lower < 0.0 or f_upper > 0.0:
+            raise _RuntimeFailure(
+                "BLOCKED_NONCONVERGENCE",
+                f"scalar_two.endpoint_sign;{f_lower};{f_upper}",
+            )
+        try:
+            u_root = float(
+                brentq(
+                    _scalar_F_u,
+                    0.0,
+                    1.0,
+                    maxiter=_WIDE_SCALAR_TWO_MAX_BRENT_ITER,
+                    xtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
+                    rtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
+                )
+            )
+            two_root = _two_from_u(u_root)
+        except _RuntimeFailure:
+            raise
+        except ValueError as exc:
+            raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.brentq") from exc
+        except Exception as exc:
+            raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "scalar_two.brentq") from exc
+        evaluated, solution = _accept_scalar_two_solution(two_root)
+        function_evaluations = callback_count - evaluations_at_start
+        return evaluated, solution, function_evaluations
+
+    if budget.wide_experimental:
+        try:
+            evaluated_final, solution, scalar_nfev = _solve_wide_physical_two_scalar()
+        except _RuntimeFailure as failure:
+            raise failure
+        q, twi, two = solution
+        if q < 0.0:
+            raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
+        if not (shell_bulk_k <= two <= twi <= tube_bulk_k):
+            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+        solver_status = (
+            "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_DOGBOX"
+            if method == "dogbox"
+            else "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_TRF"
+        )
+        return _build_valid_result(
+            request,
+            canonical_sha256(_request_projection(request)),
+            support_id,
+            tube_bulk_id,
+            shell_bulk_id,
+            tube_re,
+            tube_pr,
+            shell_re,
+            shell_pr,
+            tube_corr_id,
+            tube_corr_version,
+            evaluated_final,
+            (q, twi, two),
+            solver_status,
+            scalar_nfev,
+            callback_count,
+            numerical_profile_id=budget.numerical_profile_id,
+            provenance_refs=_EVIDENCE_REFS,
+        )
+
+    try:
+        solver = least_squares(
+            residual,
+            np.asarray([q_seed, wall_inner_seed, wall_outer_seed], dtype=float),
+            method=method,
+            loss="linear",
+            ftol=ftol,
+            xtol=xtol,
+            gtol=1e-12,
+            jac="2-point",
+            diff_step=diff_step,
+            x_scale=[residual_scale, temperature_scale, temperature_scale],
+            max_nfev=budget.max_nfev,
+            bounds=(
+                np.asarray([-np.inf, float(t_min), float(t_min)], dtype=float),
+                np.asarray([np.inf, float(t_max), float(t_max)], dtype=float),
+            ),
+            tr_solver="exact",
+            tr_options={},
+            f_scale=1.0,
+            jac_sparsity=None,
+        )
+    except _RuntimeFailure:
+        raise
+    except Exception as exc:
+        raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "solver") from exc
+
+    solution = cast(
+        tuple[float, float, float],
+        tuple(float(value) for value in solver.x),
+    )
+    if not solver.success or solver.nfev > budget.max_nfev or callback_count > budget.callback_cap:
+        raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "solver.termination")
+    evaluated_final, solution = _accept_solution(solution, solver)
+    q, twi, two = solution
+    if q < 0.0:
+        raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
+    if not (
+        float(request.shell_bulk_state.temperature_k)
+        <= two
+        <= twi
+        <= float(request.tube_bulk_state.temperature_k)
+    ):
+        raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
+    fallback = method == "dogbox"
+    solver_status = (
+        f"R94_TRF_RESIDUAL_FAIL_THEN_DOGBOX_FALLBACK_STATUS_{solver.status}"
+        if fallback
+        else f"SCIPY_TRF_STATUS_{solver.status}"
+    )
+    profile_id = _DOGBOX_FALLBACK_AUTHORITY_ID if fallback else _NUMERICAL_PROFILE_ID
+    provenance = (*_EVIDENCE_REFS, *_DOGBOX_FALLBACK_EVIDENCE_REFS) if fallback else _EVIDENCE_REFS
+    return _build_valid_result(
+        request,
+        canonical_sha256(_request_projection(request)),
+        support_id,
+        tube_bulk_id,
+        shell_bulk_id,
+        tube_re,
+        tube_pr,
+        shell_re,
+        shell_pr,
+        tube_corr_id,
+        tube_corr_version,
+        evaluated_final,
+        (q, twi, two),
+        solver_status,
+        int(solver.nfev),
+        callback_count,
+        numerical_profile_id=profile_id,
+        provenance_refs=provenance,
+    )
+
+
+def _solve_attempt(
+    request: Task172Request,
+    provider: PropertyProvider,
+    *,
+    method: Literal["trf", "dogbox"],
+    budget: _SolverBudget = _FROZEN_SOLVER_BUDGET,
+    initial_guess: tuple[float, float, float] | None = None,
+) -> Task172LocalOutcome:
+    """Run one bounded numerical attempt without applying fallback policy."""
+    try:
+        return _solve_once(
+            request,
+            provider,
+            method=method,
+            budget=budget,
+            initial_guess=initial_guess,
+        )
+    except _RuntimeFailure as exc:
+        diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
+        try:
+            request_hash = canonical_sha256(_request_projection(request))
+        except Exception:
+            request_hash = None
+        return _blocked(exc.code, exc.field_path, request_hash, diagnostics)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
+
+
+def _fallback_result_replays_request(
+    request: Task172Request,
+    result: Task172LocalResult,
+) -> bool:
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        return (
+            result.request_hash == request_hash
+            and recompute_task172_result_hash(result) == result.result_hash
+            and result.result_id == f"urn:hxforge:task172:{result.result_hash}"
+            and result.physical_support_id == recompute_task172_support_id(request)
+            and result.physical_segment_id == request.support.physical_segment_id
+            and result.mesh_level_identity == request.support.mesh_level_identity
+            and result.subdivisions_per_physical_interval_per_side
+            == request.support.subdivisions_per_physical_interval_per_side
+            and result.subdivision_index == request.support.subdivision_index
+            and result.tube_cell_id == request.support.tube_cell_id
+            and result.shell_cell_id == request.support.shell_cell_id
+            and result.wall_interface_id == request.support.wall_interface_id
+            and bool(result.tube_property_snapshot_identity)
+            and bool(result.shell_property_snapshot_identity)
+            and bool(result.tube_wall_property_snapshot_identity)
+            and bool(result.shell_wall_property_snapshot_identity)
+        )
+    except Exception:
+        return False
+
+
+def _blocked_residual_replay_valid(
+    blocked: Task172BlockedResult,
+    request: Task172Request,
+) -> bool:
+    if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return False
+    try:
+        request_hash = recompute_task172_request_hash(request)
+        return (
+            blocked.request_hash == request_hash
+            and blocked.blocked_result_hash == recompute_task172_blocked_result_hash(blocked)
+        )
+    except Exception:
+        return False
+
+
+def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalOutcome:
+    """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
+    request_hash: str | None = None
+    try:
+        request_hash = recompute_task172_request_hash(request)
+    except Exception:
+        request_hash = None
+
+    primary = _solve_attempt(request, provider, method="trf")
+    if type(primary) is Task172LocalResult:
+        return primary
+    if type(primary) is not Task172BlockedResult:
+        return primary
+    if primary.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return primary
+    if not _blocked_residual_replay_valid(primary, request):
+        return primary
+
+    fallback = _solve_attempt(request, provider, method="dogbox")
+    if type(fallback) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, fallback):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "fallback.result_identity",
+                request_hash,
+            )
+        return fallback
+    if (
+        not _experimental_wide_delta_t_solver_active()
+        or type(fallback) is not Task172BlockedResult
+        or fallback.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(fallback, request)
+    ):
+        return fallback
+
+    warm_start = _warm_start_from_blocked(fallback)
+    wide_trf = _solve_attempt(
+        request,
+        provider,
+        method="trf",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=warm_start,
+    )
+    if type(wide_trf) is Task172LocalResult:
+        if not _fallback_result_replays_request(request, wide_trf):
+            return _blocked(
+                "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+                "wide_experimental.result_identity",
+                request_hash,
+            )
+        return wide_trf
+    if (
+        type(wide_trf) is not Task172BlockedResult
+        or wide_trf.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
+        or not _blocked_residual_replay_valid(wide_trf, request)
+    ):
+        return wide_trf
+
+    wide_dogbox_initial = _warm_start_from_blocked(wide_trf) or warm_start
+    wide_dogbox = _solve_attempt(
+        request,
+        provider,
+        method="dogbox",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        initial_guess=wide_dogbox_initial,
+    )
+    if type(wide_dogbox) is Task172LocalResult and not _fallback_result_replays_request(
+        request, wide_dogbox
+    ):
+        return _blocked(
+            "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+            "wide_experimental.result_identity",
+            request_hash,
+        )
+    return wide_dogbox
+
+
+def validate_request(raw_request: object, provider: PropertyProvider) -> Task172LocalOutcome:
+    """Validate and execute one local interface closure; never return a partial result."""
+    if type(raw_request) is not Task172LocalRequest:
+        if type(raw_request) is not dict:
+            return _blocked("BLOCKED_INVALID_REQUEST_TYPE", "request", None)
+        try:
+            request = Task172LocalRequest.model_validate(raw_request, strict=True)
+        except ValidationError:
+            return _blocked("BLOCKED_INVALID_REQUEST_SCHEMA", "request", None)
+    else:
+        request = raw_request
+    try:
+        if type(provider) is not CoolPropProvider:
+            raise _RuntimeFailure(
+                "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider"
+            )
+        return _solve(request, provider)
+    except _RuntimeFailure as exc:
+        diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
+        try:
+            digest = canonical_sha256(_request_projection(request))
+        except Exception:
+            digest = None
+        return _blocked(exc.code, exc.field_path, digest, diagnostics)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
+
+
+def validate_candidate_request(
+    raw_request: CandidateTask172LocalRequest | dict[str, Any],
+    provider: PropertyProvider,
+) -> Task172LocalOutcome:
+    """Run the same reviewed R94/R98 kernel on a separately bound candidate context."""
+    if type(raw_request) is CandidateTask172LocalRequest:
+        request = raw_request
+    elif type(raw_request) is dict:
+        try:
+            request = CandidateTask172LocalRequest.model_validate(raw_request, strict=True)
+        except ValidationError:
+            return _blocked("BLOCKED_INVALID_REQUEST_SCHEMA", "request", None)
+    else:
+        return _blocked("BLOCKED_INVALID_REQUEST_TYPE", "request", None)
+    try:
+        if type(provider) is not CoolPropProvider:
+            raise _RuntimeFailure(
+                "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider"
+            )
+        return _solve(request, provider)
+    except _RuntimeFailure as exc:
+        digest: str | None
+        try:
+            digest = canonical_sha256(_request_projection(request))
+        except Exception:
+            digest = None
+        return _blocked(exc.code, exc.field_path, digest)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "runtime", None)
+
+
+__all__ = [
+    "recompute_task172_blocked_result_hash",
+    "recompute_task172_local_roundoff_bounds",
+    "recompute_task172_request_hash",
+    "recompute_task172_result_hash",
+    "recompute_task172_support_id",
+    "validate_candidate_request",
+    "validate_request",
+]

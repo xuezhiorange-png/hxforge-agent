@@ -1,0 +1,13 @@
+{
+  "energy_balance_residual_w": "2.0E-10",
+  "failure_code": null,
+  "mesh_result_hash": "472249e43f6d722bc60023cc3cf1fbcc075c155d1e1c69bf35d4b70110feefe5",
+  "mesh_status": "NUMERIC_VALID",
+  "schema_version": "hxforge.low-mesh-result.v1",
+  "shell_outlet_temperature_k": "298.60904062912533",
+  "task172_local_evaluation_count": 4396,
+  "terminal_boundary_residual_k": "7.74694E-9",
+  "total_duty_w": "38387.018185484473",
+  "tube_outlet_temperature_k": "298.9348676357185",
+  "wall_seconds": 226.229
+}

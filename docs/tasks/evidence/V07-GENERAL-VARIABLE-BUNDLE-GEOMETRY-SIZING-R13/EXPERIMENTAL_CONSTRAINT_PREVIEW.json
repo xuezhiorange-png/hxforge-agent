@@ -1,0 +1,21 @@
+{
+  "EXPERIMENTAL_CAPACITY_PREVIEW": "MEETS_TARGET",
+  "EXPERIMENTAL_DP_PREVIEW": "EXCEEDS_LIMIT",
+  "duty_constraint": "SATISFIED",
+  "fiv_numeric_verified": false,
+  "full_rating_converged": false,
+  "max_shell_dp_pa": "1180",
+  "max_tube_dp_pa": "1150",
+  "mesh_ladder_completed": false,
+  "modeled_shell_dp_pa": "1268.2922758312940284778499367107514167209249049183",
+  "modeled_tube_dp_pa": "4.192",
+  "production_design_eligible": false,
+  "r2a_production_authority_verified": false,
+  "rated_duty_w": "32328.8461907676175",
+  "schema_version": "hxforge.experimental-constraint-preview.v1",
+  "shell_dp_constraint": "NOT_SATISFIED",
+  "target_duty_w": "9500",
+  "task167_engineering_approval": false,
+  "task174_hydraulic_status": "HYDRAULIC_REFERENCE_MODEL_PREVIEW",
+  "tube_dp_constraint": "SATISFIED"
+}

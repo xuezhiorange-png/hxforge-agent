@@ -1,0 +1,228 @@
+{
+  "schema_version": "task173.provider-quantization-transient-decision-enclosure-r2a-independent-review.v1",
+  "task_id": "STAGE3_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2A_INDEPENDENT_REVIEW_R1",
+  "mode": "EXACT_GIT_ARTIFACT_BACKED_FRESH_CONTEXT_SHARED_PRODUCTION_CONTROL_FLOW_NUMERICAL_AUTHORITY_REVIEW",
+  "result": "PASS_TASK173_PROVIDER_QUANTIZATION_TRANSIENT_DECISION_ENCLOSURE_R2A_INDEPENDENT_REVIEW",
+  "review_decision": "PASS",
+  "reviewer": {
+    "name": "OpenAI Codex",
+    "id": "NOT_EXPOSED",
+    "context": "FRESH",
+    "context_id": "01a1106e-4494-7712-b2a5-643f6086aaea",
+    "self_approval": false,
+    "candidate_author_self_approval": false,
+    "prior_review_context_reused": false
+  },
+  "pull_request": {
+    "number": 283,
+    "state": "OPEN",
+    "is_draft": true,
+    "reviewed_head": "6a3b0c47d1af2e16f9e0a8d225b6d8265a6ffe3a",
+    "url": "https://github.com/xuezhiorange-png/hxforge-agent/pull/283"
+  },
+  "review_bundle": {
+    "file_count": 2268,
+    "sha256": "d2269133a37ada3cea8f5ab562f6085617f3dfb8112bbfc5e297bf710f1a2aa0",
+    "manifest_sha256": "961352dfeea285ac6ce75d0b026a56e997c72408de669bb71868da791a4432ed",
+    "external_archive_path": "/Users/charles/Documents/Codex/2026-10-06/task173-r2a-independent-review/outputs/git-artifact-bundle.tar",
+    "exact_git_blob_membership": "PASS",
+    "raw_byte_length_and_sha256": "PASS",
+    "archive_member_identity": "PASS",
+    "artifact_file_integrity": "PASS"
+  },
+  "runtime_source": {
+    "head": "5bd19b1829f2fea7757c3efb3398e9aab17c8a3d",
+    "tree": "64fc2c4b5e1776610aa8a5e39bf0666455648f73",
+    "ancestor_of_reviewed_head": true,
+    "runtime_paths_byte_identical_at_reviewed_head": true,
+    "runtime_path_count_independently_compared": 821,
+    "runtime_source_binding": "PASS",
+    "runtime_correction_file_count": 2,
+    "runtime_correction_paths": [
+      "src/hexagent/exchangers/shell_tube/task173_integrated_rating/service.py",
+      "tests/exchangers/shell_tube/test_task173_integrated_rating.py"
+    ],
+    "unrelated_runtime_file_count": 0
+  },
+  "authority": {
+    "id": "V07-T173-CELL-ROOT-PROVIDER-QUANTIZATION-ENCLOSURE-R2A",
+    "canonical_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+    "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+    "candidate_accepted": false,
+    "effective_lifecycle": "REVIEWED_AUTHORITY",
+    "effective_accepted": true,
+    "qualification_matrix_hash": "f9d5a2a0c8a462fedea2715b4e5a759d36bb2426ca2603b318660960c7eea86d",
+    "authority_hash_replay": "PASS",
+    "qualification_matrix_hash_replay": "PASS"
+  },
+  "parent_sizing_authority_package": {
+    "id": "V07-T173-SIZING-AUTHORITY-PACKAGE-R2",
+    "hash": "750c1f76953f46b63de90f2c21302160746e890cf4c61227538397e69b8501a9",
+    "hash_length": 64,
+    "binding": "PASS",
+    "package_input_binding_corrected": true
+  },
+  "prior_r2_findings": [
+    {
+      "id": "QUALIFICATION_OUTER_SOLVER_CONTROL_FLOW_DIVERGENCE",
+      "status": "CLOSED",
+      "basis": "R2A qualification calls the shared production _solve_outer_boundary_from_trial helper; production state-machine body is unchanged by extraction."
+    },
+    {
+      "id": "R2_REPLAY_ENTRYPOINT_RUNTIME_HEAD_GUARD_MISMATCH",
+      "status": "CLOSED",
+      "basis": "Runtime-descendant guard verifies ancestry, frozen runtime tree, byte-identical bound paths and a clean bound-path worktree; positive and negative cases pass."
+    },
+    {
+      "id": "PARENT_SIZING_AUTHORITY_PACKAGE_HASH_INPUT_MISMATCH",
+      "status": "CLOSED",
+      "basis": "Exact 64-character package ID/hash agrees across package, R2A candidate, qualification and replay inputs."
+    }
+  ],
+  "replay": {
+    "authority_hash": "25bb3c27ca0610e217f29581d28d86cbae560a868b35bd031276355603b4733e",
+    "qualification_matrix_hash": "f9d5a2a0c8a462fedea2715b4e5a759d36bb2426ca2603b318660960c7eea86d",
+    "authority_hash_replay": "PASS",
+    "qualification_matrix_hash_replay": "PASS",
+    "event_hash_replay_count": 16,
+    "event_hash_replay_pass_count": 16,
+    "endpoint_request_result_replay_count": 57,
+    "endpoint_request_hash_replay": "PASS",
+    "endpoint_result_hash_replay": "PASS",
+    "continuation_hash_replay_count": 16,
+    "outer_decision_certificate_hash_replay_count": 8,
+    "trajectory_hash_replay_count": 5,
+    "qualification_status": "PASS",
+    "all_replay_pass": true,
+    "h2_hole_replay": "PASS",
+    "control_flow_parity_replay": "PASS"
+  },
+  "control_flow_review": {
+    "shared_production_helper": "_solve_outer_boundary_from_trial",
+    "qualification_control_flow_source": "SHARED_PRODUCTION_HELPER",
+    "qualification_outer_solver_control_flow_parity": "PASS",
+    "qualification_independent_bisection_loop_count": 0,
+    "production_outer_numerical_semantics_changed": false,
+    "focused_helper_regression_count": 16,
+    "runtime_state_machine_ast_body_equivalence": "PASS"
+  },
+  "point_root_contract": {
+    "residual_definition": "F(q)=q-q_TASK172(q)",
+    "task172_result_must_be_valid": true,
+    "tolerance_w": "1e-6",
+    "point_root_tolerance_changed": false,
+    "task172_acceptance_changed": false
+  },
+  "transient_enclosure_scope": {
+    "transient_outer_search_allowed": true,
+    "accepted_trajectory_allowed": false,
+    "final_mesh_observables_allowed": false,
+    "max_enclosures_per_transient_trajectory": 1,
+    "transient_provider_spans_used_in_final_physical_acceptance": false,
+    "ordinary_point_root_relaxed": false
+  },
+  "event_and_decision_review": {
+    "transient_endpoint_event_count": 16,
+    "q1_q15_review": "PASS",
+    "outer_decision_certificate_count": 8,
+    "outer_decision_invariance_pass_count": 8,
+    "terminal_tolerance_invariance_pass_count": 8,
+    "outer_action_invariance_pass_count": 8,
+    "representative_branch_used_to_decide_action": false,
+    "midpoint_collapse_disposition_certificate_count": 5,
+    "midpoint_collapse_disposition_invariance_pass_count": 5,
+    "nested_enclosure_count": 0
+  },
+  "accepted_trajectories": {
+    "full_five_case_trajectory_evidence_preserved": true,
+    "accepted_cell_count": 25,
+    "accepted_cells_exact_valid_point_root": true,
+    "maximum_absolute_accepted_residual_w": "9.38386E-7",
+    "final_accepted_trajectory_provider_enclosure_count": 0,
+    "accepted_trajectory_hashes_unchanged": true,
+    "trajectory_hashes": {
+      "TRAIN_A": "c865fabcd42658368fa3eb10a4e6edbd1124a1ba649dfc7cd650ae7bc7358843",
+      "TRAIN_B": "b2e579624aae8a1a09a89c6236e3dc4ee40bf8aa952681ef884ee5f8ff179cfc",
+      "H1": "c76b049b491235066ed8ea8ae005c3e125b359b8fd8fc1dd91938c8ff1d1bf50",
+      "H2": "52b93a79a30693a843fab7cb7575560ecebc3051512fdf987d6eef040aa839d0",
+      "H3": "73a0e5e199d452ba7e8a6dc7239c43f1f9bd857028c9722a6db9e9a1a444698a"
+    }
+  },
+  "h2_hole": {
+    "review": "PASS",
+    "hole_type": "BLOCKED_RESIDUAL_ACCEPTANCE",
+    "evidence_hash": "968e50038a558af7f28d57364082c356b4a1c26aa90d40a5e65463a3c7a18afe",
+    "blocked_and_neighboring_request_result_identities_replayed": true,
+    "outer_trial_mesh_continuation_cross_binding_replayed": true,
+    "blocked_point_promoted": false
+  },
+  "task174_and_reference_rating": {
+    "task174_grouped_native_reduction_review": "PASS",
+    "task166_formula_changed": false,
+    "reference_task174_result_hash": "ccb62cd76c6089840291cc37bf2f32dcad44d6e0ba3a0616792963b04233f419",
+    "reference_task174_identity_preserved": true,
+    "reference_task173_request_hash": "77fd429c0a10223a3fb5c26501599281568e2887b17c88e4ad5c76314279e9ed",
+    "reference_task173_result_type": "Task173SuccessResult",
+    "reference_task173_result_hash": "fddc9d68414a5650b3268bdb7c27e34cdd27f41144fbd8058a011053ebbba38b",
+    "reference_task173_status": "VALIDATED",
+    "reference_task173_rating_identity_preserved": true,
+    "reference_task173_full_replay_restarted": false,
+    "reference_task173_receipt_limitation": "Committed execution receipt and request/runtime cross-bindings were verified; no additional multi-hour full Rating replay or complete-result-preimage replay is claimed."
+  },
+  "physical_uncertainty_scope": {
+    "transient_spans_are_diagnostic_provenance_only": true,
+    "transient_spans_added_to_accepted_cell_floors": false,
+    "transient_spans_added_to_mesh_floors": false,
+    "transient_spans_added_to_energy_tolerance": false,
+    "transient_spans_added_to_final_physical_uncertainty": false,
+    "energy_balance_semantics_changed": false,
+    "mesh_precision_semantics_changed": false
+  },
+  "scope_and_resource_review": {
+    "scope_containment": "PASS",
+    "resource_cap_containment": "PASS",
+    "frozen_cases_unchanged": [
+      {"label": "TRAIN_A", "cut": "0.215"},
+      {"label": "TRAIN_B", "cut": "0.220"},
+      {"label": "H1", "cut": "0.225"},
+      {"label": "H2", "cut": "0.275"},
+      {"label": "H3", "cut": "0.350"}
+    ],
+    "reference_n1_enclosure_count": 0,
+    "reference_n1_dormancy_overclaimed_as_full_rating_identity": false
+  },
+  "review_bundle_ci": {
+    "qualification_head_ci_run": "37435834013",
+    "qualification_head_ci_result": "success",
+    "ci_total_jobs": 50,
+    "ci_success": 45,
+    "ci_skipped": 5,
+    "ci_failed": 0,
+    "ci_cancelled": 0,
+    "ci_max_shard_seconds": 668,
+    "ci_runtime_budget_seconds": 540,
+    "ci_runtime_budget_gate": "FAIL_SEPARATE_FROM_NUMERICAL_AUTHORITY",
+    "review_receipt_head_ci": "RUN_AFTER_REVIEW_RECEIPT_COMMIT"
+  },
+  "review_decision_effective": {
+    "decision": "PASS",
+    "effective_authority_lifecycle": "REVIEWED_AUTHORITY",
+    "authority_accepted": true,
+    "candidate_projection_modified": false,
+    "new_numerical_findings": [],
+    "next_gate": "RESUME_STAGE3_TASK173_FULL_SIZING_IMPLEMENTATION_R1_WITH_REVIEWED_TRANSIENT_DECISION_ENCLOSURE_R2A",
+    "next_gate_executed": false
+  },
+  "boundaries": {
+    "production_code_changed_by_review": false,
+    "production_r2a_enclosure_implemented": false,
+    "sizing_executed": false,
+    "task173_rating_complete": true,
+    "task173_sizing_complete": false,
+    "task173_complete": false,
+    "task175_release_acceptance_performed": false,
+    "ready_authorized": false,
+    "merge_authorized": false,
+    "pr_state_remains_open_draft": true
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "EXPERIMENTAL_LIVE_RATING_RUN_HASH": "c1511c346cba5296c73528e7a8c012043a836df8b83c00ea9d2e195049a53b73",
+  "candidate_hash": "bf25fbe55930e3b92eed11f75a8e09a882fb29ee0b9a8d4cf66a4276a04499ea",
+  "candidate_id": "82f370ff-73cd-5d71-aaf9-efc51645d22e",
+  "disclosure": {
+    "authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+    "binding_status": "EXPERIMENTAL_LIVE_BOUNDARY",
+    "participates_in_task173_mesh": true
+  },
+  "enable_ephemeral_tp_cache": false,
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r9",
+  "experimental_thermal_boundary_authority_id": "V07-EXPERIMENTAL-THERMAL-BOUNDARY-R7-V1",
+  "experimental_thermal_boundary_binding_hash": "5787e8d8c55018bc7ecf9f8df2fb82dad09e566d1352ea7e0dbceada17eff808",
+  "git_revision": "d7508028a3836bcc08b27cf476a9e3b65053493c",
+  "mesh_level": 1,
+  "mode": "experimental-live-rating",
+  "native_candidate_rating_request_hash": "4ba416cb179ee847972fb968bd198873af185976939d234950dfd90e0707047d",
+  "numerical_authority_status": "CANDIDATE",
+  "production_rating_request_hash_semantics": "UNCHANGED_NATIVE_CANDIDATE_HASH_ONLY",
+  "property_profile_id": "V07-T172-WATER-PROPERTY-PROFILE-R2",
+  "property_provider_version": "CoolPropProvider",
+  "schema_version": "hxforge.experimental-live-rating-run-identity.v1",
+  "shell_inlet_enthalpy_j_kg": "104920.11980935509",
+  "shell_inlet_temperature_k": "298.15",
+  "solver_source_revision": "d7508028a3836bcc08b27cf476a9e3b65053493c",
+  "task025_parallel_area_m2": "0.0492914415",
+  "task171_result_hash": "3c2c815fefbb4845dec8e4afaf8e91c89c2f9be2bdcd517a35510492bb209a9b",
+  "task174_result_hash": "0449efde89fec337615888d2ffe52ccf4df4b7be4f525477729f3f2c6f1e0f72",
+  "tube_inlet_enthalpy_j_kg": "111400.69410794554",
+  "tube_inlet_temperature_k": "299.70"
+}

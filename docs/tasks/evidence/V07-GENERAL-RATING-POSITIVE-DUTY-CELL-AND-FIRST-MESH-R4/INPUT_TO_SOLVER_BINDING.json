@@ -1,0 +1,83 @@
+{
+  "actual_thermal_boundary_binding": {
+    "reference_pressure_pa": "101325",
+    "shell_inlet_temperature_k": "298.15",
+    "shell_role": "COLD",
+    "tube_inlet_temperature_k": "300",
+    "tube_role": "HOT"
+  },
+  "bind_task172_c3_reference_geometry": true,
+  "engineering_case_id": "mvp-tube-hot-shell-cold-r4",
+  "engineering_case_schema": "hxforge.general-engineering-case.v2",
+  "equipment_thermal_mapping": {
+    "shell_equipment_side": "shell_side",
+    "shell_thermal_role": "COLD",
+    "tube_equipment_side": "tube_side",
+    "tube_thermal_role": "HOT"
+  },
+  "physical_side_role_parity": "TUBE_HOT_SHELL_COLD",
+  "rows": [
+    {
+      "notes": "Tube equipment side carries the kernel HOT stream.",
+      "participates_in_rating_kernel": true,
+      "solver_parameter": "Task173 TUBE_MASS_FLOW_KG_S / Task172 tube_mass_flow_kg_s",
+      "solver_value": "12",
+      "user_field": "tube_side.mass_flow_kg_s",
+      "user_value": "12.000000"
+    },
+    {
+      "notes": "Shell equipment side carries the kernel COLD stream.",
+      "participates_in_rating_kernel": true,
+      "solver_parameter": "Task173 SHELL_MASS_FLOW_KG_S / Task172 shell_mass_flow_kg_s",
+      "solver_value": "20",
+      "user_field": "shell_side.mass_flow_kg_s",
+      "user_value": "20.000000"
+    },
+    {
+      "notes": "User-declared tube inlet; kernel mesh uses frozen 300 K until native inlet authority.",
+      "participates_in_rating_kernel": false,
+      "solver_parameter": "Task173 TUBE_INLET_T_K (frozen service constant)",
+      "solver_value": "300",
+      "user_field": "tube_side.inlet_temperature_k",
+      "user_value": "300.00"
+    },
+    {
+      "notes": "User-declared shell inlet; kernel mesh uses frozen 298.15 K until native inlet authority.",
+      "participates_in_rating_kernel": false,
+      "solver_parameter": "Task173 SHELL_INLET_T_K (frozen service constant)",
+      "solver_value": "298.15",
+      "user_field": "shell_side.inlet_temperature_k",
+      "user_value": "298.15"
+    },
+    {
+      "notes": "Sizing constraint only.",
+      "participates_in_rating_kernel": true,
+      "solver_parameter": "SizingRequirementAuthority.required_duty_w",
+      "solver_value": "9500",
+      "user_field": "target_duty_w",
+      "user_value": "9500"
+    },
+    {
+      "notes": "C3 reference geometry when bind_task172_c3_reference_geometry=true.",
+      "participates_in_rating_kernel": true,
+      "solver_parameter": "Task168 discrete authorities + Task171 materialization",
+      "solver_value": "native candidate chain",
+      "user_field": "candidate_constraints.*",
+      "user_value": {
+        "baffle_count": 4,
+        "baffle_spacings_m": [
+          "0.97"
+        ],
+        "shell_inside_diameter_m": "0.5",
+        "tube_lengths_m": [
+          "4.85"
+        ],
+        "tube_outer_diameter_m": "0.01905",
+        "tube_pass_count": 1,
+        "tube_pitch_m": "0.0254",
+        "tube_wall_thickness_m": "0.00165"
+      }
+    }
+  ],
+  "schema_version": "hxforge.input-to-solver-binding.v2"
+}

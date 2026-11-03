@@ -1,0 +1,45 @@
+{
+  "candidate_count": 4,
+  "candidate_space_hash": "b9e6034d14484dfdaedef509d62e46cb5880f458699f8dd0a3478bc8d853b9c4",
+  "candidates": [
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "b96292280c859f96d491010b07b6c08e5ed642a07458c66d7078d4626a177e78",
+      "candidate_id": "5a73903d-3325-5604-be3b-ba5950299893",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "43f4b70b1acfb8a20ad1b0c22bde31562700ab6754dd20e04449dca0301b8f75",
+      "candidate_id": "439cbc6e-5fdc-58ae-aaa4-e62f44b951bd",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.85"
+    },
+    {
+      "baffle_spacing_m": "0.97",
+      "candidate_hash": "ac95c8dd0ddb1619073478ad8cde651452fd8b7faf02247e437285c268f298ef",
+      "candidate_id": "fec327ba-27d9-53a3-a4f3-a5f11c25e009",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    },
+    {
+      "baffle_spacing_m": "0.98",
+      "candidate_hash": "7fe4ceee9ec66466487f60a9f9881e8948df83af3ee54770b11a255e88618a00",
+      "candidate_id": "f8b7482a-aa9f-5afc-8f0e-16f79caec9ee",
+      "disposition": "BLOCKED",
+      "status": "BLOCKED",
+      "tube_length_m": "4.90"
+    }
+  ],
+  "distinct_geometry_count": 4,
+  "notes": "Preflight VALID means Task168 request enumeration succeeded; per-candidate BLOCKED disposition is downstream evaluation, not geometry illegality.",
+  "status": "VALID",
+  "structurally_admitted_count": 0,
+  "task168_downstream_full_evaluation_status": "NOT_RUN_IN_PREFLIGHT_ONLY",
+  "task168_structural_enumeration_status": "VALID",
+  "task173_rating_status": "NOT_RUN"
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "task172.r119a.length-ownership-candidate.v1",
+  "task_id": "TASK172_V0_7_R119A_CASE_BOUND_TASK171_DEFINITION_AUTHORITY_CANDIDATE_R1",
+  "authority_id": "V07-T172-R119A-LENGTH-OWNERSHIP-R1",
+  "revision": "R1",
+  "lifecycle": "PROPOSED_AUTHORITY_REVIEW_PENDING",
+  "case_id": "V07-T172-PROJECT-ENGINEERING-REFERENCE-CASE-R1",
+  "total_heat_transfer_length_m": "6",
+  "intervals": [
+    {
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:7575ac6b556d764db3f7b8a1f81515055a872f3a84f84820427c15953f1286a0",
+      "start_m": "0",
+      "end_m": "1.2",
+      "interval_length_m": "1.2"
+    },
+    {
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:40ff00fbf966c7ae76296b6c8ac8e7e092702ef87e882eba65453e0602a3dc81",
+      "start_m": "1.2",
+      "end_m": "2.4",
+      "interval_length_m": "1.2"
+    },
+    {
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:2b645e6520590b7dcddbba43983bfbdb60609e9944e8250b38d26bd5d6e16245",
+      "start_m": "2.4",
+      "end_m": "3.6",
+      "interval_length_m": "1.2"
+    },
+    {
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:45e63641026ad06bba7d2ab1c7220b6f24d9d54d894eec3837f0188d70cbaf20",
+      "start_m": "3.6",
+      "end_m": "4.8",
+      "interval_length_m": "1.2"
+    },
+    {
+      "physical_segment_id": "urn:hxforge:r119a:physical-segment:fe343c367b607316b9d70af3c1f3a0bac5e057d8e4d6362a48b1fe89e6700760",
+      "start_m": "4.8",
+      "end_m": "6",
+      "interval_length_m": "1.2"
+    }
+  ],
+  "sum_interval_length_m": "6",
+  "length_total_closure_exact": true,
+  "evidence_refs": [
+    "docs/tasks/TASK-170-v0.7-final-review-receipt-r5.md",
+    "docs/tasks/TASK-172-v0.7-r118d-native-geometry-materialization-independent-review-r1.md",
+    "docs/tasks/TASK-172-v0.7-r119a-case-bound-task171-definition-authority-candidate-r1.md",
+    "docs/tasks/evidence/TASK-172-r118c-r9-task024-baffle-geometry-r1.json",
+    "docs/tasks/evidence/TASK-172-r118c-r9-task025-tube-side-geometry-r1.json",
+    "docs/tasks/evidence/TASK-172-r118d-native-geometry-materialization-independent-review-r1.json",
+    "docs/tasks/evidence/TASK-172-r119a-case-bound-task171-definition-authority-candidate-r1.json"
+  ],
+  "interval_length_m": [
+    "1.2",
+    "1.2",
+    "1.2",
+    "1.2",
+    "1.2"
+  ],
+  "canonical_hash": "eb9924e25bb68393642d4fa0e573fb58875bc0320d284e327f334acf0c8aa60b"
+}
