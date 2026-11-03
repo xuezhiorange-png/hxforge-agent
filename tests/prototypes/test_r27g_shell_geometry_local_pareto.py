@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -45,6 +47,21 @@ def test_r27g_classify_structural_blocked_for_065_shell() -> None:
     assert out["outcome_class"] == "STRUCTURAL_BLOCKED"
 
 
+def test_r27g_discrete_search_disclosure_in_sealed_fixture() -> None:
+    """Fast CI regression: frozen R27G disclosure and candidate coverage."""
+    fixture = (
+        Path(__file__).resolve().parents[1]
+        / "fixtures"
+        / "R27G_SHELL_GEOMETRY_LOCAL_PARETO.json"
+    )
+    report = json.loads(fixture.read_text(encoding="utf-8"))
+    assert "tube_length_m" in report["discrete_search_disclosure"]
+    assert report["local_search_budget"]["max_rating_queue"] == 12
+    assert len(report["local_search_budget"]["rated_candidate_ids"]) == 8
+    assert report["engineering_verdict"]["best_mid_band_candidate_id_prefix"] == "9c4b84db"
+
+
+@pytest.mark.slow
 def test_r27g_discrete_search_disclosure_in_report() -> None:
     case = shared_r26e_engineering_case()
     from prototypes.v07_general_rating_sizing_mvp.r27g_shell_geometry_local_pareto import (
