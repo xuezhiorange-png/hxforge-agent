@@ -1,0 +1,19 @@
+{
+  "schema_version": "hxforge.release-manifest.v1",
+  "release_version": "0.7.0rc1",
+  "git_tag": "v0.7.0-rc.1",
+  "github_release_name": "HXForge v0.7.0-rc.1",
+  "prerelease": true,
+  "release_notes_path": "docs/releases/v0.7.0-rc.1-RELEASE_NOTES.md",
+  "acceptance_path": "release_evidence/v0.7.0-rc.1/release-acceptance.md",
+  "distribution_artifacts": [
+    {
+      "filename": "heat_exchanger_design_agent-0.7.0rc1-py3-none-any.whl",
+      "sha256": "6c701e1bc4beaae56443582bc2b5b696f9fff1deff170496f1a819791a937e4d"
+    },
+    {
+      "filename": "heat_exchanger_design_agent-0.7.0rc1.tar.gz",
+      "sha256": "f82327ab1e4842aebc1d43a38dabcff6daf17cf0e2271cf340375b39c84ec112"
+    }
+  ]
+}

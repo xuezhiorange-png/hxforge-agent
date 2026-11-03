@@ -1,4 +1,4 @@
-"""Current distribution-version alignment contract for the v0.6 release lane."""
+"""Current distribution-version alignment contract for the v0.7.0-rc.1 release lane."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import tomllib
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_DISTRIBUTION_VERSION = "0.6.0"
+EXPECTED_DISTRIBUTION_VERSION = "0.7.0rc1"
 
 
 def _pyproject_version() -> str:
@@ -27,11 +27,11 @@ def _uv_lock_project_version() -> str:
     return package_records[0]["version"]
 
 
-def test_pyproject_current_distribution_version_is_v06() -> None:
+def test_pyproject_current_distribution_version_is_v07_rc1() -> None:
     assert _pyproject_version() == EXPECTED_DISTRIBUTION_VERSION
 
 
-def test_uv_lock_local_project_version_is_v06() -> None:
+def test_uv_lock_local_project_version_is_v07_rc1() -> None:
     assert _uv_lock_project_version() == EXPECTED_DISTRIBUTION_VERSION
 
 
