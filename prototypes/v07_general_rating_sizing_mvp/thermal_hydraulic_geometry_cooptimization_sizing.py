@@ -206,22 +206,25 @@ def classify_r27d_search_phases(
 
 
 def _mesh_rating_evidence_from_multi_row(row: dict[str, Any]) -> dict[str, Any]:
+    from prototypes.v07_general_rating_sizing_mvp.experimental_engineering_rating_core import (
+        ENGINEERING_NUMERIC_VALID,
+    )
+
     screening = row.get("screening_n1_status") or ""
     n1_status = row.get("n1_thermal_numeric_status")
     participation = row.get("rating_participation_status")
     full_converged = row.get("FULL_RATING_CONVERGED") is True
-    entered_mesh_ladder = full_converged or (
-        participation == "FULLY_RATED"
-        or (
-            participation in {"FULLY_RATED", "SCREENED_N1_ONLY"}
-            and screening not in ("NOT_SELECTED_FOR_RATING",)
-            and n1_status == "ENGINEERING_NUMERIC_VALID"
-        )
-    )
+    n1_valid = n1_status == ENGINEERING_NUMERIC_VALID
+    ladder_levels = row.get("mesh_ladder_levels_completed") or []
+    entered_mesh_ladder = row.get("entered_n2_n4_mesh_ladder")
+    if entered_mesh_ladder is None:
+        entered_mesh_ladder = full_converged or bool(set(ladder_levels) & {2, 4})
+    if full_converged:
+        entered_mesh_ladder = True
     if full_converged:
         outcome = "FULL_MESH_RATING_CONVERGED"
         classification = "FULL_MESH_COMPLETE"
-    elif n1_status != "ENGINEERING_NUMERIC_VALID":
+    elif not n1_valid:
         outcome = "N1_THERMAL_SCREEN_BLOCKED"
         classification = "NUMERIC_OR_INPUT_BLOCK_AT_N1"
     elif participation == "SCREENED_N1_ONLY":
@@ -239,8 +242,8 @@ def _mesh_rating_evidence_from_multi_row(row: dict[str, Any]) -> dict[str, Any]:
             screening.replace("BLOCKED_N1_", "") if screening.startswith("BLOCKED_N1_") else None
         ),
         "n1_duty_w": row.get("n1_duty_w"),
-        "entered_n2_n4_mesh_ladder": entered_mesh_ladder
-        and n1_status == "ENGINEERING_NUMERIC_VALID",
+        "mesh_ladder_levels_completed": ladder_levels,
+        "entered_n2_n4_mesh_ladder": bool(entered_mesh_ladder) and n1_valid,
         "full_rating_converged": full_converged,
         "mesh_rating_outcome": outcome,
         "mesh_rating_classification": classification,

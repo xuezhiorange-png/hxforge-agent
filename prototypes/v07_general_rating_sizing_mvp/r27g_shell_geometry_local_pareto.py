@@ -245,16 +245,12 @@ def classify_r27g_outcome(
     max_shell = Decimal(str(case.max_shell_side_pressure_drop_pa))
     sensitivity = {
         "mid_band_min_full_path_margin_pa": str(min_margin) if min_margin is not None else None,
-        "positive_margin_sensitivity": (
-            min_margin is not None and min_margin > Decimal("0")
-        ),
+        "positive_margin_sensitivity": (min_margin is not None and min_margin > Decimal("0")),
         "margin_ge_5pct_max_dp_sensitivity": (
-            min_margin is not None
-            and min_margin >= Decimal("0.05") * min(max_tube, max_shell)
+            min_margin is not None and min_margin >= Decimal("0.05") * min(max_tube, max_shell)
         ),
         "margin_ge_10pct_max_dp_sensitivity": (
-            min_margin is not None
-            and min_margin >= Decimal("0.10") * min(max_tube, max_shell)
+            min_margin is not None and min_margin >= Decimal("0.10") * min(max_tube, max_shell)
         ),
         "disclosure": "5% and 10% tiers are sensitivity filters only—not manufacturing acceptance.",
     }
@@ -362,9 +358,7 @@ def run_r27g_shell_geometry_local_pareto(
                     postpass=postpass,
                     loss_scenario_key=scenario_key,
                 )
-        constraints = (
-            _constraint_summary(multi_row, target_duty_w=target_duty) if multi_row else {}
-        )
+        constraints = _constraint_summary(multi_row, target_duty_w=target_duty) if multi_row else {}
         classification = classify_r27g_outcome(
             record=record,
             multi_row=multi_row,
@@ -390,9 +384,7 @@ def run_r27g_shell_geometry_local_pareto(
                 _mesh_rating_evidence_from_multi_row(multi_row) if multi_row else None
             ),
             "geometry": _geometry_report_block(row=multi_row, case=case) if multi_row else {},
-            "thermal_rating": (
-                _thermal_block_from_row(multi_row, case=case) if multi_row else {}
-            ),
+            "thermal_rating": (_thermal_block_from_row(multi_row, case=case) if multi_row else {}),
             "constraints": constraints,
             "internal_hydraulic_satisfied": _internal_hydraulic_satisfied(constraints),
             "loss_scenario_results": scenario_results,
@@ -467,7 +459,8 @@ def run_r27g_shell_geometry_local_pareto(
                 best_row["candidate_id_prefix"] if best_row else None
             ),
             "joint_shell_baffle_ladder_can_deliver_mid_band_positive_margin_at_330kw": (
-                best_gap is not None and best_gap > Decimal("0")
+                best_gap is not None
+                and best_gap > Decimal("0")
                 and best_row is not None
                 and (best_row.get("constraints") or {}).get("duty_constraint") == "SATISFIED"
             ),

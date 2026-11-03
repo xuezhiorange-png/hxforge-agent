@@ -206,14 +206,19 @@ def _candidate_report_row(
     if package:
         row["engineering_delivery_receipt"] = receipt
         postpass = package.get("live_thermal_state_hydraulic_postpass") or {}
+        mesh = package.get("mesh_convergence") or {}
+        results = mesh.get("results") or {}
+        ladder_levels = sorted(level for level in (1, 2, 4) if level in results)
+        row["mesh_ladder_levels_completed"] = ladder_levels
+        row["entered_n2_n4_mesh_ladder"] = bool(set(ladder_levels) & {2, 4}) or bool(
+            mesh.get("FULL_RATING_CONVERGED")
+        )
         from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_dp_breakdown import (
             build_hydraulic_dp_breakdown,
         )
 
         row["hydraulic_dp_breakdown"] = build_hydraulic_dp_breakdown(postpass, case=case)
         row["live_thermal_state_hydraulic_postpass"] = postpass
-        mesh = package.get("mesh_convergence") or {}
-        results = mesh.get("results") or {}
         for level in (4, 2, 1):
             res = results.get(level)
             meta = getattr(res, "mesh_metadata", None) if res is not None else None
