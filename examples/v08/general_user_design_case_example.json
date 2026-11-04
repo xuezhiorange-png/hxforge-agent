@@ -1,0 +1,26 @@
+{
+  "schema_version": "hxforge.general-user-design-case.v1",
+  "engineering_case_id": "v08-example-mid-duty-no-geometry",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 45, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 14.5, "unit": "kg/s"}
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 22, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 18.0, "unit": "kg/s"}
+  },
+  "target_heat_duty": {"value": 250, "unit": "kW"},
+  "max_tube_side_pressure_drop": {"value": 40, "unit": "kPa"},
+  "max_shell_side_pressure_drop": {"value": 35, "unit": "kPa"},
+  "design_envelope": {
+    "max_shell_inside_diameter_m": "1.2",
+    "max_tube_length_m": "6.0",
+    "provenance_note": "User installation limit only; no reference exchanger geometry."
+  },
+  "notes": "V08-01 example: no tube count, shell ID ladder, or baffle table required."
+}
