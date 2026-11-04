@@ -692,3 +692,21 @@ The following rows record the post-merge governance evidence for PR #98 (`codex/
 | TASK-019 Slice 2 implementation Closeout verdict (audit chain) | `TASK019_SLICE2_PR98_MERGED_POSTMERGE_MAIN_CI_SUCCESS_ISSUE97_CLOSED_NO_TASK020_NO_ISSUE23_TOUCH` (Slice 2 head `0361448e21a…`; P0 fix commit on top of base `51aeec99…`; PR #98 merge `df3f0bc69c…`; PR-head CI `28924292431` success; post-merge main CI `28925861092` success; Issue #97 closed completed at `2026-07-08T07:55:21Z`; no TASK-020+; no Issue #23 / #93 / #94 / #95 mutation; Feishu not sent) |
 | TASK-019 Slice 2 implementation Closeout PR body refresh verdict (final) | `TASK019_SLICE2_CLOSEOUT_GOVSYNC_DRAFT_PR_CREATED_DOCS_ONLY_READY_MERGE_NOT_AUTHORIZED` (this round; docs-only; closeout PR remains Draft pending Charles Ready / merge authorization) |
 
+## V08 — General-case automatic shell-and-tube design (PLANNING / NOT AUTHORIZED FOR IMPLEMENTATION)
+
+Version scope charter: [V08_VERSION_SCOPE_AND_ACCEPTANCE_R1.md](tasks/V08_VERSION_SCOPE_AND_ACCEPTANCE_R1.md); governing Issue [#318](https://github.com/xuezhiorange-png/hxforge-agent/issues/318).
+V07 baseline: published `v0.7.0-rc.1` @ `64b2ee3734395878e97a46e63c2ef505da4148d5` (main CI SUCCESS).
+**This section is a proposal until the V08-00 documentation PR is merged. It does not authorize implementation, release, changes to V07, or main merges.**
+
+| ID | Finite version task | Status | Depends on |
+|---|---|---|---|
+| V08-00 | Freeze V08 scope, user contract, independent acceptance and stop rules | DRAFT_FOR_REVIEW | V07 release |
+| V08-01 | General-case input/validation, unit mapping, supported envelope | PLANNED / NOT_AUTHORIZED | V08-00 |
+| V08-02 | Bounded catalog geometry candidate generation | PLANNED / NOT_AUTHORIZED | V08-01 |
+| V08-03 | Live candidate thermal sizing/rating, energy balance, convergence | PLANNED / NOT_AUTHORIZED | V08-02 |
+| V08-04 | Tube/shell full-path Δp, nozzle co-selection and K-assumption classification | PLANNED / NOT_AUTHORIZED | V08-03 |
+| V08-05 | Qualified Top-N decision and CLI/API engineering report | PLANNED / NOT_AUTHORIZED | V08-04 |
+| V08-06 | Independent multi-case live E2E / regression / performance acceptance | PLANNED / NOT_AUTHORIZED | V08-05 |
+| V08-07 | Release-candidate closeout, separate release authorization | PLANNED / NOT_AUTHORIZED | V08-06 |
+
+Version-level acceptance: R0 frozen 330 kW regression plus at least 3 independently pre-registered non-reference physically feasible water/water cases; 2 distinct blocked/infeasible cases; 4 metamorphic tests. All feasible results must satisfy the stated duty, tube/shell **full-path** Δp, nozzle velocity, geometry, provider/model and assumption-disclosure gates. See the charter for detailed criteria.
