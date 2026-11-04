@@ -69,7 +69,9 @@ def build_solver_handoff(
         "tube_mass_flow_kg_s": format_engineering_decimal(case.tube_side.mass_flow_kg_s),
         "shell_mass_flow_kg_s": format_engineering_decimal(case.shell_side.mass_flow_kg_s),
         "tube_inlet_temperature_k": format_engineering_decimal(case.tube_side.inlet_temperature_k),
-        "shell_inlet_temperature_k": format_engineering_decimal(case.shell_side.inlet_temperature_k),
+        "shell_inlet_temperature_k": format_engineering_decimal(
+            case.shell_side.inlet_temperature_k
+        ),
         "tube_inlet_pressure_pa": format_engineering_decimal(case.tube_side.inlet_pressure_pa),
         "shell_inlet_pressure_pa": format_engineering_decimal(case.shell_side.inlet_pressure_pa),
         "target_duty_w": format_engineering_decimal(case.target_duty_w),
