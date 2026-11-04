@@ -514,6 +514,12 @@ shards:
       - tests/prototypes/test_v07_version_delivery_classification.py
       - tests/prototypes/test_v07_final_live_e2e_delivery.py
     timeout: 7200
+  - name: v08-01-general-user-case
+    job: shard-v08-01-general-user-case
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_general_user_case.py
+    timeout: 900
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension
     python: ["3.11", "3.12"]
