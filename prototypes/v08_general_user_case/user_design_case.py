@@ -7,7 +7,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from hexagent.domain.quantities import (
     AbsolutePressure,
@@ -55,6 +55,23 @@ class OptionalDesignEnvelopeConstraints(BaseModel):
         default="",
         description="Document why bounds were supplied; no implicit fixture defaults.",
     )
+
+    @field_validator(
+        "max_shell_inside_diameter_m",
+        "min_shell_inside_diameter_m",
+        "max_tube_length_m",
+        "min_tube_length_m",
+        "max_overall_length_m",
+    )
+    @classmethod
+    def positive_finite_optional_dimension(
+        cls, value: Decimal | None, info: ValidationInfo
+    ) -> Decimal | None:
+        if value is None:
+            return None
+        if not value.is_finite() or value <= 0:
+            raise ValueError(f"{info.field_name} must be a positive finite decimal")
+        return value
 
     @model_validator(mode="after")
     def bounds_consistent(self) -> Self:

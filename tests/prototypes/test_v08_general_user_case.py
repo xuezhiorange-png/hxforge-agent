@@ -153,3 +153,117 @@ def test_v07_330kw_fixture_still_loads_with_geometry_constraints() -> None:
     status, detail = case.applicability_status()
     assert status == "IN_SCOPE", detail
     assert case.target_duty_w == Decimal("330000")
+
+
+_DESIGN_ENVELOPE_FIELDS = (
+    "max_shell_inside_diameter_m",
+    "min_shell_inside_diameter_m",
+    "max_tube_length_m",
+    "min_tube_length_m",
+    "max_overall_length_m",
+)
+
+
+def _payload_with_design_envelope(**fields: object) -> dict:
+    payload = _load_v08()
+    payload["design_envelope"] = {"provenance_note": "validation test", **fields}
+    return payload
+
+
+@pytest.mark.parametrize("field", _DESIGN_ENVELOPE_FIELDS)
+def test_v08_design_envelope_rejects_negative_dimension(field: str) -> None:
+    payload = _payload_with_design_envelope(**{field: "-0.5"})
+    with pytest.raises((ValidationError, V08UserCaseValidationError)):
+        _handoff_for(payload)
+
+
+@pytest.mark.parametrize("field", _DESIGN_ENVELOPE_FIELDS)
+def test_v08_design_envelope_rejects_zero_dimension(field: str) -> None:
+    payload = _payload_with_design_envelope(**{field: "0"})
+    with pytest.raises((ValidationError, V08UserCaseValidationError)):
+        _handoff_for(payload)
+
+
+@pytest.mark.parametrize(
+    ("field", "raw_value"),
+    [
+        (field, bad)
+        for field in _DESIGN_ENVELOPE_FIELDS
+        for bad in ("NaN", "Infinity", "-Infinity", "nan", "inf")
+    ],
+)
+def test_v08_design_envelope_rejects_non_finite_literals(field: str, raw_value: str) -> None:
+    payload = _payload_with_design_envelope(**{field: raw_value})
+    with pytest.raises((ValidationError, V08UserCaseValidationError)):
+        _handoff_for(payload)
+
+
+def test_v08_design_envelope_rejects_min_shell_exceeds_max_shell() -> None:
+    payload = _payload_with_design_envelope(
+        min_shell_inside_diameter_m="1.0",
+        max_shell_inside_diameter_m="0.8",
+    )
+    with pytest.raises((ValidationError, V08UserCaseValidationError)) as exc:
+        _handoff_for(payload)
+    err = exc.value
+    if isinstance(err, V08UserCaseValidationError):
+        assert any("min_shell" in issue.message for issue in err.issues)
+    else:
+        assert "min_shell_inside_diameter_m" in str(err)
+
+
+def test_v08_design_envelope_rejects_min_tube_length_exceeds_max() -> None:
+    payload = _payload_with_design_envelope(
+        min_tube_length_m="6.0",
+        max_tube_length_m="4.0",
+    )
+    with pytest.raises((ValidationError, V08UserCaseValidationError)):
+        _handoff_for(payload)
+
+
+def test_v08_design_envelope_accepts_equal_min_max_bounds() -> None:
+    payload = _payload_with_design_envelope(
+        min_shell_inside_diameter_m="0.9",
+        max_shell_inside_diameter_m="0.9",
+        min_tube_length_m="5.0",
+        max_tube_length_m="5.0",
+    )
+    result = _handoff_for(payload)
+    assert result.normalized.design_envelope is not None
+    assert result.handoff.downstream_readiness == "THERMAL_HYDRAULIC_PARAMETERS_READY"
+
+
+def test_v08_design_envelope_all_none_omitted_passes() -> None:
+    payload = _load_v08()
+    payload.pop("design_envelope", None)
+    result = _handoff_for(payload)
+    assert result.normalized.design_envelope is None
+
+
+def test_v08_design_envelope_accepts_valid_positive_bounds() -> None:
+    payload = _payload_with_design_envelope(
+        min_shell_inside_diameter_m="0.4",
+        max_shell_inside_diameter_m="1.2",
+        min_tube_length_m="3.0",
+        max_tube_length_m="6.5",
+        max_overall_length_m="7.0",
+    )
+    result = _handoff_for(payload)
+    env = result.normalized.design_envelope
+    assert env is not None
+    assert env.max_overall_length_m == Decimal("7.0")
+
+
+def test_v08_design_envelope_invalid_value_never_reaches_solver_handoff() -> None:
+    payload = _payload_with_design_envelope(max_tube_length_m="-1")
+    with pytest.raises((ValidationError, V08UserCaseValidationError)):
+        validate_and_build_solver_handoff(
+            load_general_user_design_case_json(json.dumps(payload)),
+            CoolPropProvider(),
+        )
+
+
+def test_v08_design_envelope_rejects_non_numeric_string() -> None:
+    payload = _payload_with_design_envelope(max_shell_inside_diameter_m="not-a-number")
+    with pytest.raises(ValidationError):
+        load_general_user_design_case_json(json.dumps(payload))
