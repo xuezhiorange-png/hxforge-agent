@@ -1,0 +1,28 @@
+{
+  "schema_version": "hxforge.v08-general-geometry-discrete-space.v1",
+  "authority_id": "V08-GENERAL-GEOMETRY-DISCRETE-SPACE-R1",
+  "authority_version": "R1",
+  "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
+  "approval_status": "APPROVED",
+  "disclosure": "V08-02 case-driven geometry search space. Not the V07 R27H experimental ladder or 330 kW acceptance fixture.",
+  "evidence_refs": [
+    "docs/tasks/V08_VERSION_SCOPE_AND_ACCEPTANCE_R1.md#6",
+    "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-catalog-r1.json"
+  ],
+  "tube_geometry": {
+    "tube_outer_diameter_m": "0.01905",
+    "tube_wall_thickness_m": "0.00165",
+    "tube_pitch_m": "0.0254",
+    "tube_layout": "LAYOUT_30_DEG",
+    "tube_pass_counts": [1]
+  },
+  "shell_inside_diameters_m": ["0.45", "0.52", "0.58"],
+  "tube_baffle_ladder": [
+    {"tube_length_m": "4.50", "baffle_spacing_m": "0.90", "baffle_count": 4},
+    {"tube_length_m": "5.00", "baffle_spacing_m": "1.00", "baffle_count": 4},
+    {"tube_length_m": "5.50", "baffle_spacing_m": "1.10", "baffle_count": 4}
+  ],
+  "baffle_type": "SINGLE_SEGMENTAL",
+  "baffle_cut": "0.25",
+  "construction_family": "FIXED_TUBESHEET"
+}

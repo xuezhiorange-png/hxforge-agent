@@ -520,6 +520,12 @@ shards:
     files:
       - tests/prototypes/test_v08_general_user_case.py
     timeout: 900
+  - name: v08-02-geometry-candidate-generation
+    job: shard-v08-02-geometry-candidate-generation
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_geometry_candidate_generation.py
+    timeout: 3600
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension
     python: ["3.11", "3.12"]
