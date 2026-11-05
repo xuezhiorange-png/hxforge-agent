@@ -71,9 +71,7 @@ def filter_discrete_space_by_envelope(
         ladder = [step for step in ladder if step.tube_length_m <= envelope.max_tube_length_m]
         messages.append("applied max_tube_length_m")
     if envelope.max_overall_length_m is not None:
-        ladder = [
-            step for step in ladder if step.tube_length_m <= envelope.max_overall_length_m
-        ]
+        ladder = [step for step in ladder if step.tube_length_m <= envelope.max_overall_length_m]
         messages.append("applied max_overall_length_m")
     if not shells or not ladder:
         filtered = replace(
@@ -120,8 +118,14 @@ def build_v08_task168_request(
         ("target_duty_w", handoff.consumable_parameters.get("target_duty_w", "")),
         ("tube_mass_flow_kg_s", handoff.consumable_parameters.get("tube_mass_flow_kg_s", "")),
         ("shell_mass_flow_kg_s", handoff.consumable_parameters.get("shell_mass_flow_kg_s", "")),
-        ("max_tube_side_dp_pa", handoff.pressure_limits_pa.get("max_tube_side_pressure_drop_pa", "")),
-        ("max_shell_side_dp_pa", handoff.pressure_limits_pa.get("max_shell_side_pressure_drop_pa", "")),
+        (
+            "max_tube_side_dp_pa",
+            handoff.pressure_limits_pa.get("max_tube_side_pressure_drop_pa", ""),
+        ),
+        (
+            "max_shell_side_dp_pa",
+            handoff.pressure_limits_pa.get("max_shell_side_pressure_drop_pa", ""),
+        ),
         ("geometry_source_authority", space.authority_id),
         ("geometry_source_content_hash", space.content_hash),
     )
@@ -188,9 +192,7 @@ def _apply_v08_discrete_authorities(
         DiscreteDimensionRole.BAFFLE_TYPE: (space.baffle_type,),
         DiscreteDimensionRole.BAFFLE_CUT: (space.baffle_cut,),
         DiscreteDimensionRole.BAFFLE_SPACING: space.baffle_spacings_m,
-        DiscreteDimensionRole.BAFFLE_COUNT: (
-            space.tube_baffle_ladder[0].baffle_count,
-        ),
+        DiscreteDimensionRole.BAFFLE_COUNT: (space.tube_baffle_ladder[0].baffle_count,),
     }
     authorities: list[DiscreteCandidateSetAuthority] = []
     for authority in request.discrete_candidate_set_authorities:
@@ -230,9 +232,7 @@ def _bind_handoff_to_evaluation_templates(
     mass["mass_flow_rate_kg_s"] = shell_mass
     check032 = dict(task032_template)
     check032["mass_flow_authority"] = mass
-    mass["authority_hash"] = mass_flow_authority_hash(
-        parse_task032(check032).mass_flow_authority
-    )
+    mass["authority_hash"] = mass_flow_authority_hash(parse_task032(check032).mass_flow_authority)
 
     task160_template = cast(dict[str, Any], deepcopy(evaluation.task160_request_template))
     streams = list(cast(list[dict[str, Any]], task160_template["stream_records"]))
