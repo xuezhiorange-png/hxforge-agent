@@ -55,7 +55,9 @@ def bind_process_parameters(handoff: V08SolverHandoffV1) -> V08BoundProcessParam
         tube_inlet_temperature_k=str(params["tube_inlet_temperature_k"]),
         shell_inlet_temperature_k=str(params["shell_inlet_temperature_k"]),
         target_duty_w=str(params["target_duty_w"]),
-        max_tube_side_pressure_drop_pa=str(handoff.pressure_limits_pa["max_tube_side_pressure_drop_pa"]),
+        max_tube_side_pressure_drop_pa=str(
+            handoff.pressure_limits_pa["max_tube_side_pressure_drop_pa"]
+        ),
         max_shell_side_pressure_drop_pa=str(
             handoff.pressure_limits_pa["max_shell_side_pressure_drop_pa"]
         ),

@@ -83,9 +83,7 @@ def verify_discrete_space_payload(payload: dict[str, Any]) -> None:
     shell_approval = str(shell_auth.get("approval_status", ""))
     if not shell_approval.startswith("APPROVED"):
         raise ValueError("shell/ladder authority is not approved for V08-02")
-    auth_shells = [
-        Decimal(str(row["value_m"])) for row in shell_auth["shell_inside_diameters_m"]
-    ]
+    auth_shells = [Decimal(str(row["value_m"])) for row in shell_auth["shell_inside_diameters_m"]]
     payload_shells = [Decimal(str(value)) for value in payload["shell_inside_diameters_m"]]
     if auth_shells != payload_shells:
         raise ValueError("shell_inside_diameters_m inconsistent with shell/ladder authority")

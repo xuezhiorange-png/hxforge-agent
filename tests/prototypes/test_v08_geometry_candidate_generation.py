@@ -75,7 +75,6 @@ def test_v08_02_envelope_narrowing_changes_candidate_set() -> None:
     )
     assert filtered.shell_inside_diameters_m == (Decimal("0.45"),)
 
-
     tight_case = normalized.model_copy(
         update={
             "design_envelope": OptionalDesignEnvelopeConstraints(
