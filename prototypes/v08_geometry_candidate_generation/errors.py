@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 
+class V08GeometryGenerationBlocked(Exception):
+    """Structured block; carries audit codes in evidence."""
 
-@dataclass(frozen=True)
-class V08GeometryGenerationBlocked:
     code: str
     message: str
     evidence: dict[str, str]
+
+    def __init__(self, code: str, message: str, evidence: dict[str, str]) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.evidence = evidence

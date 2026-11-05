@@ -1,0 +1,42 @@
+{
+  "schema_version": "hxforge.v08-02-engineering-audit-closeout.v1",
+  "task_id": "V08_02_ENGINEERING_AUDIT_CLOSEOUT",
+  "audit_date_utc": "2026-11-05",
+  "geometry_source_authority": "V08-GENERAL-GEOMETRY-DISCRETE-SPACE-R1",
+  "dimension_traceability": [
+    {
+      "dimension": "tube_outer_diameter_m",
+      "value_m": "0.01905",
+      "engineering_basis": "TASK-172-r117 approved catalog record tube/v07-t172-engineering-reference/od01905-id01575/r1",
+      "certification_claim": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY; NO_STANDARD_CLAIM"
+    },
+    {
+      "dimension": "tube_wall_thickness_m",
+      "value_m": "0.00165",
+      "engineering_basis": "Same TASK-172 catalog record (wall_thickness_m)",
+      "certification_claim": "PROJECT_INTERNAL_ENGINEERING_AUTHORITY"
+    },
+    {
+      "dimension": "tube_pitch_m",
+      "value_m": "0.0254",
+      "engineering_basis": "V08-TRIANGULAR-PITCH-FOUR_THIRDS-OD-R1 verified as 4/3 * tube OD at parse time",
+      "certification_claim": "V08 project binding rule; not manufacturer catalog pitch"
+    },
+    {
+      "dimension": "shell_inside_diameters_m",
+      "values_m": ["0.45", "0.52", "0.58"],
+      "engineering_basis": "V08-02-shell-and-ladder-discrete-authority-r1.json",
+      "certification_claim": "V08_PROJECT_EXPERIMENTAL_DISCRETE_SEARCH; NOT TEMA/manufacturer certified"
+    },
+    {
+      "dimension": "tube_baffle_ladder",
+      "engineering_basis": "V08-TBAFFLE-LADDER-RULE-FIVE-SPACING-R1 (length = 5 * spacing, baffle_count = 4)",
+      "certification_claim": "V08 experimental discrete ladder only"
+    }
+  ],
+  "task168_template_dependency": "Producer-chain templates from build_implementation_validation_task168_reference; dimensions overwritten from V08 discrete space; process parameters from V08SolverHandoffV1 via bind_process_parameters (no silent defaults); per-candidate Task021 envelope from shell ID when R13 opt-in set.",
+  "residual_limitations": [
+    "Non-geometry Task168 evaluation templates (local loss tables, screening snapshots) remain implementation-validation wiring until a production-neutral producer factory exists.",
+    "Shell/ladder diameters are V08 experimental discrete sets, not fabrication-approved catalog sizes."
+  ]
+}

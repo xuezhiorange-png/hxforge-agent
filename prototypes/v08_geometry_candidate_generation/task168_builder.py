@@ -44,6 +44,11 @@ from prototypes.v08_geometry_candidate_generation.discrete_space import (
     V08DiscreteSpaceAuthority,
     format_engineering_decimal,
 )
+from prototypes.v08_geometry_candidate_generation.errors import V08GeometryGenerationBlocked
+from prototypes.v08_geometry_candidate_generation.parameter_binding import (
+    V08BoundProcessParameters,
+    bind_process_parameters,
+)
 
 _V08_SPACE_ID = "V08-GENERAL-GEOMETRY-DISCRETE-SPACE-R1"
 
@@ -94,10 +99,15 @@ def build_v08_task168_request(
     space: V08DiscreteSpaceAuthority,
 ) -> Task168Request:
     if handoff.normalized_input_hash != canonical_sha256(normalized.input_snapshot_dict()):
-        raise ValueError("handoff normalized_input_hash does not match user case")
+        raise V08GeometryGenerationBlocked(
+            code="BLOCKED_USER_PARAMETER_BINDING",
+            message="handoff normalized_input_hash does not match user case",
+            evidence={"handoff_hash": handoff.normalized_input_hash},
+        )
     if not space.shell_inside_diameters_m or not space.tube_baffle_ladder:
         raise ValueError("discrete space empty after envelope filtering")
 
+    bound = bind_process_parameters(handoff)
     first_shell = space.shell_inside_diameters_m[0]
     first_ladder = space.tube_baffle_ladder[0]
     reference = build_implementation_validation_task168_reference(
@@ -111,20 +121,20 @@ def build_v08_task168_request(
     )
     reference = _apply_multi_shell_catalog(reference, space.shell_inside_diameters_m)
     reference = _apply_v08_discrete_authorities(reference, space)
-    reference = _bind_handoff_to_evaluation_templates(reference, handoff)
+    reference = _bind_handoff_to_evaluation_templates(reference, bound)
     metadata = (
         ("v08_task_id", "V08_02_AUTOMATIC_GEOMETRY_GENERATION"),
         ("normalized_input_hash", handoff.normalized_input_hash),
-        ("target_duty_w", handoff.consumable_parameters.get("target_duty_w", "")),
-        ("tube_mass_flow_kg_s", handoff.consumable_parameters.get("tube_mass_flow_kg_s", "")),
-        ("shell_mass_flow_kg_s", handoff.consumable_parameters.get("shell_mass_flow_kg_s", "")),
+        ("target_duty_w", bound.target_duty_w),
+        ("tube_mass_flow_kg_s", bound.tube_mass_flow_kg_s),
+        ("shell_mass_flow_kg_s", bound.shell_mass_flow_kg_s),
         (
             "max_tube_side_dp_pa",
-            handoff.pressure_limits_pa.get("max_tube_side_pressure_drop_pa", ""),
+            bound.max_tube_side_pressure_drop_pa,
         ),
         (
             "max_shell_side_dp_pa",
-            handoff.pressure_limits_pa.get("max_shell_side_pressure_drop_pa", ""),
+            bound.max_shell_side_pressure_drop_pa,
         ),
         ("geometry_source_authority", space.authority_id),
         ("geometry_source_content_hash", space.content_hash),
@@ -217,21 +227,39 @@ def _apply_v08_discrete_authorities(
     return replace(request, discrete_candidate_set_authorities=tuple(authorities))
 
 
+def read_task168_bound_process_inputs(request: Task168Request) -> dict[str, str]:
+    """Expose bound process parameters from a built Task168 request (for audit tests)."""
+    evaluation = request.evaluation_input_authority
+    mass = str(evaluation.task032_mass_flow_authority["mass_flow_rate_kg_s"])
+    tube_mass = str(evaluation.task026_request.mass_flow_rate_kg_s)
+    task160 = evaluation.task160_request_template
+    streams = task160["stream_records"]
+    tube_t = str(streams[0]["inlet_temperature_k"])
+    shell_t = str(streams[1]["inlet_temperature_k"])
+    meta = dict(request.request_metadata)
+    return {
+        "shell_mass_flow_kg_s": mass,
+        "tube_mass_flow_kg_s": tube_mass,
+        "tube_inlet_temperature_k": tube_t,
+        "shell_inlet_temperature_k": shell_t,
+        "target_duty_w": meta.get("target_duty_w", ""),
+    }
+
+
 def _bind_handoff_to_evaluation_templates(
-    request: Task168Request, handoff: V08SolverHandoffV1
+    request: Task168Request, bound: V08BoundProcessParameters
 ) -> Task168Request:
     evaluation = request.evaluation_input_authority
-    params = handoff.consumable_parameters
-    shell_mass = params.get("shell_mass_flow_kg_s", "20")
-    tube_mass = params.get("tube_mass_flow_kg_s", "14.5")
-    shell_t_k = params.get("shell_inlet_temperature_k", "295.15")
-    tube_t_k = params.get("tube_inlet_temperature_k", "318.15")
+    shell_mass = bound.shell_mass_flow_kg_s
+    tube_mass = bound.tube_mass_flow_kg_s
+    shell_t_k = bound.shell_inlet_temperature_k
+    tube_t_k = bound.tube_inlet_temperature_k
 
     task032_template = cast(dict[str, Any], deepcopy(evaluation.task032_request_template))
     mass = dict(task032_template["mass_flow_authority"])
     mass["mass_flow_rate_kg_s"] = shell_mass
+    task032_template["mass_flow_authority"] = mass
     check032 = dict(task032_template)
-    check032["mass_flow_authority"] = mass
     mass["authority_hash"] = mass_flow_authority_hash(parse_task032(check032).mass_flow_authority)
 
     task160_template = cast(dict[str, Any], deepcopy(evaluation.task160_request_template))
@@ -246,8 +274,8 @@ def _bind_handoff_to_evaluation_templates(
         task160_template["stream_records"] = streams
 
     task031_template = cast(dict[str, Any], deepcopy(evaluation.task031_request_template))
-    if "mass_flow_rate_kg_s" in task031_template:
-        task031_template["mass_flow_rate_kg_s"] = tube_mass
+    task026_request = evaluation.task026_request
+    task026_request = replace(task026_request, mass_flow_rate_kg_s=Decimal(tube_mass))
 
     evaluation = replace(
         evaluation,
@@ -255,6 +283,7 @@ def _bind_handoff_to_evaluation_templates(
         task032_mass_flow_authority=mass,
         task160_request_template=task160_template,
         task031_request_template=task031_template,
+        task026_request=task026_request,
         canonical_hash="",
     )
     evaluation = replace(evaluation, canonical_hash=evaluation_input_authority_hash(evaluation))

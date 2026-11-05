@@ -1,0 +1,54 @@
+{
+  "schema_version": "hxforge.v08-shell-ladder-discrete-authority.v1",
+  "authority_id": "V08-SHELL-LADDER-DISCRETE-AUTHORITY-R1",
+  "authority_version": "R1",
+  "authorization_class": "V08_PROJECT_EXPERIMENTAL_DISCRETE_SEARCH",
+  "approval_status": "APPROVED_FOR_V08_02_GEOMETRY_SEARCH_ONLY",
+  "disclosure": "NOT manufacturer-certified shell sizes or TEMA catalog data. Bounded discrete search ladder for V08-02 structural candidate generation only.",
+  "evidence_refs": [
+    "docs/tasks/V08_VERSION_SCOPE_AND_ACCEPTANCE_R1.md#6",
+    "https://github.com/xuezhiorange-png/hxforge-agent/issues/322"
+  ],
+  "shell_inside_diameters_m": [
+    {
+      "value_m": "0.45",
+      "nominal_label": "V08-experimental-shell-ID-450mm",
+      "source_id": "V08-SHELL-DISCRETE-450-R1",
+      "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+    },
+    {
+      "value_m": "0.52",
+      "nominal_label": "V08-experimental-shell-ID-520mm",
+      "source_id": "V08-SHELL-DISCRETE-520-R1",
+      "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+    },
+    {
+      "value_m": "0.58",
+      "nominal_label": "V08-experimental-shell-ID-580mm",
+      "source_id": "V08-SHELL-DISCRETE-580-R1",
+      "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+    }
+  ],
+  "tube_baffle_ladder_rule_id": "V08-TBAFFLE-LADDER-RULE-FIVE-SPACING-R1",
+  "tube_baffle_ladder_rule": {
+    "description": "Fixed baffle_count with tube_length_m equal to five times baffle_spacing_m (segmental layout spacing ladder).",
+    "baffle_count_fixed": 4,
+    "length_to_spacing_ratio": "5",
+    "allowed_steps": [
+      {"tube_length_m": "4.50", "baffle_spacing_m": "0.90", "baffle_count": 4},
+      {"tube_length_m": "5.00", "baffle_spacing_m": "1.00", "baffle_count": 4},
+      {"tube_length_m": "5.50", "baffle_spacing_m": "1.10", "baffle_count": 4}
+    ]
+  },
+  "baffle_segmental": {
+    "baffle_type": "SINGLE_SEGMENTAL",
+    "baffle_cut": "0.25",
+    "source_id": "V08-BAFFLE-SEGMENTAL-DEFAULT-R1",
+    "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+  },
+  "construction_family": {
+    "value": "FIXED_TUBESHEET",
+    "source_id": "V08-CONSTRUCTION-FIXED-TUBESHEET-R1",
+    "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+  }
+}

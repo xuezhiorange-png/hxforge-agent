@@ -105,6 +105,8 @@ def generate_geometry_candidates(
 
     try:
         t168 = build_v08_task168_request(normalized, handoff, filtered_space)
+    except V08GeometryGenerationBlocked as exc:
+        return _blocked_result(normalized, handoff, exc, space=filtered_space)
     except ValueError as exc:
         blocked = V08GeometryGenerationBlocked(
             code="BLOCKED_GEOMETRY_SOURCE",
@@ -281,6 +283,12 @@ def _base_result_fields(
     }
 
 
+def _blocked_status(code: str) -> str:
+    if code == "BLOCKED_USER_PARAMETER_BINDING":
+        return "BLOCKED_USER_PARAMETER_BINDING"
+    return "BLOCKED_GEOMETRY_SOURCE"
+
+
 def _blocked_result(
     normalized: NormalizedUserDesignCase,
     handoff: V08SolverHandoffV1,
@@ -297,11 +305,11 @@ def _blocked_result(
         geometry_source_content_hash=content_hash,
         downstream_readiness=handoff.downstream_readiness,
         preserved_search_parameters=_preserved_search_parameters(handoff),
-        status="BLOCKED_GEOMETRY_SOURCE",
+        status=_blocked_status(blocked.code),
         rejections=(
             V08GeometryRejectionRecord(
-                candidate_id="GEOMETRY_SOURCE",
-                failure_stage="V08_GEOMETRY_SOURCE",
+                candidate_id=blocked.code,
+                failure_stage=blocked.code,
                 reason_codes=(blocked.code,),
                 evidence={"message": blocked.message, **blocked.evidence},
             ),

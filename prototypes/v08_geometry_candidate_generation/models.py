@@ -12,6 +12,7 @@ V08GeometryGenerationStatus = Literal[
     "OK",
     "NO_STRUCTURAL_CANDIDATE",
     "BLOCKED_GEOMETRY_SOURCE",
+    "BLOCKED_USER_PARAMETER_BINDING",
 ]
 
 ThermalRatingStatus = Literal["THERMAL_RATING_PENDING", "NOT_IN_SCOPE"]

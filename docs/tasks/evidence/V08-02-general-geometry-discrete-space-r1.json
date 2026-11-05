@@ -3,12 +3,24 @@
   "authority_id": "V08-GENERAL-GEOMETRY-DISCRETE-SPACE-R1",
   "authority_version": "R1",
   "source_class": "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET",
-  "approval_status": "APPROVED",
-  "disclosure": "V08-02 case-driven geometry search space. Not the V07 R27H experimental ladder or 330 kW acceptance fixture.",
+  "approval_status": "APPROVED_FOR_V08_02_GEOMETRY_SEARCH_ONLY",
+  "authorization_disclosure": "V08-02 bounded geometry search only. Tube sizes trace to TASK-172 internal engineering catalog. Shell/ladder/baffle discrete values are V08 project experimental sets — not manufacturer or TEMA certification.",
   "evidence_refs": [
     "docs/tasks/V08_VERSION_SCOPE_AND_ACCEPTANCE_R1.md#6",
-    "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-catalog-r1.json"
+    "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-catalog-r1.json",
+    "docs/tasks/evidence/V08-02-shell-and-ladder-discrete-authority-r1.json",
+    "https://github.com/xuezhiorange-png/hxforge-agent/issues/322"
   ],
+  "tube_geometry_catalog_binding": {
+    "catalog_path": "docs/tasks/evidence/TASK-172-r117-approved-tube-geometry-catalog-r1.json",
+    "record_geometry_id": "tube/v07-t172-engineering-reference/od01905-id01575/r1",
+    "tube_layout": "LAYOUT_30_DEG",
+    "tube_pass_counts": [1],
+    "tube_pitch_rule_id": "V08-TRIANGULAR-PITCH-FOUR_THIRDS-OD-R1",
+    "tube_pitch_m": "0.0254",
+    "tube_pitch_rule": "tube_pitch_m must equal tube_outer_diameter_m * 4/3 for this V08 R1 triangular layout binding"
+  },
+  "shell_and_ladder_authority_path": "docs/tasks/evidence/V08-02-shell-and-ladder-discrete-authority-r1.json",
   "tube_geometry": {
     "tube_outer_diameter_m": "0.01905",
     "tube_wall_thickness_m": "0.00165",

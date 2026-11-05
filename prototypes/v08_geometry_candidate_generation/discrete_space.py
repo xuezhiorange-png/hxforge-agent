@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
+from prototypes.v08_geometry_candidate_generation.geometry_source_verification import (
+    verify_discrete_space_payload,
+)
 
 DEFAULT_V08_DISCRETE_SPACE_PATH = (
     Path(__file__).resolve().parents[2]
@@ -91,10 +94,7 @@ def load_v08_discrete_space(path: Path | None = None) -> V08DiscreteSpaceAuthori
 def parse_discrete_space_payload(
     payload: dict[str, Any], *, source_path: str
 ) -> V08DiscreteSpaceAuthority:
-    if payload.get("approval_status") != "APPROVED":
-        raise ValueError("V08 discrete space is not APPROVED")
-    if payload.get("source_class") != "AUTHORIZED_PROJECT_DEFINED_DISCRETE_SET":
-        raise ValueError("V08 discrete space source_class is not authorized")
+    verify_discrete_space_payload(payload)
     authority_id = str(payload["authority_id"])
     tube = payload["tube_geometry"]
     ladder_raw = payload["tube_baffle_ladder"]
