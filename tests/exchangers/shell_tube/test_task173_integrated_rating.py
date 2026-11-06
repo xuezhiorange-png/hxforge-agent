@@ -1187,6 +1187,83 @@ def test_r3_tube_capacity_binding_does_not_use_shell_low_side_classification(
     assert len(calls) == 14
 
 
+def test_outer_low_shooting_shell_capacity_zero_q0_hole_is_low_side_infeasible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Outer shooting at shell inlet with zero shell-side capacity: q=0 hole → LOW_SIDE (V08-03)."""
+    support = build_local_support(0, 1, 0)
+    provider = CoolPropProvider()
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    h_shell = Decimal(str(shell.native.enthalpy_j_kg))
+    authority = object()
+
+    monkeypatch.setattr(service, "effective_shell_cold_inlet_enthalpy_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "_effective_h_min_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "effective_tube_mass_flow_kg_s", lambda: Decimal("12"))
+    monkeypatch.setattr(service, "effective_shell_mass_flow_kg_s", lambda: Decimal("20"))
+
+    native = service._cell_evaluation
+
+    def q0_hole(q_w: float, **kwargs: Any) -> Any:
+        if q_w == 0.0:
+            raise _mark_replayed_residual_hole()
+        return native(q_w, **kwargs)
+
+    monkeypatch.setattr(service, "_cell_evaluation", q0_hole)
+
+    with pytest.raises(service._LowSideDomainInfeasible):
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            mesh_subdivisions=1,
+            outer_iteration=0,
+            shooting_enthalpy=h_shell,
+        )
+
+
+def test_outer_non_low_shooting_q0_hole_keeps_bracket_unresolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same zero shell capacity and q=0 hole, but shooting enthalpy ≠ shell inlet → hard stop."""
+    support = build_local_support(0, 1, 0)
+    provider = CoolPropProvider()
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    h_shell = Decimal(str(shell.native.enthalpy_j_kg))
+    authority = object()
+
+    monkeypatch.setattr(service, "effective_shell_cold_inlet_enthalpy_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "_effective_h_min_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "effective_tube_mass_flow_kg_s", lambda: Decimal("12"))
+    monkeypatch.setattr(service, "effective_shell_mass_flow_kg_s", lambda: Decimal("20"))
+
+    native = service._cell_evaluation
+
+    def q0_hole(q_w: float, **kwargs: Any) -> Any:
+        if q_w == 0.0:
+            raise _mark_replayed_residual_hole()
+        return native(q_w, **kwargs)
+
+    monkeypatch.setattr(service, "_cell_evaluation", q0_hole)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            mesh_subdivisions=1,
+            outer_iteration=0,
+            shooting_enthalpy=h_shell + Decimal("1"),
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+
+
 def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

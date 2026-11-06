@@ -2371,12 +2371,17 @@ def _solve_cell(
     h_tube = _d(tube_upstream.native.enthalpy_j_kg)
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
     h_min = _effective_h_min_j_kg()
+    shell_inlet_enthalpy_j_kg = effective_shell_cold_inlet_enthalpy_j_kg()
+    at_outer_low_shooting_enthalpy = (
+        shooting_enthalpy is not None and shooting_enthalpy == shell_inlet_enthalpy_j_kg
+    )
     with localcontext() as context:
         context.prec = 70
         tube_capacity = effective_tube_mass_flow_kg_s() * (h_tube - h_min)
         shell_capacity = effective_shell_mass_flow_kg_s() * (h_shell - h_min)
     if tube_capacity < 0 or shell_capacity < 0:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT")
+    cap_thermo_w = min(tube_capacity, shell_capacity)
 
     stats = search_stats if search_stats is not None else _CellSearchStats()
     neighborhoods = hole_neighborhoods if hole_neighborhoods is not None else []
@@ -2423,6 +2428,11 @@ def _solve_cell(
             f"wall_interface_id={support.wall_interface_id}",
             f"outer_iteration={outer_value}",
             f"shooting_enthalpy_j_kg={shooting_value}",
+            f"shell_inlet_enthalpy_j_kg={shell_inlet_enthalpy_j_kg}",
+            f"h_min_j_kg={h_min}",
+            f"tube_capacity_w={tube_capacity}",
+            f"shell_capacity_w={shell_capacity}",
+            f"thermodynamic_cap_w={cap_thermo_w}",
             f"left_q_w={left_q}",
             f"right_q_w={right_q}",
             f"left_f_q_w={left_f}",
@@ -2717,6 +2727,18 @@ def _solve_cell(
     cap = min(tube_capacity, shell_capacity)
     if cap <= 0:
         if lower_is_hole:
+            # Outer-boundary low shooting: shell face enthalpy equals cold inlet;
+            # shell-side thermodynamic capacity to cold floor is exactly zero.
+            # Treat q=0 numerical Task172 holes here as search-side infeasibility so
+            # the outer bisection can advance (V08-03), not as a hard cell bracket stop.
+            if (
+                at_outer_low_shooting_enthalpy
+                and shell_capacity == 0
+                and tube_capacity > 0
+                and h_shell == shell_inlet_enthalpy_j_kg
+                and h_shell == h_min
+            ):
+                raise _LowSideDomainInfeasible
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                 "no positive-width valid q interval remains after lower-endpoint hole",
