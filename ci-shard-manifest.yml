@@ -526,6 +526,12 @@ shards:
     files:
       - tests/prototypes/test_v08_geometry_candidate_generation.py
     timeout: 3600
+  - name: v08-03-live-thermal-rating
+    job: shard-v08-03-live-thermal-rating
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_thermal_rating.py
+    timeout: 7200
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension
     python: ["3.11", "3.12"]

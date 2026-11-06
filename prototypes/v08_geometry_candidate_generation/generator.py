@@ -5,13 +5,20 @@
 from __future__ import annotations
 
 import itertools
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168
-from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import candidate_space_hash
-from hexagent.exchangers.shell_tube.manufacturable_candidates.models import DIMENSION_ORDER
+from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
+    candidate_space_hash,
+    request_hash,
+)
+from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
+    DIMENSION_ORDER,
+    Task168Request,
+)
 from prototypes.v08_general_user_case.solver_handoff import V08SolverHandoffV1
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
 from prototypes.v08_geometry_candidate_generation.discrete_space import (
@@ -24,7 +31,11 @@ from prototypes.v08_geometry_candidate_generation.errors import V08GeometryGener
 from prototypes.v08_geometry_candidate_generation.models import (
     V08GeometryCandidateRecord,
     V08GeometryGenerationResult,
+    V08GeometryGenerationStatus,
     V08GeometryRejectionRecord,
+)
+from prototypes.v08_geometry_candidate_generation.structural_bundles import (
+    V08StructuralGeometryBundle,
 )
 from prototypes.v08_geometry_candidate_generation.task168_builder import (
     build_v08_task168_request,
@@ -58,6 +69,196 @@ def _preserved_search_parameters(handoff: V08SolverHandoffV1) -> dict[str, str]:
     out = dict(handoff.consumable_parameters)
     out.update(handoff.pressure_limits_pa)
     return out
+
+
+@dataclass(frozen=True)
+class _EnumerateGeometryOutcome:
+    space_hash: str
+    valid_structural: tuple[V08StructuralGeometryBundle, ...]
+    candidate_records: tuple[V08GeometryCandidateRecord, ...]
+    rejections: tuple[V08GeometryRejectionRecord, ...]
+
+
+def enumerate_structural_geometry(
+    t168: Task168Request,
+    filtered_space: Any,
+    envelope_msgs: tuple[str, ...],
+    *,
+    max_combinations: int = MAX_COMBINATIONS_TO_EVALUATE,
+    max_valid_candidates: int = MAX_VALID_CANDIDATES,
+) -> _EnumerateGeometryOutcome:
+    """Core Task168 structural search shared with V08-02 result records and V08-03 rating.
+
+    Callers must load/filter discrete space and build ``t168`` via
+    :func:`build_v08_task168_request` so blocked-binding and empty-space handling stay at the API boundary.
+    """
+    _ = envelope_msgs
+    authorities = task168._authority_map(t168)
+    dimensions = tuple(
+        task168._sort_values(authorities[role].values)
+        for role in DIMENSION_ORDER
+        if role != "SHELL_GEOMETRY_ID"
+    )
+    space_hash = candidate_space_hash(t168, t168.discrete_candidate_set_authorities)
+    task168_digest = request_hash(t168)
+    allowed_ladder = filtered_space.allowed_ladder_keys
+    structural: list[V08StructuralGeometryBundle] = []
+    rejections: list[V08GeometryRejectionRecord] = []
+    seen_geometry: set[str] = set()
+    evaluated = 0
+    for combination in itertools.product(t168.shell_geometry_catalog.records, *dimensions):
+        if evaluated >= max_combinations:
+            rejections.append(
+                V08GeometryRejectionRecord(
+                    candidate_id="SEARCH_BUDGET",
+                    failure_stage="V08_SEARCH_BUDGET",
+                    reason_codes=("MAX_COMBINATIONS_REACHED",),
+                    evidence={"max_combinations": str(max_combinations)},
+                )
+            )
+            break
+        evaluated += 1
+        candidate = task168._candidate(t168, authorities, combination[0], tuple(combination[1:]))
+        ladder_key = (
+            format_engineering_decimal(candidate.tube_length_m),
+            format_engineering_decimal(candidate.baffle_spacing_m),
+            int(candidate.baffle_count),
+        )
+        if ladder_key not in allowed_ladder:
+            rejections.append(
+                V08GeometryRejectionRecord(
+                    candidate_id=candidate.candidate_id,
+                    failure_stage="V08_LADDER_FILTER",
+                    reason_codes=("UNAUTHORIZED_TUBE_BAFFLE_PAIR",),
+                    evidence={
+                        "tube_length_m": ladder_key[0],
+                        "baffle_spacing_m": ladder_key[1],
+                        "baffle_count": str(ladder_key[2]),
+                    },
+                )
+            )
+            continue
+        shell_d = str(combination[0].shell_inside_diameter_m)
+        structural_block = task168._structural_blockers(candidate)
+        if structural_block:
+            rejections.append(
+                V08GeometryRejectionRecord(
+                    candidate_id=candidate.candidate_id,
+                    failure_stage="TASK168_STRUCTURAL",
+                    reason_codes=tuple(str(item.code) for item in structural_block),
+                    evidence={"shell_inside_diameter_m": shell_d},
+                )
+            )
+            continue
+        bundle, stage_failure, _ = task168._execute_candidate_chain(
+            t168,
+            candidate,
+            combination[0],
+            include_legacy_task162=False,
+            include_legacy_task168_rating_dependencies=False,
+            preserve_baffle_orientation_sequence=False,
+        )
+        if stage_failure is not None:
+            rejections.append(
+                V08GeometryRejectionRecord(
+                    candidate_id=candidate.candidate_id,
+                    failure_stage=str(stage_failure.stage.value),
+                    reason_codes=(str(stage_failure.code),),
+                    evidence={
+                        "shell_inside_diameter_m": shell_d,
+                        "message": stage_failure.message,
+                    },
+                )
+            )
+            continue
+        tube_count = int(cast(Any, bundle).task021_layout.physical_tube_count)
+        geom_hash = _geometry_projection_hash(
+            shell_inside_diameter_m=shell_d,
+            tube_length_m=format_engineering_decimal(candidate.tube_length_m),
+            baffle_spacing_m=format_engineering_decimal(candidate.baffle_spacing_m),
+            tube_pass_count=int(candidate.tube_pass_count),
+            physical_tube_count=tube_count,
+        )
+        if geom_hash in seen_geometry:
+            continue
+        seen_geometry.add(geom_hash)
+        structural.append(
+            V08StructuralGeometryBundle(
+                candidate=candidate,
+                shell_record=combination[0],
+                bundle=bundle,
+                task168_request_hash_digest=task168_digest,
+            )
+        )
+        if len(structural) >= max_valid_candidates:
+            break
+    records: list[V08GeometryCandidateRecord] = []
+    for item in structural:
+        c = item.candidate
+        shell_d = str(item.shell_record.shell_inside_diameter_m)
+        geom_hash = _geometry_projection_hash(
+            shell_inside_diameter_m=shell_d,
+            tube_length_m=format_engineering_decimal(c.tube_length_m),
+            baffle_spacing_m=format_engineering_decimal(c.baffle_spacing_m),
+            tube_pass_count=int(c.tube_pass_count),
+            physical_tube_count=int(cast(Any, item.bundle).task021_layout.physical_tube_count),
+        )
+        records.append(
+            V08GeometryCandidateRecord(
+                rank=0,
+                candidate_id=c.candidate_id,
+                candidate_hash=c.candidate_hash,
+                geometry_projection_hash=geom_hash,
+                shell_inside_diameter_m=shell_d,
+                shell_geometry_id=item.shell_record.geometry_id,
+                tube_outer_diameter_m=format_engineering_decimal(c.tube_outer_diameter_m),
+                tube_wall_thickness_m=format_engineering_decimal(c.tube_wall_thickness_m),
+                tube_pitch_m=format_engineering_decimal(c.tube_pitch_m),
+                tube_length_m=format_engineering_decimal(c.tube_length_m),
+                tube_pass_count=int(c.tube_pass_count),
+                physical_tube_count=int(cast(Any, item.bundle).task021_layout.physical_tube_count),
+                baffle_spacing_m=format_engineering_decimal(c.baffle_spacing_m),
+                baffle_count=int(c.baffle_count),
+                baffle_type=str(c.baffle_type),
+                source_authority_id=filtered_space.authority_id,
+                source_content_hash=filtered_space.content_hash,
+            )
+        )
+    ranked = tuple(
+        _with_rank(index + 1, row)
+        for index, row in enumerate(
+            sorted(
+                records,
+                key=lambda row: (
+                    row.shell_inside_diameter_m,
+                    row.tube_length_m,
+                    row.baffle_spacing_m,
+                    row.physical_tube_count,
+                    row.candidate_id,
+                ),
+            )
+        )
+    )
+    # Map geometry_projection_hash -> bundle (unique per accepted row in this loop)
+    by_projection: dict[str, V08StructuralGeometryBundle] = {}
+    for item in structural:
+        c = item.candidate
+        shell_d = str(item.shell_record.shell_inside_diameter_m)
+        gh = _geometry_projection_hash(
+            shell_inside_diameter_m=shell_d,
+            tube_length_m=format_engineering_decimal(c.tube_length_m),
+            baffle_spacing_m=format_engineering_decimal(c.baffle_spacing_m),
+            tube_pass_count=int(c.tube_pass_count),
+            physical_tube_count=int(cast(Any, item.bundle).task021_layout.physical_tube_count),
+        )
+        by_projection[gh] = item
+    ordered_structural = tuple(by_projection[row.geometry_projection_hash] for row in ranked)
+    return _EnumerateGeometryOutcome(
+        space_hash=space_hash,
+        valid_structural=ordered_structural,
+        candidate_records=ranked,
+        rejections=tuple(rejections),
+    )
 
 
 def generate_geometry_candidates(
@@ -100,6 +301,7 @@ def generate_geometry_candidates(
                 ),
             ),
             result_hash="",
+            warnings=handoff.warnings,
         )
         return _finalize_hash(result)
 
@@ -115,146 +317,21 @@ def generate_geometry_candidates(
         )
         return _blocked_result(normalized, handoff, blocked, space=filtered_space)
 
-    authorities = task168._authority_map(t168)
-    dimensions = tuple(
-        task168._sort_values(authorities[role].values)
-        for role in DIMENSION_ORDER
-        if role != "SHELL_GEOMETRY_ID"
+    enum = enumerate_structural_geometry(
+        t168,
+        filtered_space,
+        envelope_msgs,
+        max_combinations=max_combinations,
+        max_valid_candidates=max_valid_candidates,
     )
-    space_hash = candidate_space_hash(t168, t168.discrete_candidate_set_authorities)
-    allowed_ladder = filtered_space.allowed_ladder_keys
-
-    valid: list[V08GeometryCandidateRecord] = []
-    rejections: list[V08GeometryRejectionRecord] = []
-    seen_geometry: set[str] = set()
-    evaluated = 0
-
-    for combination in itertools.product(t168.shell_geometry_catalog.records, *dimensions):
-        if evaluated >= max_combinations:
-            rejections.append(
-                V08GeometryRejectionRecord(
-                    candidate_id="SEARCH_BUDGET",
-                    failure_stage="V08_SEARCH_BUDGET",
-                    reason_codes=("MAX_COMBINATIONS_REACHED",),
-                    evidence={"max_combinations": str(max_combinations)},
-                )
-            )
-            break
-        evaluated += 1
-        candidate = task168._candidate(t168, authorities, combination[0], tuple(combination[1:]))
-        ladder_key = (
-            format_engineering_decimal(candidate.tube_length_m),
-            format_engineering_decimal(candidate.baffle_spacing_m),
-            int(candidate.baffle_count),
-        )
-        if ladder_key not in allowed_ladder:
-            rejections.append(
-                V08GeometryRejectionRecord(
-                    candidate_id=candidate.candidate_id,
-                    failure_stage="V08_LADDER_FILTER",
-                    reason_codes=("UNAUTHORIZED_TUBE_BAFFLE_PAIR",),
-                    evidence={
-                        "tube_length_m": ladder_key[0],
-                        "baffle_spacing_m": ladder_key[1],
-                        "baffle_count": str(ladder_key[2]),
-                    },
-                )
-            )
-            continue
-
-        shell_d = str(combination[0].shell_inside_diameter_m)
-        structural = task168._structural_blockers(candidate)
-        if structural:
-            rejections.append(
-                V08GeometryRejectionRecord(
-                    candidate_id=candidate.candidate_id,
-                    failure_stage="TASK168_STRUCTURAL",
-                    reason_codes=tuple(str(item.code) for item in structural),
-                    evidence={"shell_inside_diameter_m": shell_d},
-                )
-            )
-            continue
-
-        bundle, stage_failure, _ = task168._execute_candidate_chain(
-            t168,
-            candidate,
-            combination[0],
-            include_legacy_task162=False,
-            include_legacy_task168_rating_dependencies=False,
-            preserve_baffle_orientation_sequence=False,
-        )
-        if stage_failure is not None:
-            rejections.append(
-                V08GeometryRejectionRecord(
-                    candidate_id=candidate.candidate_id,
-                    failure_stage=str(stage_failure.stage.value),
-                    reason_codes=(str(stage_failure.code),),
-                    evidence={
-                        "shell_inside_diameter_m": shell_d,
-                        "message": stage_failure.message,
-                    },
-                )
-            )
-            continue
-
-        tube_count = int(bundle.task021_layout.physical_tube_count)
-        geom_hash = _geometry_projection_hash(
-            shell_inside_diameter_m=shell_d,
-            tube_length_m=format_engineering_decimal(candidate.tube_length_m),
-            baffle_spacing_m=format_engineering_decimal(candidate.baffle_spacing_m),
-            tube_pass_count=int(candidate.tube_pass_count),
-            physical_tube_count=tube_count,
-        )
-        if geom_hash in seen_geometry:
-            continue
-        seen_geometry.add(geom_hash)
-        valid.append(
-            V08GeometryCandidateRecord(
-                rank=0,
-                candidate_id=candidate.candidate_id,
-                candidate_hash=candidate.candidate_hash,
-                geometry_projection_hash=geom_hash,
-                shell_inside_diameter_m=shell_d,
-                shell_geometry_id=combination[0].geometry_id,
-                tube_outer_diameter_m=format_engineering_decimal(candidate.tube_outer_diameter_m),
-                tube_wall_thickness_m=format_engineering_decimal(candidate.tube_wall_thickness_m),
-                tube_pitch_m=format_engineering_decimal(candidate.tube_pitch_m),
-                tube_length_m=format_engineering_decimal(candidate.tube_length_m),
-                tube_pass_count=int(candidate.tube_pass_count),
-                physical_tube_count=tube_count,
-                baffle_spacing_m=format_engineering_decimal(candidate.baffle_spacing_m),
-                baffle_count=int(candidate.baffle_count),
-                baffle_type=str(candidate.baffle_type),
-                source_authority_id=filtered_space.authority_id,
-                source_content_hash=filtered_space.content_hash,
-            )
-        )
-        if len(valid) >= max_valid_candidates:
-            break
-
-    valid_sorted = tuple(
-        _with_rank(index + 1, row)
-        for index, row in enumerate(
-            sorted(
-                valid,
-                key=lambda row: (
-                    row.shell_inside_diameter_m,
-                    row.tube_length_m,
-                    row.baffle_spacing_m,
-                    row.physical_tube_count,
-                    row.candidate_id,
-                ),
-            )
-        )
-    )
-
-    status = "OK" if valid_sorted else "NO_STRUCTURAL_CANDIDATE"
+    valid_sorted = enum.candidate_records
+    status: V08GeometryGenerationStatus = "OK" if valid_sorted else "NO_STRUCTURAL_CANDIDATE"
     result = V08GeometryGenerationResult(
         **base_payload,
         status=status,
-        candidate_space_hash=space_hash,
+        candidate_space_hash=enum.space_hash,
         candidates=valid_sorted,
-        rejections=tuple(rejections),
+        rejections=enum.rejections,
         distinct_valid_geometry_count=len({c.geometry_projection_hash for c in valid_sorted}),
         result_hash="",
         warnings=handoff.warnings,
@@ -283,7 +360,7 @@ def _base_result_fields(
     }
 
 
-def _blocked_status(code: str) -> str:
+def _blocked_status(code: str) -> V08GeometryGenerationStatus:
     if code == "BLOCKED_USER_PARAMETER_BINDING":
         return "BLOCKED_USER_PARAMETER_BINDING"
     return "BLOCKED_GEOMETRY_SOURCE"
