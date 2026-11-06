@@ -13,6 +13,7 @@ from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     discrete_authority_hash,
     evaluation_input_authority_hash,
+    requirement_authority_hash,
     shell_catalog_hash,
     shell_record_hash,
 )
@@ -20,7 +21,6 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.implementation_val
     build_implementation_validation_task168_reference,
 )
 from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
-    ConstructionFamily,
     DiscreteAuthoritySource,
     DiscreteCandidateSetAuthority,
     DiscreteDimensionRole,
@@ -29,11 +29,19 @@ from hexagent.exchangers.shell_tube.manufacturable_candidates.models import (
 from hexagent.exchangers.shell_tube.manufacturable_candidates.variable_shell_r13 import (
     VARIABLE_SHELL_TASK021_PLACEMENT_ENVELOPE_OPT_IN_R13,
 )
+from hexagent.exchangers.shell_tube.models import (
+    ConstructionFamily,
+    ShellAndTubeConfiguration,
+    ValidationStatus,
+)
 from hexagent.exchangers.shell_tube.shell_side_flow_state.canonical import (
     mass_flow_authority_hash,
 )
 from hexagent.exchangers.shell_tube.shell_side_flow_state.schema import (
     parse_request as parse_task032,
+)
+from hexagent.exchangers.shell_tube.validation import (
+    validate_request as validate_task020_configuration,
 )
 from prototypes.v08_general_user_case.solver_handoff import V08SolverHandoffV1
 from prototypes.v08_general_user_case.user_design_case import (
@@ -51,6 +59,55 @@ from prototypes.v08_geometry_candidate_generation.parameter_binding import (
 )
 
 _V08_SPACE_ID = "V08-GENERAL-GEOMETRY-DISCRETE-SPACE-R1"
+
+
+def _task020_request_payload_tema_e_shell(
+    base_configuration: ShellAndTubeConfiguration,
+) -> dict[str, Any]:
+    """Rebuild TASK-020 request with TEMA E shell token (Task171 native replay requires shell=E)."""
+    ca = base_configuration.case_authority
+    binding = base_configuration.authority_binding
+    return {
+        "schema_version": "task020.configuration-request.v1",
+        "case_authority": {
+            "revision_id": ca.revision_id,
+            "payload_hash": ca.payload_hash,
+            "domain_snapshot_hash": ca.domain_snapshot_hash,
+            "status": ca.revision_status.value,
+        },
+        "equipment_family": base_configuration.equipment_family.value,
+        "authority_mode": base_configuration.authority_mode.value,
+        "construction_family": base_configuration.construction_family.value,
+        "orientation": base_configuration.orientation.value,
+        "shell_pass_count": base_configuration.shell_pass_count,
+        "tube_pass_count": base_configuration.tube_pass_count,
+        "front_head_token": base_configuration.component_tokens.front_head,
+        "shell_token": "E",
+        "rear_head_token": base_configuration.component_tokens.rear_head,
+        "standard_system_id": binding.standard_system_id,
+        "requested_rule_pack_identity": None,
+        "evidence_refs": ["task168-config", "V08-02-TEMA-E-SHELL-FOR-TASK171"],
+    }
+
+
+def _with_tema_e_shell_task020(request: Task168Request) -> Task168Request:
+    cfg = request.task020_configuration
+    tokens = cfg.component_tokens
+    if tokens.shell == "E":
+        return request
+    outcome = validate_task020_configuration(_task020_request_payload_tema_e_shell(cfg))
+    if outcome.status is not ValidationStatus.VALID or outcome.configuration is None:
+        codes = ",".join(b.code for b in outcome.blockers)
+        raise V08GeometryGenerationBlocked(
+            code="BLOCKED_GEOMETRY_SOURCE",
+            message="TASK020 revalidation for TEMA E shell failed",
+            evidence={"task020_blockers": codes},
+        )
+    requirement = replace(request.requirement_authority, canonical_hash="")
+    requirement = replace(requirement, canonical_hash=requirement_authority_hash(requirement))
+    return replace(
+        request, task020_configuration=outcome.configuration, requirement_authority=requirement
+    )
 
 
 def filter_discrete_space_by_envelope(
@@ -139,7 +196,8 @@ def build_v08_task168_request(
         ("geometry_source_authority", space.authority_id),
         ("geometry_source_content_hash", space.content_hash),
     )
-    return replace(reference, request_metadata=metadata)
+    built = replace(reference, request_metadata=metadata)
+    return _with_tema_e_shell_task020(built)
 
 
 def _apply_multi_shell_catalog(
@@ -230,10 +288,12 @@ def _apply_v08_discrete_authorities(
 def read_task168_bound_process_inputs(request: Task168Request) -> dict[str, str]:
     """Expose bound process parameters from a built Task168 request (for audit tests)."""
     evaluation = request.evaluation_input_authority
-    mass = str(evaluation.task032_mass_flow_authority["mass_flow_rate_kg_s"])
-    tube_mass = str(evaluation.task026_request.mass_flow_rate_kg_s)
-    task160 = evaluation.task160_request_template
-    streams = task160["stream_records"]
+    mass_auth = cast(dict[str, Any], evaluation.task032_mass_flow_authority)
+    mass = str(mass_auth["mass_flow_rate_kg_s"])
+    task026 = cast(Any, evaluation.task026_request)
+    tube_mass = str(task026.mass_flow_rate_kg_s)
+    task160 = cast(dict[str, Any], evaluation.task160_request_template)
+    streams = cast(list[dict[str, Any]], task160["stream_records"])
     tube_t = str(streams[0]["inlet_temperature_k"])
     shell_t = str(streams[1]["inlet_temperature_k"])
     meta = dict(request.request_metadata)
@@ -274,7 +334,7 @@ def _bind_handoff_to_evaluation_templates(
         task160_template["stream_records"] = streams
 
     task031_template = cast(dict[str, Any], deepcopy(evaluation.task031_request_template))
-    task026_request = evaluation.task026_request
+    task026_request = cast(Any, evaluation.task026_request)
     task026_request = replace(task026_request, mass_flow_rate_kg_s=Decimal(tube_mass))
 
     evaluation = replace(

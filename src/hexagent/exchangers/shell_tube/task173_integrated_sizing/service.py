@@ -460,6 +460,25 @@ def _candidate_rating_request(
     )
 
 
+def v08_thermal_rating_request(
+    candidate: CandidateSpec,
+    candidate_space_hash: str,
+    bundle: Any,
+    topology: Any,
+    task174: Task174SuccessResult,
+    task168_request_hash: str,
+) -> CandidateRatingRequest:
+    """Build a Task173 candidate rating request for V08-03 (geometry from Task168 handoff)."""
+    base = _candidate_rating_request(
+        candidate, candidate_space_hash, bundle, topology, task174, task168_request_hash
+    )
+    merged_meta = (
+        ("candidate_rating_scope", "V08_03_LIVE_THERMAL_RATING"),
+        ("task168_request_hash", task168_request_hash),
+    )
+    return base.model_copy(update={"request_metadata": merged_meta})
+
+
 def _native_identities(
     bundle: Any, topology: Any | None, task174: Any | None
 ) -> tuple[tuple[str, str], ...]:
@@ -1215,4 +1234,5 @@ __all__ = [
     "recompute_sizing_result_hash",
     "sizing_request_hash",
     "validate_sizing_request",
+    "v08_thermal_rating_request",
 ]
