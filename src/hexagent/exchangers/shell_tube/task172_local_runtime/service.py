@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import struct
 import sys
 from dataclasses import dataclass, fields
@@ -1846,7 +1847,52 @@ def _blocked_residual_replay_valid(
         return False
 
 
-def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalOutcome:
+def _append_task172_solver_trace_entry(
+    trace: list[dict[str, Any]] | None,
+    *,
+    step: str,
+    method: Literal["trf", "dogbox"],
+    budget: _SolverBudget,
+    outcome: Task172LocalOutcome,
+) -> None:
+    if trace is None:
+        return
+    entry: dict[str, Any] = {
+        "step": step,
+        "method": method,
+        "wide_experimental": budget.wide_experimental,
+        "budget_numerical_profile_id": budget.numerical_profile_id,
+    }
+    if type(outcome) is Task172LocalResult:
+        entry["outcome"] = "VALIDATED"
+        entry["solver_status"] = outcome.solver_status
+        entry["solver_nfev"] = outcome.solver_nfev
+        entry["residual_callback_count"] = outcome.residual_callback_count
+        entry["numerical_profile_id"] = outcome.numerical_profile_id
+    elif type(outcome) is Task172BlockedResult:
+        entry["outcome"] = "BLOCKED"
+        entry["failure_code"] = outcome.failure_code
+        entry["field_path"] = outcome.field_path
+        entry["blocked_result_hash"] = outcome.blocked_result_hash
+    else:
+        entry["outcome"] = type(outcome).__name__
+    trace.append(entry)
+
+
+def _task172_env_solver_trace_enabled() -> bool:
+    return os.environ.get("HXFORGE_TASK172_SOLVER_TRACE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _solve(
+    request: Task172Request,
+    provider: PropertyProvider,
+    *,
+    solver_trace: list[dict[str, Any]] | None = None,
+) -> Task172LocalOutcome:
     """Run unchanged R94 first and use the reviewed fallback only for a replayable R98 miss."""
     request_hash: str | None = None
     try:
@@ -1854,7 +1900,13 @@ def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalO
     except Exception:
         request_hash = None
 
+    env_trace = _task172_env_solver_trace_enabled()
+    trace = solver_trace if solver_trace is not None else ([] if env_trace else None)
+
     primary = _solve_attempt(request, provider, method="trf")
+    _append_task172_solver_trace_entry(
+        trace, step="primary_trf", method="trf", budget=_FROZEN_SOLVER_BUDGET, outcome=primary
+    )
     if type(primary) is Task172LocalResult:
         return primary
     if type(primary) is not Task172BlockedResult:
@@ -1865,6 +1917,13 @@ def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalO
         return primary
 
     fallback = _solve_attempt(request, provider, method="dogbox")
+    _append_task172_solver_trace_entry(
+        trace,
+        step="fallback_dogbox",
+        method="dogbox",
+        budget=_FROZEN_SOLVER_BUDGET,
+        outcome=fallback,
+    )
     if type(fallback) is Task172LocalResult:
         if not _fallback_result_replays_request(request, fallback):
             return _blocked(
@@ -1889,6 +1948,13 @@ def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalO
         budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
         initial_guess=warm_start,
     )
+    _append_task172_solver_trace_entry(
+        trace,
+        step="wide_experimental_trf",
+        method="trf",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        outcome=wide_trf,
+    )
     if type(wide_trf) is Task172LocalResult:
         if not _fallback_result_replays_request(request, wide_trf):
             return _blocked(
@@ -1912,6 +1978,13 @@ def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalO
         budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
         initial_guess=wide_dogbox_initial,
     )
+    _append_task172_solver_trace_entry(
+        trace,
+        step="wide_experimental_dogbox",
+        method="dogbox",
+        budget=_WIDE_EXPERIMENTAL_SOLVER_BUDGET,
+        outcome=wide_dogbox,
+    )
     if type(wide_dogbox) is Task172LocalResult and not _fallback_result_replays_request(
         request, wide_dogbox
     ):
@@ -1923,7 +1996,12 @@ def _solve(request: Task172Request, provider: PropertyProvider) -> Task172LocalO
     return wide_dogbox
 
 
-def validate_request(raw_request: object, provider: PropertyProvider) -> Task172LocalOutcome:
+def validate_request(
+    raw_request: object,
+    provider: PropertyProvider,
+    *,
+    solver_trace: list[dict[str, Any]] | None = None,
+) -> Task172LocalOutcome:
     """Validate and execute one local interface closure; never return a partial result."""
     if type(raw_request) is not Task172LocalRequest:
         if type(raw_request) is not dict:
@@ -1939,7 +2017,7 @@ def validate_request(raw_request: object, provider: PropertyProvider) -> Task172
             raise _RuntimeFailure(
                 "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider"
             )
-        return _solve(request, provider)
+        return _solve(request, provider, solver_trace=solver_trace)
     except _RuntimeFailure as exc:
         diagnostics = tuple(exc.field_path.split(";")) if ";" in exc.field_path else ()
         try:
@@ -1954,6 +2032,8 @@ def validate_request(raw_request: object, provider: PropertyProvider) -> Task172
 def validate_candidate_request(
     raw_request: CandidateTask172LocalRequest | dict[str, Any],
     provider: PropertyProvider,
+    *,
+    solver_trace: list[dict[str, Any]] | None = None,
 ) -> Task172LocalOutcome:
     """Run the same reviewed R94/R98 kernel on a separately bound candidate context."""
     if type(raw_request) is CandidateTask172LocalRequest:
@@ -1970,7 +2050,7 @@ def validate_candidate_request(
             raise _RuntimeFailure(
                 "BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider"
             )
-        return _solve(request, provider)
+        return _solve(request, provider, solver_trace=solver_trace)
     except _RuntimeFailure as exc:
         digest: str | None
         try:

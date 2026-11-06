@@ -291,7 +291,7 @@ def test_exact_zero_q_reuses_valid_tp_states_without_ph_reconstruction(
         seen["request"] = request
         return request
 
-    def capture_task172(request: Task172LocalRequest, _provider: Any) -> Any:
+    def capture_task172(request: Task172LocalRequest, _provider: Any, **_kwargs: Any) -> Any:
         seen["task172_request"] = request
         raise Task172Reached
 
@@ -522,7 +522,7 @@ def test_injected_residual_acceptance_block_is_a_signless_nonphysical_hole(
     support, tube, shell, provider, authority = _historical_n2_cell_inputs()
 
     def return_validly_hashed_hole(
-        request: Task172LocalRequest, _provider: Any
+        request: Task172LocalRequest, _provider: Any, **_kwargs: Any
     ) -> Task172BlockedResult:
         candidate = Task172BlockedResult(
             status="BLOCKED",
@@ -1909,7 +1909,9 @@ def test_n16_first_support_q0_native_provider_reaches_task172_request(
     class Task172RequestReached(Exception):
         pass
 
-    def capture_native_request(request: Task172LocalRequest, actual_provider: Any) -> Any:
+    def capture_native_request(
+        request: Task172LocalRequest, actual_provider: Any, **_kwargs: Any
+    ) -> Any:
         assert type(request) is Task172LocalRequest
         assert actual_provider is provider
         assert request.support == support
@@ -2092,8 +2094,12 @@ def test_diagnostic_capture_does_not_change_native_trial_or_task172_call_sequenc
     def run(capture: service._CellSearchStats | None) -> tuple[Any, list[tuple[str, str]]]:
         observed: list[tuple[str, str]] = []
 
-        def counted_validate(request: Task172LocalRequest, state_provider: Any) -> Any:
-            result = native_validate(request, state_provider)
+        def counted_validate(
+            request: Task172LocalRequest,
+            state_provider: Any,
+            **kwargs: Any,
+        ) -> Any:
+            result = native_validate(request, state_provider, **kwargs)
             identity = (
                 result.result_hash
                 if type(result) is task172_models.Task172LocalResult
@@ -3122,6 +3128,9 @@ def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
         _authority: Any,
         iteration: int,
         _stats: Any = None,
+        *,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> service._OuterTrial:
         control = service._CANDIDATE_TRANSIENT_CONTROL.get()
         assert control is not None
@@ -3164,7 +3173,8 @@ def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
         _authority: Any,
         iteration: int,
         _stats: Any = None,
-        _capture: bool = False,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> Any:
         control = service._CANDIDATE_TRANSIENT_CONTROL.get()
         accepted_control_modes.append(control.mode if control is not None else None)
@@ -3204,6 +3214,9 @@ def test_accepted_mesh_replay_uses_fresh_full_search_stats_scope(
         _authority: Any,
         _iteration: int,
         search_stats: service._CellSearchStats | None = None,
+        *,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> Any:
         active_calls.append((subdivisions, search_stats))
         if search_stats is not None:
@@ -3355,7 +3368,15 @@ def test_boundary_root_uses_infeasible_low_and_valid_high_only(
     )
     observations: list[tuple[Decimal, str]] = []
 
-    def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+    def trial(
+        _n: int,
+        h: Decimal,
+        _provider: Any,
+        _authority: Any,
+        _iteration: int,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> Any:
         if h < root:
             observations.append((h, "LOW_SIDE_DOMAIN_INFEASIBLE"))
             return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
@@ -3391,7 +3412,15 @@ def test_boundary_bisection_is_deterministic_and_returns_valid_high_endpoint(
     def solve_once() -> Any:
         sequence: list[Decimal] = []
 
-        def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+        def trial(
+            _n: int,
+            h: Decimal,
+            _provider: Any,
+            _authority: Any,
+            _iteration: int,
+            *_args: Any,
+            **_kwargs: Any,
+        ) -> Any:
             sequence.append(h)
             if h < root:
                 return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
@@ -3433,7 +3462,15 @@ def test_outer_bisection_representability_floor_is_explicit(
     monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("1.0000000000000001"))
     monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
 
-    def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+    def trial(
+        _n: int,
+        h: Decimal,
+        _provider: Any,
+        _authority: Any,
+        _iteration: int,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> Any:
         if h == service.H_MIN_J_KG:
             return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
         run = SimpleNamespace(

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from collections.abc import Callable
 from contextvars import ContextVar, Token
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
@@ -596,6 +597,9 @@ class _Task172NumericalHole(Exception):
         request_hash_replay_passed: bool = False,
         blocked_result_hash_replay_passed: bool = False,
         exact_blocked_result_type: bool = False,
+        task172_request: Task172LocalRequest | CandidateTask172LocalRequest | None = None,
+        task172_blocked_result: Task172BlockedResult | None = None,
+        last_task172_solver_trace: tuple[dict[str, Any], ...] = (),
     ):
         super().__init__("BLOCKED_RESIDUAL_ACCEPTANCE")
         self.request_hash = request_hash
@@ -603,6 +607,9 @@ class _Task172NumericalHole(Exception):
         self.request_hash_replay_passed = request_hash_replay_passed
         self.blocked_result_hash_replay_passed = blocked_result_hash_replay_passed
         self.exact_blocked_result_type = exact_blocked_result_type
+        self.task172_request = task172_request
+        self.task172_blocked_result = task172_blocked_result
+        self.last_task172_solver_trace = last_task172_solver_trace
 
 
 @dataclass(frozen=True)
@@ -640,6 +647,9 @@ class _CellRootTrialReceipt:
     physical_result_hash: str | None = None
     residual_sign: Literal["NEGATIVE", "ZERO", "POSITIVE"] | None = None
     diagnostic_last_iterate_used: Literal[False] = False
+    task172_request_model_dump: dict[str, Any] | None = None
+    task172_blocked_diagnostic_last_iterate: tuple[str, ...] | None = None
+    task172_solver_trace: tuple[dict[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -732,6 +742,48 @@ class _CellSearchStats:
         )
 
 
+def _task173_capture_cell_root_diagnostics_enabled() -> bool:
+    return os.environ.get("HXFORGE_TASK173_CAPTURE_CELL_ROOT_DIAGNOSTICS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _serialize_cell_search_stats(stats: _CellSearchStats) -> dict[str, Any]:
+    """JSON-serializable snapshot for V08-03 blocked-rating exports (diagnostics only)."""
+
+    def receipt_as_json(receipt: _CellRootTrialReceipt) -> dict[str, Any]:
+        payload = asdict(receipt)
+        dump = payload.get("task172_request_model_dump")
+        if dump is not None:
+            payload["task172_request_model_dump"] = dump
+        return payload
+
+    return {
+        "schema_version": "task173.cell-search-stats-export.v1",
+        "task172_local_evaluation_count": stats.task172_local_evaluation_count,
+        "task172_evaluation_wall_seconds": stats.task172_evaluation_wall_seconds,
+        "outer_trial_count": stats.outer_trial_count,
+        "task172_numerical_hole_count": stats.task172_numerical_hole_count,
+        "task172_numerical_hole_counts_by_code": dict(stats.task172_numerical_hole_counts_by_code),
+        "task172_numerical_hole_trials": list(stats.task172_numerical_hole_trials),
+        "maximum_hole_recovery_depth_observed": stats.maximum_hole_recovery_depth_observed,
+        "trial_receipts": [receipt_as_json(item) for item in stats.trial_receipts],
+        "endpoint_hole_summaries": [asdict(item) for item in stats.endpoint_hole_summaries],
+        "endpoint_hole_level_receipts": [
+            asdict(item) for item in stats.endpoint_hole_level_receipts
+        ],
+    }
+
+
+def _task173_cell_search_stats_diagnostics(stats: _CellSearchStats) -> tuple[str, ...]:
+    return (
+        "task173_cell_search_stats_json="
+        + json.dumps(_serialize_cell_search_stats(stats), sort_keys=True, separators=(",", ":")),
+    )
+
+
 @dataclass(frozen=True)
 class _ThermoState:
     native: FluidState
@@ -767,6 +819,9 @@ class _CellTrial:
     blocked_request_hash_replay_passed: bool = False
     blocked_result_hash_replay_passed: bool = False
     exact_blocked_result_type: bool = False
+    task172_request: Task172LocalRequest | CandidateTask172LocalRequest | None = None
+    task172_blocked_result: Task172BlockedResult | None = None
+    last_task172_solver_trace: tuple[dict[str, Any], ...] = ()
 
 
 def _eligible_trial(trial: _CellTrial) -> bool:
@@ -2302,10 +2357,13 @@ def _cell_evaluation(
         shell_authority=shell_authority,
         request=task172_request,
     )
+    solver_trace: list[dict[str, Any]] = []
     if type(task172_request) is CandidateTask172LocalRequest:
-        task172_result = task172_validate_candidate(task172_request, provider)
+        task172_result = task172_validate_candidate(
+            task172_request, provider, solver_trace=solver_trace
+        )
     else:
-        task172_result = task172_validate(task172_request, provider)
+        task172_result = task172_validate(task172_request, provider, solver_trace=solver_trace)
     if type(task172_result) is Task172BlockedResult:
         if task172_result.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE":
             if task172_result.request_hash != recompute_task172_request_hash(
@@ -2321,6 +2379,9 @@ def _cell_evaluation(
                 request_hash_replay_passed=True,
                 blocked_result_hash_replay_passed=True,
                 exact_blocked_result_type=True,
+                task172_request=task172_request,
+                task172_blocked_result=task172_result,
+                last_task172_solver_trace=tuple(solver_trace),
             )
         raise _Stage3Failure(
             "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE",
@@ -2368,6 +2429,9 @@ def _solve_cell(
     shooting_enthalpy: Decimal | None = None,
     capture_diagnostics: bool = False,
 ) -> _CellEvaluation:
+    effective_capture_diagnostics = (
+        capture_diagnostics or _task173_capture_cell_root_diagnostics_enabled()
+    )
     h_tube = _d(tube_upstream.native.enthalpy_j_kg)
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
     h_min = _effective_h_min_j_kg()
@@ -2470,6 +2534,21 @@ def _solve_cell(
         result_id = getattr(result, "result_id", None)
         result_hash = getattr(result, "result_hash", None)
         result_q = getattr(result, "signed_q_hot_to_cold_w", None)
+        blocked = trial.task172_blocked_result
+        request_dump: dict[str, Any] | None = None
+        blocked_diag: tuple[str, ...] | None = None
+        task172_trace: tuple[dict[str, Any], ...] | None = None
+        if (
+            trial.classification == "TASK172_NUMERICAL_HOLE"
+            and trial.task172_request is not None
+        ):
+            try:
+                request_dump = trial.task172_request.model_dump(mode="json")
+            except Exception:
+                request_dump = None
+            if blocked is not None:
+                blocked_diag = blocked.diagnostic_last_iterate
+            task172_trace = trial.last_task172_solver_trace
         receipt = _CellRootTrialReceipt(
             mesh_subdivisions=mesh_subdivisions,
             physical_support_id=support.physical_segment_id,
@@ -2527,6 +2606,9 @@ def _solve_cell(
             physical_result_hash=result_hash,
             residual_sign=residual_sign,
             diagnostic_last_iterate_used=False,
+            task172_request_model_dump=request_dump,
+            task172_blocked_diagnostic_last_iterate=blocked_diag,
+            task172_solver_trace=task172_trace,
         )
         stats.trial_receipts.append(receipt)
         cell_trial_sequence_index += 1
@@ -2619,6 +2701,9 @@ def _solve_cell(
                     blocked_request_hash_replay_passed=exc.request_hash_replay_passed,
                     blocked_result_hash_replay_passed=exc.blocked_result_hash_replay_passed,
                     exact_blocked_result_type=exc.exact_blocked_result_type,
+                    task172_request=exc.task172_request,
+                    task172_blocked_result=exc.task172_blocked_result,
+                    last_task172_solver_trace=exc.last_task172_solver_trace,
                 )
             except _LowSideDomainInfeasible:
                 stats.record_evaluation(time.perf_counter() - eval_t0)
@@ -2626,7 +2711,7 @@ def _solve_cell(
             except _Stage3Failure as exc:
                 stats.record_evaluation(time.perf_counter() - eval_t0)
                 trials[q] = _CellTrial(q, "HARD_BLOCKER", failure_code=exc.code)
-                if capture_diagnostics:
+                if effective_capture_diagnostics:
                     append_trial_receipt(q, trials[q], search_phase or active_search_phase)
                 raise
             else:
@@ -2644,7 +2729,7 @@ def _solve_cell(
                         None,
                     ),
                 )
-            if capture_diagnostics:
+            if effective_capture_diagnostics:
                 append_trial_receipt(q, trials[q], search_phase or active_search_phase)
         return trials[q]
 
@@ -2786,7 +2871,7 @@ def _solve_cell(
         anchor_trial = upper_trial if lower_is_hole else lower_trial
         if anchor_trial.evaluation is None or anchor_trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
-        if capture_diagnostics:
+        if effective_capture_diagnostics:
             stats.endpoint_hole_summaries.append(
                 _EndpointHoleSummary(
                     mesh_subdivisions=mesh_subdivisions,
@@ -2819,7 +2904,9 @@ def _solve_cell(
                 all_trials=lambda: list(trials.values()),
                 record_hole_neighbors=record_hole_neighbors,
                 on_level=set_search_level,
-                on_recovery_level=(record_endpoint_recovery_level if capture_diagnostics else None),
+                on_recovery_level=(
+                    record_endpoint_recovery_level if effective_capture_diagnostics else None
+                ),
             )
         except _EndpointHoleRecoveryExhausted as exhausted:
             record_hole_neighbors(list(trials.values()))
@@ -3440,6 +3527,8 @@ def _outer_trial(
     shell_authority: Any,
     iterations: int,
     search_stats: _CellSearchStats | None = None,
+    *,
+    capture_diagnostics: bool = False,
 ) -> _OuterTrial:
     if search_stats is not None:
         search_stats.record_outer_trial()
@@ -3451,6 +3540,7 @@ def _outer_trial(
             shell_authority,
             iterations,
             search_stats,
+            capture_diagnostics=capture_diagnostics,
         )
     except _LowSideDomainInfeasible:
         # Search classification only: never return a partial trajectory as a result.
@@ -3510,11 +3600,28 @@ def _solve_outer_boundary(
     shell_authority: Any,
     search_stats: _CellSearchStats | None = None,
 ) -> _MeshRun:
+    capture = _CANDIDATE_RATING_CONTEXT.get() is not None and (
+        _task173_capture_cell_root_diagnostics_enabled()
+    )
+
     def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
         if search_stats is None:
-            return _outer_trial(subdivisions, enthalpy, provider, shell_authority, iteration)
+            return _outer_trial(
+                subdivisions,
+                enthalpy,
+                provider,
+                shell_authority,
+                iteration,
+                capture_diagnostics=capture,
+            )
         return _outer_trial(
-            subdivisions, enthalpy, provider, shell_authority, iteration, search_stats
+            subdivisions,
+            enthalpy,
+            provider,
+            shell_authority,
+            iteration,
+            search_stats,
+            capture_diagnostics=capture,
         )
 
     return _solve_outer_boundary_from_trial(trial_at, provider=provider)
@@ -3729,6 +3836,7 @@ def _candidate_transient_outer_boundary(
     certificate_hashes: list[str] = []
     certificate_projections: list[dict[str, Any]] = []
     outer_actions: list[str] = []
+    capture = _task173_capture_cell_root_diagnostics_enabled()
 
     def branch_trial(
         enthalpy: Decimal, iteration: int, side: Literal["LEFT_BRANCH", "RIGHT_BRANCH"]
@@ -3748,6 +3856,7 @@ def _candidate_transient_outer_boundary(
                 shell_authority,
                 iteration,
                 search_stats,
+                capture_diagnostics=capture,
             )
         finally:
             _CANDIDATE_TRANSIENT_CONTROL.reset(token)
@@ -3770,6 +3879,7 @@ def _candidate_transient_outer_boundary(
                 shell_authority,
                 iteration,
                 search_stats,
+                capture_diagnostics=capture,
             )
         except _ProviderQuantizationTrigger as trigger:
             native = None
@@ -3928,6 +4038,7 @@ def _candidate_transient_outer_boundary(
             shell_authority,
             selected.bisection_iterations,
             search_stats,
+            capture_diagnostics=capture,
         )
     finally:
         _CANDIDATE_TRANSIENT_CONTROL.reset(token)
@@ -4180,9 +4291,15 @@ def _run_mesh_sequence(
                     ),
                 }
             )
+            extra: tuple[str, ...] = ()
+            if _task173_capture_cell_root_diagnostics_enabled() and not any(
+                item.startswith("task173_cell_search_stats_json=") for item in exc.diagnostics
+            ):
+                extra = _task173_cell_search_stats_diagnostics(search_stats)
             raise _Stage3Failure(
                 exc.code,
                 *exc.diagnostics,
+                *extra,
                 "task172_numerical_hole_count_by_mesh="
                 + json.dumps(search_summaries, sort_keys=True, separators=(",", ":")),
                 f"mesh_subdivisions={subdivisions}",
@@ -4708,9 +4825,16 @@ def validate_candidate_rating(
             "BLOCKED_TASK173_CANDIDATE_REQUEST_SCHEMA_INVALID", (str(exc),), request_hash
         )
     except _Stage3Failure as exc:
+        diag = tuple(exc.diagnostics)
+        if _task173_capture_cell_root_diagnostics_enabled():
+            diag = tuple(
+                item
+                for item in diag
+                if not item.startswith("task172_numerical_hole_count_by_mesh=")
+            )
         return _blocked(
             exc.code,
-            tuple(exc.diagnostics),
+            diag,
             request_hash,
             failed_mesh=next(
                 (
