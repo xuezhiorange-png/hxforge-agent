@@ -474,6 +474,7 @@ def v08_thermal_rating_request(
     )
     merged_meta = (
         ("candidate_rating_scope", "V08_03_LIVE_THERMAL_RATING"),
+        ("v08_acceptance_task_id", "V08_03_LIVE_RATING_ACCEPTANCE_CLOSEOUT"),
         ("task168_request_hash", task168_request_hash),
     )
     return base.model_copy(update={"request_metadata": merged_meta})

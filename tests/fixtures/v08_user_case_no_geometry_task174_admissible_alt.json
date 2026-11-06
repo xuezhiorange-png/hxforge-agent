@@ -1,0 +1,26 @@
+{
+  "schema_version": "hxforge.general-user-design-case.v1",
+  "engineering_case_id": "v08-example-alt-water-water-task174-admissible",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 46, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 11.5, "unit": "kg/s"}
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 21, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 19.0, "unit": "kg/s"}
+  },
+  "target_heat_duty": {"value": 220, "unit": "kW"},
+  "max_tube_side_pressure_drop": {"value": 40, "unit": "kPa"},
+  "max_shell_side_pressure_drop": {"value": 35, "unit": "kPa"},
+  "design_envelope": {
+    "max_shell_inside_diameter_m": "1.2",
+    "max_tube_length_m": "6.0",
+    "provenance_note": "Independent water-water case for V08-03 closeout: distinct inlet states vs reference fixture; Task172 transfer contract mass flows in 12/20 kg/s neighborhood for outlet pressure domain."
+  },
+  "notes": "V08-03 acceptance: second non-reference case to prove handoff inputs propagate into Task173 (Issue #324 closeout)."
+}
