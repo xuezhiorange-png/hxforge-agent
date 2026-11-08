@@ -12,7 +12,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 from pydantic import ValidationError
-from scipy.optimize import brentq, least_squares
+from scipy.optimize import least_squares
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.bell_delaware.heat_transfer import calculate_heat_transfer
@@ -43,6 +43,7 @@ from hexagent.properties.base import (
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
+from .coupled_closure_kernel import ClosureResourceExhausted, solve_coupled_local_closure
 from .models import (
     COOLPROP_GIT_REVISION,
     COOLPROP_VERSION,
@@ -115,9 +116,6 @@ _FROZEN_RELATIVE_DIFF_STEP = 1e-5
 _WIDE_RELATIVE_DIFF_STEP_Q = 1e-4
 _WIDE_RELATIVE_DIFF_STEP_TEMPERATURE = 1e-5
 _WIDE_RELATIVE_DIFF_STEP_UV = 1e-5
-_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX = 24
-_WIDE_SCALAR_TWO_MAX_BRENT_ITER = 48
-_WIDE_SCALAR_TWO_BRENT_XTOL = 1e-12
 
 
 @dataclass(frozen=True)
@@ -1452,8 +1450,6 @@ def _solve_once(
         xtol = 1e-12
     tube_bulk_k = float(request.tube_bulk_state.temperature_k)
     shell_bulk_k = float(request.shell_bulk_state.temperature_k)
-    wall_resistance_k_w = float(wall_resistance)
-
     def residual(values: np.ndarray) -> np.ndarray:
         nonlocal callback_count, last_iterate
         callback_count += 1
@@ -1534,194 +1530,34 @@ def _solve_once(
             apply_c3_wall_pr_correction=tube_apply_c3,
         )
 
-    property_eval_cache: dict[PropertyEvalCacheKey, float] = {}
-    property_eval_counter = [0]
-
-    def _twi_from_two(two_value: float) -> tuple[float, float]:
-        two_value = float(two_value)
-        if two_value < shell_bulk_k:
-            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower")
-        g_o = _shell_outer_wall_conductance_w_per_k(
-            request,
-            provider,
-            shell_bulk_snapshot,
-            shell_h_base,
-            two_value,
-            property_eval_cache=property_eval_cache,
-            property_eval_counter=property_eval_counter,
-        )
-        q_outer = g_o * (two_value - shell_bulk_k)
-        if q_outer < 0.0:
-            raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "scalar_two.q_outer")
-        twi_value = two_value + q_outer * wall_resistance_k_w
-        return q_outer, twi_value
-
-    def _scalar_F_two(two_value: float) -> float:
-        """F(Two) = Qi(Two) - Qo(Two) using shell/tube wall conductances only."""
-        q_outer, twi_value = _twi_from_two(two_value)
-        if twi_value > tube_bulk_k:
-            return -1.0
-        g_i = _tube_inner_wall_conductance_w_per_k(
-            request,
-            provider,
-            tube_bulk_snapshot,
-            tube_h_base,
-            twi_value,
-            apply_c3_wall_pr_correction=tube_apply_c3,
-            property_eval_cache=property_eval_cache,
-            property_eval_counter=property_eval_counter,
-        )
-        q_inner = g_i * (tube_bulk_k - twi_value)
-        return q_inner - q_outer
-
-    def _physical_two_upper_bound(two_low: float) -> float:
-        if _twi_from_two(two_low)[1] > tube_bulk_k:
-            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.lower_twi")
-        two_hi = tube_bulk_k
-        if _twi_from_two(two_hi)[1] <= tube_bulk_k:
-            return two_hi
-        lo = two_low
-        hi = two_hi
-        for _ in range(_WIDE_SCALAR_TWO_UPPER_BISECTION_MAX):
-            mid = 0.5 * (lo + hi)
-            if _twi_from_two(mid)[1] <= tube_bulk_k:
-                lo = mid
-            else:
-                hi = mid
-            if hi - lo <= max(math.ulp(tube_bulk_k), 1e-12):
-                break
-        return lo
-
-    def _branch_heat_rates_w(
-        evaluated: dict[str, Any],
-        *,
-        twi_value: float,
-        two_value: float,
-    ) -> tuple[float, float, float]:
-        g_i = float(evaluated["g_i"])
-        g_wall = float(evaluated["g_wall"])
-        g_o = float(evaluated["g_o"])
-        q_inner = g_i * (tube_bulk_k - twi_value)
-        q_wall = g_wall * (twi_value - two_value)
-        q_outer = g_o * (two_value - shell_bulk_k)
-        return q_inner, q_wall, q_outer
-
-    def _accept_scalar_two_solution(
-        two_value: float,
-    ) -> tuple[dict[str, Any], tuple[float, float, float]]:
-        q_outer_seed, twi_value = _twi_from_two(two_value)
-        probe_eval = _counted_eval_trial(q_outer_seed, twi_value, two_value)
-        q_inner, q_wall, q_outer = _branch_heat_rates_w(
-            probe_eval, twi_value=twi_value, two_value=two_value
-        )
-        candidate_q_values = (q_inner, q_wall, q_outer, q_outer_seed)
-        seen_q: set[float] = set()
-        last_residual_failure: _RuntimeFailure | None = None
-        for q_ts in candidate_q_values:
-            q_key = float(q_ts)
-            if q_key in seen_q:
-                continue
-            seen_q.add(q_key)
-            try:
-                return _accept_solution((q_ts, twi_value, two_value), two_value)
-            except _RuntimeFailure as failure:
-                if failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
-                    raise failure
-                last_residual_failure = failure
-        if last_residual_failure is not None:
-            raise last_residual_failure
-        raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.accept")
-
-    def _solve_wide_physical_two_scalar() -> tuple[dict[str, Any], tuple[float, float, float], int]:
-        nonlocal callback_count
-        evaluations_at_start = callback_count
-        two_low = shell_bulk_k
-        two_high = _physical_two_upper_bound(two_low)
-        span = two_high - two_low
-        if span <= 0.0:
-            raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "scalar_two.span")
-
-        def _two_from_u(u_value: float) -> float:
-            u_clamped = min(max(float(u_value), 0.0), 1.0)
-            return two_low + u_clamped * span
-
-        def _scalar_F_u(u_value: float) -> float:
-            return _scalar_F_two(_two_from_u(u_value))
-
-        f_lower = _scalar_F_u(0.0)
-        f_upper = _scalar_F_u(1.0)
-        if f_lower < 0.0 or f_upper > 0.0:
-            raise _RuntimeFailure(
-                "BLOCKED_NONCONVERGENCE",
-                f"scalar_two.endpoint_sign;{f_lower};{f_upper}",
-            )
-        try:
-            u_root = float(
-                brentq(
-                    _scalar_F_u,
-                    0.0,
-                    1.0,
-                    maxiter=_WIDE_SCALAR_TWO_MAX_BRENT_ITER,
-                    xtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
-                    rtol=_WIDE_SCALAR_TWO_BRENT_XTOL,
-                )
-            )
-            two_root = _two_from_u(u_root)
-        except _RuntimeFailure:
-            raise
-        except ValueError as exc:
-            raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.brentq") from exc
-        except Exception as exc:
-            raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "scalar_two.brentq") from exc
-
-        def _accept_at_two(
-            two_candidate: float,
-        ) -> tuple[dict[str, Any], tuple[float, float, float]]:
-            return _accept_scalar_two_solution(float(two_candidate))
-
-        try:
-            evaluated, solution = _accept_at_two(two_root)
-        except _RuntimeFailure as root_failure:
-            if root_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
-                raise root_failure
-            ulp_step = max(math.ulp(two_root), 1e-15)
-            last_failure = root_failure
-            accepted_neighbor = False
-            for step_index in range(1, 17):
-                for sign in (1.0, -1.0):
-                    two_neighbor = two_root + sign * float(step_index) * ulp_step
-                    if not shell_bulk_k <= two_neighbor <= tube_bulk_k:
-                        continue
-                    try:
-                        evaluated, solution = _accept_at_two(two_neighbor)
-                        accepted_neighbor = True
-                        break
-                    except _RuntimeFailure as neighbor_failure:
-                        if neighbor_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
-                            raise neighbor_failure
-                        last_failure = neighbor_failure
-                if accepted_neighbor:
-                    break
-            if not accepted_neighbor:
-                raise last_failure from root_failure
-        function_evaluations = callback_count - evaluations_at_start
-        return evaluated, solution, function_evaluations
-
     if budget.wide_experimental:
+        callback_slot = [callback_count]
         try:
-            evaluated_final, solution, scalar_nfev = _solve_wide_physical_two_scalar()
+            evaluated_final, solution, scalar_nfev, solver_status = solve_coupled_local_closure(
+                tube_bulk_k=tube_bulk_k,
+                shell_bulk_k=shell_bulk_k,
+                wall_inner_seed=wall_inner_seed,
+                wall_outer_seed=wall_outer_seed,
+                evaluate_trial=_counted_eval_trial,
+                accept_solution=_accept_solution,
+                accept_context=None,
+                callback_budget=budget.callback_cap,
+                callback_counter=callback_slot,
+                method_label=method,
+            )
+        except ClosureResourceExhausted as exc:
+            raise _RuntimeFailure(
+                "BLOCKED_SOLVER_RESOURCE_EXHAUSTION",
+                "solver.callback_cap",
+            ) from exc
         except _RuntimeFailure as failure:
             raise failure
+        callback_count = callback_slot[0]
         q, twi, two = solution
         if q < 0.0:
             raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
         if not (shell_bulk_k <= two <= twi <= tube_bulk_k):
             raise _RuntimeFailure("BLOCKED_PHYSICAL_WALL_ORDERING", "wall_temperatures")
-        solver_status = (
-            "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_DOGBOX"
-            if method == "dogbox"
-            else "V07_R25D_PHYSICAL_TWO_SCALAR_BRACKET_TRF"
-        )
         return _build_valid_result(
             request,
             canonical_sha256(_request_projection(request)),
