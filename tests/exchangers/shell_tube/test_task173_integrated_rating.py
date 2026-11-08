@@ -1296,9 +1296,40 @@ def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     assert upper > 0
 
 
-def test_r3_lower_endpoint_hole_keeps_existing_unresolved_behavior(
+def test_both_endpoint_holes_shell_capacity_binding_classifies_low_side(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    provider, authority, support, tube, shell, _valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+    cap = min(
+        service.TUBE_MASS_FLOW_KG_S
+        * (Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+        service.SHELL_MASS_FLOW_KG_S
+        * (Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+    )
+    upper = float(cap)
+
+    def both_holes(q_w: float, **_kwargs: Any) -> Any:
+        if q_w in (0.0, upper):
+            raise _mark_replayed_residual_hole()
+        raise RuntimeError("unexpected probe")
+
+    monkeypatch.setattr(service, "_cell_evaluation", both_holes)
+    with pytest.raises(service._LowSideDomainInfeasible):
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+        )
+
+
+def test_r3_lower_endpoint_hole_shell_capacity_binding_classifies_low_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mirror of R3 upper-hole path when valid F(q) stays negative toward a lower q=0 hole."""
     provider, authority, support, tube, shell, valid_evaluation = (
         _r3_shell_capacity_target_fixture()
     )
@@ -1309,15 +1340,21 @@ def test_r3_lower_endpoint_hole_keeps_existing_unresolved_behavior(
         return valid_evaluation
 
     monkeypatch.setattr(service, "_cell_evaluation", lower_hole)
-    with pytest.raises(service._Stage3Failure) as caught:
+    stats = service._CellSearchStats()
+    with pytest.raises(service._LowSideDomainInfeasible):
         service._solve_cell(
             support=support,
             tube_upstream=tube,
             shell_physical_left=shell,
             provider=provider,
             shell_authority=authority,
+            search_stats=stats,
+            capture_diagnostics=True,
         )
-    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    assert stats.maximum_hole_recovery_depth_observed == 12
+    assert {entry.classification for entry in stats.trial_receipts if entry.q_trial_w == "0.0"} == {
+        "TASK172_NUMERICAL_HOLE"
+    }
 
 
 def test_r3_valid_upper_shell_capacity_low_side_path_is_unchanged(

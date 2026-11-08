@@ -965,11 +965,19 @@ def _dyadic_refine_valid_bracket(
             if probe < hole.q_w:
                 if trial.classification == "TASK172_NUMERICAL_HOLE":
                     left_hole_edge = probe
-                elif trial.classification == "VALID_CELL_EVALUATION":
+                elif (
+                    trial.classification == "VALID_CELL_EVALUATION"
+                    and trial.residual is not None
+                    and trial.residual <= 0
+                ):
                     left_anchor = trial
             elif trial.classification == "TASK172_NUMERICAL_HOLE":
                 right_hole_edge = probe
-            elif trial.classification == "VALID_CELL_EVALUATION":
+            elif (
+                trial.classification == "VALID_CELL_EVALUATION"
+                and trial.residual is not None
+                and trial.residual >= 0
+            ):
                 right_anchor = trial
         samples = [trial for trial in all_trials() if left.q_w <= trial.q_w <= right.q_w]
         eligible = [trial for trial in level_trials if _eligible_trial(trial)]
@@ -2860,6 +2868,13 @@ def _solve_cell(
     upper_trial = evaluate(upper)
     upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
     if lower_is_hole or upper_is_hole:
+        if lower_is_hole and upper_is_hole:
+            if shell_capacity <= tube_capacity:
+                raise _LowSideDomainInfeasible
+            raise _Stage3Failure(
+                "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                "both physical endpoints are numerical holes; no valid sign anchor exists",
+            )
         current_left_trial, current_right_trial = lower_trial, upper_trial
         hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"] = (
             "LOWER_ENDPOINT" if lower_is_hole else "UPPER_ENDPOINT"
@@ -2920,25 +2935,53 @@ def _solve_cell(
                 and len(upper_trial.task172_request_hash) == 64
                 and len(upper_trial.blocked_result_hash) == 64
             )
+            lower_endpoint_is_replayed_residual_hole = (
+                lower_is_hole
+                and lower_trial.q_w == lower
+                and lower_trial.classification == "TASK172_NUMERICAL_HOLE"
+                and lower_trial.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+                and lower_trial.exact_blocked_result_type
+                and lower_trial.blocked_request_hash_replay_passed
+                and lower_trial.blocked_result_hash_replay_passed
+                and lower_trial.task172_request_hash is not None
+                and lower_trial.blocked_result_hash is not None
+                and len(lower_trial.task172_request_hash) == 64
+                and len(lower_trial.blocked_result_hash) == 64
+            )
+            anchor_initial_f_negative = (
+                anchor_trial.residual is not None and anchor_trial.residual < 0
+            )
             no_prior_low_side_probe = not any(
                 trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE" for trial in trials.values()
             )
             no_hard_blocker = not any(
                 trial.classification == "HARD_BLOCKER" for trial in trials.values()
             )
-            if (
-                exhausted.endpoint_side == "UPPER_ENDPOINT"
-                and hole_endpoint_side == "UPPER_ENDPOINT"
-                and upper_endpoint_is_replayed_residual_hole
-                and shell_capacity <= tube_capacity
-                and upper_trial.q_w == upper
-                and exhausted.recovery_levels_executed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
+            recovery_exhaustion_common = (
+                exhausted.recovery_levels_executed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
                 and exhausted.valid_sample_count > 0
                 and exhausted.all_valid_residuals_negative
                 and not exhausted.sign_pair_found
                 and not exhausted.eligible_root_found
                 and no_prior_low_side_probe
                 and no_hard_blocker
+                and shell_capacity <= tube_capacity
+            )
+            if (
+                exhausted.endpoint_side == "UPPER_ENDPOINT"
+                and hole_endpoint_side == "UPPER_ENDPOINT"
+                and upper_endpoint_is_replayed_residual_hole
+                and upper_trial.q_w == upper
+                and recovery_exhaustion_common
+            ):
+                raise _LowSideDomainInfeasible from None
+            if (
+                exhausted.endpoint_side == "LOWER_ENDPOINT"
+                and hole_endpoint_side == "LOWER_ENDPOINT"
+                and lower_endpoint_is_replayed_residual_hole
+                and lower_trial.q_w == lower
+                and anchor_initial_f_negative
+                and recovery_exhaustion_common
             ):
                 raise _LowSideDomainInfeasible from None
             raise
