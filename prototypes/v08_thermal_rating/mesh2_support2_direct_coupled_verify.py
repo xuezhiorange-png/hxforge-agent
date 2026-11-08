@@ -23,26 +23,11 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_therm
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _CANDIDATE_RATING_CONTEXT,
-    _CellSearchStats,
-    _Stage3Failure,
     _candidate_context,
     _candidate_transient_outer_boundary,
+    _CellSearchStats,
+    _Stage3Failure,
 )
-from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_thermal_rating.direct_coupled_cell_solver import (
-    attempt_joint_q_twi_two_closure,
-    physical_q_upper_w,
-    scan_q_direct_coupled,
-)
-from prototypes.v08_thermal_rating.export_v08_03_blocked_cell_evidence import (
-    DEFAULT_FIXTURE,
-    _enumerate_for_fixture,
-    _find_bundle,
-)
-from prototypes.v08_thermal_rating.fatal_cell_identity import load_fatal_cell_identity
-from prototypes.v08_thermal_rating.replay_first_failed_cell_e1baa795 import EVIDENCE, CANDIDATE_ID
-from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.candidate_materialization import (
     materialize_candidate_task171,
 )
@@ -57,6 +42,21 @@ from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
 from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import (
     validate_candidate_request as validate_task174_candidate,
 )
+from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
+from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
+from prototypes.v08_thermal_rating.direct_coupled_cell_solver import (
+    attempt_joint_q_twi_two_closure,
+    physical_q_upper_w,
+    scan_q_direct_coupled,
+)
+from prototypes.v08_thermal_rating.export_v08_03_blocked_cell_evidence import (
+    DEFAULT_FIXTURE,
+    _enumerate_for_fixture,
+    _find_bundle,
+)
+from prototypes.v08_thermal_rating.fatal_cell_identity import load_fatal_cell_identity
+from prototypes.v08_thermal_rating.replay_first_failed_cell_e1baa795 import CANDIDATE_ID, EVIDENCE
 
 OUT_PATH = Path(
     f"/opt/cursor/artifacts/v08_03_mesh2_support2_direct_coupled_verify_{CANDIDATE_ID}.json"

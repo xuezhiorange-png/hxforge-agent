@@ -308,6 +308,8 @@ shards:
       - tests/exchangers/shell_tube/test_task172_scalar_two_diagnostics.py
       - tests/exchangers/shell_tube/test_task173_integrated_rating.py
       - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
+      - tests/prototypes/test_fatal_cell_identity.py
+      - tests/prototypes/test_true_three_equation_cell_coupling.py
       - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
       - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
     timeout: 600

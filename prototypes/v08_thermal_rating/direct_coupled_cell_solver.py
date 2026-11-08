@@ -13,7 +13,13 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     Task172BlockedResult,
     Task172LocalResult,
 )
-from hexagent.exchangers.shell_tube.task172_local_runtime.service import validate_request
+from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
+    CandidateTask172LocalRequest,
+)
+from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
+    validate_candidate_request,
+    validate_request,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _cell_evaluation,
     _CellEvaluation,
@@ -114,7 +120,10 @@ def probe_q_direct_coupled(
         record["task172_request_hash"] = hole.request_hash
         record["blocked_result_hash"] = hole.blocked_result_hash
         if hole.task172_request is not None:
-            outcome = validate_request(hole.task172_request, provider)
+            if type(hole.task172_request) is CandidateTask172LocalRequest:
+                outcome = validate_candidate_request(hole.task172_request, provider)
+            else:
+                outcome = validate_request(hole.task172_request, provider)
             if type(outcome) is Task172LocalResult:
                 record["production_retry_classification"] = (
                     "NUMERICAL_HOLE_PRODUCTION_RETRY_ACCEPTED"

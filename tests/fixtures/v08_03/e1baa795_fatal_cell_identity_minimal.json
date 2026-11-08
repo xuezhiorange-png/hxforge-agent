@@ -1,0 +1,33 @@
+{
+  "candidate_hash": "8d6fdb4853dd13688eaa72bd6dcec9fad67f70d0575aba3b9704fe336d8d0b2f",
+  "candidate_rating_request_hash": "607adc316ced1e760c2bca29ead1d4f0f31af54a1eb99deb8a0d93658983be49",
+  "failed_mesh_subdivisions": 1,
+  "fatal_cell": {
+    "candidate_hash": "8d6fdb4853dd13688eaa72bd6dcec9fad67f70d0575aba3b9704fe336d8d0b2f",
+    "candidate_id": "e1baa795-9cf5-5718-8fa8-0688d2102c5c",
+    "candidate_rating_request_hash": "607adc316ced1e760c2bca29ead1d4f0f31af54a1eb99deb8a0d93658983be49",
+    "failed_mesh_subdivisions": 1,
+    "geometry_projection_hash": "a98e73756a24cc181f89ccc4f97df42d2afac717056b2e5d570e83d6da472973",
+    "hole_endpoint_side": "LOWER_ENDPOINT",
+    "initial_valid_anchor_f_q_w": "102743.68537248092",
+    "initial_valid_anchor_q_w": "205823.0904314168",
+    "mesh_subdivisions": 1,
+    "outer_iteration": 40,
+    "outer_shooting_enthalpy_j_kg": "122022.671968216305767071039635993656702339649200439453125",
+    "physical_lower_q_w": "0.0",
+    "physical_support_id": "urn:hxforge:task171:candidate:8d6fdb4853dd13688eaa72bd6dcec9fad67f70d0575aba3b9704fe336d8d0b2f:support:2",
+    "physical_upper_q_w": "205823.0904314168",
+    "shell_cell_id": "urn:hxforge:task173:candidate-cell:shell:b99c15fc97306c9d8e4a67736a6ea9795165301953d85a4c119d708cfd562dfb",
+    "task_id": "V08_03_FATAL_CELL_IDENTITY",
+    "termination_failure_code": "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+    "termination_scalar_diagnostics": {
+      "mesh_subdivisions": "1"
+    },
+    "tube_cell_id": "urn:hxforge:task173:candidate-cell:tube:27fa2218b01b3acd17c5e615fb8945a94edb3caa93137fed6635ef20f34c4f5f",
+    "wall_interface_id": "urn:hxforge:task173:candidate-wall-interface:21fee6d6844ddfcf8ccd5adc68a5ddd73b95f4cd49cda1d0525c1b5509fcda96"
+  },
+  "fixture_schema": "V08_03_FATAL_CELL_IDENTITY_MINIMAL_V1",
+  "geometry_projection_hash": "a98e73756a24cc181f89ccc4f97df42d2afac717056b2e5d570e83d6da472973",
+  "source_candidate_id": "e1baa795-9cf5-5718-8fa8-0688d2102c5c",
+  "termination_failure_code": "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+}
