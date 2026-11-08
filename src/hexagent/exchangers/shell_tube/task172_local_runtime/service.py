@@ -1450,6 +1450,7 @@ def _solve_once(
         xtol = 1e-12
     tube_bulk_k = float(request.tube_bulk_state.temperature_k)
     shell_bulk_k = float(request.shell_bulk_state.temperature_k)
+
     def residual(values: np.ndarray) -> np.ndarray:
         nonlocal last_iterate
         callback_acc[0] += 1
