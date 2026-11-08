@@ -1592,33 +1592,45 @@ def _solve_once(
                 break
         return lo
 
+    def _branch_heat_rates_w(
+        evaluated: dict[str, Any],
+        *,
+        twi_value: float,
+        two_value: float,
+    ) -> tuple[float, float, float]:
+        g_i = float(evaluated["g_i"])
+        g_wall = float(evaluated["g_wall"])
+        g_o = float(evaluated["g_o"])
+        q_inner = g_i * (tube_bulk_k - twi_value)
+        q_wall = g_wall * (twi_value - two_value)
+        q_outer = g_o * (two_value - shell_bulk_k)
+        return q_inner, q_wall, q_outer
+
     def _accept_scalar_two_solution(
         two_value: float,
     ) -> tuple[dict[str, Any], tuple[float, float, float]]:
-        q_outer, twi_value = _twi_from_two(two_value)
-        evaluated = _counted_eval_trial(q_outer, twi_value, two_value)
-        q_inner = float(evaluated["g_i"]) * (tube_bulk_k - twi_value)
-        try:
-            return _accept_solution((q_inner, twi_value, two_value), two_value)
-        except _RuntimeFailure:
+        q_outer_seed, twi_value = _twi_from_two(two_value)
+        probe_eval = _counted_eval_trial(q_outer_seed, twi_value, two_value)
+        q_inner, q_wall, q_outer = _branch_heat_rates_w(
+            probe_eval, twi_value=twi_value, two_value=two_value
+        )
+        candidate_q_values = (q_inner, q_wall, q_outer, q_outer_seed)
+        seen_q: set[float] = set()
+        last_residual_failure: _RuntimeFailure | None = None
+        for q_ts in candidate_q_values:
+            q_key = float(q_ts)
+            if q_key in seen_q:
+                continue
+            seen_q.add(q_key)
             try:
-                return _accept_solution((q_outer, twi_value, two_value), two_value)
-            except _RuntimeFailure as residual_failure:
-                residual_values = cast(tuple[float, float, float], evaluated["residuals"])
-                acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
-                diagnostics = ";".join(
-                    str(item)
-                    for item in (
-                        q_inner,
-                        twi_value,
-                        two_value,
-                        *residual_values,
-                        *acceptance_bounds,
-                    )
-                )
-                raise _RuntimeFailure(
-                    "BLOCKED_RESIDUAL_ACCEPTANCE", diagnostics
-                ) from residual_failure
+                return _accept_solution((q_ts, twi_value, two_value), two_value)
+            except _RuntimeFailure as failure:
+                if failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+                    raise failure
+                last_residual_failure = failure
+        if last_residual_failure is not None:
+            raise last_residual_failure
+        raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.accept")
 
     def _solve_wide_physical_two_scalar() -> tuple[dict[str, Any], tuple[float, float, float], int]:
         nonlocal callback_count
@@ -1661,7 +1673,37 @@ def _solve_once(
             raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "scalar_two.brentq") from exc
         except Exception as exc:
             raise _RuntimeFailure("BLOCKED_SOLVER_FAILURE", "scalar_two.brentq") from exc
-        evaluated, solution = _accept_scalar_two_solution(two_root)
+
+        def _accept_at_two(
+            two_candidate: float,
+        ) -> tuple[dict[str, Any], tuple[float, float, float]]:
+            return _accept_scalar_two_solution(float(two_candidate))
+
+        try:
+            evaluated, solution = _accept_at_two(two_root)
+        except _RuntimeFailure as root_failure:
+            if root_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+                raise root_failure
+            ulp_step = max(math.ulp(two_root), 1e-15)
+            last_failure = root_failure
+            accepted_neighbor = False
+            for step_index in range(1, 17):
+                for sign in (1.0, -1.0):
+                    two_neighbor = two_root + sign * float(step_index) * ulp_step
+                    if not shell_bulk_k <= two_neighbor <= tube_bulk_k:
+                        continue
+                    try:
+                        evaluated, solution = _accept_at_two(two_neighbor)
+                        accepted_neighbor = True
+                        break
+                    except _RuntimeFailure as neighbor_failure:
+                        if neighbor_failure.code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+                            raise neighbor_failure
+                        last_failure = neighbor_failure
+                if accepted_neighbor:
+                    break
+            if not accepted_neighbor:
+                raise last_failure from root_failure
         function_evaluations = callback_count - evaluations_at_start
         return evaluated, solution, function_evaluations
 

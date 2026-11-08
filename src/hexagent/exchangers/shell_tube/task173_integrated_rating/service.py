@@ -2538,10 +2538,7 @@ def _solve_cell(
         request_dump: dict[str, Any] | None = None
         blocked_diag: tuple[str, ...] | None = None
         task172_trace: tuple[dict[str, Any], ...] | None = None
-        if (
-            trial.classification == "TASK172_NUMERICAL_HOLE"
-            and trial.task172_request is not None
-        ):
+        if trial.classification == "TASK172_NUMERICAL_HOLE" and trial.task172_request is not None:
             try:
                 request_dump = trial.task172_request.model_dump(mode="json")
             except Exception:
