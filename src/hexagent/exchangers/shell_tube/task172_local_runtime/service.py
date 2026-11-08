@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import struct
 import sys
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from decimal import Decimal, localcontext
+from pathlib import Path
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -43,6 +45,7 @@ from hexagent.properties.base import (
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 
+from .coupled_closure_accounting import CoupledClosureAccounting
 from .coupled_closure_kernel import ClosureResourceExhausted, solve_coupled_local_closure
 from .models import (
     COOLPROP_GIT_REVISION,
@@ -1519,6 +1522,13 @@ def _solve_once(
         )
 
     if budget.wide_experimental:
+        coupled_accounting: CoupledClosureAccounting | None = None
+        if os.environ.get("HXFORGE_TASK172_COUPLED_ACCOUNTING", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            coupled_accounting = CoupledClosureAccounting()
         try:
             evaluated_final, solution, scalar_nfev, solver_status = solve_coupled_local_closure(
                 tube_bulk_k=tube_bulk_k,
@@ -1531,6 +1541,7 @@ def _solve_once(
                 callback_budget=budget.callback_cap,
                 callback_counter=callback_acc,
                 least_squares_method=method,
+                accounting=coupled_accounting,
             )
         except ClosureResourceExhausted as exc:
             raise _RuntimeFailure(
@@ -1539,6 +1550,13 @@ def _solve_once(
             ) from exc
         except _RuntimeFailure as failure:
             raise failure
+        if coupled_accounting is not None:
+            accounting_out = os.environ.get("HXFORGE_TASK172_ACCOUNTING_OUT")
+            if accounting_out:
+                Path(accounting_out).write_text(
+                    json.dumps(asdict(coupled_accounting), indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
         q, twi, two = solution
         if q < 0.0:
             raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")

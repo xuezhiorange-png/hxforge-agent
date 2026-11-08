@@ -94,6 +94,7 @@ def test_q_ts_search_finds_interior_when_endpoints_fail() -> None:
     g_o = 101.0 / 3.0
 
     def evaluate_trial(q_ts: float, _wi: float, _wo: float) -> dict:
+        counter[0] += 1
         low = 100.0
         high = 101.0
         mid = 0.5 * (low + high)
@@ -131,6 +132,7 @@ def test_q_ts_search_finds_interior_when_endpoints_fail() -> None:
 
 def test_q_ts_search_raises_when_budget_exhausted() -> None:
     def evaluate_trial(_q: float, _wi: float, _wo: float) -> dict:
+        counter[0] += 1
         return {
             "g_i": 1.0,
             "g_wall": 1.0,
