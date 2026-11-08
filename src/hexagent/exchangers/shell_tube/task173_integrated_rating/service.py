@@ -2869,8 +2869,6 @@ def _solve_cell(
     upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
     if lower_is_hole or upper_is_hole:
         if lower_is_hole and upper_is_hole:
-            if shell_capacity <= tube_capacity:
-                raise _LowSideDomainInfeasible
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                 "both physical endpoints are numerical holes; no valid sign anchor exists",

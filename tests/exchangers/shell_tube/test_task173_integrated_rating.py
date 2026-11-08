@@ -1296,7 +1296,7 @@ def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     assert upper > 0
 
 
-def test_both_endpoint_holes_shell_capacity_binding_classifies_low_side(
+def test_both_endpoint_holes_remain_bracket_unresolved_without_valid_anchor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider, authority, support, tube, shell, _valid_evaluation = (
@@ -1316,7 +1316,7 @@ def test_both_endpoint_holes_shell_capacity_binding_classifies_low_side(
         raise RuntimeError("unexpected probe")
 
     monkeypatch.setattr(service, "_cell_evaluation", both_holes)
-    with pytest.raises(service._LowSideDomainInfeasible):
+    with pytest.raises(service._Stage3Failure) as caught:
         service._solve_cell(
             support=support,
             tube_upstream=tube,
@@ -1324,6 +1324,7 @@ def test_both_endpoint_holes_shell_capacity_binding_classifies_low_side(
             provider=provider,
             shell_authority=authority,
         )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
 
 
 def test_r3_lower_endpoint_hole_shell_capacity_binding_classifies_low_side(
