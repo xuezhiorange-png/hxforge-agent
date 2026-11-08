@@ -117,6 +117,10 @@ def _ratio_minus_one(
     return _max_residual_ratio(q_ts, twi, two, evaluate_trial) - 1.0
 
 
+def _remaining_callback_budget(callback_budget: int, callback_counter: list[int]) -> int:
+    return max(0, int(callback_budget) - int(callback_counter[0]))
+
+
 def _search_q_ts_for_acceptance(
     twi: float,
     two: float,
@@ -129,6 +133,10 @@ def _search_q_ts_for_acceptance(
     callback_counter: list[int],
 ) -> tuple[float, bool]:
     """Deterministic bounded search; returns (q_ts, accepted). Raises on budget exhaustion."""
+    remaining = _remaining_callback_budget(callback_budget, callback_counter)
+    if remaining <= 0:
+        raise ClosureResourceExhausted("solver.callback_cap")
+    lattice_steps = min(_Q_TS_LATTICE_STEPS, max(4, remaining // 4))
     probe = evaluate_trial(float(q_anchor), twi, two)
     q_inner, q_wall, q_outer = _branch_heat_rates_w(
         probe,
@@ -149,21 +157,21 @@ def _search_q_ts_for_acceptance(
         return float(low), ratio <= 1.0
 
     def budget_guard() -> None:
-        if callback_counter[0] >= callback_budget:
+        if _remaining_callback_budget(callback_budget, callback_counter) <= 0:
             raise ClosureResourceExhausted("solver.callback_cap")
 
     # Phase 1: fixed lattice (interior succeeds when endpoints fail).
     lattice_q: list[float] = []
-    for step in range(_Q_TS_LATTICE_STEPS + 1):
+    for step in range(lattice_steps + 1):
         budget_guard()
-        fraction = float(step) / float(_Q_TS_LATTICE_STEPS)
+        fraction = float(step) / float(lattice_steps)
         q_point = low + fraction * width
         lattice_q.append(q_point)
         if _ratio_minus_one(q_point, twi, two, evaluate_trial) <= 0.0:
             return q_point, True
 
     # Phase 2: brentq on sub-intervals where acceptance crosses the gate.
-    for left_index in range(_Q_TS_LATTICE_STEPS):
+    for left_index in range(lattice_steps):
         q_left = lattice_q[left_index]
         q_right = lattice_q[left_index + 1]
         budget_guard()
@@ -243,8 +251,10 @@ def solve_coupled_local_closure(
     u2_0 = (twi0 - two0) / max(tube_bulk_k - two0, 1e-30)
 
     evaluations_before = callback_counter[0]
-    remaining_budget = max(callback_budget - callback_counter[0], 0)
-    max_nfev = min(120, max(remaining_budget, 8))
+    remaining_budget = _remaining_callback_budget(callback_budget, callback_counter)
+    max_nfev = min(120, max(remaining_budget // 2, 4))
+    if max_nfev < 4:
+        raise ClosureResourceExhausted("solver.callback_cap")
 
     def residual_u(values: np.ndarray) -> np.ndarray:
         if callback_counter[0] >= callback_budget:
