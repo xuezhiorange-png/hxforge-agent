@@ -8,7 +8,10 @@ import pytest
 
 from hexagent.exchangers.shell_tube.task172_local_runtime import service as task172_service
 from hexagent.exchangers.shell_tube.task172_local_runtime.coupled_closure_kernel import (
+    ClosureResourceExhausted,
     _branch_heat_rates_w,
+    _search_q_ts_for_acceptance,
+    solve_coupled_local_closure,
 )
 from hexagent.exchangers.shell_tube.task172_local_runtime.models import Task172LocalResult
 from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_thermal_boundary import (
@@ -80,3 +83,120 @@ def test_r23_variable_water_closure_reference_request_validates() -> None:
     assert type(outcome) is Task172LocalResult
     assert outcome.residual_acceptance_state == "PASS_C_RESIDUAL_SPECIFIC_ULP_OPERATION_BOUND"
     assert float(outcome.signed_q_hot_to_cold_w) > 0.0
+
+
+def test_q_ts_search_finds_interior_when_endpoints_fail() -> None:
+    twi, two = 300.0, 298.0
+    tube_bulk, shell_bulk = 310.0, 295.0
+    span = 1.0
+    g_i = 10.0
+    g_wall = 50.0
+    g_o = 101.0 / 3.0
+
+    def evaluate_trial(q_ts: float, _wi: float, _wo: float) -> dict:
+        low = 100.0
+        high = 101.0
+        mid = 0.5 * (low + high)
+        bound = 0.5 * span
+        target = q_ts
+        if abs(q_ts - mid) < span / 64.0:
+            target = mid
+        elif q_ts <= low + span * 0.02:
+            target = low + 2.0 * bound
+        elif q_ts >= high - span * 0.02:
+            target = high + 2.0 * bound
+        residual = q_ts - target
+        return {
+            "g_i": g_i,
+            "g_wall": g_wall,
+            "g_o": g_o,
+            "residuals": (residual, residual, residual),
+            "bounds": (bound, bound, bound),
+        }
+
+    counter = [0]
+    q_ts, accepted = _search_q_ts_for_acceptance(
+        twi,
+        two,
+        tube_bulk_k=tube_bulk,
+        shell_bulk_k=shell_bulk,
+        evaluate_trial=evaluate_trial,
+        q_anchor=100.0,
+        callback_budget=200,
+        callback_counter=counter,
+    )
+    assert accepted
+    assert 100.0 < q_ts < 101.0
+
+
+def test_q_ts_search_raises_when_budget_exhausted() -> None:
+    def evaluate_trial(_q: float, _wi: float, _wo: float) -> dict:
+        return {
+            "g_i": 1.0,
+            "g_wall": 1.0,
+            "g_o": 1.0,
+            "residuals": (1.0, 1.0, 1.0),
+            "bounds": (1.0, 1.0, 1.0),
+        }
+
+    counter = [5]
+    with pytest.raises(ClosureResourceExhausted):
+        _search_q_ts_for_acceptance(
+            300.0,
+            298.0,
+            tube_bulk_k=310.0,
+            shell_bulk_k=295.0,
+            evaluate_trial=evaluate_trial,
+            q_anchor=100.0,
+            callback_budget=5,
+            callback_counter=counter,
+        )
+
+
+def test_coupled_closure_solver_status_reflects_least_squares_method() -> None:
+    calls = 0
+
+    def evaluate_trial(_q: float, _wi: float, _wo: float) -> dict:
+        nonlocal calls
+        calls += 1
+        return {
+            "g_i": 10.0,
+            "g_wall": 10.0,
+            "g_o": 10.0,
+            "residuals": (0.0, 0.0, 0.0),
+            "bounds": (1.0, 1.0, 1.0),
+        }
+
+    def accept_solution(solution: tuple[float, float, float], _ctx: object) -> tuple:
+        evaluated = evaluate_trial(solution[0], solution[1], solution[2])
+        return evaluated, solution
+
+    counter = [0]
+    _, _, _, status_trf = solve_coupled_local_closure(
+        tube_bulk_k=310.0,
+        shell_bulk_k=295.0,
+        wall_inner_seed=305.0,
+        wall_outer_seed=298.0,
+        evaluate_trial=evaluate_trial,
+        accept_solution=accept_solution,
+        accept_context=None,
+        callback_budget=400,
+        callback_counter=counter,
+        least_squares_method="trf",
+    )
+    assert status_trf == "V08_03_COUPLED_WALL_CLOSURE_TRF"
+
+    counter = [0]
+    _, _, _, status_dog = solve_coupled_local_closure(
+        tube_bulk_k=310.0,
+        shell_bulk_k=295.0,
+        wall_inner_seed=305.0,
+        wall_outer_seed=298.0,
+        evaluate_trial=evaluate_trial,
+        accept_solution=accept_solution,
+        accept_context=None,
+        callback_budget=400,
+        callback_counter=counter,
+        least_squares_method="dogbox",
+    )
+    assert status_dog == "V08_03_COUPLED_WALL_CLOSURE_DOGBOX"

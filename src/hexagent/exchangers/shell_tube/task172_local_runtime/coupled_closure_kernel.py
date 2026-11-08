@@ -7,15 +7,14 @@ Physics (hot tube / cold shell convention as in ``service._eval_trial``):
   Q_o    = G_o(Two) * (Two - T_cold)
 
 Closure is a root in (Twi, Two) with shell_bulk <= Two <= Twi <= tube_bulk and Q_i = Q_wall = Q_o.
-The reported DOF ``q_ts`` is recovered by a bounded 1-D feasibility search on the W residual
-acceptance gate (not scipy ``success`` alone).
+The reported DOF ``q_ts`` is recovered by a bounded, deterministic 1-D residual-acceptance search.
 """
 
 from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from scipy.optimize import brentq, least_squares
@@ -25,6 +24,10 @@ AcceptSolution = Callable[
     [tuple[float, float, float], Any],
     tuple[dict[str, Any], tuple[float, float, float]],
 ]
+
+CoupledLeastSquaresMethod = Literal["trf", "dogbox"]
+_Q_TS_LATTICE_STEPS = 32
+_Q_TS_BRENT_MAXITER = 48
 
 
 class ClosureResourceExhausted(Exception):
@@ -105,7 +108,16 @@ def _max_residual_ratio(
     return max(ratios)
 
 
-def _select_q_ts_for_acceptance(
+def _ratio_minus_one(
+    q_ts: float,
+    twi: float,
+    two: float,
+    evaluate_trial: TrialEvaluator,
+) -> float:
+    return _max_residual_ratio(q_ts, twi, two, evaluate_trial) - 1.0
+
+
+def _search_q_ts_for_acceptance(
     twi: float,
     two: float,
     *,
@@ -113,8 +125,10 @@ def _select_q_ts_for_acceptance(
     shell_bulk_k: float,
     evaluate_trial: TrialEvaluator,
     q_anchor: float,
-) -> float:
-    """Pick ``q_ts`` near branch rates; refine with a 1-D bracket on the acceptance ratio."""
+    callback_budget: int,
+    callback_counter: list[int],
+) -> tuple[float, bool]:
+    """Deterministic bounded search; returns (q_ts, accepted). Raises on budget exhaustion."""
     probe = evaluate_trial(float(q_anchor), twi, two)
     q_inner, q_wall, q_outer = _branch_heat_rates_w(
         probe,
@@ -126,29 +140,80 @@ def _select_q_ts_for_acceptance(
     low = min(q_inner, q_wall, q_outer)
     high = max(q_inner, q_wall, q_outer)
     if not math.isfinite(low) or not math.isfinite(high):
-        return float(q_wall)
-    if high - low <= max(math.ulp(high), 1e-18):
-        return float(q_wall)
+        raise ValueError("non-finite branch heat rates")
+    if high < low:
+        low, high = high, low
+    width = high - low
+    if width <= 0.0:
+        ratio = _max_residual_ratio(low, twi, two, evaluate_trial)
+        return float(low), ratio <= 1.0
 
-    def ratio_minus_one(q_ts: float) -> float:
-        return _max_residual_ratio(q_ts, twi, two, evaluate_trial) - 1.0
+    def budget_guard() -> None:
+        if callback_counter[0] >= callback_budget:
+            raise ClosureResourceExhausted("solver.callback_cap")
 
-    if ratio_minus_one(float(q_wall)) <= 0.0:
-        return float(q_wall)
+    # Phase 1: fixed lattice (interior succeeds when endpoints fail).
+    lattice_q: list[float] = []
+    for step in range(_Q_TS_LATTICE_STEPS + 1):
+        budget_guard()
+        fraction = float(step) / float(_Q_TS_LATTICE_STEPS)
+        q_point = low + fraction * width
+        lattice_q.append(q_point)
+        if _ratio_minus_one(q_point, twi, two, evaluate_trial) <= 0.0:
+            return q_point, True
 
-    try:
-        r_lo = ratio_minus_one(low)
-        r_hi = ratio_minus_one(high)
-        if r_lo <= 0.0:
-            return float(low)
-        if r_hi <= 0.0:
-            return float(high)
-        if r_lo * r_hi > 0.0:
-            return float(q_wall)
-        root = brentq(ratio_minus_one, low, high, maxiter=64, xtol=1e-15, rtol=1e-12)
-        return float(root)
-    except (ValueError, RuntimeError):
-        return float(q_wall)
+    # Phase 2: brentq on sub-intervals where acceptance crosses the gate.
+    for left_index in range(_Q_TS_LATTICE_STEPS):
+        q_left = lattice_q[left_index]
+        q_right = lattice_q[left_index + 1]
+        budget_guard()
+        r_left = _ratio_minus_one(q_left, twi, two, evaluate_trial) - 0.0
+        budget_guard()
+        r_right = _ratio_minus_one(q_right, twi, two, evaluate_trial) - 0.0
+        if r_left <= 0.0:
+            return q_left, True
+        if r_right <= 0.0:
+            return q_right, True
+        if r_left * r_right >= 0.0:
+            continue
+        try:
+            budget_guard()
+            root = brentq(
+                lambda q_ts: _ratio_minus_one(q_ts, twi, two, evaluate_trial),
+                q_left,
+                q_right,
+                maxiter=_Q_TS_BRENT_MAXITER,
+                xtol=max(math.ulp(q_left), math.ulp(q_right), 1e-18),
+                rtol=1e-12,
+            )
+            if _ratio_minus_one(float(root), twi, two, evaluate_trial) <= 0.0:
+                return float(root), True
+        except (ValueError, RuntimeError):
+            continue
+
+    # Phase 3: float64 representable neighbors around minimum-ratio lattice point.
+    best_q = q_wall
+    best_ratio = math.inf
+    for q_point in lattice_q:
+        budget_guard()
+        ratio = _max_residual_ratio(q_point, twi, two, evaluate_trial)
+        if ratio < best_ratio:
+            best_ratio = ratio
+            best_q = q_point
+    for direction in (-1.0, 1.0):
+        for step in range(1, 9):
+            budget_guard()
+            neighbor = math.nextafter(best_q, best_q + direction * step)
+            if neighbor < low or neighbor > high:
+                break
+            ratio = _max_residual_ratio(neighbor, twi, two, evaluate_trial)
+            if ratio <= 1.0:
+                return neighbor, True
+            if ratio < best_ratio:
+                best_ratio = ratio
+                best_q = neighbor
+
+    return float(best_q), best_ratio <= 1.0
 
 
 def solve_coupled_local_closure(
@@ -162,7 +227,7 @@ def solve_coupled_local_closure(
     accept_context: Any,
     callback_budget: int,
     callback_counter: list[int],
-    method_label: str,
+    least_squares_method: CoupledLeastSquaresMethod,
 ) -> tuple[dict[str, Any], tuple[float, float, float], int, str]:
     """Solve coupled closure; raise ``ClosureResourceExhausted`` on budget exceed."""
     if callback_counter[0] >= callback_budget:
@@ -172,13 +237,14 @@ def solve_coupled_local_closure(
     if span <= 0.0:
         raise ValueError("invalid bulk span")
 
-    # Seeds in monotone (two, twi) parameterization
     two0 = min(max(wall_outer_seed, shell_bulk_k), tube_bulk_k)
     twi0 = min(max(wall_inner_seed, two0), tube_bulk_k)
     u1_0 = (two0 - shell_bulk_k) / span
     u2_0 = (twi0 - two0) / max(tube_bulk_k - two0, 1e-30)
 
     evaluations_before = callback_counter[0]
+    remaining_budget = max(callback_budget - callback_counter[0], 0)
+    max_nfev = min(120, max(remaining_budget, 8))
 
     def residual_u(values: np.ndarray) -> np.ndarray:
         if callback_counter[0] >= callback_budget:
@@ -201,12 +267,12 @@ def solve_coupled_local_closure(
     result = least_squares(
         residual_u,
         np.asarray([u1_0, u2_0], dtype=float),
-        method="trf",
+        method=least_squares_method,
         bounds=([0.0, 0.0], [1.0, 1.0]),
         ftol=1e-12,
         xtol=1e-14,
         gtol=1e-12,
-        max_nfev=min(120, max(callback_budget - callback_counter[0], 8)),
+        max_nfev=max_nfev,
     )
     twi_root, two_root = _temperatures_from_u(
         float(result.x[0]),
@@ -228,17 +294,19 @@ def solve_coupled_local_closure(
         twi_value=twi_root,
         two_value=two_root,
     )
-    q_ts = _select_q_ts_for_acceptance(
+    q_ts, _accepted = _search_q_ts_for_acceptance(
         twi_root,
         two_root,
         tube_bulk_k=tube_bulk_k,
         shell_bulk_k=shell_bulk_k,
         evaluate_trial=evaluate_trial,
         q_anchor=q_wall,
+        callback_budget=callback_budget,
+        callback_counter=callback_counter,
     )
     evaluated, solution = accept_solution((q_ts, twi_root, two_root), accept_context)
     nfev = callback_counter[0] - evaluations_before
-    solver_status = f"V08_03_COUPLED_WALL_CLOSURE_{method_label.upper()}"
+    solver_status = f"V08_03_COUPLED_WALL_CLOSURE_{least_squares_method.upper()}"
     return evaluated, solution, nfev, solver_status
 
 
@@ -250,15 +318,18 @@ def residual_acceptance_feasible_at_walls(
     shell_bulk_k: float,
     evaluate_trial: TrialEvaluator,
     q_anchor: float,
+    callback_budget: int,
+    callback_counter: list[int],
 ) -> tuple[bool, float, float]:
-    """Return whether some ``q_ts`` passes the original W acceptance gate (ratio <= 1)."""
-    q_ts = _select_q_ts_for_acceptance(
+    q_ts, accepted = _search_q_ts_for_acceptance(
         twi,
         two,
         tube_bulk_k=tube_bulk_k,
         shell_bulk_k=shell_bulk_k,
         evaluate_trial=evaluate_trial,
         q_anchor=q_anchor,
+        callback_budget=callback_budget,
+        callback_counter=callback_counter,
     )
     ratio = _max_residual_ratio(q_ts, twi, two, evaluate_trial)
-    return ratio <= 1.0, q_ts, ratio
+    return accepted and ratio <= 1.0, q_ts, ratio

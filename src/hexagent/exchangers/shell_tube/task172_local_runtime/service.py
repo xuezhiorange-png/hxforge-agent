@@ -1420,7 +1420,7 @@ def _solve_once(
             "BLOCKED_INITIALIZATION_STATE_OUT_OF_DOMAIN", "initialization.wall_outer"
         )
 
-    callback_count = 0
+    callback_acc = [0]
     last_iterate: tuple[float, float, float] = (q_seed, wall_inner_seed, wall_outer_seed)
 
     def _runtime_failure_from_trial(
@@ -1451,9 +1451,9 @@ def _solve_once(
     tube_bulk_k = float(request.tube_bulk_state.temperature_k)
     shell_bulk_k = float(request.shell_bulk_state.temperature_k)
     def residual(values: np.ndarray) -> np.ndarray:
-        nonlocal callback_count, last_iterate
-        callback_count += 1
-        if callback_count > budget.callback_cap:
+        nonlocal last_iterate
+        callback_acc[0] += 1
+        if callback_acc[0] > budget.callback_cap:
             raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
         q, twi, two = (float(value) for value in values)
         last_iterate = (q, twi, two)
@@ -1477,19 +1477,7 @@ def _solve_once(
         candidate_solver: Any,
     ) -> tuple[dict[str, Any], tuple[float, float, float]]:
         q_value, twi_value, two_value = candidate_solution
-        evaluated = _eval_trial(
-            request,
-            provider,
-            tube_bulk_snapshot,
-            shell_bulk_snapshot,
-            tube_h_base,
-            shell_h_base,
-            wall_resistance,
-            q_value,
-            twi_value,
-            two_value,
-            apply_c3_wall_pr_correction=tube_apply_c3,
-        )
+        evaluated = _counted_eval_trial(q_value, twi_value, two_value)
         residual_values = cast(tuple[float, float, float], evaluated["residuals"])
         acceptance_bounds = cast(tuple[float, float, float], evaluated["bounds"])
         if any(
@@ -1512,9 +1500,8 @@ def _solve_once(
         wall_inner: float,
         wall_outer: float,
     ) -> dict[str, Any]:
-        nonlocal callback_count
-        callback_count += 1
-        if callback_count > budget.callback_cap:
+        callback_acc[0] += 1
+        if callback_acc[0] > budget.callback_cap:
             raise _RuntimeFailure("BLOCKED_SOLVER_RESOURCE_EXHAUSTION", "solver.callback_cap")
         return _eval_trial(
             request,
@@ -1531,7 +1518,6 @@ def _solve_once(
         )
 
     if budget.wide_experimental:
-        callback_slot = [callback_count]
         try:
             evaluated_final, solution, scalar_nfev, solver_status = solve_coupled_local_closure(
                 tube_bulk_k=tube_bulk_k,
@@ -1542,8 +1528,8 @@ def _solve_once(
                 accept_solution=_accept_solution,
                 accept_context=None,
                 callback_budget=budget.callback_cap,
-                callback_counter=callback_slot,
-                method_label=method,
+                callback_counter=callback_acc,
+                least_squares_method=method,
             )
         except ClosureResourceExhausted as exc:
             raise _RuntimeFailure(
@@ -1552,7 +1538,6 @@ def _solve_once(
             ) from exc
         except _RuntimeFailure as failure:
             raise failure
-        callback_count = callback_slot[0]
         q, twi, two = solution
         if q < 0.0:
             raise _RuntimeFailure("BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE", "signed_q_hot_to_cold_w")
@@ -1574,7 +1559,7 @@ def _solve_once(
             (q, twi, two),
             solver_status,
             scalar_nfev,
-            callback_count,
+            callback_acc[0],
             numerical_profile_id=budget.numerical_profile_id,
             provenance_refs=_EVIDENCE_REFS,
         )
@@ -1610,7 +1595,7 @@ def _solve_once(
         tuple[float, float, float],
         tuple(float(value) for value in solver.x),
     )
-    if not solver.success or solver.nfev > budget.max_nfev or callback_count > budget.callback_cap:
+    if not solver.success or solver.nfev > budget.max_nfev or callback_acc[0] > budget.callback_cap:
         raise _RuntimeFailure("BLOCKED_NONCONVERGENCE", "solver.termination")
     evaluated_final, solution = _accept_solution(solution, solver)
     q, twi, two = solution
@@ -1647,7 +1632,7 @@ def _solve_once(
         (q, twi, two),
         solver_status,
         int(solver.nfev),
-        callback_count,
+        callback_acc[0],
         numerical_profile_id=profile_id,
         provenance_refs=provenance,
     )
