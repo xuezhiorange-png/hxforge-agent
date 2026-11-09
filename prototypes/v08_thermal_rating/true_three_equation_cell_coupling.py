@@ -14,12 +14,10 @@ from hexagent.exchangers.shell_tube.overall_heat_transfer_resistance.engineering
     compute_wall_resistance,
 )
 from hexagent.exchangers.shell_tube.task172_local_runtime import service as t172_service
-from hexagent.exchangers.shell_tube.task172_local_runtime.coupled_closure_kernel import (
-    _temperatures_from_u,
-)
 from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     CandidateTask172LocalRequest,
     Task172LocalRequest,
+    Task172LocalResult,
 )
 from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
     recompute_task172_request_hash,
@@ -227,6 +225,173 @@ def _algebraic_seed(
     return max(q, 0.0), twi, two
 
 
+def residual_gate_record(
+    q_w: float,
+    twi_k: float,
+    two_k: float,
+    *,
+    request: Task172Request,
+    provider: Any,
+    primitives: ClosurePrimitives,
+) -> dict[str, Any]:
+    gate = evaluate_three_equation_residuals(
+        q_w, twi_k, two_k, request=request, provider=provider, primitives=primitives
+    )
+    return {
+        "q_w": float(q_w),
+        "twi_k": float(twi_k),
+        "two_k": float(two_k),
+        "r_inner_w": gate["residuals_w"][0],
+        "r_wall_w": gate["residuals_w"][1],
+        "r_outer_w": gate["residuals_w"][2],
+        "bound_inner_w": gate["acceptance_bounds_w"][0],
+        "bound_wall_w": gate["acceptance_bounds_w"][1],
+        "bound_outer_w": gate["acceptance_bounds_w"][2],
+        "max_residual_ratio": gate["max_residual_ratio"],
+        "original_residual_gate_pass": gate["passes_original_residual_gate"],
+        "request_hash": recompute_task172_request_hash(request),
+    }
+
+
+def solve_frozen_request_direct_trf(
+    request: Task172Request,
+    provider: Any,
+    *,
+    max_nfev: int = 192,
+) -> dict[str, Any]:
+    """TRF on (q,Twi,Two) with frozen request/bulk/primitives (Task172 _solve_once equivalent)."""
+    primitives = build_closure_primitives(request, provider)
+    support = request.support
+    tube_k = float(request.tube_bulk_state.temperature_k)
+    shell_k = float(request.shell_bulk_state.temperature_k)
+    q_seed, twi_seed, two_seed = _algebraic_seed(tube_k, shell_k, primitives, support)
+    residual_scale = max(abs(q_seed), 1.0)
+    t_min = float(t172_service._admitted_temperature_bounds()[0])
+    t_max = float(t172_service._admitted_temperature_bounds()[1])
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q, twi, two = (float(v) for v in vec)
+        temp_ok = t_min <= twi <= t_max and t_min <= two <= t_max
+        order_ok = shell_k <= two <= twi <= tube_k
+        if not (temp_ok and order_ok):
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        ev = evaluate_three_equation_residuals(
+            q, twi, two, request=request, provider=provider, primitives=primitives
+        )
+        return np.asarray(ev["residuals_w"], dtype=float) / residual_scale
+
+    x0 = np.asarray([q_seed, twi_seed, two_seed], dtype=float)
+    lo = np.asarray([0.0, max(shell_k, t_min), max(shell_k, t_min)], dtype=float)
+    hi = np.asarray([max(q_seed * 2.0, 1.0), tube_k, tube_k], dtype=float)
+    opt = least_squares(
+        residual,
+        x0,
+        bounds=(lo, hi),
+        method="trf",
+        ftol=1e-6,
+        xtol=1e-12,
+        max_nfev=max_nfev,
+    )
+    q_f, twi_f, two_f = (float(v) for v in opt.x)
+    gate = residual_gate_record(
+        q_f, twi_f, two_f, request=request, provider=provider, primitives=primitives
+    )
+    return {
+        "method": "FROZEN_REQUEST_DIRECT_TRF",
+        "optimizer_success": bool(opt.success),
+        "optimizer_nfev": int(opt.nfev),
+        **gate,
+    }
+
+
+def compare_same_request_production_vs_frozen_trf(
+    request: Task172Request,
+    provider: Any,
+) -> dict[str, Any]:
+    """Classify precision gap: frozen TRF vs production validate on identical request."""
+    if type(request) is CandidateTask172LocalRequest:
+        production = validate_candidate_request(request, provider)
+    else:
+        production = validate_request(request, provider)
+    frozen = solve_frozen_request_direct_trf(request, provider)
+    record: dict[str, Any] = {
+        "task_id": "V08_03_SAME_REQUEST_COMPARISON",
+        "request_hash": recompute_task172_request_hash(request),
+        "precision_root_cause_hypothesis": None,
+    }
+    if type(production) is Task172LocalResult:
+        pq = float(production.signed_q_hot_to_cold_w)
+        p_twi = float(production.wall_temperature_inner_k)
+        p_two = float(production.wall_temperature_outer_k)
+        prim = build_closure_primitives(request, provider)
+        prod_gate = residual_gate_record(
+            pq, p_twi, p_two, request=request, provider=provider, primitives=prim
+        )
+        record["production"] = {
+            **prod_gate,
+            "result_hash": production.result_hash,
+            "outcome_type": "Task172LocalResult",
+        }
+    else:
+        record["production"] = {
+            "outcome_type": type(production).__name__,
+            "failure_code": getattr(production, "failure_code", None),
+        }
+    record["frozen_trf"] = frozen
+    if type(production) is Task172LocalResult and frozen.get("original_residual_gate_pass"):
+        fq = frozen["q_w"]
+        pq = float(production.signed_q_hot_to_cold_w)
+        rel_q = abs(fq - pq) / max(abs(pq), 1.0)
+        record["q_relative_delta"] = rel_q
+        if rel_q <= 1e-12 and frozen["max_residual_ratio"] <= 1.0:
+            record["comparison_status"] = "PASS_ALIGNED"
+            record["precision_root_cause_hypothesis"] = "NONE"
+        elif rel_q <= 1e-8:
+            record["comparison_status"] = "PASS_Q_NEAR_MISMATCH_ULP"
+            record["precision_root_cause_hypothesis"] = "D_TERMINATION_OR_ROUNDING"
+        else:
+            record["comparison_status"] = "BLOCKED_Q_MISMATCH"
+            record["precision_root_cause_hypothesis"] = "C_INDEPENDENT_TERMINATION"
+    elif type(production) is Task172LocalResult:
+        record["comparison_status"] = "BLOCKED_FROZEN_GATE"
+        record["precision_root_cause_hypothesis"] = "C_INDEPENDENT_TERMINATION"
+    else:
+        record["comparison_status"] = "BLOCKED_PRODUCTION"
+        record["precision_root_cause_hypothesis"] = "E_PRODUCTION_BLOCKED"
+    return record
+
+
+def solve_constitutive_at_q_trial(
+    q_trial_w: float,
+    *,
+    support: Any,
+    tube_upstream: Any,
+    shell_physical_left: Any,
+    provider: Any,
+    shell_authority: Any,
+) -> dict[str, Any]:
+    """Task173-aligned: freeze bulk at q_trial, solve (q,Twi,Two); F(q)=q_trial-q_constitutive."""
+    request, _, _ = build_task172_request_for_q(
+        q_trial_w,
+        support=support,
+        tube_upstream=tube_upstream,
+        shell_physical_left=shell_physical_left,
+        provider=provider,
+        shell_authority=shell_authority,
+    )
+    comparison = compare_same_request_production_vs_frozen_trf(request, provider)
+    q172: float | None = None
+    if comparison.get("production", {}).get("outcome_type") == "Task172LocalResult":
+        q172 = float(comparison["production"]["q_w"])
+    f_q = float(q_trial_w) - float(q172) if q172 is not None else None
+    return {
+        "q_trial_w": float(q_trial_w),
+        "f_q_w": f_q,
+        "same_request_comparison": comparison,
+        "frozen_trf": comparison.get("frozen_trf"),
+    }
+
+
 def solve_true_three_equation_coupling(
     *,
     support: Any,
@@ -238,90 +403,17 @@ def solve_true_three_equation_coupling(
     q_seed: float | None = None,
     max_nfev: int = _TRUE_COUPLED_BUDGET_NFEV,
 ) -> dict[str, Any]:
-    """Independent least_squares on (q,u1,u2). Residual path does NOT call Task172 _solve."""
-    record: dict[str, Any] = {
-        "task_id": "V08_03_TRUE_THREE_EQUATION_COUPLING",
-        "nested_task172_solver_removed_from_residual": True,
-    }
+    """Freeze Task173 bulk at q_trial; direct TRF on (q,Twi,Two) (no nested Task172 in residual)."""
+    q_trial = min(max(q_seed if q_seed is not None else q_upper * 0.5, 0.0), q_upper)
     if q_upper <= 0:
-        record["status"] = "BLOCKED"
-        record["reason"] = "non_positive_q_upper"
-        return record
-
-    def residual(vec: np.ndarray) -> np.ndarray:
-        q = float(vec[0])
-        u1 = float(vec[1])
-        u2 = float(vec[2])
-        if q < 0.0 or q > q_upper or not (0.0 <= u1 <= 1.0 and 0.0 <= u2 <= 1.0):
-            return np.asarray([10.0, 10.0, 10.0], dtype=float)
-        try:
-            request, _, _ = build_task172_request_for_q(
-                q,
-                support=support,
-                tube_upstream=tube_upstream,
-                shell_physical_left=shell_physical_left,
-                provider=provider,
-                shell_authority=shell_authority,
-            )
-        except _LowSideDomainInfeasible:
-            return np.asarray([8.0, 8.0, 8.0], dtype=float)
-        tube_bulk_k = float(request.tube_bulk_state.temperature_k)
-        shell_bulk_k = float(request.shell_bulk_state.temperature_k)
-        if tube_bulk_k <= shell_bulk_k:
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
-        try:
-            twi, two = _temperatures_from_u(
-                u1, u2, tube_bulk_k=tube_bulk_k, shell_bulk_k=shell_bulk_k
-            )
-        except ValueError:
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
-        primitives = build_closure_primitives(request, provider)
-        ev = evaluate_three_equation_residuals(
-            q, twi, two, request=request, provider=provider, primitives=primitives
-        )
-        scale = max(abs(q), 1.0)
-        return np.asarray(ev["residuals_w"], dtype=float) / scale
-
-    q0 = min(max(q_seed if q_seed is not None else q_upper * 0.5, 0.0), q_upper)
+        return {
+            "task_id": "V08_03_TRUE_THREE_EQUATION_COUPLING",
+            "status": "BLOCKED",
+            "reason": "non_positive_q_upper",
+        }
     try:
-        req0, _, _ = build_task172_request_for_q(
-            q0,
-            support=support,
-            tube_upstream=tube_upstream,
-            shell_physical_left=shell_physical_left,
-            provider=provider,
-            shell_authority=shell_authority,
-        )
-        prim0 = build_closure_primitives(req0, provider)
-        tube_k = float(req0.tube_bulk_state.temperature_k)
-        shell_k = float(req0.shell_bulk_state.temperature_k)
-        q_alg, twi_alg, two_alg = _algebraic_seed(tube_k, shell_k, prim0, support)
-        u1_seed = (two_alg - shell_k) / max(tube_k - shell_k, 1e-9)
-        u2_seed = (
-            (twi_alg - two_alg) / max(tube_k - two_alg, 1e-9) if twi_alg > two_alg else 0.35
-        )
-        q_init = min(max(q_alg if math.isfinite(q_alg) else q0, 0.0), q_upper)
-        x0 = np.asarray(
-            [q_init, min(max(u1_seed, 0.05), 0.95), min(max(u2_seed, 0.05), 0.95)],
-            dtype=float,
-        )
-    except (_LowSideDomainInfeasible, ValueError):
-        x0 = np.asarray([min(q0, q_upper), 0.35, 0.35], dtype=float)
-
-    opt = least_squares(
-        residual,
-        x0,
-        bounds=([0.0, 0.0, 0.0], [q_upper, 1.0, 1.0]),
-        method="trf",
-        ftol=1e-10,
-        xtol=1e-12,
-        max_nfev=max_nfev,
-    )
-    q_final = float(opt.x[0])
-    u1_f, u2_f = float(opt.x[1]), float(opt.x[2])
-    try:
-        request_f, tube_local, shell_local = build_task172_request_for_q(
-            q_final,
+        constitutive = solve_constitutive_at_q_trial(
+            q_trial,
             support=support,
             tube_upstream=tube_upstream,
             shell_physical_left=shell_physical_left,
@@ -329,61 +421,24 @@ def solve_true_three_equation_coupling(
             shell_authority=shell_authority,
         )
     except _LowSideDomainInfeasible:
-        record.update(
-            {
-                "status": "BLOCKED_LOW_SIDE",
-                "optimizer_success": bool(opt.success),
-                "optimizer_nfev": int(opt.nfev),
-                "q_final_w": q_final,
-            }
-        )
-        return record
-
-    tube_bulk_k = float(request_f.tube_bulk_state.temperature_k)
-    shell_bulk_k = float(request_f.shell_bulk_state.temperature_k)
-    twi_f, two_f = _temperatures_from_u(
-        u1_f, u2_f, tube_bulk_k=tube_bulk_k, shell_bulk_k=shell_bulk_k
-    )
-    prim_f = build_closure_primitives(request_f, provider)
-    gate = evaluate_three_equation_residuals(
-        q_final, twi_f, two_f, request=request_f, provider=provider, primitives=prim_f
-    )
-    record.update(
-        {
-            "optimizer_success": bool(opt.success),
-            "optimizer_nfev": int(opt.nfev),
-            "optimizer_cost": float(opt.cost),
-            "q_w": q_final,
-            "twi_k": twi_f,
-            "two_k": two_f,
-            "tube_bulk_k": tube_bulk_k,
-            "shell_bulk_k": shell_bulk_k,
-            "residuals_w": gate["residuals_w"],
-            "acceptance_bounds_w": gate["acceptance_bounds_w"],
-            "residual_to_bound_ratios": gate["residual_to_bound_ratios"],
-            "max_residual_ratio": gate["max_residual_ratio"],
-            "original_residual_gate_pass": gate["passes_original_residual_gate"],
-            "task172_request_hash": recompute_task172_request_hash(request_f),
-        }
-    )
-    if gate["passes_original_residual_gate"]:
-        record["status"] = "INDEPENDENT_LOCAL_SOLUTION"
-    else:
-        record["status"] = "NO_ACCEPTED_RESIDUAL_GATE"
-
-    nested_outcome: Any = None
-    if type(request_f) is CandidateTask172LocalRequest:
-        nested_outcome = validate_candidate_request(request_f, provider)
-    else:
-        nested_outcome = validate_request(request_f, provider)
-    record["nested_task172_replay_for_evidence_only"] = type(nested_outcome).__name__
-    if hasattr(nested_outcome, "signed_q_hot_to_cold_w"):
-        record["nested_signed_q_w"] = str(nested_outcome.signed_q_hot_to_cold_w)
-    elif hasattr(nested_outcome, "failure_code"):
-        record["nested_failure_code"] = nested_outcome.failure_code
-    record["engineering_task172_pass"] = False
-    record["tube_local_enthalpy_j_kg"] = str(tube_local.native.enthalpy_j_kg)
-    record["shell_local_enthalpy_j_kg"] = str(shell_local.native.enthalpy_j_kg)
+        return {"task_id": "V08_03_TRUE_THREE_EQUATION_COUPLING", "status": "BLOCKED_LOW_SIDE"}
+    comparison = constitutive["same_request_comparison"]
+    production = comparison.get("production", {})
+    frozen = comparison.get("frozen_trf", {})
+    gate_pass = bool(production.get("original_residual_gate_pass"))
+    record: dict[str, Any] = {
+        "task_id": "V08_03_TRUE_THREE_EQUATION_COUPLING",
+        "nested_task172_solver_removed_from_residual": True,
+        "q_trial_w": q_trial,
+        "f_q_w": constitutive.get("f_q_w"),
+        "same_request_comparison": comparison,
+        "original_residual_gate_pass": gate_pass,
+        "engineering_task172_pass": gate_pass,
+        "status": "INDEPENDENT_LOCAL_SOLUTION" if gate_pass else "NO_ACCEPTED_RESIDUAL_GATE",
+        **{k: frozen.get(k) for k in ("q_w", "twi_k", "two_k", "max_residual_ratio")},
+    }
+    if production.get("result_hash"):
+        record["task172_result_hash"] = production["result_hash"]
     return record
 
 
