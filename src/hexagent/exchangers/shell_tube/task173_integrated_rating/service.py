@@ -2965,6 +2965,20 @@ def _solve_cell(
             on_level=set_search_level,
         )
         if recovered is None:
+            valid_in_interval = [
+                trial
+                for trial in trials.values()
+                if lower <= trial.q_w <= upper
+                and trial.classification == "VALID_CELL_EVALUATION"
+                and trial.residual is not None
+            ]
+            if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
+                raise _LowSideDomainInfeasible
+            if valid_in_interval and all(trial.residual > 0 for trial in valid_in_interval):
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                    "both endpoints are numerical holes; interior valid probes share one sign",
+                )
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                 "both physical endpoints are numerical holes; no valid sign anchor exists",
