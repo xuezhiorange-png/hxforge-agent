@@ -10,23 +10,21 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
+    CandidateTask172LocalRequest,
     Task172BlockedResult,
     Task172LocalResult,
-)
-from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
-    CandidateTask172LocalRequest,
 )
 from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
     validate_candidate_request,
     validate_request,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
-    _cell_evaluation,
     _CellEvaluation,
-    _d,
     _LowSideDomainInfeasible,
     _Stage3Failure,
     _Task172NumericalHole,
+    _cell_evaluation,
+    _d,
 )
 
 ProbeClassification = Literal[

@@ -1,5 +1,8 @@
 """Write repo-local minimal fatal-cell fixture from blocked-cell evidence export."""
 
+# Standalone entry point must prepend the repository paths before project imports.
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import json
@@ -37,7 +40,10 @@ def write_minimal_from_evidence(payload: dict) -> dict:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print("usage: export_fatal_cell_minimal_fixture.py <blocked_cell_evidence.json>", file=sys.stderr)
+        print(
+            "usage: export_fatal_cell_minimal_fixture.py <blocked_cell_evidence.json>",
+            file=sys.stderr,
+        )
         return 2
     payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
     minimal = write_minimal_from_evidence(payload)

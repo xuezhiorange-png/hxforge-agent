@@ -1,8 +1,9 @@
 """Run true (q,Twi,Two) three-equation coupling at latest fatal support-thermo replay state."""
 
-from __future__ import annotations
-
+# Standalone verifier must prepend repository paths before project imports.
 # ruff: noqa: E402
+
+from __future__ import annotations
 
 import json
 import os
@@ -89,10 +90,14 @@ def main() -> int:
         mesh = kwargs.get("mesh_subdivisions")
         outer = kwargs.get("outer_iteration")
         sid = support.physical_segment_id
-        if mesh == target_mesh and sid == fatal["physical_support_id"]:
-            if outer is not None and int(outer) >= int(replay_state["outer_iteration"]):
-                replay_state.update(kwargs)
-                replay_state["outer_iteration"] = int(outer)
+        if (
+            mesh == target_mesh
+            and sid == fatal["physical_support_id"]
+            and outer is not None
+            and int(outer) >= int(replay_state["outer_iteration"])
+        ):
+            replay_state.update(kwargs)
+            replay_state["outer_iteration"] = int(outer)
         return native_solve(**kwargs)
 
     t173_service._solve_cell = intercept  # type: ignore[method-assign]
@@ -100,7 +105,9 @@ def main() -> int:
     ctx_token = _CANDIDATE_RATING_CONTEXT.set(context)
     try:
         try:
-            _candidate_transient_outer_boundary(target_mesh, provider, context.shell_authority, _CellSearchStats())
+            _candidate_transient_outer_boundary(
+                target_mesh, provider, context.shell_authority, _CellSearchStats()
+            )
         except _Stage3Failure as exc:
             capture["mesh_outer_outcome"] = exc.code
     finally:

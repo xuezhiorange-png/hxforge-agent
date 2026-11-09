@@ -14,17 +14,20 @@ Usage (from repo root)::
 Writes ``v08_03_blocked_cell_evidence_<candidate_id>.json`` under ``/opt/cursor/artifacts/``.
 """
 
+# Standalone entry point must prepend the repository path before project imports.
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import json
 import os
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from typing import Any, cast
 
 from hexagent.exchangers.shell_tube.manufacturable_candidates.canonical import (
     request_hash as task168_request_hash_digest,
