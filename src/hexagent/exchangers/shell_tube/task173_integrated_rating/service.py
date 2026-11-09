@@ -380,6 +380,7 @@ REQUIRED_LATER_HEADROOM_LEVELS = 1
 MAX_SUBDIVISIONS_PER_INTERVAL = 64
 LATEST_ACCEPTABLE_CANDIDATE_SUBDIVISIONS = 32
 MAX_HOLE_DYADIC_LEVELS_PER_BRACKET = 12
+MAX_COARSE_HOLE_RECOVERY_STEPS = 32
 MAX_HOLE_RECOVERY_BRACKETS_PER_CELL = 15
 MAX_HOLE_RECOVERY_PROBES_PER_CELL = (
     MAX_HOLE_RECOVERY_BRACKETS_PER_CELL * 2 * MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
@@ -893,6 +894,38 @@ def _accept_cell_root_at_float_precision_floor(
     return None
 
 
+def _coarse_both_endpoint_hole_scan(
+    lower: float,
+    upper: float,
+    *,
+    evaluate: Callable[[float], _CellTrial],
+    on_level: Callable[[int], None] | None = None,
+) -> tuple[_CellTrial, _CellTrial] | None:
+    """When both physical endpoints are holes, scan interior q for a valid sign bracket."""
+    span = upper - lower
+    if span <= 0:
+        return None
+    valid: list[_CellTrial] = []
+    for index in range(1, MAX_COARSE_HOLE_RECOVERY_STEPS + 1):
+        if on_level is not None:
+            on_level(MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + index)
+        probe = lower + (index / (MAX_COARSE_HOLE_RECOVERY_STEPS + 1)) * span
+        if probe <= lower or probe >= upper:
+            continue
+        trial = evaluate(probe)
+        if trial.classification == "HARD_BLOCKER":
+            raise _Stage3Failure(trial.failure_code or "BLOCKED_CELL_TASK172_HARD_BLOCKER")
+        if trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+            raise _Stage3Failure(
+                "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                "both-endpoint-hole coarse probe exited property domain",
+            )
+        if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None:
+            valid.append(trial)
+    pairs = _valid_sign_pairs(valid)
+    return pairs[0] if pairs else None
+
+
 def _valid_sign_pairs(trials: list[_CellTrial]) -> list[tuple[_CellTrial, _CellTrial]]:
     valid = sorted(
         (
@@ -1037,14 +1070,16 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
         "LOWER_ENDPOINT" if lower_hole else "UPPER_ENDPOINT"
     )
     valid_recovery_samples: list[_CellTrial] = []
-    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
-        if on_level is not None:
-            on_level(level)
-        hole_edge_before = hole_edge
-        anchor_before = anchor
-        probe = (hole_edge + anchor.q_w) / 2.0
-        if probe == hole_edge or probe == anchor.q_w:
-            break
+    dyadic_levels_completed = 0
+
+    def _ingest_endpoint_hole_probe(
+        *,
+        level: int,
+        probe: float,
+        hole_edge_before: float,
+        anchor_before: _CellTrial,
+    ) -> tuple[_CellTrial, _CellTrial, _CellTrial | None] | Literal["CONTINUE", "BREAK"]:
+        nonlocal hole_edge, anchor
         trial = evaluate(probe)
         if trial.classification == "HARD_BLOCKER":
             raise _Stage3Failure(trial.failure_code or "BLOCKED_CELL_TASK172_HARD_BLOCKER")
@@ -1069,7 +1104,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
                         eligible_root_found=False,
                     )
                 )
-            continue
+            return "CONTINUE"
         if trial.classification != "VALID_CELL_EVALUATION" or trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
         valid_recovery_samples.append(trial)
@@ -1114,7 +1149,60 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             record_hole_neighbors(all_trials())
             return sign_pairs[0][0], sign_pairs[0][1], None
         anchor = trial
+        return "CONTINUE"
+
+    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
+        dyadic_levels_completed = level
+        if on_level is not None:
+            on_level(level)
+        hole_edge_before = hole_edge
+        anchor_before = anchor
+        probe = (hole_edge + anchor.q_w) / 2.0
+        if probe == hole_edge or probe == anchor.q_w:
+            break
+        outcome = _ingest_endpoint_hole_probe(
+            level=level,
+            probe=probe,
+            hole_edge_before=hole_edge_before,
+            anchor_before=anchor_before,
+        )
+        if outcome not in ("CONTINUE", "BREAK"):
+            return outcome
     else:
+        dyadic_levels_completed = MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
+
+    span = anchor.q_w - hole_edge
+    run_coarse_recovery = (
+        span > 0
+        and lower_hole
+        and anchor.residual is not None
+        and anchor.residual > 0
+        and (
+            not valid_recovery_samples
+            or any(
+                sample.residual is not None and sample.residual < 0
+                for sample in valid_recovery_samples
+            )
+        )
+    )
+    if run_coarse_recovery:
+        for index in range(1, MAX_COARSE_HOLE_RECOVERY_STEPS + 1):
+            level = MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + index
+            if on_level is not None:
+                on_level(level)
+            probe = hole_edge + (index / (MAX_COARSE_HOLE_RECOVERY_STEPS + 1)) * span
+            if probe <= hole_edge or probe >= anchor.q_w:
+                continue
+            outcome = _ingest_endpoint_hole_probe(
+                level=level,
+                probe=probe,
+                hole_edge_before=hole_edge,
+                anchor_before=anchor,
+            )
+            if outcome not in ("CONTINUE", "BREAK"):
+                return outcome
+
+    if dyadic_levels_completed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET:
         raise _EndpointHoleRecoveryExhausted(
             endpoint_side=endpoint_side,
             recovery_levels_executed=MAX_HOLE_DYADIC_LEVELS_PER_BRACKET,
@@ -1122,6 +1210,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             sign_pair_found=False,
             eligible_root_found=False,
         )
+
     raise _Stage3Failure(
         "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
         "endpoint-hole recovery stopped before exhausting all authorized levels",
@@ -2316,46 +2405,45 @@ def _cell_evaluation(
     shell_authority: Any,
 ) -> _CellEvaluation:
     q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
+        tube_mid_h = (tube_upstream_h + tube_downstream_h) / Decimal(2)
+        shell_mid_h = (shell_left_h + shell_next_h) / Decimal(2)
+    h_min = _effective_h_min_j_kg()
+    h_max = effective_admitted_h_max_j_kg(provider)
+    if tube_downstream_h < h_min or tube_downstream_h > h_max:
+        raise _Stage3Failure(
+            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+            "tube downstream face enthalpy outside admitted domain",
+            str(tube_downstream_h),
+        )
+    if shell_next_h < h_min:
+        # Search-side feasibility only. No property call is made for this state.
+        raise _LowSideDomainInfeasible
+    if shell_next_h > h_max:
+        raise _Stage3Failure(
+            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+            "shell next face enthalpy outside admitted domain",
+            str(shell_next_h),
+        )
     if q == Decimal(0):
-        # No thermodynamic state changes at exact zero duty. Preserve the
-        # validated provider snapshots rather than reinterpreting TP output
-        # enthalpy as a new PH input coordinate.
+        # Face states: preserve validated provider snapshots at exact zero duty.
         tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
-        tube_local = tube_downstream
         shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
-        shell_local = shell_next
     else:
-        with localcontext() as context:
-            context.prec = 70
-            tube_mdot = effective_tube_mass_flow_kg_s()
-            shell_mdot = effective_shell_mass_flow_kg_s()
-            tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / tube_mdot
-            shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / shell_mdot
-            tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
-            shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
-        h_min = _effective_h_min_j_kg()
-        h_max = effective_admitted_h_max_j_kg(provider)
-        if tube_downstream_h < h_min or tube_downstream_h > h_max:
-            raise _Stage3Failure(
-                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-                "tube downstream face enthalpy outside admitted domain",
-                str(tube_downstream_h),
-            )
-        if shell_next_h < h_min:
-            # Search-side feasibility only. No property call is made for this state.
-            raise _LowSideDomainInfeasible
-        if shell_next_h > h_max:
-            raise _Stage3Failure(
-                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-                "shell next face enthalpy outside admitted domain",
-                str(shell_next_h),
-            )
         tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
         shell_next = _state_from_enthalpy(
             provider, shell_next_h, shell_search_state=True, side="SHELL"
         )
-        tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
-        shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
+    # Task172 bulk coordinates are always cell-mean enthalpy midpoints (F(q) continuity at q=0).
+    tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
+    shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
     _preflight_task172_trial(
         q_w,
@@ -2867,12 +2955,23 @@ def _solve_cell(
     active_search_phase = "PHYSICAL_UPPER_ENDPOINT"
     upper_trial = evaluate(upper)
     upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
-    if lower_is_hole or upper_is_hole:
-        if lower_is_hole and upper_is_hole:
+    if lower_is_hole and upper_is_hole:
+        begin_hole_recovery()
+        active_search_phase = "BOTH_ENDPOINT_HOLE_COARSE"
+        recovered = _coarse_both_endpoint_hole_scan(
+            lower,
+            upper,
+            evaluate=lambda q: recovery_evaluate(q, "BOTH_ENDPOINT_HOLE_COARSE"),
+            on_level=set_search_level,
+        )
+        if recovered is None:
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                 "both physical endpoints are numerical holes; no valid sign anchor exists",
             )
+        lower_trial, upper_trial = recovered
+        record_hole_neighbors(list(trials.values()))
+    elif lower_is_hole or upper_is_hole:
         current_left_trial, current_right_trial = lower_trial, upper_trial
         hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"] = (
             "LOWER_ENDPOINT" if lower_is_hole else "UPPER_ENDPOINT"

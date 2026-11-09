@@ -39,7 +39,10 @@ def main() -> int:
         "model_blockers": list(result.model_blockers),
         "candidates": [asdict(row) for row in result.candidates_rated],
     }
-    out.write_text(json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n",
+        encoding="utf-8",
+    )
     print(out)
     return 0
 

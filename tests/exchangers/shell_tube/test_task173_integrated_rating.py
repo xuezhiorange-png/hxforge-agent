@@ -1308,12 +1308,10 @@ def test_both_endpoint_holes_remain_bracket_unresolved_without_valid_anchor(
         service.SHELL_MASS_FLOW_KG_S
         * (Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
     )
-    upper = float(cap)
+    assert float(cap) > 0
 
     def both_holes(q_w: float, **_kwargs: Any) -> Any:
-        if q_w in (0.0, upper):
-            raise _mark_replayed_residual_hole()
-        raise RuntimeError("unexpected probe")
+        raise _mark_replayed_residual_hole()
 
     monkeypatch.setattr(service, "_cell_evaluation", both_holes)
     with pytest.raises(service._Stage3Failure) as caught:
