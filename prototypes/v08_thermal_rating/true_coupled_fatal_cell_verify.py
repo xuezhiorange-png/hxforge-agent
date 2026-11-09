@@ -24,11 +24,11 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_therm
     reset_experimental_thermal_boundary,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+    _candidate_context,
     _CANDIDATE_RATING_CONTEXT,
+    _candidate_transient_outer_boundary,
     _CellSearchStats,
     _Stage3Failure,
-    _candidate_context,
-    _candidate_transient_outer_boundary,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_general_user_case.loader import load_general_user_design_case_json

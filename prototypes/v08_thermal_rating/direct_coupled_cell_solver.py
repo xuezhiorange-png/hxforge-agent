@@ -19,12 +19,12 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
     validate_request,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+    _cell_evaluation,
     _CellEvaluation,
+    _d,
     _LowSideDomainInfeasible,
     _Stage3Failure,
     _Task172NumericalHole,
-    _cell_evaluation,
-    _d,
 )
 
 ProbeClassification = Literal[
