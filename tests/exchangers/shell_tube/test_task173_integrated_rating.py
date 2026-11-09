@@ -1296,6 +1296,45 @@ def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     assert upper > 0
 
 
+def test_both_endpoint_holes_all_negative_interior_stays_bracket_unresolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Interior valid F(q)<0 only: cannot infer LOW_SIDE without authority (V08-03)."""
+    provider, authority, support, tube, shell, _valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+    cap = min(
+        service.TUBE_MASS_FLOW_KG_S
+        * (Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+        service.SHELL_MASS_FLOW_KG_S
+        * (Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+    )
+    upper = float(cap)
+
+    def both_holes_mixed(q_w: float, **kwargs: Any) -> Any:
+        if q_w in (0.0, upper):
+            raise _mark_replayed_residual_hole()
+        request = service._task172_request(
+            kwargs["support"],
+            kwargs["tube_upstream"],
+            kwargs["shell_physical_left"],
+            authority,
+        )
+        return _fake_cell_evaluation_for_capture(q_w, str(float(q_w) * 1.5 + 1.0), request)
+
+    monkeypatch.setattr(service, "_cell_evaluation", both_holes_mixed)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    assert "endpoint_low_side_classification_not_applicable" in caught.value.diagnostics
+
+
 def test_both_endpoint_holes_remain_bracket_unresolved_without_valid_anchor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

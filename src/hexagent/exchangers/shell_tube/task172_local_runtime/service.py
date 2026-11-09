@@ -270,6 +270,186 @@ def _warm_start_from_blocked(
     return cast(tuple[float, float, float], values)
 
 
+_FROZEN_BULK_DIRECT_TRF_NUMERICAL_PROFILE_ID = "V08-03-FROZEN-BULK-DIRECT-TRF-RECOVERY-V1"
+_FROZEN_BULK_DIRECT_TRF_MAX_NFEV = 192
+
+
+def attempt_frozen_bulk_direct_trf_recovery(
+    request: Task172Request,
+    provider: PropertyProvider,
+) -> Task172LocalOutcome:
+    """Frozen-bulk (q, Twi, Two) TRF on production _eval_trial (V08-03 validated path)."""
+    if (
+        provider.name != "CoolProp"
+        or provider.version != COOLPROP_VERSION
+        or provider.git_revision != COOLPROP_GIT_REVISION
+        or provider.reference_state_policy is not ReferenceStatePolicy.DEF
+    ):
+        return _blocked("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider", None)
+    try:
+        request_hash = canonical_sha256(_request_projection(request))
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "request", None)
+    try:
+        support = request.support
+        support_id = recompute_task172_support_id(request)
+        tube_bulk_snapshot, tube_bulk_id, _tube_state = _snapshot(
+            provider,
+            request,
+            "TUBE",
+            f"{support.tube_cell_id}:CELL_MEAN",
+            request.tube_bulk_state.temperature_k,
+            request.tube_bulk_state.pressure_pa,
+        )
+        shell_bulk_snapshot, shell_bulk_id, _shell_state = _snapshot(
+            provider,
+            request,
+            "SHELL",
+            f"{support.shell_cell_id}:CELL_MEAN",
+            request.shell_bulk_state.temperature_k,
+            request.shell_bulk_state.pressure_pa,
+        )
+        tube_resolution = _resolve_tube_side_htc(
+            request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
+        )
+        tube_h_base = tube_resolution.htc_w_m2_k
+        tube_apply_c3 = tube_resolution.apply_c3_wall_pr_correction
+        tube_re = tube_resolution.reynolds_number
+        tube_pr = tube_resolution.prandtl_number
+        tube_corr_id = tube_resolution.correlation_id
+        tube_corr_version = tube_resolution.correlation_version
+        shell_h_base, shell_re, shell_pr, _shell_calculation = _shell_base_htc(
+            request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
+        )
+        if type(request) is CandidateTask172LocalRequest:
+            tube_inner_diameter = request.candidate_binding.task025_result.hydraulic_diameter_m
+            bell_geometry = request.candidate_binding.task166_result.bell_geometry
+            if bell_geometry is None:
+                raise ValueError("missing bell geometry")
+            tube_outer_diameter = bell_geometry.tube_outer_diameter_m
+        else:
+            tube_inner_diameter = TUBE_ID_M
+            tube_outer_diameter = TUBE_OD_M
+        wall_resistance_result = compute_wall_resistance(
+            tube_inner_diameter,
+            tube_outer_diameter,
+            WALL_CONDUCTIVITY_W_M_K,
+            support.inside_area_m2,
+        )
+        wall_resistance = wall_resistance_result.wall_bundle_conduction_resistance_k_w
+        if wall_resistance <= 0:
+            raise _RuntimeFailure("BLOCKED_WALL_RESISTANCE_INVALID", "wall_resistance")
+    except _RuntimeFailure as exc:
+        return _blocked(exc.code, exc.field_path, request_hash)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "frozen_bulk_context", request_hash)
+
+    tube_bulk_k = float(request.tube_bulk_state.temperature_k)
+    shell_bulk_k = float(request.shell_bulk_state.temperature_k)
+    g_i = float(tube_h_base * support.inside_area_m2)
+    g_o = float(shell_h_base * support.outside_area_m2)
+    g_wall = 1.0 / float(wall_resistance)
+    delta_t = tube_bulk_k - shell_bulk_k
+    if delta_t <= 0.0:
+        return _blocked("BLOCKED_INITIALIZATION_FAILURE", "initialization.span", request_hash)
+    q_seed = delta_t / (1.0 / g_i + 1.0 / g_wall + 1.0 / g_o)
+    twi_seed = tube_bulk_k - q_seed / g_i
+    two_seed = shell_bulk_k + q_seed / g_o
+    residual_scale = max(abs(q_seed), 1.0)
+    t_min = float(_admitted_temperature_bounds()[0])
+    t_max = float(_admitted_temperature_bounds()[1])
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q_val, twi_val, two_val = (float(v) for v in vec)
+        order_ok = shell_bulk_k <= two_val <= twi_val <= tube_bulk_k
+        temp_ok = t_min <= twi_val <= t_max and t_min <= two_val <= t_max
+        if not (order_ok and temp_ok):
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_h_base,
+            shell_h_base,
+            wall_resistance,
+            q_val,
+            twi_val,
+            two_val,
+            apply_c3_wall_pr_correction=tube_apply_c3,
+        )
+        return np.asarray(evaluated["residuals"], dtype=float) / residual_scale
+
+    x0 = np.asarray([q_seed, twi_seed, two_seed], dtype=float)
+    lo = np.asarray([0.0, max(shell_bulk_k, t_min), max(shell_bulk_k, t_min)], dtype=float)
+    hi = np.asarray([max(q_seed * 2.0, 1.0), tube_bulk_k, tube_bulk_k], dtype=float)
+    try:
+        opt = least_squares(
+            residual,
+            x0,
+            bounds=(lo, hi),
+            method="trf",
+            ftol=1e-6,
+            xtol=1e-12,
+            max_nfev=_FROZEN_BULK_DIRECT_TRF_MAX_NFEV,
+        )
+    except Exception:
+        return _blocked(
+            "BLOCKED_RUNTIME_INTERNAL_FAILURE",
+            "frozen_bulk.least_squares",
+            request_hash,
+        )
+    q_final, twi_final, two_final = (float(v) for v in opt.x)
+    final = _eval_trial(
+        request,
+        provider,
+        tube_bulk_snapshot,
+        shell_bulk_snapshot,
+        tube_h_base,
+        shell_h_base,
+        wall_resistance,
+        q_final,
+        twi_final,
+        two_final,
+        apply_c3_wall_pr_correction=tube_apply_c3,
+    )
+    residual_values = cast(tuple[float, float, float], final["residuals"])
+    acceptance_bounds = cast(tuple[float, float, float], final["bounds"])
+    if any(
+        abs(value) > bound for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+    ):
+        return _blocked(
+            "BLOCKED_RESIDUAL_ACCEPTANCE",
+            ";".join(str(v) for v in (*opt.x, *residual_values, *acceptance_bounds)),
+            request_hash,
+        )
+    if q_final < 0.0:
+        return _blocked(
+            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+            "signed_q_hot_to_cold_w",
+            request_hash,
+        )
+    return _build_valid_result(
+        request,
+        request_hash,
+        support_id,
+        tube_bulk_id,
+        shell_bulk_id,
+        tube_re,
+        tube_pr,
+        shell_re,
+        shell_pr,
+        tube_corr_id,
+        tube_corr_version,
+        final,
+        (q_final, twi_final, two_final),
+        "FROZEN_BULK_DIRECT_TRF_RECOVERY",
+        int(opt.nfev),
+        int(opt.nfev),
+        numerical_profile_id=_FROZEN_BULK_DIRECT_TRF_NUMERICAL_PROFILE_ID,
+    )
+
+
 def _experimental_wide_delta_t_solver_active() -> bool:
     from hexagent.exchangers.shell_tube.task173_integrated_rating import (
         experimental_thermal_boundary as _etb,
@@ -1769,6 +1949,34 @@ def _task172_env_solver_trace_enabled() -> bool:
     )
 
 
+def _maybe_frozen_bulk_direct_trf_recovery(
+    request: Task172Request,
+    provider: PropertyProvider,
+    outcome: Task172LocalOutcome,
+    *,
+    solver_trace: list[dict[str, Any]] | None,
+) -> Task172LocalOutcome:
+    if type(outcome) is not Task172BlockedResult:
+        return outcome
+    if outcome.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
+        return outcome
+    if not _blocked_residual_replay_valid(outcome, request):
+        return outcome
+    recovered = attempt_frozen_bulk_direct_trf_recovery(request, provider)
+    _append_task172_solver_trace_entry(
+        solver_trace,
+        step="frozen_bulk_direct_trf",
+        method="trf",
+        budget=_FROZEN_SOLVER_BUDGET,
+        outcome=recovered,
+    )
+    if type(recovered) is Task172LocalResult and _fallback_result_replays_request(
+        request, recovered
+    ):
+        return recovered
+    return outcome
+
+
 def _solve(
     request: Task172Request,
     provider: PropertyProvider,
@@ -1820,7 +2028,9 @@ def _solve(
         or fallback.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE"
         or not _blocked_residual_replay_valid(fallback, request)
     ):
-        return fallback
+        return _maybe_frozen_bulk_direct_trf_recovery(
+            request, provider, fallback, solver_trace=trace
+        )
 
     warm_start = _warm_start_from_blocked(fallback)
     wide_trf = _solve_attempt(
@@ -1875,7 +2085,9 @@ def _solve(
             "wide_experimental.result_identity",
             request_hash,
         )
-    return wide_dogbox
+    return _maybe_frozen_bulk_direct_trf_recovery(
+        request, provider, wide_dogbox, solver_trace=trace
+    )
 
 
 def validate_request(
@@ -1945,6 +2157,7 @@ def validate_candidate_request(
 
 
 __all__ = [
+    "attempt_frozen_bulk_direct_trf_recovery",
     "recompute_task172_blocked_result_hash",
     "recompute_task172_local_roundoff_bounds",
     "recompute_task172_request_hash",

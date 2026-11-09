@@ -2971,12 +2971,17 @@ def _solve_cell(
                 if trial.classification == "VALID_CELL_EVALUATION"
                 and trial.residual is not None
             ]
-            if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
-                raise _LowSideDomainInfeasible
             if valid_in_interval and all(trial.residual > 0 for trial in valid_in_interval):
                 raise _Stage3Failure(
                     "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
                     "both endpoints are numerical holes; interior valid probes share one sign",
+                )
+            if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                    "both endpoints are numerical holes; interior valid F(q) share one sign",
+                    "endpoint_low_side_classification_not_applicable",
+                    f"interior_valid_sample_count={len(valid_in_interval)}",
                 )
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
