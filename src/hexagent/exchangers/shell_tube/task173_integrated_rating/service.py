@@ -2968,8 +2968,7 @@ def _solve_cell(
             valid_in_interval = [
                 trial
                 for trial in trials.values()
-                if lower <= trial.q_w <= upper
-                and trial.classification == "VALID_CELL_EVALUATION"
+                if trial.classification == "VALID_CELL_EVALUATION"
                 and trial.residual is not None
             ]
             if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
