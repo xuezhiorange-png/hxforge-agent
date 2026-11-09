@@ -24,6 +24,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _candidate_transient_outer_boundary,
     _CellSearchStats,
     _Stage3Failure,
+    _Task172NumericalHole,
 )
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
@@ -142,18 +143,24 @@ def main() -> int:
                 }
             )
             for label, q in [("lower", 0.0), ("upper", upper)]:
-                evaluation = t173._cell_evaluation(
-                    q,
-                    support=replay_state["support"],
-                    tube_upstream=replay_state["tube_upstream"],
-                    shell_physical_left=replay_state["shell_physical_left"],
-                    provider=replay_state["provider"],
-                    shell_authority=replay_state["shell_authority"],
-                )
-                comp = compare_same_request_production_vs_frozen_trf(
-                    evaluation.task172_request, provider
-                )
-                capture[f"same_request_{label}"] = comp
+                try:
+                    evaluation = t173._cell_evaluation(
+                        q,
+                        support=replay_state["support"],
+                        tube_upstream=replay_state["tube_upstream"],
+                        shell_physical_left=replay_state["shell_physical_left"],
+                        provider=replay_state["provider"],
+                        shell_authority=replay_state["shell_authority"],
+                    )
+                    request = evaluation.task172_request
+                    capture[f"same_request_{label}_cell_status"] = "VALID_CELL_EVALUATION"
+                except _Task172NumericalHole as hole:
+                    request = hole.task172_request
+                    capture[f"same_request_{label}_cell_status"] = "TASK172_NUMERICAL_HOLE"
+                if request is not None:
+                    capture[f"same_request_{label}"] = (
+                        compare_same_request_production_vs_frozen_trf(request, provider)
+                    )
         _CANDIDATE_RATING_CONTEXT.reset(ct)
         t173._solve_cell = native  # type: ignore[method-assign]
         reset_experimental_thermal_boundary(tok)
