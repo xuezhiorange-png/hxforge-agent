@@ -2435,6 +2435,29 @@ def _enthalpy_cell_mean_states_for_q(
     return tube_local, shell_local
 
 
+_ENTHALPY_COUPLED_DOMAIN_PENALTY = 1.0e4
+_ENTHALPY_COUPLED_MAX_NFEV = 96
+
+
+def _enthalpy_coupled_wall_temperatures_from_fraction(
+    u1: float,
+    u2: float,
+    *,
+    tube_bulk_k: float,
+    shell_bulk_k: float,
+) -> tuple[float, float] | None:
+    span = tube_bulk_k - shell_bulk_k
+    if span <= 0.0:
+        return None
+    u1c = min(max(float(u1), 0.0), 1.0)
+    u2c = min(max(float(u2), 0.0), 1.0)
+    two = shell_bulk_k + u1c * span
+    twi = two + u2c * max(tube_bulk_k - two, 1e-30)
+    if not (shell_bulk_k <= two <= twi <= tube_bulk_k):
+        return None
+    return twi, two
+
+
 def _attempt_enthalpy_coupled_direct_trf_root(
     *,
     support: Any,
@@ -2445,22 +2468,23 @@ def _attempt_enthalpy_coupled_direct_trf_root(
     q_upper: float,
     q_seed: float,
 ) -> _CellEvaluation | None:
-    """Joint (q,Twi,Two) closure with enthalpy-linked bulk states (V08-03)."""
+    """Joint (q,u1,u2) closure: enthalpy-linked bulk + signed physical residuals (V08-03)."""
     import numpy as np
     from scipy.optimize import least_squares
 
     from hexagent.exchangers.shell_tube.task172_local_runtime import service as t172
 
+    penalty = _ENTHALPY_COUPLED_DOMAIN_PENALTY
     if q_upper <= 0.0 or not math.isfinite(q_upper):
         return None
     q0 = min(max(float(q_seed), 0.0), float(q_upper))
-    t_min = float(t172._admitted_temperature_bounds()[0])
-    t_max = float(t172._admitted_temperature_bounds()[1])
+    residual_scale = max(abs(q0), 1.0)
 
     def residual(vec: np.ndarray) -> np.ndarray:
-        q_val, twi_val, two_val = (float(v) for v in vec)
+        q_val, u1_val, u2_val = (float(v) for v in vec)
+        invalid = np.asarray([penalty, penalty, penalty], dtype=float)
         if q_val < 0.0 or q_val > float(q_upper):
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+            return invalid
         try:
             tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
                 q_val,
@@ -2469,26 +2493,21 @@ def _attempt_enthalpy_coupled_direct_trf_root(
                 provider=provider,
             )
         except (_Stage3Failure, _LowSideDomainInfeasible):
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+            return invalid
         tube_k = float(tube_local.native.temperature_k)
         shell_k = float(shell_local.native.temperature_k)
-        if not (
-            t_min <= twi_val <= t_max
-            and t_min <= two_val <= t_max
-            and shell_k <= two_val <= twi_val <= tube_k
-        ):
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+            u1_val, u2_val, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+        )
+        if wall is None:
+            return invalid
+        twi_val, two_val = wall
         request = _task172_request(support, tube_local, shell_local, shell_authority)
         gate = t172.eval_trial_residual_gate(request, provider, q_val, twi_val, two_val)
         if gate is None:
-            return np.asarray([9.0, 9.0, 9.0], dtype=float)
-        residuals = gate["residuals_w"]
-        bounds = gate["acceptance_bounds_w"]
-        max(abs(q_val), 1.0)
-        return np.asarray(
-            [abs(r) / b if b > 0 else 9.0 for r, b in zip(residuals, bounds, strict=True)],
-            dtype=float,
-        )
+            return invalid
+        signed = gate["residuals_w"]
+        return np.asarray([float(r) / residual_scale for r in signed], dtype=float)
 
     try:
         tube_local0, shell_local0 = _enthalpy_cell_mean_states_for_q(
@@ -2499,11 +2518,9 @@ def _attempt_enthalpy_coupled_direct_trf_root(
         )
     except (_Stage3Failure, _LowSideDomainInfeasible):
         return None
-    tube_k0 = float(tube_local0.native.temperature_k)
-    shell_k0 = float(shell_local0.native.temperature_k)
-    x0 = np.asarray([q0, (tube_k0 + shell_k0) / 2.0, shell_k0], dtype=float)
-    lo = np.asarray([0.0, max(shell_k0, t_min), max(shell_k0, t_min)], dtype=float)
-    hi = np.asarray([float(q_upper), tube_k0, tube_k0], dtype=float)
+    x0 = np.asarray([q0, 0.35, 0.35], dtype=float)
+    lo = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    hi = np.asarray([float(q_upper), 1.0, 1.0], dtype=float)
     try:
         opt = least_squares(
             residual,
@@ -2512,12 +2529,12 @@ def _attempt_enthalpy_coupled_direct_trf_root(
             method="trf",
             ftol=1e-8,
             xtol=1e-12,
-            max_nfev=96,
+            max_nfev=_ENTHALPY_COUPLED_MAX_NFEV,
         )
     except Exception:
         return None
     q_final = float(opt.x[0])
-    if not opt.success and float(opt.cost) > 1.0:
+    if not math.isfinite(q_final) or q_final < 0.0 or q_final > float(q_upper):
         return None
     try:
         evaluation = _cell_evaluation(
@@ -2530,8 +2547,21 @@ def _attempt_enthalpy_coupled_direct_trf_root(
         )
     except (_Task172NumericalHole, _Stage3Failure, _LowSideDomainInfeasible):
         return None
-    q172 = float(evaluation.task172_result.signed_q_hot_to_cold_w)
-    if abs(q_final - q172) > max(1e-3, abs(q_final) * 1e-6):
+    root_trial = _CellTrial(
+        q_final,
+        "VALID_CELL_EVALUATION",
+        evaluation,
+        _d(q_final) - evaluation.task172_result.signed_q_hot_to_cold_w,
+        task172_request_hash=evaluation.task172_result.request_hash,
+    )
+    if not _eligible_trial(root_trial):
+        return None
+    twi_k = float(evaluation.task172_result.wall_temperature_inner_k)
+    two_k = float(evaluation.task172_result.wall_temperature_outer_k)
+    gate = t172.eval_trial_residual_gate(
+        evaluation.task172_request, provider, q_final, twi_k, two_k
+    )
+    if gate is None or not gate["passes_original_residual_gate"]:
         return None
     return evaluation
 

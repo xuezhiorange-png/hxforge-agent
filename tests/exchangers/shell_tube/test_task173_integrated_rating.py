@@ -1335,6 +1335,58 @@ def test_both_endpoint_holes_all_negative_interior_stays_bracket_unresolved(
     assert "endpoint_low_side_classification_not_applicable" in caught.value.diagnostics
 
 
+def test_enthalpy_coupled_wall_fraction_respects_order() -> None:
+    wall = service._enthalpy_coupled_wall_temperatures_from_fraction(
+        0.25, 0.5, tube_bulk_k=350.0, shell_bulk_k=300.0
+    )
+    assert wall is not None
+    twi, two = wall
+    assert 300.0 <= two <= twi <= 350.0
+
+
+def test_enthalpy_coupled_rejects_ineligible_root_after_optimizer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Coupled path must use _eligible_trial (Task173 root gate), not loose |q-q172|."""
+    import numpy as np
+
+    provider, authority, support, tube, shell, valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+
+    class _FakeOpt:
+        success = True
+        cost = 0.0
+        x = np.asarray([12000.0, 0.4, 0.4], dtype=float)
+
+    monkeypatch.setattr(
+        "scipy.optimize.least_squares",
+        lambda *args, **kwargs: _FakeOpt(),
+    )
+    monkeypatch.setattr(
+        service,
+        "_cell_evaluation",
+        lambda q_w, **kwargs: replace(valid_evaluation, q_w=service._d(q_w)),
+    )
+    monkeypatch.setattr(service, "_eligible_trial", lambda _trial: False)
+    assert (
+        service._attempt_enthalpy_coupled_direct_trf_root(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            q_upper=50000.0,
+            q_seed=10000.0,
+        )
+        is None
+    )
+
+
+def test_enthalpy_coupled_domain_penalty_not_low() -> None:
+    assert service._ENTHALPY_COUPLED_DOMAIN_PENALTY >= 1.0e3
+
+
 def test_both_endpoint_holes_remain_bracket_unresolved_without_valid_anchor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
