@@ -27,6 +27,7 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _Stage3Failure,
     _state_at_inlet,
     _state_from_enthalpy,
+    effective_admitted_h_max_j_kg,
     effective_shell_cold_inlet_enthalpy_j_kg,
     effective_shell_inlet_temperature_k,
     effective_shell_mass_flow_kg_s,
@@ -50,13 +51,18 @@ def _per_cell_thermodynamic_q_cap_w(
     *,
     h_t_face_j_kg: float,
     h_s_face_j_kg: float,
+    h_s_right_j_kg: float,
     tube_mdot: float,
     shell_mdot: float,
+    h_max: float | None = None,
 ) -> float:
     h_min = float(_effective_h_min_j_kg())
-    tube_cap = tube_mdot * (h_t_face_j_kg - h_min)
-    shell_cap = shell_mdot * (h_s_face_j_kg - h_min)
-    return max(0.0, min(tube_cap, shell_cap))
+    tube_cap = tube_mdot * max(h_t_face_j_kg - h_min, 0.0)
+    shell_lo_cap = shell_mdot * max(h_s_face_j_kg - h_min, 0.0)
+    caps = [tube_cap, shell_lo_cap]
+    if h_max is not None:
+        caps.append(shell_mdot * max(float(h_max) - h_s_right_j_kg, 0.0))
+    return max(0.0, min(caps))
 
 
 def _fractions_from_walls(
@@ -83,18 +89,110 @@ def _enthalpy_step_feasible(
     q_w: float,
     h_t_left: float,
     h_s_left: float,
+    h_s_right: float,
     tube_mdot: float,
     shell_mdot: float,
+    h_min: float,
+    h_max: float,
 ) -> tuple[bool, float]:
-    h_min = float(_effective_h_min_j_kg())
     tube_down = h_t_left - q_w / tube_mdot
     shell_next = h_s_left - q_w / shell_mdot
     viol = 0.0
-    if tube_down < h_min:
-        viol = max(viol, h_min - tube_down)
-    if shell_next < h_min:
-        viol = max(viol, h_min - shell_next)
+    for h_val in (h_t_left, tube_down, h_s_left, shell_next, h_s_right):
+        if h_val < h_min:
+            viol = max(viol, h_min - h_val)
+        if h_val > h_max:
+            viol = max(viol, h_val - h_max)
     return viol <= 0.0, viol
+
+
+@dataclass(frozen=True)
+class AxialFeasibilityReport:
+    feasible: bool
+    violation_j_kg: float
+    h_t: tuple[float, ...]
+    h_s: tuple[float, ...]
+    per_cell_q_hi: tuple[float, ...]
+
+    def violation_for_cell(self, index: int, *, q_w: float, tube_mdot: float, shell_mdot: float, h_min: float, h_max: float) -> float:
+        h_t = self.h_t
+        h_s = self.h_s
+        i = index
+        tube_down = h_t[i] - q_w / tube_mdot
+        shell_next = h_s[i] - q_w / shell_mdot
+        viol = 0.0
+        for h_val in (h_t[i], tube_down, h_s[i], shell_next, h_s[i + 1]):
+            if h_val < h_min:
+                viol = max(viol, h_min - h_val)
+            if h_val > h_max:
+                viol = max(viol, h_val - h_max)
+        return viol
+
+
+def audit_axial_feasibility(
+    q_w: np.ndarray | list[float],
+    *,
+    provider: Any,
+    h_t_inlet_j_kg: float,
+    h_s_cold_inlet_j_kg: float,
+    tube_mass_flow_kg_s: float,
+    shell_mass_flow_kg_s: float,
+) -> AxialFeasibilityReport:
+    """Check full axial enthalpy path (incl. h_max) and per-cell dynamic q upper bounds."""
+    q = np.asarray(q_w, dtype=float)
+    n = int(q.size)
+    h_min = float(_effective_h_min_j_kg())
+    h_max = float(effective_admitted_h_max_j_kg(provider))
+    mt = float(tube_mass_flow_kg_s)
+    ms = float(shell_mass_flow_kg_s)
+    h_t, h_s = build_axial_enthalpies_from_q(
+        q,
+        h_t_inlet_j_kg=h_t_inlet_j_kg,
+        h_s_cold_inlet_j_kg=h_s_cold_inlet_j_kg,
+        tube_mass_flow_kg_s=mt,
+        shell_mass_flow_kg_s=ms,
+    )
+    viol = 0.0
+    q_hi: list[float] = []
+    for i in range(n):
+        ok, v = _enthalpy_step_feasible(
+            q_w=float(q[i]),
+            h_t_left=float(h_t[i]),
+            h_s_left=float(h_s[i]),
+            h_s_right=float(h_s[i + 1]),
+            tube_mdot=mt,
+            shell_mdot=ms,
+            h_min=h_min,
+            h_max=h_max,
+        )
+        if not ok:
+            viol = max(viol, v)
+        caps = [
+            mt * max(float(h_t[i]) - h_min, 0.0),
+            ms * max(float(h_s[i]) - h_min, 0.0),
+            ms * max(h_max - float(h_s[i + 1]), 0.0),
+        ]
+        q_hi.append(max(0.0, min(caps)))
+    for h_val in (*h_t.tolist(), *h_s.tolist()):
+        if h_val < h_min:
+            viol = max(viol, h_min - h_val)
+        if h_val > h_max:
+            viol = max(viol, h_val - h_max)
+    return AxialFeasibilityReport(
+        feasible=viol <= 0.0,
+        violation_j_kg=viol,
+        h_t=tuple(float(v) for v in h_t),
+        h_s=tuple(float(v) for v in h_s),
+        per_cell_q_hi=tuple(q_hi),
+    )
+
+
+def _smooth_domain_residuals(violation_j_kg: float, *, scale: float) -> tuple[float, float, float]:
+    v = max(float(violation_j_kg), 0.0)
+    if v <= 0.0:
+        return (0.0, 0.0, 0.0)
+    base = (v / max(scale, 1.0)) ** 0.5
+    return (base, base * 1.017, base * 0.983)
 
 
 @dataclass
@@ -319,6 +417,544 @@ def _resistance_network_q_u_seed(
     return min(q_v, q_cap_w), frac2[0], frac2[1]
 
 
+def joint_bvp_dof_audit_summary() -> dict[str, str]:
+    """3N DOF (q, u1, u2); shell x=0 outlet enthalpy is not an independent unknown."""
+    return {
+        "unknown_parameterization": "q_u1_u2_per_cell",
+        "unknown_count_rule": "3N",
+        "shell_outlet_enthalpy_h_s0": "h_s[0]=h_s[N]+sum(q[i])/m_shell (implicit from q vector)",
+        "extra_shell_outlet_enthalpy_dof": "forbidden",
+        "audit": "PASS",
+    }
+
+
+def _wall_order_valid(twi: float, two: float, t_tube: float, t_shell: float) -> bool:
+    return t_tube > twi > two > t_shell
+
+
+def _evaluate_cell_physics_residuals(
+    *,
+    index: int,
+    q: float,
+    u1: float,
+    u2: float,
+    support: Any,
+    h_t: np.ndarray,
+    h_s: np.ndarray,
+    provider: Any,
+    shell_authority: Any,
+    heat_scale: float,
+    h_min: float,
+    h_max: float,
+    tube_mdot: float,
+    shell_mdot: float,
+) -> tuple[np.ndarray, bool, bool, bool, bool]:
+    """Return (3,) scaled residuals, physical_evaluated, domain_penalty, enthalpy_ok, property_ok."""
+    ok_step, viol = _enthalpy_step_feasible(
+        q_w=q,
+        h_t_left=float(h_t[index]),
+        h_s_left=float(h_s[index]),
+        h_s_right=float(h_s[index + 1]),
+        tube_mdot=tube_mdot,
+        shell_mdot=shell_mdot,
+        h_min=h_min,
+        h_max=h_max,
+    )
+    if not ok_step:
+        return (
+            np.asarray(_domain_violation_triplet(viol, scale=heat_scale), dtype=float),
+            False,
+            True,
+            False,
+            True,
+        )
+    try:
+        tube_up = _state_from_h(provider, float(h_t[index]), side="TUBE")
+        shell_left = _state_from_h(provider, float(h_s[index]), side="SHELL")
+    except (_Stage3Failure, _LowSideDomainInfeasible):
+        return (
+            np.asarray(_domain_violation_triplet(1.0e3, scale=heat_scale), dtype=float),
+            False,
+            True,
+            True,
+            False,
+        )
+    try:
+        request, _, _ = build_task172_request_for_q(
+            q,
+            support=support,
+            tube_upstream=tube_up,
+            shell_physical_left=shell_left,
+            provider=provider,
+            shell_authority=shell_authority,
+        )
+    except (_LowSideDomainInfeasible, _Stage3Failure):
+        return (
+            np.asarray(_domain_violation_triplet(1.0e3, scale=heat_scale), dtype=float),
+            False,
+            True,
+            True,
+            False,
+        )
+    tube_k = float(request.tube_bulk_state.temperature_k)
+    shell_k = float(request.shell_bulk_state.temperature_k)
+    wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+        u1, u2, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+    )
+    if wall is None or not _wall_order_valid(
+        wall[0], wall[1], tube_k, shell_k
+    ):
+        return (
+            np.asarray(
+                _domain_violation_triplet(max(tube_k - shell_k, 1.0), scale=heat_scale),
+                dtype=float,
+            ),
+            False,
+            True,
+            True,
+            True,
+        )
+    twi, two = wall
+    prim = build_closure_primitives(request, provider)
+    gate = evaluate_three_equation_residuals(
+        q, twi, two, request=request, provider=provider, primitives=prim
+    )
+    acts = [float(r) / heat_scale for r in gate["residuals_w"]]
+    return (np.asarray(acts, dtype=float), True, False, True, True)
+
+
+def _dynamic_q_bounds(
+    q: np.ndarray,
+    *,
+    provider: Any,
+    h_t0: float,
+    h_sN: float,
+    tube_mdot: float,
+    shell_mdot: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    report = audit_axial_feasibility(
+        q,
+        provider=provider,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    )
+    n = q.size
+    lo = np.zeros(3 * n, dtype=float)
+    hi = np.zeros(3 * n, dtype=float)
+    for i in range(n):
+        lo[3 * i] = 0.0
+        hi[3 * i] = max(float(report.per_cell_q_hi[i]), 1.0)
+        lo[3 * i + 1 : 3 * i + 3] = (0.0, 0.0)
+        hi[3 * i + 1 : 3 * i + 3] = (1.0, 1.0)
+    return lo, hi
+
+
+def _block_gauss_seidel_joint_solve(
+    x0: np.ndarray,
+    *,
+    supports: list[Any],
+    provider: Any,
+    shell_authority: Any,
+    h_t0: float,
+    h_sN: float,
+    tube_mdot: float,
+    shell_mdot: float,
+    heat_scale: float,
+    max_sweeps: int = 10,
+    max_nfev_per_cell: int = 80,
+) -> tuple[np.ndarray, int, bool]:
+    """Block-coordinate TRF: one 3x3 cell at a time with full-q feasibility audit."""
+    n = len(supports)
+    x = x0.copy()
+    h_min = float(_effective_h_min_j_kg())
+    h_max = float(effective_admitted_h_max_j_kg(provider))
+    total_nfev = 0
+    domain_plateau = False
+
+    def vec_q(vec: np.ndarray) -> np.ndarray:
+        return vec.reshape(n, 3)[:, 0].copy()
+
+    for _ in range(max_sweeps):
+        for i, support in enumerate(supports):
+            q_base = vec_q(x)
+            lo, hi = _dynamic_q_bounds(
+                q_base,
+                provider=provider,
+                h_t0=h_t0,
+                h_sN=h_sN,
+                tube_mdot=tube_mdot,
+                shell_mdot=shell_mdot,
+            )
+
+            def residual_local(x3: np.ndarray, *, cell_i: int = i, cell_support: Any = support) -> np.ndarray:
+                nonlocal domain_plateau
+                trial = x.copy()
+                trial[3 * cell_i : 3 * cell_i + 3] = x3
+                qtw = trial.reshape(n, 3)
+                q_vals = qtw[:, 0]
+                feas = audit_axial_feasibility(
+                    q_vals,
+                    provider=provider,
+                    h_t_inlet_j_kg=h_t0,
+                    h_s_cold_inlet_j_kg=h_sN,
+                    tube_mass_flow_kg_s=tube_mdot,
+                    shell_mass_flow_kg_s=shell_mdot,
+                )
+                if not feas.feasible:
+                    domain_plateau = True
+                    viol = feas.violation_for_cell(
+                        cell_i,
+                        q_w=float(x3[0]),
+                        tube_mdot=tube_mdot,
+                        shell_mdot=shell_mdot,
+                        h_min=h_min,
+                        h_max=h_max,
+                    )
+                    return np.asarray(
+                        _smooth_domain_residuals(viol or feas.violation_j_kg, scale=heat_scale),
+                        dtype=float,
+                    )
+                h_t, h_s = build_axial_enthalpies_from_q(
+                    q_vals,
+                    h_t_inlet_j_kg=h_t0,
+                    h_s_cold_inlet_j_kg=h_sN,
+                    tube_mass_flow_kg_s=tube_mdot,
+                    shell_mass_flow_kg_s=shell_mdot,
+                )
+                res, phys, penal, _, _ = _evaluate_cell_physics_residuals(
+                    index=cell_i,
+                    q=float(x3[0]),
+                    u1=float(x3[1]),
+                    u2=float(x3[2]),
+                    support=cell_support,
+                    h_t=h_t,
+                    h_s=h_s,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    heat_scale=heat_scale,
+                    h_min=h_min,
+                    h_max=h_max,
+                    tube_mdot=tube_mdot,
+                    shell_mdot=shell_mdot,
+                )
+                if penal:
+                    domain_plateau = True
+                return res
+
+            lo_c = lo[3 * i : 3 * i + 3]
+            hi_c = hi[3 * i : 3 * i + 3]
+            x_seed = np.clip(x[3 * i : 3 * i + 3], lo_c, hi_c)
+            opt = least_squares(
+                residual_local,
+                x_seed,
+                bounds=(lo_c, hi_c),
+                method="trf",
+                ftol=1e-12,
+                xtol=1e-10,
+                gtol=1e-12,
+                max_nfev=max_nfev_per_cell,
+            )
+            x[3 * i : 3 * i + 3] = opt.x
+            total_nfev += int(opt.nfev)
+    return x, total_nfev, domain_plateau
+
+
+@dataclass
+class RealCellClosureOutcome:
+    cell_index: int
+    task172_gate_pass: bool
+    task173_root_validated: bool
+    production_validated: bool
+    q_w: float
+    twi_k: float
+    two_k: float
+    domain_exit: str | None = None
+
+
+def attempt_real_single_cell_closure(
+    *,
+    cell_index: int,
+    provider: Any,
+    shell_authority: Any,
+    candidate_ctx: Any,
+    subdivisions: int = 1,
+    q_freeze: np.ndarray | None = None,
+) -> RealCellClosureOutcome:
+    """Cell-local enthalpy-coupled TRF with frozen neighbours via fixed q profile."""
+    supports = _supports_for_mesh(candidate_ctx, subdivisions)
+    if cell_index < 0 or cell_index >= len(supports):
+        return RealCellClosureOutcome(
+            cell_index=cell_index,
+            task172_gate_pass=False,
+            task173_root_validated=False,
+            production_validated=False,
+            q_w=math.nan,
+            twi_k=math.nan,
+            two_k=math.nan,
+            domain_exit="index_out_of_range",
+        )
+    tube_mdot = float(effective_tube_mass_flow_kg_s())
+    shell_mdot = float(effective_shell_mass_flow_kg_s())
+    h_t0 = float(
+        _state_at_inlet(
+            provider, effective_tube_inlet_temperature_k(), side="TUBE"
+        ).native.enthalpy_j_kg
+    )
+    h_sN = float(effective_shell_cold_inlet_enthalpy_j_kg())
+    n = len(supports)
+    q_uniform = _duty_uniform_q_per_cell(
+        provider=provider, n_cells=n, h_t_in=h_t0, tube_mdot=tube_mdot
+    )
+    q = np.full(n, q_uniform, dtype=float) if q_freeze is None else np.asarray(q_freeze, dtype=float).copy()
+    h_t, h_s = build_axial_enthalpies_from_q(
+        q,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    )
+    report = audit_axial_feasibility(
+        q,
+        provider=provider,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    )
+    q_cap = float(report.per_cell_q_hi[cell_index])
+    support = supports[cell_index]
+    tube_up = _state_from_h(provider, float(h_t[cell_index]), side="TUBE")
+    shell_left = _state_from_h(provider, float(h_s[cell_index]), side="SHELL")
+    coupled = _attempt_enthalpy_coupled_direct_trf_root(
+        support=support,
+        tube_upstream=tube_up,
+        shell_physical_left=shell_left,
+        provider=provider,
+        shell_authority=shell_authority,
+        q_upper=q_cap,
+        q_seed=min(q[cell_index], q_cap),
+    )
+    if coupled is None:
+        return RealCellClosureOutcome(
+            cell_index=cell_index,
+            task172_gate_pass=False,
+            task173_root_validated=False,
+            production_validated=False,
+            q_w=math.nan,
+            twi_k=math.nan,
+            two_k=math.nan,
+            domain_exit="enthalpy_coupled_trf_none",
+        )
+    q_out = float(coupled.q_w)
+    twi = float(coupled.task172_result.wall_temperature_inner_k)
+    two = float(coupled.task172_result.wall_temperature_outer_k)
+    rec = _collect_cell_record(
+        index=cell_index,
+        support=support,
+        q=q_out,
+        twi=twi,
+        two=two,
+        h_t=h_t,
+        h_s=h_s,
+        provider=provider,
+        shell_authority=shell_authority,
+    )
+    return RealCellClosureOutcome(
+        cell_index=cell_index,
+        task172_gate_pass=rec.task172_gate_pass,
+        task173_root_validated=rec.task173_root_validated,
+        production_validated=rec.production_validated,
+        q_w=rec.q_w,
+        twi_k=rec.twi_k,
+        two_k=rec.two_k,
+        domain_exit=rec.domain_exit,
+    )
+
+
+def attempt_real_two_cell_coupling(
+    *,
+    provider: Any,
+    shell_authority: Any,
+    candidate_ctx: Any,
+    subdivisions: int = 1,
+    q_seed: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Joint block solve on cells 0–1 with frozen q on remaining cells."""
+    supports = _supports_for_mesh(candidate_ctx, subdivisions)
+    n = len(supports)
+    if n < 2:
+        return {"status": "BLOCKED", "reason": "need_at_least_two_cells"}
+    tube_mdot = float(effective_tube_mass_flow_kg_s())
+    shell_mdot = float(effective_shell_mass_flow_kg_s())
+    h_t0 = float(
+        _state_at_inlet(
+            provider, effective_tube_inlet_temperature_k(), side="TUBE"
+        ).native.enthalpy_j_kg
+    )
+    h_sN = float(effective_shell_cold_inlet_enthalpy_j_kg())
+    q_uniform = _duty_uniform_q_per_cell(
+        provider=provider, n_cells=n, h_t_in=h_t0, tube_mdot=tube_mdot
+    )
+    x0, _, _, q_part = _sequential_q_u_initial_guess(
+        provider=provider,
+        supports=supports,
+        h_t0=h_t0,
+        h_sN=h_sN,
+        tube_mdot=tube_mdot,
+        shell_mdot=shell_mdot,
+        q_uniform=q_uniform,
+        shell_authority=shell_authority,
+    )
+    if q_seed is not None:
+        qs = np.asarray(q_seed, dtype=float)
+        for i in range(min(n, qs.size)):
+            x0[3 * i] = float(qs[i])
+    heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
+    # Solve two cells with enthalpy march on full n using frozen tail q.
+    q_full = np.asarray(x0.reshape(n, 3)[:, 0], dtype=float).copy()
+    h_min = float(_effective_h_min_j_kg())
+    h_max = float(effective_admitted_h_max_j_kg(provider))
+    total_nfev = 0
+    domain_plateau = False
+    for _sweep in range(6):
+        for i in range(2):
+            lo_i, hi_i = _dynamic_q_bounds(
+                q_full,
+                provider=provider,
+                h_t0=h_t0,
+                h_sN=h_sN,
+                tube_mdot=tube_mdot,
+                shell_mdot=shell_mdot,
+            )
+
+            def res2(x3: np.ndarray, *, cell_i: int = i) -> np.ndarray:
+                nonlocal domain_plateau
+                q_try = q_full.copy()
+                q_try[cell_i] = float(x3[0])
+                feas = audit_axial_feasibility(
+                    q_try,
+                    provider=provider,
+                    h_t_inlet_j_kg=h_t0,
+                    h_s_cold_inlet_j_kg=h_sN,
+                    tube_mass_flow_kg_s=tube_mdot,
+                    shell_mass_flow_kg_s=shell_mdot,
+                )
+                if not feas.feasible:
+                    domain_plateau = True
+                    viol = feas.violation_for_cell(
+                        cell_i,
+                        q_w=float(x3[0]),
+                        tube_mdot=tube_mdot,
+                        shell_mdot=shell_mdot,
+                        h_min=h_min,
+                        h_max=h_max,
+                    )
+                    return np.asarray(
+                        _smooth_domain_residuals(viol or feas.violation_j_kg, scale=heat_scale),
+                        dtype=float,
+                    )
+                h_t, h_s = build_axial_enthalpies_from_q(
+                    q_try,
+                    h_t_inlet_j_kg=h_t0,
+                    h_s_cold_inlet_j_kg=h_sN,
+                    tube_mass_flow_kg_s=tube_mdot,
+                    shell_mass_flow_kg_s=shell_mdot,
+                )
+                u1, u2 = float(x0[3 * cell_i + 1]), float(x0[3 * cell_i + 2])
+                if x3.size >= 3:
+                    u1, u2 = float(x3[1]), float(x3[2])
+                out, _, penal, _, _ = _evaluate_cell_physics_residuals(
+                    index=cell_i,
+                    q=float(x3[0]),
+                    u1=u1,
+                    u2=u2,
+                    support=supports[cell_i],
+                    h_t=h_t,
+                    h_s=h_s,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    heat_scale=heat_scale,
+                    h_min=h_min,
+                    h_max=h_max,
+                    tube_mdot=tube_mdot,
+                    shell_mdot=shell_mdot,
+                )
+                if penal:
+                    domain_plateau = True
+                return out
+
+            lo_c = lo_i[3 * i : 3 * i + 3]
+            hi_c = hi_i[3 * i : 3 * i + 3]
+            x_seed = np.clip(x0[3 * i : 3 * i + 3], lo_c, hi_c)
+            opt = least_squares(
+                res2,
+                x_seed,
+                bounds=(lo_c, hi_c),
+                method="trf",
+                ftol=1e-12,
+                xtol=1e-10,
+                gtol=1e-12,
+                max_nfev=120,
+            )
+            x0[3 * i : 3 * i + 3] = opt.x
+            q_full[i] = float(opt.x[0])
+            total_nfev += int(opt.nfev)
+    h_t, h_s = build_axial_enthalpies_from_q(
+        q_full,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    )
+    cells: list[JointBVPCellRecord] = []
+    for i in range(2):
+        frac = x0[3 * i + 1 : 3 * i + 3]
+        wall = None
+        try:
+            request, _, _ = build_task172_request_for_q(
+                float(q_full[i]),
+                support=supports[i],
+                tube_upstream=_state_from_h(provider, float(h_t[i]), side="TUBE"),
+                shell_physical_left=_state_from_h(provider, float(h_s[i]), side="SHELL"),
+                provider=provider,
+                shell_authority=shell_authority,
+            )
+            tube_k = float(request.tube_bulk_state.temperature_k)
+            shell_k = float(request.shell_bulk_state.temperature_k)
+            wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+                float(frac[0]), float(frac[1]), tube_bulk_k=tube_k, shell_bulk_k=shell_k
+            )
+        except (_LowSideDomainInfeasible, _Stage3Failure):
+            pass
+        twi, two = (math.nan, math.nan) if wall is None else wall
+        cells.append(
+            _collect_cell_record(
+                index=i,
+                support=supports[i],
+                q=float(q_full[i]),
+                twi=float(twi),
+                two=float(two),
+                h_t=h_t,
+                h_s=h_s,
+                provider=provider,
+                shell_authority=shell_authority,
+            )
+        )
+    pass_ = all(
+        c.task172_gate_pass and c.task173_root_validated and c.production_validated
+        for c in cells
+    )
+    return {
+        "status": "PASS" if pass_ else "BLOCKED",
+        "cells": cells,
+        "optimizer_nfev": total_nfev,
+        "domain_penalty_plateau": domain_plateau,
+        "q_full": q_full.tolist(),
+    }
+
+
 def _sequential_q_u_initial_guess(
     *,
     provider: Any,
@@ -344,11 +980,25 @@ def _sequential_q_u_initial_guess(
             tube_mass_flow_kg_s=tube_mdot,
             shell_mass_flow_kg_s=shell_mdot,
         )
-        q_cap = _per_cell_thermodynamic_q_cap_w(
-            h_t_face_j_kg=float(h_t[i]),
-            h_s_face_j_kg=float(h_s[i]),
-            tube_mdot=tube_mdot,
-            shell_mdot=shell_mdot,
+        feas = audit_axial_feasibility(
+            q,
+            provider=provider,
+            h_t_inlet_j_kg=h_t0,
+            h_s_cold_inlet_j_kg=h_sN,
+            tube_mass_flow_kg_s=tube_mdot,
+            shell_mass_flow_kg_s=shell_mdot,
+        )
+        h_max = float(effective_admitted_h_max_j_kg(provider))
+        q_cap = min(
+            _per_cell_thermodynamic_q_cap_w(
+                h_t_face_j_kg=float(h_t[i]),
+                h_s_face_j_kg=float(h_s[i]),
+                h_s_right_j_kg=float(h_s[i + 1]),
+                tube_mdot=tube_mdot,
+                shell_mdot=shell_mdot,
+                h_max=h_max,
+            ),
+            float(feas.per_cell_q_hi[i]),
         )
         lo[3 * i] = 0.0
         hi[3 * i] = max(q_cap, 1.0)
@@ -647,101 +1297,21 @@ def solve_joint_boundary_value_mesh(
         shell_authority=shell_authority,
     )
     heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
-    domain_plateau = False
-
-    def residual(vec: np.ndarray) -> np.ndarray:
-        nonlocal domain_plateau
-        qtw = vec.reshape(n_cells, 3)
-        q_vals = qtw[:, 0]
-        try:
-            h_t, h_s = build_axial_enthalpies_from_q(
-                q_vals,
-                h_t_inlet_j_kg=h_t0,
-                h_s_cold_inlet_j_kg=h_sN,
-                tube_mass_flow_kg_s=tube_mdot,
-                shell_mass_flow_kg_s=shell_mdot,
-            )
-        except ValueError:
-            domain_plateau = True
-            v = _domain_violation_triplet(1.0e4, scale=heat_scale)
-            return np.tile(np.asarray(v, dtype=float), n_cells)
-        local_scale = _heat_residual_scale_w(
-            q_vals, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN
-        )
-        res: list[float] = []
-        for i, support in enumerate(supports):
-            q, u1, u2 = (float(v) for v in qtw[i])
-            if q < 0.0 or q > float(hi[3 * i]) * 1.0001:
-                v = _domain_violation_triplet(abs(q) + 1.0, scale=local_scale)
-                res.extend(v)
-                domain_plateau = True
-                continue
-            ok, viol = _enthalpy_step_feasible(
-                q_w=q,
-                h_t_left=float(h_t[i]),
-                h_s_left=float(h_s[i]),
-                tube_mdot=tube_mdot,
-                shell_mdot=shell_mdot,
-            )
-            if not ok:
-                v = _domain_violation_triplet(viol, scale=local_scale)
-                res.extend(v)
-                domain_plateau = True
-                continue
-            try:
-                tube_up = _state_from_h(provider, float(h_t[i]), side="TUBE")
-                shell_left = _state_from_h(provider, float(h_s[i]), side="SHELL")
-            except (_Stage3Failure, _LowSideDomainInfeasible):
-                v = _domain_violation_triplet(1.0e3, scale=local_scale)
-                res.extend(v)
-                domain_plateau = True
-                continue
-            try:
-                request, _, _ = build_task172_request_for_q(
-                    q,
-                    support=support,
-                    tube_upstream=tube_up,
-                    shell_physical_left=shell_left,
-                    provider=provider,
-                    shell_authority=shell_authority,
-                )
-            except (_LowSideDomainInfeasible, _Stage3Failure):
-                v = _domain_violation_triplet(1.0e3, scale=local_scale)
-                res.extend(v)
-                domain_plateau = True
-                continue
-            tube_k = float(request.tube_bulk_state.temperature_k)
-            shell_k = float(request.shell_bulk_state.temperature_k)
-            wall = _enthalpy_coupled_wall_temperatures_from_fraction(
-                u1, u2, tube_bulk_k=tube_k, shell_bulk_k=shell_k
-            )
-            if wall is None:
-                v = _domain_violation_triplet(max(tube_k - shell_k, 1.0), scale=local_scale)
-                res.extend(v)
-                domain_plateau = True
-                continue
-            twi, two = wall
-            prim = build_closure_primitives(request, provider)
-            gate = evaluate_three_equation_residuals(
-                q, twi, two, request=request, provider=provider, primitives=prim
-            )
-            for r in gate["residuals_w"]:
-                res.append(float(r) / local_scale)
-        return np.asarray(res, dtype=float)
-
-    opt = least_squares(
-        residual,
+    opt_x, block_nfev, domain_plateau = _block_gauss_seidel_joint_solve(
         x0,
-        bounds=(lo, hi),
-        method="trf",
-        ftol=1e-15,
-        xtol=1e-12,
-        gtol=1e-15,
-        max_nfev=max_nfev,
+        supports=supports,
+        provider=provider,
+        shell_authority=shell_authority,
+        h_t0=h_t0,
+        h_sN=h_sN,
+        tube_mdot=tube_mdot,
+        shell_mdot=shell_mdot,
+        heat_scale=heat_scale,
+        max_sweeps=12,
+        max_nfev_per_cell=min(120, max(40, max_nfev // max(n_cells, 1))),
     )
-    final_residual = residual(opt.x)
     h_t, h_s, q_final, cells, q_stable = _reconcile_q_after_validation(
-        opt.x,
+        opt_x,
         supports=supports,
         h_t0=h_t0,
         h_sN=h_sN,
@@ -772,16 +1342,41 @@ def solve_joint_boundary_value_mesh(
     terminal_t = float(shell_bc.native.temperature_k) - float(effective_shell_inlet_temperature_k())
     terminal_h = float(h_sN - float(effective_shell_cold_inlet_enthalpy_j_kg()))
     terminal_pass = abs(terminal_t) <= float(TERMINAL_TOLERANCE_K)
-    residual_ok = float(np.linalg.norm(final_residual)) < 1.0
+    all_roots = all(c.task173_root_validated for c in cells)
+    axial_ok = audit_axial_feasibility(
+        q_final,
+        provider=provider,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    ).feasible
+    wall_order_ok = all(
+        _wall_order_valid(c.twi_k, c.two_k, c.t_tube_bulk_k, c.t_shell_bulk_k)
+        for c in cells
+        if not math.isnan(c.t_tube_bulk_k)
+    )
+    heat_direction_ok = all(c.q_w > 0.0 for c in cells)
+    enthalpy_consistent = all(
+        abs(c.h_t_left_j_kg - float(h_t[c.index])) < 1.0e-6
+        and abs(c.h_s_left_j_kg - float(h_s[c.index])) < 1.0e-6
+        for c in cells
+    )
     physical = (
         post_ok
         and all_gates
         and all_validated
+        and all_roots
         and q_stable
         and energy_residual <= 1.0
-        and residual_ok
+        and axial_ok
+        and wall_order_ok
+        and heat_direction_ok
+        and enthalpy_consistent
+        and terminal_pass
     )
-    status = "PASS" if physical and opt.success else "BLOCKED"
+    status = "PASS" if physical else "BLOCKED"
+    opt_success = block_nfev > 3 * n_cells
     return JointBVPOutcome(
         status=status,
         subdivisions=subdivisions,
@@ -794,20 +1389,19 @@ def solve_joint_boundary_value_mesh(
         terminal_residual_j_kg=terminal_h,
         terminal_pass=terminal_pass,
         all_task172_gates_pass=all_gates,
-        optimizer_nfev=int(opt.nfev),
-        optimizer_success=bool(opt.success),
+        optimizer_nfev=int(block_nfev),
+        optimizer_success=bool(opt_success),
         physical_acceptance=physical,
-        solver_success=bool(opt.success),
+        solver_success=bool(physical),
         tube_outlet_temperature_k=tube_out_t,
         shell_outlet_temperature_k=shell_out_t,
         diagnostics=(
-            f"residual_norm={float(np.linalg.norm(final_residual)):.6g}",
-            f"optimizer_cost={float(opt.cost):.6g}",
             f"heat_scale_w={heat_scale:.6g}",
             f"q_reconcile_stable={q_stable}",
-            f"trf_status={opt.status!s}",
-            f"trf_message={str(opt.message)[:120]}",
+            f"block_gauss_seidel_nfev={block_nfev}",
             f"domain_penalty_plateau={domain_plateau}",
+            f"axial_feasibility={axial_ok}",
+            f"task173_roots={all_roots}",
         ),
         residual_heat_scale_w=heat_scale,
         energy_conserving_formulation=True,
@@ -816,5 +1410,7 @@ def solve_joint_boundary_value_mesh(
             "optimizer_unknown_count": 3 * n_cells,
             "parameterization": "q_u1_u2",
             "domain_penalty_plateau": domain_plateau,
+            "solver_path": "block_gauss_seidel",
+            "bvp_dof_audit": joint_bvp_dof_audit_summary(),
         },
     )

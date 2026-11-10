@@ -87,6 +87,7 @@ def test_e1_cell0_resistance_seed_in_property_domain() -> None:
         q_cap = _per_cell_thermodynamic_q_cap_w(
             h_t_face_j_kg=float(h_t[0]),
             h_s_face_j_kg=float(h_s[0]),
+            h_s_right_j_kg=float(h_s[1]),
             tube_mdot=mt,
             shell_mdot=ms,
         )
