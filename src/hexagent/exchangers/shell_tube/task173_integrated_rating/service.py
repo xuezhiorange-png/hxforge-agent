@@ -3972,42 +3972,75 @@ def _terminal_tolerance_pass(run: _MeshRun) -> bool:
     return Decimal(0) <= residual_t <= allowed_t and Decimal(0) <= residual_h <= allowed_h
 
 
-def _outer_shooting_float_refine_valid_high(
+def _binary64_enthalpy_step_toward(h_high: Decimal, h_low: Decimal) -> Decimal | None:
+    """One representable binary64 enthalpy step from h_high toward h_low (V08-03)."""
+    f_lo = float(h_low)
+    f_hi = float(h_high)
+    if not (f_hi > f_lo):
+        return None
+    f_step = math.nextafter(f_hi, f_lo)
+    if f_step <= f_lo or f_step >= f_hi:
+        return None
+    stepped = Decimal(str(f_step))
+    if stepped <= h_low or stepped >= h_high:
+        return None
+    return stepped
+
+
+def _outer_shooting_residual_plateau_evidence(
     h_low: Decimal,
     h_high: Decimal,
-    high_run: _MeshRun,
     trial_at: Callable[[Decimal, int], _OuterTrial],
-    iterations: int,
+    iteration: int,
     *,
-    max_steps: int = 192,
-) -> _MeshRun | None:
-    """Refine shooting enthalpy in binary64 when Decimal bisection has collapsed (V08-03)."""
-    if _terminal_tolerance_pass(high_run):
-        return high_run
+    max_probes: int = 32,
+) -> tuple[str, ...]:
+    """Adjacent binary64 enthalpy probes when outer bisection collapses (diagnostics only)."""
     f_lo = float(h_low)
-    f_probe = float(h_high)
-    best_run = high_run
-    for _ in range(max_steps):
+    f_hi = float(h_high)
+    residuals: list[str] = []
+    enthalpies: list[str] = []
+    f_probe = f_hi
+    for _ in range(max_probes):
         f_probe = math.nextafter(f_probe, f_lo)
         if f_probe <= f_lo:
             break
         probe_h = Decimal(str(f_probe))
         if probe_h <= h_low or probe_h >= h_high:
             continue
-        trial = trial_at(probe_h, iterations)
+        trial = trial_at(probe_h, iteration)
         if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
             continue
-        residual_t = trial.mesh_run.observables.terminal_boundary_residual_k
-        residual_h = trial.mesh_run.observables.terminal_boundary_residual_j_kg
-        if residual_t < 0 or residual_h < 0:
-            continue
-        if _terminal_tolerance_pass(trial.mesh_run):
-            return trial.mesh_run
-        if residual_t < best_run.observables.terminal_boundary_residual_k:
-            best_run = trial.mesh_run
-    if _terminal_tolerance_pass(best_run):
-        return best_run
-    return None
+        enthalpies.append(format(f_probe, ".17g"))
+        enthalpies.append(float(f_probe).hex())
+        residuals.append(str(trial.mesh_run.observables.terminal_boundary_residual_k))
+    unique_residuals = sorted({value for value in residuals})
+    return (
+        f"float_h_low={f_lo:.17g}",
+        f"float_h_high={f_hi:.17g}",
+        f"float_h_high_hex={float(f_hi).hex()}",
+        f"adjacent_probe_count={len(residuals)}",
+        f"plateau_unique_residual_k_count={len(unique_residuals)}",
+        f"plateau_residual_k_sample={unique_residuals[:8]}",
+        f"plateau_enthalpy_probe_sample={enthalpies[:6]}",
+    )
+
+
+def _apply_valid_outer_trial_update(
+    *,
+    h_mid: Decimal,
+    trial: _OuterTrial,
+    seen_low: list[Decimal],
+    seen_valid: list[Decimal],
+) -> _MeshRun:
+    _assert_outer_classification_order(seen_low, seen_valid, h_mid, trial.classification)
+    if (
+        trial.mesh_run is None
+        or trial.mesh_run.observables.terminal_boundary_residual_j_kg < 0
+        or trial.mesh_run.observables.terminal_boundary_residual_k < 0
+    ):
+        raise _Stage3Failure("BLOCKED_VALID_TRAJECTORY_NEGATIVE_RESIDUAL")
+    return trial.mesh_run
 
 
 def _assert_outer_classification_order(
@@ -4127,7 +4160,9 @@ def _solve_outer_boundary_from_trial(
         with localcontext() as context:
             context.prec = 80
             h_mid = (h_low + h_high) / Decimal(2)
-        if h_mid in (h_low, h_high) or float(h_mid) in (float(h_low), float(h_high)):
+        decimal_collapsed = h_mid in (h_low, h_high)
+        float_collapsed = float(h_mid) in (float(h_low), float(h_high))
+        if decimal_collapsed or float_collapsed:
             shell_inlet_t = effective_shell_inlet_temperature_k()
             temp_floor = Decimal(
                 str(
@@ -4138,12 +4173,37 @@ def _solve_outer_boundary_from_trial(
             )
             if _terminal_tolerance_pass(high_run):
                 return high_run
-            refined = _outer_shooting_float_refine_valid_high(
-                h_low, h_high, high_run, trial_at, iterations
-            )
-            if refined is not None:
-                return refined
+            if float_collapsed and not decimal_collapsed:
+                stepped = _binary64_enthalpy_step_toward(h_high, h_low)
+                if stepped is not None:
+                    iterations += 1
+                    step_trial = trial_at(stepped, iterations)
+                    if step_trial.classification == "HARD_BLOCKER":
+                        raise _Stage3Failure(*step_trial.diagnostics)
+                    if step_trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                        _assert_outer_classification_order(
+                            seen_low, seen_valid, stepped, step_trial.classification
+                        )
+                        h_low = stepped
+                        seen_low.append(stepped)
+                        continue
+                    if (
+                        step_trial.classification == "VALID_TRAJECTORY"
+                        and step_trial.mesh_run is not None
+                    ):
+                        high_run = _apply_valid_outer_trial_update(
+                            h_mid=stepped,
+                            trial=step_trial,
+                            seen_low=seen_low,
+                            seen_valid=seen_valid,
+                        )
+                        h_high = stepped
+                        seen_valid.append(stepped)
+                        if _terminal_tolerance_pass(high_run):
+                            return high_run
+                        continue
             enthalpy_ulp = Decimal(str(math.ulp(float(h_high))))
+            plateau = _outer_shooting_residual_plateau_evidence(h_low, h_high, trial_at, iterations)
             if (
                 high_run.observables.terminal_boundary_residual_k - temp_floor
                 > TERMINAL_TOLERANCE_K
@@ -4154,13 +4214,17 @@ def _solve_outer_boundary_from_trial(
                     f"terminal_residual_j_kg={high_run.observables.terminal_boundary_residual_j_kg}",
                     f"temperature_ulp_floor_k={temp_floor}",
                     f"enthalpy_ulp_floor_j_kg={enthalpy_ulp}",
-                    f"float_h_low={float(h_low)}",
-                    f"float_h_high={float(h_high)}",
+                    f"h_low={h_low}",
+                    f"h_high={h_high}",
+                    f"decimal_collapsed={decimal_collapsed}",
+                    f"float_collapsed={float_collapsed}",
+                    *plateau,
                 )
             raise _Stage3Failure(
                 "PRECISION_FLOOR_UNRESOLVED",
                 "OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
                 f"terminal_residual_k={high_run.observables.terminal_boundary_residual_k}",
+                *plateau,
             )
         iterations += 1
         trial = trial_at(h_mid, iterations)
@@ -4173,15 +4237,14 @@ def _solve_outer_boundary_from_trial(
             continue
         if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
             raise _Stage3Failure("BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID")
-        _assert_outer_classification_order(seen_low, seen_valid, h_mid, trial.classification)
-        if (
-            trial.mesh_run.observables.terminal_boundary_residual_j_kg < 0
-            or trial.mesh_run.observables.terminal_boundary_residual_k < 0
-        ):
-            raise _Stage3Failure("BLOCKED_VALID_TRAJECTORY_NEGATIVE_RESIDUAL")
+        high_run = _apply_valid_outer_trial_update(
+            h_mid=h_mid,
+            trial=trial,
+            seen_low=seen_low,
+            seen_valid=seen_valid,
+        )
         h_high = h_mid
         seen_valid.append(h_mid)
-        high_run = trial.mesh_run
         if _terminal_tolerance_pass(high_run):
             return high_run
     raise _Stage3Failure(

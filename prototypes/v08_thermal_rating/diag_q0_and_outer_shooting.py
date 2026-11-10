@@ -129,7 +129,9 @@ def outer_bracket_audit(
                     "terminal_residual_j_kg": float(obs.terminal_boundary_residual_j_kg),
                     "terminal_pass": _terminal_tolerance_pass(trial.mesh_run),
                     "temperature_ulp_floor_k": float(
-                        Decimal(str(math.ulp(float(shell_inlet_t + obs.terminal_boundary_residual_k))))
+                        Decimal(
+                            str(math.ulp(float(shell_inlet_t + obs.terminal_boundary_residual_k)))
+                        )
                     ),
                 }
             )
@@ -154,9 +156,7 @@ def outer_bracket_audit(
         record["high_terminal_residual_k"] = float(obs.terminal_boundary_residual_k)
         record["high_terminal_residual_j_kg"] = float(obs.terminal_boundary_residual_j_kg)
         record["high_terminal_pass"] = _terminal_tolerance_pass(high.mesh_run)
-        t_ulp = Decimal(
-            str(math.ulp(float(shell_inlet_t + obs.terminal_boundary_residual_k)))
-        )
+        t_ulp = Decimal(str(math.ulp(float(shell_inlet_t + obs.terminal_boundary_residual_k))))
         record["temperature_ulp_floor_k"] = float(t_ulp)
         record["residual_minus_ulp"] = float(obs.terminal_boundary_residual_k - t_ulp)
         record["blocked_precision_floor"] = (
@@ -198,7 +198,9 @@ def main() -> int:
             payload["mesh_outer_outcome"] = err.code
             payload["mesh_outer_diagnostics"] = list(err.diagnostics)[:24]
         if hit:
-            payload["outer_shooting_bracket"] = outer_bracket_audit(hit, provider, ctx, TARGET_OUTER)
+            payload["outer_shooting_bracket"] = outer_bracket_audit(
+                hit, provider, ctx, TARGET_OUTER
+            )
             payload["endpoint_audits"] = _endpoint_audits(hit, provider)
             q0_chain: dict[str, Any] = {}
             try:
