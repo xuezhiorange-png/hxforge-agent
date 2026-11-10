@@ -90,8 +90,8 @@ def main() -> int:
     ctx_rating = _build_rating_request()
     if ctx_rating.candidate_id != CANDIDATE_ID:
         raise Support3ReplayError(f"candidate mismatch {ctx_rating.candidate_id}")
-    capture["geometry_projection_hash"] = ctx_rating.geometry_projection_hash
     capture["candidate_hash"] = ctx_rating.candidate_hash
+    capture["candidate_space_hash"] = ctx_rating.candidate_space_hash
     normalized = validate_and_build_solver_handoff(
         load_general_user_design_case_json(DEFAULT_FIXTURE.read_text(encoding="utf-8")),
         provider=provider,
