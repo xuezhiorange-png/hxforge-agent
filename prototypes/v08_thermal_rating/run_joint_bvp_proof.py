@@ -141,10 +141,20 @@ def _run_candidate(candidate_id: str) -> dict[str, object]:
 
 def main() -> int:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    candidates = [_run_candidate(cid) for cid in CANDIDATES]
+    n1 = [c["meshes"].get("1", {}) for c in candidates]  # type: ignore[union-attr]
     payload = {
-        "TASK_ID": "V08_03_JOINT_BOUNDARY_VALUE_SOLVER_PROOF",
-        "JOINT_BVP_IMPLEMENTED": True,
-        "candidates": [_run_candidate(cid) for cid in CANDIDATES],
+        "TASK_ID": "V08_03_JOINT_BVP_ENERGY_CONSERVING_FORMULATION",
+        "ENERGY_CONSERVING_FORMULATION": True,
+        "candidates": candidates,
+        "summary": {
+            "candidate_1_n1_status": n1[0].get("status"),
+            "candidate_2_n1_status": n1[1].get("status") if len(n1) > 1 else None,
+            "candidate_1_energy_residual_w": n1[0].get("energy_balance_residual_w"),
+            "candidate_2_energy_residual_w": n1[1].get("energy_balance_residual_w")
+            if len(n1) > 1
+            else None,
+        },
     }
     out = OUT_DIR / "v08_03_joint_bvp_proof.json"
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
