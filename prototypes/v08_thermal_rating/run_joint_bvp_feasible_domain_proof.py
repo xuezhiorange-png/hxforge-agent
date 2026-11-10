@@ -43,10 +43,7 @@ TASK_ID = "V08_03_JOINT_BVP_FEASIBLE_DOMAIN_RECOVERY"
 
 
 def _git_head() -> str:
-    return (
-        subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_REPO, text=True)
-        .strip()
-    )
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_REPO, text=True).strip()
 
 
 def _run_candidate(candidate_id: str, ctx_rating: Any) -> dict[str, Any]:
@@ -103,7 +100,8 @@ def _run_candidate(candidate_id: str, ctx_rating: Any) -> dict[str, Any]:
                 "task172_cells": sum(
                     1
                     for c in two.get("cells", [])
-                    if getattr(c, "task172_gate_pass", False) and getattr(c, "production_validated", False)
+                    if getattr(c, "task172_gate_pass", False)
+                    and getattr(c, "production_validated", False)
                 ),
             },
             "n1": {
@@ -194,7 +192,11 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(closeout, indent=2) + "\n", encoding="utf-8")
     print(OUT)
-    print(json.dumps({k: closeout[k] for k in closeout if k not in ("candidates", "pre_trf")}, indent=2))
+    print(
+        json.dumps(
+            {k: closeout[k] for k in closeout if k not in ("candidates", "pre_trf")}, indent=2
+        )
+    )
     return 0
 
 

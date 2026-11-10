@@ -117,7 +117,16 @@ class AxialFeasibilityReport:
     h_s: tuple[float, ...]
     per_cell_q_hi: tuple[float, ...]
 
-    def violation_for_cell(self, index: int, *, q_w: float, tube_mdot: float, shell_mdot: float, h_min: float, h_max: float) -> float:
+    def violation_for_cell(
+        self,
+        index: int,
+        *,
+        q_w: float,
+        tube_mdot: float,
+        shell_mdot: float,
+        h_min: float,
+        h_max: float,
+    ) -> float:
         h_t = self.h_t
         h_s = self.h_s
         i = index
@@ -504,9 +513,7 @@ def _evaluate_cell_physics_residuals(
     wall = _enthalpy_coupled_wall_temperatures_from_fraction(
         u1, u2, tube_bulk_k=tube_k, shell_bulk_k=shell_k
     )
-    if wall is None or not _wall_order_valid(
-        wall[0], wall[1], tube_k, shell_k
-    ):
+    if wall is None or not _wall_order_valid(wall[0], wall[1], tube_k, shell_k):
         return (
             np.asarray(
                 _domain_violation_triplet(max(tube_k - shell_k, 1.0), scale=heat_scale),
@@ -591,7 +598,9 @@ def _block_gauss_seidel_joint_solve(
                 shell_mdot=shell_mdot,
             )
 
-            def residual_local(x3: np.ndarray, *, cell_i: int = i, cell_support: Any = support) -> np.ndarray:
+            def residual_local(
+                x3: np.ndarray, *, cell_i: int = i, cell_support: Any = support
+            ) -> np.ndarray:
                 nonlocal domain_plateau
                 trial = x.copy()
                 trial[3 * cell_i : 3 * cell_i + 3] = x3
@@ -778,7 +787,11 @@ def attempt_real_single_cell_closure(
     q_uniform = _duty_uniform_q_per_cell(
         provider=provider, n_cells=n, h_t_in=h_t0, tube_mdot=tube_mdot
     )
-    q = np.full(n, q_uniform, dtype=float) if q_freeze is None else np.asarray(q_freeze, dtype=float).copy()
+    q = (
+        np.full(n, q_uniform, dtype=float)
+        if q_freeze is None
+        else np.asarray(q_freeze, dtype=float).copy()
+    )
     report = audit_axial_feasibility(
         q,
         provider=provider,
@@ -912,7 +925,8 @@ def attempt_real_single_cell_closure(
         single_cell_bc_corrected=True,
         compare_u1_u2=compare_u1_u2,
         compare_tmid=compare_tmid,
-        shell_inlet_h_fixed=abs(h_s_after - h_s_before) <= 1.0e-6 and abs(h_s_after - h_sN) <= 1.0e-3,
+        shell_inlet_h_fixed=abs(h_s_after - h_s_before) <= 1.0e-6
+        and abs(h_s_after - h_sN) <= 1.0e-3,
     )
 
 
@@ -1086,8 +1100,7 @@ def attempt_real_two_cell_coupling(
             )
         )
     pass_ = all(
-        c.task172_gate_pass and c.task173_root_validated and c.production_validated
-        for c in cells
+        c.task172_gate_pass and c.task173_root_validated and c.production_validated for c in cells
     )
     return {
         "status": "PASS" if pass_ else "BLOCKED",
@@ -1266,9 +1279,7 @@ def _collect_cell_record(
             f_q = q_trial - q_out
             tol = _task173_root_tolerance_w(q_out)
             # Do not treat F(q)=0 as root evidence when q_out==q_trial without prior ULP gate.
-            root_ok = gate_pass and (
-                abs(f_q) <= tol or abs(q_out - q_trial) > tol
-            )
+            root_ok = gate_pass and (abs(f_q) <= tol or abs(q_out - q_trial) > tol)
     except (RuntimeError, _Stage3Failure):
         prod_ok = False
     ratio = float(three["max_residual_ratio"])

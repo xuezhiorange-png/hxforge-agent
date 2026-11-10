@@ -180,7 +180,8 @@ def main() -> int:
                         "r2_Rwall_k_w": float(prim.wall_resistance_k_w),
                         "r3_1_over_Go_k_w": 1.0 / g_o,
                         "property_domain_valid": True,
-                        "enthalpy_domain_valid": h_min <= tube_h <= h_max and h_min <= shell_h <= h_max,
+                        "enthalpy_domain_valid": h_min <= tube_h <= h_max
+                        and h_min <= shell_h <= h_max,
                     }
                 )
                 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
@@ -338,9 +339,7 @@ def main() -> int:
             "initial_axial_violation_j_kg": feas_report.violation_j_kg,
             "cells": cells,
             "initial_residual_penalty_norm": float(np.linalg.norm(f_penalty)),
-            "initial_residual_physical_norm": float(
-                np.linalg.norm(f_phys[np.isfinite(f_phys)])
-            ),
+            "initial_residual_physical_norm": float(np.linalg.norm(f_phys[np.isfinite(f_phys)])),
             "jacobian_penalty_shape": list(jac_pen.shape),
             "penalty_jacobian_rank": int(np.linalg.matrix_rank(jac_pen)),
             "penalty_jacobian_condition_number": float(np.linalg.cond(jac_pen)),

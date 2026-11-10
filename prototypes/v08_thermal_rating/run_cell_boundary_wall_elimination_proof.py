@@ -64,7 +64,9 @@ def _ci_status() -> str:
     if not runs:
         return "unknown"
     r = runs[0]
-    return f"ci#{r['number']} {r['status']}" + (f" {r['conclusion']}" if r.get("conclusion") else "")
+    return f"ci#{r['number']} {r['status']}" + (
+        f" {r['conclusion']}" if r.get("conclusion") else ""
+    )
 
 
 def _run_candidate(candidate_id: str, ctx_rating: Any) -> dict[str, Any]:
@@ -142,11 +144,15 @@ def main() -> int:
             },
             "two_cell": packed["two_cell_status"],
             "n1_physical_acceptance": n1.physical_acceptance,
-            "task172_cells": sum(1 for c in n1.cells if c.task172_gate_pass and c.production_validated),
+            "task172_cells": sum(
+                1 for c in n1.cells if c.task172_gate_pass and c.production_validated
+            ),
             "energy_balance": n1.energy_balance_residual_w,
         }
     c1 = results[CANDIDATES[0]]["cell0"]
-    wall_elim = "PASS" if c1.get("compare_tmid", {}).get("original_residual_gate_pass") else "BLOCKED"
+    wall_elim = (
+        "PASS" if c1.get("compare_tmid", {}).get("original_residual_gate_pass") else "BLOCKED"
+    )
     if not c1.get("compare_tmid"):
         wall_elim = "BLOCKED"
     payload = {
@@ -165,7 +171,9 @@ def main() -> int:
         "CELL0_R3_W": c1.get("r3_w"),
         "CELL0_MAX_ULP_RATIO": c1.get("max_ulp_ratio"),
         "REAL_CELL0_TASK172": "PASS" if c1.get("task172") else "BLOCKED",
-        "REAL_TWO_CELL_COUPLING": "PASS" if results[CANDIDATES[0]]["two_cell"] == "PASS" else "BLOCKED",
+        "REAL_TWO_CELL_COUPLING": "PASS"
+        if results[CANDIDATES[0]]["two_cell"] == "PASS"
+        else "BLOCKED",
         "CANDIDATE_1_N1": "PASS" if results[CANDIDATES[0]]["n1_physical_acceptance"] else "BLOCKED",
         "CANDIDATE_2_N1": "PASS" if results[CANDIDATES[1]]["n1_physical_acceptance"] else "BLOCKED",
         "TASK173_ROOT_GATE": c1.get("task172"),
@@ -183,7 +191,9 @@ def main() -> int:
             f"{c1.get('failure_class')}: r2={c1.get('r2_w')}, max_ulp={c1.get('max_ulp_ratio')}"
         )
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(payload, indent=2, default=lambda o: getattr(o, "__dict__", str(o))) + "\n")
+    OUT.write_text(
+        json.dumps(payload, indent=2, default=lambda o: getattr(o, "__dict__", str(o))) + "\n"
+    )
     print(OUT)
     print(json.dumps({k: payload[k] for k in payload if k != "candidates"}, indent=2))
     return 0
