@@ -19,7 +19,10 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import TERMINAL_TOLERANCE_K
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+    _attempt_enthalpy_coupled_direct_trf_root,
     _build_candidate_local_support,
+    _effective_h_min_j_kg,
+    _enthalpy_coupled_wall_temperatures_from_fraction,
     _LowSideDomainInfeasible,
     _Stage3Failure,
     _state_at_inlet,
@@ -31,12 +34,67 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     effective_tube_mass_flow_kg_s,
 )
 from prototypes.v08_thermal_rating.true_three_equation_cell_coupling import (
+    _algebraic_seed,
     build_closure_primitives,
     build_task172_request_for_q,
     evaluate_three_equation_residuals,
 )
 
-_DOMAIN_VIOLATION_SCALE = 1.0e3
+
+def _task173_root_tolerance_w(q_w: float) -> float:
+    q_scale = max(abs(float(q_w)), 1.0)
+    return max(1.0e-6, q_scale * 2.0e-8)
+
+
+def _per_cell_thermodynamic_q_cap_w(
+    *,
+    h_t_face_j_kg: float,
+    h_s_face_j_kg: float,
+    tube_mdot: float,
+    shell_mdot: float,
+) -> float:
+    h_min = float(_effective_h_min_j_kg())
+    tube_cap = tube_mdot * (h_t_face_j_kg - h_min)
+    shell_cap = shell_mdot * (h_s_face_j_kg - h_min)
+    return max(0.0, min(tube_cap, shell_cap))
+
+
+def _fractions_from_walls(
+    twi_k: float, two_k: float, *, tube_bulk_k: float, shell_bulk_k: float
+) -> tuple[float, float] | None:
+    span = tube_bulk_k - shell_bulk_k
+    if span <= 0.0:
+        return None
+    u1 = (two_k - shell_bulk_k) / span
+    u2 = (twi_k - two_k) / max(tube_bulk_k - two_k, 1e-30)
+    if not (0.0 <= u1 <= 1.0 and 0.0 <= u2 <= 1.0):
+        return None
+    return u1, u2
+
+
+def _domain_violation_triplet(violation_w: float, *, scale: float) -> tuple[float, float, float]:
+    """Distinct components so FD Jacobian is not a constant penalty plate."""
+    v = max(float(violation_w), 1.0) / max(scale, 1.0)
+    return (v, v * 1.013, v * 0.987)
+
+
+def _enthalpy_step_feasible(
+    *,
+    q_w: float,
+    h_t_left: float,
+    h_s_left: float,
+    tube_mdot: float,
+    shell_mdot: float,
+) -> tuple[bool, float]:
+    h_min = float(_effective_h_min_j_kg())
+    tube_down = h_t_left - q_w / tube_mdot
+    shell_next = h_s_left - q_w / shell_mdot
+    viol = 0.0
+    if tube_down < h_min:
+        viol = max(viol, h_min - tube_down)
+    if shell_next < h_min:
+        viol = max(viol, h_min - shell_next)
+    return viol <= 0.0, viol
 
 
 @dataclass
@@ -193,66 +251,147 @@ def _duty_uniform_q_per_cell(
     return total_q / max(n_cells, 1)
 
 
-def _trf_cell_triple_warm_start(
+def _resistance_network_q_u_seed(
     *,
+    q_cap_w: float,
     q_guess: float,
     support: Any,
     tube_up: Any,
     shell_left: Any,
     provider: Any,
     shell_authority: Any,
-) -> tuple[float, float, float]:
+) -> tuple[float, float, float] | None:
+    """Gi/Go/Rwall network seed; optional frozen-bulk polish; returns (q, u1, u2)."""
+    q_try = min(max(float(q_guess), 0.0), q_cap_w)
     try:
         request, _, _ = build_task172_request_for_q(
-            q_guess,
+            q_try,
             support=support,
             tube_upstream=tube_up,
             shell_physical_left=shell_left,
             provider=provider,
             shell_authority=shell_authority,
         )
-    except _LowSideDomainInfeasible:
-        return (
-            q_guess,
-            float(tube_up.native.temperature_k) - 1.0,
-            float(shell_left.native.temperature_k) + 1.0,
+    except (_LowSideDomainInfeasible, _Stage3Failure):
+        return None
+    tube_k = float(request.tube_bulk_state.temperature_k)
+    shell_k = float(request.shell_bulk_state.temperature_k)
+    if tube_k <= shell_k:
+        return None
+    prim = build_closure_primitives(request, provider)
+    q_a, twi_a, two_a = _algebraic_seed(tube_k, shell_k, prim, support)
+    if q_a <= 0.0 or q_a > q_cap_w:
+        q_a = min(max(q_a, 0.0), q_cap_w)
+    frac = _fractions_from_walls(twi_a, two_a, tube_bulk_k=tube_k, shell_bulk_k=shell_k)
+    if frac is None:
+        wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+            0.35, 0.35, tube_bulk_k=tube_k, shell_bulk_k=shell_k
         )
-    outcome = attempt_frozen_bulk_direct_trf_recovery(request, provider)
+        if wall is None:
+            return None
+        twi_a, two_a = wall
+        frac = _fractions_from_walls(twi_a, two_a, tube_bulk_k=tube_k, shell_bulk_k=shell_k)
+        if frac is None:
+            return None
+    u1, u2 = frac
+    try:
+        request_a, _, _ = build_task172_request_for_q(
+            q_a,
+            support=support,
+            tube_upstream=tube_up,
+            shell_physical_left=shell_left,
+            provider=provider,
+            shell_authority=shell_authority,
+        )
+    except (_LowSideDomainInfeasible, _Stage3Failure):
+        return q_a, u1, u2
+    outcome = attempt_frozen_bulk_direct_trf_recovery(request_a, provider)
     if getattr(outcome, "status", None) != "VALIDATED":
-        twi = float(request.tube_bulk_state.temperature_k) - 1.0
-        two = float(request.shell_bulk_state.temperature_k) + 1.0
-        return q_guess, twi, two
-    return (
-        float(outcome.signed_q_hot_to_cold_w),  # type: ignore[union-attr]
-        float(outcome.wall_temperature_inner_k),  # type: ignore[union-attr]
-        float(outcome.wall_temperature_outer_k),  # type: ignore[union-attr]
-    )
+        return q_a, u1, u2
+    q_v = float(outcome.signed_q_hot_to_cold_w)  # type: ignore[union-attr]
+    twi_v = float(outcome.wall_temperature_inner_k)  # type: ignore[union-attr]
+    two_v = float(outcome.wall_temperature_outer_k)  # type: ignore[union-attr]
+    tube_k2 = float(request_a.tube_bulk_state.temperature_k)
+    shell_k2 = float(request_a.shell_bulk_state.temperature_k)
+    frac2 = _fractions_from_walls(twi_v, two_v, tube_bulk_k=tube_k2, shell_bulk_k=shell_k2)
+    if frac2 is None:
+        return q_a, u1, u2
+    return min(q_v, q_cap_w), frac2[0], frac2[1]
 
 
-def _qtw_initial_guess(
+def _sequential_q_u_initial_guess(
     *,
     provider: Any,
     supports: list[Any],
-    h_t: np.ndarray,
-    h_s: np.ndarray,
+    h_t0: float,
+    h_sN: float,
+    tube_mdot: float,
+    shell_mdot: float,
     q_uniform: float,
     shell_authority: Any,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """March axial q with enthalpy rebuild; per-cell resistance/TRF u seed."""
     n = len(supports)
-    out = np.zeros(3 * n, dtype=float)
+    q = np.full(n, q_uniform, dtype=float)
+    x0 = np.zeros(3 * n, dtype=float)
+    lo = np.zeros(3 * n, dtype=float)
+    hi = np.zeros(3 * n, dtype=float)
     for i, support in enumerate(supports):
+        h_t, h_s = build_axial_enthalpies_from_q(
+            q,
+            h_t_inlet_j_kg=h_t0,
+            h_s_cold_inlet_j_kg=h_sN,
+            tube_mass_flow_kg_s=tube_mdot,
+            shell_mass_flow_kg_s=shell_mdot,
+        )
+        q_cap = _per_cell_thermodynamic_q_cap_w(
+            h_t_face_j_kg=float(h_t[i]),
+            h_s_face_j_kg=float(h_s[i]),
+            tube_mdot=tube_mdot,
+            shell_mdot=shell_mdot,
+        )
+        lo[3 * i] = 0.0
+        hi[3 * i] = max(q_cap, 1.0)
+        lo[3 * i + 1 : 3 * i + 3] = (0.0, 0.0)
+        hi[3 * i + 1 : 3 * i + 3] = (1.0, 1.0)
         tube_up = _state_from_h(provider, float(h_t[i]), side="TUBE")
         shell_left = _state_from_h(provider, float(h_s[i]), side="SHELL")
-        q_w, twi, two = _trf_cell_triple_warm_start(
-            q_guess=q_uniform,
+        q_seed = min(q_uniform, q_cap)
+        coupled = _attempt_enthalpy_coupled_direct_trf_root(
+            support=support,
+            tube_upstream=tube_up,
+            shell_physical_left=shell_left,
+            provider=provider,
+            shell_authority=shell_authority,
+            q_upper=float(q_cap),
+            q_seed=float(q[i] if q[i] > 0 else q_seed),
+        )
+        if coupled is not None:
+            q[i] = float(coupled.q_w)
+            tube_k = float(coupled.tube_local.native.temperature_k)
+            shell_k = float(coupled.shell_local.native.temperature_k)
+            twi = float(coupled.task172_result.wall_temperature_inner_k)
+            two = float(coupled.task172_result.wall_temperature_outer_k)
+            frac = _fractions_from_walls(twi, two, tube_bulk_k=tube_k, shell_bulk_k=shell_k)
+            if frac is not None:
+                x0[3 * i : 3 * i + 3] = (q[i], frac[0], frac[1])
+                continue
+        seed = _resistance_network_q_u_seed(
+            q_cap_w=q_cap,
+            q_guess=q_seed,
             support=support,
             tube_up=tube_up,
             shell_left=shell_left,
             provider=provider,
             shell_authority=shell_authority,
         )
-        out[3 * i : 3 * i + 3] = (q_w, twi, two)
-    return out
+        if seed is None:
+            x0[3 * i : 3 * i + 3] = (min(q_uniform, q_cap), 0.35, 0.35)
+            continue
+        q_i, u1, u2 = seed
+        x0[3 * i : 3 * i + 3] = (q_i, u1, u2)
+        q[i] = q_i
+    return x0, lo, hi, q
 
 
 def _collect_cell_record(
@@ -310,9 +449,12 @@ def _collect_cell_record(
     if math.isnan(r1):
         r1, r2, r3 = three["residuals_w"]
     prod_ok = False
+    q_trial = float(q)
     q_out = q
     twi_out = twi
     two_out = two
+    f_q = math.nan
+    root_ok = False
     try:
         validated = build_validated_local_result_from_verified_trial_triple(
             request, provider, q, twi, two, polish_nextafter=True
@@ -328,10 +470,12 @@ def _collect_cell_record(
                 q_out, twi_out, two_out, request=request, provider=provider, primitives=prim
             )
             r1, r2, r3 = three["residuals_w"]
+            f_q = q_trial - q_out
+            tol = _task173_root_tolerance_w(q_out)
+            root_ok = abs(f_q) <= tol
     except (RuntimeError, _Stage3Failure):
         prod_ok = False
     ratio = float(three["max_residual_ratio"])
-    root_residual = abs(r1) + abs(r2) + abs(r3)
     tube_t = float(request.tube_bulk_state.temperature_k)
     shell_t = float(request.shell_bulk_state.temperature_k)
     return JointBVPCellRecord(
@@ -352,15 +496,22 @@ def _collect_cell_record(
         task172_r1_w=r1,
         task172_r2_w=r2,
         task172_r3_w=r3,
-        task173_root_residual_w=root_residual,
-        task173_root_validated=gate_pass and prod_ok,
+        task173_root_residual_w=f_q,
+        task173_root_validated=root_ok and gate_pass and prod_ok,
         task172_request_hash=req_hash,
         domain_exit=domain_exit,
     )
 
 
+def _qu_from_optimizer_vec(
+    vec: np.ndarray, n_cells: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    qtw = vec.reshape(n_cells, 3)
+    return qtw[:, 0].copy(), qtw[:, 1].copy(), qtw[:, 2].copy()
+
+
 def _reconcile_q_after_validation(
-    q_vec: np.ndarray,
+    vec: np.ndarray,
     *,
     supports: list[Any],
     h_t0: float,
@@ -373,9 +524,7 @@ def _reconcile_q_after_validation(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, list[JointBVPCellRecord], bool]:
     """If ULP polish changes q, rebuild enthalpies and re-validate until q stable."""
     n = len(supports)
-    q_current = np.asarray(q_vec[:n], dtype=float)
-    twi = q_vec[n : 2 * n].copy()
-    two = q_vec[2 * n : 3 * n].copy()
+    q_current, u1, u2 = _qu_from_optimizer_vec(vec, n)
     for _ in range(max_passes):
         h_t, h_s = build_axial_enthalpies_from_q(
             q_current,
@@ -388,20 +537,45 @@ def _reconcile_q_after_validation(
         q_next = q_current.copy()
         changed = False
         for i, support in enumerate(supports):
+            tube_k = shell_k = math.nan
+            try:
+                request, _, _ = build_task172_request_for_q(
+                    float(q_current[i]),
+                    support=support,
+                    tube_upstream=_state_from_h(provider, float(h_t[i]), side="TUBE"),
+                    shell_physical_left=_state_from_h(provider, float(h_s[i]), side="SHELL"),
+                    provider=provider,
+                    shell_authority=shell_authority,
+                )
+                tube_k = float(request.tube_bulk_state.temperature_k)
+                shell_k = float(request.shell_bulk_state.temperature_k)
+            except (_LowSideDomainInfeasible, _Stage3Failure):
+                pass
+            wall = None
+            if math.isfinite(tube_k) and math.isfinite(shell_k):
+                wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+                    float(u1[i]), float(u2[i]), tube_bulk_k=tube_k, shell_bulk_k=shell_k
+                )
+            if wall is None:
+                twi_i, two_i = 300.0, 299.0
+            else:
+                twi_i, two_i = wall
             rec = _collect_cell_record(
                 index=i,
                 support=support,
                 q=float(q_current[i]),
-                twi=float(twi[i]),
-                two=float(two[i]),
+                twi=float(twi_i),
+                two=float(two_i),
                 h_t=h_t,
                 h_s=h_s,
                 provider=provider,
                 shell_authority=shell_authority,
             )
             cells.append(rec)
-            twi[i] = rec.twi_k
-            two[i] = rec.two_k
+            twi_i, two_i = rec.twi_k, rec.two_k
+            frac = _fractions_from_walls(twi_i, two_i, tube_bulk_k=tube_k, shell_bulk_k=shell_k)
+            if frac is not None:
+                u1[i], u2[i] = frac
             if rec.q_w != q_current[i]:
                 changed = True
                 q_next[i] = rec.q_w
@@ -462,30 +636,21 @@ def solve_joint_boundary_value_mesh(
     q_uniform = _duty_uniform_q_per_cell(
         provider=provider, n_cells=n_cells, h_t_in=h_t0, tube_mdot=tube_mdot
     )
-    q_seed = np.full(n_cells, q_uniform, dtype=float)
-    h_t_seed, h_s_seed = build_axial_enthalpies_from_q(
-        q_seed,
-        h_t_inlet_j_kg=h_t0,
-        h_s_cold_inlet_j_kg=h_sN,
-        tube_mass_flow_kg_s=tube_mdot,
-        shell_mass_flow_kg_s=shell_mdot,
-    )
-    q_block = _qtw_initial_guess(
+    x0, lo, hi, q_part = _sequential_q_u_initial_guess(
         provider=provider,
         supports=supports,
-        h_t=h_t_seed,
-        h_s=h_s_seed,
+        h_t0=h_t0,
+        h_sN=h_sN,
+        tube_mdot=tube_mdot,
+        shell_mdot=shell_mdot,
         q_uniform=q_uniform,
         shell_authority=shell_authority,
     )
-    q_part = q_block[: n_cells * 3 : 3]
-    x0 = q_block.copy()
     heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
-
-    lo = np.tile(np.asarray([0.0, 280.0, 280.0], dtype=float), n_cells)
-    hi = np.tile(np.asarray([1.0e7, 400.0, 400.0], dtype=float), n_cells)
+    domain_plateau = False
 
     def residual(vec: np.ndarray) -> np.ndarray:
+        nonlocal domain_plateau
         qtw = vec.reshape(n_cells, 3)
         q_vals = qtw[:, 0]
         try:
@@ -497,21 +662,39 @@ def solve_joint_boundary_value_mesh(
                 shell_mass_flow_kg_s=shell_mdot,
             )
         except ValueError:
-            return np.full(3 * n_cells, _DOMAIN_VIOLATION_SCALE, dtype=float)
+            domain_plateau = True
+            v = _domain_violation_triplet(1.0e4, scale=heat_scale)
+            return np.tile(np.asarray(v, dtype=float), n_cells)
         local_scale = _heat_residual_scale_w(
             q_vals, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN
         )
         res: list[float] = []
         for i, support in enumerate(supports):
-            q, twi, two = (float(v) for v in qtw[i])
-            if q < 0.0:
-                res.extend((-_DOMAIN_VIOLATION_SCALE,) * 3)
+            q, u1, u2 = (float(v) for v in qtw[i])
+            if q < 0.0 or q > float(hi[3 * i]) * 1.0001:
+                v = _domain_violation_triplet(abs(q) + 1.0, scale=local_scale)
+                res.extend(v)
+                domain_plateau = True
+                continue
+            ok, viol = _enthalpy_step_feasible(
+                q_w=q,
+                h_t_left=float(h_t[i]),
+                h_s_left=float(h_s[i]),
+                tube_mdot=tube_mdot,
+                shell_mdot=shell_mdot,
+            )
+            if not ok:
+                v = _domain_violation_triplet(viol, scale=local_scale)
+                res.extend(v)
+                domain_plateau = True
                 continue
             try:
                 tube_up = _state_from_h(provider, float(h_t[i]), side="TUBE")
                 shell_left = _state_from_h(provider, float(h_s[i]), side="SHELL")
             except (_Stage3Failure, _LowSideDomainInfeasible):
-                res.extend((-_DOMAIN_VIOLATION_SCALE,) * 3)
+                v = _domain_violation_triplet(1.0e3, scale=local_scale)
+                res.extend(v)
+                domain_plateau = True
                 continue
             try:
                 request, _, _ = build_task172_request_for_q(
@@ -523,8 +706,21 @@ def solve_joint_boundary_value_mesh(
                     shell_authority=shell_authority,
                 )
             except (_LowSideDomainInfeasible, _Stage3Failure):
-                res.extend((-_DOMAIN_VIOLATION_SCALE,) * 3)
+                v = _domain_violation_triplet(1.0e3, scale=local_scale)
+                res.extend(v)
+                domain_plateau = True
                 continue
+            tube_k = float(request.tube_bulk_state.temperature_k)
+            shell_k = float(request.shell_bulk_state.temperature_k)
+            wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+                u1, u2, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+            )
+            if wall is None:
+                v = _domain_violation_triplet(max(tube_k - shell_k, 1.0), scale=local_scale)
+                res.extend(v)
+                domain_plateau = True
+                continue
+            twi, two = wall
             prim = build_closure_primitives(request, provider)
             gate = evaluate_three_equation_residuals(
                 q, twi, two, request=request, provider=provider, primitives=prim
@@ -538,15 +734,14 @@ def solve_joint_boundary_value_mesh(
         x0,
         bounds=(lo, hi),
         method="trf",
-        ftol=1e-8,
-        xtol=1e-10,
+        ftol=1e-15,
+        xtol=1e-12,
+        gtol=1e-15,
         max_nfev=max_nfev,
     )
     final_residual = residual(opt.x)
-    qtw = opt.x.reshape(n_cells, 3)
-    q_vec = np.concatenate([qtw[:, 0], qtw[:, 1], qtw[:, 2]])
     h_t, h_s, q_final, cells, q_stable = _reconcile_q_after_validation(
-        q_vec,
+        opt.x,
         supports=supports,
         h_t0=h_t0,
         h_sN=h_sN,
@@ -610,11 +805,16 @@ def solve_joint_boundary_value_mesh(
             f"optimizer_cost={float(opt.cost):.6g}",
             f"heat_scale_w={heat_scale:.6g}",
             f"q_reconcile_stable={q_stable}",
+            f"trf_status={opt.status!s}",
+            f"trf_message={str(opt.message)[:120]}",
+            f"domain_penalty_plateau={domain_plateau}",
         ),
         residual_heat_scale_w=heat_scale,
         energy_conserving_formulation=True,
         extra={
             "energized_q_construction": True,
             "optimizer_unknown_count": 3 * n_cells,
+            "parameterization": "q_u1_u2",
+            "domain_penalty_plateau": domain_plateau,
         },
     )

@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from prototypes.v08_thermal_rating.joint_boundary_value_axial_solver import (
+    _fractions_from_walls,
+    _task173_root_tolerance_w,
     axial_energy_slack_w,
     build_axial_enthalpies_from_q,
     solve_joint_boundary_value_mesh,
@@ -91,6 +93,21 @@ def test_build_enthalpy_rejects_nonpositive_mdot() -> None:
             tube_mass_flow_kg_s=0.0,
             shell_mass_flow_kg_s=1.0,
         )
+
+
+def test_wall_fraction_roundtrip_preserves_order() -> None:
+    tube_k, shell_k = 320.0, 300.0
+    twi, two = 315.0, 305.0
+    frac = _fractions_from_walls(twi, two, tube_bulk_k=tube_k, shell_bulk_k=shell_k)
+    assert frac is not None
+    u1, u2 = frac
+    assert 0.0 <= u1 <= 1.0 and 0.0 <= u2 <= 1.0
+    assert shell_k <= two <= twi <= tube_k
+
+
+def test_task173_root_tolerance_matches_production_floor() -> None:
+    assert _task173_root_tolerance_w(40_000.0) == pytest.approx(max(1e-6, 40_000.0 * 2e-8))
+    assert _task173_root_tolerance_w(0.5) == pytest.approx(1e-6)
 
 
 def test_empty_mesh_returns_blocked_outcome() -> None:

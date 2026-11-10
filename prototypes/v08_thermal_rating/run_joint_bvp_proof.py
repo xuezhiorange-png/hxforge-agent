@@ -144,7 +144,7 @@ def main() -> int:
     candidates = [_run_candidate(cid) for cid in CANDIDATES]
     n1 = [c["meshes"].get("1", {}) for c in candidates]  # type: ignore[union-attr]
     payload = {
-        "TASK_ID": "V08_03_JOINT_BVP_ENERGY_CONSERVING_FORMULATION",
+        "TASK_ID": "V08_03_JOINT_BVP_WALL_CLOSURE_RECOVERY",
         "ENERGY_CONSERVING_FORMULATION": True,
         "candidates": candidates,
         "summary": {
