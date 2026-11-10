@@ -1169,8 +1169,13 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             hole_edge_before=hole_edge_before,
             anchor_before=anchor_before,
         )
-        if outcome not in ("CONTINUE", "BREAK"):
-            return outcome
+        if isinstance(outcome, str):
+            if outcome in ("CONTINUE", "BREAK"):
+                pass
+            else:
+                raise ValueError(f"unexpected hole recovery marker: {outcome!r}")
+            continue
+        return outcome
     else:
         dyadic_levels_completed = MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
 
@@ -1202,8 +1207,13 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
                 hole_edge_before=hole_edge,
                 anchor_before=anchor,
             )
-            if outcome not in ("CONTINUE", "BREAK"):
-                return outcome
+            if isinstance(outcome, str):
+                if outcome in ("CONTINUE", "BREAK"):
+                    pass
+                else:
+                    raise ValueError(f"unexpected hole recovery marker: {outcome!r}")
+                continue
+            return outcome
 
     if dyadic_levels_completed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET:
         raise _EndpointHoleRecoveryExhausted(
@@ -3203,12 +3213,16 @@ def _solve_cell(
                 for trial in trials.values()
                 if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None
             ]
-            if valid_in_interval and all(trial.residual > 0 for trial in valid_in_interval):
+            if valid_in_interval and all(
+                trial.residual is not None and trial.residual > 0 for trial in valid_in_interval
+            ):
                 raise _Stage3Failure(
                     "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
                     "both endpoints are numerical holes; interior valid probes share one sign",
                 )
-            if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
+            if valid_in_interval and all(
+                trial.residual is not None and trial.residual < 0 for trial in valid_in_interval
+            ):
                 coupled_root = _attempt_enthalpy_coupled_direct_trf_root(
                     support=support,
                     tube_upstream=tube_upstream,

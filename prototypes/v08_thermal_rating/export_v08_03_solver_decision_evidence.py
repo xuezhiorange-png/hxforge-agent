@@ -38,7 +38,9 @@ def main() -> int:
         "leaves terminal_residual_k unchanged at 3.5037e-8",
         "DOMINANT_ERROR_SOURCE": "D: binary64 shooting enthalpy bracket collapse (float_collapsed) "
         "with zero adjacent-probe residual sensitivity; secondary inner slack via trial-q≠signed_q propagation",
-        "OUTER_RESIDUAL_BEFORE_K": bisect.get("terminal_residual_k", mesh1.get("terminal_residual_k")),
+        "OUTER_RESIDUAL_BEFORE_K": bisect.get(
+            "terminal_residual_k", mesh1.get("terminal_residual_k")
+        ),
         "OUTER_RESIDUAL_AFTER_K": "N/A (q_phys propagation replay → HARD_BLOCKER cell bracket; not committed)",
         "ORIGINAL_TERMINAL_GATE": "BLOCKED",
         "ALTERNATIVE_SOLVER_REQUIRED": True,
