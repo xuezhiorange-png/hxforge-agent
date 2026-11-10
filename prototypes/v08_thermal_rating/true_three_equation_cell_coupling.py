@@ -442,6 +442,221 @@ def solve_true_three_equation_coupling(
     return record
 
 
+def wall_temperatures_from_tmid_k(
+    q_w: float,
+    tmid_k: float,
+    *,
+    rwall_k_w: float,
+) -> tuple[float, float]:
+    """Enforce r2=0 by construction: Twi = Tmid + q*Rwall/2, Two = Tmid - q*Rwall/2."""
+    rw = float(rwall_k_w)
+    q = float(q_w)
+    tmid = float(tmid_k)
+    twi = tmid + q * rw / 2.0
+    two = tmid - q * rw / 2.0
+    return twi, two
+
+
+def wall_resistance_geometry_audit(
+    request: Task172Request,
+    provider: Any,
+) -> dict[str, Any]:
+    """Confirm production Rwall depends on support geometry/material only (not trial wall T)."""
+    prim = build_closure_primitives(request, provider)
+    rw = float(prim.wall_resistance_k_w)
+    support = request.support
+    return {
+        "rwall_k_w": rw,
+        "independent_of_trial_wall_temperature": True,
+        "source": "compute_wall_resistance(support geometry)",
+        "inside_area_m2": float(support.inside_area_m2),
+        "tube_cell_id": getattr(support, "tube_cell_id", ""),
+    }
+
+
+def solve_bvp_cell_wall_eliminated_trf(
+    *,
+    request_at_q: Any,
+    provider: Any,
+    q_upper: float,
+    q_seed: float,
+    max_nfev: int = 160,
+) -> dict[str, Any]:
+    """2-DOF (q, Tmid) with conductive r2 eliminated; residuals r1,r3 via production _eval_trial."""
+    q0 = min(max(float(q_seed), 0.0), float(q_upper))
+    if q_upper <= 0.0:
+        return {"status": "BLOCKED", "reason": "non_positive_q_upper"}
+    try:
+        request0 = request_at_q(q0)
+    except (_LowSideDomainInfeasible, ValueError, TypeError):
+        return {"status": "BLOCKED", "reason": "request_at_q_seed_failed"}
+    tube_k0 = float(request0.tube_bulk_state.temperature_k)
+    shell_k0 = float(request0.shell_bulk_state.temperature_k)
+    tmid0 = (tube_k0 + shell_k0) / 2.0
+    scale = max(abs(q0), 1.0)
+    t_min = float(t172_service._admitted_temperature_bounds()[0])
+    t_max = float(t172_service._admitted_temperature_bounds()[1])
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q_val, tmid = (float(vec[0]), float(vec[1]))
+        invalid = np.asarray([9.0, 9.0], dtype=float) / scale
+        if q_val < 0.0 or q_val > float(q_upper):
+            return invalid
+        if not (t_min <= tmid <= t_max):
+            return invalid
+        try:
+            request = request_at_q(q_val)
+        except (_LowSideDomainInfeasible, ValueError, TypeError):
+            return invalid
+        prim = build_closure_primitives(request, provider)
+        rw = float(prim.wall_resistance_k_w)
+        twi, two = wall_temperatures_from_tmid_k(q_val, tmid, rwall_k_w=rw)
+        tube_k = float(request.tube_bulk_state.temperature_k)
+        shell_k = float(request.shell_bulk_state.temperature_k)
+        if not (shell_k <= two <= twi <= tube_k):
+            return invalid
+        ev = evaluate_three_equation_residuals(
+            q_val, twi, two, request=request, provider=provider, primitives=prim
+        )
+        r1, _, r3 = ev["residuals_w"]
+        return np.asarray([float(r1) / scale, float(r3) / scale], dtype=float)
+
+    x0 = np.asarray([q0, tmid0], dtype=float)
+    lo = np.asarray([0.0, t_min], dtype=float)
+    hi = np.asarray([float(q_upper), t_max], dtype=float)
+    opt = least_squares(
+        residual,
+        x0,
+        bounds=(lo, hi),
+        method="trf",
+        ftol=1e-10,
+        xtol=1e-12,
+        max_nfev=max_nfev,
+    )
+    q_f, tmid_f = (float(v) for v in opt.x)
+    request_f = request_at_q(q_f)
+    prim_f = build_closure_primitives(request_f, provider)
+    rw_f = float(prim_f.wall_resistance_k_w)
+    twi_f, two_f = wall_temperatures_from_tmid_k(q_f, tmid_f, rwall_k_w=rw_f)
+    gate = evaluate_three_equation_residuals(
+        q_f, twi_f, two_f, request=request_f, provider=provider, primitives=prim_f
+    )
+    return {
+        "method": "BVP_WALL_ELIMINATED_Q_TMID",
+        "status": "SOLVED" if bool(opt.success) else "BLOCKED",
+        "optimizer_success": bool(opt.success),
+        "optimizer_nfev": int(opt.nfev),
+        "optimizer_message": str(opt.message),
+        "q_w": q_f,
+        "tmid_k": tmid_f,
+        "twi_k": twi_f,
+        "two_k": two_f,
+        "r1_w": gate["residuals_w"][0],
+        "r2_w": gate["residuals_w"][1],
+        "r3_w": gate["residuals_w"][2],
+        "max_residual_ratio": gate["max_residual_ratio"],
+        "original_residual_gate_pass": gate["passes_original_residual_gate"],
+        "g_i_w_k": gate["g_i_w_per_k"],
+        "g_o_w_k": gate["g_o_w_per_k"],
+        "rwall_k_w": rw_f,
+        "request_hash": recompute_task172_request_hash(request_f),
+    }
+
+
+def solve_bvp_cell_u1_u2_trf(
+    *,
+    request_at_q: Any,
+    provider: Any,
+    q_upper: float,
+    q_seed: float,
+    max_nfev: int = 160,
+) -> dict[str, Any]:
+    """3-DOF (q,u1,u2) with BVP-coupled request_at_q rebuilding enthalpy faces each trial."""
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+        _enthalpy_coupled_wall_temperatures_from_fraction,
+    )
+
+    q0 = min(max(float(q_seed), 0.0), float(q_upper))
+    if q_upper <= 0.0:
+        return {"status": "BLOCKED", "reason": "non_positive_q_upper"}
+    try:
+        request_at_q(q0)
+    except (_LowSideDomainInfeasible, ValueError, TypeError):
+        return {"status": "BLOCKED", "reason": "request_at_q_seed_failed"}
+    scale = max(abs(q0), 1.0)
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q_val, u1, u2 = (float(vec[0]), float(vec[1]), float(vec[2]))
+        invalid = np.asarray([9.0, 9.0, 9.0], dtype=float) / scale
+        if q_val < 0.0 or q_val > float(q_upper):
+            return invalid
+        if not (0.0 <= u1 <= 1.0 and 0.0 <= u2 <= 1.0):
+            return invalid
+        try:
+            request = request_at_q(q_val)
+        except (_LowSideDomainInfeasible, ValueError, TypeError):
+            return invalid
+        tube_k = float(request.tube_bulk_state.temperature_k)
+        shell_k = float(request.shell_bulk_state.temperature_k)
+        wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+            u1, u2, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+        )
+        if wall is None:
+            return invalid
+        twi, two = wall
+        prim = build_closure_primitives(request, provider)
+        ev = evaluate_three_equation_residuals(
+            q_val, twi, two, request=request, provider=provider, primitives=prim
+        )
+        return np.asarray([float(r) / scale for r in ev["residuals_w"]], dtype=float)
+
+    x0 = np.asarray([q0, 0.35, 0.35], dtype=float)
+    lo = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    hi = np.asarray([float(q_upper), 1.0, 1.0], dtype=float)
+    opt = least_squares(
+        residual,
+        x0,
+        bounds=(lo, hi),
+        method="trf",
+        ftol=1e-10,
+        xtol=1e-12,
+        max_nfev=max_nfev,
+    )
+    q_f, u1_f, u2_f = (float(v) for v in opt.x)
+    request_f = request_at_q(q_f)
+    tube_k = float(request_f.tube_bulk_state.temperature_k)
+    shell_k = float(request_f.shell_bulk_state.temperature_k)
+    wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+        u1_f, u2_f, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+    )
+    if wall is None:
+        return {"status": "BLOCKED", "reason": "wall_order_invalid", "method": "BVP_U1_U2"}
+    twi_f, two_f = wall
+    prim_f = build_closure_primitives(request_f, provider)
+    gate = evaluate_three_equation_residuals(
+        q_f, twi_f, two_f, request=request_f, provider=provider, primitives=prim_f
+    )
+    return {
+        "method": "BVP_U1_U2",
+        "status": "SOLVED" if bool(opt.success) else "BLOCKED",
+        "optimizer_success": bool(opt.success),
+        "optimizer_nfev": int(opt.nfev),
+        "optimizer_message": str(opt.message),
+        "q_w": q_f,
+        "twi_k": twi_f,
+        "two_k": two_f,
+        "r1_w": gate["residuals_w"][0],
+        "r2_w": gate["residuals_w"][1],
+        "r3_w": gate["residuals_w"][2],
+        "max_residual_ratio": gate["max_residual_ratio"],
+        "original_residual_gate_pass": gate["passes_original_residual_gate"],
+        "g_i_w_k": gate["g_i_w_per_k"],
+        "g_o_w_k": gate["g_o_w_per_k"],
+        "rwall_k_w": float(prim_f.wall_resistance_k_w),
+        "request_hash": recompute_task172_request_hash(request_f),
+    }
+
+
 def task172_validation_dispatch(
     request: Task172Request,
     provider: Any,

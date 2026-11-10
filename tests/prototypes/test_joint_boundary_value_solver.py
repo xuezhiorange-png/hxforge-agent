@@ -110,6 +110,34 @@ def test_task173_root_tolerance_matches_production_floor() -> None:
     assert _task173_root_tolerance_w(0.5) == pytest.approx(1e-6)
 
 
+def test_bvp_q_trial_moves_shell_left_preserves_downstream_face() -> None:
+    n = 5
+    mt, ms = 2.1, 3.0
+    h_t0 = 188_000.0
+    h_sN = 92_000.0
+    q = np.linspace(5_000.0, 9_000.0, n)
+    _h_t, h_s = build_axial_enthalpies_from_q(
+        q,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=mt,
+        shell_mass_flow_kg_s=ms,
+    )
+    h_s_right = float(h_s[1])
+    h_s_inlet = float(h_s[-1])
+    q[0] = 15_000.0
+    _, h_s2 = build_axial_enthalpies_from_q(
+        q,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=mt,
+        shell_mass_flow_kg_s=ms,
+    )
+    assert h_s2[1] == pytest.approx(h_s_right)
+    assert h_s2[-1] == pytest.approx(h_s_inlet)
+    assert h_s2[0] == pytest.approx(h_s2[1] + q[0] / ms)
+
+
 def test_empty_mesh_returns_blocked_outcome() -> None:
     class _Ctx:
         interval_count = 0

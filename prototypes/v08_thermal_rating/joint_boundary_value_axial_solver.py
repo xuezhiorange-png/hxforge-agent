@@ -39,6 +39,9 @@ from prototypes.v08_thermal_rating.true_three_equation_cell_coupling import (
     build_closure_primitives,
     build_task172_request_for_q,
     evaluate_three_equation_residuals,
+    solve_bvp_cell_u1_u2_trf,
+    solve_bvp_cell_wall_eliminated_trf,
+    wall_resistance_geometry_audit,
 )
 
 
@@ -671,6 +674,74 @@ class RealCellClosureOutcome:
     twi_k: float
     two_k: float
     domain_exit: str | None = None
+    r1_w: float = math.nan
+    r2_w: float = math.nan
+    r3_w: float = math.nan
+    max_ulp_ratio: float = math.nan
+    g_i_w_k: float = math.nan
+    g_o_w_k: float = math.nan
+    rwall_k_w: float = math.nan
+    elimination_method: str = ""
+    optimizer_message: str = ""
+    failure_class: str = ""
+    single_cell_bc_corrected: bool = False
+    compare_u1_u2: dict[str, Any] = field(default_factory=dict)
+    compare_tmid: dict[str, Any] = field(default_factory=dict)
+    shell_inlet_h_fixed: bool = False
+
+
+def build_bvp_cell_task172_for_trial_q(
+    cell_index: int,
+    q_trial_w: float,
+    q_full: np.ndarray,
+    *,
+    support: Any,
+    provider: Any,
+    shell_authority: Any,
+    h_t_inlet_j_kg: float,
+    h_s_cold_inlet_j_kg: float,
+    tube_mass_flow_kg_s: float,
+    shell_mass_flow_kg_s: float,
+) -> tuple[Any, Any, Any, np.ndarray, np.ndarray]:
+    """Rebuild BVP face enthalpies on each q trial; shell left follows h_s_right + q/m_s."""
+    q_work = np.asarray(q_full, dtype=float).copy()
+    q_work[cell_index] = float(q_trial_w)
+    h_t, h_s = build_axial_enthalpies_from_q(
+        q_work,
+        h_t_inlet_j_kg=h_t_inlet_j_kg,
+        h_s_cold_inlet_j_kg=h_s_cold_inlet_j_kg,
+        tube_mass_flow_kg_s=tube_mass_flow_kg_s,
+        shell_mass_flow_kg_s=shell_mass_flow_kg_s,
+    )
+    tube_up = _state_from_h(provider, float(h_t[cell_index]), side="TUBE")
+    shell_left = _state_from_h(provider, float(h_s[cell_index]), side="SHELL")
+    request, tube_local, shell_local = build_task172_request_for_q(
+        float(q_trial_w),
+        support=support,
+        tube_upstream=tube_up,
+        shell_physical_left=shell_left,
+        provider=provider,
+        shell_authority=shell_authority,
+    )
+    return request, tube_local, shell_local, h_t, h_s
+
+
+def _classify_cell_closure_failure(
+    *,
+    gate_pass: bool,
+    optimizer_success: bool,
+    max_ratio: float,
+    q_cap: float,
+) -> str:
+    if gate_pass:
+        return ""
+    if not optimizer_success:
+        return "A_NUMERICAL_ROOT_NOT_FOUND"
+    if max_ratio > 1.0 and math.isfinite(max_ratio):
+        return "B_WALL_RELATED_HTC_NONLINEARITY"
+    if q_cap <= 0.0:
+        return "C_FROZEN_NEIGHBOUR_Q_INFEASIBLE"
+    return "A_NUMERICAL_ROOT_NOT_FOUND"
 
 
 def attempt_real_single_cell_closure(
@@ -682,7 +753,7 @@ def attempt_real_single_cell_closure(
     subdivisions: int = 1,
     q_freeze: np.ndarray | None = None,
 ) -> RealCellClosureOutcome:
-    """Cell-local enthalpy-coupled TRF with frozen neighbours via fixed q profile."""
+    """Cell-0 closure with BVP face reconstruction; compare 3-DOF u1/u2 vs 2-DOF wall elimination."""
     supports = _supports_for_mesh(candidate_ctx, subdivisions)
     if cell_index < 0 or cell_index >= len(supports):
         return RealCellClosureOutcome(
@@ -708,13 +779,6 @@ def attempt_real_single_cell_closure(
         provider=provider, n_cells=n, h_t_in=h_t0, tube_mdot=tube_mdot
     )
     q = np.full(n, q_uniform, dtype=float) if q_freeze is None else np.asarray(q_freeze, dtype=float).copy()
-    h_t, h_s = build_axial_enthalpies_from_q(
-        q,
-        h_t_inlet_j_kg=h_t0,
-        h_s_cold_inlet_j_kg=h_sN,
-        tube_mass_flow_kg_s=tube_mdot,
-        shell_mass_flow_kg_s=shell_mdot,
-    )
     report = audit_axial_feasibility(
         q,
         provider=provider,
@@ -725,18 +789,53 @@ def attempt_real_single_cell_closure(
     )
     q_cap = float(report.per_cell_q_hi[cell_index])
     support = supports[cell_index]
-    tube_up = _state_from_h(provider, float(h_t[cell_index]), side="TUBE")
-    shell_left = _state_from_h(provider, float(h_s[cell_index]), side="SHELL")
-    coupled = _attempt_enthalpy_coupled_direct_trf_root(
-        support=support,
-        tube_upstream=tube_up,
-        shell_physical_left=shell_left,
-        provider=provider,
-        shell_authority=shell_authority,
-        q_upper=q_cap,
-        q_seed=min(q[cell_index], q_cap),
+    h_s_before = float(
+        build_axial_enthalpies_from_q(
+            q,
+            h_t_inlet_j_kg=h_t0,
+            h_s_cold_inlet_j_kg=h_sN,
+            tube_mass_flow_kg_s=tube_mdot,
+            shell_mass_flow_kg_s=shell_mdot,
+        )[1][-1]
     )
-    if coupled is None:
+    q_seed = min(float(q[cell_index]), q_cap)
+
+    def request_at_q(q_val: float) -> Any:
+        request, _, _, _, _ = build_bvp_cell_task172_for_trial_q(
+            cell_index,
+            q_val,
+            q,
+            support=support,
+            provider=provider,
+            shell_authority=shell_authority,
+            h_t_inlet_j_kg=h_t0,
+            h_s_cold_inlet_j_kg=h_sN,
+            tube_mass_flow_kg_s=tube_mdot,
+            shell_mass_flow_kg_s=shell_mdot,
+        )
+        return request
+
+    compare_tmid = solve_bvp_cell_wall_eliminated_trf(
+        request_at_q=request_at_q,
+        provider=provider,
+        q_upper=q_cap,
+        q_seed=q_seed,
+    )
+    compare_u1_u2 = solve_bvp_cell_u1_u2_trf(
+        request_at_q=request_at_q,
+        provider=provider,
+        q_upper=q_cap,
+        q_seed=q_seed,
+    )
+    candidates = [compare_tmid, compare_u1_u2]
+    candidates.sort(
+        key=lambda c: (
+            0 if c.get("original_residual_gate_pass") else 1,
+            float(c.get("max_residual_ratio", math.inf)),
+        )
+    )
+    best = candidates[0]
+    if best.get("status") == "BLOCKED" and "reason" in best:
         return RealCellClosureOutcome(
             cell_index=cell_index,
             task172_gate_pass=False,
@@ -745,11 +844,34 @@ def attempt_real_single_cell_closure(
             q_w=math.nan,
             twi_k=math.nan,
             two_k=math.nan,
-            domain_exit="enthalpy_coupled_trf_none",
+            domain_exit=str(best.get("reason")),
+            failure_class=_classify_cell_closure_failure(
+                gate_pass=False,
+                optimizer_success=False,
+                max_ratio=math.inf,
+                q_cap=q_cap,
+            ),
+            single_cell_bc_corrected=True,
+            compare_u1_u2=compare_u1_u2,
+            compare_tmid=compare_tmid,
         )
-    q_out = float(coupled.q_w)
-    twi = float(coupled.task172_result.wall_temperature_inner_k)
-    two = float(coupled.task172_result.wall_temperature_outer_k)
+    q_out = float(best["q_w"])
+    twi = float(best["twi_k"])
+    two = float(best["two_k"])
+    request_f, _, _, h_t, h_s = build_bvp_cell_task172_for_trial_q(
+        cell_index,
+        q_out,
+        q,
+        support=support,
+        provider=provider,
+        shell_authority=shell_authority,
+        h_t_inlet_j_kg=h_t0,
+        h_s_cold_inlet_j_kg=h_sN,
+        tube_mass_flow_kg_s=tube_mdot,
+        shell_mass_flow_kg_s=shell_mdot,
+    )
+    wall_audit = wall_resistance_geometry_audit(request_f, provider)
+    h_s_after = float(h_s[-1])
     rec = _collect_cell_record(
         index=cell_index,
         support=support,
@@ -761,15 +883,36 @@ def attempt_real_single_cell_closure(
         provider=provider,
         shell_authority=shell_authority,
     )
+    gate_pass = bool(best.get("original_residual_gate_pass")) and rec.task172_gate_pass
+    failure = _classify_cell_closure_failure(
+        gate_pass=gate_pass,
+        optimizer_success=bool(best.get("optimizer_success")),
+        max_ratio=float(best.get("max_residual_ratio", math.inf)),
+        q_cap=q_cap,
+    )
     return RealCellClosureOutcome(
         cell_index=cell_index,
-        task172_gate_pass=rec.task172_gate_pass,
-        task173_root_validated=rec.task173_root_validated,
-        production_validated=rec.production_validated,
+        task172_gate_pass=gate_pass,
+        task173_root_validated=rec.task173_root_validated and gate_pass,
+        production_validated=rec.production_validated and gate_pass,
         q_w=rec.q_w,
         twi_k=rec.twi_k,
         two_k=rec.two_k,
         domain_exit=rec.domain_exit,
+        r1_w=float(best.get("r1_w", math.nan)),
+        r2_w=float(best.get("r2_w", math.nan)),
+        r3_w=float(best.get("r3_w", math.nan)),
+        max_ulp_ratio=float(best.get("max_residual_ratio", math.nan)),
+        g_i_w_k=float(best.get("g_i_w_k", math.nan)),
+        g_o_w_k=float(best.get("g_o_w_k", math.nan)),
+        rwall_k_w=float(wall_audit["rwall_k_w"]),
+        elimination_method=str(best.get("method", "")),
+        optimizer_message=str(best.get("optimizer_message", "")),
+        failure_class=failure,
+        single_cell_bc_corrected=True,
+        compare_u1_u2=compare_u1_u2,
+        compare_tmid=compare_tmid,
+        shell_inlet_h_fixed=abs(h_s_after - h_s_before) <= 1.0e-6 and abs(h_s_after - h_sN) <= 1.0e-3,
     )
 
 
@@ -1122,7 +1265,10 @@ def _collect_cell_record(
             r1, r2, r3 = three["residuals_w"]
             f_q = q_trial - q_out
             tol = _task173_root_tolerance_w(q_out)
-            root_ok = abs(f_q) <= tol
+            # Do not treat F(q)=0 as root evidence when q_out==q_trial without prior ULP gate.
+            root_ok = gate_pass and (
+                abs(f_q) <= tol or abs(q_out - q_trial) > tol
+            )
     except (RuntimeError, _Stage3Failure):
         prod_ok = False
     ratio = float(three["max_residual_ratio"])
