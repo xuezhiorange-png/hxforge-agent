@@ -50,6 +50,9 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     TopologyBinding,
     mesh_level_identity,
 )
+from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
+    build_validated_local_result_from_verified_trial_triple,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     CandidateRatingRequest,
     CandidateRatingSuccessResult,
@@ -2534,19 +2537,46 @@ def _attempt_enthalpy_coupled_direct_trf_root(
     except Exception:
         return None
     q_final = float(opt.x[0])
+    u1_final, u2_final = (float(v) for v in opt.x[1:])
     if not math.isfinite(q_final) or q_final < 0.0 or q_final > float(q_upper):
         return None
     try:
-        evaluation = _cell_evaluation(
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
             q_final,
-            support=support,
             tube_upstream=tube_upstream,
             shell_physical_left=shell_physical_left,
             provider=provider,
-            shell_authority=shell_authority,
         )
-    except (_Task172NumericalHole, _Stage3Failure, _LowSideDomainInfeasible):
+    except (_Stage3Failure, _LowSideDomainInfeasible):
         return None
+    tube_k = float(tube_local.native.temperature_k)
+    shell_k = float(shell_local.native.temperature_k)
+    wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+        u1_final, u2_final, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+    )
+    if wall is None:
+        return None
+    twi_final, two_final = wall
+    task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
+    task172_outcome = build_validated_local_result_from_verified_trial_triple(
+        task172_request,
+        provider,
+        q_final,
+        twi_final,
+        two_final,
+        polish_nextafter=True,
+    )
+    if type(task172_outcome) is not Task172LocalResult:
+        return None
+    evaluation = _cell_evaluation_from_verified_task172_result(
+        q_final,
+        support=support,
+        tube_upstream=tube_upstream,
+        shell_physical_left=shell_physical_left,
+        provider=provider,
+        task172_request=task172_request,
+        task172_result=task172_outcome,
+    )
     root_trial = _CellTrial(
         q_final,
         "VALID_CELL_EVALUATION",
@@ -2556,14 +2586,64 @@ def _attempt_enthalpy_coupled_direct_trf_root(
     )
     if not _eligible_trial(root_trial):
         return None
-    twi_k = float(evaluation.task172_result.wall_temperature_inner_k)
-    two_k = float(evaluation.task172_result.wall_temperature_outer_k)
-    gate = t172.eval_trial_residual_gate(
-        evaluation.task172_request, provider, q_final, twi_k, two_k
-    )
-    if gate is None or not gate["passes_original_residual_gate"]:
-        return None
     return evaluation
+
+
+def _cell_evaluation_from_verified_task172_result(
+    q_w: float,
+    *,
+    support: Any,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+    task172_request: Task172LocalRequest | CandidateTask172LocalRequest,
+    task172_result: Task172LocalResult,
+) -> _CellEvaluation:
+    """Task173 cell receipt using a production-validated Task172 triple (no re-solve)."""
+    q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
+    if q == Decimal(0):
+        tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
+    else:
+        tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
+        shell_next = _state_from_enthalpy(
+            provider, shell_next_h, shell_search_state=True, side="SHELL"
+        )
+    tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+        q_w,
+        tube_upstream=tube_upstream,
+        shell_physical_left=shell_physical_left,
+        provider=provider,
+    )
+    if (
+        recompute_task172_request_hash(task172_request) != task172_result.request_hash
+        or recompute_task172_result_hash(task172_result) != task172_result.result_hash
+        or task172_result.physical_support_id != recompute_task172_support_id(task172_request)
+        or task172_result.request_hash != recompute_task172_request_hash(task172_request)
+    ):
+        raise _Stage3Failure("BLOCKED_TASK172_LOCAL_IDENTITY_REPLAY")
+    if task172_result.signed_q_hot_to_cold_w < 0:
+        raise _Stage3Failure(
+            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+            str(task172_result.signed_q_hot_to_cold_w),
+        )
+    return _CellEvaluation(
+        q_w=q,
+        tube_downstream=tube_downstream,
+        shell_next_physical=shell_next,
+        tube_local=tube_local,
+        shell_local=shell_local,
+        task172_request=task172_request,
+        task172_result=task172_result,
+    )
 
 
 def _cell_evaluation(

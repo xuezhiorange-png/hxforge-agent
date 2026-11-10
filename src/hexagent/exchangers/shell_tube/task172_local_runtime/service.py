@@ -271,6 +271,241 @@ def _warm_start_from_blocked(
 
 
 _FROZEN_BULK_DIRECT_TRF_MAX_NFEV = 192
+_VERIFIED_TRIAL_TRIPLE_SOLVER_STATUS = "VERIFIED_TRIAL_TRIPLE_V1"
+
+
+def _neighbor_float_values(value: float, *, min_value: float | None = None) -> tuple[float, ...]:
+    neighbors = {float(value)}
+    up = math.nextafter(float(value), math.inf)
+    down = math.nextafter(float(value), -math.inf)
+    neighbors.add(up)
+    if min_value is None or down >= float(min_value):
+        neighbors.add(down)
+    return tuple(sorted(neighbors))
+
+
+def _neighbor_float_triple_candidates(
+    q_w: float,
+    twi_k: float,
+    two_k: float,
+) -> tuple[tuple[float, float, float], ...]:
+    q_neighbors = _neighbor_float_values(q_w, min_value=0.0)
+    twi_neighbors = _neighbor_float_values(twi_k)
+    two_neighbors = _neighbor_float_values(two_k)
+    return tuple(
+        (q, twi, two)
+        for q in sorted(q_neighbors)
+        for twi in sorted(twi_neighbors)
+        for two in sorted(two_neighbors)
+    )
+
+
+def polish_eval_trial_residual_gate_at_nextafter(
+    request: Task172Request,
+    provider: PropertyProvider,
+    q_w: float,
+    twi_k: float,
+    two_k: float,
+) -> dict[str, Any]:
+    """Bounded nextafter polish on (q,Twi,Two); production _eval_trial gate only."""
+    baseline = eval_trial_residual_gate(request, provider, q_w, twi_k, two_k)
+    if baseline is None:
+        return {
+            "status": "UNAVAILABLE",
+            "trial_q_w": float(q_w),
+            "polish_applied": False,
+        }
+    if baseline["passes_original_residual_gate"]:
+        return {
+            **baseline,
+            "status": "PASS",
+            "polish_applied": False,
+            "polish_neighbor_evaluations": 1,
+        }
+    best: dict[str, Any] | None = None
+    evaluated = 0
+    for q, twi, two in _neighbor_float_triple_candidates(q_w, twi_k, two_k):
+        gate = eval_trial_residual_gate(request, provider, q, twi, two)
+        if gate is None:
+            continue
+        evaluated += 1
+        if gate["passes_original_residual_gate"]:
+            return {
+                **gate,
+                "status": "PASS",
+                "polish_applied": q != q_w or twi != twi_k or two != two_k,
+                "polish_neighbor_evaluations": evaluated,
+                "baseline_max_residual_ratio": baseline["max_residual_ratio"],
+            }
+        if best is None or gate["max_residual_ratio"] < best["max_residual_ratio"]:
+            best = gate
+    if best is None:
+        best = baseline
+    return {
+        **best,
+        "status": "BLOCKED",
+        "polish_applied": True,
+        "polish_neighbor_evaluations": evaluated,
+        "baseline_max_residual_ratio": baseline["max_residual_ratio"],
+    }
+
+
+def build_validated_local_result_from_verified_trial_triple(
+    request: Task172Request,
+    provider: PropertyProvider,
+    q_w: float,
+    twi_k: float,
+    two_k: float,
+    *,
+    polish_nextafter: bool = True,
+) -> Task172LocalOutcome:
+    """Build Task172LocalResult only when _eval_trial passes the original C ULP gate."""
+    if (
+        provider.name != "CoolProp"
+        or provider.version != COOLPROP_VERSION
+        or provider.git_revision != COOLPROP_GIT_REVISION
+        or provider.reference_state_policy is not ReferenceStatePolicy.DEF
+    ):
+        return _blocked("BLOCKED_PROPERTY_PROVIDER_IDENTITY_MISMATCH", "property_provider", None)
+    try:
+        request_hash = canonical_sha256(_request_projection(request))
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "request", None)
+
+    polished: dict[str, Any] | None
+    if polish_nextafter:
+        polished = polish_eval_trial_residual_gate_at_nextafter(
+            request, provider, q_w, twi_k, two_k
+        )
+    else:
+        gate_only = eval_trial_residual_gate(request, provider, q_w, twi_k, two_k)
+        polished = (
+            {
+                **gate_only,
+                "passes_original_residual_gate": gate_only["passes_original_residual_gate"],
+            }
+            if gate_only
+            else None
+        )
+    if polished is None or not isinstance(polished, dict):
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "verified_trial.gate", request_hash)
+    if not polished.get("passes_original_residual_gate", False):
+        residuals = polished.get("residuals_w", ())
+        bounds = polished.get("acceptance_bounds_w", ())
+        return _blocked(
+            "BLOCKED_RESIDUAL_ACCEPTANCE",
+            ";".join(
+                str(v)
+                for v in (
+                    polished.get("q_w", q_w),
+                    polished.get("twi_k", twi_k),
+                    polished.get("two_k", two_k),
+                    *residuals,
+                    *bounds,
+                )
+            ),
+            request_hash,
+        )
+    q_accept = float(polished["q_w"])
+    twi_accept = float(polished["twi_k"])
+    two_accept = float(polished["two_k"])
+    if q_accept < 0.0:
+        return _blocked(
+            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+            "signed_q_hot_to_cold_w",
+            request_hash,
+        )
+    try:
+        support = request.support
+        support_id = recompute_task172_support_id(request)
+        tube_bulk_snapshot, tube_bulk_id, _ = _snapshot(
+            provider,
+            request,
+            "TUBE",
+            f"{support.tube_cell_id}:CELL_MEAN",
+            request.tube_bulk_state.temperature_k,
+            request.tube_bulk_state.pressure_pa,
+        )
+        shell_bulk_snapshot, shell_bulk_id, _ = _snapshot(
+            provider,
+            request,
+            "SHELL",
+            f"{support.shell_cell_id}:CELL_MEAN",
+            request.shell_bulk_state.temperature_k,
+            request.shell_bulk_state.pressure_pa,
+        )
+        tube_resolution = _resolve_tube_side_htc(
+            request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
+        )
+        shell_h_base, shell_re, shell_pr, _ = _shell_base_htc(
+            request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
+        )
+        if type(request) is CandidateTask172LocalRequest:
+            tube_inner_diameter = request.candidate_binding.task025_result.hydraulic_diameter_m
+            bell_geometry = request.candidate_binding.task166_result.bell_geometry
+            if bell_geometry is None:
+                raise ValueError("missing bell geometry")
+            tube_od = bell_geometry.tube_outer_diameter_m
+        else:
+            tube_inner_diameter = TUBE_ID_M
+            tube_od = TUBE_OD_M
+        wall_resistance_result = compute_wall_resistance(
+            tube_inner_diameter,
+            tube_od,
+            WALL_CONDUCTIVITY_W_M_K,
+            support.inside_area_m2,
+        )
+        wall_resistance = wall_resistance_result.wall_bundle_conduction_resistance_k_w
+        final = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_resolution.htc_w_m2_k,
+            shell_h_base,
+            wall_resistance,
+            q_accept,
+            twi_accept,
+            two_accept,
+            apply_c3_wall_pr_correction=tube_resolution.apply_c3_wall_pr_correction,
+        )
+    except _RuntimeFailure as exc:
+        return _blocked(exc.code, exc.field_path, request_hash)
+    except Exception:
+        return _blocked("BLOCKED_RUNTIME_INTERNAL_FAILURE", "verified_trial.eval", request_hash)
+
+    residual_values = cast(tuple[float, float, float], final["residuals"])
+    acceptance_bounds = cast(tuple[float, float, float], final["bounds"])
+    if any(
+        abs(value) > bound for value, bound in zip(residual_values, acceptance_bounds, strict=True)
+    ):
+        return _blocked(
+            "BLOCKED_RESIDUAL_ACCEPTANCE",
+            ";".join(
+                str(v)
+                for v in (q_accept, twi_accept, two_accept, *residual_values, *acceptance_bounds)
+            ),
+            request_hash,
+        )
+    return _build_valid_result(
+        request,
+        request_hash,
+        support_id,
+        tube_bulk_id,
+        shell_bulk_id,
+        tube_resolution.reynolds_number,
+        tube_resolution.prandtl_number,
+        shell_re,
+        shell_pr,
+        tube_resolution.correlation_id,
+        tube_resolution.correlation_version,
+        final,
+        (q_accept, twi_accept, two_accept),
+        _VERIFIED_TRIAL_TRIPLE_SOLVER_STATUS,
+        0,
+        0,
+        numerical_profile_id=_NUMERICAL_PROFILE_ID,
+    )
 
 
 def attempt_frozen_bulk_direct_trf_recovery(
@@ -417,10 +652,22 @@ def attempt_frozen_bulk_direct_trf_recovery(
     if any(
         abs(value) > bound for value, bound in zip(residual_values, acceptance_bounds, strict=True)
     ):
-        return _blocked(
-            "BLOCKED_RESIDUAL_ACCEPTANCE",
-            ";".join(str(v) for v in (*opt.x, *residual_values, *acceptance_bounds)),
-            request_hash,
+        polished = polish_eval_trial_residual_gate_at_nextafter(
+            request, provider, q_final, twi_final, two_final
+        )
+        if not polished.get("passes_original_residual_gate"):
+            return _blocked(
+                "BLOCKED_RESIDUAL_ACCEPTANCE",
+                ";".join(str(v) for v in (*opt.x, *residual_values, *acceptance_bounds)),
+                request_hash,
+            )
+        return build_validated_local_result_from_verified_trial_triple(
+            request,
+            provider,
+            float(polished["q_w"]),
+            float(polished["twi_k"]),
+            float(polished["two_k"]),
+            polish_nextafter=False,
         )
     if q_final < 0.0:
         return _blocked(
@@ -533,6 +780,10 @@ def eval_trial_residual_gate(
 def audit_task172_solver_chain(
     request: Task172Request,
     provider: PropertyProvider,
+    *,
+    trial_q_w: float | None = None,
+    trial_twi_k: float | None = None,
+    trial_two_k: float | None = None,
 ) -> dict[str, Any]:
     """Record primary/dogbox/wide/frozen outcomes for one frozen request."""
     trace: list[dict[str, Any]] = []
@@ -588,12 +839,19 @@ def audit_task172_solver_chain(
             and len(terminal.diagnostic_last_iterate) >= 3
         ):
             q_d, twi_d, two_d = (float(terminal.diagnostic_last_iterate[i]) for i in range(3))
-            record["q_w"] = q_d
-            record["twi_k"] = twi_d
-            record["two_k"] = two_d
-            gate = eval_trial_residual_gate(request, provider, q_d, twi_d, two_d)
+            q_audit = float(trial_q_w) if trial_q_w is not None else q_d
+            twi_audit = float(trial_twi_k) if trial_twi_k is not None else twi_d
+            two_audit = float(trial_two_k) if trial_two_k is not None else two_d
+            record["solver_iterate_q_w"] = q_d
+            record["q_w"] = q_audit
+            record["twi_k"] = twi_audit
+            record["two_k"] = two_audit
+            gate = eval_trial_residual_gate(request, provider, q_audit, twi_audit, two_audit)
             if gate:
                 record.update(gate)
+            record["nextafter_polish"] = polish_eval_trial_residual_gate_at_nextafter(
+                request, provider, q_audit, twi_audit, two_audit
+            )
         if frozen_attempted and frozen_entry:
             if frozen_entry.get("outcome") == "VALIDATED":
                 record["frozen_trf_recovery_status"] = "VALIDATED"
@@ -2112,6 +2370,34 @@ def _task172_env_solver_trace_enabled() -> bool:
     )
 
 
+def _maybe_nextafter_polish_from_blocked(
+    request: Task172Request,
+    provider: PropertyProvider,
+    blocked: Task172BlockedResult,
+) -> Task172LocalOutcome:
+    """Bounded nextafter polish on a replayable BLOCKED_RESIDUAL_ACCEPTANCE iterate."""
+    if not _blocked_residual_replay_valid(blocked, request):
+        return blocked
+    warm = _warm_start_from_blocked(blocked)
+    if warm is None:
+        return blocked
+    q, twi, two = warm
+    polished = polish_eval_trial_residual_gate_at_nextafter(request, provider, q, twi, two)
+    if not polished.get("passes_original_residual_gate"):
+        return blocked
+    result = build_validated_local_result_from_verified_trial_triple(
+        request,
+        provider,
+        float(polished["q_w"]),
+        float(polished["twi_k"]),
+        float(polished["two_k"]),
+        polish_nextafter=False,
+    )
+    if type(result) is Task172LocalResult and _fallback_result_replays_request(request, result):
+        return result
+    return blocked
+
+
 def _maybe_frozen_bulk_direct_trf_recovery(
     request: Task172Request,
     provider: PropertyProvider,
@@ -2125,6 +2411,16 @@ def _maybe_frozen_bulk_direct_trf_recovery(
         return outcome
     if not _blocked_residual_replay_valid(outcome, request):
         return outcome
+    polished = _maybe_nextafter_polish_from_blocked(request, provider, outcome)
+    if type(polished) is Task172LocalResult:
+        _append_task172_solver_trace_entry(
+            solver_trace,
+            step="nextafter_polish_blocked_iterate",
+            method="trf",
+            budget=_FROZEN_SOLVER_BUDGET,
+            outcome=polished,
+        )
+        return polished
     recovered = attempt_frozen_bulk_direct_trf_recovery(request, provider)
     _append_task172_solver_trace_entry(
         solver_trace,
@@ -2322,7 +2618,9 @@ def validate_candidate_request(
 __all__ = [
     "attempt_frozen_bulk_direct_trf_recovery",
     "audit_task172_solver_chain",
+    "build_validated_local_result_from_verified_trial_triple",
     "eval_trial_residual_gate",
+    "polish_eval_trial_residual_gate_at_nextafter",
     "recompute_task172_blocked_result_hash",
     "recompute_task172_local_roundoff_bounds",
     "recompute_task172_request_hash",

@@ -14,6 +14,7 @@ sys.path[:0] = [str(_REPO), str(_REPO / "src")]
 
 from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
     audit_task172_solver_chain,
+    polish_eval_trial_residual_gate_at_nextafter,
     recompute_task172_request_hash,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating import service as t173
@@ -82,20 +83,33 @@ def _endpoint_audits(hit: dict[str, Any], provider: CoolPropProvider) -> dict[st
     endpoints: dict[str, Any] = {}
     hashes: dict[str, str] = {}
     for label, q in [("lower", 0.0), ("upper", upper)]:
-        req = _task172_request_at_q(
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
             q,
-            support=support,
             tube_upstream=hit["tube_upstream"],
             shell_physical_left=hit["shell_physical_left"],
             provider=provider,
-            shell_authority=hit["shell_authority"],
         )
+        req = _task172_request(support, tube_local, shell_local, hit["shell_authority"])
         req_hash = recompute_task172_request_hash(req)
         hashes[label] = req_hash
+        seed_twi = float(tube_local.native.temperature_k)
+        seed_two = float(shell_local.native.temperature_k)
+        audit = audit_task172_solver_chain(req, provider, trial_q_w=float(q))
+        polish_q = float(audit.get("solver_iterate_q_w", q))
+        polish_twi = float(audit.get("twi_k", seed_twi))
+        polish_two = float(audit.get("two_k", seed_two))
+        if audit.get("frozen_trf_direct_q_w") is not None:
+            polish_q = float(audit["frozen_trf_direct_q_w"])
+            polish_twi = float(audit.get("twi_k", polish_twi))
+            polish_two = float(audit.get("two_k", polish_two))
+        polish = polish_eval_trial_residual_gate_at_nextafter(
+            req, provider, polish_q, polish_twi, polish_two
+        )
         endpoints[label] = {
             "q_w": q,
             "task172_request_hash": req_hash,
-            "solver_audit": audit_task172_solver_chain(req, provider),
+            "solver_audit": audit,
+            "nextafter_polish": polish,
         }
         try:
             t173._cell_evaluation(

@@ -1365,8 +1365,8 @@ def test_enthalpy_coupled_rejects_ineligible_root_after_optimizer(
     )
     monkeypatch.setattr(
         service,
-        "_cell_evaluation",
-        lambda q_w, **kwargs: replace(valid_evaluation, q_w=service._d(q_w)),
+        "build_validated_local_result_from_verified_trial_triple",
+        lambda *args, **kwargs: valid_evaluation.task172_result,
     )
     monkeypatch.setattr(service, "_eligible_trial", lambda _trial: False)
     assert (
