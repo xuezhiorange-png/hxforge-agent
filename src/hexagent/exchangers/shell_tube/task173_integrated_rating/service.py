@@ -2395,15 +2395,14 @@ def _preflight_task172_trial(
         raise _Stage3Failure("BLOCKED_NATIVE_SHELL_FLOW_AUTHORITY_PREFLIGHT")
 
 
-def _cell_evaluation(
+def _enthalpy_cell_mean_states_for_q(
     q_w: float,
     *,
-    support: Any,
     tube_upstream: _ThermoState,
     shell_physical_left: _ThermoState,
     provider: PropertyProvider,
-    shell_authority: Any,
-) -> _CellEvaluation:
+) -> tuple[_ThermoState, _ThermoState]:
+    """Task173 enthalpy-midpoint cell-mean states for trial heat duty q (W)."""
     q = _d(q_w)
     with localcontext() as context:
         context.prec = 70
@@ -2424,7 +2423,6 @@ def _cell_evaluation(
             str(tube_downstream_h),
         )
     if shell_next_h < h_min:
-        # Search-side feasibility only. No property call is made for this state.
         raise _LowSideDomainInfeasible
     if shell_next_h > h_max:
         raise _Stage3Failure(
@@ -2432,8 +2430,131 @@ def _cell_evaluation(
             "shell next face enthalpy outside admitted domain",
             str(shell_next_h),
         )
+    tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
+    shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
+    return tube_local, shell_local
+
+
+def _attempt_enthalpy_coupled_direct_trf_root(
+    *,
+    support: Any,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+    shell_authority: Any,
+    q_upper: float,
+    q_seed: float,
+) -> _CellEvaluation | None:
+    """Joint (q,Twi,Two) closure with enthalpy-linked bulk states (V08-03)."""
+    import numpy as np
+    from scipy.optimize import least_squares
+
+    from hexagent.exchangers.shell_tube.task172_local_runtime import service as t172
+
+    if q_upper <= 0.0 or not math.isfinite(q_upper):
+        return None
+    q0 = min(max(float(q_seed), 0.0), float(q_upper))
+    t_min = float(t172._admitted_temperature_bounds()[0])
+    t_max = float(t172._admitted_temperature_bounds()[1])
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q_val, twi_val, two_val = (float(v) for v in vec)
+        if q_val < 0.0 or q_val > float(q_upper):
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        try:
+            tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+                q_val,
+                tube_upstream=tube_upstream,
+                shell_physical_left=shell_physical_left,
+                provider=provider,
+            )
+        except (_Stage3Failure, _LowSideDomainInfeasible):
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        tube_k = float(tube_local.native.temperature_k)
+        shell_k = float(shell_local.native.temperature_k)
+        if not (
+            t_min <= twi_val <= t_max
+            and t_min <= two_val <= t_max
+            and shell_k <= two_val <= twi_val <= tube_k
+        ):
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        request = _task172_request(support, tube_local, shell_local, shell_authority)
+        gate = t172.eval_trial_residual_gate(request, provider, q_val, twi_val, two_val)
+        if gate is None:
+            return np.asarray([9.0, 9.0, 9.0], dtype=float)
+        residuals = gate["residuals_w"]
+        bounds = gate["acceptance_bounds_w"]
+        max(abs(q_val), 1.0)
+        return np.asarray(
+            [abs(r) / b if b > 0 else 9.0 for r, b in zip(residuals, bounds, strict=True)],
+            dtype=float,
+        )
+
+    try:
+        tube_local0, shell_local0 = _enthalpy_cell_mean_states_for_q(
+            q0,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
+    except (_Stage3Failure, _LowSideDomainInfeasible):
+        return None
+    tube_k0 = float(tube_local0.native.temperature_k)
+    shell_k0 = float(shell_local0.native.temperature_k)
+    x0 = np.asarray([q0, (tube_k0 + shell_k0) / 2.0, shell_k0], dtype=float)
+    lo = np.asarray([0.0, max(shell_k0, t_min), max(shell_k0, t_min)], dtype=float)
+    hi = np.asarray([float(q_upper), tube_k0, tube_k0], dtype=float)
+    try:
+        opt = least_squares(
+            residual,
+            x0,
+            bounds=(lo, hi),
+            method="trf",
+            ftol=1e-8,
+            xtol=1e-12,
+            max_nfev=96,
+        )
+    except Exception:
+        return None
+    q_final = float(opt.x[0])
+    if not opt.success and float(opt.cost) > 1.0:
+        return None
+    try:
+        evaluation = _cell_evaluation(
+            q_final,
+            support=support,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+            shell_authority=shell_authority,
+        )
+    except (_Task172NumericalHole, _Stage3Failure, _LowSideDomainInfeasible):
+        return None
+    q172 = float(evaluation.task172_result.signed_q_hot_to_cold_w)
+    if abs(q_final - q172) > max(1e-3, abs(q_final) * 1e-6):
+        return None
+    return evaluation
+
+
+def _cell_evaluation(
+    q_w: float,
+    *,
+    support: Any,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+    shell_authority: Any,
+) -> _CellEvaluation:
+    q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
     if q == Decimal(0):
-        # Face states: preserve validated provider snapshots at exact zero duty.
         tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
         shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
     else:
@@ -2441,9 +2562,12 @@ def _cell_evaluation(
         shell_next = _state_from_enthalpy(
             provider, shell_next_h, shell_search_state=True, side="SHELL"
         )
-    # Task172 bulk coordinates are always cell-mean enthalpy midpoints (F(q) continuity at q=0).
-    tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
-    shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
+    tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+        q_w,
+        tube_upstream=tube_upstream,
+        shell_physical_left=shell_physical_left,
+        provider=provider,
+    )
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
     _preflight_task172_trial(
         q_w,
@@ -2468,7 +2592,6 @@ def _cell_evaluation(
                 task172_result
             ):
                 raise _Stage3Failure("BLOCKED_TASK172_BLOCKED_RESULT_IDENTITY_REPLAY")
-            # Do not inspect/use diagnostic_last_iterate: it is not an evaluation of F(q).
             raise _Task172NumericalHole(
                 task172_result.request_hash,
                 task172_result.blocked_result_hash,
@@ -2968,8 +3091,7 @@ def _solve_cell(
             valid_in_interval = [
                 trial
                 for trial in trials.values()
-                if trial.classification == "VALID_CELL_EVALUATION"
-                and trial.residual is not None
+                if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None
             ]
             if valid_in_interval and all(trial.residual > 0 for trial in valid_in_interval):
                 raise _Stage3Failure(
@@ -2977,11 +3099,24 @@ def _solve_cell(
                     "both endpoints are numerical holes; interior valid probes share one sign",
                 )
             if valid_in_interval and all(trial.residual < 0 for trial in valid_in_interval):
+                coupled_root = _attempt_enthalpy_coupled_direct_trf_root(
+                    support=support,
+                    tube_upstream=tube_upstream,
+                    shell_physical_left=shell_physical_left,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    q_upper=float(upper),
+                    q_seed=float(upper) * 0.92,
+                )
+                if coupled_root is not None:
+                    record_hole_neighbors(list(trials.values()))
+                    return coupled_root
                 raise _Stage3Failure(
                     "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                     "both endpoints are numerical holes; interior valid F(q) share one sign",
                     "endpoint_low_side_classification_not_applicable",
                     f"interior_valid_sample_count={len(valid_in_interval)}",
+                    "enthalpy_coupled_direct_trf_root=BLOCKED",
                 )
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",

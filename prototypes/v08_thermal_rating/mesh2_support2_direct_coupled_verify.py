@@ -124,9 +124,7 @@ def main() -> int:
     replay_path = Path(f"/opt/cursor/artifacts/v08_03_first_failed_cell_replay_{CANDIDATE_ID}.json")
     replay = json.loads(replay_path.read_text() if replay_path.is_file() else "{}")
     replay_q = [
-        float(p["q_trial_w"])
-        for p in replay.get("valid_f_q_points", [])
-        if p.get("q_trial_w")
+        float(p["q_trial_w"]) for p in replay.get("valid_f_q_points", []) if p.get("q_trial_w")
     ]
 
     capture: dict[str, Any] = {
@@ -176,14 +174,10 @@ def main() -> int:
             provider=cell_kwargs["provider"],
             shell_authority=cell_kwargs["shell_authority"],
         )
-        f_vals = [
-            float(row["f_q_w"]) for row in capture["scan"] if row.get("f_q_w") is not None
-        ]
+        f_vals = [float(row["f_q_w"]) for row in capture["scan"] if row.get("f_q_w") is not None]
         capture["min_abs_f_q_w"] = min((abs(v) for v in f_vals), default=None)
         capture["valid_sign_crossings"] = sum(
-            1
-            for a, b in zip(f_vals, f_vals[1:], strict=False)
-            if a <= 0 <= b or b <= 0 <= a
+            1 for a, b in zip(f_vals, f_vals[1:], strict=False) if a <= 0 <= b or b <= 0 <= a
         )
         seed = float(fatal.get("initial_valid_anchor_q_w") or upper * 0.5)
         capture["joint_search"] = attempt_joint_q_twi_two_closure(
@@ -243,12 +237,8 @@ def main() -> int:
                 if replay_state.get("shooting_enthalpy") is not None
                 else None
             ),
-            "tube_enthalpy_j_kg": str(
-                replay_state["tube_upstream"].native.enthalpy_j_kg
-            ),
-            "shell_enthalpy_j_kg": str(
-                replay_state["shell_physical_left"].native.enthalpy_j_kg
-            ),
+            "tube_enthalpy_j_kg": str(replay_state["tube_upstream"].native.enthalpy_j_kg),
+            "shell_enthalpy_j_kg": str(replay_state["shell_physical_left"].native.enthalpy_j_kg),
         }
 
     out = {

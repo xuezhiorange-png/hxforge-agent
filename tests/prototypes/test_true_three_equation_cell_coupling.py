@@ -49,7 +49,12 @@ def test_evaluate_three_equation_residuals_contract_keys() -> None:
     mod.t172_service._eval_trial = lambda *a, **k: _FakeEval()
     try:
         out = evaluate_three_equation_residuals(
-            0.0, 325.0, 315.0, request=_Req(), provider=None, primitives=_Prim()  # type: ignore[arg-type]
+            0.0,
+            325.0,
+            315.0,
+            request=_Req(),
+            provider=None,
+            primitives=_Prim(),  # type: ignore[arg-type]
         )
     finally:
         mod.t172_service._eval_trial = original

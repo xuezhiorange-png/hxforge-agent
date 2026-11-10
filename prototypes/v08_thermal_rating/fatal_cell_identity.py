@@ -32,9 +32,7 @@ def select_fatal_cell_from_evidence(payload: dict[str, Any]) -> dict[str, Any]:
     candidates = summaries
     if target_mesh is not None:
         candidates = [
-            s
-            for s in summaries
-            if int(s.get("mesh_subdivisions", -1)) == int(target_mesh)
+            s for s in summaries if int(s.get("mesh_subdivisions", -1)) == int(target_mesh)
         ]
     if not candidates and summaries:
         candidates = summaries

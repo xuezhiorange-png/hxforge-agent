@@ -270,7 +270,6 @@ def _warm_start_from_blocked(
     return cast(tuple[float, float, float], values)
 
 
-_FROZEN_BULK_DIRECT_TRF_NUMERICAL_PROFILE_ID = "V08-03-FROZEN-BULK-DIRECT-TRF-RECOVERY-V1"
 _FROZEN_BULK_DIRECT_TRF_MAX_NFEV = 192
 
 
@@ -446,8 +445,172 @@ def attempt_frozen_bulk_direct_trf_recovery(
         "FROZEN_BULK_DIRECT_TRF_RECOVERY",
         int(opt.nfev),
         int(opt.nfev),
-        numerical_profile_id=_FROZEN_BULK_DIRECT_TRF_NUMERICAL_PROFILE_ID,
+        numerical_profile_id=_NUMERICAL_PROFILE_ID,
     )
+
+
+def eval_trial_residual_gate(
+    request: Task172Request,
+    provider: PropertyProvider,
+    q_w: float,
+    twi_k: float,
+    two_k: float,
+) -> dict[str, Any] | None:
+    """Production _eval_trial residual snapshot for diagnostics (no solver)."""
+    try:
+        support = request.support
+        tube_bulk_snapshot, _, _ = _snapshot(
+            provider,
+            request,
+            "TUBE",
+            f"{support.tube_cell_id}:CELL_MEAN",
+            request.tube_bulk_state.temperature_k,
+            request.tube_bulk_state.pressure_pa,
+        )
+        shell_bulk_snapshot, _, _ = _snapshot(
+            provider,
+            request,
+            "SHELL",
+            f"{support.shell_cell_id}:CELL_MEAN",
+            request.shell_bulk_state.temperature_k,
+            request.shell_bulk_state.pressure_pa,
+        )
+        tube_resolution = _resolve_tube_side_htc(
+            request, tube_bulk_snapshot, request.tube_mass_flow_kg_s
+        )
+        shell_h_base, *_ = _shell_base_htc(
+            request, shell_bulk_snapshot, request.shell_mass_flow_kg_s
+        )
+        if type(request) is CandidateTask172LocalRequest:
+            tube_inner_diameter = request.candidate_binding.task025_result.hydraulic_diameter_m
+            bell_geometry = request.candidate_binding.task166_result.bell_geometry
+            if bell_geometry is None:
+                return None
+            tube_od = bell_geometry.tube_outer_diameter_m
+        else:
+            tube_inner_diameter = TUBE_ID_M
+            tube_od = TUBE_OD_M
+        wall_resistance_result = compute_wall_resistance(
+            tube_inner_diameter,
+            tube_od,
+            WALL_CONDUCTIVITY_W_M_K,
+            support.inside_area_m2,
+        )
+        wall_resistance = wall_resistance_result.wall_bundle_conduction_resistance_k_w
+        evaluated = _eval_trial(
+            request,
+            provider,
+            tube_bulk_snapshot,
+            shell_bulk_snapshot,
+            tube_resolution.htc_w_m2_k,
+            shell_h_base,
+            wall_resistance,
+            float(q_w),
+            float(twi_k),
+            float(two_k),
+            apply_c3_wall_pr_correction=tube_resolution.apply_c3_wall_pr_correction,
+        )
+    except Exception:
+        return None
+    residuals = cast(tuple[float, float, float], evaluated["residuals"])
+    bounds = cast(tuple[float, float, float], evaluated["bounds"])
+    ratios = [
+        abs(float(r)) / float(b) if float(b) > 0 else math.inf
+        for r, b in zip(residuals, bounds, strict=True)
+    ]
+    return {
+        "q_w": float(q_w),
+        "twi_k": float(twi_k),
+        "two_k": float(two_k),
+        "residuals_w": tuple(float(r) for r in residuals),
+        "acceptance_bounds_w": tuple(float(b) for b in bounds),
+        "max_residual_ratio": max(ratios),
+        "passes_original_residual_gate": all(r <= 1.0 for r in ratios),
+        "request_hash": recompute_task172_request_hash(request),
+    }
+
+
+def audit_task172_solver_chain(
+    request: Task172Request,
+    provider: PropertyProvider,
+) -> dict[str, Any]:
+    """Record primary/dogbox/wide/frozen outcomes for one frozen request."""
+    trace: list[dict[str, Any]] = []
+    if type(request) is CandidateTask172LocalRequest:
+        terminal = validate_candidate_request(request, provider, solver_trace=trace)
+    else:
+        terminal = validate_request(request, provider, solver_trace=trace)
+
+    def step_outcome(step: str) -> dict[str, Any] | None:
+        for entry in trace:
+            if entry.get("step") == step:
+                return entry
+        return None
+
+    primary = step_outcome("primary_trf")
+    dogbox = step_outcome("fallback_dogbox")
+    wide_trf = step_outcome("wide_experimental_trf")
+    wide_dogbox = step_outcome("wide_experimental_dogbox")
+    frozen_entry = step_outcome("frozen_bulk_direct_trf")
+    frozen_attempted = frozen_entry is not None
+
+    record: dict[str, Any] = {
+        "task172_request_hash": recompute_task172_request_hash(request),
+        "primary_solver_outcome": primary,
+        "dogbox_outcome": dogbox,
+        "wide_solver_outcome": wide_trf or wide_dogbox,
+        "frozen_trf_attempted": frozen_attempted,
+        "frozen_trf_outcome": frozen_entry,
+        "terminal_outcome_class": type(terminal).__name__,
+    }
+
+    if type(terminal) is Task172LocalResult:
+        record["terminal_status"] = "VALIDATED"
+        record["q_w"] = float(terminal.signed_q_hot_to_cold_w)
+        record["twi_k"] = float(terminal.wall_temperature_inner_k)
+        record["two_k"] = float(terminal.wall_temperature_outer_k)
+        record["solver_status"] = terminal.solver_status
+        gate = eval_trial_residual_gate(
+            request,
+            provider,
+            record["q_w"],
+            record["twi_k"],
+            record["two_k"],
+        )
+        if gate:
+            record.update(gate)
+    elif type(terminal) is Task172BlockedResult:
+        record["terminal_status"] = "BLOCKED"
+        record["failure_code"] = terminal.failure_code
+        record["field_path"] = terminal.field_path
+        if (
+            terminal.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+            and len(terminal.diagnostic_last_iterate) >= 3
+        ):
+            q_d, twi_d, two_d = (float(terminal.diagnostic_last_iterate[i]) for i in range(3))
+            record["q_w"] = q_d
+            record["twi_k"] = twi_d
+            record["two_k"] = two_d
+            gate = eval_trial_residual_gate(request, provider, q_d, twi_d, two_d)
+            if gate:
+                record.update(gate)
+        if frozen_attempted and frozen_entry:
+            if frozen_entry.get("outcome") == "VALIDATED":
+                record["frozen_trf_recovery_status"] = "VALIDATED"
+            elif frozen_entry.get("outcome") == "BLOCKED":
+                record["frozen_trf_recovery_status"] = "BLOCKED"
+                record["frozen_trf_failure_code"] = frozen_entry.get("failure_code")
+                record["frozen_trf_field_path"] = frozen_entry.get("field_path")
+    if frozen_attempted and record.get("frozen_trf_recovery_status") is None:
+        direct_frozen = attempt_frozen_bulk_direct_trf_recovery(request, provider)
+        if type(direct_frozen) is Task172LocalResult:
+            record["frozen_trf_direct_status"] = "VALIDATED"
+            record["frozen_trf_direct_q_w"] = float(direct_frozen.signed_q_hot_to_cold_w)
+        elif type(direct_frozen) is Task172BlockedResult:
+            record["frozen_trf_direct_status"] = "BLOCKED"
+            record["frozen_trf_direct_failure_code"] = direct_frozen.failure_code
+            record["frozen_trf_direct_field_path"] = direct_frozen.field_path
+    return record
 
 
 def _experimental_wide_delta_t_solver_active() -> bool:
@@ -2158,6 +2321,8 @@ def validate_candidate_request(
 
 __all__ = [
     "attempt_frozen_bulk_direct_trf_recovery",
+    "audit_task172_solver_chain",
+    "eval_trial_residual_gate",
     "recompute_task172_blocked_result_hash",
     "recompute_task172_local_roundoff_bounds",
     "recompute_task172_request_hash",
