@@ -3972,6 +3972,44 @@ def _terminal_tolerance_pass(run: _MeshRun) -> bool:
     return Decimal(0) <= residual_t <= allowed_t and Decimal(0) <= residual_h <= allowed_h
 
 
+def _outer_shooting_float_refine_valid_high(
+    h_low: Decimal,
+    h_high: Decimal,
+    high_run: _MeshRun,
+    trial_at: Callable[[Decimal, int], _OuterTrial],
+    iterations: int,
+    *,
+    max_steps: int = 192,
+) -> _MeshRun | None:
+    """Refine shooting enthalpy in binary64 when Decimal bisection has collapsed (V08-03)."""
+    if _terminal_tolerance_pass(high_run):
+        return high_run
+    f_lo = float(h_low)
+    f_probe = float(h_high)
+    best_run = high_run
+    for _ in range(max_steps):
+        f_probe = math.nextafter(f_probe, f_lo)
+        if f_probe <= f_lo:
+            break
+        probe_h = Decimal(str(f_probe))
+        if probe_h <= h_low or probe_h >= h_high:
+            continue
+        trial = trial_at(probe_h, iterations)
+        if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
+            continue
+        residual_t = trial.mesh_run.observables.terminal_boundary_residual_k
+        residual_h = trial.mesh_run.observables.terminal_boundary_residual_j_kg
+        if residual_t < 0 or residual_h < 0:
+            continue
+        if _terminal_tolerance_pass(trial.mesh_run):
+            return trial.mesh_run
+        if residual_t < best_run.observables.terminal_boundary_residual_k:
+            best_run = trial.mesh_run
+    if _terminal_tolerance_pass(best_run):
+        return best_run
+    return None
+
+
 def _assert_outer_classification_order(
     seen_low: list[Decimal],
     seen_valid: list[Decimal],
@@ -4100,6 +4138,12 @@ def _solve_outer_boundary_from_trial(
             )
             if _terminal_tolerance_pass(high_run):
                 return high_run
+            refined = _outer_shooting_float_refine_valid_high(
+                h_low, h_high, high_run, trial_at, iterations
+            )
+            if refined is not None:
+                return refined
+            enthalpy_ulp = Decimal(str(math.ulp(float(h_high))))
             if (
                 high_run.observables.terminal_boundary_residual_k - temp_floor
                 > TERMINAL_TOLERANCE_K
@@ -4107,6 +4151,11 @@ def _solve_outer_boundary_from_trial(
                 raise _Stage3Failure(
                     "BLOCKED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
                     f"terminal_residual_k={high_run.observables.terminal_boundary_residual_k}",
+                    f"terminal_residual_j_kg={high_run.observables.terminal_boundary_residual_j_kg}",
+                    f"temperature_ulp_floor_k={temp_floor}",
+                    f"enthalpy_ulp_floor_j_kg={enthalpy_ulp}",
+                    f"float_h_low={float(h_low)}",
+                    f"float_h_high={float(h_high)}",
                 )
             raise _Stage3Failure(
                 "PRECISION_FLOOR_UNRESOLVED",

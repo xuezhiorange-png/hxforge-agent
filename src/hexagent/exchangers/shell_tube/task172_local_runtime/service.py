@@ -251,18 +251,29 @@ def _residual_acceptance_ratios_from_diagnostics(
     )
 
 
+def _blocked_residual_diagnostics(blocked: Task172BlockedResult) -> tuple[str, ...]:
+    """Prefer full residual/bound tuple from field_path when iterate diagnostics are short."""
+    if len(blocked.diagnostic_last_iterate) >= 9:
+        return blocked.diagnostic_last_iterate
+    parts = blocked.field_path.split(";")
+    if len(parts) >= 9:
+        return tuple(parts[:9])
+    return blocked.diagnostic_last_iterate
+
+
 def _warm_start_from_blocked(
     blocked: Task172BlockedResult,
 ) -> tuple[float, float, float] | None:
     if blocked.failure_code != "BLOCKED_RESIDUAL_ACCEPTANCE":
         return None
-    if len(blocked.diagnostic_last_iterate) < 3:
+    diagnostics = _blocked_residual_diagnostics(blocked)
+    if len(diagnostics) < 3:
         return None
-    ratios = _residual_acceptance_ratios_from_diagnostics(blocked.diagnostic_last_iterate)
+    ratios = _residual_acceptance_ratios_from_diagnostics(diagnostics)
     if ratios is None or max(ratios) > 2.0:
         return None
     try:
-        values = tuple(float(blocked.diagnostic_last_iterate[index]) for index in range(3))
+        values = tuple(float(diagnostics[index]) for index in range(3))
     except ValueError:
         return None
     if not all(math.isfinite(value) for value in values):
