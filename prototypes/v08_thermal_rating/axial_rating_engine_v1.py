@@ -685,16 +685,38 @@ def experimental_mesh_converged(closeout: CandidateMeshCloseout) -> bool:
 
 
 def production_distinct_fully_converged(closeout: CandidateMeshCloseout) -> bool:
-    """Production C-ULP N1/N2/N4 NUMERIC_VALID + rating success + hydraulic constraints."""
-    if not closeout.hydraulic_pass:
-        return False
-    if closeout.production_task173_gate != "RATING_SUCCESS":
-        return False
+    """Deprecated alias — use :func:`engineering_distinct_fully_converged` with nozzle report."""
     return (
-        closeout.production_mesh_n1 == "NUMERIC_VALID"
+        closeout.production_task173_gate == "RATING_SUCCESS"
+        and closeout.production_mesh_n1 == "NUMERIC_VALID"
         and closeout.production_mesh_n2 == "NUMERIC_VALID"
         and closeout.production_mesh_n4 == "NUMERIC_VALID"
+        and closeout.hydraulic_pass
+        and closeout.target_330kw_met == "true"
+        and closeout.n1 == "ACCEPTED"
+        and closeout.n2 == "ACCEPTED"
+        and closeout.n4 == "ACCEPTED"
     )
+
+
+def engineering_distinct_fully_converged(
+    closeout: CandidateMeshCloseout,
+    *,
+    nozzle: Any,
+    target_met: Literal["true", "false", "unresolved"] | str,
+) -> bool:
+    """Full engineering acceptance counter (production + duty + hydraulic + nozzle verify)."""
+    from prototypes.v08_thermal_rating.nozzle_velocity_v08 import NozzleVelocityReport
+
+    if not production_distinct_fully_converged(closeout):
+        return False
+    if target_met != "true" and closeout.target_330kw_met != "true":
+        return False
+    if not isinstance(nozzle, NozzleVelocityReport):
+        return False
+    if nozzle.status != "VERIFIED":
+        return False
+    return all(s.in_range_1_3 for s in nozzle.sides if s.velocity_m_s is not None)
 
 
 def _outer_result_to_trial_report(
@@ -1108,6 +1130,7 @@ __all__ = [
     "isolated_mesh_acceptance_gate",
     "production_terminal_tolerance_pass",
     "experimental_mesh_converged",
+    "engineering_distinct_fully_converged",
     "production_distinct_fully_converged",
     "run_candidate_mesh_closeout",
     "run_primary_330kw_closeout",

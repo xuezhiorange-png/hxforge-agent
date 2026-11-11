@@ -44,22 +44,33 @@ class ShootingProbeRow:
 
 
 @dataclass(frozen=True)
+class TpPhRoundtripAudit:
+    t_tp_k: str
+    p_pa: str
+    h_tp_j_kg: str
+    t_ph_k: str
+    h_ph_j_kg: str
+    delta_t_k: str
+    delta_h_j_kg: str
+    h_inlet_bound_j_kg: str
+    h_last_face_minus_h_inlet_j_kg: str | None
+
+
+@dataclass(frozen=True)
 class BoundaryPrecisionAudit:
     candidate_id: str
     geometry_projection_hash: str
     outer_status: str
-    h_low_final: str | None
-    h_high_final: str | None
-    float_h_low_hex: str | None
-    float_h_high_hex: str | None
-    shell_inlet_temperature_k: str
-    shell_cold_inlet_enthalpy_j_kg: str
-    shell_inlet_tp_enthalpy_j_kg: str | None
-    shell_inlet_ph_rebuild_delta_j_kg: str | None
-    last_two_valid_probes: tuple[ShootingProbeRow, ...]
+    outer_bracket_low_endpoint_j_kg: str | None
+    outer_bracket_high_endpoint_j_kg: str | None
+    outer_bracket_low_hex: str | None
+    outer_bracket_high_hex: str | None
+    supplementary_valid_trial_probes: tuple[ShootingProbeRow, ...]
+    tp_ph_roundtrip: TpPhRoundtripAudit | None
     cumulative_enthalpy_audit: tuple[str, ...]
     terminal_precision_recovered: bool
     first_numerical_blocker: str
+    minimal_architecture_recommendation: str | None
     task172_identity_hashes_on_accepted: tuple[str, ...]
 
 
@@ -115,13 +126,13 @@ def _probe_at_h(
         reset_experimental_thermal_boundary(btoken)
 
 
-def _shell_inlet_ph_delta(
+def _shell_inlet_tp_ph_roundtrip(
     provider: PropertyProvider, bindings: CandidateRatingBindings
-) -> tuple[str | None, str | None]:
-    """Compare bound cold-inlet enthalpy against provider PH rebuild at inlet T/P."""
-    bound_h = effective_shell_cold_inlet_enthalpy_j_kg()
-    t_in = effective_shell_inlet_temperature_k()
+) -> TpPhRoundtripAudit | None:
+    """TP(T_in,P)->H_TP then PH(P,H_TP)->(T_PH,H_PH); compare to bound inlet enthalpy."""
+    t_tp = effective_shell_inlet_temperature_k()
     p_pa = bindings.normalized.shell_side.inlet_pressure_pa
+    h_inlet = effective_shell_cold_inlet_enthalpy_j_kg()
     exp = build_experimental_thermal_boundary_v1(
         provider=provider,
         tube_inlet_temperature_k=bindings.normalized.tube_side.inlet_temperature_k,
@@ -137,12 +148,25 @@ def _shell_inlet_ph_delta(
     token = bind_experimental_thermal_boundary_v1(exp)
     try:
         shell_fluid = bindings.normalized.shell_side.fluid
-        state = provider.state_tp(shell_fluid, float(t_in), float(p_pa))
-        ph_h = Decimal(str(state.enthalpy_j_kg))
-        delta = ph_h - bound_h
-        return str(ph_h), str(delta)
+        ref = provider.reference_state_policy()
+        tp_state = provider.state_tp(shell_fluid, float(t_tp), float(p_pa))
+        h_tp = Decimal(str(tp_state.enthalpy_j_kg))
+        ph_state = provider.state_ph(shell_fluid, float(p_pa), float(h_tp), reference_state=ref)
+        t_ph = Decimal(str(ph_state.temperature_k))
+        h_ph = Decimal(str(ph_state.enthalpy_j_kg))
+        return TpPhRoundtripAudit(
+            t_tp_k=str(t_tp),
+            p_pa=str(p_pa),
+            h_tp_j_kg=str(h_tp),
+            t_ph_k=str(t_ph),
+            h_ph_j_kg=str(h_ph),
+            delta_t_k=str(t_ph - t_tp),
+            delta_h_j_kg=str(h_ph - h_tp),
+            h_inlet_bound_j_kg=str(h_inlet),
+            h_last_face_minus_h_inlet_j_kg=None,
+        )
     except Exception:
-        return None, None
+        return None
     finally:
         reset_experimental_thermal_boundary(token)
 
@@ -160,11 +184,9 @@ def _last_two_valid_shooting_hs(result: Any) -> tuple[Decimal, Decimal] | None:
             "ACCEPTED_AFTER_ITERATION_BUDGET",
         }:
             highs.append(Decimal(step.h_trial))
-    if len(highs) < 2:
-        if result.h_high_final and result.h_low_final:
-            return Decimal(result.h_low_final), Decimal(result.h_high_final)
-        return None
-    return highs[-2], highs[-1]
+    if len(highs) >= 2:
+        return highs[-2], highs[-1]
+    return None
 
 
 def run_boundary_precision_audit(
@@ -173,7 +195,7 @@ def run_boundary_precision_audit(
     *,
     subdivisions: int = 1,
 ) -> BoundaryPrecisionAudit:
-    """Probe last shooting bracket and report terminal plateau (no tolerance change)."""
+    """Audit outer bracket endpoints and terminal plateau without tolerance overrides."""
     solved = solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
     pair = _last_two_valid_shooting_hs(solved)
     probes: list[ShootingProbeRow] = []
@@ -187,7 +209,7 @@ def run_boundary_precision_audit(
                 _probe_at_h(bindings, provider, subdivisions=subdivisions, enthalpy=stepped)
             )
 
-    tp_h, ph_delta = _shell_inlet_ph_delta(provider, bindings)
+    tp_ph = _shell_inlet_tp_ph_roundtrip(provider, bindings)
 
     accepted = solved.accepted_run
     recovered = (
@@ -204,14 +226,37 @@ def run_boundary_precision_audit(
         else:
             blocker = "OUTER_NOT_ACCEPTED"
 
+    run_for_face: _MeshRun | None = accepted or solved.best_valid_run
+    if tp_ph is not None and run_for_face is not None and solved.shooting_enthalpy_j_kg:
+        h_face = Decimal(solved.shooting_enthalpy_j_kg)
+        h_in = Decimal(tp_ph.h_inlet_bound_j_kg)
+        tp_ph = TpPhRoundtripAudit(
+            t_tp_k=tp_ph.t_tp_k,
+            p_pa=tp_ph.p_pa,
+            h_tp_j_kg=tp_ph.h_tp_j_kg,
+            t_ph_k=tp_ph.t_ph_k,
+            h_ph_j_kg=tp_ph.h_ph_j_kg,
+            delta_t_k=tp_ph.delta_t_k,
+            delta_h_j_kg=tp_ph.delta_h_j_kg,
+            h_inlet_bound_j_kg=tp_ph.h_inlet_bound_j_kg,
+            h_last_face_minus_h_inlet_j_kg=str(h_face - h_in),
+        )
+
+    arch: str | None = None
+    if blocker == "TERMINAL_ENTHALPY_OR_TEMPERATURE_RESIDUAL_PLATEAU":
+        arch = (
+            "Store outer shooting enthalpy and shell-face coupling in a single Decimal lane "
+            "with explicit TP→PH property replay at shell face 0 before each outer trial; "
+            "keep production TERMINAL_TOLERANCE_K and _terminal_tolerance_pass unchanged."
+        )
+
     t172_hashes: tuple[str, ...] = ()
-    if accepted is not None:
+    if accepted is not None and accepted.observables.local_task172_result_hashes:
         t172_hashes = tuple(str(h) for h in accepted.observables.local_task172_result_hashes)
 
     cum: list[str] = []
-    run: _MeshRun | None = accepted or solved.best_valid_run
-    if run is not None:
-        obs = run.observables
+    if run_for_face is not None:
+        obs = run_for_face.observables
         cum.append(f"total_duty_w={obs.total_duty_w}")
         cum.append(f"hot_loss_w={obs.hot_energy_loss_w}")
         cum.append(f"cold_gain_w={obs.cold_energy_gain_w}")
@@ -223,20 +268,18 @@ def run_boundary_precision_audit(
         candidate_id=bindings.rating_request.candidate_id,
         geometry_projection_hash=bindings.geometry_projection_hash,
         outer_status=solved.status,
-        h_low_final=solved.h_low_final,
-        h_high_final=solved.h_high_final,
-        float_h_low_hex=solved.float_h_low_hex,
-        float_h_high_hex=solved.float_h_high_hex,
-        shell_inlet_temperature_k=str(effective_shell_inlet_temperature_k()),
-        shell_cold_inlet_enthalpy_j_kg=str(effective_shell_cold_inlet_enthalpy_j_kg()),
-        shell_inlet_tp_enthalpy_j_kg=tp_h,
-        shell_inlet_ph_rebuild_delta_j_kg=ph_delta,
-        last_two_valid_probes=tuple(probes[:3]),
+        outer_bracket_low_endpoint_j_kg=solved.h_low_final,
+        outer_bracket_high_endpoint_j_kg=solved.h_high_final,
+        outer_bracket_low_hex=solved.float_h_low_hex,
+        outer_bracket_high_hex=solved.float_h_high_hex,
+        supplementary_valid_trial_probes=tuple(probes[:3]),
+        tp_ph_roundtrip=tp_ph,
         cumulative_enthalpy_audit=tuple(cum),
         terminal_precision_recovered=recovered,
         first_numerical_blocker=blocker,
+        minimal_architecture_recommendation=arch,
         task172_identity_hashes_on_accepted=t172_hashes,
     )
 
 
-__all__ = ["BoundaryPrecisionAudit", "run_boundary_precision_audit"]
+__all__ = ["BoundaryPrecisionAudit", "TpPhRoundtripAudit", "run_boundary_precision_audit"]

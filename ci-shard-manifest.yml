@@ -540,6 +540,7 @@ shards:
       - tests/prototypes/test_v08_axial_rating_engine.py
       - tests/prototypes/test_v08_330kw_terminal_mesh_closeout.py
       - tests/prototypes/test_v08_hydraulic_feasibility.py
+      - tests/prototypes/test_v08_feasible_candidate_thermal_bridge.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py

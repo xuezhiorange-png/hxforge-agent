@@ -16,17 +16,12 @@ sys.path[:0] = [str(_REPO), str(_REPO / "src")]
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
-    CandidateMeshCloseout,
-    build_candidate_rating_bindings,
-    enumerate_structural_bundles,
-    experimental_mesh_converged,
     load_case_bindings,
-    production_distinct_fully_converged,
-    run_candidate_mesh_closeout,
 )
-from prototypes.v08_thermal_rating.boundary_precision_audit_v1 import run_boundary_precision_audit
 from prototypes.v08_thermal_rating.case_identity_v08 import CASE_330KW_ID, FIXTURE_330
-from prototypes.v08_thermal_rating.hydraulic_feasibility_v08 import run_hydraulic_feasibility_screen
+from prototypes.v08_thermal_rating.feasible_candidate_thermal_bridge_v08 import (
+    run_feasible_candidate_thermal_bridge,
+)
 
 
 def _git_head() -> str:
@@ -83,7 +78,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-production", action="store_true")
     parser.add_argument("--hydraulic-max", type=int, default=64)
-    parser.add_argument("--thermal-max", type=int, default=2)
     args = parser.parse_args()
 
     out = Path("/opt/cursor/artifacts/v08_03_boundary_precision_and_hydraulic.json")
@@ -91,59 +85,43 @@ def main() -> None:
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     assert normalized.engineering_case_id == CASE_330KW_ID
 
+    bridge = run_feasible_candidate_thermal_bridge(
+        normalized,
+        handoff,
+        provider=provider,
+        max_candidates=args.hydraulic_max,
+        run_production=not args.skip_production,
+    )
+    selected = bridge.selected
+    precision_audit = (
+        _json_ready(asdict(selected.precision_audit))
+        if selected and selected.precision_audit
+        else None
+    )
+
+    closeout_rows = [_json_ready(asdict(r.mesh_closeout)) for r in bridge.thermal_runs]
+    sel_close = selected.mesh_closeout if selected else None
+    n1v = asdict(sel_close.n1_verification) if sel_close else {}
+
+    exp_mesh = bridge.experimental_mesh_converged_count
+    prod_hashes_count = bridge.distinct_fully_converged_geometry
+
+    term_rec = bool(
+        precision_audit.get("terminal_precision_recovered") if precision_audit else False
+    )
+    first_blocker = (
+        str(precision_audit.get("first_numerical_blocker"))
+        if precision_audit
+        else (selected.precision_blocker if selected else "unverified")
+    )
+
+    from prototypes.v08_thermal_rating.hydraulic_feasibility_v08 import (
+        run_hydraulic_feasibility_screen,
+    )
+
     hydraulic = run_hydraulic_feasibility_screen(
         normalized, handoff, provider=provider, max_candidates=args.hydraulic_max
     )
-
-    space_hash, t168_digest, bundles, geom = enumerate_structural_bundles(
-        normalized, handoff, max_valid=max(1, args.thermal_max)
-    )
-    closeouts: list[CandidateMeshCloseout] = []
-    precision_audit: dict[str, Any] | None = None
-
-    for i, bundle in enumerate(bundles[: args.thermal_max]):
-        bindings = build_candidate_rating_bindings(
-            bundle,
-            space_hash=space_hash,
-            t168_digest=t168_digest,
-            normalized=normalized,
-            handoff=handoff,
-            provider=provider,
-            geometry_projection_hash=geom.get(bundle.candidate.candidate_id, ""),
-        )
-        if bindings is None:
-            continue
-        closeout = run_candidate_mesh_closeout(
-            bindings, provider, run_production_gate=not args.skip_production
-        )
-        closeouts.append(closeout)
-        if i == 0:
-            audit = run_boundary_precision_audit(bindings, provider, subdivisions=1)
-            precision_audit = asdict(audit)
-
-    closeout_rows = [asdict(c) for c in closeouts]
-
-    def _row0(key: str, default: str = "") -> str:
-        if not closeout_rows:
-            return default
-        return str(closeout_rows[0].get(key, default))
-
-    cand1_close = closeout_rows[0] if closeout_rows else {}
-    n1v = cand1_close.get("n1_verification", {})
-
-    exp_mesh = sum(1 for c in closeouts if experimental_mesh_converged(c))
-
-    prod_hashes: set[str] = set()
-    for c in closeouts:
-        if production_distinct_fully_converged(c) and c.geometry_projection_hash:
-            prod_hashes.add(c.geometry_projection_hash)
-
-    term_rec = False
-    first_blocker = "unverified"
-    if precision_audit:
-        term_rec = bool(precision_audit.get("terminal_precision_recovered"))
-        first_blocker = str(precision_audit.get("first_numerical_blocker", "unverified"))
-
     feasible_hydraulic = [_json_ready(asdict(r)) for r in hydraulic.rows if r.hydraulic_pass]
 
     payload: dict[str, Any] = {
@@ -153,10 +131,13 @@ def main() -> None:
         "CI_STATUS": _ci_status(),
         "TERMINAL_PRECISION_RECOVERED": term_rec,
         "FIRST_NUMERICAL_BLOCKER": first_blocker,
-        "CANDIDATE_1_N1": _row0("n1", "BLOCKED"),
-        "CANDIDATE_1_N2_N4": f"n2={_row0('n2', 'not_run')};n4={_row0('n4', 'not_run')}",
-        "CANDIDATE_1_SHELL_DP_PASS": cand1_close.get("shell_dp_pass", False),
-        "CANDIDATE_1_TUBE_DP_PASS": cand1_close.get("tube_dp_pass", False),
+        "CANDIDATE_1_N1": str(sel_close.n1) if sel_close else "not_run",
+        "CANDIDATE_1_N2_N4": (f"n2={sel_close.n2};n4={sel_close.n4}" if sel_close else "not_run"),
+        "SELECTED_HYDRAULIC_FEASIBLE_ID": (
+            selected.hydraulic_row.candidate_id if selected else "none"
+        ),
+        "CANDIDATE_1_SHELL_DP_PASS": (selected.hydraulic_row.shell_dp_pass if selected else False),
+        "CANDIDATE_1_TUBE_DP_PASS": (selected.hydraulic_row.tube_dp_pass if selected else False),
         "HYDRAULIC_FEASIBLE_CANDIDATES": hydraulic.hydraulic_feasible_count,
         "DISTINCT_HYDRAULIC_FEASIBLE_GEOMETRY": hydraulic.distinct_hydraulic_feasible_geometry,
         "NOZZLE_VELOCITY_CHECK": hydraulic.rows[0].nozzle_velocity_note
@@ -164,7 +145,7 @@ def main() -> None:
         else "no_candidates",
         "THERMAL_VALIDATED_CANDIDATES": 0,
         "EXPERIMENTAL_MESH_CONVERGED": exp_mesh,
-        "DISTINCT_FULLY_CONVERGED": len(prod_hashes),
+        "DISTINCT_FULLY_CONVERGED": prod_hashes_count,
         "ENGINEERING_ACCEPTANCE": "BLOCKED",
         "PRODUCTION_CONTRACT_CHANGE_AUTHORIZED": False,
         "PRODUCTION_SOLVER_REPLACED": False,
@@ -176,7 +157,11 @@ def main() -> None:
         "ORIGINAL_TASK173_GATE": (
             "skipped_by_flag"
             if args.skip_production
-            else _row0("production_task173_gate", "not_run")
+            else (
+                str(sel_close.production_task173_gate)
+                if sel_close and sel_close.production_task173_gate
+                else "not_run"
+            )
         ),
         "N1_ACCEPTED_RUN_HASH": n1v.get("N1_ACCEPTED_RUN_HASH"),
         "precision_audit_candidate1": _json_ready(precision_audit) if precision_audit else None,
@@ -191,15 +176,15 @@ def main() -> None:
     blockers: list[str] = []
     if not term_rec:
         blockers.append(first_blocker)
-    if cand1_close.get("shell_dp_pass") is False:
-        blockers.append("CANDIDATE_1_SHELL_DP_EXCEEDS_CASE_LIMIT")
+    if selected is None:
+        blockers.append("NO_HYDRAULIC_FEASIBLE_SELECTED_FOR_THERMAL")
     if hydraulic.hydraulic_feasible_count == 0:
         blockers.append("NO_HYDRAULIC_FEASIBLE_STRUCTURE_IN_SCREENED_SET")
     else:
         blockers.append(
             f"HYDRAULIC_ALTERNATIVE_EXISTS({hydraulic.distinct_hydraulic_feasible_geometry}_distinct_geometry)"
         )
-    if len(prod_hashes) == 0:
+    if prod_hashes_count == 0:
         blockers.append("NO_PRODUCTION_DISTINCT_FULLY_CONVERGED")
     payload["REMAINING_BLOCKER"] = (
         "; ".join(blockers) if blockers else "ENGINEERING_ACCEPTANCE_BLOCKED"
