@@ -494,10 +494,10 @@ def isolated_mesh_acceptance_gate(
     provider: PropertyProvider,
     result: IsolatedOuterBoundaryResult,
 ) -> Literal["ACCEPTED", "BLOCKED"]:
-    """N1/N2/N4 gate: production terminal tolerance + energy floor + Task172 holes on final trajectory."""
-    run = result.accepted_run or result.best_valid_run
-    if run is None:
+    """Experimental mesh gate: outer ACCEPTED + accepted_run only (never best_valid_run)."""
+    if result.status != "ACCEPTED" or result.accepted_run is None:
         return "BLOCKED"
+    run = result.accepted_run
     if not production_terminal_tolerance_pass(run):
         return "BLOCKED"
     if abs(run.observables.energy_balance_residual_w) > ENERGY_ACCEPTANCE_FLOOR_W:
@@ -550,8 +550,8 @@ def verify_n1_terminal(
     n1: IsolatedOuterBoundaryResult | None = None,
 ) -> N1VerificationReport:
     n1 = n1 or solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
-    run = n1.accepted_run or n1.best_valid_run
-    term_pass = production_terminal_tolerance_pass(run)
+    audit_run = n1.accepted_run or n1.best_valid_run
+    term_pass = production_terminal_tolerance_pass(audit_run)
     holes = (
         final_trajectory_task172_holes(
             bindings,
@@ -562,7 +562,7 @@ def verify_n1_terminal(
         if n1.shooting_enthalpy_j_kg
         else n1.stats.task172_numerical_hole_count
     )
-    obs = run.observables if run is not None else None
+    obs = audit_run.observables if audit_run is not None else None
     trace_tail = tuple(
         f"iter={s.iteration}:decision={s.decision_update}:term_pass={s.terminal_tolerance_pass}"
         for s in n1.search_trace[-6:]
@@ -575,7 +575,11 @@ def verify_n1_terminal(
         N1_TOTAL_DUTY_W=str(obs.total_duty_w) if obs else None,
         N1_ENERGY_RESIDUAL_W=str(obs.energy_balance_residual_w) if obs else None,
         N1_TASK172_HOLES=holes,
-        N1_ACCEPTED_RUN_HASH=run.mesh_result_hash if run is not None else None,
+        N1_ACCEPTED_RUN_HASH=(
+            n1.accepted_run.mesh_result_hash
+            if n1.status == "ACCEPTED" and n1.accepted_run is not None
+            else None
+        ),
         N1_TERMINAL_GATE="PASS"
         if isolated_mesh_acceptance_gate(bindings, provider, n1) == "ACCEPTED"
         else "BLOCKED",
@@ -594,9 +598,15 @@ class CandidateMeshCloseout:
     target_330kw_met: Literal["true", "false", "unresolved"]
     tube_dp_pa: str
     shell_dp_pa: str
+    tube_dp_pass: bool
+    shell_dp_pass: bool
+    hydraulic_pass: bool
     nozzle_velocities: str
     thermal_hydraulic_class: str
     production_task173_gate: str | None
+    production_mesh_n1: str | None
+    production_mesh_n2: str | None
+    production_mesh_n4: str | None
 
 
 def run_candidate_mesh_closeout(
@@ -618,18 +628,18 @@ def run_candidate_mesh_closeout(
     n2_gate = _solve_mesh(2)
     n4_gate = _solve_mesh(4)
 
-    run = n1.accepted_run or n1.best_valid_run
-    target_met = target_330kw_met_label(n1_gate, run, bindings.target_duty_w)
+    target_met = target_330kw_met_label(
+        n1_gate, n1.accepted_run if n1_gate == "ACCEPTED" else None, bindings.target_duty_w
+    )
 
     t174 = bindings.rating_request.task174_result
     tube_dp = str(t174.modeled_total_tube_side_pressure_drop_pa)
     shell_dp = str(t174.bell_total_shell_pressure_drop_pa)
     max_tube = bindings.normalized.max_tube_side_pressure_drop_pa
     max_shell = bindings.normalized.max_shell_side_pressure_drop_pa
-    dp_ok = (
-        t174.modeled_total_tube_side_pressure_drop_pa <= max_tube
-        and t174.bell_total_shell_pressure_drop_pa <= max_shell
-    )
+    tube_ok = t174.modeled_total_tube_side_pressure_drop_pa <= max_tube
+    shell_ok = t174.bell_total_shell_pressure_drop_pa <= max_shell
+    dp_ok = tube_ok and shell_ok
     thermal_hydraulic = (
         "THERMAL_PASS_HYDRAULIC_BLOCKED"
         if n1_gate == "ACCEPTED" and not dp_ok
@@ -637,9 +647,15 @@ def run_candidate_mesh_closeout(
     )
 
     prod_gate: str | None = None
+    prod_m1: str | None = None
+    prod_m2: str | None = None
+    prod_m4: str | None = None
     if run_production_gate:
         prod = assess_production_culp_rating(bindings, provider)
         prod_gate = prod.failure_code or prod.outcome
+        prod_m1 = prod.mesh_n1_status
+        prod_m2 = prod.mesh_n2_status
+        prod_m4 = prod.mesh_n4_status
 
     return CandidateMeshCloseout(
         candidate_id=bindings.rating_request.candidate_id,
@@ -651,9 +667,33 @@ def run_candidate_mesh_closeout(
         target_330kw_met=target_met,
         tube_dp_pa=tube_dp,
         shell_dp_pa=shell_dp,
+        tube_dp_pass=tube_ok,
+        shell_dp_pass=shell_ok,
+        hydraulic_pass=dp_ok,
         nozzle_velocities="unresolved: nozzle velocity not bound in Task174 fixed-geometry rating chain",
         thermal_hydraulic_class=thermal_hydraulic,
         production_task173_gate=prod_gate,
+        production_mesh_n1=prod_m1,
+        production_mesh_n2=prod_m2,
+        production_mesh_n4=prod_m4,
+    )
+
+
+def experimental_mesh_converged(closeout: CandidateMeshCloseout) -> bool:
+    """Isolated prototype N1/N2/N4 all ACCEPTED (does not imply production VALIDATED)."""
+    return closeout.n1 == "ACCEPTED" and closeout.n2 == "ACCEPTED" and closeout.n4 == "ACCEPTED"
+
+
+def production_distinct_fully_converged(closeout: CandidateMeshCloseout) -> bool:
+    """Production C-ULP N1/N2/N4 NUMERIC_VALID + rating success + hydraulic constraints."""
+    if not closeout.hydraulic_pass:
+        return False
+    if closeout.production_task173_gate != "RATING_SUCCESS":
+        return False
+    return (
+        closeout.production_mesh_n1 == "NUMERIC_VALID"
+        and closeout.production_mesh_n2 == "NUMERIC_VALID"
+        and closeout.production_mesh_n4 == "NUMERIC_VALID"
     )
 
 
@@ -1067,6 +1107,8 @@ __all__ = [
     "closeout_to_jsonable",
     "isolated_mesh_acceptance_gate",
     "production_terminal_tolerance_pass",
+    "experimental_mesh_converged",
+    "production_distinct_fully_converged",
     "run_candidate_mesh_closeout",
     "run_primary_330kw_closeout",
     "run_250kw_regression_smoke",

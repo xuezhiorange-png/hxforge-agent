@@ -113,12 +113,14 @@ def main() -> None:
         "SHELL_DP_PA": _cand(0, "shell_dp_pa", ""),
         "NOZZLE_VELOCITIES": _cand(0, "nozzle_velocities", "unresolved"),
         "ORIGINAL_TASK173_GATE": _cand(0, "production_task173_gate", "not_run"),
-        "ORIGINAL_TASK172_GATE": "isolated_trajectory_holes=0 when mesh ACCEPTED",
-        "DISTINCT_FULLY_CONVERGED": sum(
+        "ORIGINAL_TASK172_GATE": "NOT_INFERRED_FROM_ISOLATED_TASK172_HOLES",
+        "EXPERIMENTAL_MESH_CONVERGED": sum(
             1
             for r in rows
             if r.get("n1") == "ACCEPTED" and r.get("n2") == "ACCEPTED" and r.get("n4") == "ACCEPTED"
         ),
+        "DISTINCT_FULLY_CONVERGED": 0,
+        "CANDIDATE_1_SHELL_DP_PASS": rows[0].get("shell_dp_pass", False) if rows else False,
         "candidates": rows,
     }
     if rows:
