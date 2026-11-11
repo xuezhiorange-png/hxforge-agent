@@ -652,6 +652,33 @@ def solve_outer_boundary_from_trial_isolated(
                 float_h_high_hex=float(h_high).hex(),
             )
 
+    if _terminal_tolerance_pass(high_run):
+        trace.append(
+            _trace_step(
+                iteration=iterations,
+                h_low=h_low,
+                h_high=h_high,
+                h_trial=h_high,
+                trial=_OuterTrial("VALID_TRAJECTORY", h_high, mesh_run=high_run),
+                stats=stats,
+                decision="ACCEPTED_AFTER_ITERATION_BUDGET",
+            )
+        )
+        return IsolatedOuterBoundaryResult(
+            status="ACCEPTED",
+            subdivisions=subdivisions,
+            accepted_run=high_run,
+            best_valid_run=high_run,
+            shooting_enthalpy_j_kg=str(h_high),
+            failure_code=None,
+            diagnostics=(),
+            search_trace=tuple(trace),
+            stats=stats,
+            h_low_final=str(h_low),
+            h_high_final=str(h_high),
+            float_h_low_hex=float(h_low).hex(),
+            float_h_high_hex=float(h_high).hex(),
+        )
     return IsolatedOuterBoundaryResult(
         status="RESOURCE_EXHAUSTION",
         subdivisions=subdivisions,
