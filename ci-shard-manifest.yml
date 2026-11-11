@@ -539,6 +539,7 @@ shards:
       - tests/prototypes/test_v08_thermal_rating.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
+      - tests/prototypes/test_float_lattice_bracket.py
     timeout: 7200
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension

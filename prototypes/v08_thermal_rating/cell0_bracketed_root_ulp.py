@@ -289,12 +289,16 @@ def shrink_sign_bracket_float64(
             lone = math.nextafter(a, math.inf)
             fm = f(lone)
             evaluations += 1
-            if math.isfinite(fm) and va * vb < 0.0:
-                if va * fm <= 0.0 <= fm * vb and (va * fm < 0.0 or fm * vb < 0.0):
-                    if va * fm < 0.0:
-                        b, vb = lone, fm
-                    else:
-                        a, va = lone, fm
+            if (
+                math.isfinite(fm)
+                and va * vb < 0.0
+                and va * fm <= 0.0 <= fm * vb
+                and (va * fm < 0.0 or fm * vb < 0.0)
+            ):
+                if va * fm < 0.0:
+                    b, vb = lone, fm
+                else:
+                    a, va = lone, fm
     return {
         "status": "ADJACENT" if bracket_endpoints_adjacent(a, b) else "PARTIAL",
         "initial": initial,
@@ -680,9 +684,7 @@ def solve_q_bracketed_r3_with_inner_r1(
     with contextlib.suppress(ValueError):
         brentq_ref = float(brentq(lambda v: r3_for_shrink(v), a, b, maxiter=32, xtol=1.0e-9))
     narrow_q = (
-        localize_sign_bracket_near_root(
-            r3_for_shrink, brentq_ref, lo_limit=q_lo, hi_limit=q_hi
-        )
+        localize_sign_bracket_near_root(r3_for_shrink, brentq_ref, lo_limit=q_lo, hi_limit=q_hi)
         if math.isfinite(brentq_ref)
         else None
     )
