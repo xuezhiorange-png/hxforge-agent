@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
@@ -55,17 +56,256 @@ def _dominant_name(detail: TrialGateDetail | None) -> str:
     return ("r1", "r2", "r3")[detail.dominant_index]
 
 
-def float_binary_audit(value: float) -> dict[str, Any]:
+def bracket_endpoints_adjacent(lo: float, hi: float) -> bool:
+    if lo > hi:
+        lo, hi = hi, lo
+    if lo == hi:
+        return True
+    return math.nextafter(lo, math.inf) == hi
+
+
+def count_representable_strictly_between(
+    lo: float, hi: float, *, cap: int = 2_000_000
+) -> int | str:
+    if lo > hi:
+        lo, hi = hi, lo
+    if bracket_endpoints_adjacent(lo, hi):
+        return 0
+    n = 0
+    x = math.nextafter(lo, math.inf)
+    while x < hi:
+        n += 1
+        if n >= cap:
+            return f">={cap}"
+        x = math.nextafter(x, math.inf)
+    return n
+
+
+def float_binary_audit(value: float, *, partner: float | None = None) -> dict[str, Any]:
     na_up = math.nextafter(value, math.inf)
     na_dn = math.nextafter(value, -math.inf)
-    return {
+    out: dict[str, Any] = {
         "value": value,
         "hex": value.hex(),
         "ulp": math.ulp(value),
         "next_up": na_up,
         "next_down": na_dn,
-        "bracket_collapsed_up": na_up == value,
-        "bracket_collapsed_down": na_dn == value,
+    }
+    if partner is not None:
+        out["adjacent_to_partner"] = bracket_endpoints_adjacent(value, partner)
+        out["representables_between"] = count_representable_strictly_between(value, partner)
+    return out
+
+
+def _float_lattice_midpoint(lo: float, hi: float) -> float:
+    if lo > hi:
+        lo, hi = hi, lo
+    if bracket_endpoints_adjacent(lo, hi):
+        return math.nan
+    import struct
+
+    def _bits(x: float) -> int:
+        return struct.unpack(">Q", struct.pack(">d", x))[0]
+
+    ia, ib = _bits(lo), _bits(hi)
+    if ia > ib:
+        ia, ib = ib, ia
+    im = (ia + ib) // 2
+    mid = struct.unpack(">d", struct.pack(">Q", im))[0]
+    if lo < mid < hi:
+        return mid
+    na = math.nextafter(lo, math.inf)
+    if na < hi:
+        return na
+    return math.nextafter(hi, -math.inf)
+
+
+def _shrink_eval_budget(lo: float, hi: float, *, default: int = 96, ceiling: int = 256) -> int:
+    mid = count_representable_strictly_between(lo, hi, cap=10_000)
+    if isinstance(mid, int) and mid > 0:
+        return min(ceiling, max(default, int(math.ceil(math.log2(mid + 2))) + default))
+    return ceiling
+
+
+def _float_neighbors(value: float) -> tuple[float, float, float]:
+    return (math.nextafter(value, -math.inf), value, math.nextafter(value, math.inf))
+
+
+def localize_sign_bracket_near_root(
+    f: Callable[[float], float],
+    center: float,
+    *,
+    lo_limit: float | None = None,
+    hi_limit: float | None = None,
+    max_steps: int = 64,
+) -> tuple[float, float] | None:
+    """Narrow异号括弧到根附近少量 ULP（用于可预算的 lattice shrink）。"""
+    center = float(center)
+    vc = f(center)
+    if not math.isfinite(vc):
+        return None
+    if vc == 0.0:
+        dn = math.nextafter(center, -math.inf)
+        up = math.nextafter(center, math.inf)
+        vd, vu = f(dn), f(up)
+        if math.isfinite(vd) and vd != 0.0 and vd * vu < 0.0:
+            return (dn, up)
+        if math.isfinite(vd) and vd * vc < 0.0:
+            return (dn, center) if dn < center else (center, dn)
+        if math.isfinite(vu) and vu * vc < 0.0:
+            return (center, up) if center < up else (up, center)
+    found: tuple[float, float] | None = None
+    x = center
+    vx = vc
+    for _ in range(max_steps):
+        x = math.nextafter(x, -math.inf)
+        if lo_limit is not None and x < lo_limit:
+            break
+        v = f(x)
+        if not math.isfinite(v):
+            break
+        if vx * v < 0.0:
+            found = (x, center) if x < center else (center, x)
+            break
+        x, vx = x, v
+    if found is not None:
+        return found
+    x = center
+    vx = vc
+    for _ in range(max_steps):
+        x = math.nextafter(x, math.inf)
+        if hi_limit is not None and x > hi_limit:
+            break
+        v = f(x)
+        if not math.isfinite(v):
+            break
+        if vx * v < 0.0:
+            return (center, x) if center < x else (x, center)
+        x, vx = x, v
+    return None
+
+
+def shrink_sign_bracket_float64(
+    f: Callable[[float], float],
+    lo: float,
+    hi: float,
+    *,
+    max_evaluations: int = 128,
+) -> dict[str, Any]:
+    """Shrink异号括弧到相邻 binary64 端点（不用 brentq xtol 冒充精度）。"""
+    initial = [float(lo), float(hi)]
+    if lo > hi:
+        lo, hi = hi, lo
+    fa, fb = f(lo), f(hi)
+    evaluations = 2
+    discontinuities: list[dict[str, Any]] = []
+    if not (math.isfinite(fa) and math.isfinite(fb)):
+        return {
+            "status": "BLOCKED",
+            "reason": "endpoint_non_finite",
+            "initial": initial,
+            "final_lo": lo,
+            "final_hi": hi,
+            "adjacent": bracket_endpoints_adjacent(lo, hi),
+            "f_lo": fa,
+            "f_hi": fb,
+            "evaluations": evaluations,
+            "discontinuities": discontinuities,
+        }
+    if fa == 0.0 or fb == 0.0:
+        return {
+            "status": "ADJACENT" if bracket_endpoints_adjacent(lo, hi) else "ZERO_ENDPOINT",
+            "initial": initial,
+            "final_lo": lo,
+            "final_hi": hi,
+            "adjacent": bracket_endpoints_adjacent(lo, hi),
+            "f_lo": fa,
+            "f_hi": fb,
+            "evaluations": evaluations,
+            "discontinuities": discontinuities,
+        }
+    if fa * fb > 0.0:
+        return {
+            "status": "BLOCKED",
+            "reason": "no_sign_change",
+            "initial": initial,
+            "final_lo": lo,
+            "final_hi": hi,
+            "adjacent": bracket_endpoints_adjacent(lo, hi),
+            "f_lo": fa,
+            "f_hi": fb,
+            "evaluations": evaluations,
+            "discontinuities": discontinuities,
+        }
+    a, b = lo, hi
+    va, vb = fa, fb
+    while not bracket_endpoints_adjacent(a, b) and evaluations < max_evaluations:
+        mid = _float_lattice_midpoint(a, b)
+        if not math.isfinite(mid) or not (a < mid < b):
+            break
+        vm = f(mid)
+        evaluations += 1
+        if not math.isfinite(vm):
+            discontinuities.append({"position": mid, "kind": "non_finite_residual"})
+            break
+        if vm == 0.0:
+            left = math.nextafter(mid, -math.inf)
+            right = math.nextafter(mid, math.inf)
+            fl, fr = f(left), f(right)
+            if math.isfinite(fl) and math.isfinite(fr) and fl * fr < 0.0:
+                a, b, va, vb = left, right, fl, fr
+                if bracket_endpoints_adjacent(a, b):
+                    break
+                continue
+            if math.isfinite(fl) and fl * vb < 0.0:
+                a, va = left, fl
+            elif math.isfinite(fr) and fr * va < 0.0:
+                b, vb = right, fr
+            else:
+                break
+            continue
+        if va * vm < 0.0:
+            b, vb = mid, vm
+            continue
+        if vm * vb < 0.0:
+            a, va = mid, vm
+            continue
+        discontinuities.append(
+            {
+                "position": mid,
+                "kind": "sign_plateau",
+                "f_a": va,
+                "f_mid": vm,
+                "f_b": vb,
+            }
+        )
+        if abs(va) > abs(vb):
+            a, va = mid, vm
+        else:
+            b, vb = mid, vm
+    if not bracket_endpoints_adjacent(a, b):
+        mid_count = count_representable_strictly_between(a, b, cap=4)
+        if mid_count == 1 and evaluations < max_evaluations + 1:
+            lone = math.nextafter(a, math.inf)
+            fm = f(lone)
+            evaluations += 1
+            if math.isfinite(fm) and va * vb < 0.0:
+                if va * fm <= 0.0 <= fm * vb and (va * fm < 0.0 or fm * vb < 0.0):
+                    if va * fm < 0.0:
+                        b, vb = lone, fm
+                    else:
+                        a, va = lone, fm
+    return {
+        "status": "ADJACENT" if bracket_endpoints_adjacent(a, b) else "PARTIAL",
+        "initial": initial,
+        "final_lo": a,
+        "final_hi": b,
+        "adjacent": bracket_endpoints_adjacent(a, b),
+        "f_lo": va,
+        "f_hi": vb,
+        "evaluations": evaluations,
+        "discontinuities": discontinuities,
+        "representables_between_final": count_representable_strictly_between(a, b),
     }
 
 
@@ -333,21 +573,56 @@ def solve_tmid_bracketed_r1_root(
             "samples": samples,
         }
     a, b = bracket
-    try:
-        tmid_root = float(brentq(f, a, b, maxiter=64, xtol=1.0e-12))
-    except ValueError:
+    brentq_ref = math.nan
+    with contextlib.suppress(ValueError):
+        brentq_ref = float(brentq(f, a, b, maxiter=32, xtol=1.0e-12))
+    narrow = (
+        localize_sign_bracket_near_root(f, brentq_ref, lo_limit=lo, hi_limit=hi)
+        if math.isfinite(brentq_ref)
+        else None
+    )
+    shrink_lo, shrink_hi = narrow if narrow else (a, b)
+    tmid_budget = _shrink_eval_budget(shrink_lo, shrink_hi)
+    tmid_shrink = shrink_sign_bracket_float64(f, shrink_lo, shrink_hi, max_evaluations=tmid_budget)
+    if narrow:
+        tmid_shrink["initial_wide"] = [a, b]
+        tmid_shrink["localized_seed"] = [shrink_lo, shrink_hi]
+    ta, tb = float(tmid_shrink["final_lo"]), float(tmid_shrink["final_hi"])
+    tmid_candidates: set[float] = set()
+    if tmid_shrink.get("adjacent"):
+        tmid_candidates.update((ta, tb))
+    if math.isfinite(brentq_ref):
+        tmid_candidates.update(_float_neighbors(brentq_ref))
+    pick: list[tuple[float, TrialGateDetail | None]] = []
+    for tmid_c in tmid_candidates:
+        twi_c, two_c = wall_temperatures_from_tmid_k(q_w, tmid_c, rwall_k_w=rw)
+        if not (shell_k <= two_c <= twi_c <= tube_k):
+            continue
+        pick.append(
+            (
+                tmid_c,
+                production_trial_gate(q_w, twi_c, two_c, request=request, provider=provider),
+            )
+        )
+    valid = [p for p in pick if p[1] is not None and math.isfinite(p[1].max_ratio)]
+    if not valid:
         return {
             "status": "BLOCKED",
-            "reason": "brentq_r1_failed",
+            "reason": "lattice_tmid_gate_none",
             "bracket_found": True,
-            "bracket": [a, b],
+            "bracket_initial": [a, b],
+            "tmid_lattice": tmid_shrink,
         }
+    tmid_root, detail = min(valid, key=lambda p: p[1].max_ratio)  # type: ignore[union-attr]
     twi, two = wall_temperatures_from_tmid_k(q_w, tmid_root, rwall_k_w=rw)
-    detail = production_trial_gate(q_w, twi, two, request=request, provider=provider)
     return {
         "status": "SOLVED",
         "bracket_found": True,
-        "bracket": [a, b],
+        "bracket_initial": [a, b],
+        "bracket_final": [ta, tb],
+        "tmid_lattice": tmid_shrink,
+        "brentq_reference_k": brentq_ref,
+        "bracket": [ta, tb],
         "tmid_k": tmid_root,
         "twi_k": twi,
         "two_k": two,
@@ -397,31 +672,88 @@ def solve_q_bracketed_r3_with_inner_r1(
             "samples": q_samples,
         }
     a, b = bracket
-    try:
-        q_root = float(brentq(lambda v: r3_scalar(v), a, b, maxiter=48, xtol=1.0e-9))
-    except ValueError:
+
+    def r3_for_shrink(qv: float) -> float:
+        return r3_scalar(qv)
+
+    brentq_ref = math.nan
+    with contextlib.suppress(ValueError):
+        brentq_ref = float(brentq(lambda v: r3_for_shrink(v), a, b, maxiter=32, xtol=1.0e-9))
+    narrow_q = (
+        localize_sign_bracket_near_root(
+            r3_for_shrink, brentq_ref, lo_limit=q_lo, hi_limit=q_hi
+        )
+        if math.isfinite(brentq_ref)
+        else None
+    )
+    shrink_lo, shrink_hi = narrow_q if narrow_q else (a, b)
+    q_budget = _shrink_eval_budget(shrink_lo, shrink_hi, default=72)
+    q_shrink = shrink_sign_bracket_float64(
+        r3_for_shrink, shrink_lo, shrink_hi, max_evaluations=q_budget
+    )
+    if narrow_q:
+        q_shrink["initial_wide"] = [a, b]
+        q_shrink["localized_seed"] = [shrink_lo, shrink_hi]
+    qa, qb = float(q_shrink["final_lo"]), float(q_shrink["final_hi"])
+    q_trials: set[float] = set()
+    if q_shrink.get("adjacent"):
+        q_trials.update((qa, qb))
+    if math.isfinite(brentq_ref):
+        q_trials.update(_float_neighbors(brentq_ref))
+    candidates: list[dict[str, Any]] = []
+    for q_cand in q_trials:
+        try:
+            request_c = request_at_q(q_cand)
+        except Exception:
+            continue
+        inner_c = solve_tmid_bracketed_r1_root(q_cand, request=request_c, provider=provider)
+        if inner_c.get("status") != "SOLVED":
+            continue
+        det = production_trial_gate(
+            q_cand,
+            float(inner_c["twi_k"]),
+            float(inner_c["two_k"]),
+            request=request_c,
+            provider=provider,
+        )
+        if det is None or not math.isfinite(det.max_ratio):
+            continue
+        candidates.append(
+            {
+                "q_w": q_cand,
+                "inner": inner_c,
+                "detail": det,
+                "request": request_c,
+            }
+        )
+    if not candidates:
         return {
             "status": "BLOCKED",
-            "reason": "brentq_r3_failed",
+            "reason": "lattice_q_no_valid_endpoint",
             "bracket_found": True,
-            "bracket": [a, b],
+            "q_bracket_initial": [a, b],
+            "q_lattice": q_shrink,
         }
-    request = request_at_q(q_root)
-    inner = solve_tmid_bracketed_r1_root(q_root, request=request, provider=provider)
-    if inner.get("status") != "SOLVED":
-        return {"status": "BLOCKED", "reason": "inner_r1_after_q", "q_w": q_root, "inner": inner}
+    best = min(candidates, key=lambda c: c["detail"].max_ratio)
+    q_root = float(best["q_w"])
+    inner = best["inner"]
     twi, two = float(inner["twi_k"]), float(inner["two_k"])
-    detail = production_trial_gate(q_root, twi, two, request=request, provider=provider)
+    detail = best["detail"]
     return {
         "status": "SOLVED",
         "bracket_found": True,
-        "q_bracket": [a, b],
+        "q_bracket_initial": [a, b],
+        "q_bracket_final": [qa, qb],
+        "q_lattice": q_shrink,
+        "q_bracket": [qa, qb],
+        "brentq_reference_w": brentq_ref,
         "q_w": q_root,
         "tmid_k": inner["tmid_k"],
         "twi_k": twi,
         "two_k": two,
         "detail": detail,
         "inner": inner,
+        "lattice_endpoints_evaluated": len(candidates),
     }
 
 
@@ -453,28 +785,54 @@ def _residual_sensitivity(
     *,
     request_at_q: Callable[[float], Any],
     provider: Any,
-) -> dict[str, float]:
-    """Central nextafter bump for q,Twi,Two vs max ULP ratio (diagnostic only)."""
+) -> dict[str, Any]:
+    """Nextafter bumps: each perturbation uses matching request_at_q(q_trial) for q."""
     q, twi, two = detail.q_w, detail.twi_k, detail.two_k
-    sens: dict[str, float] = {}
-    for name in ("q", "twi", "two"):
+    base_req = request_at_q(q)
+    sens: dict[str, Any] = {}
+    for name, (var, direction) in (
+        ("q_up", ("q", math.inf)),
+        ("q_down", ("q", -math.inf)),
+        ("twi_up", ("twi", math.inf)),
+        ("twi_down", ("twi", -math.inf)),
+        ("two_up", ("two", math.inf)),
+        ("two_down", ("two", -math.inf)),
+    ):
         try:
-            req = request_at_q(q)
-            up = production_trial_gate(
-                math.nextafter(q, math.inf) if name == "q" else q,
-                math.nextafter(twi, math.inf) if name == "twi" else twi,
-                math.nextafter(two, math.inf) if name == "two" else two,
-                request=req if name == "q" else request_at_q(q),
-                provider=provider,
-            )
-            if name != "q":
-                req = request_at_q(q)
-            if up is None:
-                sens[name] = math.inf
+            if var == "q":
+                q_trial = math.nextafter(q, direction)
+                req = request_at_q(q_trial)
+                trial = production_trial_gate(q_trial, twi, two, request=req, provider=provider)
+            else:
+                req = base_req
+                shell_k = float(req.shell_bulk_state.temperature_k)
+                tube_k = float(req.tube_bulk_state.temperature_k)
+                twi_t = twi
+                two_t = two
+                if var == "twi":
+                    twi_t = math.nextafter(twi, direction)
+                else:
+                    two_t = math.nextafter(two, direction)
+                if not (shell_k <= two_t <= twi_t <= tube_k):
+                    sens[name] = {"valid": False, "reason": "wall_order"}
+                    continue
+                trial = production_trial_gate(q, twi_t, two_t, request=req, provider=provider)
+            if trial is None:
+                sens[name] = {"valid": False, "reason": "eval_none"}
                 continue
-            sens[name] = abs(up.max_ratio - detail.max_ratio)
-        except Exception:
-            sens[name] = math.inf
+            sens[name] = {
+                "valid": True,
+                "dr1_w": trial.r1_w - detail.r1_w,
+                "dr2_w": trial.r2_w - detail.r2_w,
+                "dr3_w": trial.r3_w - detail.r3_w,
+                "d_ratio1": trial.ratio1 - detail.ratio1,
+                "d_ratio2": trial.ratio2 - detail.ratio2,
+                "d_ratio3": trial.ratio3 - detail.ratio3,
+                "d_max_ratio": trial.max_ratio - detail.max_ratio,
+            }
+        except Exception as exc:
+            sens[name] = {"valid": False, "reason": type(exc).__name__}
+    sens["q_perturbation_uses_trial_request"] = True
     return sens
 
 
@@ -555,20 +913,45 @@ def bounded_ulp_neighborhood_search(
     }
 
 
+def _snapshot_residual_at_tmid(
+    tmid: float,
+    *,
+    q_w: float,
+    request: Any,
+    provider: Any,
+) -> dict[str, Any]:
+    prim = build_closure_primitives(request, provider)
+    rw = float(prim.wall_resistance_k_w)
+    twi, two = wall_temperatures_from_tmid_k(q_w, tmid, rwall_k_w=rw)
+    det = production_trial_gate(q_w, twi, two, request=request, provider=provider)
+    gate = asdict(det) if det else None
+    return {
+        "tmid_k": tmid,
+        "production_gate": gate,
+        "domain_exit": det.domain_exit if det else None,
+    }
+
+
 def audit_bracket_scalar_precision(
     bracketed: dict[str, Any],
     *,
     request_at_q: Callable[[float], Any],
     provider: Any,
 ) -> dict[str, Any]:
-    """Brentq bracket endpoints, binary64 representation, endpoint residual snapshot."""
+    """Initial vs final float-lattice brackets, endpoint production residuals."""
     if not bracketed.get("bracket_found"):
         return {"verified": False, "reason": bracketed.get("reason", "no_bracket")}
-    q_a, q_b = bracketed["q_bracket"]
+    q_init = bracketed.get("q_bracket_initial") or bracketed.get("q_bracket")
+    q_final = bracketed.get("q_bracket_final") or bracketed["q_bracket"]
+    q_lo_i, q_hi_i = float(q_init[0]), float(q_init[1])
+    q_lo_f, q_hi_f = float(q_final[0]), float(q_final[1])
     q_root = float(bracketed["q_w"])
-    tmid = float(bracketed.get("tmid_k", math.nan))
     inner = bracketed.get("inner") or {}
-    tmid_br = inner.get("bracket")
+    tmid_init = inner.get("bracket_initial") or inner.get("bracket")
+    tmid_final = inner.get("bracket_final") or inner.get("bracket")
+    tmid = float(bracketed.get("tmid_k", math.nan))
+    q_lat = bracketed.get("q_lattice") or {}
+    tmid_lat = inner.get("tmid_lattice") or {}
     endpoint_gates: dict[str, Any] = {}
 
     def _gate_at_q(q_val: float) -> TrialGateDetail | None:
@@ -587,7 +970,13 @@ def audit_bracket_scalar_precision(
             provider=provider,
         )
 
-    for tag, q_val in (("q_lo", q_a), ("q_hi", q_b), ("q_root", q_root)):
+    for tag, q_val in (
+        ("q_initial_lo", q_lo_i),
+        ("q_initial_hi", q_hi_i),
+        ("q_final_lo", q_lo_f),
+        ("q_final_hi", q_hi_f),
+        ("q_root", q_root),
+    ):
         det = (
             _gate_at_q(q_val)
             if tag != "q_root"
@@ -600,20 +989,44 @@ def audit_bracket_scalar_precision(
             )
         )
         endpoint_gates[tag] = asdict(det) if det else None
+    tmid_endpoint: dict[str, Any] = {}
+    if tmid_final and q_root:
+        try:
+            request = request_at_q(q_root)
+            for tag, tv in (("tmid_final_lo", tmid_final[0]), ("tmid_final_hi", tmid_final[1])):
+                tmid_endpoint[tag] = _snapshot_residual_at_tmid(
+                    float(tv), q_w=q_root, request=request, provider=provider
+                )
+        except Exception:
+            pass
     return {
-        "verified": True,
-        "q_bracket_w": [q_a, q_b],
-        "q_bracket_width_w": abs(q_b - q_a),
-        "q_bracket_binary": [
-            float_binary_audit(q_a),
-            float_binary_audit(q_b),
-            float_binary_audit(q_root),
-        ],
-        "tmid_bracket_k": tmid_br,
+        "verified": bool(
+            q_lat.get("adjacent") and (tmid_lat.get("adjacent") if tmid_lat else True)
+        ),
+        "q_bracket_initial_w": [q_lo_i, q_hi_i],
+        "q_bracket_final_w": [q_lo_f, q_hi_f],
+        "q_bracket_adjacent_floats": bracket_endpoints_adjacent(q_lo_f, q_hi_f),
+        "q_bracket_initial_adjacent": bracket_endpoints_adjacent(q_lo_i, q_hi_i),
+        "q_lattice_shrink": q_lat,
+        "q_endpoint_binary": {
+            "initial_lo": float_binary_audit(q_lo_i, partner=q_hi_i),
+            "initial_hi": float_binary_audit(q_hi_i, partner=q_lo_i),
+            "final_lo": float_binary_audit(q_lo_f, partner=q_hi_f),
+            "final_hi": float_binary_audit(q_hi_f, partner=q_lo_f),
+            "root": float_binary_audit(q_root),
+        },
+        "tmid_bracket_initial_k": tmid_init,
+        "tmid_bracket_final_k": tmid_final,
+        "tmid_bracket_adjacent_floats": (
+            bracket_endpoints_adjacent(float(tmid_final[0]), float(tmid_final[1]))
+            if tmid_final
+            else None
+        ),
+        "tmid_lattice_shrink": tmid_lat,
         "tmid_root_k": tmid,
-        "tmid_binary": float_binary_audit(tmid) if math.isfinite(tmid) else None,
-        "brentq_q_xtol_w": 1.0e-9,
-        "brentq_tmid_xtol_k": 1.0e-12,
+        "tmid_endpoint_residuals": tmid_endpoint,
+        "brentq_q_reference_w": bracketed.get("brentq_reference_w"),
+        "brentq_tmid_reference_k": inner.get("brentq_reference_k"),
         "endpoint_gates": endpoint_gates,
     }
 
@@ -728,7 +1141,7 @@ def run_cell0_evidence_pack(
     if bracketed.get("status") == "SOLVED" and bracketed.get("q_w") is not None:
         cands.append(
             build_candidate_evidence(
-                "4_bracketed_scalar_root",
+                "4_float_lattice_scalar_root",
                 q_w=float(bracketed["q_w"]),
                 twi_k=float(bracketed["twi_k"]),
                 two_k=float(bracketed["two_k"]),
@@ -738,7 +1151,7 @@ def run_cell0_evidence_pack(
         )
     pack.candidates = cands
     base_ev = _candidate_by_label(cands, "1_baseline")
-    bracket_ev = _candidate_by_label(cands, "4_bracketed_scalar_root")
+    bracket_ev = _candidate_by_label(cands, "4_float_lattice_scalar_root")
     if base_ev and base_ev.detail:
         pack.refinement_from_baseline = bounded_ulp_neighborhood_search(
             base_ev.detail,
@@ -776,10 +1189,10 @@ def run_cell0_evidence_pack(
     elif bracketed.get("bracket_found"):
         pack.numerical_decision = "B"
         min_r = best_detail.max_ratio if best_detail else math.inf
-        pack.numerical_subclass = "B2_property_quantization_ulP"
+        pack.numerical_subclass = "B2_float_lattice_ulP_limit"
         pack.remaining_blocker = (
-            f"verified_local_search_only: min_max_ratio={min_r:.6g}, "
-            f"dominant={pack.dominant_residual}; bracket_brentq_xtol not sufficient for nanowatt bounds"
+            f"verified_float_lattice_only: min_max_ratio={min_r:.6g}, "
+            f"dominant={pack.dominant_residual}; adjacent binary64 root still exceeds Task172 W bounds"
         )
     else:
         pack.numerical_decision = "C"
@@ -805,7 +1218,7 @@ def run_cell0_bracketed_ulp_pipeline(
         baseline=baseline,
     )
     baseline_ev = _candidate_by_label(pack.candidates, "1_baseline")
-    bracket_ev = _candidate_by_label(pack.candidates, "4_bracketed_scalar_root")
+    bracket_ev = _candidate_by_label(pack.candidates, "4_float_lattice_scalar_root")
     refin_b = pack.refinement_from_baseline.get("evidence")
     refin_r = pack.refinement_from_bracket.get("evidence")
     ulp_best = None

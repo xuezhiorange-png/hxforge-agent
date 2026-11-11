@@ -180,7 +180,7 @@ def main() -> int:
         )
         rows = [_evidence_row(c) for c in pack.candidates]
         bracket_ev = next(
-            (c for c in pack.candidates if c.label == "4_bracketed_scalar_root"), None
+            (c for c in pack.candidates if c.label == "4_float_lattice_scalar_root"), None
         )
         baseline_ev = next((c for c in pack.candidates if c.label == "1_baseline"), None)
         refin_a = pack.refinement_from_baseline.get("evidence")
