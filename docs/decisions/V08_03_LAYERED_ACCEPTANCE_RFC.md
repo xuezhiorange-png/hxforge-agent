@@ -4,7 +4,7 @@
 |-------|-------|
 | **TASK_ID** | `V08_03_ACCEPTANCE_RFC_AND_SHADOW_VALIDATION` |
 | **PR** | 325 (Draft) |
-| **HEAD** | `dbfc2137de5c1b061d621f33150541de0f5c2ac4` |
+| **HEAD** | `c04f9778b52cbbcccf2f26d691e7762dafbf8814` |
 | **CI #1574** | See decision doc; lint/manifest/resolve-authority green; some shards timeout or pending |
 | **DECISION** | `C_REVIEW_ONLY` |
 | **PRODUCTION_CONTRACT_CHANGE_AUTHORIZED** | `false` |
