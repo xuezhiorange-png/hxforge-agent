@@ -130,9 +130,7 @@ def _shell_inlet_tp_ph_roundtrip(
     provider: PropertyProvider, bindings: CandidateRatingBindings
 ) -> TpPhRoundtripAudit | None:
     """TP(T_in,P)->H_TP then PH(P,H_TP)->(T_PH,H_PH); compare to bound inlet enthalpy."""
-    t_tp = effective_shell_inlet_temperature_k()
     p_pa = bindings.normalized.shell_side.inlet_pressure_pa
-    h_inlet = effective_shell_cold_inlet_enthalpy_j_kg()
     exp = build_experimental_thermal_boundary_v1(
         provider=provider,
         tube_inlet_temperature_k=bindings.normalized.tube_side.inlet_temperature_k,
@@ -147,6 +145,8 @@ def _shell_inlet_tp_ph_roundtrip(
     )
     token = bind_experimental_thermal_boundary_v1(exp)
     try:
+        t_tp = effective_shell_inlet_temperature_k()
+        h_inlet = effective_shell_cold_inlet_enthalpy_j_kg()
         shell_fluid = bindings.normalized.shell_side.fluid
         ref = provider.reference_state_policy()
         tp_state = provider.state_tp(shell_fluid, float(t_tp), float(p_pa))

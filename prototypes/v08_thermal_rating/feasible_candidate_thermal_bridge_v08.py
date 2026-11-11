@@ -131,13 +131,13 @@ def classify_thermal_hydraulic(
 ) -> ThermalHydraulicClass:
     if not closeout.hydraulic_pass:
         return "THERMAL_NUMERICAL_BLOCKED"
-    if closeout.n1 != "ACCEPTED":
+    if closeout.n1 != "ACCEPTED" or closeout.n2 != "ACCEPTED" or closeout.n4 != "ACCEPTED":
         return "THERMAL_NUMERICAL_BLOCKED"
     if closeout.target_330kw_met == "false":
         return "THERMAL_DUTY_INSUFFICIENT"
     if nozzle.status != "VERIFIED":
         return "HYDRAULIC_FEASIBLE_NOZZLE_UNRESOLVED"
-    if closeout.target_330kw_met == "true" and closeout.hydraulic_pass:
+    if closeout.target_330kw_met == "true":
         return "THERMAL_AND_HYDRAULIC_FEASIBLE"
     return "HYDRAULIC_FEASIBLE_NOZZLE_UNRESOLVED"
 
