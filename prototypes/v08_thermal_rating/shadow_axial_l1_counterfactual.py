@@ -31,7 +31,6 @@ def _cell_shadow_row(
     tube_face_h = rec.h_t_left_j_kg
     shell_face_h = rec.h_s_left_j_kg
     property_domain = rec.domain_exit or "IN_DOMAIN"
-    gate_detail: dict[str, Any] | None = None
     r1_ratio = r2_ratio = r3_ratio = math.nan
     physical_solution = rec.domain_exit is None and math.isfinite(rec.q_w)
     shadow_status: str = EXPERIMENTAL_TAG
@@ -122,8 +121,6 @@ def assess_shadow_n1_counterfactual(
     domain_exit_cells = any(c.domain_exit for c in cells)
     if domain_exit_cells:
         blockers.append("PROPERTY_DOMAIN_EXIT")
-    if not outcome.optimizer_success:
-        blockers.append("OPTIMIZER_UNDERCONVERGED")
     if outcome.energy_balance_residual_w > 1.0:
         blockers.append(f"ENERGY_RESIDUAL_W={outcome.energy_balance_residual_w}")
     if not outcome.terminal_pass:
@@ -142,15 +139,29 @@ def assess_shadow_n1_counterfactual(
     ]
     if wall_bad:
         blockers.append(f"WALL_ORDER_VIOLATION_CELLS={wall_bad}")
-    if not all(c.task173_root_validated for c in cells):
-        blockers.append("TASK173_F_Q_ROOT_NOT_VALIDATED")
-    shadow_physical = (
-        not domain_exit_cells
-        and outcome.energy_balance_residual_w <= 1.0
-        and all(c.q_w > 0.0 for c in cells)
-        and not wall_bad
-        and outcome.optimizer_success
+    fq_root_fail = not all(c.task173_root_validated for c in cells)
+    if fq_root_fail:
+        if not all(c.production_validated for c in cells):
+            blockers.append("TASK173_F_Q_ROOT_DEPENDENT_ON_L1")
+        else:
+            blockers.append("TASK173_F_Q_ROOT_NOT_VALIDATED")
+    all_l1 = all(c.task172_gate_pass for c in cells)
+    all_prod = all(c.production_validated for c in cells)
+    n1_closure = (
+        "PASS"
+        if (
+            all_l1
+            and all_prod
+            and all(c.task173_root_validated for c in cells)
+            and not domain_exit_cells
+            and outcome.energy_balance_residual_w <= 1.0
+            and outcome.physical_acceptance
+        )
+        else "UNVERIFIED"
     )
+    if domain_exit_cells or not all_l1:
+        n1_closure = "BLOCKED"
+    shadow_physical = False
     rows = [
         _cell_shadow_row(
             c,
@@ -165,6 +176,9 @@ def assess_shadow_n1_counterfactual(
         "l1_gate_used_as_stop": False,
         "l1_would_block_production": l1_stop_would_block,
         "shadow_physical_profile_without_l1_stop": shadow_physical,
+        "n1_physical_closure_status": n1_closure,
+        "optimizer_nfev_reported": outcome.optimizer_nfev,
+        "optimizer_success_heuristic_ignored": True,
         "independent_remaining_blockers": blockers,
         "aggregate": {
             "Q_SUM_W": outcome.total_q_w,

@@ -147,6 +147,17 @@ def test_v08_330kw_equivalent_handoff_matches_live_acceptance_case() -> None:
     assert result.handoff.property_provider_identity["provider_class"] == "CoolPropProvider"
 
 
+def test_hxforge_330kw_strict_dp_fixture_identity() -> None:
+    path = _FIXTURES / "v08_user_case_hxforge_330kw_strict_dp.json"
+    result = _handoff_for(json.loads(path.read_text(encoding="utf-8")))
+    assert result.normalized.engineering_case_id == "HXFORGE_330KW_STRICT_DP"
+    assert result.normalized.target_duty_w == Decimal("330000")
+    assert result.normalized.tube_side.inlet_temperature_k == Decimal("310")
+    assert result.normalized.shell_side.inlet_temperature_k == Decimal("295")
+    assert result.handoff.pressure_limits_pa["max_tube_side_pressure_drop_pa"] == "1150"
+    assert result.handoff.consumable_parameters["target_duty_w"] == "330000"
+
+
 def test_v07_330kw_fixture_still_loads_with_geometry_constraints() -> None:
     """Regression guard: V07 acceptance JSON and applicability rules remain unchanged."""
     case = load_general_engineering_case_json(_V07_330KW.read_text(encoding="utf-8"))
