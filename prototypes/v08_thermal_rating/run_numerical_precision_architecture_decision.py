@@ -217,12 +217,17 @@ def _error_source_study(
         study["arith_dominates_r3"] = False
     else:
         study["arith_dominates_r3"] = "UNRESOLVED"
-    if prop_ratio > arith_ratio:
-        study["property_sensitivity_exceeds_arith"] = True
-    else:
-        study["property_sensitivity_exceeds_arith"] = (
-            False if math.isfinite(prop_ratio) else "UNRESOLVED"
-        )
+    study["property_sensitivity_exceeds_arith"] = (
+        "UNRESOLVED"
+        if not math.isfinite(prop_ratio) or prop_ratio == 0.0
+        else (prop_ratio > arith_ratio)
+    )
+    study["coolprop_dominance_proven"] = False
+    study["attribution_notes"] = [
+        "Decimal B compares residual formula at frozen Gi/Go/Rwall only.",
+        "Zero delta_r3 on a single Twi+1 ULP probe does not prove zero CoolProp quantization.",
+        "Property uncertainty budget: UNRESOLVED.",
+    ]
     return study
 
 
@@ -241,9 +246,8 @@ def _architecture_choice(error: dict[str, Any], best_max: float) -> tuple[str, s
             )
         return (
             "C",
-            "Nanowatt C-ULP bounds exceed residual magnitude at verified frozen snapshots; "
-            "engineered layered acceptance (ULP / energy / property uncertainty) review required",
-            True,
+            "Recommend formal layered acceptance RFC review; does not prove current contract must relax",
+            False,
         )
     if isinstance(ar, float) and ar >= 0.05:
         return (
@@ -425,9 +429,8 @@ def main() -> int:
                 "bound_ratio"
             ),
             "ROOT_LOCALIZATION_CONTRIBUTION": "measured_in_search_only; not dominant vs r3 gate",
-            "PRIMARY_NUMERICAL_LIMIT": (
-                "verified_property_plus_contract_mismatch" if arch in ("B", "C") else "unresolved"
-            ),
+            "PRIMARY_NUMERICAL_LIMIT": "UNRESOLVED",
+            "DECISION_C_REVIEW_ONLY": arch == "C",
             "ARCHITECTURE_DECISION": arch,
             "RECOMMENDED_CHANGE": rec,
             "PRODUCTION_CONTRACT_CHANGE_REQUIRED": contract,
@@ -488,7 +491,9 @@ Candidate label: `{p["BEST_CANDIDATE_LABEL"]}`. Evidence from one `eval_trial_re
 | Source | r3 impact vs bound3 (ratio) |
 |--------|-------------------------------|
 | Arithmetic (Decimal, frozen Gi/Go/Rwall) | {p["ARITHMETIC_ERROR_CONTRIBUTION"]} |
-| Property neighbor (Twi +1 ULP) | {p["PROPERTY_QUANTIZATION_CONTRIBUTION"]} |
+| Property neighbor (Twi +1 ULP) | {p["PROPERTY_QUANTIZATION_CONTRIBUTION"]} (zero here ≠ zero quantization) |
+
+**PRIMARY_NUMERICAL_LIMIT:** UNRESOLVED — CoolProp/property dominance not proven from these probes alone.
 
 Full JSON: `{OUT_JSON}`
 
@@ -509,7 +514,13 @@ Keep physics; study whether nanowatt ULP bounds match binary64 + property uncert
 
 **RECOMMENDED_CHANGE:** {p["RECOMMENDED_CHANGE"]}
 
-**PRODUCTION_CONTRACT_CHANGE_REQUIRED:** {p["PRODUCTION_CONTRACT_CHANGE_REQUIRED"]}
+**PRODUCTION_CONTRACT_CHANGE_REQUIRED:** {p["PRODUCTION_CONTRACT_CHANGE_REQUIRED"]} (Decision C = start RFC review only)
+
+## Attribution (corrected)
+
+- Decimal row: residual formula at frozen Gi/Go/Rwall only.
+- Twi +1 ULP probe: local insensitivity only; not a property uncertainty budget.
+- See layered RFC: `docs/decisions/V08_03_LAYERED_ACCEPTANCE_RFC.md`
 
 ## Risks and boundary
 
@@ -519,6 +530,7 @@ Keep physics; study whether nanowatt ULP bounds match binary64 + property uncert
 ## CI
 
 - **#1572 root cause:** missing `test_float_lattice_bracket.py` in manifest + Ruff SIM102 (fixed).
+- **#1574 (HEAD `dbfc213`):** in progress on push; early shard fails include task168 (passes locally), r23 (pytest-timeout 300s on primary case), r24 (long-run); merge-ref shards may cascade. Re-verify after run completes; not authorized to relax gates.
 """
 
 

@@ -2,7 +2,7 @@
 
 **TASK_ID:** `V08_03_NUMERICAL_PRECISION_ARCHITECTURE_DECISION`  
 **PR:** 325 (Draft)  
-**HEAD:** `b8e846b859dfb16b04758e3f5b792795557cc507`  
+**HEAD:** `dbfc2137de5c1b061d621f33150541de0f5c2ac4`  
 **ENGINEERING_ACCEPTANCE:** BLOCKED (unchanged)
 
 ## Unified best point (single production gate)
@@ -30,7 +30,9 @@ Candidate label: `5b_refinement_from_bracket_root`. Evidence from one `eval_tria
 | Source | r3 impact vs bound3 (ratio) |
 |--------|-------------------------------|
 | Arithmetic (Decimal, frozen Gi/Go/Rwall) | 0.01945144381613445 |
-| Property neighbor (Twi +1 ULP) | 0.0 |
+| Property neighbor (Twi +1 ULP) | 0.0 (zero here ≠ zero quantization) |
+
+**PRIMARY_NUMERICAL_LIMIT:** UNRESOLVED — CoolProp/property dominance not proven from these probes alone.
 
 Full JSON: `/opt/cursor/artifacts/v08_03_numerical_precision_architecture_decision.json`
 
@@ -49,9 +51,15 @@ Keep physics; study whether nanowatt ULP bounds match binary64 + property uncert
 
 **ARCHITECTURE_DECISION = C**
 
-**RECOMMENDED_CHANGE:** Nanowatt C-ULP bounds exceed residual magnitude at verified frozen snapshots; engineered layered acceptance (ULP / energy / property uncertainty) review required
+**RECOMMENDED_CHANGE:** Recommend formal layered acceptance RFC review; does not prove current contract must relax
 
-**PRODUCTION_CONTRACT_CHANGE_REQUIRED:** True
+**PRODUCTION_CONTRACT_CHANGE_REQUIRED:** False (Decision C = start RFC review only)
+
+## Attribution (corrected)
+
+- Decimal row: residual formula at frozen Gi/Go/Rwall only.
+- Twi +1 ULP probe: local insensitivity only; not a property uncertainty budget.
+- See layered RFC: `docs/decisions/V08_03_LAYERED_ACCEPTANCE_RFC.md`
 
 ## Risks and boundary
 
@@ -61,3 +69,4 @@ Keep physics; study whether nanowatt ULP bounds match binary64 + property uncert
 ## CI
 
 - **#1572 root cause:** missing `test_float_lattice_bracket.py` in manifest + Ruff SIM102 (fixed).
+- **#1574 (HEAD `dbfc213`):** lint/manifest/resolve-authority green; observed shard fails: task168 (passes locally), r23 (pytest-timeout), r24 (long-run); merge-ref cascade possible. No gate bypass in this task.
