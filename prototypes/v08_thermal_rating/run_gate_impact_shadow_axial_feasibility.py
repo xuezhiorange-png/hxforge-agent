@@ -235,7 +235,9 @@ def main() -> int:
         blockers_union.extend(p.get("shadow_n1", {}).get("independent_remaining_blockers", []))
 
     agg_e1 = (
-        candidate_payloads[0].get("shadow_n1", {}).get("aggregate", {}) if candidate_payloads else {}
+        candidate_payloads[0].get("shadow_n1", {}).get("aggregate", {})
+        if candidate_payloads
+        else {}
     )
     payload = {
         "TASK_ID": "V08_03_GATE_IMPACT_AND_SHADOW_AXIAL_FEASIBILITY",

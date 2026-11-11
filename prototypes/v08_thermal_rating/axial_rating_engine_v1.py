@@ -11,8 +11,6 @@ Primary case: HXFORGE_330KW_STRICT_DP. 250 kW fixture is regression-only (see te
 
 from __future__ import annotations
 
-import math
-import os
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -32,16 +30,15 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.experimental_therm
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     REVIEWED_MESH_SEQUENCE,
-    TERMINAL_TOLERANCE_K,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _CANDIDATE_RATING_CONTEXT,
     ENERGY_ACCEPTANCE_FLOOR_W,
     _candidate_context,
     _CellSearchStats,
+    _MeshRun,
     _outer_trial,
     _OuterTrial,
-    effective_admitted_h_max_j_kg,
     effective_shell_cold_inlet_enthalpy_j_kg,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_sizing.candidate_materialization import (
@@ -83,6 +80,10 @@ from prototypes.v08_thermal_rating.case_identity_v08 import (
     FIXTURE_250,
     FIXTURE_330,
 )
+from prototypes.v08_thermal_rating.outer_shooting_isolated_v1 import (
+    IsolatedOuterBoundaryResult,
+    solve_outer_boundary_from_trial_isolated,
+)
 from prototypes.v08_thermal_rating.pipeline import (
     V08ThermalCandidateRatingRow,
     _rate_one_structural_bundle,
@@ -106,6 +107,7 @@ class CandidateRatingBindings:
     rating_request: CandidateRatingRequest
     engineering_case_id: str
     target_duty_w: Decimal
+    geometry_projection_hash: str
 
 
 @dataclass(frozen=True)
@@ -139,7 +141,10 @@ class PhysicalClosureReport:
     terminal_boundary_residual_k: str | None
     terminal_within_production_tolerance: bool | None
     task172_numerical_hole_count: int
+    geometry_projection_hash: str
+    geometry_duty_insufficient: bool
     isolated_n2_n4_fixed_enthalpy: tuple[IsolatedMeshTrialReport, ...]
+    outer_solve_by_mesh: tuple[IsolatedOuterBoundaryResult, ...]
     first_blocker: str
     evidence: tuple[str, ...]
 
@@ -179,14 +184,6 @@ class AxialRatingCaseCloseout:
     aggregate_delivery: DeliveryOutcome
 
 
-def _bracket_search_limit() -> int:
-    raw = os.environ.get("V08_AXIAL_BRACKET_MAX_ITER", "16")
-    try:
-        return max(4, min(32, int(raw)))
-    except ValueError:
-        return 16
-
-
 def load_case_bindings(
     fixture_path: Path,
     *,
@@ -205,13 +202,14 @@ def enumerate_structural_bundles(
     handoff: V08SolverHandoffV1,
     *,
     max_valid: int = 32,
-) -> tuple[str, str, tuple[V08StructuralGeometryBundle, ...]]:
+) -> tuple[str, str, tuple[V08StructuralGeometryBundle, ...], dict[str, str]]:
     space = load_v08_discrete_space(DEFAULT_V08_DISCRETE_SPACE_PATH)
     filtered, _ = filter_discrete_space_by_envelope(space, normalized.design_envelope)
     t168 = build_v08_task168_request(normalized, handoff, filtered)
     t168_digest = task168_request_hash_digest(t168)
     enum = enumerate_structural_geometry(t168, filtered, (), max_valid_candidates=max_valid)
-    return enum.space_hash, t168_digest, enum.valid_structural
+    geom_by_id = {row.candidate_id: row.geometry_projection_hash for row in enum.candidate_records}
+    return enum.space_hash, t168_digest, enum.valid_structural, geom_by_id
 
 
 def build_candidate_rating_bindings(
@@ -222,6 +220,7 @@ def build_candidate_rating_bindings(
     normalized: NormalizedUserDesignCase,
     handoff: V08SolverHandoffV1,
     provider: PropertyProvider,
+    geometry_projection_hash: str = "",
 ) -> CandidateRatingBindings | None:
     candidate = bundle.candidate
     b = bundle.bundle
@@ -246,9 +245,7 @@ def build_candidate_rating_bindings(
     )
     if type(t174) is not Task174SuccessResult:
         return None
-    rating_req = v08_thermal_rating_request(
-        candidate, space_hash, b, topology, t174, t168_digest
-    )
+    rating_req = v08_thermal_rating_request(candidate, space_hash, b, topology, t174, t168_digest)
     return CandidateRatingBindings(
         bundle=bundle,
         space_hash=space_hash,
@@ -257,6 +254,122 @@ def build_candidate_rating_bindings(
         rating_request=rating_req,
         engineering_case_id=normalized.engineering_case_id,
         target_duty_w=normalized.target_duty_w,
+        geometry_projection_hash=geometry_projection_hash,
+    )
+
+
+def _run_with_rating_context(
+    bindings: CandidateRatingBindings,
+    provider: PropertyProvider,
+    *,
+    subdivisions: int,
+    body: Any,
+) -> Any:
+    btoken = _thermal_boundary_token(bindings.normalized, provider)
+    context = _candidate_context(bindings.rating_request)
+    ctx_token = _CANDIDATE_RATING_CONTEXT.set(context)
+    try:
+        return body(context, btoken)
+    finally:
+        _CANDIDATE_RATING_CONTEXT.reset(ctx_token)
+        reset_experimental_thermal_boundary(btoken)
+
+
+def solve_isolated_outer_boundary(
+    bindings: CandidateRatingBindings,
+    provider: PropertyProvider,
+    *,
+    subdivisions: int,
+) -> IsolatedOuterBoundaryResult:
+    """Independent outer shooting solve for one mesh level (production-parallel)."""
+
+    def body(context: Any, _btoken: object) -> IsolatedOuterBoundaryResult:
+        stats = _CellSearchStats()
+
+        def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
+            return _outer_trial(
+                subdivisions,
+                enthalpy,
+                provider,
+                context.shell_authority,
+                iteration,
+                stats,
+            )
+
+        return solve_outer_boundary_from_trial_isolated(
+            trial_at,
+            subdivisions=subdivisions,
+            provider=provider,
+            stats=stats,
+        )
+
+    return _run_with_rating_context(bindings, provider, subdivisions=subdivisions, body=body)
+
+
+def _legacy_wrong_shooting_search(
+    bindings: CandidateRatingBindings,
+    provider: PropertyProvider,
+    *,
+    subdivisions: int = 1,
+) -> tuple[str | None, str | None]:
+    """Pre-correction mistake: VALID_TRAJECTORY updated h_lo (diagnostic baseline only)."""
+
+    def body(context: Any, _btoken: object) -> tuple[str | None, str | None]:
+        from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+            effective_admitted_h_max_j_kg,
+        )
+
+        h_lo = float(effective_shell_cold_inlet_enthalpy_j_kg())
+        h_hi = float(effective_admitted_h_max_j_kg(provider))
+        best_term: str | None = None
+        best_duty: str | None = None
+        for _ in range(16):
+            h_mid = (h_lo + h_hi) / 2.0
+            stats = _CellSearchStats()
+            trial = _outer_trial(
+                subdivisions,
+                Decimal(str(h_mid)),
+                provider,
+                context.shell_authority,
+                0,
+                stats,
+            )
+            if trial.classification == "VALID_TRAJECTORY" and trial.mesh_run is not None:
+                h_lo = h_mid
+                obs = trial.mesh_run.observables
+                best_term = str(obs.terminal_boundary_residual_k)
+                best_duty = str(obs.total_duty_w)
+            elif trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                h_lo = h_mid
+            else:
+                h_hi = h_mid
+            if abs(h_lo - h_hi) < 1e-6:
+                break
+        return best_term, best_duty
+
+    return _run_with_rating_context(bindings, provider, subdivisions=subdivisions, body=body)
+
+
+def _search_valid_shooting_enthalpy(
+    bindings: CandidateRatingBindings,
+    provider: PropertyProvider,
+    *,
+    subdivisions: int = 1,
+) -> IsolatedOuterBoundaryResult:
+    """Corrected outer search (replaces mistaken admitted-max / h_lo-on-VALID bisection)."""
+    return solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
+
+
+def _mesh_run_summary(run: _MeshRun | None) -> tuple[str | None, ...]:
+    if run is None:
+        return None, None, None, None, None
+    o = run.observables
+    return (
+        str(o.terminal_boundary_residual_k),
+        str(o.terminal_boundary_residual_j_kg),
+        str(o.total_duty_w),
+        str(o.tube_outlet_temperature_k),
+        str(o.shell_outlet_temperature_k),
     )
 
 
@@ -293,7 +406,9 @@ def _trial_report(
         shooting_enthalpy_j_kg=str(shooting_h) if shooting_h is not None else None,
         total_duty_w=str(obs.total_duty_w) if obs is not None else None,
         energy_balance_residual_w=str(obs.energy_balance_residual_w) if obs is not None else None,
-        terminal_boundary_residual_k=str(obs.terminal_boundary_residual_k) if obs is not None else None,
+        terminal_boundary_residual_k=str(obs.terminal_boundary_residual_k)
+        if obs is not None
+        else None,
         terminal_boundary_residual_j_kg=(
             str(obs.terminal_boundary_residual_j_kg) if obs is not None else None
         ),
@@ -312,6 +427,32 @@ def _duty_vs_target(
     if duty * THERMODYNAMIC_DUTY_TOLERANCE >= target:
         return "AT_OR_ABOVE_TARGET"
     return "BELOW_TARGET"
+
+
+def final_trajectory_task172_holes(
+    bindings: CandidateRatingBindings,
+    provider: PropertyProvider,
+    *,
+    subdivisions: int,
+    shooting_enthalpy_j_kg: Decimal | str,
+) -> int:
+    """Task172 hole count on one final accepted shooting enthalpy (not outer-search cumulative)."""
+
+    def body(context: Any, _btoken: object) -> int:
+        stats = _CellSearchStats()
+        _outer_trial(
+            subdivisions,
+            Decimal(str(shooting_enthalpy_j_kg)),
+            provider,
+            context.shell_authority,
+            0,
+            stats,
+        )
+        return stats.task172_numerical_hole_count
+
+    return int(
+        _run_with_rating_context(bindings, provider, subdivisions=subdivisions, body=body)
+    )
 
 
 def run_isolated_outer_trials(
@@ -341,68 +482,66 @@ def run_isolated_outer_trials(
         reset_experimental_thermal_boundary(btoken)
 
 
-def _search_valid_shooting_enthalpy(
-    bindings: CandidateRatingBindings,
-    provider: PropertyProvider,
+def _outer_result_to_trial_report(
+    result: IsolatedOuterBoundaryResult,
     *,
-    subdivisions: int = 1,
-) -> tuple[Decimal | None, _OuterTrial | None, _CellSearchStats]:
-    """Bracket shell-outlet enthalpy between cold inlet and admitted max (production bounds)."""
-    btoken = _thermal_boundary_token(bindings.normalized, provider)
-    context = _candidate_context(bindings.rating_request)
-    ctx_token = _CANDIDATE_RATING_CONTEXT.set(context)
-    h_lo = float(effective_shell_cold_inlet_enthalpy_j_kg())
-    h_hi = float(effective_admitted_h_max_j_kg(provider))
-    best_h: Decimal | None = None
-    best_trial: _OuterTrial | None = None
-    best_stats = _CellSearchStats()
-    try:
-        for _ in range(_bracket_search_limit()):
-            h_mid = (h_lo + h_hi) / 2.0
-            stats = _CellSearchStats()
-            trial = _outer_trial(
-                subdivisions,
-                Decimal(str(h_mid)),
-                provider,
-                context.shell_authority,
-                0,
-                stats,
-            )
-            if trial.classification == "VALID_TRAJECTORY":
-                h_lo = h_mid
-                best_h = Decimal(str(h_mid))
-                best_trial = trial
-                best_stats = stats
-            elif trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
-                h_lo = h_mid
-            else:
-                h_hi = h_mid
-            if math.isclose(h_lo, h_hi, rel_tol=0.0, abs_tol=1e-6):
-                break
-        return best_h, best_trial, best_stats
-    finally:
-        _CANDIDATE_RATING_CONTEXT.reset(ctx_token)
-        reset_experimental_thermal_boundary(btoken)
+    trajectory_hole_count: int | None = None,
+) -> IsolatedMeshTrialReport:
+    run = result.accepted_run or result.best_valid_run
+    classification = result.status
+    if result.status == "ACCEPTED":
+        classification = "VALID_TRAJECTORY_TERMINAL_PASS"
+    elif result.status == "PRECISION_FLOOR":
+        classification = "VALID_TRAJECTORY_PRECISION_FLOOR"
+    term_k, term_h, duty, t_out, s_out = _mesh_run_summary(run)
+    return IsolatedMeshTrialReport(
+        subdivisions=result.subdivisions,
+        classification=classification,
+        shooting_enthalpy_j_kg=result.shooting_enthalpy_j_kg,
+        total_duty_w=duty,
+        energy_balance_residual_w=(
+            str(run.observables.energy_balance_residual_w) if run is not None else None
+        ),
+        terminal_boundary_residual_k=term_k,
+        terminal_boundary_residual_j_kg=term_h,
+        tube_outlet_temperature_k=t_out,
+        shell_outlet_temperature_k=s_out,
+        task172_numerical_hole_count=(
+            trajectory_hole_count
+            if trajectory_hole_count is not None
+            else result.stats.task172_numerical_hole_count
+        ),
+        diagnostics=result.diagnostics,
+    )
 
 
 def assess_physical_n1_closure(
     bindings: CandidateRatingBindings,
     provider: PropertyProvider,
 ) -> PhysicalClosureReport:
-    """Physics-layer N1: full cell march via production _outer_trial, separate from C-ULP."""
+    """Physics-layer closure via corrected isolated outer shooting (per mesh level)."""
     target = bindings.target_duty_w
-    best_h, best_trial, stats = _search_valid_shooting_enthalpy(bindings, provider, subdivisions=1)
     candidate_id = bindings.rating_request.candidate_id
-    n2_n4: list[IsolatedMeshTrialReport] = []
-    first_blocker = ""
     evidence: list[str] = []
+    first_blocker = ""
+    mesh_results: list[IsolatedOuterBoundaryResult] = []
+    trial_rows: list[IsolatedMeshTrialReport] = []
 
-    if best_h is None or best_trial is None or best_trial.mesh_run is None:
+    wrong_term, wrong_duty = _legacy_wrong_shooting_search(bindings, provider, subdivisions=1)
+    if wrong_term is not None:
+        evidence.append(f"legacy_wrong_search_terminal_residual_k={wrong_term}")
+        evidence.append(f"legacy_wrong_search_total_duty_w={wrong_duty}")
+
+    n1 = solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
+    mesh_results.append(n1)
+
+    n1_run = n1.accepted_run or n1.best_valid_run
+    if n1_run is None:
         return PhysicalClosureReport(
             case_id=bindings.engineering_case_id,
             candidate_id=candidate_id,
             n1_status="BLOCKED",
-            best_shooting_enthalpy_j_kg=str(best_h) if best_h is not None else None,
+            best_shooting_enthalpy_j_kg=n1.shooting_enthalpy_j_kg,
             total_duty_w=None,
             target_duty_w=str(target),
             duty_vs_target="UNKNOWN",
@@ -410,46 +549,63 @@ def assess_physical_n1_closure(
             energy_balance_pass=None,
             terminal_boundary_residual_k=None,
             terminal_within_production_tolerance=None,
-            task172_numerical_hole_count=stats.task172_numerical_hole_count,
-            isolated_n2_n4_fixed_enthalpy=tuple(n2_n4),
-            first_blocker="NO_VALID_TRAJECTORY_IN_SHOOTING_BRACKET",
+            task172_numerical_hole_count=n1.stats.task172_numerical_hole_count,
+            geometry_projection_hash=bindings.geometry_projection_hash,
+            geometry_duty_insufficient=False,
+            isolated_n2_n4_fixed_enthalpy=tuple(trial_rows),
+            outer_solve_by_mesh=tuple(mesh_results),
+            first_blocker=n1.failure_code or "NO_MESH_RUN",
             evidence=tuple(evidence),
         )
 
-    obs = best_trial.mesh_run.observables
-    ebal = abs(obs.energy_balance_residual_w) <= ENERGY_ACCEPTANCE_FLOOR_W
-    term_ok = obs.terminal_boundary_residual_k <= TERMINAL_TOLERANCE_K
-    duty_class = _duty_vs_target(obs.total_duty_w, target)
-    holes = stats.task172_numerical_hole_count
-
-    for subdivisions in (2, 4):
-        if subdivisions not in REVIEWED_MESH_SEQUENCE:
-            continue
-        trial_row = run_isolated_outer_trials(
-            bindings, provider, subdivisions=subdivisions, shooting_enthalpy_j_kg=best_h
-        )
-        n2_n4.append(trial_row)
-
-    n1_closed = (
-        ebal
-        and holes == 0
-        and best_trial.classification == "VALID_TRAJECTORY"
-        and term_ok
-        and duty_class == "AT_OR_ABOVE_TARGET"
+    obs = n1_run.observables
+    from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
+        _terminal_tolerance_pass,
     )
 
-    if not term_ok:
+    holes = (
+        final_trajectory_task172_holes(
+            bindings, provider, subdivisions=1, shooting_enthalpy_j_kg=n1.shooting_enthalpy_j_kg
+        )
+        if n1.shooting_enthalpy_j_kg
+        else n1.stats.task172_numerical_hole_count
+    )
+    trial_rows.append(_outer_result_to_trial_report(n1, trajectory_hole_count=holes))
+    ebal = abs(obs.energy_balance_residual_w) <= ENERGY_ACCEPTANCE_FLOOR_W
+    term_ok = _terminal_tolerance_pass(n1_run)
+    duty_class = _duty_vs_target(obs.total_duty_w, target)
+    geometry_duty_insufficient = term_ok and ebal and holes == 0 and duty_class == "BELOW_TARGET"
+
+    if wrong_term is not None:
+        evidence.append(f"corrected_search_terminal_residual_k={obs.terminal_boundary_residual_k}")
+        evidence.append(f"corrected_search_total_duty_w={obs.total_duty_w}")
+
+    n1_terminal_closed = term_ok and ebal and holes == 0
+    if n1_terminal_closed:
+        for subdivisions in (2, 4):
+            if subdivisions not in REVIEWED_MESH_SEQUENCE:
+                continue
+            mesh_out = solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
+            mesh_results.append(mesh_out)
+            trial_rows.append(_outer_result_to_trial_report(mesh_out))
+
+    n1_closed = (
+        n1_terminal_closed and duty_class == "AT_OR_ABOVE_TARGET" and n1.status == "ACCEPTED"
+    )
+
+    if n1.status == "PRECISION_FLOOR":
+        first_blocker = "OUTER_BOUNDARY_PRECISION_FLOOR"
+        evidence.extend(n1.diagnostics)
+    elif not term_ok:
         first_blocker = "TERMINAL_BOUNDARY_RESIDUAL_EXCEEDS_PRODUCTION_TOLERANCE"
         evidence.append(f"terminal_boundary_residual_k={obs.terminal_boundary_residual_k}")
-        evidence.append(f"TERMINAL_TOLERANCE_K={TERMINAL_TOLERANCE_K}")
-    if duty_class == "BELOW_TARGET":
-        if not first_blocker:
-            first_blocker = "TOTAL_DUTY_BELOW_TARGET"
+        evidence.append(f"terminal_boundary_residual_j_kg={obs.terminal_boundary_residual_j_kg}")
+    if geometry_duty_insufficient:
+        first_blocker = "GEOMETRY_DUTY_INSUFFICIENT"
         evidence.append(f"total_duty_w={obs.total_duty_w}")
         evidence.append(f"target_duty_w={target}")
-    if holes > 0:
-        if not first_blocker:
-            first_blocker = "TASK172_NUMERICAL_HOLES"
+    if holes > 0 and not first_blocker:
+        first_blocker = "TASK172_NUMERICAL_HOLES"
         evidence.append(f"task172_numerical_hole_count={holes}")
 
     n1_status: PhysicalN1Status = "CLOSED" if n1_closed else "BLOCKED"
@@ -458,7 +614,7 @@ def assess_physical_n1_closure(
         case_id=bindings.engineering_case_id,
         candidate_id=candidate_id,
         n1_status=n1_status,
-        best_shooting_enthalpy_j_kg=str(best_h),
+        best_shooting_enthalpy_j_kg=n1.shooting_enthalpy_j_kg,
         total_duty_w=str(obs.total_duty_w),
         target_duty_w=str(target),
         duty_vs_target=duty_class,
@@ -467,7 +623,10 @@ def assess_physical_n1_closure(
         terminal_boundary_residual_k=str(obs.terminal_boundary_residual_k),
         terminal_within_production_tolerance=term_ok,
         task172_numerical_hole_count=holes,
-        isolated_n2_n4_fixed_enthalpy=tuple(n2_n4),
+        geometry_projection_hash=bindings.geometry_projection_hash,
+        geometry_duty_insufficient=geometry_duty_insufficient,
+        isolated_n2_n4_fixed_enthalpy=tuple(trial_rows),
+        outer_solve_by_mesh=tuple(mesh_results),
         first_blocker=first_blocker or ("N1_NOT_FULLY_CLOSED" if not n1_closed else ""),
         evidence=tuple(evidence),
     )
@@ -583,7 +742,7 @@ def run_primary_330kw_closeout(
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=active)
     if normalized.engineering_case_id != CASE_330KW_ID:
         raise RuntimeError(f"expected {CASE_330KW_ID}, got {normalized.engineering_case_id}")
-    space_hash, t168_digest, bundles = enumerate_structural_bundles(
+    space_hash, t168_digest, bundles, geom_by_id = enumerate_structural_bundles(
         normalized, handoff, max_valid=max(2, max_candidates)
     )
     closeouts: list[AxialRatingCandidateCloseout] = []
@@ -595,6 +754,7 @@ def run_primary_330kw_closeout(
             normalized=normalized,
             handoff=handoff,
             provider=active,
+            geometry_projection_hash=geom_by_id.get(bundle.candidate.candidate_id, ""),
         )
         if bindings is None:
             continue
@@ -635,11 +795,14 @@ def closeout_to_jsonable(closeout: AxialRatingCaseCloseout) -> dict[str, Any]:
             "task172_numerical_hole_count": p.task172_numerical_hole_count,
             "first_blocker": p.first_blocker,
             "evidence": list(p.evidence),
+            "geometry_projection_hash": p.geometry_projection_hash,
+            "geometry_duty_insufficient": p.geometry_duty_insufficient,
             "isolated_n2_n4_fixed_enthalpy": [
                 {
                     "subdivisions": t.subdivisions,
                     "classification": t.classification,
                     "total_duty_w": t.total_duty_w,
+                    "terminal_boundary_residual_k": t.terminal_boundary_residual_k,
                     "task172_numerical_hole_count": t.task172_numerical_hole_count,
                 }
                 for t in p.isolated_n2_n4_fixed_enthalpy
@@ -684,7 +847,9 @@ def run_250kw_regression_smoke(
     active = provider or CoolPropProvider()
     normalized, handoff, _ = load_case_bindings(FIXTURE_250, provider=active)
     assert normalized.engineering_case_id != CASE_330KW_ID
-    space_hash, t168_digest, bundles = enumerate_structural_bundles(normalized, handoff, max_valid=1)
+    space_hash, t168_digest, bundles, _geom = enumerate_structural_bundles(
+        normalized, handoff, max_valid=1
+    )
     bundle = bundles[0]
     bindings = build_candidate_rating_bindings(
         bundle,

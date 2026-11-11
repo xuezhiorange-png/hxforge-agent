@@ -124,9 +124,7 @@ def assess_shadow_n1_counterfactual(
     if outcome.energy_balance_residual_w > 1.0:
         blockers.append(f"ENERGY_RESIDUAL_W={outcome.energy_balance_residual_w}")
     if not outcome.terminal_pass:
-        blockers.append(
-            f"TERMINAL_BOUNDARY_RESIDUAL_K={outcome.terminal_residual_k}"
-        )
+        blockers.append(f"TERMINAL_BOUNDARY_RESIDUAL_K={outcome.terminal_residual_k}")
     if l1_stop_would_block and not outcome.all_task172_gates_pass:
         blockers.append("L1_C_ULP_WOULD_STOP_IN_PRODUCTION")
     if not all(c.q_w > 0.0 for c in cells):

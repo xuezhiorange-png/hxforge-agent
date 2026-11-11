@@ -537,6 +537,7 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_v08_thermal_rating.py
+      - tests/prototypes/test_v08_axial_rating_engine.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py
