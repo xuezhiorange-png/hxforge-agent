@@ -2,7 +2,7 @@
 
 **TASK_ID:** `V08_03_NUMERICAL_PRECISION_ARCHITECTURE_DECISION`  
 **PR:** 325 (Draft)  
-**HEAD:** `52e6684ac6ede6f80834c1fe1e5829d92dfcba87`  
+**HEAD:** `b8e846b859dfb16b04758e3f5b792795557cc507`  
 **ENGINEERING_ACCEPTANCE:** BLOCKED (unchanged)
 
 ## Unified best point (single production gate)
