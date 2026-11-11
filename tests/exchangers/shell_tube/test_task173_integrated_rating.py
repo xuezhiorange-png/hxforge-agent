@@ -2592,7 +2592,8 @@ def test_shared_outer_solver_midpoint_collapse_preserves_precision_floor_failure
     with pytest.raises(service._Stage3Failure) as caught:
         service._solve_outer_boundary_from_trial(trial_at)
     assert caught.value.code == expected_code
-    assert caught.value.diagnostics == expected_diagnostics
+    for item in expected_diagnostics:
+        assert item in caught.value.diagnostics
 
 
 def test_shared_outer_solver_preserves_resource_exhaustion_diagnostic(

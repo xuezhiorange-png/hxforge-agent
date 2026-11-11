@@ -2622,17 +2622,19 @@ def _cell_evaluation_from_verified_task172_result(
     if q == Decimal(0):
         tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
         shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
+        tube_local = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_local = _reuse_authority_valid_thermo_state(shell_physical_left)
     else:
         tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
         shell_next = _state_from_enthalpy(
             provider, shell_next_h, shell_search_state=True, side="SHELL"
         )
-    tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
-        q_w,
-        tube_upstream=tube_upstream,
-        shell_physical_left=shell_physical_left,
-        provider=provider,
-    )
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+            q_w,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
     if (
         recompute_task172_request_hash(task172_request) != task172_result.request_hash
         or recompute_task172_result_hash(task172_result) != task172_result.result_hash
@@ -2677,17 +2679,19 @@ def _cell_evaluation(
     if q == Decimal(0):
         tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
         shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
+        tube_local = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_local = _reuse_authority_valid_thermo_state(shell_physical_left)
     else:
         tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
         shell_next = _state_from_enthalpy(
             provider, shell_next_h, shell_search_state=True, side="SHELL"
         )
-    tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
-        q_w,
-        tube_upstream=tube_upstream,
-        shell_physical_left=shell_physical_left,
-        provider=provider,
-    )
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+            q_w,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
     _preflight_task172_trial(
         q_w,
