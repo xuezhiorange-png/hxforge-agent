@@ -137,7 +137,11 @@ def classify_thermal_hydraulic(
         return "THERMAL_DUTY_INSUFFICIENT"
     if nozzle.status != "VERIFIED":
         return "HYDRAULIC_FEASIBLE_NOZZLE_UNRESOLVED"
-    if closeout.target_330kw_met == "true":
+    if closeout.production_task173_gate != "RATING_SUCCESS":
+        if closeout.n4 != "ACCEPTED":
+            return "THERMAL_NUMERICAL_BLOCKED"
+        return "HYDRAULIC_FEASIBLE_NOZZLE_UNRESOLVED"
+    if closeout.target_330kw_met == "true" and nozzle.status == "VERIFIED":
         return "THERMAL_AND_HYDRAULIC_FEASIBLE"
     return "HYDRAULIC_FEASIBLE_NOZZLE_UNRESOLVED"
 

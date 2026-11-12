@@ -607,6 +607,39 @@ class CandidateMeshCloseout:
     production_mesh_n1: str | None
     production_mesh_n2: str | None
     production_mesh_n4: str | None
+    n1_diagnostic: Any | None = None
+    n2_diagnostic: Any | None = None
+    n4_diagnostic: Any | None = None
+    experimental_mesh_gates_accepted: bool = False
+    experimental_mesh_convergence_pass: Literal["PASS", "BLOCKED", "not_run"] = "not_run"
+    production_rating_validated: bool = False
+    engineering_fully_accepted: bool = False
+
+
+def resolve_candidate_bindings_by_id(
+    candidate_id: str,
+    normalized: NormalizedUserDesignCase,
+    handoff: V08SolverHandoffV1,
+    provider: PropertyProvider,
+    *,
+    max_valid: int = 64,
+) -> CandidateRatingBindings | None:
+    space_hash, t168_digest, bundles, geom = enumerate_structural_bundles(
+        normalized, handoff, max_valid=max_valid
+    )
+    for bundle in bundles:
+        if bundle.candidate.candidate_id != candidate_id:
+            continue
+        return build_candidate_rating_bindings(
+            bundle,
+            space_hash=space_hash,
+            t168_digest=t168_digest,
+            normalized=normalized,
+            handoff=handoff,
+            provider=provider,
+            geometry_projection_hash=geom.get(bundle.candidate.candidate_id, ""),
+        )
+    return None
 
 
 def run_candidate_mesh_closeout(
@@ -615,18 +648,31 @@ def run_candidate_mesh_closeout(
     *,
     run_production_gate: bool = True,
 ) -> CandidateMeshCloseout:
+    from prototypes.v08_thermal_rating.mesh_level_diagnostics_v08 import (
+        build_mesh_level_diagnostic,
+        experimental_mesh_convergence_pass,
+    )
+
     n1 = solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
     n1_gate = isolated_mesh_acceptance_gate(bindings, provider, n1)
     n1_v = verify_n1_terminal(bindings, provider, n1=n1)
+    n1_diag = build_mesh_level_diagnostic(bindings, provider, n1)
 
-    def _solve_mesh(subdivisions: int) -> Literal["ACCEPTED", "BLOCKED", "not_run"]:
+    def _solve_mesh(subdivisions: int) -> tuple[Literal["ACCEPTED", "BLOCKED", "not_run"], Any]:
         if n1_gate != "ACCEPTED":
-            return "not_run"
+            return "not_run", None
         out = solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
-        return isolated_mesh_acceptance_gate(bindings, provider, out)
+        gate = isolated_mesh_acceptance_gate(bindings, provider, out)
+        return gate, build_mesh_level_diagnostic(bindings, provider, out)
 
-    n2_gate = _solve_mesh(2)
-    n4_gate = _solve_mesh(4)
+    n2_gate, n2_diag = _solve_mesh(2)
+    n4_gate, n4_diag = _solve_mesh(4)
+
+    mesh_conv: Literal["PASS", "BLOCKED", "not_run"] = "not_run"
+    if n1_diag and n2_diag and n4_diag:
+        ok, _notes = experimental_mesh_convergence_pass(n1_diag, n2_diag, n4_diag)
+        mesh_conv = "PASS" if ok else "BLOCKED"
+    gates_all = n1_gate == "ACCEPTED" and n2_gate == "ACCEPTED" and n4_gate == "ACCEPTED"
 
     target_met = target_330kw_met_label(
         n1_gate, n1.accepted_run if n1_gate == "ACCEPTED" else None, bindings.target_duty_w
@@ -676,6 +722,15 @@ def run_candidate_mesh_closeout(
         production_mesh_n1=prod_m1,
         production_mesh_n2=prod_m2,
         production_mesh_n4=prod_m4,
+        n1_diagnostic=n1_diag,
+        n2_diagnostic=n2_diag,
+        n4_diagnostic=n4_diag,
+        experimental_mesh_gates_accepted=gates_all,
+        experimental_mesh_convergence_pass=mesh_conv,
+        production_rating_validated=(
+            prod.outcome == "RATING_SUCCESS" if run_production_gate else False
+        ),
+        engineering_fully_accepted=False,
     )
 
 

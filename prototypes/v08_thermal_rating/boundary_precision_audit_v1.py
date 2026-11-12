@@ -52,8 +52,11 @@ class TpPhRoundtripAudit:
     h_ph_j_kg: str
     delta_t_k: str
     delta_h_j_kg: str
-    h_inlet_bound_j_kg: str
-    h_last_face_minus_h_inlet_j_kg: str | None
+    h_authority_cold_inlet_j_kg: str
+    shell_shooting_outlet_enthalpy_j_kg: str | None
+    shell_cold_inlet_face_enthalpy_j_kg: str | None
+    shell_inlet_face_travel_role: str | None
+    inlet_face_minus_authority_j_kg: str | None
 
 
 @dataclass(frozen=True)
@@ -162,8 +165,11 @@ def _shell_inlet_tp_ph_roundtrip(
             h_ph_j_kg=str(h_ph),
             delta_t_k=str(t_ph - t_tp),
             delta_h_j_kg=str(h_ph - h_tp),
-            h_inlet_bound_j_kg=str(h_inlet),
-            h_last_face_minus_h_inlet_j_kg=None,
+            h_authority_cold_inlet_j_kg=str(h_inlet),
+            shell_shooting_outlet_enthalpy_j_kg=None,
+            shell_cold_inlet_face_enthalpy_j_kg=None,
+            shell_inlet_face_travel_role=None,
+            inlet_face_minus_authority_j_kg=None,
         )
     except Exception:
         return None
@@ -227,9 +233,28 @@ def run_boundary_precision_audit(
             blocker = "OUTER_NOT_ACCEPTED"
 
     run_for_face: _MeshRun | None = accepted or solved.best_valid_run
-    if tp_ph is not None and run_for_face is not None and solved.shooting_enthalpy_j_kg:
-        h_face = Decimal(solved.shooting_enthalpy_j_kg)
-        h_in = Decimal(tp_ph.h_inlet_bound_j_kg)
+    if tp_ph is not None and run_for_face is not None:
+        shell_faces = run_for_face.faces_shell
+        outlet_h: str | None = None
+        inlet_h: str | None = None
+        inlet_role: str | None = None
+        if shell_faces:
+            outlet = shell_faces[0]
+            if outlet.travel_role == "OUTLET":
+                outlet_h = str(outlet.enthalpy_j_kg)
+            inlet_face = shell_faces[-1]
+            inlet_role = inlet_face.travel_role
+            if inlet_role == "INLET":
+                inlet_h = str(inlet_face.enthalpy_j_kg)
+            else:
+                inlet_face = next(
+                    (f for f in reversed(shell_faces) if f.travel_role == "INLET"), None
+                )
+                if inlet_face is not None:
+                    inlet_h = str(inlet_face.enthalpy_j_kg)
+                    inlet_role = inlet_face.travel_role
+        auth = Decimal(tp_ph.h_authority_cold_inlet_j_kg)
+        delta_auth = str(Decimal(inlet_h) - auth) if inlet_h is not None else None
         tp_ph = TpPhRoundtripAudit(
             t_tp_k=tp_ph.t_tp_k,
             p_pa=tp_ph.p_pa,
@@ -238,8 +263,11 @@ def run_boundary_precision_audit(
             h_ph_j_kg=tp_ph.h_ph_j_kg,
             delta_t_k=tp_ph.delta_t_k,
             delta_h_j_kg=tp_ph.delta_h_j_kg,
-            h_inlet_bound_j_kg=tp_ph.h_inlet_bound_j_kg,
-            h_last_face_minus_h_inlet_j_kg=str(h_face - h_in),
+            h_authority_cold_inlet_j_kg=tp_ph.h_authority_cold_inlet_j_kg,
+            shell_shooting_outlet_enthalpy_j_kg=outlet_h,
+            shell_cold_inlet_face_enthalpy_j_kg=inlet_h,
+            shell_inlet_face_travel_role=inlet_role,
+            inlet_face_minus_authority_j_kg=delta_auth,
         )
 
     arch: str | None = None
