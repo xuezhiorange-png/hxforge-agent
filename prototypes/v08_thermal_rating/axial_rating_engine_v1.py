@@ -696,12 +696,14 @@ def run_candidate_mesh_closeout(
     prod_m1: str | None = None
     prod_m2: str | None = None
     prod_m4: str | None = None
+    prod_validated = False
     if run_production_gate:
         prod = assess_production_culp_rating(bindings, provider)
         prod_gate = prod.failure_code or prod.outcome
         prod_m1 = prod.mesh_n1_status
         prod_m2 = prod.mesh_n2_status
         prod_m4 = prod.mesh_n4_status
+        prod_validated = prod.outcome == "RATING_SUCCESS"
 
     return CandidateMeshCloseout(
         candidate_id=bindings.rating_request.candidate_id,
@@ -727,9 +729,7 @@ def run_candidate_mesh_closeout(
         n4_diagnostic=n4_diag,
         experimental_mesh_gates_accepted=gates_all,
         experimental_mesh_convergence_pass=mesh_conv,
-        production_rating_validated=(
-            prod.outcome == "RATING_SUCCESS" if run_production_gate else False
-        ),
+        production_rating_validated=prod_validated,
         engineering_fully_accepted=False,
     )
 
