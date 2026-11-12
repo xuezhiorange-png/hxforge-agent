@@ -304,8 +304,14 @@ shards:
     files:
       - tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py
       - tests/exchangers/shell_tube/test_task172_local_runtime.py
+      - tests/exchangers/shell_tube/test_task172_coupled_local_closure_kernel.py
+      - tests/exchangers/shell_tube/test_task172_scalar_two_diagnostics.py
+      - tests/exchangers/shell_tube/test_task172_ulp_polish.py
       - tests/exchangers/shell_tube/test_task173_integrated_rating.py
       - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
+      - tests/exchangers/shell_tube/test_task173_outer_shooting_refine.py
+      - tests/prototypes/test_fatal_cell_identity.py
+      - tests/prototypes/test_true_three_equation_cell_coupling.py
       - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
       - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
     timeout: 600
@@ -526,6 +532,20 @@ shards:
     files:
       - tests/prototypes/test_v08_geometry_candidate_generation.py
     timeout: 3600
+  - name: v08-03-live-thermal-rating
+    job: shard-v08-03-live-thermal-rating
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_thermal_rating.py
+      - tests/prototypes/test_v08_axial_rating_engine.py
+      - tests/prototypes/test_v08_330kw_terminal_mesh_closeout.py
+      - tests/prototypes/test_v08_hydraulic_feasibility.py
+      - tests/prototypes/test_v08_feasible_candidate_thermal_bridge.py
+      - tests/prototypes/test_v08_frozen_candidate_resolve.py
+      - tests/prototypes/test_joint_boundary_value_solver.py
+      - tests/prototypes/test_joint_bvp_wall_closure_e1.py
+      - tests/prototypes/test_float_lattice_bracket.py
+    timeout: 7200
   - name: v07-r27h-candidate-space-extension
     job: shard-v07-r27h-candidate-space-extension
     python: ["3.11", "3.12"]

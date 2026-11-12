@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from collections.abc import Callable
 from contextvars import ContextVar, Token
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from decimal import Decimal, localcontext
 from typing import Any, Literal, cast
 
@@ -48,6 +49,9 @@ from hexagent.exchangers.shell_tube.task172_local_runtime.models import (
     LocalState,
     TopologyBinding,
     mesh_level_identity,
+)
+from hexagent.exchangers.shell_tube.task172_local_runtime.service import (
+    build_validated_local_result_from_verified_trial_triple,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     CandidateRatingRequest,
@@ -379,6 +383,7 @@ REQUIRED_LATER_HEADROOM_LEVELS = 1
 MAX_SUBDIVISIONS_PER_INTERVAL = 64
 LATEST_ACCEPTABLE_CANDIDATE_SUBDIVISIONS = 32
 MAX_HOLE_DYADIC_LEVELS_PER_BRACKET = 12
+MAX_COARSE_HOLE_RECOVERY_STEPS = 32
 MAX_HOLE_RECOVERY_BRACKETS_PER_CELL = 15
 MAX_HOLE_RECOVERY_PROBES_PER_CELL = (
     MAX_HOLE_RECOVERY_BRACKETS_PER_CELL * 2 * MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
@@ -596,6 +601,9 @@ class _Task172NumericalHole(Exception):
         request_hash_replay_passed: bool = False,
         blocked_result_hash_replay_passed: bool = False,
         exact_blocked_result_type: bool = False,
+        task172_request: Task172LocalRequest | CandidateTask172LocalRequest | None = None,
+        task172_blocked_result: Task172BlockedResult | None = None,
+        last_task172_solver_trace: tuple[dict[str, Any], ...] = (),
     ):
         super().__init__("BLOCKED_RESIDUAL_ACCEPTANCE")
         self.request_hash = request_hash
@@ -603,6 +611,9 @@ class _Task172NumericalHole(Exception):
         self.request_hash_replay_passed = request_hash_replay_passed
         self.blocked_result_hash_replay_passed = blocked_result_hash_replay_passed
         self.exact_blocked_result_type = exact_blocked_result_type
+        self.task172_request = task172_request
+        self.task172_blocked_result = task172_blocked_result
+        self.last_task172_solver_trace = last_task172_solver_trace
 
 
 @dataclass(frozen=True)
@@ -640,6 +651,9 @@ class _CellRootTrialReceipt:
     physical_result_hash: str | None = None
     residual_sign: Literal["NEGATIVE", "ZERO", "POSITIVE"] | None = None
     diagnostic_last_iterate_used: Literal[False] = False
+    task172_request_model_dump: dict[str, Any] | None = None
+    task172_blocked_diagnostic_last_iterate: tuple[str, ...] | None = None
+    task172_solver_trace: tuple[dict[str, Any], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -732,6 +746,48 @@ class _CellSearchStats:
         )
 
 
+def _task173_capture_cell_root_diagnostics_enabled() -> bool:
+    return os.environ.get("HXFORGE_TASK173_CAPTURE_CELL_ROOT_DIAGNOSTICS", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _serialize_cell_search_stats(stats: _CellSearchStats) -> dict[str, Any]:
+    """JSON-serializable snapshot for V08-03 blocked-rating exports (diagnostics only)."""
+
+    def receipt_as_json(receipt: _CellRootTrialReceipt) -> dict[str, Any]:
+        payload = asdict(receipt)
+        dump = payload.get("task172_request_model_dump")
+        if dump is not None:
+            payload["task172_request_model_dump"] = dump
+        return payload
+
+    return {
+        "schema_version": "task173.cell-search-stats-export.v1",
+        "task172_local_evaluation_count": stats.task172_local_evaluation_count,
+        "task172_evaluation_wall_seconds": stats.task172_evaluation_wall_seconds,
+        "outer_trial_count": stats.outer_trial_count,
+        "task172_numerical_hole_count": stats.task172_numerical_hole_count,
+        "task172_numerical_hole_counts_by_code": dict(stats.task172_numerical_hole_counts_by_code),
+        "task172_numerical_hole_trials": list(stats.task172_numerical_hole_trials),
+        "maximum_hole_recovery_depth_observed": stats.maximum_hole_recovery_depth_observed,
+        "trial_receipts": [receipt_as_json(item) for item in stats.trial_receipts],
+        "endpoint_hole_summaries": [asdict(item) for item in stats.endpoint_hole_summaries],
+        "endpoint_hole_level_receipts": [
+            asdict(item) for item in stats.endpoint_hole_level_receipts
+        ],
+    }
+
+
+def _task173_cell_search_stats_diagnostics(stats: _CellSearchStats) -> tuple[str, ...]:
+    return (
+        "task173_cell_search_stats_json="
+        + json.dumps(_serialize_cell_search_stats(stats), sort_keys=True, separators=(",", ":")),
+    )
+
+
 @dataclass(frozen=True)
 class _ThermoState:
     native: FluidState
@@ -767,6 +823,9 @@ class _CellTrial:
     blocked_request_hash_replay_passed: bool = False
     blocked_result_hash_replay_passed: bool = False
     exact_blocked_result_type: bool = False
+    task172_request: Task172LocalRequest | CandidateTask172LocalRequest | None = None
+    task172_blocked_result: Task172BlockedResult | None = None
+    last_task172_solver_trace: tuple[dict[str, Any], ...] = ()
 
 
 def _eligible_trial(trial: _CellTrial) -> bool:
@@ -836,6 +895,38 @@ def _accept_cell_root_at_float_precision_floor(
         if abs(trial.residual) <= tolerance:
             return trial.evaluation
     return None
+
+
+def _coarse_both_endpoint_hole_scan(
+    lower: float,
+    upper: float,
+    *,
+    evaluate: Callable[[float], _CellTrial],
+    on_level: Callable[[int], None] | None = None,
+) -> tuple[_CellTrial, _CellTrial] | None:
+    """When both physical endpoints are holes, scan interior q for a valid sign bracket."""
+    span = upper - lower
+    if span <= 0:
+        return None
+    valid: list[_CellTrial] = []
+    for index in range(1, MAX_COARSE_HOLE_RECOVERY_STEPS + 1):
+        if on_level is not None:
+            on_level(MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + index)
+        probe = lower + (index / (MAX_COARSE_HOLE_RECOVERY_STEPS + 1)) * span
+        if probe <= lower or probe >= upper:
+            continue
+        trial = evaluate(probe)
+        if trial.classification == "HARD_BLOCKER":
+            raise _Stage3Failure(trial.failure_code or "BLOCKED_CELL_TASK172_HARD_BLOCKER")
+        if trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+            raise _Stage3Failure(
+                "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                "both-endpoint-hole coarse probe exited property domain",
+            )
+        if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None:
+            valid.append(trial)
+    pairs = _valid_sign_pairs(valid)
+    return pairs[0] if pairs else None
 
 
 def _valid_sign_pairs(trials: list[_CellTrial]) -> list[tuple[_CellTrial, _CellTrial]]:
@@ -910,11 +1001,19 @@ def _dyadic_refine_valid_bracket(
             if probe < hole.q_w:
                 if trial.classification == "TASK172_NUMERICAL_HOLE":
                     left_hole_edge = probe
-                elif trial.classification == "VALID_CELL_EVALUATION":
+                elif (
+                    trial.classification == "VALID_CELL_EVALUATION"
+                    and trial.residual is not None
+                    and trial.residual <= 0
+                ):
                     left_anchor = trial
             elif trial.classification == "TASK172_NUMERICAL_HOLE":
                 right_hole_edge = probe
-            elif trial.classification == "VALID_CELL_EVALUATION":
+            elif (
+                trial.classification == "VALID_CELL_EVALUATION"
+                and trial.residual is not None
+                and trial.residual >= 0
+            ):
                 right_anchor = trial
         samples = [trial for trial in all_trials() if left.q_w <= trial.q_w <= right.q_w]
         eligible = [trial for trial in level_trials if _eligible_trial(trial)]
@@ -974,14 +1073,16 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
         "LOWER_ENDPOINT" if lower_hole else "UPPER_ENDPOINT"
     )
     valid_recovery_samples: list[_CellTrial] = []
-    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
-        if on_level is not None:
-            on_level(level)
-        hole_edge_before = hole_edge
-        anchor_before = anchor
-        probe = (hole_edge + anchor.q_w) / 2.0
-        if probe == hole_edge or probe == anchor.q_w:
-            break
+    dyadic_levels_completed = 0
+
+    def _ingest_endpoint_hole_probe(
+        *,
+        level: int,
+        probe: float,
+        hole_edge_before: float,
+        anchor_before: _CellTrial,
+    ) -> tuple[_CellTrial, _CellTrial, _CellTrial | None] | Literal["CONTINUE", "BREAK"]:
+        nonlocal hole_edge, anchor
         trial = evaluate(probe)
         if trial.classification == "HARD_BLOCKER":
             raise _Stage3Failure(trial.failure_code or "BLOCKED_CELL_TASK172_HARD_BLOCKER")
@@ -1006,7 +1107,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
                         eligible_root_found=False,
                     )
                 )
-            continue
+            return "CONTINUE"
         if trial.classification != "VALID_CELL_EVALUATION" or trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
         valid_recovery_samples.append(trial)
@@ -1051,7 +1152,70 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             record_hole_neighbors(all_trials())
             return sign_pairs[0][0], sign_pairs[0][1], None
         anchor = trial
+        return "CONTINUE"
+
+    for level in range(1, MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + 1):
+        dyadic_levels_completed = level
+        if on_level is not None:
+            on_level(level)
+        hole_edge_before = hole_edge
+        anchor_before = anchor
+        probe = (hole_edge + anchor.q_w) / 2.0
+        if probe == hole_edge or probe == anchor.q_w:
+            break
+        outcome = _ingest_endpoint_hole_probe(
+            level=level,
+            probe=probe,
+            hole_edge_before=hole_edge_before,
+            anchor_before=anchor_before,
+        )
+        if isinstance(outcome, str):
+            if outcome in ("CONTINUE", "BREAK"):
+                pass
+            else:
+                raise ValueError(f"unexpected hole recovery marker: {outcome!r}")
+            continue
+        return outcome
     else:
+        dyadic_levels_completed = MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
+
+    span = anchor.q_w - hole_edge
+    run_coarse_recovery = (
+        span > 0
+        and lower_hole
+        and anchor.residual is not None
+        and anchor.residual > 0
+        and (
+            not valid_recovery_samples
+            or any(
+                sample.residual is not None and sample.residual < 0
+                for sample in valid_recovery_samples
+            )
+        )
+    )
+    if run_coarse_recovery:
+        for index in range(1, MAX_COARSE_HOLE_RECOVERY_STEPS + 1):
+            level = MAX_HOLE_DYADIC_LEVELS_PER_BRACKET + index
+            if on_level is not None:
+                on_level(level)
+            probe = hole_edge + (index / (MAX_COARSE_HOLE_RECOVERY_STEPS + 1)) * span
+            if probe <= hole_edge or probe >= anchor.q_w:
+                continue
+            outcome = _ingest_endpoint_hole_probe(
+                level=level,
+                probe=probe,
+                hole_edge_before=hole_edge,
+                anchor_before=anchor,
+            )
+            if isinstance(outcome, str):
+                if outcome in ("CONTINUE", "BREAK"):
+                    pass
+                else:
+                    raise ValueError(f"unexpected hole recovery marker: {outcome!r}")
+                continue
+            return outcome
+
+    if dyadic_levels_completed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET:
         raise _EndpointHoleRecoveryExhausted(
             endpoint_side=endpoint_side,
             recovery_levels_executed=MAX_HOLE_DYADIC_LEVELS_PER_BRACKET,
@@ -1059,6 +1223,7 @@ def _discover_valid_sign_bracket_from_endpoint_holes(
             sign_pair_found=False,
             eligible_root_found=False,
         )
+
     raise _Stage3Failure(
         "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
         "endpoint-hole recovery stopped before exhausting all authorized levels",
@@ -2243,6 +2408,256 @@ def _preflight_task172_trial(
         raise _Stage3Failure("BLOCKED_NATIVE_SHELL_FLOW_AUTHORITY_PREFLIGHT")
 
 
+def _enthalpy_cell_mean_states_for_q(
+    q_w: float,
+    *,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+) -> tuple[_ThermoState, _ThermoState]:
+    """Task173 enthalpy-midpoint cell-mean states for trial heat duty q (W)."""
+    q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
+        tube_mid_h = (tube_upstream_h + tube_downstream_h) / Decimal(2)
+        shell_mid_h = (shell_left_h + shell_next_h) / Decimal(2)
+    h_min = _effective_h_min_j_kg()
+    h_max = effective_admitted_h_max_j_kg(provider)
+    if tube_downstream_h < h_min or tube_downstream_h > h_max:
+        raise _Stage3Failure(
+            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+            "tube downstream face enthalpy outside admitted domain",
+            str(tube_downstream_h),
+        )
+    if shell_next_h < h_min:
+        raise _LowSideDomainInfeasible
+    if shell_next_h > h_max:
+        raise _Stage3Failure(
+            "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
+            "shell next face enthalpy outside admitted domain",
+            str(shell_next_h),
+        )
+    tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
+    shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
+    return tube_local, shell_local
+
+
+_ENTHALPY_COUPLED_DOMAIN_PENALTY = 1.0e4
+_ENTHALPY_COUPLED_MAX_NFEV = 96
+
+
+def _enthalpy_coupled_wall_temperatures_from_fraction(
+    u1: float,
+    u2: float,
+    *,
+    tube_bulk_k: float,
+    shell_bulk_k: float,
+) -> tuple[float, float] | None:
+    span = tube_bulk_k - shell_bulk_k
+    if span <= 0.0:
+        return None
+    u1c = min(max(float(u1), 0.0), 1.0)
+    u2c = min(max(float(u2), 0.0), 1.0)
+    two = shell_bulk_k + u1c * span
+    twi = two + u2c * max(tube_bulk_k - two, 1e-30)
+    if not (shell_bulk_k <= two <= twi <= tube_bulk_k):
+        return None
+    return twi, two
+
+
+def _attempt_enthalpy_coupled_direct_trf_root(
+    *,
+    support: Any,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+    shell_authority: Any,
+    q_upper: float,
+    q_seed: float,
+) -> _CellEvaluation | None:
+    """Joint (q,u1,u2) closure: enthalpy-linked bulk + signed physical residuals (V08-03)."""
+    import numpy as np
+    from scipy.optimize import least_squares
+
+    from hexagent.exchangers.shell_tube.task172_local_runtime import service as t172
+
+    penalty = _ENTHALPY_COUPLED_DOMAIN_PENALTY
+    if q_upper <= 0.0 or not math.isfinite(q_upper):
+        return None
+    q0 = min(max(float(q_seed), 0.0), float(q_upper))
+    residual_scale = max(abs(q0), 1.0)
+
+    def residual(vec: np.ndarray) -> np.ndarray:
+        q_val, u1_val, u2_val = (float(v) for v in vec)
+        invalid = np.asarray([penalty, penalty, penalty], dtype=float)
+        if q_val < 0.0 or q_val > float(q_upper):
+            return invalid
+        try:
+            tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+                q_val,
+                tube_upstream=tube_upstream,
+                shell_physical_left=shell_physical_left,
+                provider=provider,
+            )
+        except (_Stage3Failure, _LowSideDomainInfeasible):
+            return invalid
+        tube_k = float(tube_local.native.temperature_k)
+        shell_k = float(shell_local.native.temperature_k)
+        wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+            u1_val, u2_val, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+        )
+        if wall is None:
+            return invalid
+        twi_val, two_val = wall
+        request = _task172_request(support, tube_local, shell_local, shell_authority)
+        gate = t172.eval_trial_residual_gate(request, provider, q_val, twi_val, two_val)
+        if gate is None:
+            return invalid
+        signed = gate["residuals_w"]
+        return np.asarray([float(r) / residual_scale for r in signed], dtype=float)
+
+    try:
+        tube_local0, shell_local0 = _enthalpy_cell_mean_states_for_q(
+            q0,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
+    except (_Stage3Failure, _LowSideDomainInfeasible):
+        return None
+    x0 = np.asarray([q0, 0.35, 0.35], dtype=float)
+    lo = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    hi = np.asarray([float(q_upper), 1.0, 1.0], dtype=float)
+    try:
+        opt = least_squares(
+            residual,
+            x0,
+            bounds=(lo, hi),
+            method="trf",
+            ftol=1e-8,
+            xtol=1e-12,
+            max_nfev=_ENTHALPY_COUPLED_MAX_NFEV,
+        )
+    except Exception:
+        return None
+    q_final = float(opt.x[0])
+    u1_final, u2_final = (float(v) for v in opt.x[1:])
+    if not math.isfinite(q_final) or q_final < 0.0 or q_final > float(q_upper):
+        return None
+    try:
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+            q_final,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
+    except (_Stage3Failure, _LowSideDomainInfeasible):
+        return None
+    tube_k = float(tube_local.native.temperature_k)
+    shell_k = float(shell_local.native.temperature_k)
+    wall = _enthalpy_coupled_wall_temperatures_from_fraction(
+        u1_final, u2_final, tube_bulk_k=tube_k, shell_bulk_k=shell_k
+    )
+    if wall is None:
+        return None
+    twi_final, two_final = wall
+    task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
+    task172_outcome = build_validated_local_result_from_verified_trial_triple(
+        task172_request,
+        provider,
+        q_final,
+        twi_final,
+        two_final,
+        polish_nextafter=True,
+    )
+    if type(task172_outcome) is not Task172LocalResult:
+        return None
+    evaluation = _cell_evaluation_from_verified_task172_result(
+        q_final,
+        support=support,
+        tube_upstream=tube_upstream,
+        shell_physical_left=shell_physical_left,
+        provider=provider,
+        task172_request=task172_request,
+        task172_result=task172_outcome,
+    )
+    root_trial = _CellTrial(
+        q_final,
+        "VALID_CELL_EVALUATION",
+        evaluation,
+        _d(q_final) - evaluation.task172_result.signed_q_hot_to_cold_w,
+        task172_request_hash=evaluation.task172_result.request_hash,
+    )
+    if not _eligible_trial(root_trial):
+        return None
+    return evaluation
+
+
+def _cell_evaluation_from_verified_task172_result(
+    q_w: float,
+    *,
+    support: Any,
+    tube_upstream: _ThermoState,
+    shell_physical_left: _ThermoState,
+    provider: PropertyProvider,
+    task172_request: Task172LocalRequest | CandidateTask172LocalRequest,
+    task172_result: Task172LocalResult,
+) -> _CellEvaluation:
+    """Task173 cell receipt using a production-validated Task172 triple (no re-solve)."""
+    q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
+    if q == Decimal(0):
+        tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
+        tube_local = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_local = _reuse_authority_valid_thermo_state(shell_physical_left)
+    else:
+        tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
+        shell_next = _state_from_enthalpy(
+            provider, shell_next_h, shell_search_state=True, side="SHELL"
+        )
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+            q_w,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
+    if (
+        recompute_task172_request_hash(task172_request) != task172_result.request_hash
+        or recompute_task172_result_hash(task172_result) != task172_result.result_hash
+        or task172_result.physical_support_id != recompute_task172_support_id(task172_request)
+        or task172_result.request_hash != recompute_task172_request_hash(task172_request)
+    ):
+        raise _Stage3Failure("BLOCKED_TASK172_LOCAL_IDENTITY_REPLAY")
+    if task172_result.signed_q_hot_to_cold_w < 0:
+        raise _Stage3Failure(
+            "BLOCKED_NEGATIVE_PHYSICAL_HEAT_RATE",
+            str(task172_result.signed_q_hot_to_cold_w),
+        )
+    return _CellEvaluation(
+        q_w=q,
+        tube_downstream=tube_downstream,
+        shell_next_physical=shell_next,
+        tube_local=tube_local,
+        shell_local=shell_local,
+        task172_request=task172_request,
+        task172_result=task172_result,
+    )
+
+
 def _cell_evaluation(
     q_w: float,
     *,
@@ -2253,46 +2668,30 @@ def _cell_evaluation(
     shell_authority: Any,
 ) -> _CellEvaluation:
     q = _d(q_w)
+    with localcontext() as context:
+        context.prec = 70
+        tube_mdot = effective_tube_mass_flow_kg_s()
+        shell_mdot = effective_shell_mass_flow_kg_s()
+        tube_upstream_h = _d(tube_upstream.native.enthalpy_j_kg)
+        shell_left_h = _d(shell_physical_left.native.enthalpy_j_kg)
+        tube_downstream_h = tube_upstream_h - q / tube_mdot
+        shell_next_h = shell_left_h - q / shell_mdot
     if q == Decimal(0):
-        # No thermodynamic state changes at exact zero duty. Preserve the
-        # validated provider snapshots rather than reinterpreting TP output
-        # enthalpy as a new PH input coordinate.
         tube_downstream = _reuse_authority_valid_thermo_state(tube_upstream)
-        tube_local = tube_downstream
         shell_next = _reuse_authority_valid_thermo_state(shell_physical_left)
-        shell_local = shell_next
+        tube_local = _reuse_authority_valid_thermo_state(tube_upstream)
+        shell_local = _reuse_authority_valid_thermo_state(shell_physical_left)
     else:
-        with localcontext() as context:
-            context.prec = 70
-            tube_mdot = effective_tube_mass_flow_kg_s()
-            shell_mdot = effective_shell_mass_flow_kg_s()
-            tube_downstream_h = _d(tube_upstream.native.enthalpy_j_kg) - q / tube_mdot
-            shell_next_h = _d(shell_physical_left.native.enthalpy_j_kg) - q / shell_mdot
-            tube_mid_h = (_d(tube_upstream.native.enthalpy_j_kg) + tube_downstream_h) / Decimal(2)
-            shell_mid_h = (_d(shell_physical_left.native.enthalpy_j_kg) + shell_next_h) / Decimal(2)
-        h_min = _effective_h_min_j_kg()
-        h_max = effective_admitted_h_max_j_kg(provider)
-        if tube_downstream_h < h_min or tube_downstream_h > h_max:
-            raise _Stage3Failure(
-                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-                "tube downstream face enthalpy outside admitted domain",
-                str(tube_downstream_h),
-            )
-        if shell_next_h < h_min:
-            # Search-side feasibility only. No property call is made for this state.
-            raise _LowSideDomainInfeasible
-        if shell_next_h > h_max:
-            raise _Stage3Failure(
-                "BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT",
-                "shell next face enthalpy outside admitted domain",
-                str(shell_next_h),
-            )
         tube_downstream = _state_from_enthalpy(provider, tube_downstream_h, side="TUBE")
         shell_next = _state_from_enthalpy(
             provider, shell_next_h, shell_search_state=True, side="SHELL"
         )
-        tube_local = _state_from_enthalpy(provider, tube_mid_h, side="TUBE")
-        shell_local = _state_from_enthalpy(provider, shell_mid_h, side="SHELL")
+        tube_local, shell_local = _enthalpy_cell_mean_states_for_q(
+            q_w,
+            tube_upstream=tube_upstream,
+            shell_physical_left=shell_physical_left,
+            provider=provider,
+        )
     task172_request = _task172_request(support, tube_local, shell_local, shell_authority)
     _preflight_task172_trial(
         q_w,
@@ -2302,10 +2701,13 @@ def _cell_evaluation(
         shell_authority=shell_authority,
         request=task172_request,
     )
+    solver_trace: list[dict[str, Any]] = []
     if type(task172_request) is CandidateTask172LocalRequest:
-        task172_result = task172_validate_candidate(task172_request, provider)
+        task172_result = task172_validate_candidate(
+            task172_request, provider, solver_trace=solver_trace
+        )
     else:
-        task172_result = task172_validate(task172_request, provider)
+        task172_result = task172_validate(task172_request, provider, solver_trace=solver_trace)
     if type(task172_result) is Task172BlockedResult:
         if task172_result.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE":
             if task172_result.request_hash != recompute_task172_request_hash(
@@ -2314,13 +2716,15 @@ def _cell_evaluation(
                 task172_result
             ):
                 raise _Stage3Failure("BLOCKED_TASK172_BLOCKED_RESULT_IDENTITY_REPLAY")
-            # Do not inspect/use diagnostic_last_iterate: it is not an evaluation of F(q).
             raise _Task172NumericalHole(
                 task172_result.request_hash,
                 task172_result.blocked_result_hash,
                 request_hash_replay_passed=True,
                 blocked_result_hash_replay_passed=True,
                 exact_blocked_result_type=True,
+                task172_request=task172_request,
+                task172_blocked_result=task172_result,
+                last_task172_solver_trace=tuple(solver_trace),
             )
         raise _Stage3Failure(
             "BLOCKED_TASK172_LOCAL_CONSTITUTIVE_CLOSURE",
@@ -2368,15 +2772,23 @@ def _solve_cell(
     shooting_enthalpy: Decimal | None = None,
     capture_diagnostics: bool = False,
 ) -> _CellEvaluation:
+    effective_capture_diagnostics = (
+        capture_diagnostics or _task173_capture_cell_root_diagnostics_enabled()
+    )
     h_tube = _d(tube_upstream.native.enthalpy_j_kg)
     h_shell = _d(shell_physical_left.native.enthalpy_j_kg)
     h_min = _effective_h_min_j_kg()
+    shell_inlet_enthalpy_j_kg = effective_shell_cold_inlet_enthalpy_j_kg()
+    at_outer_low_shooting_enthalpy = (
+        shooting_enthalpy is not None and shooting_enthalpy == shell_inlet_enthalpy_j_kg
+    )
     with localcontext() as context:
         context.prec = 70
         tube_capacity = effective_tube_mass_flow_kg_s() * (h_tube - h_min)
         shell_capacity = effective_shell_mass_flow_kg_s() * (h_shell - h_min)
     if tube_capacity < 0 or shell_capacity < 0:
         raise _Stage3Failure("BLOCKED_LOCAL_STATE_RECONSTRUCTION_DOMAIN_EXIT")
+    cap_thermo_w = min(tube_capacity, shell_capacity)
 
     stats = search_stats if search_stats is not None else _CellSearchStats()
     neighborhoods = hole_neighborhoods if hole_neighborhoods is not None else []
@@ -2423,6 +2835,11 @@ def _solve_cell(
             f"wall_interface_id={support.wall_interface_id}",
             f"outer_iteration={outer_value}",
             f"shooting_enthalpy_j_kg={shooting_value}",
+            f"shell_inlet_enthalpy_j_kg={shell_inlet_enthalpy_j_kg}",
+            f"h_min_j_kg={h_min}",
+            f"tube_capacity_w={tube_capacity}",
+            f"shell_capacity_w={shell_capacity}",
+            f"thermodynamic_cap_w={cap_thermo_w}",
             f"left_q_w={left_q}",
             f"right_q_w={right_q}",
             f"left_f_q_w={left_f}",
@@ -2460,6 +2877,18 @@ def _solve_cell(
         result_id = getattr(result, "result_id", None)
         result_hash = getattr(result, "result_hash", None)
         result_q = getattr(result, "signed_q_hot_to_cold_w", None)
+        blocked = trial.task172_blocked_result
+        request_dump: dict[str, Any] | None = None
+        blocked_diag: tuple[str, ...] | None = None
+        task172_trace: tuple[dict[str, Any], ...] | None = None
+        if trial.classification == "TASK172_NUMERICAL_HOLE" and trial.task172_request is not None:
+            try:
+                request_dump = trial.task172_request.model_dump(mode="json")
+            except Exception:
+                request_dump = None
+            if blocked is not None:
+                blocked_diag = blocked.diagnostic_last_iterate
+            task172_trace = trial.last_task172_solver_trace
         receipt = _CellRootTrialReceipt(
             mesh_subdivisions=mesh_subdivisions,
             physical_support_id=support.physical_segment_id,
@@ -2517,6 +2946,9 @@ def _solve_cell(
             physical_result_hash=result_hash,
             residual_sign=residual_sign,
             diagnostic_last_iterate_used=False,
+            task172_request_model_dump=request_dump,
+            task172_blocked_diagnostic_last_iterate=blocked_diag,
+            task172_solver_trace=task172_trace,
         )
         stats.trial_receipts.append(receipt)
         cell_trial_sequence_index += 1
@@ -2609,6 +3041,9 @@ def _solve_cell(
                     blocked_request_hash_replay_passed=exc.request_hash_replay_passed,
                     blocked_result_hash_replay_passed=exc.blocked_result_hash_replay_passed,
                     exact_blocked_result_type=exc.exact_blocked_result_type,
+                    task172_request=exc.task172_request,
+                    task172_blocked_result=exc.task172_blocked_result,
+                    last_task172_solver_trace=exc.last_task172_solver_trace,
                 )
             except _LowSideDomainInfeasible:
                 stats.record_evaluation(time.perf_counter() - eval_t0)
@@ -2616,7 +3051,7 @@ def _solve_cell(
             except _Stage3Failure as exc:
                 stats.record_evaluation(time.perf_counter() - eval_t0)
                 trials[q] = _CellTrial(q, "HARD_BLOCKER", failure_code=exc.code)
-                if capture_diagnostics:
+                if effective_capture_diagnostics:
                     append_trial_receipt(q, trials[q], search_phase or active_search_phase)
                 raise
             else:
@@ -2634,7 +3069,7 @@ def _solve_cell(
                         None,
                     ),
                 )
-            if capture_diagnostics:
+            if effective_capture_diagnostics:
                 append_trial_receipt(q, trials[q], search_phase or active_search_phase)
         return trials[q]
 
@@ -2717,6 +3152,18 @@ def _solve_cell(
     cap = min(tube_capacity, shell_capacity)
     if cap <= 0:
         if lower_is_hole:
+            # Outer-boundary low shooting: shell face enthalpy equals cold inlet;
+            # shell-side thermodynamic capacity to cold floor is exactly zero.
+            # Treat q=0 numerical Task172 holes here as search-side infeasibility so
+            # the outer bisection can advance (V08-03), not as a hard cell bracket stop.
+            if (
+                at_outer_low_shooting_enthalpy
+                and shell_capacity == 0
+                and tube_capacity > 0
+                and h_shell == shell_inlet_enthalpy_j_kg
+                and h_shell == h_min
+            ):
+                raise _LowSideDomainInfeasible
             raise _Stage3Failure(
                 "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
                 "no positive-width valid q interval remains after lower-endpoint hole",
@@ -2755,7 +3202,57 @@ def _solve_cell(
     active_search_phase = "PHYSICAL_UPPER_ENDPOINT"
     upper_trial = evaluate(upper)
     upper_is_hole = upper_trial.classification == "TASK172_NUMERICAL_HOLE"
-    if lower_is_hole or upper_is_hole:
+    if lower_is_hole and upper_is_hole:
+        begin_hole_recovery()
+        active_search_phase = "BOTH_ENDPOINT_HOLE_COARSE"
+        recovered = _coarse_both_endpoint_hole_scan(
+            lower,
+            upper,
+            evaluate=lambda q: recovery_evaluate(q, "BOTH_ENDPOINT_HOLE_COARSE"),
+            on_level=set_search_level,
+        )
+        if recovered is None:
+            valid_in_interval = [
+                trial
+                for trial in trials.values()
+                if trial.classification == "VALID_CELL_EVALUATION" and trial.residual is not None
+            ]
+            if valid_in_interval and all(
+                trial.residual is not None and trial.residual > 0 for trial in valid_in_interval
+            ):
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_CONSTITUTIVE_BRACKET_NOT_ESTABLISHED",
+                    "both endpoints are numerical holes; interior valid probes share one sign",
+                )
+            if valid_in_interval and all(
+                trial.residual is not None and trial.residual < 0 for trial in valid_in_interval
+            ):
+                coupled_root = _attempt_enthalpy_coupled_direct_trf_root(
+                    support=support,
+                    tube_upstream=tube_upstream,
+                    shell_physical_left=shell_physical_left,
+                    provider=provider,
+                    shell_authority=shell_authority,
+                    q_upper=float(upper),
+                    q_seed=float(upper) * 0.92,
+                )
+                if coupled_root is not None:
+                    record_hole_neighbors(list(trials.values()))
+                    return coupled_root
+                raise _Stage3Failure(
+                    "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                    "both endpoints are numerical holes; interior valid F(q) share one sign",
+                    "endpoint_low_side_classification_not_applicable",
+                    f"interior_valid_sample_count={len(valid_in_interval)}",
+                    "enthalpy_coupled_direct_trf_root=BLOCKED",
+                )
+            raise _Stage3Failure(
+                "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED",
+                "both physical endpoints are numerical holes; no valid sign anchor exists",
+            )
+        lower_trial, upper_trial = recovered
+        record_hole_neighbors(list(trials.values()))
+    elif lower_is_hole or upper_is_hole:
         current_left_trial, current_right_trial = lower_trial, upper_trial
         hole_endpoint_side: Literal["LOWER_ENDPOINT", "UPPER_ENDPOINT"] = (
             "LOWER_ENDPOINT" if lower_is_hole else "UPPER_ENDPOINT"
@@ -2764,7 +3261,7 @@ def _solve_cell(
         anchor_trial = upper_trial if lower_is_hole else lower_trial
         if anchor_trial.evaluation is None or anchor_trial.residual is None:
             raise _Stage3Failure("BLOCKED_CELL_VALID_POINT_BRACKET_SIGN_INVALID")
-        if capture_diagnostics:
+        if effective_capture_diagnostics:
             stats.endpoint_hole_summaries.append(
                 _EndpointHoleSummary(
                     mesh_subdivisions=mesh_subdivisions,
@@ -2797,7 +3294,9 @@ def _solve_cell(
                 all_trials=lambda: list(trials.values()),
                 record_hole_neighbors=record_hole_neighbors,
                 on_level=set_search_level,
-                on_recovery_level=(record_endpoint_recovery_level if capture_diagnostics else None),
+                on_recovery_level=(
+                    record_endpoint_recovery_level if effective_capture_diagnostics else None
+                ),
             )
         except _EndpointHoleRecoveryExhausted as exhausted:
             record_hole_neighbors(list(trials.values()))
@@ -2814,25 +3313,53 @@ def _solve_cell(
                 and len(upper_trial.task172_request_hash) == 64
                 and len(upper_trial.blocked_result_hash) == 64
             )
+            lower_endpoint_is_replayed_residual_hole = (
+                lower_is_hole
+                and lower_trial.q_w == lower
+                and lower_trial.classification == "TASK172_NUMERICAL_HOLE"
+                and lower_trial.failure_code == "BLOCKED_RESIDUAL_ACCEPTANCE"
+                and lower_trial.exact_blocked_result_type
+                and lower_trial.blocked_request_hash_replay_passed
+                and lower_trial.blocked_result_hash_replay_passed
+                and lower_trial.task172_request_hash is not None
+                and lower_trial.blocked_result_hash is not None
+                and len(lower_trial.task172_request_hash) == 64
+                and len(lower_trial.blocked_result_hash) == 64
+            )
+            anchor_initial_f_negative = (
+                anchor_trial.residual is not None and anchor_trial.residual < 0
+            )
             no_prior_low_side_probe = not any(
                 trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE" for trial in trials.values()
             )
             no_hard_blocker = not any(
                 trial.classification == "HARD_BLOCKER" for trial in trials.values()
             )
-            if (
-                exhausted.endpoint_side == "UPPER_ENDPOINT"
-                and hole_endpoint_side == "UPPER_ENDPOINT"
-                and upper_endpoint_is_replayed_residual_hole
-                and shell_capacity <= tube_capacity
-                and upper_trial.q_w == upper
-                and exhausted.recovery_levels_executed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
+            recovery_exhaustion_common = (
+                exhausted.recovery_levels_executed == MAX_HOLE_DYADIC_LEVELS_PER_BRACKET
                 and exhausted.valid_sample_count > 0
                 and exhausted.all_valid_residuals_negative
                 and not exhausted.sign_pair_found
                 and not exhausted.eligible_root_found
                 and no_prior_low_side_probe
                 and no_hard_blocker
+                and shell_capacity <= tube_capacity
+            )
+            if (
+                exhausted.endpoint_side == "UPPER_ENDPOINT"
+                and hole_endpoint_side == "UPPER_ENDPOINT"
+                and upper_endpoint_is_replayed_residual_hole
+                and upper_trial.q_w == upper
+                and recovery_exhaustion_common
+            ):
+                raise _LowSideDomainInfeasible from None
+            if (
+                exhausted.endpoint_side == "LOWER_ENDPOINT"
+                and hole_endpoint_side == "LOWER_ENDPOINT"
+                and lower_endpoint_is_replayed_residual_hole
+                and lower_trial.q_w == lower
+                and anchor_initial_f_negative
+                and recovery_exhaustion_common
             ):
                 raise _LowSideDomainInfeasible from None
             raise
@@ -3418,6 +3945,8 @@ def _outer_trial(
     shell_authority: Any,
     iterations: int,
     search_stats: _CellSearchStats | None = None,
+    *,
+    capture_diagnostics: bool = False,
 ) -> _OuterTrial:
     if search_stats is not None:
         search_stats.record_outer_trial()
@@ -3429,6 +3958,7 @@ def _outer_trial(
             shell_authority,
             iterations,
             search_stats,
+            capture_diagnostics=capture_diagnostics,
         )
     except _LowSideDomainInfeasible:
         # Search classification only: never return a partial trajectory as a result.
@@ -3460,6 +3990,77 @@ def _terminal_tolerance_pass(run: _MeshRun) -> bool:
     return Decimal(0) <= residual_t <= allowed_t and Decimal(0) <= residual_h <= allowed_h
 
 
+def _binary64_enthalpy_step_toward(h_high: Decimal, h_low: Decimal) -> Decimal | None:
+    """One representable binary64 enthalpy step from h_high toward h_low (V08-03)."""
+    f_lo = float(h_low)
+    f_hi = float(h_high)
+    if not (f_hi > f_lo):
+        return None
+    f_step = math.nextafter(f_hi, f_lo)
+    if f_step <= f_lo or f_step >= f_hi:
+        return None
+    stepped = Decimal(str(f_step))
+    if stepped <= h_low or stepped >= h_high:
+        return None
+    return stepped
+
+
+def _outer_shooting_residual_plateau_evidence(
+    h_low: Decimal,
+    h_high: Decimal,
+    trial_at: Callable[[Decimal, int], _OuterTrial],
+    iteration: int,
+    *,
+    max_probes: int = 32,
+) -> tuple[str, ...]:
+    """Adjacent binary64 enthalpy probes when outer bisection collapses (diagnostics only)."""
+    f_lo = float(h_low)
+    f_hi = float(h_high)
+    residuals: list[str] = []
+    enthalpies: list[str] = []
+    f_probe = f_hi
+    for _ in range(max_probes):
+        f_probe = math.nextafter(f_probe, f_lo)
+        if f_probe <= f_lo:
+            break
+        probe_h = Decimal(str(f_probe))
+        if probe_h <= h_low or probe_h >= h_high:
+            continue
+        trial = trial_at(probe_h, iteration)
+        if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
+            continue
+        enthalpies.append(format(f_probe, ".17g"))
+        enthalpies.append(float(f_probe).hex())
+        residuals.append(str(trial.mesh_run.observables.terminal_boundary_residual_k))
+    unique_residuals = sorted({value for value in residuals})
+    return (
+        f"float_h_low={f_lo:.17g}",
+        f"float_h_high={f_hi:.17g}",
+        f"float_h_high_hex={float(f_hi).hex()}",
+        f"adjacent_probe_count={len(residuals)}",
+        f"plateau_unique_residual_k_count={len(unique_residuals)}",
+        f"plateau_residual_k_sample={unique_residuals[:8]}",
+        f"plateau_enthalpy_probe_sample={enthalpies[:6]}",
+    )
+
+
+def _apply_valid_outer_trial_update(
+    *,
+    h_mid: Decimal,
+    trial: _OuterTrial,
+    seen_low: list[Decimal],
+    seen_valid: list[Decimal],
+) -> _MeshRun:
+    _assert_outer_classification_order(seen_low, seen_valid, h_mid, trial.classification)
+    if (
+        trial.mesh_run is None
+        or trial.mesh_run.observables.terminal_boundary_residual_j_kg < 0
+        or trial.mesh_run.observables.terminal_boundary_residual_k < 0
+    ):
+        raise _Stage3Failure("BLOCKED_VALID_TRAJECTORY_NEGATIVE_RESIDUAL")
+    return trial.mesh_run
+
+
 def _assert_outer_classification_order(
     seen_low: list[Decimal],
     seen_valid: list[Decimal],
@@ -3488,11 +4089,28 @@ def _solve_outer_boundary(
     shell_authority: Any,
     search_stats: _CellSearchStats | None = None,
 ) -> _MeshRun:
+    capture = _CANDIDATE_RATING_CONTEXT.get() is not None and (
+        _task173_capture_cell_root_diagnostics_enabled()
+    )
+
     def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
         if search_stats is None:
-            return _outer_trial(subdivisions, enthalpy, provider, shell_authority, iteration)
+            return _outer_trial(
+                subdivisions,
+                enthalpy,
+                provider,
+                shell_authority,
+                iteration,
+                capture_diagnostics=capture,
+            )
         return _outer_trial(
-            subdivisions, enthalpy, provider, shell_authority, iteration, search_stats
+            subdivisions,
+            enthalpy,
+            provider,
+            shell_authority,
+            iteration,
+            search_stats,
+            capture_diagnostics=capture,
         )
 
     return _solve_outer_boundary_from_trial(trial_at, provider=provider)
@@ -3560,7 +4178,9 @@ def _solve_outer_boundary_from_trial(
         with localcontext() as context:
             context.prec = 80
             h_mid = (h_low + h_high) / Decimal(2)
-        if h_mid in (h_low, h_high) or float(h_mid) in (float(h_low), float(h_high)):
+        decimal_collapsed = h_mid in (h_low, h_high)
+        float_collapsed = float(h_mid) in (float(h_low), float(h_high))
+        if decimal_collapsed or float_collapsed:
             shell_inlet_t = effective_shell_inlet_temperature_k()
             temp_floor = Decimal(
                 str(
@@ -3571,6 +4191,37 @@ def _solve_outer_boundary_from_trial(
             )
             if _terminal_tolerance_pass(high_run):
                 return high_run
+            if float_collapsed and not decimal_collapsed:
+                stepped = _binary64_enthalpy_step_toward(h_high, h_low)
+                if stepped is not None:
+                    iterations += 1
+                    step_trial = trial_at(stepped, iterations)
+                    if step_trial.classification == "HARD_BLOCKER":
+                        raise _Stage3Failure(*step_trial.diagnostics)
+                    if step_trial.classification == "LOW_SIDE_DOMAIN_INFEASIBLE":
+                        _assert_outer_classification_order(
+                            seen_low, seen_valid, stepped, step_trial.classification
+                        )
+                        h_low = stepped
+                        seen_low.append(stepped)
+                        continue
+                    if (
+                        step_trial.classification == "VALID_TRAJECTORY"
+                        and step_trial.mesh_run is not None
+                    ):
+                        high_run = _apply_valid_outer_trial_update(
+                            h_mid=stepped,
+                            trial=step_trial,
+                            seen_low=seen_low,
+                            seen_valid=seen_valid,
+                        )
+                        h_high = stepped
+                        seen_valid.append(stepped)
+                        if _terminal_tolerance_pass(high_run):
+                            return high_run
+                        continue
+            enthalpy_ulp = Decimal(str(math.ulp(float(h_high))))
+            plateau = _outer_shooting_residual_plateau_evidence(h_low, h_high, trial_at, iterations)
             if (
                 high_run.observables.terminal_boundary_residual_k - temp_floor
                 > TERMINAL_TOLERANCE_K
@@ -3578,11 +4229,20 @@ def _solve_outer_boundary_from_trial(
                 raise _Stage3Failure(
                     "BLOCKED_OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
                     f"terminal_residual_k={high_run.observables.terminal_boundary_residual_k}",
+                    f"terminal_residual_j_kg={high_run.observables.terminal_boundary_residual_j_kg}",
+                    f"temperature_ulp_floor_k={temp_floor}",
+                    f"enthalpy_ulp_floor_j_kg={enthalpy_ulp}",
+                    f"h_low={h_low}",
+                    f"h_high={h_high}",
+                    f"decimal_collapsed={decimal_collapsed}",
+                    f"float_collapsed={float_collapsed}",
+                    *plateau,
                 )
             raise _Stage3Failure(
                 "PRECISION_FLOOR_UNRESOLVED",
                 "OUTER_BOUNDARY_PRECISION_FLOOR_REACHED",
                 f"terminal_residual_k={high_run.observables.terminal_boundary_residual_k}",
+                *plateau,
             )
         iterations += 1
         trial = trial_at(h_mid, iterations)
@@ -3595,15 +4255,14 @@ def _solve_outer_boundary_from_trial(
             continue
         if trial.classification != "VALID_TRAJECTORY" or trial.mesh_run is None:
             raise _Stage3Failure("BLOCKED_OUTER_TRIAL_CLASSIFICATION_INVALID")
-        _assert_outer_classification_order(seen_low, seen_valid, h_mid, trial.classification)
-        if (
-            trial.mesh_run.observables.terminal_boundary_residual_j_kg < 0
-            or trial.mesh_run.observables.terminal_boundary_residual_k < 0
-        ):
-            raise _Stage3Failure("BLOCKED_VALID_TRAJECTORY_NEGATIVE_RESIDUAL")
+        high_run = _apply_valid_outer_trial_update(
+            h_mid=h_mid,
+            trial=trial,
+            seen_low=seen_low,
+            seen_valid=seen_valid,
+        )
         h_high = h_mid
         seen_valid.append(h_mid)
-        high_run = trial.mesh_run
         if _terminal_tolerance_pass(high_run):
             return high_run
     raise _Stage3Failure(
@@ -3707,6 +4366,7 @@ def _candidate_transient_outer_boundary(
     certificate_hashes: list[str] = []
     certificate_projections: list[dict[str, Any]] = []
     outer_actions: list[str] = []
+    capture = _task173_capture_cell_root_diagnostics_enabled()
 
     def branch_trial(
         enthalpy: Decimal, iteration: int, side: Literal["LEFT_BRANCH", "RIGHT_BRANCH"]
@@ -3726,6 +4386,7 @@ def _candidate_transient_outer_boundary(
                 shell_authority,
                 iteration,
                 search_stats,
+                capture_diagnostics=capture,
             )
         finally:
             _CANDIDATE_TRANSIENT_CONTROL.reset(token)
@@ -3748,6 +4409,7 @@ def _candidate_transient_outer_boundary(
                 shell_authority,
                 iteration,
                 search_stats,
+                capture_diagnostics=capture,
             )
         except _ProviderQuantizationTrigger as trigger:
             native = None
@@ -3906,6 +4568,7 @@ def _candidate_transient_outer_boundary(
             shell_authority,
             selected.bisection_iterations,
             search_stats,
+            capture_diagnostics=capture,
         )
     finally:
         _CANDIDATE_TRANSIENT_CONTROL.reset(token)
@@ -4158,9 +4821,15 @@ def _run_mesh_sequence(
                     ),
                 }
             )
+            extra: tuple[str, ...] = ()
+            if _task173_capture_cell_root_diagnostics_enabled() and not any(
+                item.startswith("task173_cell_search_stats_json=") for item in exc.diagnostics
+            ):
+                extra = _task173_cell_search_stats_diagnostics(search_stats)
             raise _Stage3Failure(
                 exc.code,
                 *exc.diagnostics,
+                *extra,
                 "task172_numerical_hole_count_by_mesh="
                 + json.dumps(search_summaries, sort_keys=True, separators=(",", ":")),
                 f"mesh_subdivisions={subdivisions}",
@@ -4686,9 +5355,16 @@ def validate_candidate_rating(
             "BLOCKED_TASK173_CANDIDATE_REQUEST_SCHEMA_INVALID", (str(exc),), request_hash
         )
     except _Stage3Failure as exc:
+        diag = tuple(exc.diagnostics)
+        if _task173_capture_cell_root_diagnostics_enabled():
+            diag = tuple(
+                item
+                for item in diag
+                if not item.startswith("task172_numerical_hole_count_by_mesh=")
+            )
         return _blocked(
             exc.code,
-            tuple(exc.diagnostics),
+            diag,
             request_hash,
             failed_mesh=next(
                 (

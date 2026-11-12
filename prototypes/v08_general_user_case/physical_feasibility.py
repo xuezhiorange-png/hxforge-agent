@@ -26,7 +26,8 @@ from prototypes.v08_general_user_case.envelope import (
 from prototypes.v08_general_user_case.errors import V08ValidationCode, V08ValidationIssue
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
 
-_THERMODYNAMIC_DUTY_TOLERANCE = Decimal("1.0001")
+# Rated duty at or above target / THERMODYNAMIC_DUTY_TOLERANCE counts as meeting target (same envelope as feasibility).
+THERMODYNAMIC_DUTY_TOLERANCE = Decimal("1.0001")
 
 
 @dataclass(frozen=True)
@@ -243,7 +244,7 @@ def assess_physical_feasibility(
                         thermodynamic_max_duty_w=str(thermo_max),
                     )
                 )
-            elif case.target_duty_w > thermo_max * _THERMODYNAMIC_DUTY_TOLERANCE:
+            elif case.target_duty_w > thermo_max * THERMODYNAMIC_DUTY_TOLERANCE:
                 issues.append(
                     _issue(
                         V08ValidationCode.THERMODYNAMICALLY_INFEASIBLE,

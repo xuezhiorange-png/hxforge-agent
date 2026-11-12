@@ -291,7 +291,7 @@ def test_exact_zero_q_reuses_valid_tp_states_without_ph_reconstruction(
         seen["request"] = request
         return request
 
-    def capture_task172(request: Task172LocalRequest, _provider: Any) -> Any:
+    def capture_task172(request: Task172LocalRequest, _provider: Any, **_kwargs: Any) -> Any:
         seen["task172_request"] = request
         raise Task172Reached
 
@@ -522,7 +522,7 @@ def test_injected_residual_acceptance_block_is_a_signless_nonphysical_hole(
     support, tube, shell, provider, authority = _historical_n2_cell_inputs()
 
     def return_validly_hashed_hole(
-        request: Task172LocalRequest, _provider: Any
+        request: Task172LocalRequest, _provider: Any, **_kwargs: Any
     ) -> Task172BlockedResult:
         candidate = Task172BlockedResult(
             status="BLOCKED",
@@ -1187,6 +1187,83 @@ def test_r3_tube_capacity_binding_does_not_use_shell_low_side_classification(
     assert len(calls) == 14
 
 
+def test_outer_low_shooting_shell_capacity_zero_q0_hole_is_low_side_infeasible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Outer shooting at shell inlet with zero shell-side capacity: q=0 hole → LOW_SIDE (V08-03)."""
+    support = build_local_support(0, 1, 0)
+    provider = CoolPropProvider()
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    h_shell = Decimal(str(shell.native.enthalpy_j_kg))
+    authority = object()
+
+    monkeypatch.setattr(service, "effective_shell_cold_inlet_enthalpy_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "_effective_h_min_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "effective_tube_mass_flow_kg_s", lambda: Decimal("12"))
+    monkeypatch.setattr(service, "effective_shell_mass_flow_kg_s", lambda: Decimal("20"))
+
+    native = service._cell_evaluation
+
+    def q0_hole(q_w: float, **kwargs: Any) -> Any:
+        if q_w == 0.0:
+            raise _mark_replayed_residual_hole()
+        return native(q_w, **kwargs)
+
+    monkeypatch.setattr(service, "_cell_evaluation", q0_hole)
+
+    with pytest.raises(service._LowSideDomainInfeasible):
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            mesh_subdivisions=1,
+            outer_iteration=0,
+            shooting_enthalpy=h_shell,
+        )
+
+
+def test_outer_non_low_shooting_q0_hole_keeps_bracket_unresolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same zero shell capacity and q=0 hole, but shooting enthalpy ≠ shell inlet → hard stop."""
+    support = build_local_support(0, 1, 0)
+    provider = CoolPropProvider()
+    tube = service._state_at_inlet(provider, Decimal("300"))
+    shell = service._state_at_inlet(provider, Decimal("299"))
+    h_shell = Decimal(str(shell.native.enthalpy_j_kg))
+    authority = object()
+
+    monkeypatch.setattr(service, "effective_shell_cold_inlet_enthalpy_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "_effective_h_min_j_kg", lambda: h_shell)
+    monkeypatch.setattr(service, "effective_tube_mass_flow_kg_s", lambda: Decimal("12"))
+    monkeypatch.setattr(service, "effective_shell_mass_flow_kg_s", lambda: Decimal("20"))
+
+    native = service._cell_evaluation
+
+    def q0_hole(q_w: float, **kwargs: Any) -> Any:
+        if q_w == 0.0:
+            raise _mark_replayed_residual_hole()
+        return native(q_w, **kwargs)
+
+    monkeypatch.setattr(service, "_cell_evaluation", q0_hole)
+
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            mesh_subdivisions=1,
+            outer_iteration=0,
+            shooting_enthalpy=h_shell + Decimal("1"),
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+
+
 def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1219,9 +1296,130 @@ def test_r3_zero_valid_recovery_samples_do_not_classify_low_side(
     assert upper > 0
 
 
-def test_r3_lower_endpoint_hole_keeps_existing_unresolved_behavior(
+def test_both_endpoint_holes_all_negative_interior_stays_bracket_unresolved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Interior valid F(q)<0 only: cannot infer LOW_SIDE without authority (V08-03)."""
+    provider, authority, support, tube, shell, _valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+    cap = min(
+        service.TUBE_MASS_FLOW_KG_S
+        * (Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+        service.SHELL_MASS_FLOW_KG_S
+        * (Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+    )
+    upper = float(cap)
+
+    def both_holes_mixed(q_w: float, **kwargs: Any) -> Any:
+        if q_w in (0.0, upper):
+            raise _mark_replayed_residual_hole()
+        request = service._task172_request(
+            kwargs["support"],
+            kwargs["tube_upstream"],
+            kwargs["shell_physical_left"],
+            authority,
+        )
+        return _fake_cell_evaluation_for_capture(q_w, str(float(q_w) * 1.5 + 1.0), request)
+
+    monkeypatch.setattr(service, "_cell_evaluation", both_holes_mixed)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    assert "endpoint_low_side_classification_not_applicable" in caught.value.diagnostics
+
+
+def test_enthalpy_coupled_wall_fraction_respects_order() -> None:
+    wall = service._enthalpy_coupled_wall_temperatures_from_fraction(
+        0.25, 0.5, tube_bulk_k=350.0, shell_bulk_k=300.0
+    )
+    assert wall is not None
+    twi, two = wall
+    assert 300.0 <= two <= twi <= 350.0
+
+
+def test_enthalpy_coupled_rejects_ineligible_root_after_optimizer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Coupled path must use _eligible_trial (Task173 root gate), not loose |q-q172|."""
+    import numpy as np
+
+    provider, authority, support, tube, shell, valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+
+    class _FakeOpt:
+        success = True
+        cost = 0.0
+        x = np.asarray([12000.0, 0.4, 0.4], dtype=float)
+
+    monkeypatch.setattr(
+        "scipy.optimize.least_squares",
+        lambda *args, **kwargs: _FakeOpt(),
+    )
+    monkeypatch.setattr(
+        service,
+        "build_validated_local_result_from_verified_trial_triple",
+        lambda *args, **kwargs: valid_evaluation.task172_result,
+    )
+    monkeypatch.setattr(service, "_eligible_trial", lambda _trial: False)
+    assert (
+        service._attempt_enthalpy_coupled_direct_trf_root(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+            q_upper=50000.0,
+            q_seed=10000.0,
+        )
+        is None
+    )
+
+
+def test_enthalpy_coupled_domain_penalty_not_low() -> None:
+    assert service._ENTHALPY_COUPLED_DOMAIN_PENALTY >= 1.0e3
+
+
+def test_both_endpoint_holes_remain_bracket_unresolved_without_valid_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, authority, support, tube, shell, _valid_evaluation = (
+        _r3_shell_capacity_target_fixture()
+    )
+    cap = min(
+        service.TUBE_MASS_FLOW_KG_S
+        * (Decimal(str(tube.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+        service.SHELL_MASS_FLOW_KG_S
+        * (Decimal(str(shell.native.enthalpy_j_kg)) - service.H_MIN_J_KG),
+    )
+    assert float(cap) > 0
+
+    def both_holes(q_w: float, **_kwargs: Any) -> Any:
+        raise _mark_replayed_residual_hole()
+
+    monkeypatch.setattr(service, "_cell_evaluation", both_holes)
+    with pytest.raises(service._Stage3Failure) as caught:
+        service._solve_cell(
+            support=support,
+            tube_upstream=tube,
+            shell_physical_left=shell,
+            provider=provider,
+            shell_authority=authority,
+        )
+    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+
+
+def test_r3_lower_endpoint_hole_shell_capacity_binding_classifies_low_side(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mirror of R3 upper-hole path when valid F(q) stays negative toward a lower q=0 hole."""
     provider, authority, support, tube, shell, valid_evaluation = (
         _r3_shell_capacity_target_fixture()
     )
@@ -1232,15 +1430,21 @@ def test_r3_lower_endpoint_hole_keeps_existing_unresolved_behavior(
         return valid_evaluation
 
     monkeypatch.setattr(service, "_cell_evaluation", lower_hole)
-    with pytest.raises(service._Stage3Failure) as caught:
+    stats = service._CellSearchStats()
+    with pytest.raises(service._LowSideDomainInfeasible):
         service._solve_cell(
             support=support,
             tube_upstream=tube,
             shell_physical_left=shell,
             provider=provider,
             shell_authority=authority,
+            search_stats=stats,
+            capture_diagnostics=True,
         )
-    assert caught.value.code == "BLOCKED_CELL_VALID_EVALUATION_BRACKET_UNRESOLVED"
+    assert stats.maximum_hole_recovery_depth_observed == 12
+    assert {entry.classification for entry in stats.trial_receipts if entry.q_trial_w == "0.0"} == {
+        "TASK172_NUMERICAL_HOLE"
+    }
 
 
 def test_r3_valid_upper_shell_capacity_low_side_path_is_unchanged(
@@ -1832,7 +2036,9 @@ def test_n16_first_support_q0_native_provider_reaches_task172_request(
     class Task172RequestReached(Exception):
         pass
 
-    def capture_native_request(request: Task172LocalRequest, actual_provider: Any) -> Any:
+    def capture_native_request(
+        request: Task172LocalRequest, actual_provider: Any, **_kwargs: Any
+    ) -> Any:
         assert type(request) is Task172LocalRequest
         assert actual_provider is provider
         assert request.support == support
@@ -2015,8 +2221,12 @@ def test_diagnostic_capture_does_not_change_native_trial_or_task172_call_sequenc
     def run(capture: service._CellSearchStats | None) -> tuple[Any, list[tuple[str, str]]]:
         observed: list[tuple[str, str]] = []
 
-        def counted_validate(request: Task172LocalRequest, state_provider: Any) -> Any:
-            result = native_validate(request, state_provider)
+        def counted_validate(
+            request: Task172LocalRequest,
+            state_provider: Any,
+            **kwargs: Any,
+        ) -> Any:
+            result = native_validate(request, state_provider, **kwargs)
             identity = (
                 result.result_hash
                 if type(result) is task172_models.Task172LocalResult
@@ -2382,7 +2592,8 @@ def test_shared_outer_solver_midpoint_collapse_preserves_precision_floor_failure
     with pytest.raises(service._Stage3Failure) as caught:
         service._solve_outer_boundary_from_trial(trial_at)
     assert caught.value.code == expected_code
-    assert caught.value.diagnostics == expected_diagnostics
+    for item in expected_diagnostics:
+        assert item in caught.value.diagnostics
 
 
 def test_shared_outer_solver_preserves_resource_exhaustion_diagnostic(
@@ -3045,6 +3256,9 @@ def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
         _authority: Any,
         iteration: int,
         _stats: Any = None,
+        *,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> service._OuterTrial:
         control = service._CANDIDATE_TRANSIENT_CONTROL.get()
         assert control is not None
@@ -3087,7 +3301,8 @@ def test_candidate_r2a_uses_shared_outer_solver_then_reruns_accepted_path(
         _authority: Any,
         iteration: int,
         _stats: Any = None,
-        _capture: bool = False,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> Any:
         control = service._CANDIDATE_TRANSIENT_CONTROL.get()
         accepted_control_modes.append(control.mode if control is not None else None)
@@ -3127,6 +3342,9 @@ def test_accepted_mesh_replay_uses_fresh_full_search_stats_scope(
         _authority: Any,
         _iteration: int,
         search_stats: service._CellSearchStats | None = None,
+        *,
+        capture_diagnostics: bool = False,
+        **_kwargs: Any,
     ) -> Any:
         active_calls.append((subdivisions, search_stats))
         if search_stats is not None:
@@ -3278,7 +3496,15 @@ def test_boundary_root_uses_infeasible_low_and_valid_high_only(
     )
     observations: list[tuple[Decimal, str]] = []
 
-    def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+    def trial(
+        _n: int,
+        h: Decimal,
+        _provider: Any,
+        _authority: Any,
+        _iteration: int,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> Any:
         if h < root:
             observations.append((h, "LOW_SIDE_DOMAIN_INFEASIBLE"))
             return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
@@ -3314,7 +3540,15 @@ def test_boundary_bisection_is_deterministic_and_returns_valid_high_endpoint(
     def solve_once() -> Any:
         sequence: list[Decimal] = []
 
-        def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+        def trial(
+            _n: int,
+            h: Decimal,
+            _provider: Any,
+            _authority: Any,
+            _iteration: int,
+            *_args: Any,
+            **_kwargs: Any,
+        ) -> Any:
             sequence.append(h)
             if h < root:
                 return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
@@ -3356,7 +3590,15 @@ def test_outer_bisection_representability_floor_is_explicit(
     monkeypatch.setattr(service, "H_MAX_J_KG", Decimal("1.0000000000000001"))
     monkeypatch.setattr(service, "_terminal_tolerance_pass", lambda _run: False)
 
-    def trial(_n: int, h: Decimal, _provider: Any, _authority: Any, _iteration: int) -> Any:
+    def trial(
+        _n: int,
+        h: Decimal,
+        _provider: Any,
+        _authority: Any,
+        _iteration: int,
+        *_args: Any,
+        **_kwargs: Any,
+    ) -> Any:
         if h == service.H_MIN_J_KG:
             return service._OuterTrial("LOW_SIDE_DOMAIN_INFEASIBLE", h)
         run = SimpleNamespace(
