@@ -1121,10 +1121,14 @@ def _sequential_q_u_initial_guess(
     shell_mdot: float,
     q_uniform: float,
     shell_authority: Any,
+    q_seed_per_cell: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """March axial q with enthalpy rebuild; per-cell resistance/TRF u seed."""
     n = len(supports)
-    q = np.full(n, q_uniform, dtype=float)
+    if q_seed_per_cell is not None and len(q_seed_per_cell) == n:
+        q = np.asarray(q_seed_per_cell, dtype=float).copy()
+    else:
+        q = np.full(n, q_uniform, dtype=float)
     x0 = np.zeros(3 * n, dtype=float)
     lo = np.zeros(3 * n, dtype=float)
     hi = np.zeros(3 * n, dtype=float)
@@ -1406,6 +1410,7 @@ def solve_joint_boundary_value_mesh(
     shell_authority: Any,
     candidate_ctx: Any,
     max_nfev: int = 320,
+    q_seed_per_cell: np.ndarray | None = None,
 ) -> JointBVPOutcome:
     """Fix tube inlet (x=0) and shell cold inlet (x=L); unknowns are q, Twi, Two only."""
     supports = _supports_for_mesh(candidate_ctx, subdivisions)
@@ -1452,6 +1457,7 @@ def solve_joint_boundary_value_mesh(
         shell_mdot=shell_mdot,
         q_uniform=q_uniform,
         shell_authority=shell_authority,
+        q_seed_per_cell=q_seed_per_cell,
     )
     heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
     opt_x, block_nfev, domain_plateau = _block_gauss_seidel_joint_solve(

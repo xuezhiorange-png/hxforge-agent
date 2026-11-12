@@ -127,34 +127,44 @@ def experimental_mesh_convergence_pass(
     n2: IsolatedMeshLevelDiagnostic,
     n4: IsolatedMeshLevelDiagnostic,
     *,
-    duty_tolerance: Decimal | None = None,
+    duty_tolerance_w: Decimal | None = None,
 ) -> tuple[bool, tuple[str, ...]]:
-    """Coarse checks when all gates ACCEPTED — duty drift N1→N2→N4."""
+    """Isolated outer-shooting duty consistency — not production Task173 mesh convergence."""
     if not (n1.gate == "ACCEPTED" and n2.gate == "ACCEPTED" and n4.gate == "ACCEPTED"):
-        return False, ("MESH_GATE_NOT_ALL_ACCEPTED",)
-    notes: list[str] = []
+        return False, ("MESH_GATE_NOT_ALL_ACCEPTED", "NOT_PRODUCTION_TASK173_MESH_CONVERGENCE")
+    notes: list[str] = ["NOT_PRODUCTION_TASK173_MESH_CONVERGENCE"]
 
-    def _duty(d: IsolatedMeshLevelDiagnostic) -> Decimal | None:
+    def _duty_pair(
+        d: IsolatedMeshLevelDiagnostic,
+    ) -> tuple[Decimal | None, Decimal]:
         r = d.outer_result.accepted_run
         if r is None:
-            return None
-        return r.observables.total_duty_w
+            return None, Decimal("0")
+        obs = r.observables
+        return obs.total_duty_w, obs.duty_roundoff_floor_w
 
-    d1, d2, d4 = _duty(n1), _duty(n2), _duty(n4)
+    d1, f1 = _duty_pair(n1)
+    d2, f2 = _duty_pair(n2)
+    d4, f4 = _duty_pair(n4)
     if d1 is None or d2 is None or d4 is None:
-        return False, ("MISSING_ACCEPTED_DUTY",)
-    if duty_tolerance is None:
-        from prototypes.v08_general_user_case.physical_feasibility import (
-            THERMODYNAMIC_DUTY_TOLERANCE,
-        )
+        return False, tuple(notes + ["MISSING_ACCEPTED_DUTY"])
+    from prototypes.v08_thermal_rating.axial_rating_engine_v1 import ENERGY_ACCEPTANCE_FLOOR_W
 
-        duty_tolerance = THERMODYNAMIC_DUTY_TOLERANCE
+    floor = max(
+        float(ENERGY_ACCEPTANCE_FLOOR_W),
+        float(f1),
+        float(f2),
+        float(f4),
+    )
+    if duty_tolerance_w is not None:
+        floor = max(floor, float(duty_tolerance_w))
     ref = d4
-    for label, d in (("N1", d1), ("N2", d2)):
-        rel = abs(d - ref) / ref if ref != 0 else abs(d - ref)
-        notes.append(f"{label}_duty_w={d}:rel_delta_to_N4={rel}")
-        if rel > Decimal("0.02"):
-            return False, tuple(notes + [f"DUTY_DRIFT_{label}_VS_N4_EXCEEDS_2PCT"])
+    for label, d, rf in (("N1", d1, f1), ("N2", d2, f2)):
+        delta_w = abs(d - ref)
+        tol_w = max(float(ENERGY_ACCEPTANCE_FLOOR_W), float(rf), float(f4))
+        notes.append(f"{label}_duty_w={d}:abs_delta_to_N4_w={delta_w}:tol_w={tol_w}")
+        if delta_w > Decimal(str(tol_w)):
+            return False, tuple(notes + [f"ISOLATED_DUTY_DELTA_{label}_VS_N4_EXCEEDS_TOLERANCE"])
     notes.append(f"N4_duty_w={d4}")
     return True, tuple(notes)
 

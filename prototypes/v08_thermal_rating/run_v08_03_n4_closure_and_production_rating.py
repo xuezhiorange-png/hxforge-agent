@@ -125,18 +125,12 @@ def main() -> None:
         raise SystemExit(f"candidate {FROZEN_CANDIDATE_ID} not found in manufacturable set")
     assert bindings.geometry_projection_hash == FROZEN_GEOMETRY_HASH
 
-    closeout = run_candidate_mesh_closeout(bindings, provider, run_production_gate=True)
+    closeout = run_candidate_mesh_closeout(bindings, provider, run_production_gate=False)
     prod = assess_production_culp_rating(bindings, provider)
     prod_diag = build_production_rating_diagnostic(prod)
     nozzle = assess_nozzle_velocities(bindings, provider)
-    n1_solved = (
-        closeout.n1_diagnostic.outer_result
-        if closeout.n1_diagnostic is not None
-        else None
-    )
-    precision = run_boundary_precision_audit(
-        bindings, provider, subdivisions=1, solved=n1_solved
-    )
+    n1_solved = closeout.n1_diagnostic.outer_result if closeout.n1_diagnostic is not None else None
+    precision = run_boundary_precision_audit(bindings, provider, subdivisions=1, solved=n1_solved)
 
     n1v = closeout.n1_verification
     run_n1 = closeout.n1_diagnostic.outer_result.accepted_run if closeout.n1_diagnostic else None
