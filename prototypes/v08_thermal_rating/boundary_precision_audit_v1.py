@@ -29,6 +29,7 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     CandidateRatingBindings,
     solve_isolated_outer_boundary,
 )
+from prototypes.v08_thermal_rating.outer_shooting_isolated_v1 import IsolatedOuterBoundaryResult
 
 
 @dataclass(frozen=True)
@@ -200,9 +201,10 @@ def run_boundary_precision_audit(
     provider: PropertyProvider,
     *,
     subdivisions: int = 1,
+    solved: IsolatedOuterBoundaryResult | None = None,
 ) -> BoundaryPrecisionAudit:
     """Audit outer bracket endpoints and terminal plateau without tolerance overrides."""
-    solved = solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
+    solved = solved or solve_isolated_outer_boundary(bindings, provider, subdivisions=subdivisions)
     pair = _last_two_valid_shooting_hs(solved)
     probes: list[ShootingProbeRow] = []
     if pair is not None:

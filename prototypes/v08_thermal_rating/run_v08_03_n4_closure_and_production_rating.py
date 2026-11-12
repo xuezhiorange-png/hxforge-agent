@@ -129,7 +129,14 @@ def main() -> None:
     prod = assess_production_culp_rating(bindings, provider)
     prod_diag = build_production_rating_diagnostic(prod)
     nozzle = assess_nozzle_velocities(bindings, provider)
-    precision = run_boundary_precision_audit(bindings, provider, subdivisions=1)
+    n1_solved = (
+        closeout.n1_diagnostic.outer_result
+        if closeout.n1_diagnostic is not None
+        else None
+    )
+    precision = run_boundary_precision_audit(
+        bindings, provider, subdivisions=1, solved=n1_solved
+    )
 
     n1v = closeout.n1_verification
     run_n1 = closeout.n1_diagnostic.outer_result.accepted_run if closeout.n1_diagnostic else None
