@@ -574,7 +574,7 @@ def _block_gauss_seidel_joint_solve(
     heat_scale: float,
     max_sweeps: int = 10,
     max_nfev_per_cell: int = 80,
-) -> tuple[np.ndarray, int, bool]:
+) -> tuple[np.ndarray, int, bool, list[bool], list[float]]:
     """Block-coordinate TRF: one 3x3 cell at a time with full-q feasibility audit."""
     n = len(supports)
     x = x0.copy()
@@ -582,6 +582,8 @@ def _block_gauss_seidel_joint_solve(
     h_max = float(effective_admitted_h_max_j_kg(provider))
     total_nfev = 0
     domain_plateau = False
+    per_cell_opt_success: list[bool] = []
+    per_cell_opt_cost: list[float] = []
 
     def vec_q(vec: np.ndarray) -> np.ndarray:
         return vec.reshape(n, 3)[:, 0].copy()
@@ -670,7 +672,9 @@ def _block_gauss_seidel_joint_solve(
             )
             x[3 * i : 3 * i + 3] = opt.x
             total_nfev += int(opt.nfev)
-    return x, total_nfev, domain_plateau
+            per_cell_opt_success.append(bool(opt.success))
+            per_cell_opt_cost.append(float(opt.cost))
+    return x, total_nfev, domain_plateau, per_cell_opt_success, per_cell_opt_cost
 
 
 @dataclass
@@ -1460,7 +1464,8 @@ def solve_joint_boundary_value_mesh(
         q_seed_per_cell=q_seed_per_cell,
     )
     heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
-    opt_x, block_nfev, domain_plateau = _block_gauss_seidel_joint_solve(
+    opt_x, block_nfev, domain_plateau, per_cell_opt_success, per_cell_opt_cost = (
+        _block_gauss_seidel_joint_solve(
         x0,
         supports=supports,
         provider=provider,
@@ -1472,6 +1477,7 @@ def solve_joint_boundary_value_mesh(
         heat_scale=heat_scale,
         max_sweeps=12,
         max_nfev_per_cell=min(120, max(40, max_nfev // max(n_cells, 1))),
+        )
     )
     h_t, h_s, q_final, cells, q_stable = _reconcile_q_after_validation(
         opt_x,
@@ -1539,7 +1545,12 @@ def solve_joint_boundary_value_mesh(
         and terminal_pass
     )
     status = "PASS" if physical else "BLOCKED"
-    opt_success = block_nfev > 3 * n_cells
+    optimizer_actually_converged = bool(
+        per_cell_opt_success
+        and all(per_cell_opt_success)
+        and not domain_plateau
+        and q_stable
+    )
     return JointBVPOutcome(
         status=status,
         subdivisions=subdivisions,
@@ -1553,7 +1564,7 @@ def solve_joint_boundary_value_mesh(
         terminal_pass=terminal_pass,
         all_task172_gates_pass=all_gates,
         optimizer_nfev=int(block_nfev),
-        optimizer_success=bool(opt_success),
+        optimizer_success=bool(optimizer_actually_converged),
         physical_acceptance=physical,
         solver_success=bool(physical),
         tube_outlet_temperature_k=tube_out_t,
@@ -1575,5 +1586,9 @@ def solve_joint_boundary_value_mesh(
             "domain_penalty_plateau": domain_plateau,
             "solver_path": "block_gauss_seidel",
             "bvp_dof_audit": joint_bvp_dof_audit_summary(),
+            "per_cell_optimizer_success": per_cell_opt_success,
+            "per_cell_optimizer_cost": per_cell_opt_cost,
+            "optimizer_actually_converged": optimizer_actually_converged,
+            "q_reconcile_stable": q_stable,
         },
     )

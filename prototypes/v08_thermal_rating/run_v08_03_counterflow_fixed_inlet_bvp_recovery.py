@@ -18,13 +18,14 @@ from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     CASE_330KW_ID,
     assess_production_culp_rating,
+    isolated_mesh_acceptance_gate,
     load_case_bindings,
     resolve_candidate_bindings_by_id,
+    solve_isolated_outer_boundary,
 )
+from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import classify_bvp_go_no_go
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
-from prototypes.v08_thermal_rating.counterflow_fixed_inlet_bvp_recovery_v08 import (
-    run_counterflow_fixed_inlet_bvp_recovery,
-)
+from prototypes.v08_thermal_rating.counterflow_fixed_inlet_bvp_recovery_v08 import run_n4_bvp_only
 from prototypes.v08_thermal_rating.production_rating_diagnostics_v08 import (
     build_production_rating_diagnostic,
 )
@@ -79,37 +80,29 @@ def _json_ready(value: Any) -> Any:
     return value
 
 
-def _bvp_label(result: Any | None) -> str:
-    if result is None:
-        return "BLOCKED"
-    return "PASS" if result.original_task172_gate == "PASS" else "BLOCKED"
-
-
 def main() -> None:
     out = Path("/opt/cursor/artifacts/v08_03_counterflow_fixed_inlet_bvp_recovery.json")
     provider = CoolPropProvider()
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    assert normalized.engineering_case_id == CASE_330KW_ID
     bindings = resolve_candidate_bindings_by_id(
         FROZEN_CANDIDATE_ID, normalized, handoff, provider, max_valid=64
     )
-    if bindings is None:
-        raise SystemExit(f"candidate {FROZEN_CANDIDATE_ID} not found")
-    assert bindings.geometry_projection_hash == FROZEN_GEOMETRY_HASH
+    assert bindings and bindings.geometry_projection_hash == FROZEN_GEOMETRY_HASH
 
-    recovery = run_counterflow_fixed_inlet_bvp_recovery(bindings, provider)
+    recovery = run_n4_bvp_only(bindings, provider)
     n4 = recovery["n4"]
-    decision = recovery["numerical_decision"]
+    cell0 = recovery["cell0"]
+    opt_conv = bool(n4.outcome.extra.get("optimizer_actually_converged", False))
+    decision, note, route, arch = classify_bvp_go_no_go(
+        rows=n4.cell_gate_rows,
+        cell0=cell0,
+        optimizer_actually_converged=opt_conv,
+    )
 
-    prod = assess_production_culp_rating(bindings, provider)
-    prod_diag = build_production_rating_diagnostic(prod)
-
-    mesh_conv = "BLOCKED"
-    shooting_gates = recovery.get("isolated_shooting_gates") or {}
-    if shooting_gates.get("1") == "ACCEPTED" and shooting_gates.get("2") == "ACCEPTED":
-        mesh_conv = "BLOCKED" if shooting_gates.get("4") != "ACCEPTED" else "not_production_task173"
-
-    eng_ok = False
+    n1s = solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
+    n2s = solve_isolated_outer_boundary(bindings, provider, subdivisions=2)
+    n4s = solve_isolated_outer_boundary(bindings, provider, subdivisions=4)
+    prod_diag = build_production_rating_diagnostic(assess_production_culp_rating(bindings, provider))
 
     payload: dict[str, Any] = {
         "TASK_ID": "V08_03_COUNTERFLOW_FIXED_INLET_BVP_RECOVERY",
@@ -118,47 +111,29 @@ def main() -> None:
         "CI_STATUS": _ci_status(),
         "CASE_ID": CASE_330KW_ID,
         "CANDIDATE_ID": FROZEN_CANDIDATE_ID,
-        "GEOMETRY_HASH": FROZEN_GEOMETRY_HASH,
-        "BVP_N1": _bvp_label(recovery.get("n1_bvp")),
-        "BVP_N2": _bvp_label(recovery.get("n2_bvp")),
-        "BVP_N4": _bvp_label(n4),
+        "BVP_N1": "NOT_RUN",
+        "BVP_N2": "NOT_RUN",
+        "BVP_N4": n4.original_task172_gate,
         "N4_ORIGINAL_TASK172_GATE": n4.original_task172_gate,
         "N4_MAX_R1_RATIO": recovery["n4_max_r1_ratio"],
         "N4_MAX_R2_RATIO": recovery["n4_max_r2_ratio"],
         "N4_MAX_R3_RATIO": recovery["n4_max_r3_ratio"],
-        "N4_TOTAL_Q_W": n4.outcome.total_q_w,
-        "N4_TUBE_OUTLET_K": n4.outcome.tube_outlet_temperature_k,
-        "N4_SHELL_OUTLET_K": n4.outcome.shell_outlet_temperature_k,
-        "N4_ENERGY_BALANCE_W": n4.outcome.energy_balance_residual_w,
-        "ORIGINAL_TASK173_GATE": prod_diag.PRODUCTION_TASK173_STATUS,
-        "ORIGINAL_MESH_CONVERGENCE": mesh_conv,
         "NUMERICAL_DECISION": decision,
-        "NUMERICAL_DECISION_NOTE": recovery["numerical_decision_note"],
-        "DISTINCT_FULLY_CONVERGED": 1 if eng_ok else 0,
+        "NUMERICAL_DECISION_NOTE": note,
+        "CURRENT_BVP_ROUTE": route,
+        "SHOOTING_N1": isolated_mesh_acceptance_gate(bindings, provider, n1s),
+        "SHOOTING_N2": isolated_mesh_acceptance_gate(bindings, provider, n2s),
+        "SHOOTING_N4": isolated_mesh_acceptance_gate(bindings, provider, n4s),
+        "CELL0_AUDIT": _json_ready(asdict(cell0)),
+        "PRODUCTION_TASK173": prod_diag.PRODUCTION_TASK173_STATUS,
+        "DISTINCT_FULLY_CONVERGED": 0,
         "ENGINEERING_ACCEPTANCE": "BLOCKED",
-        "REMAINING_BLOCKER": recovery["numerical_decision_note"],
-        "PRODUCTION_SOLVER_REPLACED": False,
-        "PRODUCTION_CONTRACT_CHANGE_AUTHORIZED": False,
+        "REMAINING_BLOCKER": note,
         "MERGE_AUTHORIZED": False,
-        "ISOLATED_SHOOTING_N1": shooting_gates.get("1", "unknown"),
-        "ISOLATED_SHOOTING_N2": shooting_gates.get("2", "unknown"),
-        "ISOLATED_SHOOTING_N4": shooting_gates.get("4", "unknown"),
-        "shooting_vs_bvp": _json_ready(
-            {k: asdict(v) for k, v in recovery["shooting_comparison"].items()}
-        ),
-        "n4_cell_gate_rows": [_json_ready(asdict(r)) for r in n4.cell_gate_rows],
-        "q_seed_sum_w": recovery["q_seed_sum_w"],
-        "bvp_n4_diagnostics": list(n4.outcome.diagnostics),
-        "PRODUCTION_FIRST_BLOCKER": prod_diag.PRODUCTION_FIRST_BLOCKER,
     }
-
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    print(
-        json.dumps({"out": str(out), "NUMERICAL_DECISION": decision, "BVP_N4": payload["BVP_N4"]})
-    )
+    out.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps({"out": str(out), "NUMERICAL_DECISION": decision, "CELL0_R1": cell0.r1_ratio}))
 
 
 if __name__ == "__main__":

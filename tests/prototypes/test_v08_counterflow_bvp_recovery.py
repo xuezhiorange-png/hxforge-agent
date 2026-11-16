@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import _ratio_triple
 from prototypes.v08_thermal_rating.counterflow_fixed_inlet_bvp_recovery_v08 import (
     build_n4_q_seed_from_n2_shooting_intervals,
 )
@@ -52,6 +53,11 @@ def _diag(duty: str, gate: str, roundoff: str = "0.01") -> IsolatedMeshLevelDiag
         N_SHOOTING_ENTHALPY_J_KG=None,
         outer_result=outer,
     )
+
+
+def test_ratio_triple_returns_none_when_gate_missing_not_inf() -> None:
+    assert _ratio_triple(None, None) == (None, None, None)
+    assert _ratio_triple((1.0, 2.0, 3.0), (0.0, 1.0, 1.0)) == (None, 2.0, 3.0)
 
 
 def test_experimental_mesh_convergence_uses_energy_floor_not_two_percent() -> None:
