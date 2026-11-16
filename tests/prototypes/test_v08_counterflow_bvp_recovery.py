@@ -7,7 +7,11 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import _ratio_triple
+from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import (
+    BVP_PROTOTYPE_ROUTE,
+    _ratio_triple,
+    frozen_route_closeout_decision,
+)
 from prototypes.v08_thermal_rating.counterflow_fixed_inlet_bvp_recovery_v08 import (
     build_n4_q_seed_from_n2_shooting_intervals,
 )
@@ -53,6 +57,13 @@ def _diag(duty: str, gate: str, roundoff: str = "0.01") -> IsolatedMeshLevelDiag
         N_SHOOTING_ENTHALPY_J_KG=None,
         outer_result=outer,
     )
+
+
+def test_bvp_route_frozen_stop() -> None:
+    dec, _, route, infeas = frozen_route_closeout_decision()
+    assert dec == "B"
+    assert route == "STOP" == BVP_PROTOTYPE_ROUTE
+    assert infeas is False
 
 
 def test_ratio_triple_returns_none_when_gate_missing_not_inf() -> None:

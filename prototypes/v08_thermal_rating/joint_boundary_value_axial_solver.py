@@ -1466,17 +1466,17 @@ def solve_joint_boundary_value_mesh(
     heat_scale = _heat_residual_scale_w(q_part, tube_mdot=tube_mdot, enthalpy_span_j_kg=h_t0 - h_sN)
     opt_x, block_nfev, domain_plateau, per_cell_opt_success, per_cell_opt_cost = (
         _block_gauss_seidel_joint_solve(
-        x0,
-        supports=supports,
-        provider=provider,
-        shell_authority=shell_authority,
-        h_t0=h_t0,
-        h_sN=h_sN,
-        tube_mdot=tube_mdot,
-        shell_mdot=shell_mdot,
-        heat_scale=heat_scale,
-        max_sweeps=12,
-        max_nfev_per_cell=min(120, max(40, max_nfev // max(n_cells, 1))),
+            x0,
+            supports=supports,
+            provider=provider,
+            shell_authority=shell_authority,
+            h_t0=h_t0,
+            h_sN=h_sN,
+            tube_mdot=tube_mdot,
+            shell_mdot=shell_mdot,
+            heat_scale=heat_scale,
+            max_sweeps=12,
+            max_nfev_per_cell=min(120, max(40, max_nfev // max(n_cells, 1))),
         )
     )
     h_t, h_s, q_final, cells, q_stable = _reconcile_q_after_validation(
@@ -1545,11 +1545,9 @@ def solve_joint_boundary_value_mesh(
         and terminal_pass
     )
     status = "PASS" if physical else "BLOCKED"
+    scipy_all_success = bool(per_cell_opt_success and all(per_cell_opt_success))
     optimizer_actually_converged = bool(
-        per_cell_opt_success
-        and all(per_cell_opt_success)
-        and not domain_plateau
-        and q_stable
+        scipy_all_success and not domain_plateau and q_stable and all_gates
     )
     return JointBVPOutcome(
         status=status,
@@ -1589,6 +1587,8 @@ def solve_joint_boundary_value_mesh(
             "per_cell_optimizer_success": per_cell_opt_success,
             "per_cell_optimizer_cost": per_cell_opt_cost,
             "optimizer_actually_converged": optimizer_actually_converged,
+            "scipy_all_success": scipy_all_success,
             "q_reconcile_stable": q_stable,
+            "all_task172_gates_pass": all_gates,
         },
     )

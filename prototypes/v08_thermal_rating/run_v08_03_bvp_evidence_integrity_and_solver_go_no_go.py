@@ -146,7 +146,9 @@ def main() -> None:
         "q_reconcile_stable": n4.outcome.extra.get("q_reconcile_stable"),
     }
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(json.dumps({"out": str(out), "NUMERICAL_DECISION": decision, "ROUTE": route}))
 
 

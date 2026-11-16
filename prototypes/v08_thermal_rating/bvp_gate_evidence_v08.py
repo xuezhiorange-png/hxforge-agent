@@ -29,6 +29,10 @@ GateEvidenceKind = Literal[
 GoDecision = Literal["A", "B", "C"]
 BvpRoute = Literal["KEEP", "STOP"]
 
+# Block Gauss–Seidel joint BVP is closed; do not extend this prototype path.
+BVP_PROTOTYPE_ROUTE: BvpRoute = "STOP"
+BVP_PHYSICAL_INFEASIBILITY_PROVEN: bool = False
+
 
 @dataclass(frozen=True)
 class BvpCellGateRow:
@@ -50,6 +54,8 @@ class BvpCellGateRow:
     task172_gate_pass: bool | None
     solver_recorded_gate_pass: bool
     identity_mismatch: bool
+    request_hash_mismatch: bool
+    gate_status_mismatch: bool
     property_domain_status: str
 
 
@@ -74,6 +80,8 @@ class CellProductionGateAudit:
     property_domain_status: str
     gate_evidence: GateEvidenceKind
     identity_mismatch: bool
+    request_hash_mismatch: bool
+    gate_status_mismatch: bool
 
 
 def _ratio_triple(
@@ -163,9 +171,17 @@ def snapshot_production_task172_gate(
         prod_pass = bool(gate.get("passes_original_residual_gate"))
         req_hash = str(gate.get("request_hash", req_hash))
 
-    identity_mismatch = (
-        prod_pass is not None and bool(prod_pass) != bool(cell.task172_gate_pass)
+    gate_hash = str(gate.get("request_hash", req_hash)) if gate else req_hash
+    solver_hash = str(cell.task172_request_hash or "").strip()
+    hash_mismatch = bool(
+        gate is not None
+        and evidence == "VALID_PRODUCTION_GATE"
+        and solver_hash
+        and gate_hash
+        and solver_hash != gate_hash
     )
+    status_mismatch = prod_pass is not None and bool(prod_pass) != bool(cell.task172_gate_pass)
+    identity_mismatch = hash_mismatch or status_mismatch
     return BvpCellGateRow(
         cell_index=cell.index,
         q_w=float(cell.q_w),
@@ -185,6 +201,8 @@ def snapshot_production_task172_gate(
         task172_gate_pass=prod_pass,
         solver_recorded_gate_pass=bool(cell.task172_gate_pass),
         identity_mismatch=identity_mismatch,
+        request_hash_mismatch=hash_mismatch,
+        gate_status_mismatch=status_mismatch,
         property_domain_status=property_status,
     )
 
@@ -255,6 +273,8 @@ def audit_cell_production_gate(
         property_domain_status=row.property_domain_status,
         gate_evidence=row.gate_evidence,
         identity_mismatch=row.identity_mismatch,
+        request_hash_mismatch=row.request_hash_mismatch,
+        gate_status_mismatch=row.gate_status_mismatch,
     )
 
 
@@ -314,15 +334,20 @@ def classify_bvp_go_no_go(
             "STOP",
             "block_gauss_seidel joint BVP fails original Task172 at N4 (cell0 production gate)",
         )
+    if physical_residual_closure(rows) == "PASS":
+        return (
+            "A",
+            "EVIDENCE_CONTRADICTS_FROZEN_STOP",
+            "STOP",
+            "all production gates pass in snapshot but route frozen STOP — re-audit only",
+        )
     if not optimizer_actually_converged:
         return (
             "B",
             "BVP_SOLVER_NONCONVERGENCE",
             "STOP",
-            "per-cell least_squares did not all report success or q reconcile unstable",
+            "per-cell least_squares plateau/domain or q reconcile unstable",
         )
-    if physical_residual_closure(rows) == "PASS":
-        return ("C", "VERIFIED_PHYSICAL_INFEASIBILITY", "STOP", "n/a-unlikely")
     return (
         "B",
         "BVP_SOLVER_NONCONVERGENCE",
@@ -331,7 +356,19 @@ def classify_bvp_go_no_go(
     )
 
 
+def frozen_route_closeout_decision() -> tuple[GoDecision, str, BvpRoute, bool]:
+    """Authoritative closeout after cell0 audit — no further BVP execution."""
+    return (
+        "B",
+        "BVP_SOLVER_NONCONVERGENCE",
+        BVP_PROTOTYPE_ROUTE,
+        BVP_PHYSICAL_INFEASIBILITY_PROVEN,
+    )
+
+
 __all__ = [
+    "BVP_PHYSICAL_INFEASIBILITY_PROVEN",
+    "BVP_PROTOTYPE_ROUTE",
     "BvpCellGateRow",
     "BvpRoute",
     "CellProductionGateAudit",
@@ -340,6 +377,7 @@ __all__ = [
     "audit_cell_production_gate",
     "cell_gate_rows_from_outcome",
     "classify_bvp_go_no_go",
+    "frozen_route_closeout_decision",
     "infinite_ratio_source",
     "physical_residual_closure",
     "snapshot_production_task172_gate",

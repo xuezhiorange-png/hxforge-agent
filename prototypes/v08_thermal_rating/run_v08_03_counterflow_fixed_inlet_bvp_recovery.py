@@ -102,7 +102,9 @@ def main() -> None:
     n1s = solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
     n2s = solve_isolated_outer_boundary(bindings, provider, subdivisions=2)
     n4s = solve_isolated_outer_boundary(bindings, provider, subdivisions=4)
-    prod_diag = build_production_rating_diagnostic(assess_production_culp_rating(bindings, provider))
+    prod_diag = build_production_rating_diagnostic(
+        assess_production_culp_rating(bindings, provider)
+    )
 
     payload: dict[str, Any] = {
         "TASK_ID": "V08_03_COUNTERFLOW_FIXED_INLET_BVP_RECOVERY",
@@ -132,7 +134,9 @@ def main() -> None:
         "MERGE_AUTHORIZED": False,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    out.write_text(
+        json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     print(json.dumps({"out": str(out), "NUMERICAL_DECISION": decision, "CELL0_R1": cell0.r1_ratio}))
 
 
