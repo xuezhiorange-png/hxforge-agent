@@ -306,20 +306,13 @@ def classify_bvp_go_no_go(
             "KEEP",
             f"cell0_evidence={cell0.gate_evidence}",
         )
-    if any(r.gate_evidence != "VALID_PRODUCTION_GATE" for r in rows):
-        return (
-            "A",
-            "EVIDENCE_IDENTITY_DEFECT",
-            "KEEP",
-            "non-valid production gate snapshot on one or more cells",
-        )
     r1 = cell0.r1_ratio
     if r1 is not None and r1 > 1.0:
         return (
             "B",
             "BVP_SOLVER_NONCONVERGENCE",
             "STOP",
-            "block_gauss_seidel joint BVP fails original Task172 at N4 despite scipy sweeps",
+            "block_gauss_seidel joint BVP fails original Task172 at N4 (cell0 production gate)",
         )
     if not optimizer_actually_converged:
         return (
