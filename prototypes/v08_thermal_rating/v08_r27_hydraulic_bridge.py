@@ -1,16 +1,27 @@
 """Bridge V08 candidate bindings to V07 R27C nozzle / full-path hydraulic inputs."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.bell_delaware.models import (
+    ApplicabilityStatus,
+    Task166BlockedResult,
+    Task166Result,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
     candidate_rating_request_hash,
 )
 from hexagent.exchangers.shell_tube.task174_hydraulic_orchestration import Task174SuccessResult
+from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v07_general_rating_sizing_mvp.candidate_selection import CandidateSelectionRecord
+from prototypes.v07_general_rating_sizing_mvp.engineering_hydraulic_path_physical_consistency import (
+    _outlet_domain_ok,
+)
 from prototypes.v07_general_rating_sizing_mvp.engineering_input import (
     CandidateGenerationConstraints,
     FluidSideSpec,
@@ -130,33 +141,84 @@ def task174_hydraulic_postpass_from_bindings(
     tube_margin = bindings.normalized.max_tube_side_pressure_drop_pa - tube_total
     shell_margin = bindings.normalized.max_shell_side_pressure_drop_pa - shell_total
     norm = bindings.normalized
-    tube_p = str(norm.tube_side.inlet_pressure_pa)
-    shell_p = str(norm.shell_side.inlet_pressure_pa)
+    tube_p_in = str(norm.tube_side.inlet_pressure_pa)
+    shell_p_in = str(norm.shell_side.inlet_pressure_pa)
     tube_t = str(norm.tube_side.inlet_temperature_k)
     shell_t = str(norm.shell_side.inlet_temperature_k)
+
+    t166 = raw.task166_result
+    correlation_applicability = "NOT_EVALUATED"
+    correlation_detail: list[str] = []
+    if isinstance(t166, Task166Result) and t166.applicability is not None:
+        if t166.applicability.status == ApplicabilityStatus.APPLICABLE:
+            correlation_applicability = "APPLICABLE"
+        else:
+            correlation_applicability = f"NOT_{t166.applicability.status.value}"
+            correlation_detail.append(str(t166.applicability.status.value))
+    elif isinstance(t166, Task166BlockedResult):
+        correlation_applicability = "NOT_EVALUATED"
+        correlation_detail.append("TASK166_BLOCKED")
+    else:
+        correlation_detail.append("TASK166_MISSING")
+
+    partial_satisfied = (
+        tube_total <= bindings.normalized.max_tube_side_pressure_drop_pa
+        and shell_total <= bindings.normalized.max_shell_side_pressure_drop_pa
+    )
+    hydraulic_constraint_status = "SATISFIED" if partial_satisfied else "NOT_SATISFIED"
+
+    provider = CoolPropProvider()
+    tube_out_ok, tube_out_reason = _outlet_domain_ok(
+        provider,
+        temperature_k=Decimal(tube_t),
+        pressure_pa=t174.tube_outlet_pressure_pa,
+    )
+    shell_out_ok, shell_out_reason = _outlet_domain_ok(
+        provider,
+        temperature_k=Decimal(shell_t),
+        pressure_pa=t174.shell_outlet_pressure_pa,
+    )
+
     return {
-        "correlation_applicability_status": "APPLICABLE",
+        "correlation_applicability_status": correlation_applicability,
+        "correlation_applicability_detail": tuple(correlation_detail),
         "tube_hydraulic_recompute_status": "EXPERIMENTAL_TRANSITIONAL_SUCCESS",
         "shell_hydraulic_recompute_status": "SUCCESS",
-        "tube_inlet_pressure_pa": tube_p,
-        "shell_inlet_pressure_pa": shell_p,
+        "tube_inlet_pressure_pa": tube_p_in,
+        "shell_inlet_pressure_pa": shell_p_in,
+        "tube_outlet_pressure_pa": str(t174.tube_outlet_pressure_pa),
+        "shell_outlet_pressure_pa": str(t174.shell_outlet_pressure_pa),
         "property_inputs": {
-            "tube": {"bulk_pressure_pa": tube_p, "bulk_temperature_k": tube_t},
-            "shell": {"bulk_pressure_pa": shell_p, "bulk_temperature_k": shell_t},
+            "tube": {"bulk_pressure_pa": tube_p_in, "bulk_temperature_k": tube_t},
+            "shell": {"bulk_pressure_pa": shell_p_in, "bulk_temperature_k": shell_t},
         },
-        "coolprop_outlet_domain_checks": {"tube": {"ok": True}, "shell": {"ok": True}},
+        "coolprop_outlet_domain_checks": {
+            "tube": {"ok": tube_out_ok, "detail": tube_out_reason},
+            "shell": {"ok": shell_out_ok, "detail": shell_out_reason},
+        },
         "experimental_transitional_tube_hydraulic": {
             "tube_friction_dp_pa": str(friction),
             "tube_local_loss_dp_pa": str(local),
             "total_tube_dp_pa": str(tube_total),
             "authority": "TASK027_STRAIGHT_TUBE_FRICTION_PLUS_TASK029_DECOMPOSITION",
         },
+        "task027_straight_tube_friction_pressure_drop_pa": str(friction),
         "recalculated_tube_dp_pa": str(tube_total),
         "recalculated_shell_dp_pa": str(shell_total),
-        "shell_dp_components_pa": {"total": str(shell_total)},
-        "hydraulic_constraint_status": "SATISFIED",
+        "shell_dp_components_pa": {
+            "total": str(shell_total),
+            "central_crossflow": str(t174.bell_central_crossflow_contribution_pa),
+            "window": str(t174.bell_window_contribution_pa),
+            "inlet_end_zone": str(t174.bell_inlet_end_zone_contribution_pa),
+            "outlet_end_zone": str(t174.bell_outlet_end_zone_contribution_pa),
+        },
+        "hydraulic_constraint_status": hydraulic_constraint_status,
         "tube_dp_margin_pa": str(tube_margin),
         "shell_dp_margin_pa": str(shell_margin),
+        "upstream_hydraulic_authority_disclosure": (
+            "V08 bridge binds live Task027/029/174 numeric outputs. "
+            "R27B K coefficients remain ASSUMPTION_BASED until owner-verified engineering input."
+        ),
         "task174_partial_model_disclosure": (
             "Tube total from Task029; shell Bell-Delaware from Task174. "
             "Full-path adds channel/transition/nozzle K scenarios (R27B)."

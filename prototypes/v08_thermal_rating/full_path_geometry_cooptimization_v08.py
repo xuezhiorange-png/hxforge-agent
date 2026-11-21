@@ -24,11 +24,14 @@ from prototypes.v08_thermal_rating.experimental_geometry_discrete_space_v08 impo
     EXPERIMENTAL_V08_DISCRETE_SPACE_PATH,
     load_approved_r1_discrete_space,
 )
+from prototypes.v08_thermal_rating.shell_hydraulic_lower_bound_v08 import (
+    analyze_shell_hydraulic_lower_bound,
+)
 from prototypes.v08_thermal_rating.v08_geometry_enumeration_bridge import (
     enumerate_structural_bundles_for_space,
 )
 
-DutyScreen = Literal["INDICATIVE_PASS", "INDICATIVE_FAIL", "NOT_EVALUATED"]
+DutyScreen = Literal["THERMAL_DUTY=NOT_EVALUATED"]
 
 
 @dataclass(frozen=True)
@@ -62,20 +65,8 @@ class FullPathGeometryCooptimizationReport:
     gap_notes: tuple[str, ...]
 
 
-def _duty_screen(bindings: Any) -> DutyScreen:
-    target = bindings.target_duty_w
-    t174 = bindings.rating_request.task174_result
-    tube_lim = bindings.normalized.max_tube_side_pressure_drop_pa
-    shell_lim = bindings.normalized.max_shell_side_pressure_drop_pa
-    if t174.modeled_total_tube_side_pressure_drop_pa > tube_lim:
-        return "NOT_EVALUATED"
-    if t174.bell_total_shell_pressure_drop_pa > shell_lim:
-        return "NOT_EVALUATED"
-    area_proxy = bindings.bundle.bundle.task025_result.total_parallel_flow_area_m2
-    if area_proxy is None:
-        return "INDICATIVE_FAIL"
-    _ = target
-    return "INDICATIVE_PASS"
+def _duty_screen(_bindings: Any) -> DutyScreen:
+    return "THERMAL_DUTY=NOT_EVALUATED"
 
 
 def _row_from_binding(
@@ -92,9 +83,12 @@ def _row_from_binding(
         t174.modeled_total_tube_side_pressure_drop_pa <= tube_lim
         and t174.bell_total_shell_pressure_drop_pa <= shell_lim
     )
+    lb = analyze_shell_hydraulic_lower_bound(bindings)
     blocker: str | None = None
     report: AutonomousNozzleFullPathReport | None = None
-    if not t174_ok:
+    if lb.all_proven_infeasible:
+        blocker = "PROVEN_HYDRAULIC_INFEASIBLE_UNDER_ASSUMED_K"
+    elif not t174_ok:
         if t174.modeled_total_tube_side_pressure_drop_pa > tube_lim:
             blocker = "TASK174_PARTIAL_TUBE_DP_EXCEEDED"
         else:
@@ -225,6 +219,8 @@ def run_full_path_geometry_cooptimization(
         max_valid=max_valid,
     )
     all_rows = tuple(r1_rows + exp_rows)
+    geom_hashes = {r.geometry_projection_hash for r in all_rows}
+    r1_hashes = {r.geometry_projection_hash for r in r1_rows}
     experimental_only = [r for r in all_rows if r.geometry_space == "EXPERIMENTAL_COOPT"]
     structurally_admitted = len(all_rows)
     mid_ok = sum(
@@ -250,6 +246,7 @@ def run_full_path_geometry_cooptimization(
         ).hydraulic_check
         == "PASS"
     }
+    _ = len(geom_hashes - r1_hashes)
     best = _pick_best(all_rows)
     first_blocker = None
     if best and best.first_hydraulic_blocker:
