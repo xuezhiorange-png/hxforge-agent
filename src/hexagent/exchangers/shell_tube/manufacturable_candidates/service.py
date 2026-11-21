@@ -1865,11 +1865,20 @@ def _result_payload(
 ) -> object:
     status = getattr(value, "status", None)
     if status is not None and _status_text(status) not in {"VALID", "SUCCESS"}:
+        detail_parts: list[str] = []
+        blockers = getattr(value, "blockers", None)
+        if blockers:
+            for entry in blockers[:3]:
+                code = getattr(entry, "code", entry)
+                detail_parts.append(str(getattr(code, "value", code)))
+        message = "producer returned a non-success status"
+        if detail_parts:
+            message = f"{message}: {', '.join(detail_parts)}"
         raise _StageFailure(
             stage,
             BlockerCode.CANDIDATE_STAGE_FAILED,
             field_path + ".status",
-            "producer returned a non-success status",
+            message,
         )
     for name in names:
         payload = getattr(value, name, None)

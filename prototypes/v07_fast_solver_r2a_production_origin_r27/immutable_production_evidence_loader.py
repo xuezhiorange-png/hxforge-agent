@@ -46,12 +46,11 @@ def _extract_nested(
         elif isinstance(node, list):
             for value in node:
                 walk(value)
-        elif isinstance(node, str):
-            if cert_schema in node or event_schema in node:
-                try:
-                    walk(json.loads(node))
-                except json.JSONDecodeError:
-                    return
+        elif isinstance(node, str) and (cert_schema in node or event_schema in node):
+            try:
+                walk(json.loads(node))
+            except json.JSONDecodeError:
+                return
 
     walk(obj)
     return certificates, events
