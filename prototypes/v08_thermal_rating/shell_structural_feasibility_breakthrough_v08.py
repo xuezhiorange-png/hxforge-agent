@@ -5,6 +5,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
+    resolve_baffle_authority,
+)
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
@@ -106,6 +110,10 @@ def _row_from_bindings(
     cand = bindings.bundle.candidate
     shell = bindings.bundle.shell_record.shell_inside_diameter_m
     layout = bindings.bundle.bundle.task021_layout
+    baffle = resolve_baffle_authority(
+        candidate=bindings.bundle.candidate,
+        bundle=bindings.bundle.bundle,
+    )
     t174 = bindings.rating_request.task174_result
     postpass = task174_hydraulic_postpass_from_bindings(bindings)
     upstream = assess_upstream_hydraulic_postpass_for_full_path(postpass)
@@ -126,7 +134,7 @@ def _row_from_bindings(
             shell_inside_diameter_m=str(shell),
             tube_length_m=str(cand.tube_length_m),
             baffle_spacing_m=str(cand.baffle_spacing_m),
-            baffle_count=int(bindings.bundle.bundle.task024_geometry.position_count),
+            baffle_count=baffle.baffle_count_authoritative,
             physical_tube_count=int(layout.physical_tube_count),
             manufacturing_geometry_authority=geometry_space,
             upstream_hydraulic_authority_valid=upstream_ok,
@@ -167,7 +175,7 @@ def _row_from_bindings(
         shell_inside_diameter_m=str(shell),
         tube_length_m=str(cand.tube_length_m),
         baffle_spacing_m=str(cand.baffle_spacing_m),
-        baffle_count=int(bindings.bundle.bundle.task024_geometry.position_count),
+        baffle_count=baffle.baffle_count_authoritative,
         physical_tube_count=int(layout.physical_tube_count),
         manufacturing_geometry_authority=geometry_space,
         upstream_hydraulic_authority_valid=upstream_ok,

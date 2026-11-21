@@ -26,6 +26,9 @@ from prototypes.v08_thermal_rating.experimental_geometry_discrete_space_v08 impo
     EXPERIMENTAL_GEOMETRY_LABEL,
     EXPERIMENTAL_V08_DISCRETE_SPACE_PATH,
 )
+from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
+    resolve_baffle_authority,
+)
 from prototypes.v08_thermal_rating.shell_hydraulic_lower_bound_v08 import (
     ShellHydraulicLowerBoundReport,
     analyze_shell_hydraulic_lower_bound,
@@ -159,7 +162,10 @@ def _row_from_binding(
         shell_inside_diameter_m=str(shell),
         tube_length_m=str(cand.tube_length_m),
         baffle_spacing_m=str(cand.baffle_spacing_m),
-        baffle_count=int(bindings.bundle.bundle.task024_geometry.position_count),
+        baffle_count=resolve_baffle_authority(
+            candidate=bindings.bundle.candidate,
+            bundle=bindings.bundle.bundle,
+        ).baffle_count_authoritative,
         manufacturing_geometry_authority=mfg,
         task174_partial_pass=t174_ok,
         thermal_duty_status="THERMAL_DUTY=NOT_EVALUATED",
