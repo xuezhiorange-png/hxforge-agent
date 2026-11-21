@@ -184,7 +184,10 @@ def run_geometry_identity_and_layout_recovery(
 
     v1_v2 = [(r.geometry_projection_hash_v1, r.geometry_identity_v2) for r in rows]
     legacy_aliases = legacy_geometry_projection_aliases(tuple(v1_v2))
-    legacy_resolved = bool(legacy_aliases) or cut_sample[0] != cut_sample[1]
+    cut_distinct = (
+        cut_sample[0] != cut_sample[1] and cut_sample[0] != "" and cut_sample[1] != ""
+    )
+    legacy_resolved = bool(legacy_aliases) and cut_distinct
 
     best_row: GeometryRecoveryCandidateRow | None = None
 
@@ -227,10 +230,6 @@ def run_geometry_identity_and_layout_recovery(
     )
     hole_pos = best_row.baffle_hole_position_count if best_row else None
     actual_bc = best_row.breakthrough.baffle_count if best_row else None
-
-    cut_distinct = (
-        cut_sample[0] != cut_sample[1] and cut_sample[0] != "" and cut_sample[1] != ""
-    )
 
     return GeometryIdentityLayoutRecoveryReport(
         baffle_count_corrected=baffle_ok,
