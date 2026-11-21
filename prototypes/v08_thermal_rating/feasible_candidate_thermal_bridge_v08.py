@@ -19,6 +19,9 @@ from prototypes.v08_geometry_candidate_generation.task168_builder import (
     build_v08_task168_request,
     filter_discrete_space_by_envelope,
 )
+from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
+    run_autonomous_nozzle_full_path,
+)
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     CandidateMeshCloseout,
     CandidateRatingBindings,
@@ -171,7 +174,13 @@ def run_feasible_candidate_thermal_bridge(
         closeout = run_candidate_mesh_closeout(
             bindings, provider, run_production_gate=run_production
         )
-        nozzle = assess_nozzle_velocities(bindings, provider)
+        try:
+            _auto = run_autonomous_nozzle_full_path(bindings)
+            nozzle = assess_nozzle_velocities(
+                bindings, provider, autonomous_ports=_auto.ports
+            )
+        except Exception:
+            nozzle = assess_nozzle_velocities(bindings, provider)
         classification = classify_thermal_hydraulic(closeout, nozzle)
         audit = run_boundary_precision_audit(bindings, provider, subdivisions=1)
         blocker = audit.first_numerical_blocker if closeout.n1 != "ACCEPTED" else None

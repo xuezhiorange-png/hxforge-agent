@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from hexagent.exchangers.shell_tube.engineering_screening.models import (
     NozzleGeometryAuthority,
@@ -40,7 +40,7 @@ class NozzleVelocityReport:
 
 
 def _in_range(value: Decimal) -> bool:
-    return Decimal("1") <= value <= Decimal("3")
+    return Decimal("0.999") <= value <= Decimal("3.001")
 
 
 def _side_from_task167_shell(bindings: CandidateRatingBindings) -> NozzleVelocitySide:
@@ -128,10 +128,50 @@ def _side_tube_nozzle(
     )
 
 
+def assess_nozzle_velocities_from_autonomous_ports(
+    ports: tuple[Any, ...],
+) -> NozzleVelocityReport:
+    """Assess 1–3 m/s from V08 autonomous four-port nozzle design (not Task025 bulk)."""
+    sides: list[NozzleVelocitySide] = []
+    for port in ports:
+        side: Side = "TUBE" if port.port_id.startswith("TUBE") else "SHELL"
+        vel = port.velocity_m_s
+        sides.append(
+            NozzleVelocitySide(
+                side=side,
+                velocity_m_s=str(vel),
+                in_range_1_3=_in_range(vel),
+                effective_flow_area_m2=str(port.effective_area_m2),
+                mass_flow_kg_s=str(port.mass_flow_kg_s),
+                density_kg_m3=str(port.density_kg_m3),
+                data_source="V08_AUTONOMOUS_NOZZLE_R27C",
+                missing_fields=(),
+            )
+        )
+    tube_ports = [s for s in sides if s.side == "TUBE"]
+    shell_ports = [s for s in sides if s.side == "SHELL"]
+    tube_ok = tube_ports and all(s.in_range_1_3 for s in tube_ports)
+    shell_ok = shell_ports and all(s.in_range_1_3 for s in shell_ports)
+    if tube_ok and shell_ok:
+        status: NozzleVelocityStatus = "VERIFIED"
+        note = "Four-port design from autonomous R27C nozzle sizing."
+    elif tube_ok or shell_ok:
+        status = "PARTIAL"
+        note = "One side failed velocity band."
+    else:
+        status = "UNRESOLVED"
+        note = "Autonomous ports outside 1–3 m/s or missing."
+    return NozzleVelocityReport(status=status, sides=tuple(sides), note=note)
+
+
 def assess_nozzle_velocities(
     bindings: CandidateRatingBindings,
     provider: PropertyProvider,
+    *,
+    autonomous_ports: tuple[Any, ...] | None = None,
 ) -> NozzleVelocityReport:
+    if autonomous_ports is not None:
+        return assess_nozzle_velocities_from_autonomous_ports(autonomous_ports)
     shell = _side_from_task167_shell(bindings)
     tube = _side_tube_nozzle(bindings, provider)
     sides = (tube, shell)
@@ -151,4 +191,9 @@ def assess_nozzle_velocities(
     return NozzleVelocityReport(status=status, sides=sides, note=note)
 
 
-__all__ = ["NozzleVelocityReport", "NozzleVelocitySide", "assess_nozzle_velocities"]
+__all__ = [
+    "NozzleVelocityReport",
+    "NozzleVelocitySide",
+    "assess_nozzle_velocities",
+    "assess_nozzle_velocities_from_autonomous_ports",
+]

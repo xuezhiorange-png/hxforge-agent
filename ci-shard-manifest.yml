@@ -548,6 +548,7 @@ shards:
       - tests/prototypes/test_tp_ph_property_audit_v08.py
       - tests/prototypes/test_propagation_defect_verdict_v08.py
       - tests/prototypes/test_engineering_acceptance_decision_v08.py
+      - tests/prototypes/test_autonomous_nozzle_full_path_hydraulics_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py
