@@ -156,7 +156,8 @@ def main() -> None:
         "OUTER_TERMINAL_RESIDUAL": verdict.outer_terminal_residual_j_kg,
         "LOCAL_CONSTITUTIVE_ROOT_STATUS": verdict.local_constitutive_root_status,
         "ENTHALPY_PROPAGATION_DEFECT_CONFIRMED": verdict.enthalpy_propagation_defect_confirmed,
-        "NUMERICAL_CONTRACT_DECISION": review.numerical_contract_decision,
+        "NUMERICAL_CONTRACT_POSTURE": review.numerical_contract_posture,
+        "CONTRACT_REVIEW_ELIGIBILITY": review.contract_review_eligibility,
         "SPECIFIC_REQUIRED_CHANGE": review.specific_required_change,
         "SHOOTING_N1": frozen.get("ISOLATED_N1", "ACCEPTED"),
         "SHOOTING_N2": frozen.get("ISOLATED_N2", "ACCEPTED"),
@@ -177,7 +178,10 @@ def main() -> None:
     )
     print(
         json.dumps(
-            {"out": str(out), "NUMERICAL_CONTRACT_DECISION": review.numerical_contract_decision}
+            {
+                "out": str(out),
+                "NUMERICAL_CONTRACT_POSTURE": review.numerical_contract_posture,
+            }
         )
     )
 

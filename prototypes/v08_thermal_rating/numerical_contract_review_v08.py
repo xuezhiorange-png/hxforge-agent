@@ -1,23 +1,34 @@
-"""Formal numerical acceptance contract review (prototype closeout; no tolerance edits)."""
+"""Formal numerical contract posture (decoupled from solver BLOCKED → change contract)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Literal
 
+from prototypes.v08_thermal_rating.engineering_acceptance_decision_v08 import (
+    ContractReviewEligibility,
+    EngineeringAcceptanceDecisionPackage,
+)
 from prototypes.v08_thermal_rating.numerical_contract_terminal_v08 import (
     ProductionTerminalGateAudit,
 )
 from prototypes.v08_thermal_rating.propagation_defect_verdict_v08 import PropagationDefectVerdict
 
-ContractDecision = Literal["A", "B"]
+ContractPosture = Literal[
+    "PRODUCTION_BLOCKED_REVIEW_ELIGIBLE",
+    "PRODUCTION_BLOCKED_EVIDENCE_INSUFFICIENT",
+    "PRODUCTION_PASS",
+]
 
 
 @dataclass(frozen=True)
 class NumericalContractReview:
-    numerical_contract_decision: ContractDecision
+    """Legacy A/B posture derived from eligibility, not from BLOCKED alone."""
+
+    numerical_contract_posture: ContractPosture
+    contract_review_eligibility: ContractReviewEligibility
     specific_required_change: str
+    production_numerical_status: str
     rationale: tuple[str, ...]
 
 
@@ -28,41 +39,44 @@ def review_numerical_acceptance_contract(
     outer_n4_status: str,
     production_task173: str,
     cell_propagation_j_kg: float,
+    decision_package: EngineeringAcceptanceDecisionPackage | None = None,
 ) -> NumericalContractReview:
-    """Path A vs B per V08-03 contract review charter (no tolerance override)."""
-    term_h = Decimal(terminal.terminal_residual_j_kg)
-    allowed_h = Decimal(terminal.terminal_allowed_j_kg)
-    enthalpy_gate = terminal.terminal_enthalpy_gate
+    """Map layered decision package to review posture (no if BLOCKED → B)."""
     notes: list[str] = []
     notes.append(f"cell_face_propagation={cell_propagation_j_kg:.6e} J/kg")
-    notes.append(f"terminal_residual_h={term_h} allowed_h={allowed_h}")
+    notes.append(f"terminal_h_residual={terminal.terminal_residual_j_kg}")
+    notes.append(f"causal_proof={propagation.propagation_defect_causal_proof}")
 
-    if propagation.propagation_defect_causal_proof == "false" and cell_propagation_j_kg < float(
-        allowed_h
-    ):
-        notes.append("propagation_cannot_explain_terminal_enthalpy_residual")
-
-    if (
-        outer_n4_status != "ACCEPTED"
-        or enthalpy_gate == "BLOCKED"
-        or production_task173 == "BLOCKED"
-    ):
-        decision: ContractDecision = "B"
-        scope = (
-            "Independent engineering review of Task173 terminal K/H contract vs binary64 outer "
-            "shooting plateau and N4 mesh refinement; no ad-hoc prototype iteration. "
-            "Propagation path A (Decimal authority + same-context PH) insufficient alone: "
-            f"causal_proof={propagation.propagation_defect_causal_proof}."
+    if decision_package is not None:
+        elig = decision_package.contract_review_eligibility
+        prod = decision_package.production_numerical_status
+        scope = decision_package.recommended_contract_change
+        posture: ContractPosture
+        if prod == "PASS":
+            posture = "PRODUCTION_PASS"
+        elif elig == "ELIGIBLE":
+            posture = "PRODUCTION_BLOCKED_REVIEW_ELIGIBLE"
+        else:
+            posture = "PRODUCTION_BLOCKED_EVIDENCE_INSUFFICIENT"
+            scope = "none"
+        return NumericalContractReview(
+            numerical_contract_posture=posture,
+            contract_review_eligibility=elig,
+            specific_required_change=scope,
+            production_numerical_status=prod,
+            rationale=tuple(decision_package.rationale) + tuple(notes),
         )
-        return NumericalContractReview(decision, scope, tuple(notes))
 
-    decision = "A"
-    scope = (
-        "Keep original Task172 C-ULP and Task173 terminal contract; complete production "
-        "enthalpy-identity / outer-shooting representation fix with reproducible "
-        "N4 ACCEPTED evidence."
+    # Fallback without package: never assert contract change.
+    blocked = production_task173 != "VALIDATED" or outer_n4_status != "ACCEPTED"
+    posture = "PRODUCTION_PASS" if not blocked else "PRODUCTION_BLOCKED_EVIDENCE_INSUFFICIENT"
+    return NumericalContractReview(
+        numerical_contract_posture=posture,
+        contract_review_eligibility="INSUFFICIENT",
+        specific_required_change="none",
+        production_numerical_status="BLOCKED" if blocked else "PASS",
+        rationale=tuple(notes),
     )
-    return NumericalContractReview(decision, scope, tuple(notes))
 
 
 __all__ = ["NumericalContractReview", "review_numerical_acceptance_contract"]

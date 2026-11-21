@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 
 from hexagent.properties.base import FluidIdentifier
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from hexagent.properties.errors import PropertyServiceError
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     load_case_bindings,
     resolve_candidate_bindings_by_id,
@@ -68,5 +67,5 @@ def test_tp_ph_invalid_fluid_blocked(bindings_330, monkeypatch: pytest.MonkeyPat
 
 def test_pure_ordinary_water_string_fails_coolprop_directly() -> None:
     provider = CoolPropProvider()
-    with pytest.raises(Exception):
+    with pytest.raises(PropertyServiceError):
         provider.state_tp(FluidIdentifier(name="PURE_ORDINARY_WATER"), 295.0, 101325.0)
