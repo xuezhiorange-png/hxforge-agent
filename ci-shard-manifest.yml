@@ -554,6 +554,7 @@ shards:
       - tests/prototypes/test_shell_hydraulic_lower_bound_v08.py
       - tests/prototypes/test_shell_structural_feasibility_breakthrough_v08.py
       - tests/prototypes/test_geometry_identity_v2_v08.py
+      - tests/prototypes/test_recovered_shell_052_full_chain_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py

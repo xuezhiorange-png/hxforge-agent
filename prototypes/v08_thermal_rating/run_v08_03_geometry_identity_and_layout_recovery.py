@@ -109,8 +109,8 @@ def main() -> None:
         "BEST_NEW_TUBE_FULL_PATH_DP_PA": br.mid_tube_full_path_dp_pa if br else "none",
         "BEST_NEW_SHELL_FULL_PATH_DP_PA": br.mid_shell_full_path_dp_pa if br else "none",
         "THERMAL_PRESCREEN": best.thermal.status if best else "NOT_EVALUATED",
-        "ESTIMATED_UA_W_K": best.thermal.estimated_ua_w_per_k if best else "unavailable",
-        "ESTIMATED_Q_W": best.thermal.estimated_q_w if best else "unavailable",
+        "ESTIMATED_UA_W_K": best.thermal.ua_w_per_k if best else "unavailable",
+        "ESTIMATED_Q_W": best.thermal.epsilon_ntu_q_w if best else "unavailable",
         "DESIGN_DECISION": report.design_decision,
         "NEXT_REQUIRED_ENGINEERING_CHANGE": report.next_required_engineering_change,
         "PRODUCTION_TASK172": "BLOCKED",
@@ -128,8 +128,8 @@ def main() -> None:
                     "geometry_projection_hash_v1": r.geometry_projection_hash_v1,
                     "baffle_hole_position_count": r.baffle_hole_position_count,
                     "thermal_prescreen": r.thermal.status,
-                    "estimated_ua_w_k": r.thermal.estimated_ua_w_per_k,
-                    "estimated_q_w": r.thermal.estimated_q_w,
+                    "estimated_ua_w_k": r.thermal.ua_w_per_k,
+                    "estimated_q_w": r.thermal.epsilon_ntu_q_w,
                 }
             )
             for r in report.rows

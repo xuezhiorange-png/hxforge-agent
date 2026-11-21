@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
@@ -66,18 +67,33 @@ def _shell_clearances(bundle: Any, t166: object | None) -> dict[str, str]:
     return out
 
 
-def geometry_identity_v2_hash(
-    bundle: V08StructuralGeometryBundle,
-    *,
-    baffle_cut_fraction: str | None = None,
-) -> str:
+def authoritative_baffle_cut_fraction(*, candidate: CandidateSpec, bundle: Any) -> str:
+    """Baffle cut from CandidateSpec, cross-checked against Task024 when present."""
+    spec_cut = format_engineering_decimal(candidate.baffle_cut_fraction)
+    t024 = bundle.task024_geometry
+    da = getattr(t024, "design_authority", None)
+    if da is not None:
+        t024_cut = str(getattr(da, "baffle_cut_fraction", "")).strip()
+        if t024_cut and format_engineering_decimal(Decimal(t024_cut)) != spec_cut:
+            raise ValueError(
+                f"baffle_cut mismatch: candidate={spec_cut} task024.design_authority={t024_cut}"
+            )
+    t166 = getattr(bundle, "task166_result", None)
+    if isinstance(t166, Task166Result) and t166.bell_geometry is not None:
+        bell_cut = format_engineering_decimal(t166.bell_geometry.baffle_cut_fraction)
+        if bell_cut != spec_cut:
+            raise ValueError(f"baffle_cut mismatch: candidate={spec_cut} task166.bell={bell_cut}")
+    return spec_cut
+
+
+def geometry_identity_v2_hash(bundle: V08StructuralGeometryBundle) -> str:
     """Deterministic V2 identity including baffle cut/count/type and layout hash."""
     candidate = bundle.candidate
     raw = bundle.bundle
     layout = raw.task021_layout
     t024 = raw.task024_geometry
     shell_id = str(bundle.shell_record.shell_inside_diameter_m)
-    cut = baffle_cut_fraction or format_engineering_decimal(candidate.baffle_cut_fraction)
+    cut = authoritative_baffle_cut_fraction(candidate=candidate, bundle=raw)
     baffle = resolve_baffle_authority(candidate=candidate, bundle=raw)
     clearances = _shell_clearances(raw, getattr(raw, "task166_result", None))
     payload: dict[str, str] = {
@@ -127,16 +143,16 @@ def legacy_geometry_projection_aliases(
 
 
 def sample_v2_cut_distinctness(
-    bundle: V08StructuralGeometryBundle,
+    bundle_a: V08StructuralGeometryBundle,
+    bundle_b: V08StructuralGeometryBundle,
 ) -> tuple[str, str]:
-    """Return V2 hashes for cut 0.25 vs 0.49 on the same structural bundle (regression aid)."""
-    low = geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.25")
-    high = geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.49")
-    return low, high
+    """Return V2 hashes for two bundles with different authoritative baffle cuts."""
+    return geometry_identity_v2_hash(bundle_a), geometry_identity_v2_hash(bundle_b)
 
 
 __all__ = [
     "ResolvedBaffleAuthority",
+    "authoritative_baffle_cut_fraction",
     "geometry_identity_v2_hash",
     "geometry_projection_hash_v1",
     "legacy_geometry_projection_aliases",

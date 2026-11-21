@@ -88,12 +88,7 @@ def _collect_rows(
         )
         for bundle in valid:
             v1 = geometry_projection_hash_v1(bundle)
-            v2 = geometry_identity_v2_hash(bundle, baffle_cut_fraction=str(cut))
-            if cut_pair_sample is None:
-                cut_pair_sample = (
-                    geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.25"),
-                    geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.49"),
-                )
+            v2 = geometry_identity_v2_hash(bundle)
             bindings = build_candidate_rating_bindings(
                 bundle,
                 space_hash=space_hash,
@@ -108,7 +103,7 @@ def _collect_rows(
             baffle = resolve_baffle_authority(candidate=bundle.candidate, bundle=bundle.bundle)
             br = _row_from_bindings(bindings, baffle_cut=cut, geometry_space=label)
             br = replace(br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative)
-            thermal = run_thermal_prescreen(bindings, normalized)
+            thermal = run_thermal_prescreen(bindings, normalized, provider=provider)
             enriched.append(
                 GeometryRecoveryCandidateRow(
                     breakthrough=br,
@@ -123,12 +118,7 @@ def _collect_rows(
     sh, dg, r1_bundles, _geom = enumerate_structural_bundles(normalized, handoff, max_valid=8)
     for bundle in r1_bundles:
         v1 = geometry_projection_hash_v1(bundle)
-        v2 = geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.25")
-        if cut_pair_sample is None:
-            cut_pair_sample = (
-                geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.25"),
-                geometry_identity_v2_hash(bundle, baffle_cut_fraction="0.49"),
-            )
+        v2 = geometry_identity_v2_hash(bundle)
         bindings = build_candidate_rating_bindings(
             bundle,
             space_hash=sh,
@@ -147,7 +137,7 @@ def _collect_rows(
             geometry_space="APPROVED_R1_SEARCH_ONLY",
         )
         br = replace(br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative)
-        thermal = run_thermal_prescreen(bindings, normalized)
+        thermal = run_thermal_prescreen(bindings, normalized, provider=provider)
         enriched.append(
             GeometryRecoveryCandidateRow(
                 breakthrough=br,
@@ -159,6 +149,12 @@ def _collect_rows(
             )
         )
 
+    by_cut: dict[str, str] = {}
+    for row in enriched:
+        cut_key = row.breakthrough.baffle_cut_fraction
+        by_cut.setdefault(cut_key, row.geometry_identity_v2)
+    if "0.25" in by_cut and "0.49" in by_cut:
+        cut_pair_sample = (by_cut["0.25"], by_cut["0.49"])
     sample = cut_pair_sample or ("", "")
     return enriched, sample
 
