@@ -294,8 +294,8 @@ def run_shell_hydraulic_redirection(
         f"for feasibility at min 1 m/s nozzles + R27B transitions."
     )
     gaps.append(
-        "Larger shell IDs (≥0.52 m) fail Task168 BAFFLE_GEOMETRY/TUBE_SIDE in current discrete "
-        "authority — cannot lower Bell-Delaware via shell ID expansion without ladder/baffle fix."
+        "See V08_03_SHELL_STRUCTURAL_FEASIBILITY_BREAKTHROUGH: per-shell Task168 rejection rows "
+        "(BFG hole/cut at 0.52 m, tube-side Re transition at 0.62 m, etc.), not template envelope."
     )
     if mid_ok == 0:
         gaps.append("No mid_band full-path feasible geometry in R1+verified experimental enumeration.")

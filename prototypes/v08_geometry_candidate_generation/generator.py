@@ -166,7 +166,11 @@ def enumerate_structural_geometry(
                     reason_codes=(str(stage_failure.code),),
                     evidence={
                         "shell_inside_diameter_m": shell_d,
-                        "message": stage_failure.message,
+                        "tube_length_m": format_engineering_decimal(candidate.tube_length_m),
+                        "baffle_spacing_m": format_engineering_decimal(candidate.baffle_spacing_m),
+                        "message": stage_failure.message or str(stage_failure.code),
+                        "field_path": stage_failure.field_path or "",
+                        "blocker_code": str(stage_failure.code),
                     },
                 )
             )
