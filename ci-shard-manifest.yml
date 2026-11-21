@@ -544,6 +544,7 @@ shards:
       - tests/prototypes/test_v08_frozen_candidate_resolve.py
       - tests/prototypes/test_v08_counterflow_bvp_recovery.py
       - tests/prototypes/test_enthalpy_authority_experiment_v08.py
+      - tests/prototypes/test_enthalpy_audit_context_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py

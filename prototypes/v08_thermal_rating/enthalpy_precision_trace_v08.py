@@ -12,6 +12,9 @@ from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     effective_shell_mass_flow_kg_s,
     effective_tube_mass_flow_kg_s,
 )
+from prototypes.v08_thermal_rating.enthalpy_audit_context_v08 import (
+    enthalpy_audit_precision_threshold_j_kg,
+)
 
 
 @dataclass(frozen=True)
@@ -52,7 +55,10 @@ class EnthalpyPrecisionTrace:
         "local_q_root_or_other",
         "mixed",
         "undetermined",
+        "audit_context_invalid",
     ]
+    max_tp_ph_delta_h_j_kg: float
+    max_tp_ph_delta_t_k: float
 
 
 def _ph_roundtrip_delta_j_kg(
@@ -98,7 +104,7 @@ def trace_enthalpy_on_mesh_run(
     cumulative = 0.0
     max_ph = 0.0
     first_loss: int | None = None
-    threshold = max(float(Decimal("1e-9")), 1.0)
+    threshold = enthalpy_audit_precision_threshold_j_kg()
 
     for i, cell in enumerate(run.cells):
         q = cell.solution.q_w
@@ -169,6 +175,12 @@ def trace_enthalpy_on_mesh_run(
     else:
         attributed = "undetermined"
 
+    prod_term = Decimal(str(term_h))
+    if inlet_delta != prod_term:
+        attributed = (
+            "audit_context_invalid" if abs(float(inlet_delta - prod_term)) > 1e-15 else attributed
+        )
+
     return EnthalpyPrecisionTrace(
         subdivisions=run.subdivisions,
         shooting_enthalpy_j_kg=str(run.shooting_enthalpy),
@@ -182,6 +194,8 @@ def trace_enthalpy_on_mesh_run(
         terminal_residual_k=term_k,
         terminal_residual_j_kg=term_h,
         defect_attributed_to=attributed,
+        max_tp_ph_delta_h_j_kg=0.0,
+        max_tp_ph_delta_t_k=0.0,
     )
 
 

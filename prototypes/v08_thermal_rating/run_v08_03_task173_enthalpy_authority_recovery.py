@@ -84,6 +84,7 @@ def _run_mesh(bindings: Any, provider: CoolPropProvider, subdivisions: int) -> d
     run = iso.accepted_run or iso.best_valid_run
     exp = evaluate_n4_authority_experiment(
         run,
+        bindings=bindings,
         provider=provider,
         outer_status=iso.status,
         holes=None if run else 0,
