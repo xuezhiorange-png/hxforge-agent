@@ -63,6 +63,21 @@ class TpPhReconstructionSummary:
     inlet_delta_t_k: str | None
 
 
+@dataclass(frozen=True)
+class TpPhReconstructionAudit:
+    query_status: Literal["PASS", "BLOCKED"]
+    delta_t_k: str | None
+    delta_h_j_kg: str | None
+    h_tp_j_kg: str | None
+    t_ph_k: str | None
+    h_ph_j_kg: str | None
+    property_provider_identity: str
+    user_fluid_identity: str
+    coolprop_fluid_name: str
+    mapping_basis: str
+    property_exception: str | None
+
+
 def verify_audit_thermal_context(
     bindings: CandidateRatingBindings,
 ) -> AuditContextSnapshot:
@@ -149,40 +164,89 @@ def inlet_terminal_invariant(run: _MeshRun) -> InletTerminalInvariant:
     )
 
 
-def tp_ph_reconstruction_summary(
+def _coolprop_water_for_v08_shell(bindings: CandidateRatingBindings) -> tuple[str, str, str]:
+    """User PURE_ORDINARY_WATER → CoolProp Water (production Task173 experimental boundary path)."""
+    from prototypes.v08_general_user_case.envelope import V08_SUPPORTED_FLUID
+
+    user = str(bindings.normalized.shell_side.fluid)
+    coolprop_name = "Water"
+    basis = (
+        f"{V08_SUPPORTED_FLUID}→{coolprop_name} "
+        "(hexagent...experimental_thermal_boundary._enthalpy_at_tp)"
+    )
+    return user, coolprop_name, basis
+
+
+def tp_ph_reconstruction_audit(
     provider: PropertyProvider,
     bindings: CandidateRatingBindings,
-) -> TpPhReconstructionSummary:
-    """Invariant C — TP(inlet) then PH(P,H_TP); record real ΔT and ΔH (must be in context)."""
+) -> TpPhReconstructionAudit:
+    """Invariant C — TP(P,T_in) then PH(P,H_TP); never report zero error on failure."""
     from hexagent.properties.base import FluidIdentifier, ReferenceStatePolicy
 
-    fluid = FluidIdentifier(name=str(bindings.normalized.shell_side.fluid))
+    user_fluid, coolprop_name, mapping_basis = _coolprop_water_for_v08_shell(bindings)
+    provider_id = f"{type(provider).__name__}:{getattr(provider, 'backend', 'CoolProp')}"
     p_pa = float(bindings.normalized.shell_side.inlet_pressure_pa)
     t_in = float(effective_shell_inlet_temperature_k())
+    fluid = FluidIdentifier(name=coolprop_name)
     ref = getattr(provider, "reference_state_policy", ReferenceStatePolicy.DEF)
     if not isinstance(ref, ReferenceStatePolicy):
         ref = ReferenceStatePolicy.DEF
-    max_dh = 0.0
-    max_dt = 0.0
-    inlet_dh: str | None = None
-    inlet_dt: str | None = None
     try:
         tp = provider.state_tp(fluid, t_in, p_pa)
         h_tp = float(tp.enthalpy_j_kg)
         ph = provider.state_ph(fluid, p_pa, h_tp, reference_state=ref)
         dt = float(ph.temperature_k) - t_in
         dh = float(ph.enthalpy_j_kg) - h_tp
-        max_dt = abs(dt)
-        max_dh = abs(dh)
-        inlet_dt = str(dt)
-        inlet_dh = str(dh)
-    except Exception:
-        pass
+        return TpPhReconstructionAudit(
+            query_status="PASS",
+            delta_t_k=str(dt),
+            delta_h_j_kg=str(dh),
+            h_tp_j_kg=str(h_tp),
+            t_ph_k=str(ph.temperature_k),
+            h_ph_j_kg=str(ph.enthalpy_j_kg),
+            property_provider_identity=provider_id,
+            user_fluid_identity=user_fluid,
+            coolprop_fluid_name=coolprop_name,
+            mapping_basis=mapping_basis,
+            property_exception=None,
+        )
+    except Exception as exc:
+        return TpPhReconstructionAudit(
+            query_status="BLOCKED",
+            delta_t_k=None,
+            delta_h_j_kg=None,
+            h_tp_j_kg=None,
+            t_ph_k=None,
+            h_ph_j_kg=None,
+            property_provider_identity=provider_id,
+            user_fluid_identity=user_fluid,
+            coolprop_fluid_name=coolprop_name,
+            mapping_basis=mapping_basis,
+            property_exception=f"{type(exc).__name__}:{exc}",
+        )
+
+
+def tp_ph_reconstruction_summary(
+    provider: PropertyProvider,
+    bindings: CandidateRatingBindings,
+) -> TpPhReconstructionSummary:
+    """Backward-compatible scalar summary derived from ``tp_ph_reconstruction_audit``."""
+    audit = tp_ph_reconstruction_audit(provider, bindings)
+    if audit.query_status != "PASS" or audit.delta_h_j_kg is None or audit.delta_t_k is None:
+        return TpPhReconstructionSummary(
+            max_delta_h_j_kg=float("nan"),
+            max_delta_t_k=float("nan"),
+            inlet_delta_h_j_kg=None,
+            inlet_delta_t_k=None,
+        )
+    dh = abs(float(audit.delta_h_j_kg))
+    dt = abs(float(audit.delta_t_k))
     return TpPhReconstructionSummary(
-        max_delta_h_j_kg=max_dh,
-        max_delta_t_k=max_dt,
-        inlet_delta_h_j_kg=inlet_dh,
-        inlet_delta_t_k=inlet_dt,
+        max_delta_h_j_kg=dh,
+        max_delta_t_k=dt,
+        inlet_delta_h_j_kg=audit.delta_h_j_kg,
+        inlet_delta_t_k=audit.delta_t_k,
     )
 
 
@@ -221,7 +285,9 @@ __all__ = [
     "AuditContextSnapshot",
     "ContextStatus",
     "InletTerminalInvariant",
+    "TpPhReconstructionAudit",
     "TpPhReconstructionSummary",
+    "tp_ph_reconstruction_audit",
     "enthalpy_audit_precision_threshold_j_kg",
     "inlet_terminal_invariant",
     "read_effective_audit_invariants",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
@@ -19,16 +20,22 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
 from prototypes.v08_thermal_rating.enthalpy_audit_context_v08 import (
     AuditContextSnapshot,
     InletTerminalInvariant,
+    TpPhReconstructionAudit,
     TpPhReconstructionSummary,
     enthalpy_audit_precision_threshold_j_kg,
     inlet_terminal_invariant,
     run_enthalpy_audit_body,
+    tp_ph_reconstruction_audit,
     tp_ph_reconstruction_summary,
     verify_audit_thermal_context,
 )
 from prototypes.v08_thermal_rating.enthalpy_precision_trace_v08 import (
     EnthalpyPrecisionTrace,
     trace_enthalpy_on_mesh_run,
+)
+from prototypes.v08_thermal_rating.propagation_defect_verdict_v08 import (
+    PropagationDefectVerdict,
+    assess_propagation_defect_verdict,
 )
 
 PropagationDefect = bool | Literal["unresolved"]
@@ -54,6 +61,8 @@ class N4AuthorityExperimentOutcome:
     energy_balance_ok: bool
     total_q_w: str | None
     enthalpy_propagation_defect_confirmed: PropagationDefect
+    propagation_verdict: PropagationDefectVerdict | None
+    tp_ph_audit: TpPhReconstructionAudit | None
     numerical_decision: Literal["A", "B"]
     n4_precision_floor_remains: bool
 
@@ -69,7 +78,10 @@ def _authority_consistency_audit(
     max_delta = 0.0
     first_block: int | None = None
     blocked = False
-    ulp_gate = max(enthalpy_audit_precision_threshold_j_kg(), tp_ph.max_delta_h_j_kg * 0.01)
+    ph_scale = tp_ph.max_delta_h_j_kg
+    if math.isnan(ph_scale):
+        ph_scale = 0.0
+    ulp_gate = max(enthalpy_audit_precision_threshold_j_kg(), ph_scale * 0.01)
 
     for row in trace.rows:
         for side, h_str in (
@@ -122,31 +134,6 @@ def _empty_trace(subdivisions: int = 4) -> EnthalpyPrecisionTrace:
     )
 
 
-def _propagation_defect(
-    *,
-    context: AuditContextSnapshot,
-    trace: EnthalpyPrecisionTrace,
-    consistency: AuthorityConsistencyVerdict,
-    tp_ph: TpPhReconstructionSummary | None,
-) -> PropagationDefect:
-    if context.status != "VALID":
-        return "unresolved"
-    if trace.defect_attributed_to == "audit_context_invalid":
-        return "unresolved"
-    thresh = enthalpy_audit_precision_threshold_j_kg()
-    ph_err = trace.max_ph_roundtrip_error_j_kg
-    tp_err = tp_ph.max_delta_h_j_kg if tp_ph is not None else 0.0
-    prop_err = trace.cumulative_face_prediction_error_j_kg
-    recon = trace.defect_attributed_to in ("enthalpy_state_reconstruction", "mixed") or (
-        ph_err > thresh and tp_err > thresh
-    )
-    auth_block = consistency.status == "BLOCKED" and any(
-        "shell_inlet_face_delta" not in n for n in consistency.notes
-    )
-    local = trace.defect_attributed_to == "local_q_root_or_other" or prop_err > thresh
-    return bool(recon or auth_block or local)
-
-
 def evaluate_n4_authority_experiment(
     run: _MeshRun | None,
     *,
@@ -168,6 +155,8 @@ def evaluate_n4_authority_experiment(
             energy_balance_ok=False,
             total_q_w=None,
             enthalpy_propagation_defect_confirmed="unresolved",
+            propagation_verdict=None,
+            tp_ph_audit=None,
             numerical_decision="B",
             n4_precision_floor_remains=True,
         )
@@ -188,10 +177,13 @@ def evaluate_n4_authority_experiment(
                 energy_balance_ok=False,
                 total_q_w=str(run.observables.total_duty_w),
                 enthalpy_propagation_defect_confirmed="unresolved",
+                propagation_verdict=None,
+                tp_ph_audit=None,
                 numerical_decision="B",
                 n4_precision_floor_remains=outer_status != "ACCEPTED",
             )
 
+        tp_audit = tp_ph_reconstruction_audit(provider, bindings)
         tp = tp_ph_reconstruction_summary(provider, bindings)
         trace = trace_enthalpy_on_mesh_run(run, provider=provider)
         trace = EnthalpyPrecisionTrace(
@@ -218,7 +210,14 @@ def evaluate_n4_authority_experiment(
         energy_ok = float(obs.energy_balance_residual_w) <= energy_tol
         hole_count = holes if holes is not None else int(obs.task172_numerical_hole_count)
         t172: Literal["PASS", "BLOCKED", "NOT_EVALUATED"] = "PASS" if hole_count == 0 else "BLOCKED"
-        defect = _propagation_defect(context=ctx, trace=trace, consistency=consistency, tp_ph=tp)
+        verdict = assess_propagation_defect_verdict(
+            context=ctx,
+            trace=trace,
+            consistency_status=consistency.status,
+            tp_ph=tp_audit,
+            task172_gate=t172,
+        )
+        defect = verdict.enthalpy_propagation_defect_confirmed
         accepted = (
             outer_status == "ACCEPTED"
             and term_ok
@@ -239,6 +238,8 @@ def evaluate_n4_authority_experiment(
             energy_balance_ok=energy_ok,
             total_q_w=str(obs.total_duty_w),
             enthalpy_propagation_defect_confirmed=defect,
+            propagation_verdict=verdict,
+            tp_ph_audit=tp_audit,
             numerical_decision=decision,
             n4_precision_floor_remains=outer_status != "ACCEPTED",
         )

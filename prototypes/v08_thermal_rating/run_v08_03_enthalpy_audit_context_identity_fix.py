@@ -37,9 +37,7 @@ from prototypes.v08_thermal_rating.production_rating_diagnostics_v08 import (
 
 FROZEN_CANDIDATE_ID = "9277ebb8-5b05-5130-8b90-92ee4768606b"
 GEOMETRY_HASH = "1d5cfed590c20aacb2224df020fd7fc88866c551b9ac6d813812d40b9a0a874f"
-PRIOR_ARTIFACT = Path(
-    "/opt/cursor/artifacts/v08_03_task173_enthalpy_authority_recovery.json"
-)
+PRIOR_ARTIFACT = Path("/opt/cursor/artifacts/v08_03_task173_enthalpy_authority_recovery.json")
 
 
 def _git_head() -> str:
@@ -90,7 +88,9 @@ def _prior_inlet_mismatch() -> bool | None:
         return None
     try:
         data = json.loads(PRIOR_ARTIFACT.read_text(encoding="utf-8"))
-        delta = abs(float(data.get("trace_summary", {}).get("shell_inlet_face_minus_authority_j_kg", 0)))
+        delta = abs(
+            float(data.get("trace_summary", {}).get("shell_inlet_face_minus_authority_j_kg", 0))
+        )
         return delta > 1000.0
     except Exception:
         return None
@@ -141,7 +141,9 @@ def main() -> None:
         "AUTHORITY_SHELL_INLET_H": ctx.authority_shell_inlet_h_j_kg,
         "SHELL_INLET_FACE_H": inlet.shell_inlet_face_h_j_kg if inlet else None,
         "INLET_FACE_MINUS_AUTHORITY_J_KG": (
-            inlet.inlet_face_minus_authority_j_kg if inlet else trace.shell_inlet_face_minus_authority_j_kg
+            inlet.inlet_face_minus_authority_j_kg
+            if inlet
+            else trace.shell_inlet_face_minus_authority_j_kg
         ),
         "PRODUCTION_TERMINAL_RESIDUAL_J_KG": (
             inlet.production_terminal_residual_j_kg if inlet else trace.terminal_residual_j_kg
@@ -178,7 +180,9 @@ def main() -> None:
     out.write_text(
         json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(json.dumps({"out": str(out), "AUDIT_CONTEXT_FIXED": context_fixed, "ISOLATED_N4": gate_n4}))
+    print(
+        json.dumps({"out": str(out), "AUDIT_CONTEXT_FIXED": context_fixed, "ISOLATED_N4": gate_n4})
+    )
 
 
 if __name__ == "__main__":
