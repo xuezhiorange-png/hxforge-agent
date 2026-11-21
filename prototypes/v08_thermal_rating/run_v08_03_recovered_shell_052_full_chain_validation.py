@@ -126,6 +126,19 @@ def main() -> None:
             "tube_dp_pa": report.hydraulic_report.task174_partial.tube_dp_pa,
             "shell_bell_dp_pa": report.hydraulic_report.task174_partial.shell_bell_total_dp_pa,
         }
+    recovered = report.recovered
+    if recovered is not None:
+        t166 = recovered.structural_bundle.bundle.task166_result
+        from hexagent.exchangers.shell_tube.bell_delaware.models import Task166Result
+
+        if isinstance(t166, Task166Result):
+            payload["TASK166_BELL_DP_BREAKDOWN"] = {
+                "ideal_crossflow_dp_pa": str(t166.ideal_crossflow_pressure_drop),
+                "crossflow_dp_pa": str(t166.crossflow_pressure_drop),
+                "window_dp_pa": str(t166.window_pressure_drop),
+                "end_zone_dp_pa": str(t166.end_zone_pressure_drop),
+                "total_shell_pressure_drop_pa": str(t166.total_shell_pressure_drop),
+            }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     print(json.dumps(payload, indent=2, sort_keys=True))
