@@ -175,10 +175,8 @@ def run_feasible_candidate_thermal_bridge(
             bindings, provider, run_production_gate=run_production
         )
         try:
-            _auto = run_autonomous_nozzle_full_path(bindings)
-            nozzle = assess_nozzle_velocities(
-                bindings, provider, autonomous_ports=_auto.ports
-            )
+            auto = run_autonomous_nozzle_full_path(bindings)
+            nozzle = assess_nozzle_velocities(bindings, provider, autonomous_ports=auto.ports)
         except Exception:
             nozzle = assess_nozzle_velocities(bindings, provider)
         classification = classify_thermal_hydraulic(closeout, nozzle)

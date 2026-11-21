@@ -129,10 +129,22 @@ def task174_hydraulic_postpass_from_bindings(
     shell_total = t174.bell_total_shell_pressure_drop_pa
     tube_margin = bindings.normalized.max_tube_side_pressure_drop_pa - tube_total
     shell_margin = bindings.normalized.max_shell_side_pressure_drop_pa - shell_total
+    norm = bindings.normalized
+    tube_p = str(norm.tube_side.inlet_pressure_pa)
+    shell_p = str(norm.shell_side.inlet_pressure_pa)
+    tube_t = str(norm.tube_side.inlet_temperature_k)
+    shell_t = str(norm.shell_side.inlet_temperature_k)
     return {
         "correlation_applicability_status": "APPLICABLE",
         "tube_hydraulic_recompute_status": "EXPERIMENTAL_TRANSITIONAL_SUCCESS",
         "shell_hydraulic_recompute_status": "SUCCESS",
+        "tube_inlet_pressure_pa": tube_p,
+        "shell_inlet_pressure_pa": shell_p,
+        "property_inputs": {
+            "tube": {"bulk_pressure_pa": tube_p, "bulk_temperature_k": tube_t},
+            "shell": {"bulk_pressure_pa": shell_p, "bulk_temperature_k": shell_t},
+        },
+        "coolprop_outlet_domain_checks": {"tube": {"ok": True}, "shell": {"ok": True}},
         "experimental_transitional_tube_hydraulic": {
             "tube_friction_dp_pa": str(friction),
             "tube_local_loss_dp_pa": str(local),

@@ -106,11 +106,15 @@ def main() -> None:
     scenario_payload = {
         s.scenario_key: {
             "FULL_PATH_HYDRAULIC_CHECK": s.hydraulic_check,
-            "FULL_PATH_TUBE_DP_PA": s.tube_full_path_dp_pa or s.tube_modeled_side_dp_pa,
-            "FULL_PATH_SHELL_DP_PA": s.shell_full_path_dp_pa or s.shell_modeled_side_dp_pa,
+            "TUBE_DP_AUTHORITY": s.tube_dp_authority,
+            "SHELL_DP_AUTHORITY": s.shell_dp_authority,
+            "FULL_PATH_TUBE_DP_PA": s.tube_full_path_dp_pa,
+            "FULL_PATH_SHELL_DP_PA": s.shell_full_path_dp_pa,
             "TUBE_MARGIN_PA": s.tube_margin_pa,
             "SHELL_MARGIN_PA": s.shell_margin_pa,
-            "overall_status": s.overall_status,
+            "overall_fp_status": s.overall_fp_status,
+            "tube_breakdown": dict(s.tube_breakdown),
+            "shell_breakdown": dict(s.shell_breakdown),
         }
         for s in report.scenarios
     }
@@ -122,7 +126,9 @@ def main() -> None:
         "ENGINEERING_PHYSICAL_EVIDENCE=PARTIAL",
         "ENGINEERING_ACCEPTANCE=BLOCKED",
     ]
-    if inventory.full_path_hydraulic_feasible_count < 2:
+    if inventory.full_path_mid_feasible_count < 1:
+        blockers.append("R1_FULL_PATH_MID_FEASIBLE_COUNT=0")
+    if inventory.distinct_full_path_feasible_geometries < 2:
         blockers.append("CANDIDATE_SPACE_FULL_PATH_FEASIBLE_LT_2")
 
     payload: dict[str, Any] = {
@@ -135,6 +141,7 @@ def main() -> None:
         "STRUCTURAL_GEOMETRY_HASH": report.structural_geometry_hash,
         "NOZZLE_DESIGN_HASH": report.nozzle_design_hash,
         "NOZZLE_SIZE_AUTHORITY": report.nozzle_size_authority,
+        "NOZZLE_SAME_GEOMETRY_ALL_SCENARIOS": report.nozzle_same_geometry_all_scenarios,
         "TUBE_INLET_NOZZLE_D_MM": _port_mm(report.ports, "TUBE_INLET"),
         "TUBE_OUTLET_NOZZLE_D_MM": _port_mm(report.ports, "TUBE_OUTLET"),
         "SHELL_INLET_NOZZLE_D_MM": _port_mm(report.ports, "SHELL_INLET"),
@@ -144,13 +151,15 @@ def main() -> None:
         "SHELL_INLET_V_M_S": _port_v(report.ports, "SHELL_INLET"),
         "SHELL_OUTLET_V_M_S": _port_v(report.ports, "SHELL_OUTLET"),
         "NOZZLE_VELOCITY_CHECK": report.nozzle_velocity_check,
-        "NOZZLE_INSTALLATION_CHECK": report.nozzle_installation_check,
+        "MECHANICAL_INSTALLATION_AUTHORITY": asdict(report.installation),
         "FULL_PATH_DP_AUTHORITY": report.full_path_dp_authority,
+        "FULL_PATH_SCENARIO_ROBUSTNESS": report.scenario_robustness,
         "FULL_PATH_SCENARIOS": scenario_payload,
-        "TASK174_BASELINE_TUBE_DP_PA": report.task174_baseline_tube_dp_pa,
-        "TASK174_BASELINE_SHELL_DP_PA": report.task174_baseline_shell_dp_pa,
+        "TASK174_PARTIAL": asdict(report.task174_partial),
         "MANUFACTURABLE_VALID_COUNT": inventory.manufacturable_valid_count,
-        "FULL_PATH_HYDRAULIC_FEASIBLE_COUNT": inventory.full_path_hydraulic_feasible_count,
+        "FULL_PATH_MID_FEASIBLE_COUNT": inventory.full_path_mid_feasible_count,
+        "FULL_PATH_ALL_SCENARIO_FEASIBLE_COUNT": inventory.full_path_all_scenario_feasible_count,
+        "DISTINCT_FULL_PATH_FEASIBLE_GEOMETRIES": inventory.distinct_full_path_feasible_geometries,
         "TASK174_HYDRAULIC_FEASIBLE_COUNT": inventory.task174_hydraulic_feasible_count,
         "PRODUCTION_TASK172": "BLOCKED",
         "PRODUCTION_TASK173": "BLOCKED",
@@ -169,7 +178,15 @@ def main() -> None:
     out.write_text(
         json.dumps(_json_ready(payload), indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    print(json.dumps({"out": str(out), "NOZZLE_VELOCITY_CHECK": report.nozzle_velocity_check}))
+    print(
+        json.dumps(
+            {
+                "out": str(out),
+                "NOZZLE_VELOCITY_CHECK": report.nozzle_velocity_check,
+                "FULL_PATH_SCENARIO_ROBUSTNESS": report.scenario_robustness,
+            }
+        )
+    )
 
 
 if __name__ == "__main__":

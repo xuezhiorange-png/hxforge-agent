@@ -40,7 +40,7 @@ class NozzleVelocityReport:
 
 
 def _in_range(value: Decimal) -> bool:
-    return Decimal("0.999") <= value <= Decimal("3.001")
+    return Decimal("1") <= value <= Decimal("3")
 
 
 def _side_from_task167_shell(bindings: CandidateRatingBindings) -> NozzleVelocitySide:

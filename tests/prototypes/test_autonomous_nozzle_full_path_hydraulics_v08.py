@@ -35,7 +35,7 @@ def test_frozen_candidate_four_nozzles_from_real_mass_flow() -> None:
     assert report.nozzle_size_authority == "PARAMETRIC_CALCULATED"
     assert report.full_path_dp_authority == "ASSUMPTION_BASED"
     for port in report.ports:
-        assert Decimal("0.999") <= port.velocity_m_s <= Decimal("3.001")
+        assert Decimal("1") <= port.velocity_m_s <= Decimal("3")
         expected_v = port.mass_flow_kg_s / (port.density_kg_m3 * port.effective_area_m2)
         assert abs(port.velocity_m_s - expected_v) < Decimal("1e-6")
     assert report.nozzle_velocity_check == "PASS"
@@ -44,8 +44,9 @@ def test_frozen_candidate_four_nozzles_from_real_mass_flow() -> None:
     assert len(report.scenarios) == 3
     mid = next(s for s in report.scenarios if s.scenario_key == "mid_band")
     assert mid.hydraulic_check == "BLOCKED"
-    assert mid.tube_modeled_side_dp_pa is not None
-    assert Decimal(mid.tube_modeled_side_dp_pa) <= Decimal("1150")
+    assert report.task174_partial.tube_dp_pa
+    assert Decimal(report.task174_partial.tube_dp_pa) <= Decimal("1150")
+    assert report.nozzle_same_geometry_all_scenarios is True
 
 
 def test_manufacturable_inventory_counts_without_expanding_space() -> None:
@@ -56,4 +57,4 @@ def test_manufacturable_inventory_counts_without_expanding_space() -> None:
     )
     assert inv.manufacturable_valid_count == 3
     assert inv.task174_hydraulic_feasible_count >= 1
-    assert inv.full_path_hydraulic_feasible_count < 2
+    assert inv.distinct_full_path_feasible_geometries < 2
