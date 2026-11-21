@@ -18,12 +18,12 @@ from prototypes.v08_thermal_rating.engineering_acceptance_decision_v08 import (
     build_engineering_acceptance_decision,
 )
 from prototypes.v08_thermal_rating.engineering_error_budget_v08 import (
-    frozen_engineering_error_budgets,
+    build_engineering_error_budget_report,
 )
 from prototypes.v08_thermal_rating.engineering_physical_evaluator_v08 import (
     assess_engineering_physical_layer,
     load_frozen_330_evidence,
-    run_negative_controls,
+    run_negative_controls_via_evaluator,
 )
 
 FROZEN_FIXTURE = _REPO / "tests/fixtures/v08_03_frozen_330kw_engineering_evidence.json"
@@ -66,8 +66,8 @@ def main() -> None:
     ev = load_frozen_330_evidence(FROZEN_FIXTURE)
     tp_status = str(ev.raw.get("tp_ph_query_status", "PASS"))
     physical = assess_engineering_physical_layer(ev, tp_ph_query_status=tp_status)
-    negative = run_negative_controls()
-    budgets = frozen_engineering_error_budgets()
+    negative = run_negative_controls_via_evaluator(ev, tp_ph_query_status=tp_status)
+    error_budget = build_engineering_error_budget_report(frozen=ev.raw)
 
     task172 = str(ev.raw.get("production_task172_gate", "BLOCKED"))
     task173 = str(ev.raw.get("production_task173", "BLOCKED"))
@@ -78,7 +78,7 @@ def main() -> None:
         negative=negative,
         task172_gate=task172,
         task173_gate=task173,
-        budgets=budgets,
+        error_budget=error_budget,
     )
 
     payload: dict[str, Any] = {
@@ -89,7 +89,8 @@ def main() -> None:
         "PRODUCTION_NUMERICAL_STATUS": pkg.production_numerical_status,
         "PRODUCTION_NUMERICAL_DETAIL": pkg.production_numerical_detail,
         "ENGINEERING_PHYSICAL_EVIDENCE": pkg.engineering_physical_evidence,
-        "CONTRACT_REVIEW_ELIGIBILITY": pkg.contract_review_eligibility,
+        "CONTRACT_REVIEW_STATUS": pkg.contract_review_status,
+        "CONTRACT_CHANGE_EVIDENCE": pkg.contract_change_evidence,
         "ENGINEERING_ACCEPTANCE": pkg.engineering_acceptance,
         "PRODUCTION_TASK172": pkg.production_task172,
         "PRODUCTION_TASK173": pkg.production_task173,
@@ -110,8 +111,7 @@ def main() -> None:
         "CASE_ID": ev.case_id,
         "CANDIDATE_ID": ev.candidate_id,
         "rationale": pkg.rationale,
-        "task172_budget_ref": budgets.task172.contract_id,
-        "task173_budget_ref": budgets.task173_terminal.contract_id,
+        "ENGINEERING_ERROR_BUDGET_STATUS": pkg.engineering_error_budget_status,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -119,7 +119,7 @@ def main() -> None:
         json.dumps(
             {
                 "out": str(out),
-                "CONTRACT_REVIEW_ELIGIBILITY": pkg.contract_review_eligibility,
+                "CONTRACT_REVIEW_STATUS": pkg.contract_review_status,
                 "NEGATIVE_CONTROL_TESTS": pkg.negative_control_tests,
             }
         )

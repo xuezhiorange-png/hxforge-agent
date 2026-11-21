@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 from prototypes.v08_thermal_rating.engineering_acceptance_decision_v08 import (
-    ContractReviewEligibility,
+    ContractChangeEvidence,
+    ContractReviewStatus,
     EngineeringAcceptanceDecisionPackage,
 )
 from prototypes.v08_thermal_rating.numerical_contract_terminal_v08 import (
@@ -26,7 +27,8 @@ class NumericalContractReview:
     """Legacy A/B posture derived from eligibility, not from BLOCKED alone."""
 
     numerical_contract_posture: ContractPosture
-    contract_review_eligibility: ContractReviewEligibility
+    contract_review_status: ContractReviewStatus
+    contract_change_evidence: ContractChangeEvidence
     specific_required_change: str
     production_numerical_status: str
     rationale: tuple[str, ...]
@@ -48,31 +50,33 @@ def review_numerical_acceptance_contract(
     notes.append(f"causal_proof={propagation.propagation_defect_causal_proof}")
 
     if decision_package is not None:
-        elig = decision_package.contract_review_eligibility
+        review = decision_package.contract_review_status
+        change_ev = decision_package.contract_change_evidence
         prod = decision_package.production_numerical_status
         scope = decision_package.recommended_contract_change
         posture: ContractPosture
         if prod == "PASS":
             posture = "PRODUCTION_PASS"
-        elif elig == "ELIGIBLE":
+        elif review == "ELIGIBLE_FOR_DISCUSSION" and change_ev == "INSUFFICIENT":
             posture = "PRODUCTION_BLOCKED_REVIEW_ELIGIBLE"
         else:
             posture = "PRODUCTION_BLOCKED_EVIDENCE_INSUFFICIENT"
             scope = "none"
         return NumericalContractReview(
             numerical_contract_posture=posture,
-            contract_review_eligibility=elig,
+            contract_review_status=review,
+            contract_change_evidence=change_ev,
             specific_required_change=scope,
             production_numerical_status=prod,
             rationale=tuple(decision_package.rationale) + tuple(notes),
         )
 
-    # Fallback without package: never assert contract change.
     blocked = production_task173 != "VALIDATED" or outer_n4_status != "ACCEPTED"
     posture = "PRODUCTION_PASS" if not blocked else "PRODUCTION_BLOCKED_EVIDENCE_INSUFFICIENT"
     return NumericalContractReview(
         numerical_contract_posture=posture,
-        contract_review_eligibility="INSUFFICIENT",
+        contract_review_status="NOT_ELIGIBLE",
+        contract_change_evidence="INSUFFICIENT",
         specific_required_change="none",
         production_numerical_status="BLOCKED" if blocked else "PASS",
         rationale=tuple(notes),

@@ -25,8 +25,10 @@ Status: **proposal only** — `PRODUCTION_CONTRACT_CHANGE_AUTHORIZED=false`.
 
 ## Positive / negative examples
 
-- **Positive (frozen 330 kW):** N1/N2 ACCEPTED, duty ~395 kW, dP within envelope, terminal h residual ~5% above production `allowed_h`, propagation ~1e-10 J/kg.
-- **Negative:** +15% duty imbalance or inverted wall order → L2 evaluator BLOCKED (see `run_negative_controls`).
+- **Positive (frozen 330 kW, L2 only):** N1/N2 ACCEPTED, duty ~395 kW (experimental isolated), dP within envelope, **energy balance not evaluated** (no independent Q_hot/Q_cold/wall residual in bundle), **local heat transfer BLOCKED** (Task172 production), **N4/mesh BLOCKED**, nozzle velocity **UNRESOLVED** → `ENGINEERING_PHYSICAL_EVIDENCE=PARTIAL` — not SUFFICIENT and not production VALIDATED.
+- **Terminal enthalpy (L1):** measured residual `4.757584e-5 J/kg` vs production `allowed_h` `4.182871e-5 J/kg` → **~13.74%** above allowance (not ~5%).
+- **Task172:** production gate BLOCKED; per-cell r1/r2/r3 magnitudes **not** in frozen bundle — do not cite BVP Cell 0 residuals as current N4 production evidence.
+- **Negative:** perturbations via `run_negative_controls_via_evaluator` (duty, dP, energy failed, wall order, N4 blocked, nozzle unresolved) — each must trip the named screen rule.
 
 ## V07 Golden
 

@@ -22,5 +22,6 @@
   "tube_dp_pa": "1105.970",
   "shell_dp_pa": "1177.1016117274713753280239465170046662049076209262",
   "max_tube_dp_pa": "1150",
-  "max_shell_dp_pa": "1180"
+  "max_shell_dp_pa": "1180",
+  "nozzle_velocity_status": "UNRESOLVED"
 }
