@@ -36,6 +36,11 @@ from prototypes.v08_thermal_rating.thermal_prescreen_v08 import (
     run_thermal_prescreen,
 )
 
+FROZEN_SHELL_052_CANDIDATE_ID = "6d78897b-77b7-545d-8b49-38a569b1c86e"
+FROZEN_SHELL_052_GEOMETRY_V2 = (
+    "aba3161014a6a9f16c47797eb2e23b63203e8ccf2a5fe70e80ec869d6b00d98e"
+)
+
 DesignDecision = Literal["MID_FEASIBLE_FOUND", "RECOVERED_LAYOUT_HYDRAULIC_BLOCKED"]
 MidHydraulic = Literal["PASS", "BLOCKED", "NOT_RUN_PROVEN_INFEASIBLE"]
 HighHydraulic = Literal["PASS", "BLOCKED", "NOT_RUN"]

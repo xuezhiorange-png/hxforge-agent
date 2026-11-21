@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
+    run_autonomous_nozzle_full_path,
+)
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     load_case_bindings,
     resolve_candidate_bindings_by_id,
-)
-from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
-    run_autonomous_nozzle_full_path,
 )
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
 from tests.prototypes.test_v08_frozen_candidate_resolve import FROZEN_ID

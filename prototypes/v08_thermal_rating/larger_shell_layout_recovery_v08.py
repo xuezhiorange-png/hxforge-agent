@@ -172,7 +172,7 @@ def run_larger_shell_layout_recovery(
     if recovered and recovered_bundle is not None:
         notes.append(recovered_bundle.recovery_note)
     if not recovered:
-        for discrete_path, cut_label in (
+        for discrete_path, _cut_label in (
             (BREAKTHROUGH_DISCRETE_SPACE_PATH, "0.35"),
             (
                 _REPO / "docs/tasks/evidence/V08-03-breakthrough-discrete-space-cut049-r1.json",

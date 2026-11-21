@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
+from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
     geometry_identity_v2_hash,
     geometry_projection_hash_v1,
@@ -24,8 +27,6 @@ from prototypes.v08_thermal_rating.task168_rejection_diagnostics_v08 import (
     BREAKTHROUGH_DISCRETE_SPACE_PATH,
     _enumerate_with_payload,
 )
-from hexagent.properties.coolprop_provider import CoolPropProvider
-from decimal import Decimal
 
 
 def test_v2_cut_distinct_across_authoritative_bundles() -> None:
@@ -76,7 +77,7 @@ def test_legacy_v1_can_alias_different_v2_cuts() -> None:
         baffle_cut_override=Decimal("0.35"),
     )
     v2b = geometry_identity_v2_hash(other_valid[0])
-    aliases = legacy_geometry_projection_aliases(((v1, v2a), (v1, v2b)))
+    legacy_geometry_projection_aliases(((v1, v2a), (v1, v2b)))
     assert v2a != v2b
 
 

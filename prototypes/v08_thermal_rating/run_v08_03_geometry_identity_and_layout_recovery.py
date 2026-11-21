@@ -15,48 +15,22 @@ _REPO = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(_REPO), str(_REPO / "src")]
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindings
-from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import BVP_PROTOTYPE_ROUTE
-from prototypes.v08_thermal_rating.case_identity_v08 import CASE_330KW_ID, FIXTURE_330
 from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
     legacy_geometry_projection_aliases,
 )
+from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindings
+from prototypes.v08_thermal_rating.bvp_gate_evidence_v08 import BVP_PROTOTYPE_ROUTE
+from prototypes.v08_thermal_rating.case_identity_v08 import CASE_330KW_ID, FIXTURE_330
 from prototypes.v08_thermal_rating.geometry_identity_and_layout_recovery_v08 import (
     run_geometry_identity_and_layout_recovery,
 )
+from prototypes.v08_thermal_rating.v08_ci_status import ci_status_for_head
 
 PR_NUMBER = 325
 
 
 def _git_head() -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_REPO, text=True).strip()
-
-
-def _ci_status() -> str:
-    try:
-        out = subprocess.check_output(
-            [
-                "gh",
-                "run",
-                "list",
-                "--repo",
-                "xuezhiorange-png/hxforge-agent",
-                "--branch",
-                "cursor/v08-03-live-thermal-rating-1201",
-                "--limit",
-                "1",
-                "--json",
-                "conclusion,status,number",
-            ],
-            cwd=_REPO,
-            text=True,
-        )
-        row = json.loads(out)[0]
-        if row.get("status") != "completed":
-            return f"in_progress_{row.get('number', '?')}"
-        return str(row.get("conclusion") or "unknown")
-    except Exception:
-        return "unknown"
 
 
 def _json_ready(value: Any) -> Any:
@@ -82,11 +56,12 @@ def main() -> None:
     best = report.best_new
     br = best.breakthrough if best else None
 
+    head = _git_head()
     payload: dict[str, Any] = {
         "TASK_ID": "V08_03_GEOMETRY_IDENTITY_AND_LAYOUT_RECOVERY",
         "PR_NUMBER": PR_NUMBER,
-        "HEAD_SHA": _git_head(),
-        "CI_STATUS": _ci_status(),
+        "HEAD_SHA": head,
+        "CI_STATUS": ci_status_for_head(head),
         "CASE_ID": CASE_330KW_ID,
         "BAFFLE_COUNT_CORRECTED": report.baffle_count_corrected,
         "ACTUAL_BAFFLE_COUNT": report.actual_baffle_count,

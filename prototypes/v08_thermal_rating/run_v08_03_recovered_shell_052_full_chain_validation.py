@@ -20,6 +20,7 @@ from prototypes.v08_thermal_rating.case_identity_v08 import CASE_330KW_ID, FIXTU
 from prototypes.v08_thermal_rating.recovered_shell_052_full_chain_v08 import (
     run_recovered_shell_052_full_chain,
 )
+from prototypes.v08_thermal_rating.v08_ci_status import ci_status_for_head
 
 PR_NUMBER = 325
 
@@ -28,51 +29,19 @@ def _git_head() -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_REPO, text=True).strip()
 
 
-def _ci_status() -> str:
-    try:
-        out = subprocess.check_output(
-            [
-                "gh",
-                "run",
-                "list",
-                "--repo",
-                "xuezhiorange-png/hxforge-agent",
-                "--branch",
-                "cursor/v08-03-live-thermal-rating-1201",
-                "--limit",
-                "3",
-                "--json",
-                "conclusion,status,number",
-            ],
-            cwd=_REPO,
-            text=True,
-        )
-        rows = json.loads(out)
-        for row in rows:
-            if row.get("number") in (1599, 1600):
-                num = row.get("number")
-                if row.get("status") != "completed":
-                    return f"in_progress_{num}"
-                return f"{row.get('conclusion')}_{num}"
-        if rows and rows[0].get("status") != "completed":
-            return f"in_progress_{rows[0].get('number', '?')}"
-        return str(rows[0].get("conclusion") if rows else "unknown")
-    except Exception:
-        return "unknown"
-
-
 def main() -> None:
     out = Path("/opt/cursor/artifacts/v08_03_recovered_shell_052_full_chain_validation.json")
     provider = CoolPropProvider()
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
+    head = _git_head()
     report = run_recovered_shell_052_full_chain(normalized, handoff, provider=provider)
     thermal = report.thermal
 
     payload: dict[str, Any] = {
         "TASK_ID": "V08_03_RECOVERED_SHELL_052_FULL_CHAIN_VALIDATION",
         "PR_NUMBER": PR_NUMBER,
-        "HEAD_SHA": _git_head(),
-        "CI_STATUS": _ci_status(),
+        "HEAD_SHA": head,
+        "CI_STATUS": ci_status_for_head(head),
         "CASE_ID": CASE_330KW_ID,
         "SHELL_052_TASK168": report.shell_052_task168,
         "SHELL_052_GEOMETRY_V2": report.geometry_identity_v2 or "none",

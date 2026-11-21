@@ -11,6 +11,9 @@ from typing import Any, Literal
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_general_user_case.solver_handoff import V08SolverHandoffV1
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
+from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
+    resolve_baffle_authority,
+)
 from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
     AutonomousNozzleFullPathReport,
     run_autonomous_nozzle_full_path,
@@ -18,9 +21,6 @@ from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 im
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     build_candidate_rating_bindings,
     enumerate_structural_bundles,
-)
-from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
-    resolve_baffle_authority,
 )
 from prototypes.v08_thermal_rating.experimental_geometry_discrete_space_v08 import (
     EXPERIMENTAL_GEOMETRY_LABEL,

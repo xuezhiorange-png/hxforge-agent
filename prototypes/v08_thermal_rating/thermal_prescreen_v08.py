@@ -77,10 +77,7 @@ def _epsilon_ntu_counterflow(
         expo = Decimal(str(math.exp(float(-ntu * (Decimal("1") - cr)))))
         num = Decimal("1") - expo
         den = Decimal("1") - cr * expo
-        if den == 0:
-            eff = Decimal("0")
-        else:
-            eff = num / den
+        eff = Decimal("0") if den == 0 else num / den
     q_max = c_min * (t_hot_in - t_cold_in)
     q = eff * q_max
     t_ho = t_hot_in - q / c_hot
@@ -93,6 +90,7 @@ def run_thermal_prescreen(
     normalized: NormalizedUserDesignCase,
     *,
     provider: PropertyProvider,
+    task037_override: Task037SuccessResult | None = None,
 ) -> ThermalPrescreenResult:
     raw = bindings.bundle.bundle
     t166 = raw.task166_result
@@ -170,7 +168,7 @@ def run_thermal_prescreen(
             notes=("task026_blocked",),
         )
 
-    t037 = raw.task037_result
+    t037 = task037_override if task037_override is not None else raw.task037_result
     if not isinstance(t037, Task037SuccessResult):
         return ThermalPrescreenResult(
             status="NOT_EVALUATED",
@@ -200,9 +198,11 @@ def run_thermal_prescreen(
     )
     a_o = a_i * ratio
     r_wall_o = t037.wall_resistance_outer_surface_m2_k_w
+    r_fi = t037.inside_fouling_authority.fouling_resistance_m2_k_w * ratio
+    r_fo = t037.outside_fouling_authority.fouling_resistance_m2_k_w
     wall_src = f"task037:{t037.wall_material_authority_hash}/{t037.wall_conductivity_authority_hash}"
 
-    denom = ratio / h_i + r_wall_o + Decimal(1) / h_o
+    denom = ratio / h_i + r_fi + r_wall_o + r_fo + Decimal(1) / h_o
     if denom <= 0 or a_o <= 0:
         return ThermalPrescreenResult(
             status="NOT_EVALUATED",
@@ -226,8 +226,8 @@ def run_thermal_prescreen(
     t_si = Decimal(str(normalized.shell_side.inlet_temperature_k))
     p_t = Decimal(str(normalized.tube_side.inlet_pressure_pa))
     p_s = Decimal(str(normalized.shell_side.inlet_pressure_pa))
-    c_t = _cp_kg_s(provider, fluid=normalized.tube_side.fluid, t_k=t_ti, p_pa=p_t) * normalized.tube_side.mass_flow_kg_s
-    c_s = _cp_kg_s(provider, fluid=normalized.shell_side.fluid, t_k=t_si, p_pa=p_s) * normalized.shell_side.mass_flow_kg_s
+    c_t = _cp_kg_s(provider, _fluid=normalized.tube_side.fluid, t_k=t_ti, p_pa=p_t) * normalized.tube_side.mass_flow_kg_s
+    c_s = _cp_kg_s(provider, _fluid=normalized.shell_side.fluid, t_k=t_si, p_pa=p_s) * normalized.shell_side.mass_flow_kg_s
 
     q_ntu, t_to, t_so, _eff = _epsilon_ntu_counterflow(
         ua=ua,
