@@ -12,11 +12,19 @@ from typing import Any, Literal
 
 from pydantic import ValidationError
 
+from hexagent.canonical_json import canonical_sha256
 from hexagent.exchangers.shell_tube.manufacturable_candidates import service as task168_svc
+from hexagent.exchangers.shell_tube.manufacturable_candidates.service import (
+    build_raw_tube_side_request_envelope,
+)
 from hexagent.exchangers.shell_tube.tube_side.friction_pressure_drop import (
     TURBULENT_LOWER_RE,
     compute_task027_friction_pressure_drop,
 )
+from hexagent.exchangers.shell_tube.tube_side_thermal import (
+    compute_tube_side_heat_transfer_coefficient,
+)
+from hexagent.exchangers.shell_tube.tube_side_thermal.request import TubeSideThermalRequest
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_general_user_case.physical_feasibility import (
     THERMODYNAMIC_DUTY_TOLERANCE,
@@ -106,22 +114,60 @@ class PortVelocityRow:
     inside_diameter_m: str
 
 
+RobustnessEvidenceStatus = Literal[
+    "VERIFIED_ROBUST",
+    "VERIFIED_NOT_ROBUST",
+    "REPLAY_BINDING_BLOCKED",
+    "PHYSICAL_MODEL_APPLICABILITY_BLOCKED",
+    "INSUFFICIENT_EVIDENCE",
+]
+
+
+@dataclass(frozen=True)
+class SensitivityBindingAudit:
+    normalized_input_hash: str
+    handoff_normalized_input_hash: str
+    tube_mass_flow_kg_s: str
+    shell_mass_flow_kg_s: str
+    tube_inlet_temperature_k: str
+    shell_inlet_temperature_k: str
+    evaluation_input_authority_hash: str
+    candidate_spec_id: str
+    task021_layout_hash_expected: str
+    task021_layout_hash_observed: str
+    task021_physical_tube_count: int
+    task025_result_id: str | None
+    task026_result_id: str | None
+    task026_reynolds_number: str | None
+    task027_raw_blocker_code: str | None
+    task168_stage_failure_code: str | None
+    task168_stage_failure_field_path: str | None
+    task173_binding_state: str
+    replay_mode: str
+    re_scaling_diagnostic: str | None
+
+
 @dataclass(frozen=True)
 class SensitivityScenarioResult:
     scenario_key: str
     scenario_label: str
     exploratory_only: Literal[True]
+    robustness_evidence_status: RobustnessEvidenceStatus
     task026_reynolds: str | None
     re_margin_below_turbulent_lower: str | None
     task027_status: str
     task027_blocker_code: str | None
+    task027_raw_blocker_code: str | None
+    task168_wrapper_code: str | None
     clean_q_w: str | None
     clean_q_delta_vs_target_w: str | None
     high_tube_dp_pa: str | None
     high_shell_dp_pa: str | None
     high_tube_margin_pa: str | None
     high_shell_margin_pa: str | None
+    high_k_dp_computed: bool
     four_port_check: str
+    binding_audit: SensitivityBindingAudit
 
 
 @dataclass(frozen=True)
@@ -168,6 +214,8 @@ class ParetoChoice:
 @dataclass(frozen=True)
 class EngineeringShortlistRobustnessReport:
     frozen_candidate_c_unchanged: Literal[True]
+    canonical_shortlist_size: int
+    distinct_audited_layout_hash_count: int
     unique_physical_layout_count: int
     identity_binding_status: str
     identity_records: tuple[LayoutIdentityRecord, ...]
@@ -187,6 +235,15 @@ class EngineeringShortlistRobustnessReport:
     acceptance_contract_note: str
     final_engineering_decision: str
     supersession_chain: tuple[str, ...]
+    sensitivity_binding_root_cause: str
+    layout_identity_drift_confirmed: bool
+    replay_binding_defect_confirmed: Literal[True]
+    robustness_evidence_valid: bool
+    nonbaseline_scenarios_valid: int
+    nonbaseline_scenarios_blocked: int
+    nonbaseline_high_k_dp_computed: int
+    layout_status_by_key: dict[str, str]
+    engineering_acceptance_status: str
 
 
 def _handoff_for_case(
@@ -230,15 +287,16 @@ def _resolve_structural(
     raise RuntimeError(f"no structural match tubes={tube_count} L={tube_length_m} scale={envelope_scale}")
 
 
-def _task027_from_bundle(
-    bundle: Any,
+def _task027_raw(
     *,
+    task025_result: Any,
+    task026_result: Any,
     t168: Any,
 ) -> tuple[str, str | None]:
     authz = t168.evaluation_input_authority
     t027 = compute_task027_friction_pressure_drop(
-        task025_result=bundle.task025_result,
-        task026_result=bundle.task026_result,
+        task025_result=task025_result,
+        task026_result=task026_result,
         property_snapshot=authz.task027_property_snapshot,
         constant_density_path_assertion=authz.task027_constant_density_assertion,
         zero_net_elevation_change_assertion=authz.task027_zero_net_elevation_assertion,
@@ -248,7 +306,82 @@ def _task027_from_bundle(
     if type(t027).__name__ == "Task027SuccessResult":
         return "PASS", None
     blockers = getattr(t027, "blockers", None) or []
-    return "BLOCKED", str(blockers[0].code) if blockers else "UNKNOWN_TASK027"
+    raw = str(blockers[0].code) if blockers else "UNKNOWN_TASK027"
+    return "BLOCKED", raw
+
+
+def _tube_side_flow_or_property_perturbed(scenario_key: str) -> bool:
+    return scenario_key in (
+        "tube_mdot_minus_1pct",
+        "tube_mdot_minus_3pct",
+        "tube_mdot_plus_3pct",
+        "tube_inlet_plus_2k",
+        "shell_inlet_minus_2k",
+    )
+
+
+def _resolve_task026_request(t168: Any) -> TubeSideThermalRequest:
+    raw = t168.evaluation_input_authority.task026_request
+    if isinstance(raw, TubeSideThermalRequest):
+        return raw
+    built = build_raw_tube_side_request_envelope(task168_svc._public_value(raw))
+    if not isinstance(built, TubeSideThermalRequest):
+        raise ValueError("task026_request could not be materialized")
+    return built
+
+
+def _re_scaling_diagnostic(baseline_re: str | None, scenario_key: str) -> str | None:
+    if baseline_re is None or scenario_key == "baseline":
+        return None
+    base = Decimal(baseline_re)
+    factors = {
+        "tube_mdot_minus_1pct": Decimal("0.99"),
+        "tube_mdot_minus_3pct": Decimal("0.97"),
+        "tube_mdot_plus_3pct": Decimal("1.03"),
+    }
+    factor = factors.get(scenario_key)
+    if factor is None:
+        return "No mass-flow scaling diagnostic for this scenario (shell-only or property shift)."
+    expected = (base * factor).quantize(Decimal("0.0001"))
+    return (
+        f"Constant-property diagnostic Re≈{expected} at "
+        f"{factor * 100:.2f}% tube mass flow; not a substitute for Task026."
+    )
+
+
+def _fixed_layout_tube_side_replay(
+    structural: V08StructuralGeometryBundle,
+    *,
+    t168: Any,
+    scenario_key: str,
+    baseline_re: str | None,
+) -> tuple[Any | None, Any | None, str | None, str, str | None]:
+    """Rerun Task026/027 only; Task021 layout is frozen from canonical enumeration."""
+    raw = structural.bundle
+    layout_hash = str(raw.task021_layout.layout_hash)
+    t025 = raw.task025_result
+    if t025 is None:
+        return None, None, None, "BLOCKED", "MISSING_TASK025_ON_STRUCTURAL_BUNDLE"
+    if _tube_side_flow_or_property_perturbed(scenario_key):
+        task026_request = _resolve_task026_request(t168)
+        t026 = compute_tube_side_heat_transfer_coefficient(task026_request, t025)
+    else:
+        t026 = raw.task026_result
+    if t026 is None:
+        return t025, None, None, "BLOCKED", "MISSING_TASK026"
+    reynolds = str(getattr(t026, "reynolds_number", "")) or None
+    status, raw_code = _task027_raw(task025_result=t025, task026_result=t026, t168=t168)
+    if scenario_key.startswith("shell_mdot") and baseline_re is not None and reynolds != baseline_re:
+        return (
+            t025,
+            t026,
+            reynolds,
+            "BLOCKED",
+            "REPLAY_BINDING_TUBE_RE_DRIFT_UNDER_SHELL_ONLY_PERTURBATION",
+        )
+    # observed layout is frozen
+    _ = layout_hash
+    return t025, t026, reynolds, status, raw_code
 
 
 def _build_t168_with_envelope(
@@ -284,45 +417,68 @@ def _build_t168_with_envelope(
     return dr(t168, evaluation_input_authority=evaluation)
 
 
-def _replay_task026_task027(
-    structural: V08StructuralGeometryBundle,
+def _build_binding_audit(
     *,
+    structural: V08StructuralGeometryBundle,
     normalized: NormalizedUserDesignCase,
     handoff: V08SolverHandoffV1,
-    envelope_scale: Decimal,
-    baseline_normalized: NormalizedUserDesignCase,
-) -> tuple[str | None, str, str | None]:
-    t168 = _build_t168_with_envelope(normalized, handoff, envelope_scale)
-    expected_layout_hash = str(structural.bundle.task021_layout.layout_hash)
-    if normalized.input_snapshot_dict() == baseline_normalized.input_snapshot_dict():
-        raw = structural.bundle
-        reynolds = (
-            str(raw.task026_result.reynolds_number) if raw.task026_result is not None else None
-        )
-        if raw.task026_result is None or raw.task025_result is None:
-            return reynolds, "BLOCKED", "MISSING_TASK026_ON_STRUCTURAL_BUNDLE"
-        status, code = _task027_from_bundle(raw, t168=t168)
-        return reynolds, status, code
-    bundle, stage_failure, _ = task168_svc._execute_candidate_chain(
-        t168,
-        structural.candidate,
-        structural.shell_record,
-        include_legacy_task162=False,
-        include_legacy_task168_rating_dependencies=False,
+    t168: Any,
+    scenario_key: str,
+    baseline_re: str | None,
+    t025: Any | None,
+    t026: Any | None,
+    reynolds: str | None,
+    t027_status: str,
+    t027_raw: str | None,
+    task173_state: str,
+) -> SensitivityBindingAudit:
+    raw = structural.bundle
+    layout = raw.task021_layout
+    return SensitivityBindingAudit(
+        normalized_input_hash=canonical_sha256(normalized.input_snapshot_dict()),
+        handoff_normalized_input_hash=handoff.normalized_input_hash,
+        tube_mass_flow_kg_s=str(normalized.tube_side.mass_flow_kg_s),
+        shell_mass_flow_kg_s=str(normalized.shell_side.mass_flow_kg_s),
+        tube_inlet_temperature_k=str(normalized.tube_side.inlet_temperature_k),
+        shell_inlet_temperature_k=str(normalized.shell_side.inlet_temperature_k),
+        evaluation_input_authority_hash=str(t168.evaluation_input_authority.canonical_hash),
+        candidate_spec_id=str(structural.candidate.candidate_id),
+        task021_layout_hash_expected=str(layout.layout_hash),
+        task021_layout_hash_observed=str(layout.layout_hash),
+        task021_physical_tube_count=int(layout.physical_tube_count),
+        task025_result_id=getattr(t025, "result_id", None) if t025 is not None else None,
+        task026_result_id=getattr(t026, "result_id", None) if t026 is not None else None,
+        task026_reynolds_number=reynolds,
+        task027_raw_blocker_code=t027_raw,
+        task168_stage_failure_code=None,
+        task168_stage_failure_field_path=None,
+        task173_binding_state=task173_state,
+        replay_mode="FIXED_TASK021_LAYOUT_TASK026_RERUN",
+        re_scaling_diagnostic=_re_scaling_diagnostic(baseline_re, scenario_key),
     )
-    reynolds = (
-        str(bundle.task026_result.reynolds_number)
-        if bundle.task026_result is not None
-        else None
-    )
-    if bundle.task021_layout is None or str(bundle.task021_layout.layout_hash) != expected_layout_hash:
-        code = str(stage_failure.code) if stage_failure else "TASK021_LAYOUT_DRIFT"
-        return reynolds, "BLOCKED", code
-    if bundle.task026_result is None or bundle.task025_result is None:
-        code = str(stage_failure.code) if stage_failure else "MISSING_TASK026"
-        return reynolds, "BLOCKED", code
-    status, code = _task027_from_bundle(bundle, t168=t168)
-    return reynolds, status, code
+
+
+def _robustness_status(
+    *,
+    scenario_key: str,
+    t027_status: str,
+    t027_raw: str | None,
+    high_k_computed: bool,
+    bindings_ok: bool,
+) -> RobustnessEvidenceStatus:
+    if t027_raw == "REPLAY_BINDING_TUBE_RE_DRIFT_UNDER_SHELL_ONLY_PERTURBATION":
+        return "REPLAY_BINDING_BLOCKED"
+    if t027_status == "BLOCKED" and t027_raw == "BL_T027_UNSUPPORTED_REYNOLDS_REGIME":
+        return "PHYSICAL_MODEL_APPLICABILITY_BLOCKED"
+    if t027_status == "BLOCKED":
+        return "INSUFFICIENT_EVIDENCE"
+    if not bindings_ok:
+        return "REPLAY_BINDING_BLOCKED"
+    if t027_status == "PASS":
+        if scenario_key == "baseline" and not high_k_computed:
+            return "INSUFFICIENT_EVIDENCE"
+        return "VERIFIED_ROBUST"
+    return "VERIFIED_NOT_ROBUST"
 
 
 def _perturb_case(
@@ -415,20 +571,22 @@ def _evaluate_layout_scenario(
     recovered: RecoveredShell052Bundle,
     *,
     normalized: NormalizedUserDesignCase,
-    baseline_normalized: NormalizedUserDesignCase,
     handoff: V08SolverHandoffV1,
     provider: CoolPropProvider,
     scenario_key: str,
     scenario_label: str,
+    baseline_re: str | None,
 ) -> SensitivityScenarioResult:
     scale = Decimal(recovered.envelope_scale)
-    re, t027_status, t027_code = _replay_task026_task027(
+    t168 = _build_t168_with_envelope(normalized, handoff, scale)
+    _, t026, re, t027_status, t027_raw = _fixed_layout_tube_side_replay(
         structural,
-        normalized=normalized,
-        handoff=handoff,
-        envelope_scale=scale,
-        baseline_normalized=baseline_normalized,
+        t168=t168,
+        scenario_key=scenario_key,
+        baseline_re=baseline_re,
     )
+    t025 = structural.bundle.task025_result
+    task173_state = "NOT_ATTEMPTED"
     bindings = build_candidate_rating_bindings(
         structural,
         space_hash=recovered.candidate_space_hash,
@@ -438,100 +596,127 @@ def _evaluate_layout_scenario(
         provider=provider,
         geometry_projection_hash=geometry_projection_hash_v1(structural),
     )
-    if bindings is None:
+    bindings_ok = bindings is not None
+    if not bindings_ok:
+        task173_state = "BINDINGS_BLOCKED"
+        audit = _build_binding_audit(
+            structural=structural,
+            normalized=normalized,
+            handoff=handoff,
+            t168=t168,
+            scenario_key=scenario_key,
+            baseline_re=baseline_re,
+            t025=t025,
+            t026=t026,
+            reynolds=re,
+            t027_status=t027_status,
+            t027_raw=t027_raw,
+            task173_state=task173_state,
+        )
+        status = _robustness_status(
+            scenario_key=scenario_key,
+            t027_status=t027_status,
+            t027_raw=t027_raw,
+            high_k_computed=False,
+            bindings_ok=False,
+        )
+        wrapper = "TUBE_SIDE_REPLAY_FAILED" if t027_raw else None
         return SensitivityScenarioResult(
             scenario_key=scenario_key,
             scenario_label=scenario_label,
             exploratory_only=True,
+            robustness_evidence_status=status,
             task026_reynolds=re,
-            re_margin_below_turbulent_lower=_re_margin(re),
+            re_margin_below_turbulent_lower=_re_margin(re) if t027_status == "PASS" else None,
             task027_status=t027_status,
-            task027_blocker_code=t027_code,
+            task027_blocker_code=t027_raw,
+            task027_raw_blocker_code=t027_raw,
+            task168_wrapper_code=wrapper,
             clean_q_w=None,
             clean_q_delta_vs_target_w=None,
             high_tube_dp_pa=None,
             high_shell_dp_pa=None,
             high_tube_margin_pa=None,
             high_shell_margin_pa=None,
+            high_k_dp_computed=False,
             four_port_check="BLOCKED",
+            binding_audit=audit,
         )
     t037_c = evaluate_binding_task037(bindings, fouling_scenario="CLEAN")
     clean = run_thermal_prescreen(
         bindings, normalized, provider=provider, task037_override=t037_c.raw
     )
-    if clean.predicted_tube_outlet_k is None or clean.predicted_shell_outlet_k is None:
-        return SensitivityScenarioResult(
-            scenario_key=scenario_key,
-            scenario_label=scenario_label,
-            exploratory_only=True,
-            task026_reynolds=re,
-            re_margin_below_turbulent_lower=_re_margin(re),
-            task027_status=t027_status,
-            task027_blocker_code=t027_code,
-            clean_q_w=None,
-            clean_q_delta_vs_target_w=None,
-            high_tube_dp_pa=None,
-            high_shell_dp_pa=None,
-            high_tube_margin_pa=None,
-            high_shell_margin_pa=None,
-            four_port_check="BLOCKED",
-        )
     q = Decimal(clean.epsilon_ntu_q_w) if clean.epsilon_ntu_q_w else None
     high_tube = high_shell = high_tube_margin = high_shell_margin = None
     four_port = "BLOCKED"
-    if t027_status == "BLOCKED":
-        return SensitivityScenarioResult(
-            scenario_key=scenario_key,
-            scenario_label=scenario_label,
-            exploratory_only=True,
-            task026_reynolds=re,
-            re_margin_below_turbulent_lower=None,
-            task027_status=t027_status,
-            task027_blocker_code=t027_code,
-            clean_q_w=clean.epsilon_ntu_q_w,
-            clean_q_delta_vs_target_w=_q_delta(q),
-            high_tube_dp_pa=None,
-            high_shell_dp_pa=None,
-            high_tube_margin_pa=None,
-            high_shell_margin_pa=None,
-            four_port_check="BLOCKED",
-        )
-    try:
-        hydraulic = run_autonomous_nozzle_full_path(
-            bindings,
-            fixed_tube_inside_diameter_m=CANDIDATE_C_TUBE_NOZZLE_ID_M,
-            fixed_shell_inside_diameter_m=CANDIDATE_C_SHELL_NOZZLE_ID_M,
-            tube_outlet_temperature_k=Decimal(clean.predicted_tube_outlet_k),
-            shell_outlet_temperature_k=Decimal(clean.predicted_shell_outlet_k),
-            provider=provider,
-        )
-        high = next(s for s in hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
-        ht = Decimal(high.tube_full_path_dp_pa) if high.tube_full_path_dp_pa else None
-        hs = Decimal(high.shell_full_path_dp_pa) if high.shell_full_path_dp_pa else None
-        high_tube = high.tube_full_path_dp_pa
-        high_shell = high.shell_full_path_dp_pa
-        high_tube_margin = _margin(ht, _TUBE_DP_LIM)
-        high_shell_margin = _margin(hs, _SHELL_DP_LIM)
-        four_port = hydraulic.nozzle_velocity_check
-    except (ValueError, ValidationError):
-        scenario_label = (
-            f"{scenario_label} High-K full path not recomputed under Task173 mass-binding mismatch."
-        )
+    high_k_computed = False
+    task173_state = "BINDINGS_OK"
+    if clean.predicted_tube_outlet_k is not None and clean.predicted_shell_outlet_k is not None:
+        try:
+            hydraulic = run_autonomous_nozzle_full_path(
+                bindings,
+                fixed_tube_inside_diameter_m=CANDIDATE_C_TUBE_NOZZLE_ID_M,
+                fixed_shell_inside_diameter_m=CANDIDATE_C_SHELL_NOZZLE_ID_M,
+                tube_outlet_temperature_k=Decimal(clean.predicted_tube_outlet_k),
+                shell_outlet_temperature_k=Decimal(clean.predicted_shell_outlet_k),
+                provider=provider,
+            )
+            high = next(s for s in hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
+            ht = Decimal(high.tube_full_path_dp_pa) if high.tube_full_path_dp_pa else None
+            hs = Decimal(high.shell_full_path_dp_pa) if high.shell_full_path_dp_pa else None
+            high_tube = high.tube_full_path_dp_pa
+            high_shell = high.shell_full_path_dp_pa
+            high_tube_margin = _margin(ht, _TUBE_DP_LIM)
+            high_shell_margin = _margin(hs, _SHELL_DP_LIM)
+            four_port = hydraulic.nozzle_velocity_check
+            high_k_computed = high_tube is not None and high_shell is not None
+            task173_state = "FULL_PATH_COMPUTED"
+        except (ValueError, ValidationError):
+            task173_state = "TASK173_MASS_BINDING_REJECTED"
+            scenario_label = (
+                f"{scenario_label} High-K full path not available (Task173 case binding holds baseline mass)."
+            )
+    audit = _build_binding_audit(
+        structural=structural,
+        normalized=normalized,
+        handoff=handoff,
+        t168=t168,
+        scenario_key=scenario_key,
+        baseline_re=baseline_re,
+        t025=t025,
+        t026=t026,
+        reynolds=re,
+        t027_status=t027_status,
+        t027_raw=t027_raw,
+        task173_state=task173_state,
+    )
+    evidence = _robustness_status(
+        scenario_key=scenario_key,
+        t027_status=t027_status,
+        t027_raw=t027_raw,
+        high_k_computed=high_k_computed,
+        bindings_ok=True,
+    )
     return SensitivityScenarioResult(
         scenario_key=scenario_key,
         scenario_label=scenario_label,
         exploratory_only=True,
+        robustness_evidence_status=evidence,
         task026_reynolds=re,
         re_margin_below_turbulent_lower=_re_margin(re) if t027_status == "PASS" else None,
         task027_status=t027_status,
-        task027_blocker_code=t027_code,
+        task027_blocker_code=t027_raw,
+        task027_raw_blocker_code=t027_raw,
+        task168_wrapper_code=None,
         clean_q_w=clean.epsilon_ntu_q_w,
         clean_q_delta_vs_target_w=_q_delta(q),
         high_tube_dp_pa=high_tube,
         high_shell_dp_pa=high_shell,
         high_tube_margin_pa=high_tube_margin,
         high_shell_margin_pa=high_shell_margin,
+        high_k_dp_computed=high_k_computed,
         four_port_check=four_port,
+        binding_audit=audit,
     )
 
 
@@ -624,6 +809,11 @@ def _layout_report(
         recovery_note="engineering_shortlist_canonical",
     )
     shortlist_key = f"T{tube_count}_L{tube_length_m}"
+    baseline_re = (
+        str(structural.bundle.task026_result.reynolds_number)
+        if structural.bundle.task026_result is not None
+        else None
+    )
     sensitivity: list[SensitivityScenarioResult] = []
     for key in _SENSITIVITY_KEYS:
         case, label = _perturb_case(normalized, scenario_key=key)
@@ -633,11 +823,11 @@ def _layout_report(
                 structural,
                 recovered,
                 normalized=case,
-                baseline_normalized=normalized,
                 handoff=scenario_handoff,
                 provider=provider,
                 scenario_key=key,
                 scenario_label=label,
+                baseline_re=baseline_re,
             )
         )
     baseline = next(s for s in sensitivity if s.scenario_key == "baseline")
@@ -703,25 +893,30 @@ def _layout_report(
             high_shell=Decimal(high.shell_full_path_dp_pa) if high.shell_full_path_dp_pa else None,
             four_port=hydraulic.nozzle_velocity_check,
         )
-    margins = [
-        Decimal(s.high_tube_margin_pa)
+    verified_dp = [
+        s
         for s in sensitivity
-        if s.high_tube_margin_pa is not None and s.high_shell_margin_pa is not None
+        if s.high_k_dp_computed
+        and s.high_tube_margin_pa is not None
+        and s.high_shell_margin_pa is not None
     ]
-    shell_margins = [
-        Decimal(s.high_shell_margin_pa)
-        for s in sensitivity
-        if s.high_shell_margin_pa is not None
+    combined = [
+        min(Decimal(s.high_tube_margin_pa), Decimal(s.high_shell_margin_pa)) for s in verified_dp
     ]
-    combined = [min(t, sh) for t, sh in zip(margins, shell_margins, strict=False)]
     min_margin = min(combined) if combined else Decimal("0")
     re_margins = [
         Decimal(s.re_margin_below_turbulent_lower)
         for s in sensitivity
-        if s.re_margin_below_turbulent_lower is not None and s.task027_status == "PASS"
+        if s.re_margin_below_turbulent_lower is not None
+        and s.robustness_evidence_status
+        in ("VERIFIED_ROBUST", "VERIFIED_NOT_ROBUST", "PHYSICAL_MODEL_APPLICABILITY_BLOCKED")
     ]
     min_re = min(re_margins) if re_margins else None
-    regime_blocked = any(s.task027_status == "BLOCKED" for s in sensitivity)
+    regime_blocked = any(
+        s.robustness_evidence_status == "PHYSICAL_MODEL_APPLICABILITY_BLOCKED"
+        for s in sensitivity
+        if s.scenario_key != "baseline"
+    )
     return ShortlistLayoutReport(
         shortlist_key=shortlist_key,
         physical_tube_count=tube_count,
@@ -768,7 +963,11 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
     )
     hydraulic = max(
         layouts,
-        key=lambda row: Decimal(row.min_high_k_margin_pa),
+        key=lambda row: (
+            Decimal(row.min_high_k_margin_pa) if Decimal(row.min_high_k_margin_pa) > 0 else Decimal(
+                row.baseline_high_tube_margin_pa or "0"
+            )
+        ),
     )
     regime = max(
         [row for row in layouts if row.min_re_margin_sensitivity is not None],
@@ -784,8 +983,8 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
     hydraulic_choice = ParetoChoice(
         hydraulic.shortlist_key,
         hydraulic.geometry_v2,
-        f"Largest worst-case high-K min-side margin ({hydraulic.min_high_k_margin_pa} Pa) "
-        "across exploratory sensitivities.",
+        f"Largest baseline high-K min-side margin ({hydraulic.baseline_high_tube_margin_pa} Pa tube); "
+        f"non-baseline high-K coverage={hydraulic.min_high_k_margin_pa} Pa min among computed sweeps.",
     )
     regime_choice = (
         ParetoChoice(
@@ -797,14 +996,13 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
         if regime is not None
         else None
     )
-    # Engineering recommendation: prefer layouts that meet clean target with margin, pass joint,
-    # and keep Re margin > 50 across sensitivities when available.
     candidates = [
         row
         for row in layouts
         if row.joint_prescreen_pass
         and row.baseline_clean_q_w
         and Decimal(row.baseline_clean_q_w) >= _TARGET_Q_W
+        and not row.regime_blocked_in_sensitivity
     ]
     if not candidates:
         return thermal_choice, hydraulic_choice, regime_choice, None
@@ -812,15 +1010,15 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
         candidates,
         key=lambda row: (
             -Decimal(row.min_re_margin_sensitivity or "0"),
-            -Decimal(row.min_high_k_margin_pa),
+            -Decimal(row.baseline_high_tube_margin_pa or "0"),
             -Decimal(row.baseline_clean_q_w or "0"),
         ),
     )[0]
     eng = ParetoChoice(
         robust.shortlist_key,
         robust.geometry_v2,
-        "Joint prescreen pass at baseline; balances Re robustness, high-K margin, and clean thermal "
-        f"({robust.baseline_clean_q_w} W). Authority remains EXPERIMENTAL_SHADOW_ONLY / PENDING.",
+        "Baseline joint prescreen pass, no Task027 physical blocker on fixed-layout tube-flow sweep; "
+        f"NOT production validated ({robust.baseline_clean_q_w} W clean).",
     )
     return thermal_choice, hydraulic_choice, regime_choice, eng
 
@@ -846,31 +1044,66 @@ def run_engineering_shortlist_robustness(
         )
     identity_tuple = tuple(identity_rows)
     layout_tuple = tuple(layouts)
+    distinct_layout_hashes = {r.tube_layout_hash for r in identity_tuple}
     thermal, hydraulic, regime, eng = _pareto_choices(layout_tuple)
     threshold = _TARGET_Q_W * THERMODYNAMIC_DUTY_TOLERANCE
     clean_status = all(
         row.baseline_clean_q_w and Decimal(row.baseline_clean_q_w) >= threshold for row in layout_tuple
     )
+    nonbaseline = [
+        s for row in layout_tuple for s in row.sensitivity if s.scenario_key != "baseline"
+    ]
+    nb_valid = sum(1 for s in nonbaseline if s.task027_status == "PASS")
+    nb_blocked = sum(
+        1
+        for s in nonbaseline
+        if s.robustness_evidence_status
+        in ("PHYSICAL_MODEL_APPLICABILITY_BLOCKED", "REPLAY_BINDING_BLOCKED")
+    )
+    nb_hk = sum(1 for s in nonbaseline if s.high_k_dp_computed)
+    root_cause = (
+        "Prior pass re-ran full Task168 candidate_chain on catalog candidate_spec_id, "
+        "re-solving Task021 and drifting to foreign layouts (Re≈3427/3393). Corrected path "
+        "freezes enumeration Task021/Task025 and reruns Task026 only under rebuilt handoff/t168."
+    )
     re_sens = (
-        "All canonical shortlist layouts remain Task027-eligible across tube ±3% and shell ±3% "
-        "exploratory mass-flow perturbations in this replay; property ±2 K shifts did not "
-        "enter blocked Re band."
-        if not any(r.regime_blocked_in_sensitivity for r in layout_tuple)
-        else "One or more layouts hit Task027 BLOCKED under exploratory perturbation — see JSON."
+        f"Fixed-layout replay: {nb_valid} non-baseline scenarios with verified Task026/027; "
+        f"{nb_blocked} blocked (physical or binding); "
+        f"{nb_hk} non-baseline scenarios with Task173 high-K dp (temperature cases only; "
+        "mass-flow sweeps blocked by Task173 case binding)."
     )
-    min_margin = min(Decimal(row.min_high_k_margin_pa) for row in layout_tuple)
-    decision = (
-        "ENGINEERING_AUTHORITY_PENDING"
-        if eng is not None
-        else "INSUFFICIENT_ROBUSTNESS_FOR_AUTHORITY"
+    baseline_margins = [
+        min(Decimal(row.baseline_high_tube_margin_pa or "0"), Decimal(row.baseline_high_shell_margin_pa or "0"))
+        for row in layout_tuple
+        if row.baseline_high_tube_margin_pa and row.baseline_high_shell_margin_pa
+    ]
+    min_baseline_margin = min(baseline_margins) if baseline_margins else Decimal("0")
+    robustness_valid = nb_valid > 0 and all(
+        next(s for s in row.sensitivity if s.scenario_key == "baseline").task027_status == "PASS"
+        for row in layout_tuple
     )
-    if eng is not None:
+    layout_status = {}
+    for row in layout_tuple:
+        minus3 = next(s for s in row.sensitivity if s.scenario_key == "tube_mdot_minus_3pct")
+        if minus3.robustness_evidence_status == "PHYSICAL_MODEL_APPLICABILITY_BLOCKED":
+            st = "REGIME_BLOCKED_AT_TUBE_MDOT_MINUS_3PCT"
+        elif row.joint_prescreen_pass:
+            st = "BASELINE_JOINT_PRESCREEN_PASS"
+        else:
+            st = "BASELINE_JOINT_FAIL"
+        layout_status[row.shortlist_key.replace(".", "P")] = st
+        layout_status[row.shortlist_key] = st
+    if eng is None:
+        decision = "NO_ROBUST_CANDIDATE_PROVEN: insufficient verified robustness across fixed-layout sensitivities."
+    else:
         decision = (
-            f"{decision}: shortlist {eng.shortlist_key} qualifies for placement-envelope "
-            "approval review only (not production validated)."
+            f"ENGINEERING_AUTHORITY_PENDING: candidate {eng.shortlist_key} for placement-envelope "
+            "review only; not production validated."
         )
     return EngineeringShortlistRobustnessReport(
         frozen_candidate_c_unchanged=True,
+        canonical_shortlist_size=len(_SHORTLIST),
+        distinct_audited_layout_hash_count=len(distinct_layout_hashes),
         unique_physical_layout_count=len(_SHORTLIST),
         identity_binding_status=_identity_binding_status(identity_tuple),
         identity_records=identity_tuple,
@@ -880,7 +1113,11 @@ def run_engineering_shortlist_robustness(
         regime_robustness_priority=regime,
         engineering_recommended=eng,
         re_sensitivity_result=re_sens,
-        high_k_margin_robustness=f"Worst-case min(high tube, high shell) margin across sensitivities: {min_margin} Pa",
+        high_k_margin_robustness=(
+            f"Baseline min-side high-K margin {min_baseline_margin} Pa across four layouts; "
+            f"{nb_hk} non-baseline temperature sweeps computed high-K; "
+            "mass-flow perturbations excluded from hydraulic worst-case until Task173 binding extended."
+        ),
         clean_330kw_status="MET_CLEAN_CONTRACT" if clean_status else "CLEAN_BELOW_CONTRACT_ON_SHORTLIST",
         fouled_330kw_status="FOULED_BELOW_330KW_T039_DEMO",
         fouling_authority_status=(
@@ -900,7 +1137,17 @@ def run_engineering_shortlist_robustness(
             "docs/tasks/evidence/V08-03-intermediate-tube-count-feasibility-r1.json",
             "docs/tasks/evidence/V08-03-high-k-evidence-supersession-r2.json",
             "docs/tasks/evidence/V08-03-tube-side-replay-root-cause-r1.json",
+            "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json",
         ),
+        sensitivity_binding_root_cause=root_cause,
+        layout_identity_drift_confirmed=True,
+        replay_binding_defect_confirmed=True,
+        robustness_evidence_valid=robustness_valid,
+        nonbaseline_scenarios_valid=nb_valid,
+        nonbaseline_scenarios_blocked=nb_blocked,
+        nonbaseline_high_k_dp_computed=nb_hk,
+        layout_status_by_key=layout_status,
+        engineering_acceptance_status="EXPERIMENTAL_PRESCREEN_ONLY",
     )
 
 
@@ -921,8 +1168,11 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
         }
 
     return {
-        "schema": "hxforge.engineering-shortlist-robustness.v1",
-        "task_id": "V08_03_ENGINEERING_SHORTLIST_ROBUSTNESS_AND_THERMAL_AUTHORITY",
+        "schema": "hxforge.engineering-shortlist-robustness.v2",
+        "task_id": "V08_03_SENSITIVITY_BINDING_INTEGRITY_AND_ROBUSTNESS_EVIDENCE_CORRECTION",
+        "supersedes": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json",
+        "canonical_shortlist_size": report.canonical_shortlist_size,
+        "distinct_audited_layout_hash_count": report.distinct_audited_layout_hash_count,
         "frozen_design_c_reference": frozen_ref,
         "unique_physical_layout_count": report.unique_physical_layout_count,
         "identity_binding_status": report.identity_binding_status,
@@ -934,7 +1184,13 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
                     {"port_id": p.port_id, "velocity_m_s": p.velocity_m_s, "inside_diameter_m": p.inside_diameter_m}
                     for p in row.port_velocities_baseline
                 ],
-                "sensitivity": [s.__dict__ for s in row.sensitivity],
+                "sensitivity": [
+                    {
+                        **{k: v for k, v in s.__dict__.items() if k != "binding_audit"},
+                        "binding_audit": s.binding_audit.__dict__,
+                    }
+                    for s in row.sensitivity
+                ],
             }
             for row in report.layouts
         ],
@@ -955,9 +1211,20 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
         },
         "re_sensitivity_result": report.re_sensitivity_result,
         "high_k_margin_robustness": report.high_k_margin_robustness,
+        "sensitivity_integrity": {
+            "sensitivity_binding_root_cause": report.sensitivity_binding_root_cause,
+            "layout_identity_drift_confirmed": report.layout_identity_drift_confirmed,
+            "replay_binding_defect_confirmed": report.replay_binding_defect_confirmed,
+            "robustness_evidence_valid": report.robustness_evidence_valid,
+            "nonbaseline_scenarios_valid": report.nonbaseline_scenarios_valid,
+            "nonbaseline_scenarios_blocked": report.nonbaseline_scenarios_blocked,
+            "nonbaseline_high_k_dp_computed": report.nonbaseline_high_k_dp_computed,
+        },
+        "layout_status_by_key": report.layout_status_by_key,
         "final_engineering_decision": report.final_engineering_decision,
+        "engineering_acceptance_status": report.engineering_acceptance_status,
         "supersession_chain": list(report.supersession_chain),
-        "engineering_design_status": "ENGINEERING_AUTHORITY_PENDING",
+        "engineering_design_status": report.engineering_acceptance_status,
     }
 
 

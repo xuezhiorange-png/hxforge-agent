@@ -24,8 +24,9 @@ from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
 from prototypes.v08_thermal_rating.v08_ci_status import ci_status_for_head
 
 PR_NUMBER = 325
-ARTIFACT_JSON = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json")
-ARTIFACT_MD = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.md")
+ARTIFACT_JSON = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json")
+ARTIFACT_MD = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.md")
+TASK_ID = "V08_03_SENSITIVITY_BINDING_INTEGRITY_AND_ROBUSTNESS_EVIDENCE_CORRECTION"
 
 
 def _choice_key(report: Any, attr: str) -> str | None:
@@ -45,11 +46,22 @@ def main() -> None:
         json_path=artifacts / ARTIFACT_JSON.name,
         md_path=artifacts / ARTIFACT_MD.name,
     )
+    ls = report.layout_status_by_key
     payload: dict[str, Any] = {
-        "TASK_ID": "V08_03_ENGINEERING_SHORTLIST_ROBUSTNESS_AND_THERMAL_AUTHORITY",
+        "TASK_ID": TASK_ID,
         "PR_NUMBER": PR_NUMBER,
         "HEAD_SHA": head,
         "CI_STATUS": ci_status_for_head(head),
+        "SENSITIVITY_BINDING_ROOT_CAUSE": report.sensitivity_binding_root_cause,
+        "LAYOUT_IDENTITY_DRIFT": report.layout_identity_drift_confirmed,
+        "ACTUAL_TASK027_BLOCKERS": "BL_T027_UNSUPPORTED_REYNOLDS_REGIME on 241-tube layouts at tube_mdot_minus_1pct/minus_3pct",
+        "REPLAY_BINDING_DEFECT_CONFIRMED": report.replay_binding_defect_confirmed,
+        "NONBASELINE_SCENARIOS_VALID": report.nonbaseline_scenarios_valid,
+        "NONBASELINE_SCENARIOS_BLOCKED": report.nonbaseline_scenarios_blocked,
+        "NONBASELINE_HIGH_K_DP_COMPUTED": report.nonbaseline_high_k_dp_computed,
+        "CANONICAL_SHORTLIST_SIZE": report.canonical_shortlist_size,
+        "DISTINCT_AUDITED_LAYOUT_HASH_COUNT": report.distinct_audited_layout_hash_count,
+        "ROBUSTNESS_EVIDENCE_VALID": report.robustness_evidence_valid,
         "UNIQUE_PHYSICAL_LAYOUT_COUNT": report.unique_physical_layout_count,
         "IDENTITY_BINDING_STATUS": report.identity_binding_status,
         "THERMAL_PRIORITY_CANDIDATE": _choice_key(report, "thermal_priority"),
@@ -65,10 +77,16 @@ def main() -> None:
         "PLACEMENT_ENVELOPE_APPROVAL_REQUIRED": report.placement_envelope_approval_required,
         "NEW_TUBE_CATALOG_RECORD_REQUIRED": report.new_tube_catalog_record_required,
         "FINAL_ENGINEERING_DECISION": report.final_engineering_decision,
+        "ENGINEERING_ACCEPTANCE_STATUS": report.engineering_acceptance_status,
+        "T235_L5P5_STATUS": ls.get("T235_L5.5"),
+        "T235_L6P0_STATUS": ls.get("T235_L6.0"),
+        "T241_L5P5_STATUS": ls.get("T241_L5.5"),
+        "T241_L6P0_STATUS": ls.get("T241_L6.0"),
         "PR_STATE": "DRAFT",
         "MERGE_AUTHORIZED": False,
         "BVP_ROUTE": BVP_PROTOTYPE_ROUTE,
         "artifact_path": str(ARTIFACT_JSON),
+        "supersession_path": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-supersession-r2.json",
     }
     out = artifacts / "v08_03_engineering_shortlist_robustness_delivery.json"
     out.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

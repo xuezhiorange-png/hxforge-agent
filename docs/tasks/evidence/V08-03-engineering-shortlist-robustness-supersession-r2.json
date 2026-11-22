@@ -1,0 +1,12 @@
+{
+  "corrected_method_summary": "Fixed Task021 layout; Task026-only rerun for tube-side perturbations",
+  "historical_defects": [
+    "Full Task168 chain replay drifted Task021 layout and Reynolds",
+    "TUBE_SIDE_REPLAY_FAILED used without raw Task027 code",
+    "Worst-case high-K margin included missing non-baseline dp"
+  ],
+  "schema": "hxforge.engineering-shortlist-supersession.v1",
+  "superseded_artifact": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json",
+  "supersession_revision": "r2",
+  "task_id": "V08_03_SENSITIVITY_BINDING_INTEGRITY_AND_ROBUSTNESS_EVIDENCE_CORRECTION"
+}
