@@ -53,9 +53,10 @@ from prototypes.v08_thermal_rating.v08_thermal_hydraulic_cooptimization_recovery
     REGRESSION_REQUIRED_UA_W_K,
 )
 
-TARGET_Q_W = Decimal("330000")
-TUBE_DP_LIMIT_PA = Decimal("1150")
-SHELL_DP_LIMIT_PA = Decimal("1180")
+REGRESSION_TARGET_Q_W = Decimal("330000")
+REGRESSION_TUBE_DP_LIMIT_PA = Decimal("1150")
+REGRESSION_SHELL_DP_LIMIT_PA = Decimal("1180")
+PARETO_METRIC_UNAVAILABLE = "UNAVAILABLE"
 
 ParetoTier = Literal[
     "MID_JOINT_PRESCREEN_PASS",
@@ -125,20 +126,80 @@ class Shell052ParetoJointReport:
     next_required_engineering_change: str
 
 
+def _user_limits(
+    normalized: NormalizedUserDesignCase,
+) -> tuple[Decimal, Decimal, Decimal]:
+    target_q = normalized.target_duty_w
+    if target_q is None:
+        raise ValueError("normalized.target_duty_w is required for joint prescreen")
+    tube_lim = normalized.max_tube_side_pressure_drop_pa
+    shell_lim = normalized.max_shell_side_pressure_drop_pa
+    if tube_lim is None or shell_lim is None:
+        raise ValueError("normalized side pressure drop limits are required")
+    return target_q, tube_lim, shell_lim
+
+
 def _excess_metrics(
     clean: ThermalPrescreenResult,
     hydraulic: AutonomousNozzleFullPathReport | None,
+    *,
+    normalized: NormalizedUserDesignCase,
 ) -> tuple[str, str, str]:
-    q = Decimal(clean.epsilon_ntu_q_w or "0")
-    q_def = max(Decimal("0"), TARGET_Q_W - q)
-    tube_ex = shell_ex = Decimal("0")
-    if hydraulic is not None:
-        mid = next(s for s in hydraulic.scenarios if s.scenario_key == "mid_band")
-        if mid.tube_full_path_dp_pa:
-            tube_ex = max(Decimal("0"), Decimal(mid.tube_full_path_dp_pa) - TUBE_DP_LIMIT_PA)
-        if mid.shell_full_path_dp_pa:
-            shell_ex = max(Decimal("0"), Decimal(mid.shell_full_path_dp_pa) - SHELL_DP_LIMIT_PA)
-    return str(q_def.quantize(Decimal("0.1"))), str(tube_ex), str(shell_ex)
+    target_q, tube_lim, shell_lim = _user_limits(normalized)
+    if clean.epsilon_ntu_q_w is None:
+        q_def = PARETO_METRIC_UNAVAILABLE
+    else:
+        q = Decimal(clean.epsilon_ntu_q_w)
+        q_def = str(max(Decimal("0"), target_q - q).quantize(Decimal("0.1")))
+    if hydraulic is None:
+        return q_def, PARETO_METRIC_UNAVAILABLE, PARETO_METRIC_UNAVAILABLE
+    mid = next(s for s in hydraulic.scenarios if s.scenario_key == "mid_band")
+    if not mid.tube_full_path_dp_pa or not mid.shell_full_path_dp_pa:
+        return q_def, PARETO_METRIC_UNAVAILABLE, PARETO_METRIC_UNAVAILABLE
+    tube_ex = max(Decimal("0"), Decimal(mid.tube_full_path_dp_pa) - tube_lim)
+    shell_ex = max(Decimal("0"), Decimal(mid.shell_full_path_dp_pa) - shell_lim)
+    return q_def, str(tube_ex), str(shell_ex)
+
+
+def _row_pareto_metrics_complete(row: ParetoJointRow) -> bool:
+    if row.task168_blocker is not None or row.hydraulic is None:
+        return False
+    for metric in (row.q_deficit_w, row.tube_dp_excess_pa, row.shell_dp_excess_pa):
+        if metric == PARETO_METRIC_UNAVAILABLE:
+            return False
+    if row.clean_thermal.epsilon_ntu_q_w is None:
+        return False
+    mid = next(s for s in row.hydraulic.scenarios if s.scenario_key == "mid_band")
+    return bool(mid.tube_full_path_dp_pa and mid.shell_full_path_dp_pa)
+
+
+def _pareto_metric_vector(row: ParetoJointRow) -> tuple[Decimal, Decimal, Decimal]:
+    return (
+        Decimal(row.q_deficit_w),
+        Decimal(row.tube_dp_excess_pa),
+        Decimal(row.shell_dp_excess_pa),
+    )
+
+
+def _rank_decimal(value: str) -> Decimal:
+    if value == PARETO_METRIC_UNAVAILABLE:
+        return Decimal("1e30")
+    return Decimal(value)
+
+
+def select_first_joint_frozen_row(report: Shell052ParetoJointReport) -> ParetoJointRow | None:
+    """First mid joint prescreen pass candidate — freeze target for V08-03."""
+    mids = [r for r in report.rows if r.mid_joint_pass]
+    if not mids:
+        return None
+    return sorted(
+        mids,
+        key=lambda r: (
+            _rank_decimal(r.q_deficit_w),
+            _rank_decimal(r.tube_dp_excess_pa) + _rank_decimal(r.shell_dp_excess_pa),
+            r.geometry_v2,
+        ),
+    )[0]
 
 
 def _tier(
@@ -239,9 +300,9 @@ def _evaluate_bundle(
                 notes=(),
             ),
             hydraulic=None,
-            q_deficit_w=str(TARGET_Q_W),
-            tube_dp_excess_pa="0",
-            shell_dp_excess_pa="0",
+            q_deficit_w=PARETO_METRIC_UNAVAILABLE,
+            tube_dp_excess_pa=PARETO_METRIC_UNAVAILABLE,
+            shell_dp_excess_pa=PARETO_METRIC_UNAVAILABLE,
             pareto_tier="BLOCKED",
             mid_joint_pass=False,
             all_scenario_pass=False,
@@ -266,24 +327,35 @@ def _evaluate_bundle(
         )
     except Exception:
         hydraulic = None
-    q_def, t_ex, s_ex = _excess_metrics(clean, hydraulic)
-    mid_joint = (
-        clean.status == "INDICATIVE_PASS"
-        and hydraulic is not None
-        and next(s for s in hydraulic.scenarios if s.scenario_key == "mid_band").hydraulic_check
-        == "PASS"
-    )
-    all_pass = bool(mid_joint and hydraulic is not None and hydraulic.scenario_robustness == "PASS")
-    tier = _tier(clean=clean, hydraulic=hydraulic, mid_joint=mid_joint, all_pass=all_pass)
-    dep = clean.status == "INDICATIVE_PASS" and foul.status != "INDICATIVE_PASS"
-    mid = (
+    q_def, t_ex, s_ex = _excess_metrics(clean, hydraulic, normalized=normalized)
+    mid_scenario = (
         next(s for s in hydraulic.scenarios if s.scenario_key == "mid_band") if hydraulic else None
     )
-    high = (
+    high_scenario = (
         next(s for s in hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
         if hydraulic
         else None
     )
+    mid_joint = (
+        clean.status == "INDICATIVE_PASS"
+        and mid_scenario is not None
+        and mid_scenario.hydraulic_check == "PASS"
+    )
+    foul_mid_pass = (
+        foul.status == "INDICATIVE_PASS"
+        and mid_scenario is not None
+        and mid_scenario.hydraulic_check == "PASS"
+    )
+    all_pass = bool(
+        mid_joint
+        and foul_mid_pass
+        and hydraulic is not None
+        and hydraulic.scenario_robustness == "PASS"
+        and high_scenario is not None
+        and high_scenario.hydraulic_check == "PASS"
+    )
+    tier = _tier(clean=clean, hydraulic=hydraulic, mid_joint=mid_joint, all_pass=all_pass)
+    dep = clean.status == "INDICATIVE_PASS" and foul.status != "INDICATIVE_PASS"
     return ParetoJointRow(
         candidate_id=bindings.rating_request.candidate_id,
         geometry_v2=v2,
@@ -301,30 +373,27 @@ def _evaluate_bundle(
         pareto_tier=tier,
         mid_joint_pass=mid_joint,
         all_scenario_pass=all_pass,
-        mid_tube_dp_pa=mid.tube_full_path_dp_pa if mid else None,
-        mid_shell_dp_pa=mid.shell_full_path_dp_pa if mid else None,
-        tube_margin_pa=mid.tube_margin_pa if mid else None,
-        shell_margin_pa=mid.shell_margin_pa if mid else None,
-        high_tube_dp_pa=high.tube_full_path_dp_pa if high else None,
-        high_shell_dp_pa=high.shell_full_path_dp_pa if high else None,
+        mid_tube_dp_pa=mid_scenario.tube_full_path_dp_pa if mid_scenario else None,
+        mid_shell_dp_pa=mid_scenario.shell_full_path_dp_pa if mid_scenario else None,
+        tube_margin_pa=mid_scenario.tube_margin_pa if mid_scenario else None,
+        shell_margin_pa=mid_scenario.shell_margin_pa if mid_scenario else None,
+        high_tube_dp_pa=high_scenario.tube_full_path_dp_pa if high_scenario else None,
+        high_shell_dp_pa=high_scenario.shell_full_path_dp_pa if high_scenario else None,
         task168_blocker=None,
         clean_fouling_dependent=dep,
     )
 
 
 def _pareto_nondominated(rows: list[ParetoJointRow]) -> list[ParetoJointRow]:
+    eligible = [r for r in rows if _row_pareto_metrics_complete(r)]
     front: list[ParetoJointRow] = []
-    for a in rows:
+    for a in eligible:
         dominated = False
-        va = (Decimal(a.q_deficit_w), Decimal(a.tube_dp_excess_pa), Decimal(a.shell_dp_excess_pa))
-        for b in rows:
-            if a.candidate_id == b.candidate_id:
+        va = _pareto_metric_vector(a)
+        for b in eligible:
+            if a.geometry_v2 == b.geometry_v2:
                 continue
-            vb = (
-                Decimal(b.q_deficit_w),
-                Decimal(b.tube_dp_excess_pa),
-                Decimal(b.shell_dp_excess_pa),
-            )
+            vb = _pareto_metric_vector(b)
             if all(x <= y for x, y in zip(vb, va, strict=True)) and any(
                 x < y for x, y in zip(vb, va, strict=True)
             ):
@@ -420,8 +489,8 @@ def run_recovered_shell_052_pareto_joint_optimization(
     def rank_key(r: ParetoJointRow) -> tuple:
         return (
             0 if r.mid_joint_pass else 1,
-            Decimal(r.q_deficit_w),
-            Decimal(r.tube_dp_excess_pa) + Decimal(r.shell_dp_excess_pa),
+            _rank_decimal(r.q_deficit_w),
+            _rank_decimal(r.tube_dp_excess_pa) + _rank_decimal(r.shell_dp_excess_pa),
         )
 
     ranked = sorted(rows, key=rank_key)
@@ -493,7 +562,12 @@ def run_recovered_shell_052_pareto_joint_optimization(
 
 
 __all__ = [
+    "PARETO_METRIC_UNAVAILABLE",
     "ParetoJointRow",
+    "REGRESSION_SHELL_DP_LIMIT_PA",
+    "REGRESSION_TARGET_Q_W",
+    "REGRESSION_TUBE_DP_LIMIT_PA",
     "Shell052ParetoJointReport",
+    "select_first_joint_frozen_row",
     "run_recovered_shell_052_pareto_joint_optimization",
 ]

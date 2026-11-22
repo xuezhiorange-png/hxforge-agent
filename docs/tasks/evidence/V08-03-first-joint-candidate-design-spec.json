@@ -1,0 +1,195 @@
+{
+  "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+  "engineering_design_status": "EXPERIMENTAL_PRESCREEN_ONLY",
+  "geometry": {
+    "baffle_count": 4,
+    "baffle_cut_fraction": "0.35",
+    "baffle_spacing_m": "1.20",
+    "baffle_type": "SINGLE_SEGMENTAL",
+    "layout_identity": "fac33628-2cf0-5098-8911-703f66ce5911",
+    "physical_tube_count": 223,
+    "placement_envelope_diameter_m": "0.4160000000",
+    "placement_envelope_note": "envelope_scale is Task021 tube-center envelope / shell ID, not baffle pitch",
+    "placement_envelope_scale": "0.80",
+    "shell_inside_diameter_m": "0.52",
+    "tube_inner_diameter_m": "0.01575",
+    "tube_layout_pattern": "LAYOUT_30_DEG",
+    "tube_length_m": "6.00",
+    "tube_outer_diameter_m": "0.01905",
+    "tube_pass_count": 1,
+    "tube_pitch_m": "0.0254",
+    "tube_wall_thickness_m": "0.00165"
+  },
+  "geometry_identity_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+  "geometry_projection_hash": "4a7b0dfd0e8cad463cce9f89c6297dd9a5865f2e49fb4b207cea59d7ed8c8fc1",
+  "hydraulic_engineering_validation": "UNRESOLVED",
+  "hydraulic_results": {
+    "high_loss": {
+      "hydraulic_check": "BLOCKED",
+      "scenario_key": "high_loss_sensitivity",
+      "shell_breakdown": {
+        "R27B-ASSUMP-SHELL-INLET-NOZZLE": "429.717",
+        "R27B-ASSUMP-SHELL-INLET-TRANSITION": "16.326",
+        "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "429.717",
+        "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "16.326"
+      },
+      "shell_full_path_dp_pa": "1330.494631023644509985811160",
+      "shell_margin_pa": "-150.494631023644509985811160",
+      "tube_breakdown": {
+        "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "23.039",
+        "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "42.237",
+        "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "15.973",
+        "R27B-ASSUMP-TUBE-INLET-NOZZLE": "273.181",
+        "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "273.181"
+      },
+      "tube_full_path_dp_pa": "1195.504",
+      "tube_margin_pa": "-45.504"
+    },
+    "low_loss": {
+      "hydraulic_check": "PASS",
+      "scenario_key": "low_loss_sensitivity",
+      "shell_breakdown": {
+        "R27B-ASSUMP-SHELL-INLET-NOZZLE": "286.478",
+        "R27B-ASSUMP-SHELL-INLET-TRANSITION": "9.070",
+        "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "286.478",
+        "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "9.070"
+      },
+      "shell_full_path_dp_pa": "1029.504631023644509985811160",
+      "shell_margin_pa": "150.495368976355490014188840",
+      "tube_breakdown": {
+        "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "15.359",
+        "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "26.878",
+        "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "11.059",
+        "R27B-ASSUMP-TUBE-INLET-NOZZLE": "173.842",
+        "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "173.842"
+      },
+      "tube_full_path_dp_pa": "968.873",
+      "tube_margin_pa": "181.127"
+    },
+    "mid_band": {
+      "hydraulic_check": "PASS",
+      "scenario_key": "mid_band",
+      "shell_breakdown": {
+        "R27B-ASSUMP-SHELL-INLET-NOZZLE": "358.097",
+        "R27B-ASSUMP-SHELL-INLET-TRANSITION": "12.698",
+        "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "358.097",
+        "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "12.698"
+      },
+      "shell_full_path_dp_pa": "1179.998631023644509985811160",
+      "shell_margin_pa": "0.001368976355490014188840",
+      "tube_breakdown": {
+        "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "19.199",
+        "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "34.558",
+        "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "13.516",
+        "R27B-ASSUMP-TUBE-INLET-NOZZLE": "223.511",
+        "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "223.511"
+      },
+      "tube_full_path_dp_pa": "1082.188",
+      "tube_margin_pa": "67.812"
+    },
+    "nozzle_design_hash": "e0ba59ceb0f34d4af51f10053219ee748a8c11242581b67fbb80f99759fe65da",
+    "nozzle_manufacturing_authority": "PROVISIONAL",
+    "nozzle_velocity_check": "PASS",
+    "ports": [
+      {
+        "effective_area_m2": "0.0120799233",
+        "inside_diameter_mm": "124.02",
+        "port_id": "TUBE_INLET",
+        "size_authority": "PARAMETRIC_CALCULATED",
+        "velocity_m_s": "1.000"
+      },
+      {
+        "effective_area_m2": "0.0120799233",
+        "inside_diameter_mm": "124.02",
+        "port_id": "TUBE_OUTLET",
+        "size_authority": "PARAMETRIC_CALCULATED",
+        "velocity_m_s": "1.000"
+      },
+      {
+        "effective_area_m2": "0.0167292314",
+        "inside_diameter_mm": "145.95",
+        "port_id": "SHELL_INLET",
+        "size_authority": "PARAMETRIC_CALCULATED",
+        "velocity_m_s": "1.198"
+      },
+      {
+        "effective_area_m2": "0.0167292314",
+        "inside_diameter_mm": "145.95",
+        "port_id": "SHELL_OUTLET",
+        "size_authority": "PARAMETRIC_CALCULATED",
+        "velocity_m_s": "1.198"
+      }
+    ],
+    "scenario_robustness": "SCENARIO_DEPENDENT"
+  },
+  "schema": "hxforge.first-joint-candidate-design-spec.v1",
+  "structural_source": {
+    "candidate_space_hash": "131b972a97b55a323159dd38793e10aa54a3f37af88d1c32477b4c4df8115694",
+    "discrete_space_authority_id": "V08-BREAKTHROUGH-GEOMETRY-DISCRETE-SPACE-R1",
+    "discrete_space_content_hash": "4f808cfc940dc269125502aa9fcf0e08758c4d192ac113a8b8b975dad3c586d8",
+    "origin": "SHELL_052_LOCAL_COMBO",
+    "recovery_authority_label": "V08-03-CONSTRAINED-PLACEMENT-ENVELOPE-PROTOTYPE/BOUNDED_LOCAL_COMBO"
+  },
+  "task168_request_hash_digest": "f2f83135540e22bb342c0e8cd1c5c92a9c7a9f98a08e0c1f8019db419e9b0a68",
+  "task_id": "V08_03_FIRST_JOINT_CANDIDATE_FREEZE_AND_RISK_VALIDATION",
+  "thermal_authorities": {
+    "clean_task037_content_hash": "d582c13064054dce084f763ac86f9b10daff099c5e25e274bd20c29404a519e1",
+    "fouled_task037_content_hash": "91a1a631340e316a3fb05e7226e7e41313acb787fa9dde6991c422a9edd19af9",
+    "fouling_scenario_labels": [
+      "CLEAN",
+      "T039_DEMO_FOULING"
+    ],
+    "model_scope": "Indicative counterflow \u03b5-NTU prescreen using Task166/026/037 + CoolProp; not production Task173/BVP acceptance."
+  },
+  "thermal_results": {
+    "clean": {
+      "area_basis_m2": "80.0757409880552696211203740",
+      "epsilon_ntu_q_w": "330961.9",
+      "label": "CLEAN",
+      "notes": [
+        "epsilon_ntu_counterflow_indicative_only",
+        "THERMAL_PRESCREEN_ISOLATED_NOT_TASK173"
+      ],
+      "predicted_shell_outlet_k": "298.956",
+      "predicted_tube_outlet_k": "303.401",
+      "property_basis": "CoolProp tube=PURE_ORDINARY_WATER shell=PURE_ORDINARY_WATER at_case_inlet_T_P",
+      "shell_htc_w_m2_k": "773.00986638058243753921818706087081193708753551769",
+      "status": "INDICATIVE_PASS",
+      "target_duty_gap_w": "961.9",
+      "task166_applicability": "APPLICABLE",
+      "tube_htc_w_m2_k": "1322.376802",
+      "ua_w_per_k": "34253.69",
+      "wall_resistance_source": "task037:78f03e3c9315f3137d493625a3c943117eeb8d58a6955ae8e6977c1b0c7576cd/23248df54629d3973f7ca265effc21f89706aa07b7207b19f49f1ab01882fb18"
+    },
+    "cr_clean": "0.5995",
+    "effectiveness_authority": "INDICATIVE_EPSILON_NTU_COUNTERFLOW",
+    "effectiveness_clean": "0.4400",
+    "fouled_t039_demo": {
+      "area_basis_m2": "80.0757409880552696211203740",
+      "epsilon_ntu_q_w": "304206.3",
+      "label": "T039_DEMO_FOULING",
+      "notes": [
+        "epsilon_ntu_counterflow_indicative_only",
+        "THERMAL_PRESCREEN_ISOLATED_NOT_TASK173"
+      ],
+      "predicted_shell_outlet_k": "298.636",
+      "predicted_tube_outlet_k": "303.934",
+      "property_basis": "CoolProp tube=PURE_ORDINARY_WATER shell=PURE_ORDINARY_WATER at_case_inlet_T_P",
+      "shell_htc_w_m2_k": "773.00986638058243753921818706087081193708753551769",
+      "status": "INDICATIVE_FAIL",
+      "target_duty_gap_w": "-25793.7",
+      "task166_applicability": "APPLICABLE",
+      "tube_htc_w_m2_k": "1322.376802",
+      "ua_w_per_k": "30118.63",
+      "wall_resistance_source": "task037:78f03e3c9315f3137d493625a3c943117eeb8d58a6955ae8e6977c1b0c7576cd/23248df54629d3973f7ca265effc21f89706aa07b7207b19f49f1ab01882fb18"
+    },
+    "ntu_clean": "0.683",
+    "q_margin_note": "Q_clean - target = 961.9 W is computational prescreen slack only, not a verified thermal design margin.",
+    "required_ua_w_per_k": "34098.43"
+  },
+  "user_case_limits": {
+    "max_shell_side_pressure_drop_pa": "1180",
+    "max_tube_side_pressure_drop_pa": "1150",
+    "target_duty_w": "330000"
+  }
+}
