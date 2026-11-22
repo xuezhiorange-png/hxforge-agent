@@ -90,7 +90,9 @@ def main() -> None:
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=_REPO, text=True).strip()
     report = run_intermediate_tube_count_feasibility(normalized, handoff, provider=provider)
-    write_feasibility_artifacts(report, json_path=_REPO / ARTIFACT_JSON, md_path=_REPO / ARTIFACT_MD)
+    write_feasibility_artifacts(
+        report, json_path=_REPO / ARTIFACT_JSON, md_path=_REPO / ARTIFACT_MD
+    )
     write_feasibility_artifacts(
         report, json_path=artifacts / ARTIFACT_JSON.name, md_path=artifacts / ARTIFACT_MD.name
     )
