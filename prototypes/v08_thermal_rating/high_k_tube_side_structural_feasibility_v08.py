@@ -184,7 +184,11 @@ def _build_dp_budget(
     for key, fp in (("mid_band", mid_fp), ("high_loss_sensitivity", high_fp)):
         cmap = _component_map(fp)
         delta = {
-            cid: str((cmap.get(cid, Decimal("0")) - mid_c.get(cid, Decimal("0"))).quantize(Decimal("0.001")))
+            cid: str(
+                (cmap.get(cid, Decimal("0")) - mid_c.get(cid, Decimal("0"))).quantize(
+                    Decimal("0.001")
+                )
+            )
             for cid in sorted(set(cmap) | set(mid_c))
             if key != "mid_band"
         }
@@ -197,7 +201,9 @@ def _build_dp_budget(
                     if fp.get("TUBE_INTERNAL_FRICTION_DP_PA")
                     else None
                 ),
-                tube_local_dp_pa=str(fp["TUBE_LOCAL_DP_PA"]) if fp.get("TUBE_LOCAL_DP_PA") else None,
+                tube_local_dp_pa=str(fp["TUBE_LOCAL_DP_PA"])
+                if fp.get("TUBE_LOCAL_DP_PA")
+                else None,
                 component_dp_pa={k: str(v) for k, v in cmap.items()},
                 delta_vs_mid_pa=delta,
             )
@@ -392,9 +398,7 @@ def run_high_k_tube_side_structural_feasibility(
     if bindings is None:
         raise RuntimeError("design C bindings blocked")
     t037 = evaluate_binding_task037(bindings, fouling_scenario="CLEAN")
-    clean = run_thermal_prescreen(
-        bindings, normalized, provider=active, task037_override=t037.raw
-    )
+    clean = run_thermal_prescreen(bindings, normalized, provider=active, task037_override=t037.raw)
     if clean.predicted_tube_outlet_k is None or clean.predicted_shell_outlet_k is None:
         raise RuntimeError("design C missing outlet temperatures")
     case = build_engineering_case_v2_from_v08(normalized)
@@ -416,9 +420,7 @@ def run_high_k_tube_side_structural_feasibility(
     excess = (high_total - _TUBE_DP_LIMIT_PA).quantize(Decimal("0.001"))
 
     tube_rho_in = Decimal(str(_side_inlet_density_kg_m3(case, "tube_side")))
-    tube_rho_out = _fluid_density_kg_m3(
-        active, temperature_k=tube_out_state[0], pressure_pa=tube_p
-    )
+    tube_rho_out = _fluid_density_kg_m3(active, temperature_k=tube_out_state[0], pressure_pa=tube_p)
     bounds = _common_diameter_bounds(
         mass_kg_s=Decimal(str(case.tube_side.mass_flow_kg_s)),
         rho_in=tube_rho_in,
@@ -471,7 +473,9 @@ def run_high_k_tube_side_structural_feasibility(
             )[0]
 
     catalog = _catalog_status()
-    new_geom_auth = catalog.get("approved_tube_records", 0) <= 1
+    # Sole R1 catalog entry alone does not prove a new tube record is required; joint
+    # failure on design C high-K is documented separately (R27B local K, not tube OD).
+    new_geom_auth = False
     proposed = (
         "Authorized 0.52 m shell search exhausted at fixed design C nozzles (123.80/159.00 mm). "
         "Next structural levers require (a) Task168-approved placement envelope expansion "
@@ -535,9 +539,9 @@ def feasibility_artifact_dict(report: HighKTubeStructuralFeasibilityReport) -> d
             "high_tube_dp_excess_pa": report.high_tube_dp_excess_pa,
             "high_tube_dp_nozzle_lower_bound_pa": report.high_tube_dp_nozzle_lower_bound_pa,
             "nozzle_only_remaining_excess_pa": str(
-                (
-                    Decimal(report.high_tube_dp_nozzle_lower_bound_pa) - _TUBE_DP_LIMIT_PA
-                ).quantize(Decimal("0.001"))
+                (Decimal(report.high_tube_dp_nozzle_lower_bound_pa) - _TUBE_DP_LIMIT_PA).quantize(
+                    Decimal("0.001")
+                )
             ),
             "tube_internal_friction_dp_pa": report.tube_internal_friction_dp_pa,
             "tube_local_dp_pa": report.tube_local_dp_pa,
@@ -597,11 +601,8 @@ def feasibility_artifact_dict(report: HighKTubeStructuralFeasibilityReport) -> d
             "new_tube_geometry_authority_required": report.new_tube_geometry_authority_required,
             "proposed_engineering_change": report.proposed_engineering_change,
             "engineering_source_status": report.engineering_source_status,
-            "proposed_geometry_authority_state": (
-                "PROPOSED_GEOMETRY_AUTHORITY_REQUIRED"
-                if report.new_tube_geometry_authority_required
-                else "UNKNOWN"
-            ),
+            "proposed_geometry_authority_state": "NOT_PROVEN_FROM_CATALOG_COUNT_ALONE",
+            "catalog_status": catalog,
         },
         "design_decision": report.design_decision,
         "engineering_design_status": "EXPERIMENTAL_PRESCREEN_ONLY",

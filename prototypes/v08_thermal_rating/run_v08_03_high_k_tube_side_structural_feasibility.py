@@ -38,9 +38,7 @@ def main() -> None:
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     head = _git_head()
     report = run_high_k_tube_side_structural_feasibility(normalized, handoff, provider=provider)
-    write_feasibility_artifacts(
-        report, json_path=_REPO / JSON_REPO, md_path=_REPO / MD_REPO
-    )
+    write_feasibility_artifacts(report, json_path=_REPO / JSON_REPO, md_path=_REPO / MD_REPO)
     write_feasibility_artifacts(
         report,
         json_path=artifacts / JSON_REPO.name,
@@ -63,7 +61,8 @@ def main() -> None:
         "AUTHORIZED_VARIANTS_EVALUATED": report.authorized_variants_evaluated,
         "BEST_VALIDATED_VARIANT_ID": report.best_validated_variant_id or "none",
         "BEST_VALIDATED_VARIANT_GEOMETRY_V2": report.best_validated_variant_geometry_v2 or "none",
-        "BEST_VALIDATED_VARIANT_CLEAN_Q_W": report.best_validated_variant_clean_q_w or "unavailable",
+        "BEST_VALIDATED_VARIANT_CLEAN_Q_W": report.best_validated_variant_clean_q_w
+        or "unavailable",
         "BEST_VALIDATED_VARIANT_HIGH_TUBE_DP_PA": report.best_validated_variant_high_tube_dp_pa
         or "unavailable",
         "BEST_VALIDATED_VARIANT_HIGH_SHELL_DP_PA": report.best_validated_variant_high_shell_dp_pa

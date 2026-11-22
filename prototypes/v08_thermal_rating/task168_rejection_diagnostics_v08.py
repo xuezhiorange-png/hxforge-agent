@@ -15,6 +15,7 @@ from prototypes.v08_geometry_candidate_generation.discrete_space import (
     load_v08_discrete_space,
 )
 from prototypes.v08_geometry_candidate_generation.generator import enumerate_structural_geometry
+from prototypes.v08_geometry_candidate_generation.models import V08GeometryRejectionRecord
 from prototypes.v08_geometry_candidate_generation.task168_builder import (
     build_v08_task168_request,
     filter_discrete_space_by_envelope,
@@ -27,6 +28,57 @@ _REPO = Path(__file__).resolve().parents[2]
 BREAKTHROUGH_DISCRETE_SPACE_PATH = (
     _REPO / "docs/tasks/evidence/V08-03-breakthrough-discrete-space-r1.json"
 )
+
+
+def baffle_spacing_for_length_m(tube_length_m: Decimal) -> Decimal:
+    return Decimal("1.1") if tube_length_m == Decimal("5.5") else Decimal("1.2")
+
+
+def _decimal_match(a: str | Decimal | None, b: Decimal) -> bool:
+    if a is None:
+        return False
+    return Decimal(str(a)) == b
+
+
+def find_rejection_for_candidate_spec(
+    rejections: tuple[V08GeometryRejectionRecord, ...],
+    *,
+    shell_inside_diameter_m: Decimal,
+    tube_length_m: Decimal,
+    baffle_spacing_m: Decimal,
+) -> V08GeometryRejectionRecord | None:
+    for record in rejections:
+        ev = record.evidence
+        if not _decimal_match(ev.get("shell_inside_diameter_m"), shell_inside_diameter_m):
+            continue
+        if not _decimal_match(ev.get("tube_length_m"), tube_length_m):
+            continue
+        spacing = ev.get("baffle_spacing_m")
+        if spacing is not None and not _decimal_match(spacing, baffle_spacing_m):
+            continue
+        return record
+    return None
+
+
+def format_combo_blocker(
+    *,
+    tube_length_m: Decimal,
+    envelope_scale: Decimal,
+    placement_envelope_m: str,
+    record: V08GeometryRejectionRecord | None,
+) -> str:
+    if record is None:
+        return (
+            f"L={tube_length_m}m,scale={envelope_scale},envelope={placement_envelope_m}:"
+            "NO_MATCHING_REJECTION_RECORD"
+        )
+    code = record.evidence.get("blocker_code") or (
+        record.reason_codes[0] if record.reason_codes else "UNKNOWN"
+    )
+    return (
+        f"L={tube_length_m}m,scale={envelope_scale},envelope={placement_envelope_m}:"
+        f"{code}:candidate={record.candidate_id}:stage={record.failure_stage}"
+    )
 
 
 @dataclass(frozen=True)
@@ -96,6 +148,9 @@ def collect_larger_shell_task168_rejections(
 __all__ = [
     "BREAKTHROUGH_DISCRETE_SPACE_PATH",
     "Task168RejectionRow",
+    "baffle_spacing_for_length_m",
     "_enumerate_with_payload",
     "collect_larger_shell_task168_rejections",
+    "find_rejection_for_candidate_spec",
+    "format_combo_blocker",
 ]

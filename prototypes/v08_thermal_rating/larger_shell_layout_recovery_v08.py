@@ -26,6 +26,9 @@ from prototypes.v08_geometry_candidate_generation.task168_builder import (
 )
 from prototypes.v08_thermal_rating.task168_rejection_diagnostics_v08 import (
     BREAKTHROUGH_DISCRETE_SPACE_PATH,
+    baffle_spacing_for_length_m,
+    find_rejection_for_candidate_spec,
+    format_combo_blocker,
 )
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -189,13 +192,20 @@ def enumerate_shell_052_bounded_local_combos(
                 and Decimal(str(item.candidate.tube_length_m)) == length
             ]
             if not matched:
-                blocker = "none"
-                if outcome.rejections:
-                    blocker = str(
-                        outcome.rejections[0].evidence.get("blocker_code", "TASK168_REJECT")
-                    )
+                spacing = baffle_spacing_for_length_m(length)
+                record = find_rejection_for_candidate_spec(
+                    outcome.rejections,
+                    shell_inside_diameter_m=SHELL_052_PROBE_M,
+                    tube_length_m=length,
+                    baffle_spacing_m=spacing,
+                )
                 blockers.append(
-                    f"L={length}m,scale={scale},envelope={outcome.placement_envelope_diameter_m}:{blocker}"
+                    format_combo_blocker(
+                        tube_length_m=length,
+                        envelope_scale=scale,
+                        placement_envelope_m=outcome.placement_envelope_diameter_m,
+                        record=record,
+                    )
                 )
                 continue
             item = matched[0]

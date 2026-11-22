@@ -35,7 +35,7 @@ def test_design_c_high_k_budget_and_authorized_space_blocked() -> None:
     assert Decimal(report.tube_nozzle_pair_dp_pa or "0") == Decimal("549.627")
     assert report.existing_authorized_variant_feasible is False
     assert report.design_decision == "EXISTING_AUTHORIZED_SPACE_BLOCKED"
-    assert report.new_tube_geometry_authority_required is True
+    assert report.new_tube_geometry_authority_required is False
     assert report.authorized_variants_evaluated >= 2
     design_c = next(v for v in report.variants if v.geometry_v2 == FROZEN_FIRST_JOINT_GEOMETRY_V2)
     assert Decimal(design_c.clean_q_w or "0") >= Decimal("330000")

@@ -41,9 +41,7 @@ def test_design_c_deep_validators_and_frozen_identity() -> None:
     assert report.all_scenario_prescreen == "BLOCKED"
     assert Decimal(report.clean_q_w) > Decimal("330000")
     assert Decimal(report.fouled_q_w) < Decimal("330000")
-    assert Decimal(report.mid_tube_dp_pa or "0").quantize(Decimal("0.001")) == Decimal(
-        "1084.785"
-    )
+    assert Decimal(report.mid_tube_dp_pa or "0").quantize(Decimal("0.001")) == Decimal("1084.785")
     assert report.design_spec["tube_common_nozzle_id_mm"] == str(CANDIDATE_C_TUBE_NOZZLE_ID_MM)
     assert report.design_spec["shell_common_nozzle_id_mm"] == str(CANDIDATE_C_SHELL_NOZZLE_ID_MM)
 

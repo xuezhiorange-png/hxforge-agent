@@ -35,12 +35,8 @@ from prototypes.v08_thermal_rating.first_joint_candidate_identity_v08 import (
 from prototypes.v08_thermal_rating.v08_ci_status import ci_status_for_head
 
 PR_NUMBER = 325
-SPEC_REPO = (
-    _REPO / "docs/tasks/evidence/V08-03-candidate-C-design-spec-r1.json"
-)
-REVIEW_REPO = (
-    _REPO / "docs/tasks/evidence/V08-03-candidate-C-engineering-review-r1.md"
-)
+SPEC_REPO = _REPO / "docs/tasks/evidence/V08-03-candidate-C-design-spec-r1.json"
+REVIEW_REPO = _REPO / "docs/tasks/evidence/V08-03-candidate-C-engineering-review-r1.md"
 
 
 def _git_head() -> str:

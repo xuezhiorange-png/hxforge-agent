@@ -275,7 +275,8 @@ def run_candidate_c_engineering_evidence_closure(
     v2 = geometry_identity_v2_hash(struct)
     replay: Literal["PASS", "BLOCKED"] = (
         "PASS"
-        if struct.candidate.candidate_id == FROZEN_FIRST_JOINT_CANDIDATE_ID and v2 == FROZEN_FIRST_JOINT_GEOMETRY_V2
+        if struct.candidate.candidate_id == FROZEN_FIRST_JOINT_CANDIDATE_ID
+        and v2 == FROZEN_FIRST_JOINT_GEOMETRY_V2
         else "BLOCKED"
     )
     bindings = build_candidate_rating_bindings(
@@ -295,11 +296,11 @@ def run_candidate_c_engineering_evidence_closure(
     clean = run_thermal_prescreen(
         bindings, normalized, provider=active, task037_override=t037_c.raw
     )
-    foul = run_thermal_prescreen(
-        bindings, normalized, provider=active, task037_override=t037_f.raw
-    )
+    foul = run_thermal_prescreen(bindings, normalized, provider=active, task037_override=t037_f.raw)
     tube_out_k = Decimal(clean.predicted_tube_outlet_k) if clean.predicted_tube_outlet_k else None
-    shell_out_k = Decimal(clean.predicted_shell_outlet_k) if clean.predicted_shell_outlet_k else None
+    shell_out_k = (
+        Decimal(clean.predicted_shell_outlet_k) if clean.predicted_shell_outlet_k else None
+    )
     if tube_out_k is None or shell_out_k is None:
         raise RuntimeError("CLEAN prescreen missing outlet temperatures")
 

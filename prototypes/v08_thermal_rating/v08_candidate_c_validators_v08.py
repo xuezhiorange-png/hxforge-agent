@@ -86,7 +86,9 @@ def validate_outlet_property_consistency(
             )
         area = nozzle_flow_area_m2(port.inside_diameter_m)
         v_replay = _decimal_velocity_m_s(
-            mass_flow_kg_s=port.mass_flow_kg_s, rho=port.density_kg_m3, diameter_m=port.inside_diameter_m
+            mass_flow_kg_s=port.mass_flow_kg_s,
+            rho=port.density_kg_m3,
+            diameter_m=port.inside_diameter_m,
         )
         if abs(v_replay - port.velocity_m_s) > Decimal("1e-9"):
             failures.append(f"VELOCITY_REPLAY:{port_id}:decl={port.velocity_m_s}:replay={v_replay}")
@@ -160,9 +162,7 @@ def validate_outlet_property_consistency(
             if tube_parts >= 0 and tube_friction is not None:
                 rebuilt = Decimal(str(tube_friction)) + tube_parts
                 if abs(rebuilt - tube_total) > Decimal("0.05"):
-                    failures.append(
-                        f"TUBE_SUM_MISMATCH:{key}:total={tube_total}:parts={rebuilt}"
-                    )
+                    failures.append(f"TUBE_SUM_MISMATCH:{key}:total={tube_total}:parts={rebuilt}")
         shell_total = Decimal(str(fp["SHELL_FULL_PATH_TOTAL_DP_PA"]))
         if recon.get("shell_full_equals_bd_plus_external") is False:
             failures.append(f"SHELL_RECONCILIATION_FAIL:{key}")
@@ -173,11 +173,7 @@ def validate_outlet_property_consistency(
                 f"SHELL_SUM_MISMATCH:{key}:total={shell_total}:bd+ext={shell_bd + shell_ext}"
             )
     for port_id in ("TUBE_INLET", "SHELL_INLET"):
-        diameters = {
-            str(p.inside_diameter_m)
-            for p in hydraulic.ports
-            if p.port_id == port_id
-        }
+        diameters = {str(p.inside_diameter_m) for p in hydraulic.ports if p.port_id == port_id}
         if len(diameters) > 1:
             failures.append(f"NOZZLE_DIAMETER_VARIES:{port_id}")
     if not hydraulic.nozzle_same_geometry_all_scenarios:
@@ -230,9 +226,7 @@ def validate_fixed_nozzle_override_check(
             failures.append(f"FALSE_BISECT_BLOCKER:{blocker}")
     for p in hydraulic.ports:
         if p.velocity_m_s < Decimal("1") or p.velocity_m_s > Decimal("3"):
-            failures.append(
-                f"STRICT_VELOCITY_FAIL:{p.port_id}:v={p.velocity_m_s}"
-            )
+            failures.append(f"STRICT_VELOCITY_FAIL:{p.port_id}:v={p.velocity_m_s}")
     for scenario in hydraulic.scenarios:
         if scenario.tube_full_path_dp_pa is None or scenario.shell_full_path_dp_pa is None:
             failures.append(f"INCOMPLETE_SCENARIO:{scenario.scenario_key}")

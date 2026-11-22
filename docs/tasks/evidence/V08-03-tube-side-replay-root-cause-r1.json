@@ -1,0 +1,164 @@
+{
+  "binding_defect_confirmed": false,
+  "combos": [
+    {
+      "baffle_spacing_m": "1.1",
+      "candidate_id": "6d78897b-77b7-545d-8b49-38a569b1c86e",
+      "combo_key": "L5.5_scale0.85",
+      "delivery_root_cause": "TASK027_REYNOLDS_FRICTION_REGIME:Task027=BL_T027_UNSUPPORTED_REYNOLDS_REGIME:Re=3834.3370:tubes=253",
+      "enumeration_rejection": {
+        "candidate_id": "6d78897b-77b7-545d-8b49-38a569b1c86e",
+        "evidence": {
+          "baffle_spacing_m": "1.1",
+          "blocker_code": "TUBE_SIDE_REPLAY_FAILED",
+          "field_path": "task027.result",
+          "message": "TUBE_SIDE_REPLAY_FAILED",
+          "shell_inside_diameter_m": "0.52",
+          "tube_length_m": "5.5"
+        },
+        "failure_stage": "TUBE_DP",
+        "reason_codes": [
+          "TUBE_SIDE_REPLAY_FAILED"
+        ]
+      },
+      "envelope_scale": "0.85",
+      "placement_envelope_m": "0.4420000000",
+      "root_cause_class": "TASK027_REYNOLDS_FRICTION_REGIME",
+      "root_cause_summary": "Task021 layout succeeds with 253 tubes but Task027 friction correlation rejects Reynolds=3834.3370 (BL_T027_UNSUPPORTED_REYNOLDS_REGIME).",
+      "shell_id_m": "0.52",
+      "task021_physical_tube_count": 253,
+      "task021_status": "PASS",
+      "task024_status": "PASS",
+      "task025_status": "PASS",
+      "task026_reynolds_number": "3834.3370",
+      "task026_status": "PASS",
+      "task027_blocker_code": "BL_T027_UNSUPPORTED_REYNOLDS_REGIME",
+      "task027_status": "BLOCKED",
+      "task168_failure_field_path": "task027.result",
+      "task168_failure_message": "TUBE_SIDE_REPLAY_FAILED",
+      "task168_failure_stage": "TUBE_DP",
+      "tube_length_m": "5.5"
+    },
+    {
+      "baffle_spacing_m": "1.1",
+      "candidate_id": "6d78897b-77b7-545d-8b49-38a569b1c86e",
+      "combo_key": "L5.5_scale0.90",
+      "delivery_root_cause": "TASK027_REYNOLDS_FRICTION_REGIME:Task027=BL_T027_UNSUPPORTED_REYNOLDS_REGIME:Re=3427.8702:tubes=283",
+      "enumeration_rejection": {
+        "candidate_id": "6d78897b-77b7-545d-8b49-38a569b1c86e",
+        "evidence": {
+          "baffle_spacing_m": "1.1",
+          "blocker_code": "TUBE_SIDE_REPLAY_FAILED",
+          "field_path": "task027.result",
+          "message": "TUBE_SIDE_REPLAY_FAILED",
+          "shell_inside_diameter_m": "0.52",
+          "tube_length_m": "5.5"
+        },
+        "failure_stage": "TUBE_DP",
+        "reason_codes": [
+          "TUBE_SIDE_REPLAY_FAILED"
+        ]
+      },
+      "envelope_scale": "0.90",
+      "placement_envelope_m": "0.4680000000",
+      "root_cause_class": "TASK027_REYNOLDS_FRICTION_REGIME",
+      "root_cause_summary": "Task021 layout succeeds with 283 tubes but Task027 friction correlation rejects Reynolds=3427.8702 (BL_T027_UNSUPPORTED_REYNOLDS_REGIME).",
+      "shell_id_m": "0.52",
+      "task021_physical_tube_count": 283,
+      "task021_status": "PASS",
+      "task024_status": "PASS",
+      "task025_status": "PASS",
+      "task026_reynolds_number": "3427.8702",
+      "task026_status": "PASS",
+      "task027_blocker_code": "BL_T027_UNSUPPORTED_REYNOLDS_REGIME",
+      "task027_status": "BLOCKED",
+      "task168_failure_field_path": "task027.result",
+      "task168_failure_message": "TUBE_SIDE_REPLAY_FAILED",
+      "task168_failure_stage": "TUBE_DP",
+      "tube_length_m": "5.5"
+    },
+    {
+      "baffle_spacing_m": "1.2",
+      "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+      "combo_key": "L6.0_scale0.85",
+      "delivery_root_cause": "TASK027_REYNOLDS_FRICTION_REGIME:Task027=BL_T027_UNSUPPORTED_REYNOLDS_REGIME:Re=3834.3370:tubes=253",
+      "enumeration_rejection": {
+        "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+        "evidence": {
+          "baffle_spacing_m": "1.2",
+          "blocker_code": "TUBE_SIDE_REPLAY_FAILED",
+          "field_path": "task027.result",
+          "message": "TUBE_SIDE_REPLAY_FAILED",
+          "shell_inside_diameter_m": "0.52",
+          "tube_length_m": "6"
+        },
+        "failure_stage": "TUBE_DP",
+        "reason_codes": [
+          "TUBE_SIDE_REPLAY_FAILED"
+        ]
+      },
+      "envelope_scale": "0.85",
+      "placement_envelope_m": "0.4420000000",
+      "root_cause_class": "TASK027_REYNOLDS_FRICTION_REGIME",
+      "root_cause_summary": "Task021 layout succeeds with 253 tubes but Task027 friction correlation rejects Reynolds=3834.3370 (BL_T027_UNSUPPORTED_REYNOLDS_REGIME).",
+      "shell_id_m": "0.52",
+      "task021_physical_tube_count": 253,
+      "task021_status": "PASS",
+      "task024_status": "PASS",
+      "task025_status": "PASS",
+      "task026_reynolds_number": "3834.3370",
+      "task026_status": "PASS",
+      "task027_blocker_code": "BL_T027_UNSUPPORTED_REYNOLDS_REGIME",
+      "task027_status": "BLOCKED",
+      "task168_failure_field_path": "task027.result",
+      "task168_failure_message": "TUBE_SIDE_REPLAY_FAILED",
+      "task168_failure_stage": "TUBE_DP",
+      "tube_length_m": "6.0"
+    },
+    {
+      "baffle_spacing_m": "1.2",
+      "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+      "combo_key": "L6.0_scale0.90",
+      "delivery_root_cause": "TASK027_REYNOLDS_FRICTION_REGIME:Task027=BL_T027_UNSUPPORTED_REYNOLDS_REGIME:Re=3427.8702:tubes=283",
+      "enumeration_rejection": {
+        "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+        "evidence": {
+          "baffle_spacing_m": "1.2",
+          "blocker_code": "TUBE_SIDE_REPLAY_FAILED",
+          "field_path": "task027.result",
+          "message": "TUBE_SIDE_REPLAY_FAILED",
+          "shell_inside_diameter_m": "0.52",
+          "tube_length_m": "6"
+        },
+        "failure_stage": "TUBE_DP",
+        "reason_codes": [
+          "TUBE_SIDE_REPLAY_FAILED"
+        ]
+      },
+      "envelope_scale": "0.90",
+      "placement_envelope_m": "0.4680000000",
+      "root_cause_class": "TASK027_REYNOLDS_FRICTION_REGIME",
+      "root_cause_summary": "Task021 layout succeeds with 283 tubes but Task027 friction correlation rejects Reynolds=3427.8702 (BL_T027_UNSUPPORTED_REYNOLDS_REGIME).",
+      "shell_id_m": "0.52",
+      "task021_physical_tube_count": 283,
+      "task021_status": "PASS",
+      "task024_status": "PASS",
+      "task025_status": "PASS",
+      "task026_reynolds_number": "3427.8702",
+      "task026_status": "PASS",
+      "task027_blocker_code": "BL_T027_UNSUPPORTED_REYNOLDS_REGIME",
+      "task027_status": "BLOCKED",
+      "task168_failure_field_path": "task027.result",
+      "task168_failure_message": "TUBE_SIDE_REPLAY_FAILED",
+      "task168_failure_stage": "TUBE_DP",
+      "tube_length_m": "6.0"
+    }
+  ],
+  "frozen_candidate_c_unchanged": true,
+  "incorrect_rejection_attribution_fixed": true,
+  "new_tube_geometry_authority_required": "not_proven",
+  "next_required_engineering_change": "All four envelope combos fail Task027 with BL_T027_UNSUPPORTED_REYNOLDS_REGIME (Re\u22483834.3370\u20133427.8702) after Task021\u2013026 pass. Requires correlation envelope extension or geometry that raises tube-side Reynolds without unauthorized catalog edits.",
+  "physical_applicability_blocker_confirmed": true,
+  "schema": "hxforge.tube-side-replay-root-cause.v1",
+  "task_id": "V08_03_TUBE_SIDE_REPLAY_ROOT_CAUSE_AND_DESIGN_DECISION"
+}
