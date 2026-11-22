@@ -1,0 +1,134 @@
+{
+  "authorized_variant_scan": {
+    "authorized_variants_evaluated": 2,
+    "best_validated": {
+      "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+      "clean_q_w": "330961.9",
+      "four_port_check": "PASS",
+      "geometry_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+      "high_shell_dp_pa": "1081.465631023644509985811160",
+      "high_tube_dp_pa": "1198.676"
+    },
+    "existing_authorized_variant_feasible": false,
+    "task168_combo_blockers": [
+      "L=5.5m,scale=0.85,envelope=0.4420000000:TUBE_SIDE_REPLAY_FAILED",
+      "L=5.5m,scale=0.90,envelope=0.4680000000:TUBE_SIDE_REPLAY_FAILED",
+      "L=6.0m,scale=0.85,envelope=0.4420000000:TUBE_SIDE_REPLAY_FAILED",
+      "L=6.0m,scale=0.90,envelope=0.4680000000:TUBE_SIDE_REPLAY_FAILED"
+    ],
+    "variants": [
+      {
+        "candidate_id": "6d78897b-77b7-545d-8b49-38a569b1c86e",
+        "clean_q_w": "318315.7",
+        "envelope_scale": "0.80",
+        "failure_reasons": [
+          "CLEAN_Q_BELOW_TARGET:318315.7",
+          "HIGH_TUBE_DP:1151.376"
+        ],
+        "fouled_q_w": "291407.1",
+        "four_port_check": "PASS",
+        "full_joint_pass": false,
+        "geometry_v2": "aba3161014a6a9f16c47797eb2e23b63203e8ccf2a5fe70e80ec869d6b00d98e",
+        "high_shell_dp_pa": "1117.628598490404313896016446",
+        "high_tube_dp_pa": "1151.376",
+        "label": "tube_length_m=5.5 envelope_scale=0.80",
+        "mid_shell_dp_pa": "1008.639598490404313896016446",
+        "mid_tube_dp_pa": "1037.479",
+        "physical_tube_count": 223,
+        "shell_htc_w_m2_k": "811.83316886649419594842270040976846395386269919847",
+        "tube_htc_w_m2_k": "1322.376802",
+        "tube_length_m": "5.50",
+        "ua_w_per_k": "32252.74"
+      },
+      {
+        "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+        "clean_q_w": "330961.9",
+        "envelope_scale": "0.80",
+        "failure_reasons": [
+          "HIGH_TUBE_DP:1198.676"
+        ],
+        "fouled_q_w": "304206.3",
+        "four_port_check": "PASS",
+        "full_joint_pass": false,
+        "geometry_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+        "high_shell_dp_pa": "1081.465631023644509985811160",
+        "high_tube_dp_pa": "1198.676",
+        "label": "tube_length_m=6.0 envelope_scale=0.80",
+        "mid_shell_dp_pa": "972.4756310236445099858111598",
+        "mid_tube_dp_pa": "1084.785",
+        "physical_tube_count": 223,
+        "shell_htc_w_m2_k": "773.00986638058243753921818706087081193708753551769",
+        "tube_htc_w_m2_k": "1322.376802",
+        "tube_length_m": "6.00",
+        "ua_w_per_k": "34253.69"
+      }
+    ]
+  },
+  "design_c_reference": {
+    "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+    "geometry_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+    "physical_tube_count": 223,
+    "shell_nozzle_id_mm": "159.00",
+    "tube_nozzle_id_mm": "123.80"
+  },
+  "design_decision": "EXISTING_AUTHORIZED_SPACE_BLOCKED",
+  "engineering_design_status": "EXPERIMENTAL_PRESCREEN_ONLY",
+  "frozen_candidate_c_unchanged": true,
+  "high_k_tube_dp_budget": {
+    "friction_only_directional_reduction_pa": "47.135",
+    "high_tube_dp_baseline_pa": "1198.676",
+    "high_tube_dp_excess_pa": "48.676",
+    "high_tube_dp_nozzle_lower_bound_pa": "1197.218",
+    "mechanism_note": "High-K excess vs mid is dominated by R27B local loss coefficients on inlet/outlet nozzles and bundle entrance/exit; Task174 internal friction is unchanged across K scenarios at fixed geometry.",
+    "nozzle_only_remaining_excess_pa": "47.218",
+    "required_internal_dp_reduction_pa": "48.676",
+    "scenarios": [
+      {
+        "component_dp_pa": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "19.199",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "34.482",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "13.516",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "225.095",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "224.600"
+        },
+        "delta_vs_mid_pa": {},
+        "loss_scenario_key": "mid_band",
+        "tube_full_path_total_dp_pa": "1084.785",
+        "tube_internal_friction_dp_pa": "567.893",
+        "tube_local_dp_pa": "516.892"
+      },
+      {
+        "component_dp_pa": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "23.039",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "42.144",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "15.973",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "275.116",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "274.511"
+        },
+        "delta_vs_mid_pa": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "3.840",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "7.662",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "2.457",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "50.021",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "49.911"
+        },
+        "loss_scenario_key": "high_loss_sensitivity",
+        "tube_full_path_total_dp_pa": "1198.676",
+        "tube_internal_friction_dp_pa": "567.893",
+        "tube_local_dp_pa": "630.783"
+      }
+    ],
+    "tube_dp_limit_pa": "1150",
+    "tube_internal_friction_dp_pa": "567.893",
+    "tube_local_dp_pa": "630.783",
+    "tube_nozzle_pair_dp_pa": "549.627"
+  },
+  "schema": "hxforge.high-k-tube-structural-feasibility.v1",
+  "task_id": "V08_03_HIGH_K_TUBE_SIDE_STRUCTURAL_FEASIBILITY",
+  "tube_geometry_authority": {
+    "engineering_source_status": "SOLE_APPROVED_R1_OD19.05_ID15.75; bounded local combos blocked: 4 Task168/Task021 failures",
+    "new_tube_geometry_authority_required": true,
+    "proposed_engineering_change": "Authorized 0.52 m shell search exhausted at fixed design C nozzles (123.80/159.00 mm). Next structural levers require (a) Task168-approved placement envelope expansion (0.85/0.90 scales currently blocked at Task021 replay) to increase tube count and reduce per-tube velocity/local K losses, or (b) a new approved tube catalog record (larger ID / revised wall) with mechanical and fouling authority review.",
+    "proposed_geometry_authority_state": "PROPOSED_GEOMETRY_AUTHORITY_REQUIRED"
+  }
+}
