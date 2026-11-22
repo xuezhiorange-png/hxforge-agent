@@ -236,7 +236,7 @@ def _rank_key(trial: TrialNozzleEvaluation) -> tuple:
         0 if trial.mid_joint_prescreen == "PASS" else 1,
         -shell_margin,
         -tube_margin,
-        min_v,
+        -min_v,
     )
 
 

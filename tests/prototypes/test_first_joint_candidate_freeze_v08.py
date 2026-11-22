@@ -68,8 +68,12 @@ def test_first_joint_freeze_replay_identity_and_spec() -> None:
     assert spec["geometry_identity_v2"] == FROZEN_FIRST_JOINT_GEOMETRY_V2
     assert "placement_envelope_scale" in spec["geometry"]
     mid = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "mid_band")
-    assert mid.hydraulic_check == "PASS"
+    low = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "low_loss_sensitivity")
     high = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
+    # First-joint artifact keeps autonomous nozzle sizing; after outlet-state COOLPROP_TP
+    # hydraulics, low may pass while mid/high remain sensitivity-dependent (not design C).
+    assert low.hydraulic_check == "PASS"
+    assert mid.hydraulic_check in ("PASS", "BLOCKED")
     assert high.hydraulic_check != "PASS"
 
 

@@ -562,6 +562,7 @@ shards:
       - tests/prototypes/test_first_joint_candidate_freeze_v08.py
       - tests/prototypes/test_frozen_nozzle_margin_and_port_validation_v08.py
       - tests/prototypes/test_four_port_nozzle_correction_and_validation_v08.py
+      - tests/prototypes/test_candidate_c_engineering_evidence_closure_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py
