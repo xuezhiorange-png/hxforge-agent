@@ -41,7 +41,10 @@ def test_joint_does_not_count_high_k_only_as_full_pass() -> None:
     report = run_thermal_hydraulic_cooptimization_recovery(
         normalized, handoff, provider=provider, max_valid=8
     )
-    assert report.joint.all_scenario_prescreen_pass_count <= report.joint.mid_thermal_hydraulic_prescreen_pass_count
+    assert (
+        report.joint.all_scenario_prescreen_pass_count
+        <= report.joint.mid_thermal_hydraulic_prescreen_pass_count
+    )
     if report.joint.best and report.joint.best.classification == "THERMAL_PASS_HYDRAULIC_FAIL":
         assert report.joint.best.clean_thermal.status == "INDICATIVE_PASS"
         assert report.joint.best.hydraulic is not None
@@ -58,8 +61,21 @@ def test_frozen_052_geometry_unchanged_in_identity() -> None:
     assert report.clean.epsilon_ntu_q_w is not None
     t_ti = Decimal(str(normalized.tube_side.inlet_temperature_k))
     t_si = Decimal(str(normalized.shell_side.inlet_temperature_k))
-    c_t = _cp_kg_s(provider, _fluid="", t_k=t_ti, p_pa=Decimal(str(normalized.tube_side.inlet_pressure_pa))) * normalized.tube_side.mass_flow_kg_s
-    c_s = _cp_kg_s(provider, _fluid="", t_k=t_si, p_pa=Decimal(str(normalized.shell_side.inlet_pressure_pa))) * normalized.shell_side.mass_flow_kg_s
+    c_t = (
+        _cp_kg_s(
+            provider, _fluid="", t_k=t_ti, p_pa=Decimal(str(normalized.tube_side.inlet_pressure_pa))
+        )
+        * normalized.tube_side.mass_flow_kg_s
+    )
+    c_s = (
+        _cp_kg_s(
+            provider,
+            _fluid="",
+            t_k=t_si,
+            p_pa=Decimal(str(normalized.shell_side.inlet_pressure_pa)),
+        )
+        * normalized.shell_side.mass_flow_kg_s
+    )
     req = required_ua_w_k_for_duty(
         target_q_w=normalized.target_duty_w,
         c_hot=c_t,

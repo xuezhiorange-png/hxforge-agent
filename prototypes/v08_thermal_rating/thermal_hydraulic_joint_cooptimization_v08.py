@@ -13,6 +13,7 @@ from prototypes.v08_general_user_case.solver_handoff import V08SolverHandoffV1
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
 from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
     geometry_identity_v2_hash,
+    geometry_projection_hash_v1,
 )
 from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
     AutonomousNozzleFullPathReport,
@@ -24,6 +25,12 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
 from prototypes.v08_thermal_rating.experimental_geometry_discrete_space_v08 import (
     EXPERIMENTAL_GEOMETRY_LABEL,
     EXPERIMENTAL_V08_DISCRETE_SPACE_PATH,
+)
+from prototypes.v08_thermal_rating.larger_shell_layout_recovery_v08 import (
+    resolve_recovered_shell_052_bundle,
+)
+from prototypes.v08_thermal_rating.recovered_shell_052_full_chain_v08 import (
+    FROZEN_SHELL_052_GEOMETRY_V2,
 )
 from prototypes.v08_thermal_rating.thermal_prescreen_v08 import (
     ThermalPrescreenResult,
@@ -160,9 +167,19 @@ def run_thermal_hydraulic_joint_cooptimization(
         discrete_space_path=EXPERIMENTAL_V08_DISCRETE_SPACE_PATH,
         max_valid=max_valid,
     )
+    bundle_list = list(bundles)
+    recovered = resolve_recovered_shell_052_bundle(normalized, handoff)
+    recovered_included = False
+    if recovered is not None:
+        rb = recovered.structural_bundle
+        v2_rec = geometry_identity_v2_hash(rb)
+        if v2_rec == FROZEN_SHELL_052_GEOMETRY_V2:
+            bundle_list.append(rb)
+            geom[rb.candidate.candidate_id] = geometry_projection_hash_v1(rb)
+            recovered_included = True
     rows: list[JointCooptimizationRow] = []
     v2_set: set[str] = set()
-    for bundle in bundles:
+    for bundle in bundle_list:
         bindings = build_candidate_rating_bindings(
             bundle,
             space_hash=_space_hash,
@@ -203,9 +220,7 @@ def run_thermal_hydraulic_joint_cooptimization(
             normalized=normalized,
         )
         t_dp, s_dp, t_m, s_m = (
-            (None, None, None, None)
-            if hydraulic is None
-            else _margins(normalized, hydraulic)
+            (None, None, None, None) if hydraulic is None else _margins(normalized, hydraulic)
         )
         high = None
         if hydraulic is not None:
@@ -222,7 +237,11 @@ def run_thermal_hydraulic_joint_cooptimization(
                 baffle_spacing_m=str(cand.baffle_spacing_m),
                 baffle_cut_fraction=str(cand.baffle_cut_fraction),
                 physical_tube_count=int(bindings.bundle.bundle.task021_layout.physical_tube_count),
-                experimental_source=EXPERIMENTAL_GEOMETRY_LABEL,
+                experimental_source=(
+                    "RECOVERED_SHELL_052"
+                    if geometry_identity_v2_hash(bindings.bundle) == FROZEN_SHELL_052_GEOMETRY_V2
+                    else EXPERIMENTAL_GEOMETRY_LABEL
+                ),
                 task037_status=t037_clean.status if task037_ok else "BLOCKED",
                 clean_thermal=clean_prescreen,
                 fouled_thermal=foul_prescreen,
@@ -248,7 +267,8 @@ def run_thermal_hydraulic_joint_cooptimization(
     notes = (
         "joint_thermal_uses_clean_task172_stage2_experimental_basis",
         "fouled_scenario_t039_demo_sensitivity_only",
-        "frozen_0.52_m_baseline_not_in_experimental_search_rows",
+        f"recovered_shell_052_included={recovered_included}",
+        "see_recovered_shell_052_pareto_joint_v08_for_bounded_local_search",
     )
     return ThermalHydraulicJointCooptimizationReport(
         task168_valid_count=len(rows),

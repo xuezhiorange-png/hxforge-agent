@@ -81,9 +81,7 @@ def _conductivity_preimage_bytes(authority: TubeWallThermalConductivityAuthority
         "approval_status",
         "evidence_refs",
     )
-    return _authority_record_bytes(
-        authority, "v08.task037.wall-conductivity-authority.v1", fields
-    )
+    return _authority_record_bytes(authority, "v08.task037.wall-conductivity-authority.v1", fields)
 
 
 def _fouling_preimage_bytes(
@@ -280,9 +278,7 @@ def build_v08_experimental_task037_request(
         evidence_refs=TASK172_STAGE2_EVIDENCE,
     )
     mean_t = Decimal("302.5")
-    cond_preimage = (
-        f"V08-EXP-COND-APPLICABILITY|k={V08_STAGE2_CONDUCTIVITY_W_M_K}|t={mean_t}"
-    )
+    cond_preimage = f"V08-EXP-COND-APPLICABILITY|k={V08_STAGE2_CONDUCTIVITY_W_M_K}|t={mean_t}"
     conductivity = _with_content_hash_conductivity(
         authority_id="V08-EXP-WALL-COND-316L-R1",
         material_id="V08-MAT-316L-WATER-SERVICE",
@@ -409,7 +405,8 @@ def audit_task037_authority_provenance() -> Task037AuthorityProvenanceAudit:
     )
     mat_ok = (
         clean.wall_material_authority.authority_hash != t039.wall_material_authority.authority_hash
-        and clean.wall_material_authority.material_grade != t039.wall_material_authority.material_grade
+        and clean.wall_material_authority.material_grade
+        != t039.wall_material_authority.material_grade
     )
     cond_ok = (
         clean.wall_thermal_conductivity_authority.authority_hash
@@ -443,8 +440,12 @@ def audit_task037_authority_provenance() -> Task037AuthorityProvenanceAudit:
         v08_experimental_conductivity_hash=clean.wall_thermal_conductivity_authority.authority_hash,
         t039_material_grade=t039.wall_material_authority.material_grade,
         v08_material_grade=clean.wall_material_authority.material_grade,
-        t039_conductivity_w_m_k=str(t039.wall_thermal_conductivity_authority.thermal_conductivity_w_m_k),
-        v08_conductivity_w_m_k=str(clean.wall_thermal_conductivity_authority.thermal_conductivity_w_m_k),
+        t039_conductivity_w_m_k=str(
+            t039.wall_thermal_conductivity_authority.thermal_conductivity_w_m_k
+        ),
+        v08_conductivity_w_m_k=str(
+            clean.wall_thermal_conductivity_authority.thermal_conductivity_w_m_k
+        ),
         notes=notes,
     )
 

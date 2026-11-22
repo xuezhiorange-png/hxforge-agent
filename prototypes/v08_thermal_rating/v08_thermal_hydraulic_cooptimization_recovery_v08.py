@@ -40,6 +40,11 @@ from prototypes.v08_thermal_rating.v08_task037_experimental_authority_v08 import
     audit_task037_authority_provenance,
 )
 
+REGRESSION_CLEAN_Q_W = Decimal("318315.7")
+REGRESSION_CLEAN_UA_W_K = Decimal("32252.74")
+REGRESSION_REQUIRED_UA_W_K = Decimal("34098.43")
+REGRESSION_CLEAN_UA_GAP_W_K = Decimal("1845.69")
+
 
 @dataclass(frozen=True)
 class FoulingScenarioSnapshot:

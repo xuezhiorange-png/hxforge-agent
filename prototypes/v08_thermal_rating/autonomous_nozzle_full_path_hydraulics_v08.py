@@ -223,22 +223,37 @@ def _installation_authority(
     )
 
 
+NozzleSelectionObjective = Literal["MINIMUM_DIAMETER", "MAX_MARGIN_WITHIN_VELOCITY_BAND"]
+
+
 def run_autonomous_nozzle_full_path(
     bindings: CandidateRatingBindings,
+    *,
+    tube_nozzle_objective: NozzleSelectionObjective = "MINIMUM_DIAMETER",
 ) -> AutonomousNozzleFullPathReport:
     case = build_engineering_case_v2_from_v08(bindings.normalized)
     record = candidate_selection_record_from_bindings(bindings)
     postpass = task174_hydraulic_postpass_from_bindings(bindings)
     t174 = bindings.rating_request.task174_result
     blockers: list[str] = []
-    disclosures = (
+    disclosures_list = [
         "Single fixed nozzle pair sized once (mid_band bisect); three K scenarios reuse same IDs.",
         "Loss coefficients: R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS.",
         "PARAMETRIC_CALCULATED nozzle IDs — no verified standard series catalog.",
         "Outlet nozzle velocity PROVISIONAL (no production thermal outlet state bound).",
-    )
+    ]
+    if tube_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
+        disclosures_list.append(
+            "Tube nozzle uses largest ID within 1–3 m/s band for mid-band pressure margin probe."
+        )
+    disclosures = tuple(disclosures_list)
 
-    fixed = select_fixed_nozzle_design(case=case, record=record, postpass=postpass)
+    fixed = select_fixed_nozzle_design(
+        case=case,
+        record=record,
+        postpass=postpass,
+        tube_nozzle_objective=tube_nozzle_objective,
+    )
     if fixed.shell_select_status != "FEASIBLE_WITHIN_DESIGN_BOUNDS":
         blockers.append(f"SHELL_NOZZLE_BISECT:{fixed.shell_select_status}")
     if fixed.tube_select_status != "FEASIBLE_WITHIN_DESIGN_BOUNDS":

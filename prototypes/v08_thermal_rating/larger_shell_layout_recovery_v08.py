@@ -160,6 +160,61 @@ def resolve_recovered_shell_052_bundle(
     return None
 
 
+SHELL_052_LOCAL_TUBE_LENGTHS_M = (Decimal("5.5"), Decimal("6.0"))
+SHELL_052_LOCAL_ENVELOPE_SCALES = (Decimal("0.80"), Decimal("0.85"), Decimal("0.90"))
+
+
+def enumerate_shell_052_bounded_local_combos(
+    normalized: NormalizedUserDesignCase,
+    handoff: V08SolverHandoffV1,
+) -> tuple[tuple[RecoveredShell052Bundle, ...], tuple[str, ...]]:
+    """Six authorized combos: 5.5/6.0 m tube length × 0.80/0.85/0.90 envelope @ 0.52 m shell."""
+    space = load_v08_discrete_space(BREAKTHROUGH_DISCRETE_SPACE_PATH)
+    cut = format_engineering_decimal(space.baffle_cut)
+    bundles: list[RecoveredShell052Bundle] = []
+    blockers: list[str] = []
+    for length in SHELL_052_LOCAL_TUBE_LENGTHS_M:
+        for scale in SHELL_052_LOCAL_ENVELOPE_SCALES:
+            outcome = _with_envelope_override(
+                normalized,
+                handoff,
+                discrete_path=BREAKTHROUGH_DISCRETE_SPACE_PATH,
+                shell_m=SHELL_052_PROBE_M,
+                envelope_scale=scale,
+            )
+            matched = [
+                item
+                for item in outcome.valid_structural
+                if Decimal(str(item.shell_record.shell_inside_diameter_m)) == SHELL_052_PROBE_M
+                and Decimal(str(item.candidate.tube_length_m)) == length
+            ]
+            if not matched:
+                blocker = "none"
+                if outcome.rejections:
+                    blocker = str(
+                        outcome.rejections[0].evidence.get("blocker_code", "TASK168_REJECT")
+                    )
+                blockers.append(
+                    f"L={length}m,scale={scale},envelope={outcome.placement_envelope_diameter_m}:{blocker}"
+                )
+                continue
+            item = matched[0]
+            bundles.append(
+                RecoveredShell052Bundle(
+                    structural_bundle=item,
+                    candidate_space_hash=outcome.space_hash,
+                    discrete_space_authority_id=space.authority_id,
+                    discrete_space_content_hash=space.content_hash,
+                    placement_envelope_diameter_m=outcome.placement_envelope_diameter_m,
+                    envelope_scale=str(scale),
+                    baffle_cut_fraction=cut,
+                    experimental_authority_label=f"{RECOVERY_AUTHORITY_LABEL}/BOUNDED_LOCAL_COMBO",
+                    recovery_note=f"tube_length_m={length} envelope_scale={scale}",
+                )
+            )
+    return tuple(bundles), tuple(blockers)
+
+
 def run_larger_shell_layout_recovery(
     normalized: NormalizedUserDesignCase,
     handoff: V08SolverHandoffV1,

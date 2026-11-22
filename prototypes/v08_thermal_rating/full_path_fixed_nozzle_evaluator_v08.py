@@ -106,12 +106,83 @@ class FixedNozzleScenarioEvaluation:
     blockers: tuple[str, ...]
 
 
+def _largest_feasible_nozzle_diameter(
+    *,
+    case: EngineeringCase,
+    record: CandidateSelectionRecord,
+    postpass: dict[str, Any],
+    scenario: dict[str, Any],
+    side: Literal["tube_side", "shell_side"],
+    max_dp_pa: Decimal,
+    velocity_rule: dict[str, Any] | None,
+    tube_nozzle_d_m: Decimal | None,
+    shell_nozzle_d_m: Decimal | None,
+) -> Decimal | None:
+    from prototypes.v07_general_rating_sizing_mvp.nozzle_pressure_budget_solver import (
+        _search_nozzle_d_in_velocity_band,
+        _shell_bd_internal_pa,
+        _shell_external_dp_pa_for_nozzle_d,
+        _tube_path_dp_pa_for_nozzle_d,
+    )
+
+    d_lo, d_hi = _search_nozzle_d_in_velocity_band(
+        case=case, side=side, velocity_rule=velocity_rule
+    )
+
+    def side_total_dp(d_m: float) -> Decimal | None:
+        d_dec = Decimal(str(d_m))
+        if side == "tube_side":
+            total, _ = _tube_path_dp_pa_for_nozzle_d(
+                case=case,
+                record=record,
+                postpass=postpass,
+                scenario=scenario,
+                tube_nozzle_d_m=d_dec,
+                include_nozzle_pair=True,
+            )
+            return total
+        ext, _ = _shell_external_dp_pa_for_nozzle_d(
+            case=case,
+            record=record,
+            scenario=scenario,
+            shell_nozzle_d_m=d_dec,
+            include_nozzle_pair=True,
+        )
+        bd = _shell_bd_internal_pa(postpass)
+        if ext is None or bd is None:
+            return None
+        return bd + ext
+
+    dp_hi = side_total_dp(d_hi)
+    if dp_hi is not None and dp_hi <= max_dp_pa:
+        return Decimal(str(d_hi))
+    dp_lo = side_total_dp(d_lo)
+    if dp_lo is None or dp_lo > max_dp_pa:
+        return None
+    lo, hi = float(d_lo), float(d_hi)
+    best = lo
+    for _ in range(48):
+        mid = (lo + hi) / 2.0
+        dp_mid = side_total_dp(mid)
+        if dp_mid is None:
+            return None
+        if dp_mid <= max_dp_pa:
+            best = mid
+            lo = mid
+        else:
+            hi = mid
+    return Decimal(str(best))
+
+
 def select_fixed_nozzle_design(
     *,
     case: EngineeringCase,
     record: CandidateSelectionRecord,
     postpass: dict[str, Any],
     selection_scenario: LossScenarioKey = "mid_band",
+    tube_nozzle_objective: Literal["MINIMUM_DIAMETER", "MAX_MARGIN_WITHIN_VELOCITY_BAND"] = (
+        "MINIMUM_DIAMETER"
+    ),
 ) -> FixedNozzleDesign:
     """Pick one tube/shell nozzle ID (mid-band K) for all loss scenarios."""
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS[selection_scenario]
@@ -149,6 +220,20 @@ def select_fixed_nozzle_design(
         shell_d = Decimal(
             str(band.get("max", shell_search.get("theoretical_at_band_max_diameter_m")))
         )
+    if tube_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
+        alt = _largest_feasible_nozzle_diameter(
+            case=case,
+            record=record,
+            postpass=postpass,
+            scenario=scenario,
+            side="tube_side",
+            max_dp_pa=Decimal(str(case.max_tube_side_pressure_drop_pa)),
+            velocity_rule=None,
+            tube_nozzle_d_m=None,
+            shell_nozzle_d_m=None,
+        )
+        if alt is not None and alt > tube_d:
+            tube_d = alt
     tube_d = _clamp_nozzle_d_to_velocity_band(case=case, side="tube_side", diameter_m=tube_d)
     shell_d = _clamp_nozzle_d_to_velocity_band(case=case, side="shell_side", diameter_m=shell_d)
     return FixedNozzleDesign(

@@ -45,9 +45,7 @@ def _json_ready(value: Any) -> Any:
 
 
 def main() -> None:
-    out = Path(
-        "/opt/cursor/artifacts/v08_03_thermal_hydraulic_cooptimization_recovery.json"
-    )
+    out = Path("/opt/cursor/artifacts/v08_03_thermal_hydraulic_cooptimization_recovery.json")
     provider = CoolPropProvider()
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     head = _git_head()
