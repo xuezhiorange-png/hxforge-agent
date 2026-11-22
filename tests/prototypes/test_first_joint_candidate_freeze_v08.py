@@ -63,6 +63,8 @@ def test_first_joint_freeze_replay_identity_and_spec() -> None:
     assert freeze.geometry_identity_replay == "PASS"
     spec = freeze.design_spec
     assert spec["candidate_id"] == FROZEN_FIRST_JOINT_CANDIDATE_ID
+    assert freeze.structure_spec_validation in ("PASS", "BLOCKED", "NOT_EVALUATED")
+    assert freeze.generic_user_constraints in ("PASS", "BLOCKED", "NOT_EVALUATED")
     assert spec["geometry_identity_v2"] == FROZEN_FIRST_JOINT_GEOMETRY_V2
     assert "placement_envelope_scale" in spec["geometry"]
     mid = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "mid_band")

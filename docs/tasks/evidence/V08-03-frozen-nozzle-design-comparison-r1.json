@@ -1,0 +1,233 @@
+{
+  "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+  "design_a_baseline_frozen": {
+    "nozzle_design_hash": "95e70d4627243ac8eb75ba787fb0b8a3ca50cda3684d58b8627e9af090c45e5c",
+    "ports": [
+      {
+        "density_kg_m3": "993.38",
+        "effective_area_m2": "0.0120801780",
+        "inside_diameter_m": "0.12402",
+        "inside_diameter_mm": "124.02",
+        "mass_flow_kg_s": "12.000000",
+        "port_id": "TUBE_INLET",
+        "velocity_basis": "INLET_TP_PROPERTY",
+        "velocity_m_s": "1.0000"
+      },
+      {
+        "density_kg_m3": "995.57",
+        "effective_area_m2": "0.0120801780",
+        "inside_diameter_m": "0.12402",
+        "inside_diameter_mm": "124.02",
+        "mass_flow_kg_s": "12.000000",
+        "port_id": "TUBE_OUTLET",
+        "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+        "velocity_m_s": "0.9978"
+      },
+      {
+        "density_kg_m3": "997.81",
+        "effective_area_m2": "0.0167300824",
+        "inside_diameter_m": "0.14595",
+        "inside_diameter_mm": "145.95",
+        "mass_flow_kg_s": "20.000000",
+        "port_id": "SHELL_INLET",
+        "velocity_basis": "INLET_TP_PROPERTY",
+        "velocity_m_s": "1.1981"
+      },
+      {
+        "density_kg_m3": "996.84",
+        "effective_area_m2": "0.0167300824",
+        "inside_diameter_m": "0.14595",
+        "inside_diameter_mm": "145.95",
+        "mass_flow_kg_s": "20.000000",
+        "port_id": "SHELL_OUTLET",
+        "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+        "velocity_m_s": "1.1992"
+      }
+    ],
+    "scenarios": {
+      "high_loss_sensitivity": {
+        "hydraulic_check": "BLOCKED",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "429.673",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "16.326",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "429.673",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "16.326"
+        },
+        "shell_full_path_dp_pa": "1330.406631023644509985811160",
+        "shell_margin_pa": "-150.406631023644509985811160",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "23.039",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "42.237",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "15.973",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "273.169",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "273.169"
+        },
+        "tube_full_path_dp_pa": "1195.480",
+        "tube_margin_pa": "-45.480"
+      },
+      "low_loss_sensitivity": {
+        "hydraulic_check": "PASS",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "286.449",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "9.070",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "286.449",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "9.070"
+        },
+        "shell_full_path_dp_pa": "1029.446631023644509985811160",
+        "shell_margin_pa": "150.553368976355490014188840",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "15.359",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "26.878",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "11.059",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "173.835",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "173.835"
+        },
+        "tube_full_path_dp_pa": "968.859",
+        "tube_margin_pa": "181.141"
+      },
+      "mid_band": {
+        "hydraulic_check": "PASS",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "358.061",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "12.698",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "358.061",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "12.698"
+        },
+        "shell_full_path_dp_pa": "1179.926631023644509985811160",
+        "shell_margin_pa": "0.073368976355490014188840",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "19.199",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "34.558",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "13.516",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "223.502",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "223.502"
+        },
+        "tube_full_path_dp_pa": "1082.170",
+        "tube_margin_pa": "67.830"
+      }
+    },
+    "shell_nozzle_id_mm": "145.95",
+    "tube_nozzle_id_mm": "124.02"
+  },
+  "design_b_shell_max_margin": {
+    "nozzle_design_hash": "15445c7ed0a6473b9cd9beedb04e165b2cb1ba75a7e1a066220e2711523c191e",
+    "ports": [
+      {
+        "density_kg_m3": "993.38",
+        "effective_area_m2": "0.0120801780",
+        "inside_diameter_m": "0.12402",
+        "inside_diameter_mm": "124.02",
+        "mass_flow_kg_s": "12.000000",
+        "port_id": "TUBE_INLET",
+        "velocity_basis": "INLET_TP_PROPERTY",
+        "velocity_m_s": "1.0000"
+      },
+      {
+        "density_kg_m3": "995.57",
+        "effective_area_m2": "0.0120801780",
+        "inside_diameter_m": "0.12402",
+        "inside_diameter_mm": "124.02",
+        "mass_flow_kg_s": "12.000000",
+        "port_id": "TUBE_OUTLET",
+        "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+        "velocity_m_s": "0.9978"
+      },
+      {
+        "density_kg_m3": "997.81",
+        "effective_area_m2": "0.0200439476",
+        "inside_diameter_m": "0.1597521415058464795229548436",
+        "inside_diameter_mm": "159.75",
+        "mass_flow_kg_s": "20.000000",
+        "port_id": "SHELL_INLET",
+        "velocity_basis": "INLET_TP_PROPERTY",
+        "velocity_m_s": "1.0000"
+      },
+      {
+        "density_kg_m3": "996.84",
+        "effective_area_m2": "0.0200439476",
+        "inside_diameter_m": "0.1597521415058464795229548436",
+        "inside_diameter_mm": "159.75",
+        "mass_flow_kg_s": "20.000000",
+        "port_id": "SHELL_OUTLET",
+        "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+        "velocity_m_s": "1.0010"
+      }
+    ],
+    "scenarios": {
+      "high_loss_sensitivity": {
+        "hydraulic_check": "BLOCKED",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "299.342",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "16.326",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "299.342",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "16.326"
+        },
+        "shell_full_path_dp_pa": "1069.744631023644509985811160",
+        "shell_margin_pa": "110.255368976355490014188840",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "23.039",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "42.237",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "15.973",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "273.169",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "273.169"
+        },
+        "tube_full_path_dp_pa": "1195.480",
+        "tube_margin_pa": "-45.480"
+      },
+      "low_loss_sensitivity": {
+        "hydraulic_check": "PASS",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "199.561",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "9.070",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "199.561",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "9.070"
+        },
+        "shell_full_path_dp_pa": "855.6706310236445099858111598",
+        "shell_margin_pa": "324.3293689763554900141888402",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "15.359",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "26.878",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "11.059",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "173.835",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "173.835"
+        },
+        "tube_full_path_dp_pa": "968.859",
+        "tube_margin_pa": "181.141"
+      },
+      "mid_band": {
+        "hydraulic_check": "PASS",
+        "shell_breakdown": {
+          "R27B-ASSUMP-SHELL-INLET-NOZZLE": "249.452",
+          "R27B-ASSUMP-SHELL-INLET-TRANSITION": "12.698",
+          "R27B-ASSUMP-SHELL-OUTLET-NOZZLE": "249.452",
+          "R27B-ASSUMP-SHELL-OUTLET-TRANSITION": "12.698"
+        },
+        "shell_full_path_dp_pa": "962.7086310236445099858111598",
+        "shell_margin_pa": "217.2913689763554900141888402",
+        "tube_breakdown": {
+          "R27B-ASSUMP-TUBE-BUNDLE-ENTRANCE": "19.199",
+          "R27B-ASSUMP-TUBE-BUNDLE-EXIT": "34.558",
+          "R27B-ASSUMP-TUBE-CHANNEL-HEAD": "13.516",
+          "R27B-ASSUMP-TUBE-INLET-NOZZLE": "223.502",
+          "R27B-ASSUMP-TUBE-OUTLET-NOZZLE": "223.502"
+        },
+        "tube_full_path_dp_pa": "1082.170",
+        "tube_margin_pa": "67.830"
+      }
+    },
+    "shell_nozzle_id_mm": "159.75",
+    "tube_nozzle_id_mm": "124.02"
+  },
+  "geometry_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+  "outlet_state_authority": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+  "perturbation_sensitivity": [
+    {
+      "tube_id_plus_5pct": "BLOCKED_VELOCITY_BAND"
+    },
+    {
+      "shell_id_plus_5pct": "BLOCKED_VELOCITY_BAND"
+    }
+  ],
+  "schema": "hxforge.frozen-nozzle-design-comparison.v1",
+  "task_id": "V08_03_FROZEN_CANDIDATE_NOZZLE_MARGIN_AND_PORT_STATE_VALIDATION"
+}

@@ -48,7 +48,11 @@ LOSS_SCENARIOS: tuple[LossScenarioKey, ...] = (
 )
 
 NozzleSizeAuthority = Literal["PARAMETRIC_CALCULATED", "STANDARD_SERIES"]
-VelocityBasis = Literal["INLET_TP_PROPERTY", "PROVISIONAL_SYMMETRIC_INLET"]
+VelocityBasis = Literal[
+    "INLET_TP_PROPERTY",
+    "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+    "PROVISIONAL_SYMMETRIC_INLET",
+]
 
 
 @dataclass(frozen=True)
@@ -123,6 +127,15 @@ def _velocity_in_band(v: Decimal) -> bool:
     return Decimal("1") <= v <= Decimal("3")
 
 
+def _fluid_density_kg_m3(
+    provider: CoolPropProvider, *, temperature_k: Decimal, pressure_pa: Decimal
+) -> Decimal:
+    from hexagent.properties.base import FluidIdentifier
+
+    state = provider.state_tp(FluidIdentifier(name="Water"), float(temperature_k), float(pressure_pa))
+    return Decimal(str(state.density_kg_m3))
+
+
 def _nozzle_design_hash(ports: tuple[NozzlePortDesign, ...]) -> str:
     payload = {
         "ports": [
@@ -143,17 +156,39 @@ def _port_designs(
     case_engineering: Any,
     tube_d_m: Decimal,
     shell_d_m: Decimal,
+    provider: CoolPropProvider | None = None,
+    tube_outlet_temperature_k: Decimal | None = None,
+    shell_outlet_temperature_k: Decimal | None = None,
 ) -> tuple[NozzlePortDesign, ...]:
-    tube_rho = Decimal(str(_side_inlet_density_kg_m3(case_engineering, "tube_side")))
-    shell_rho = Decimal(str(_side_inlet_density_kg_m3(case_engineering, "shell_side")))
+    active = provider or CoolPropProvider()
+    tube_p = Decimal(str(case_engineering.tube_side.inlet_pressure_pa))
+    shell_p = Decimal(str(case_engineering.shell_side.inlet_pressure_pa))
+    tube_rho_in = Decimal(str(_side_inlet_density_kg_m3(case_engineering, "tube_side")))
+    shell_rho_in = Decimal(str(_side_inlet_density_kg_m3(case_engineering, "shell_side")))
+    if tube_outlet_temperature_k is not None:
+        tube_rho_out = _fluid_density_kg_m3(
+            active, temperature_k=tube_outlet_temperature_k, pressure_pa=tube_p
+        )
+    else:
+        tube_rho_out = tube_rho_in
+    if shell_outlet_temperature_k is not None:
+        shell_rho_out = _fluid_density_kg_m3(
+            active, temperature_k=shell_outlet_temperature_k, pressure_pa=shell_p
+        )
+    else:
+        shell_rho_out = shell_rho_in
     tube_m = Decimal(str(case_engineering.tube_side.mass_flow_kg_s))
     shell_m = Decimal(str(case_engineering.shell_side.mass_flow_kg_s))
     from prototypes.v08_thermal_rating.full_path_fixed_nozzle_evaluator_v08 import (
         _decimal_velocity_m_s,
     )
 
-    tube_v = _decimal_velocity_m_s(mass_flow_kg_s=tube_m, rho=tube_rho, diameter_m=tube_d_m)
-    shell_v = _decimal_velocity_m_s(mass_flow_kg_s=shell_m, rho=shell_rho, diameter_m=shell_d_m)
+    tube_v_in = _decimal_velocity_m_s(mass_flow_kg_s=tube_m, rho=tube_rho_in, diameter_m=tube_d_m)
+    tube_v_out = _decimal_velocity_m_s(mass_flow_kg_s=tube_m, rho=tube_rho_out, diameter_m=tube_d_m)
+    shell_v_in = _decimal_velocity_m_s(mass_flow_kg_s=shell_m, rho=shell_rho_in, diameter_m=shell_d_m)
+    shell_v_out = _decimal_velocity_m_s(
+        mass_flow_kg_s=shell_m, rho=shell_rho_out, diameter_m=shell_d_m
+    )
     tube_area = Decimal(str(nozzle_flow_area_m2(tube_d_m)))
     shell_area = Decimal(str(nozzle_flow_area_m2(shell_d_m)))
     authority: NozzleSizeAuthority = "PARAMETRIC_CALCULATED"
@@ -179,29 +214,24 @@ def _port_designs(
             multiplicity=1,
         )
 
+    out_basis: VelocityBasis = (
+        "INDICATIVE_THERMAL_PRESCREEN_OUTLET"
+        if tube_outlet_temperature_k is not None
+        else "PROVISIONAL_SYMMETRIC_INLET"
+    )
     return (
-        port("TUBE_INLET", tube_d_m, tube_v, tube_area, tube_m, tube_rho, "INLET_TP_PROPERTY"),
+        port("TUBE_INLET", tube_d_m, tube_v_in, tube_area, tube_m, tube_rho_in, "INLET_TP_PROPERTY"),
+        port("TUBE_OUTLET", tube_d_m, tube_v_out, tube_area, tube_m, tube_rho_out, out_basis),
         port(
-            "TUBE_OUTLET",
-            tube_d_m,
-            tube_v,
-            tube_area,
-            tube_m,
-            tube_rho,
-            "PROVISIONAL_SYMMETRIC_INLET",
-        ),
-        port(
-            "SHELL_INLET", shell_d_m, shell_v, shell_area, shell_m, shell_rho, "INLET_TP_PROPERTY"
-        ),
-        port(
-            "SHELL_OUTLET",
+            "SHELL_INLET",
             shell_d_m,
-            shell_v,
+            shell_v_in,
             shell_area,
             shell_m,
-            shell_rho,
-            "PROVISIONAL_SYMMETRIC_INLET",
+            shell_rho_in,
+            "INLET_TP_PROPERTY",
         ),
+        port("SHELL_OUTLET", shell_d_m, shell_v_out, shell_area, shell_m, shell_rho_out, out_basis),
     )
 
 
@@ -230,6 +260,12 @@ def run_autonomous_nozzle_full_path(
     bindings: CandidateRatingBindings,
     *,
     tube_nozzle_objective: NozzleSelectionObjective = "MINIMUM_DIAMETER",
+    shell_nozzle_objective: NozzleSelectionObjective = "MINIMUM_DIAMETER",
+    fixed_tube_inside_diameter_m: Decimal | None = None,
+    fixed_shell_inside_diameter_m: Decimal | None = None,
+    tube_outlet_temperature_k: Decimal | None = None,
+    shell_outlet_temperature_k: Decimal | None = None,
+    provider: CoolPropProvider | None = None,
 ) -> AutonomousNozzleFullPathReport:
     case = build_engineering_case_v2_from_v08(bindings.normalized)
     record = candidate_selection_record_from_bindings(bindings)
@@ -246,6 +282,15 @@ def run_autonomous_nozzle_full_path(
         disclosures_list.append(
             "Tube nozzle uses largest ID within 1–3 m/s band for mid-band pressure margin probe."
         )
+    if shell_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
+        disclosures_list.append(
+            "Shell nozzle uses largest ID within 1–3 m/s band for mid-band shell margin probe."
+        )
+    if tube_outlet_temperature_k is not None:
+        disclosures_list.append(
+            "Outlet port velocities use INDICATIVE_THERMAL_PRESCREEN_OUTLET density (ε-NTU), "
+            "not Task173 converged state."
+        )
     disclosures = tuple(disclosures_list)
 
     fixed = select_fixed_nozzle_design(
@@ -253,6 +298,9 @@ def run_autonomous_nozzle_full_path(
         record=record,
         postpass=postpass,
         tube_nozzle_objective=tube_nozzle_objective,
+        shell_nozzle_objective=shell_nozzle_objective,
+        fixed_tube_inside_diameter_m=fixed_tube_inside_diameter_m,
+        fixed_shell_inside_diameter_m=fixed_shell_inside_diameter_m,
     )
     if fixed.shell_select_status != "FEASIBLE_WITHIN_DESIGN_BOUNDS":
         blockers.append(f"SHELL_NOZZLE_BISECT:{fixed.shell_select_status}")
@@ -281,10 +329,14 @@ def run_autonomous_nozzle_full_path(
             )
         )
 
+    active = provider or CoolPropProvider()
     ports = _port_designs(
         case_engineering=case,
         tube_d_m=fixed.tube_inside_diameter_m,
         shell_d_m=fixed.shell_inside_diameter_m,
+        provider=active,
+        tube_outlet_temperature_k=tube_outlet_temperature_k,
+        shell_outlet_temperature_k=shell_outlet_temperature_k,
     )
     all_vel_ok = all(_velocity_in_band(p.velocity_m_s) for p in ports)
     velocity_check: CheckStatus = "PASS" if all_vel_ok else "BLOCKED"

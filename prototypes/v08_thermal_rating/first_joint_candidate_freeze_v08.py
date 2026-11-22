@@ -27,11 +27,7 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
 )
 from prototypes.v08_thermal_rating.first_joint_candidate_identity_v08 import (
     FROZEN_FIRST_JOINT_CANDIDATE_ID,
-    FROZEN_FIRST_JOINT_ENVELOPE_SCALE,
     FROZEN_FIRST_JOINT_GEOMETRY_V2,
-    FROZEN_FIRST_JOINT_PHYSICAL_TUBE_COUNT,
-    FROZEN_FIRST_JOINT_SHELL_ID_M,
-    FROZEN_FIRST_JOINT_TUBE_LENGTH_M,
 )
 from prototypes.v08_thermal_rating.larger_shell_layout_recovery_v08 import (
     RecoveredShell052Bundle,
@@ -44,6 +40,12 @@ from prototypes.v08_thermal_rating.thermal_prescreen_v08 import (
     run_thermal_prescreen,
 )
 from prototypes.v08_thermal_rating.v08_epsilon_ntu_required_ua_v08 import required_ua_w_k_for_duty
+from prototypes.v08_thermal_rating.v08_prescreen_validators_v08 import (
+    ValidatorStatus,
+    validate_frozen_structure_spec,
+    validate_generic_user_constraints,
+    validate_pareto_missing_result_handling,
+)
 from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import (
     evaluate_binding_task037,
 )
@@ -68,8 +70,9 @@ class FirstJointCandidateFreezeReport:
     cr_clean: str | None
     effectiveness_clean: str | None
     sensitivity_notes: tuple[str, ...]
-    generic_user_constraints: Literal["PASS", "BLOCKED"]
-    pareto_missing_result_handling: Literal["PASS", "BLOCKED"]
+    generic_user_constraints: ValidatorStatus
+    pareto_missing_result_handling: ValidatorStatus
+    structure_spec_validation: ValidatorStatus
 
 
 def _resolve_frozen_bundle(
@@ -169,9 +172,8 @@ def _sensitivity_notes(
                 f"largest listed component={dominant[0]} ({dominant[1]} Pa)."
             )
     notes.append(
-        "Nozzle bore authority is PARAMETRIC_CALCULATED, not standard-series; "
-        "±5% bore perturbation would shift port velocity ~±10% and local K losses "
-        "scale ~velocity² (analysis only — K vectors not altered)."
+        "Nozzle bore perturbation sensitivity is computed in the nozzle margin comparison "
+        "artifact (±5% ID reruns on mid_band full path), not analytic estimates."
     )
     notes.append(
         "Placement envelope scale 0.80 is Task021 tube-center envelope fraction of shell ID, "
@@ -468,8 +470,18 @@ def run_first_joint_candidate_freeze(
     foul = run_thermal_prescreen(
         bindings, normalized, provider=active, task037_override=t037_f.raw
     )
+    tube_out = (
+        Decimal(clean.predicted_tube_outlet_k) if clean.predicted_tube_outlet_k else None
+    )
+    shell_out = (
+        Decimal(clean.predicted_shell_outlet_k) if clean.predicted_shell_outlet_k else None
+    )
     hydraulic = run_autonomous_nozzle_full_path(
-        bindings, tube_nozzle_objective="MAX_MARGIN_WITHIN_VELOCITY_BAND"
+        bindings,
+        tube_nozzle_objective="MAX_MARGIN_WITHIN_VELOCITY_BAND",
+        tube_outlet_temperature_k=tube_out,
+        shell_outlet_temperature_k=shell_out,
+        provider=active,
     )
 
     ntu = cr = eff = None
@@ -494,13 +506,16 @@ def run_first_joint_candidate_freeze(
     sens = _sensitivity_notes(hydraulic=hydraulic, normalized=normalized)
     review = _engineering_review_md(design_spec=spec, sensitivity=sens, hydraulic=hydraulic)
 
-    structure_complete = (
-        replay == "PASS"
-        and int(spec["geometry"]["physical_tube_count"]) == FROZEN_FIRST_JOINT_PHYSICAL_TUBE_COUNT
-        and Decimal(spec["geometry"]["tube_length_m"]) == FROZEN_FIRST_JOINT_TUBE_LENGTH_M
-        and Decimal(spec["geometry"]["shell_inside_diameter_m"]) == FROZEN_FIRST_JOINT_SHELL_ID_M
-        and Decimal(spec["geometry"]["placement_envelope_scale"]) == FROZEN_FIRST_JOINT_ENVELOPE_SCALE
-    )
+    structure_validation = validate_frozen_structure_spec(spec)
+    structure_complete = structure_validation == "PASS" and replay == "PASS"
+
+    generic_status = validate_generic_user_constraints(provider=active)
+    pareto_status = validate_pareto_missing_result_handling(provider=active)
+    spec["quality_gates"] = {
+        "structure_spec_validation": structure_validation,
+        "generic_user_constraints": generic_status,
+        "pareto_missing_result_handling": pareto_status,
+    }
 
     return FirstJointCandidateFreezeReport(
         candidate_id=cid,
@@ -516,8 +531,9 @@ def run_first_joint_candidate_freeze(
         cr_clean=cr,
         effectiveness_clean=eff,
         sensitivity_notes=sens,
-        generic_user_constraints="PASS",
-        pareto_missing_result_handling="PASS",
+        generic_user_constraints=generic_status,
+        pareto_missing_result_handling=pareto_status,
+        structure_spec_validation=structure_validation,
     )
 
 

@@ -174,54 +174,28 @@ def _largest_feasible_nozzle_diameter(
     return Decimal(str(best))
 
 
+NozzleDiameterObjective = Literal["MINIMUM_DIAMETER", "MAX_MARGIN_WITHIN_VELOCITY_BAND"]
+
+
 def select_fixed_nozzle_design(
     *,
     case: EngineeringCase,
     record: CandidateSelectionRecord,
     postpass: dict[str, Any],
     selection_scenario: LossScenarioKey = "mid_band",
-    tube_nozzle_objective: Literal["MINIMUM_DIAMETER", "MAX_MARGIN_WITHIN_VELOCITY_BAND"] = (
-        "MINIMUM_DIAMETER"
-    ),
+    tube_nozzle_objective: NozzleDiameterObjective = "MINIMUM_DIAMETER",
+    shell_nozzle_objective: NozzleDiameterObjective = "MINIMUM_DIAMETER",
+    fixed_tube_inside_diameter_m: Decimal | None = None,
+    fixed_shell_inside_diameter_m: Decimal | None = None,
 ) -> FixedNozzleDesign:
     """Pick one tube/shell nozzle ID (mid-band K) for all loss scenarios."""
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS[selection_scenario]
-    tube_search = _bisect_feasible_nozzle_d(
-        case=case,
-        record=record,
-        postpass=postpass,
-        scenario=scenario,
-        side="tube_side",
-        max_dp_pa=Decimal(str(case.max_tube_side_pressure_drop_pa)),
-        velocity_rule=None,
-        tube_nozzle_d_m=None,
-        shell_nozzle_d_m=None,
-    )
-    tube_d: Decimal
-    if tube_search.get("selected_inside_diameter_m") is not None:
-        tube_d = Decimal(str(tube_search["selected_inside_diameter_m"]))
+    tube_status = "FIXED_OVERRIDE"
+    shell_status = "FIXED_OVERRIDE"
+    if fixed_tube_inside_diameter_m is not None:
+        tube_d = fixed_tube_inside_diameter_m
     else:
-        tube_d = Decimal(str(tube_search["diameter_search_band_m"]["max"]))
-    shell_search = _bisect_feasible_nozzle_d(
-        case=case,
-        record=record,
-        postpass=postpass,
-        scenario=scenario,
-        side="shell_side",
-        max_dp_pa=Decimal(str(case.max_shell_side_pressure_drop_pa)),
-        velocity_rule=None,
-        tube_nozzle_d_m=tube_d,
-        shell_nozzle_d_m=None,
-    )
-    if shell_search.get("selected_inside_diameter_m") is not None:
-        shell_d = Decimal(str(shell_search["selected_inside_diameter_m"]))
-    else:
-        band = shell_search.get("diameter_search_band_m") or {}
-        shell_d = Decimal(
-            str(band.get("max", shell_search.get("theoretical_at_band_max_diameter_m")))
-        )
-    if tube_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
-        alt = _largest_feasible_nozzle_diameter(
+        tube_search = _bisect_feasible_nozzle_d(
             case=case,
             record=record,
             postpass=postpass,
@@ -232,15 +206,70 @@ def select_fixed_nozzle_design(
             tube_nozzle_d_m=None,
             shell_nozzle_d_m=None,
         )
-        if alt is not None and alt > tube_d:
-            tube_d = alt
-    tube_d = _clamp_nozzle_d_to_velocity_band(case=case, side="tube_side", diameter_m=tube_d)
-    shell_d = _clamp_nozzle_d_to_velocity_band(case=case, side="shell_side", diameter_m=shell_d)
+        tube_status = str(tube_search.get("status", "UNKNOWN"))
+        if tube_search.get("selected_inside_diameter_m") is not None:
+            tube_d = Decimal(str(tube_search["selected_inside_diameter_m"]))
+        else:
+            tube_d = Decimal(str(tube_search["diameter_search_band_m"]["max"]))
+        if tube_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
+            alt = _largest_feasible_nozzle_diameter(
+                case=case,
+                record=record,
+                postpass=postpass,
+                scenario=scenario,
+                side="tube_side",
+                max_dp_pa=Decimal(str(case.max_tube_side_pressure_drop_pa)),
+                velocity_rule=None,
+                tube_nozzle_d_m=None,
+                shell_nozzle_d_m=None,
+            )
+            if alt is not None and alt > tube_d:
+                tube_d = alt
+        tube_d = _clamp_nozzle_d_to_velocity_band(case=case, side="tube_side", diameter_m=tube_d)
+    if fixed_shell_inside_diameter_m is not None:
+        shell_d = fixed_shell_inside_diameter_m
+    else:
+        shell_search = _bisect_feasible_nozzle_d(
+            case=case,
+            record=record,
+            postpass=postpass,
+            scenario=scenario,
+            side="shell_side",
+            max_dp_pa=Decimal(str(case.max_shell_side_pressure_drop_pa)),
+            velocity_rule=None,
+            tube_nozzle_d_m=tube_d,
+            shell_nozzle_d_m=None,
+        )
+        shell_status = str(shell_search.get("status", "UNKNOWN"))
+        if shell_search.get("selected_inside_diameter_m") is not None:
+            shell_d = Decimal(str(shell_search["selected_inside_diameter_m"]))
+        else:
+            band = shell_search.get("diameter_search_band_m") or {}
+            shell_d = Decimal(
+                str(band.get("max", shell_search.get("theoretical_at_band_max_diameter_m")))
+            )
+        if shell_nozzle_objective == "MAX_MARGIN_WITHIN_VELOCITY_BAND":
+            alt = _largest_feasible_nozzle_diameter(
+                case=case,
+                record=record,
+                postpass=postpass,
+                scenario=scenario,
+                side="shell_side",
+                max_dp_pa=Decimal(str(case.max_shell_side_pressure_drop_pa)),
+                velocity_rule=None,
+                tube_nozzle_d_m=tube_d,
+                shell_nozzle_d_m=None,
+            )
+            if alt is not None and alt > shell_d:
+                shell_d = alt
+        shell_d = _clamp_nozzle_d_to_velocity_band(
+            case=case, side="shell_side", diameter_m=shell_d
+        )
     return FixedNozzleDesign(
         tube_inside_diameter_m=tube_d,
         shell_inside_diameter_m=shell_d,
-        tube_select_status=str(tube_search.get("status", "UNKNOWN")),
-        shell_select_status=str(shell_search.get("status", "UNKNOWN")),
+        tube_select_status=tube_status,
+        shell_select_status=shell_status,
         selection_loss_scenario=selection_scenario,
     )
 
@@ -355,6 +384,7 @@ __all__ = [
     "DpAuthority",
     "FixedNozzleDesign",
     "FixedNozzleScenarioEvaluation",
+    "NozzleDiameterObjective",
     "SideDpBreakdown",
     "classify_scenario_robustness",
     "evaluate_fixed_nozzle_all_scenarios",
