@@ -132,7 +132,9 @@ def _fluid_density_kg_m3(
 ) -> Decimal:
     from hexagent.properties.base import FluidIdentifier
 
-    state = provider.state_tp(FluidIdentifier(name="Water"), float(temperature_k), float(pressure_pa))
+    state = provider.state_tp(
+        FluidIdentifier(name="Water"), float(temperature_k), float(pressure_pa)
+    )
     return Decimal(str(state.density_kg_m3))
 
 
@@ -185,7 +187,9 @@ def _port_designs(
 
     tube_v_in = _decimal_velocity_m_s(mass_flow_kg_s=tube_m, rho=tube_rho_in, diameter_m=tube_d_m)
     tube_v_out = _decimal_velocity_m_s(mass_flow_kg_s=tube_m, rho=tube_rho_out, diameter_m=tube_d_m)
-    shell_v_in = _decimal_velocity_m_s(mass_flow_kg_s=shell_m, rho=shell_rho_in, diameter_m=shell_d_m)
+    shell_v_in = _decimal_velocity_m_s(
+        mass_flow_kg_s=shell_m, rho=shell_rho_in, diameter_m=shell_d_m
+    )
     shell_v_out = _decimal_velocity_m_s(
         mass_flow_kg_s=shell_m, rho=shell_rho_out, diameter_m=shell_d_m
     )
@@ -220,7 +224,9 @@ def _port_designs(
         else "PROVISIONAL_SYMMETRIC_INLET"
     )
     return (
-        port("TUBE_INLET", tube_d_m, tube_v_in, tube_area, tube_m, tube_rho_in, "INLET_TP_PROPERTY"),
+        port(
+            "TUBE_INLET", tube_d_m, tube_v_in, tube_area, tube_m, tube_rho_in, "INLET_TP_PROPERTY"
+        ),
         port("TUBE_OUTLET", tube_d_m, tube_v_out, tube_area, tube_m, tube_rho_out, out_basis),
         port(
             "SHELL_INLET",
@@ -291,6 +297,10 @@ def run_autonomous_nozzle_full_path(
             "Outlet port velocities use INDICATIVE_THERMAL_PRESCREEN_OUTLET density (ε-NTU), "
             "not Task173 converged state."
         )
+        disclosures_list.append(
+            "When outlet T is set, R27B outlet nozzles/transitions use COOLPROP_TP in full-path "
+            "calculation (experimental prescreen path only)."
+        )
     disclosures = tuple(disclosures_list)
 
     fixed = select_fixed_nozzle_design(
@@ -302,13 +312,32 @@ def run_autonomous_nozzle_full_path(
         fixed_tube_inside_diameter_m=fixed_tube_inside_diameter_m,
         fixed_shell_inside_diameter_m=fixed_shell_inside_diameter_m,
     )
-    if fixed.shell_select_status != "FEASIBLE_WITHIN_DESIGN_BOUNDS":
+    ok_status = frozenset({"FEASIBLE_WITHIN_DESIGN_BOUNDS", "FIXED_OVERRIDE"})
+    if fixed.shell_select_status not in ok_status:
         blockers.append(f"SHELL_NOZZLE_BISECT:{fixed.shell_select_status}")
-    if fixed.tube_select_status != "FEASIBLE_WITHIN_DESIGN_BOUNDS":
+    if fixed.tube_select_status not in ok_status:
         blockers.append(f"TUBE_NOZZLE_BISECT:{fixed.tube_select_status}")
 
+    tube_out_state: tuple[Decimal, Decimal] | None = None
+    shell_out_state: tuple[Decimal, Decimal] | None = None
+    if tube_outlet_temperature_k is not None:
+        tube_out_state = (
+            tube_outlet_temperature_k,
+            Decimal(str(case.tube_side.inlet_pressure_pa)),
+        )
+    if shell_outlet_temperature_k is not None:
+        shell_out_state = (
+            shell_outlet_temperature_k,
+            Decimal(str(case.shell_side.inlet_pressure_pa)),
+        )
+
     evals = evaluate_fixed_nozzle_all_scenarios(
-        case=case, record=record, postpass=postpass, fixed=fixed
+        case=case,
+        record=record,
+        postpass=postpass,
+        fixed=fixed,
+        tube_outlet_state_k_pa=tube_out_state,
+        shell_outlet_state_k_pa=shell_out_state,
     )
     scenario_rows: list[FullPathScenarioResult] = []
     for ev in evals:

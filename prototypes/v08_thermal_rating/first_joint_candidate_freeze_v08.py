@@ -126,8 +126,10 @@ def _thermal_ntu_bundle(
     c_max = max(c_t, c_s)
     cr = c_min / c_max if c_max > 0 else Decimal("0")
     ntu = Decimal(ua_w_k) / c_min if c_min > 0 else Decimal("0")
-    return str(ntu.quantize(Decimal("0.001"))), str(cr.quantize(Decimal("0.0001"))), str(
-        eff.quantize(Decimal("0.0001"))
+    return (
+        str(ntu.quantize(Decimal("0.001"))),
+        str(cr.quantize(Decimal("0.0001"))),
+        str(eff.quantize(Decimal("0.0001"))),
     )
 
 
@@ -231,7 +233,9 @@ def _build_design_spec(
     ports = [
         {
             "port_id": p.port_id,
-            "inside_diameter_mm": str((p.inside_diameter_m * Decimal("1000")).quantize(Decimal("0.01"))),
+            "inside_diameter_mm": str(
+                (p.inside_diameter_m * Decimal("1000")).quantize(Decimal("0.01"))
+            ),
             "velocity_m_s": str(p.velocity_m_s.quantize(Decimal("0.001"))),
             "effective_area_m2": str(p.effective_area_m2),
             "size_authority": p.size_authority,
@@ -467,15 +471,9 @@ def run_first_joint_candidate_freeze(
     clean = run_thermal_prescreen(
         bindings, normalized, provider=active, task037_override=t037_c.raw
     )
-    foul = run_thermal_prescreen(
-        bindings, normalized, provider=active, task037_override=t037_f.raw
-    )
-    tube_out = (
-        Decimal(clean.predicted_tube_outlet_k) if clean.predicted_tube_outlet_k else None
-    )
-    shell_out = (
-        Decimal(clean.predicted_shell_outlet_k) if clean.predicted_shell_outlet_k else None
-    )
+    foul = run_thermal_prescreen(bindings, normalized, provider=active, task037_override=t037_f.raw)
+    tube_out = Decimal(clean.predicted_tube_outlet_k) if clean.predicted_tube_outlet_k else None
+    shell_out = Decimal(clean.predicted_shell_outlet_k) if clean.predicted_shell_outlet_k else None
     hydraulic = run_autonomous_nozzle_full_path(
         bindings,
         tube_nozzle_objective="MAX_MARGIN_WITHIN_VELOCITY_BAND",

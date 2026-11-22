@@ -263,6 +263,8 @@ def _verify_full_path(
     loss_scenario_key: LossScenarioKey,
     tube_nozzle_d_m: Decimal,
     shell_nozzle_d_m: Decimal,
+    tube_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
+    shell_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
 ) -> dict[str, Any]:
     path_input = build_r27b_assumption_based_hydraulic_path_input_v1(
         case=case,
@@ -270,6 +272,8 @@ def _verify_full_path(
         loss_scenario_key=loss_scenario_key,
         tube_nozzle_inside_diameter_m=tube_nozzle_d_m,
         shell_nozzle_inside_diameter_m=shell_nozzle_d_m,
+        tube_outlet_state_k_pa=tube_outlet_state_k_pa,
+        shell_outlet_state_k_pa=shell_outlet_state_k_pa,
     )
     return run_authorized_full_path_hydraulic_calculation(
         case=case,

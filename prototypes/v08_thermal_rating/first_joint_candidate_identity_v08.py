@@ -5,9 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 FROZEN_FIRST_JOINT_CANDIDATE_ID = "92187d45-ae76-5fdb-bf91-28f9dfca682b"
-FROZEN_FIRST_JOINT_GEOMETRY_V2 = (
-    "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906"
-)
+FROZEN_FIRST_JOINT_GEOMETRY_V2 = "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906"
 FROZEN_FIRST_JOINT_TUBE_LENGTH_M = Decimal("6.00")
 FROZEN_FIRST_JOINT_ENVELOPE_SCALE = Decimal("0.80")
 FROZEN_FIRST_JOINT_SHELL_ID_M = Decimal("0.52")

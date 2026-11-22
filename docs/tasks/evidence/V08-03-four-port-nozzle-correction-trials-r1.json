@@ -1,0 +1,267 @@
+{
+  "candidate_id": "92187d45-ae76-5fdb-bf91-28f9dfca682b",
+  "diameter_bounds": [
+    {
+      "common_feasible_upper_m": "0.1238822395608403919405994756",
+      "d_max_inlet_at_1m_s_m": "0.1240187024749012538995257929",
+      "d_max_outlet_at_1m_s_m": "0.1238822395608403919405994756",
+      "d_min_strict_band_m": "0.07160223125843234595756432774",
+      "feasible_interval_nonempty": true,
+      "rho_inlet_kg_m3": "993.3836279738581",
+      "rho_outlet_kg_m3": "995.5733637817352",
+      "side": "tube"
+    },
+    {
+      "common_feasible_upper_m": "0.1597521415058464855859493420",
+      "d_max_inlet_at_1m_s_m": "0.1597521415058464855859493420",
+      "d_max_outlet_at_1m_s_m": "0.1598298196698294632867046328",
+      "d_min_strict_band_m": "0.09227778941090538355895534135",
+      "feasible_interval_nonempty": true,
+      "rho_inlet_kg_m3": "997.8074379396465",
+      "rho_outlet_kg_m3": "996.8377939104041",
+      "side": "shell"
+    }
+  ],
+  "geometry_v2": "dff4ddcb29abbc15254bed0d4e75b7e635a1cdc165800325e624fdc2baded906",
+  "outlet_property_basis": "R27B outlet nozzles and outlet transitions use COOLPROP_TP at \u03b5-NTU prescreen outlet T with inlet P (experimental; not Task173 converged pressure).",
+  "outlet_state_authority": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+  "schema": "hxforge.four-port-nozzle-correction-trials.v1",
+  "selected": {
+    "nozzle_design_hash": "b9ebe893a4e49bb3dde31307f1a9f8a480cb7fd34f71f2922e0b036b5bfaa05a",
+    "shell_id_mm": "159.00",
+    "tube_id_mm": "123.80"
+  },
+  "task_id": "V08_03_FOUR_PORT_NOZZLE_CORRECTION_AND_VALIDATION",
+  "trials": [
+    {
+      "grid_trial": true,
+      "high_joint_prescreen": "BLOCKED",
+      "high_shell_dp_pa": "1097.065631023644509985811160",
+      "high_tube_dp_pa": "1204.036",
+      "mid_joint_prescreen": "PASS",
+      "mid_shell_dp_pa": "985.4746310236445099858111598",
+      "mid_shell_margin_pa": "194.5253689763554900141888402",
+      "mid_tube_dp_pa": "1089.170",
+      "mid_tube_margin_pa": "60.830",
+      "nozzle_design_hash": "6f9658c6807bed1526c0d1383c7b05c47868419b9db58a826d932bdb047a4045",
+      "ports": [
+        {
+          "density_kg_m3": "993.3836279738581",
+          "diameter_m": "0.1235000000",
+          "port_id": "TUBE_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.008417680247706222468607960"
+        },
+        {
+          "density_kg_m3": "995.5733637817352",
+          "diameter_m": "0.1235000000",
+          "port_id": "TUBE_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.006199693724496195651144195"
+        },
+        {
+          "density_kg_m3": "997.8074379396465",
+          "diameter_m": "0.1580000000",
+          "port_id": "SHELL_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.022301983484377403384475671"
+        },
+        {
+          "density_kg_m3": "996.8377939104041",
+          "diameter_m": "0.1580000000",
+          "port_id": "SHELL_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.023296397039344787117320372"
+        }
+      ],
+      "shell_id_mm": "158.00",
+      "strict_velocity": "PASS",
+      "tube_id_mm": "123.50",
+      "velocity_failures": []
+    },
+    {
+      "grid_trial": true,
+      "high_joint_prescreen": "BLOCKED",
+      "high_shell_dp_pa": "1081.465631023644509985811160",
+      "high_tube_dp_pa": "1204.036",
+      "mid_joint_prescreen": "PASS",
+      "mid_shell_dp_pa": "972.4756310236445099858111598",
+      "mid_shell_margin_pa": "207.5243689763554900141888402",
+      "mid_tube_dp_pa": "1089.170",
+      "mid_tube_margin_pa": "60.830",
+      "nozzle_design_hash": "8edb8b7fe61cec6c72f58bf9093849015913e60f58680ec6f589e7dcbdc7c788",
+      "ports": [
+        {
+          "density_kg_m3": "993.3836279738581",
+          "diameter_m": "0.1235000000",
+          "port_id": "TUBE_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.008417680247706222468607960"
+        },
+        {
+          "density_kg_m3": "995.5733637817352",
+          "diameter_m": "0.1235000000",
+          "port_id": "TUBE_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.006199693724496195651144195"
+        },
+        {
+          "density_kg_m3": "997.8074379396465",
+          "diameter_m": "0.1590000000",
+          "port_id": "SHELL_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.009483276599185059850878156"
+        },
+        {
+          "density_kg_m3": "996.8377939104041",
+          "diameter_m": "0.1590000000",
+          "port_id": "SHELL_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.010465221141972361283049950"
+        }
+      ],
+      "shell_id_mm": "159.00",
+      "strict_velocity": "PASS",
+      "tube_id_mm": "123.50",
+      "velocity_failures": []
+    },
+    {
+      "grid_trial": true,
+      "high_joint_prescreen": "BLOCKED",
+      "high_shell_dp_pa": "1097.065631023644509985811160",
+      "high_tube_dp_pa": "1198.676",
+      "mid_joint_prescreen": "PASS",
+      "mid_shell_dp_pa": "985.4746310236445099858111598",
+      "mid_shell_margin_pa": "194.5253689763554900141888402",
+      "mid_tube_dp_pa": "1084.785",
+      "mid_tube_margin_pa": "65.215",
+      "nozzle_design_hash": "97738f93af41c6401f1de2d7d45eacf4bcdb1a9944d4afa92dd7970865b3e2db",
+      "ports": [
+        {
+          "density_kg_m3": "993.3836279738581",
+          "diameter_m": "0.1238000000",
+          "port_id": "TUBE_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.003536278715610228575378611"
+        },
+        {
+          "density_kg_m3": "995.5733637817352",
+          "diameter_m": "0.1238000000",
+          "port_id": "TUBE_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.001329028698735459775405382"
+        },
+        {
+          "density_kg_m3": "997.8074379396465",
+          "diameter_m": "0.1580000000",
+          "port_id": "SHELL_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.022301983484377403384475671"
+        },
+        {
+          "density_kg_m3": "996.8377939104041",
+          "diameter_m": "0.1580000000",
+          "port_id": "SHELL_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.023296397039344787117320372"
+        }
+      ],
+      "shell_id_mm": "158.00",
+      "strict_velocity": "PASS",
+      "tube_id_mm": "123.80",
+      "velocity_failures": []
+    },
+    {
+      "grid_trial": true,
+      "high_joint_prescreen": "BLOCKED",
+      "high_shell_dp_pa": "1081.465631023644509985811160",
+      "high_tube_dp_pa": "1198.676",
+      "mid_joint_prescreen": "PASS",
+      "mid_shell_dp_pa": "972.4756310236445099858111598",
+      "mid_shell_margin_pa": "207.5243689763554900141888402",
+      "mid_tube_dp_pa": "1084.785",
+      "mid_tube_margin_pa": "65.215",
+      "nozzle_design_hash": "b9ebe893a4e49bb3dde31307f1a9f8a480cb7fd34f71f2922e0b036b5bfaa05a",
+      "ports": [
+        {
+          "density_kg_m3": "993.3836279738581",
+          "diameter_m": "0.1238000000",
+          "port_id": "TUBE_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.003536278715610228575378611"
+        },
+        {
+          "density_kg_m3": "995.5733637817352",
+          "diameter_m": "0.1238000000",
+          "port_id": "TUBE_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.001329028698735459775405382"
+        },
+        {
+          "density_kg_m3": "997.8074379396465",
+          "diameter_m": "0.1590000000",
+          "port_id": "SHELL_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.009483276599185059850878156"
+        },
+        {
+          "density_kg_m3": "996.8377939104041",
+          "diameter_m": "0.1590000000",
+          "port_id": "SHELL_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.010465221141972361283049950"
+        }
+      ],
+      "shell_id_mm": "159.00",
+      "strict_velocity": "PASS",
+      "tube_id_mm": "123.80",
+      "velocity_failures": []
+    },
+    {
+      "grid_trial": false,
+      "high_joint_prescreen": "BLOCKED",
+      "high_shell_dp_pa": "1070.082631023644509985811160",
+      "high_tube_dp_pa": "1197.257",
+      "mid_joint_prescreen": "PASS",
+      "mid_shell_dp_pa": "962.9896310236445099858111598",
+      "mid_shell_margin_pa": "217.0103689763554900141888402",
+      "mid_tube_dp_pa": "1083.624",
+      "mid_tube_margin_pa": "66.376",
+      "nozzle_design_hash": "d535e7f85558d735cc9078fb9e916f8cb7b879d639208cac20a5e6651d1f43b0",
+      "ports": [
+        {
+          "density_kg_m3": "993.3836279738581",
+          "diameter_m": "0.1238800000",
+          "port_id": "TUBE_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.002240557380443089204022694"
+        },
+        {
+          "density_kg_m3": "995.5733637817352",
+          "diameter_m": "0.1238800000",
+          "port_id": "TUBE_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.000036157266456308721179812"
+        },
+        {
+          "density_kg_m3": "997.8074379396465",
+          "diameter_m": "0.1597500000",
+          "port_id": "SHELL_INLET",
+          "velocity_basis": "INLET_TP_PROPERTY",
+          "velocity_m_s": "1.000026810894526512154507877"
+        },
+        {
+          "density_kg_m3": "996.8377939104041",
+          "diameter_m": "0.1597500000",
+          "port_id": "SHELL_OUTLET",
+          "velocity_basis": "INDICATIVE_THERMAL_PRESCREEN_OUTLET",
+          "velocity_m_s": "1.000999556944274852994454296"
+        }
+      ],
+      "shell_id_mm": "159.75",
+      "strict_velocity": "PASS",
+      "tube_id_mm": "123.88",
+      "velocity_failures": []
+    }
+  ]
+}

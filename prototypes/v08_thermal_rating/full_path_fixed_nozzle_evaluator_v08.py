@@ -262,9 +262,7 @@ def select_fixed_nozzle_design(
             )
             if alt is not None and alt > shell_d:
                 shell_d = alt
-        shell_d = _clamp_nozzle_d_to_velocity_band(
-            case=case, side="shell_side", diameter_m=shell_d
-        )
+        shell_d = _clamp_nozzle_d_to_velocity_band(case=case, side="shell_side", diameter_m=shell_d)
     return FixedNozzleDesign(
         tube_inside_diameter_m=tube_d,
         shell_inside_diameter_m=shell_d,
@@ -332,6 +330,8 @@ def evaluate_fixed_nozzle_all_scenarios(
         "low_loss_sensitivity",
         "high_loss_sensitivity",
     ),
+    tube_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
+    shell_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
 ) -> tuple[FixedNozzleScenarioEvaluation, ...]:
     out: list[FixedNozzleScenarioEvaluation] = []
     for key in scenarios:
@@ -342,6 +342,8 @@ def evaluate_fixed_nozzle_all_scenarios(
             loss_scenario_key=key,
             tube_nozzle_d_m=fixed.tube_inside_diameter_m,
             shell_nozzle_d_m=fixed.shell_inside_diameter_m,
+            tube_outlet_state_k_pa=tube_outlet_state_k_pa,
+            shell_outlet_state_k_pa=shell_outlet_state_k_pa,
         )
         tube = _side_from_full_path(fp, side="tube")
         shell = _side_from_full_path(fp, side="shell")
