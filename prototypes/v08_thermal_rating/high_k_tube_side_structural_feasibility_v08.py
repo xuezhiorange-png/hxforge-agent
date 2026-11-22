@@ -477,15 +477,15 @@ def run_high_k_tube_side_structural_feasibility(
     # failure on design C high-K is documented separately (R27B local K, not tube OD).
     new_geom_auth = False
     proposed = (
-        "Authorized 0.52 m shell search exhausted at fixed design C nozzles (123.80/159.00 mm). "
-        "Next structural levers require (a) Task168-approved placement envelope expansion "
-        "(0.85/0.90 scales currently blocked at Task021 replay) to increase tube count and "
-        "reduce per-tube velocity/local K losses, or (b) a new approved tube catalog record "
-        "(larger ID / revised wall) with mechanical and fouling authority review."
+        "Authorized 0.52 m catalog at frozen 0.80 m envelope: 223 tubes blocked on high-K joint "
+        "at fixed design C nozzles. Intermediate envelope scan (0.815–0.835) can yield "
+        "235–241 tubes with EXPERIMENTAL_PRESCREEN_PASS on high-K joint — requires placement "
+        "envelope authority, not proven new tube OD/ID record."
     )
     source_status = (
-        f"{catalog.get('status')}; bounded local combos blocked: "
-        f"{len(combo_blockers)} Task168/Task021 failures"
+        f"{catalog.get('status')}; bounded local combos at scales 0.85/0.90 blocked at "
+        f"Task027 Reynolds friction regime (see tube-side-replay-root-cause-r1.json; "
+        f"not Task021 replay failures)."
     )
     decision: DesignDecision = (
         "HIGH_K_JOINT_PRESCREEN_PASS" if feasible else "EXISTING_AUTHORIZED_SPACE_BLOCKED"
@@ -527,7 +527,12 @@ def run_high_k_tube_side_structural_feasibility(
     )
 
 
-def feasibility_artifact_dict(report: HighKTubeStructuralFeasibilityReport) -> dict[str, Any]:
+def feasibility_artifact_dict(
+    report: HighKTubeStructuralFeasibilityReport,
+    *,
+    catalog_status: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    catalog = catalog_status if catalog_status is not None else _catalog_status()
     return {
         "schema": "hxforge.high-k-tube-structural-feasibility.v1",
         "task_id": "V08_03_HIGH_K_TUBE_SIDE_STRUCTURAL_FEASIBILITY",
@@ -599,10 +604,12 @@ def feasibility_artifact_dict(report: HighKTubeStructuralFeasibilityReport) -> d
         },
         "tube_geometry_authority": {
             "new_tube_geometry_authority_required": report.new_tube_geometry_authority_required,
+            "new_tube_geometry_authority_tri_state": "not_proven",
             "proposed_engineering_change": report.proposed_engineering_change,
             "engineering_source_status": report.engineering_source_status,
             "proposed_geometry_authority_state": "NOT_PROVEN_FROM_CATALOG_COUNT_ALONE",
             "catalog_status": catalog,
+            "superseded_by": "docs/tasks/evidence/V08-03-high-k-evidence-supersession-r2.json",
         },
         "design_decision": report.design_decision,
         "engineering_design_status": "EXPERIMENTAL_PRESCREEN_ONLY",
