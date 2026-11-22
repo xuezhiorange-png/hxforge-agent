@@ -28,9 +28,7 @@ from hexagent.properties.base import FluidIdentifier, PropertyProvider
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import CandidateRatingBindings
 
-ThermalPrescreenStatus = Literal[
-    "INDICATIVE_PASS", "INDICATIVE_FAIL", "NOT_EVALUATED"
-]
+ThermalPrescreenStatus = Literal["INDICATIVE_PASS", "INDICATIVE_FAIL", "NOT_EVALUATED"]
 
 
 @dataclass(frozen=True)
@@ -200,7 +198,9 @@ def run_thermal_prescreen(
     r_wall_o = t037.wall_resistance_outer_surface_m2_k_w
     r_fi = t037.inside_fouling_authority.fouling_resistance_m2_k_w * ratio
     r_fo = t037.outside_fouling_authority.fouling_resistance_m2_k_w
-    wall_src = f"task037:{t037.wall_material_authority_hash}/{t037.wall_conductivity_authority_hash}"
+    wall_src = (
+        f"task037:{t037.wall_material_authority_hash}/{t037.wall_conductivity_authority_hash}"
+    )
 
     denom = ratio / h_i + r_fi + r_wall_o + r_fo + Decimal(1) / h_o
     if denom <= 0 or a_o <= 0:
@@ -226,8 +226,14 @@ def run_thermal_prescreen(
     t_si = Decimal(str(normalized.shell_side.inlet_temperature_k))
     p_t = Decimal(str(normalized.tube_side.inlet_pressure_pa))
     p_s = Decimal(str(normalized.shell_side.inlet_pressure_pa))
-    c_t = _cp_kg_s(provider, _fluid=normalized.tube_side.fluid, t_k=t_ti, p_pa=p_t) * normalized.tube_side.mass_flow_kg_s
-    c_s = _cp_kg_s(provider, _fluid=normalized.shell_side.fluid, t_k=t_si, p_pa=p_s) * normalized.shell_side.mass_flow_kg_s
+    c_t = (
+        _cp_kg_s(provider, _fluid=normalized.tube_side.fluid, t_k=t_ti, p_pa=p_t)
+        * normalized.tube_side.mass_flow_kg_s
+    )
+    c_s = (
+        _cp_kg_s(provider, _fluid=normalized.shell_side.fluid, t_k=t_si, p_pa=p_s)
+        * normalized.shell_side.mass_flow_kg_s
+    )
 
     q_ntu, t_to, t_so, _eff = _epsilon_ntu_counterflow(
         ua=ua,

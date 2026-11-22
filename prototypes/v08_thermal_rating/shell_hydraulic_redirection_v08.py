@@ -122,9 +122,11 @@ def _row_from_binding(
     if lb.all_proven_infeasible:
         blocker = "PROVEN_HYDRAULIC_INFEASIBLE_UNDER_ASSUMED_K"
         mid_mid = next(s for s in lb.scenarios if s.scenario_key == "mid_band")
-        excess = Decimal(mid_mid.shell_bell_internal_dp_pa) + Decimal(
-            mid_mid.shell_external_min_dp_pa
-        ) - shell_lim
+        excess = (
+            Decimal(mid_mid.shell_bell_internal_dp_pa)
+            + Decimal(mid_mid.shell_external_min_dp_pa)
+            - shell_lim
+        )
         mid_excess = str(excess)
     elif not t174_ok:
         blocker = (
@@ -142,9 +144,7 @@ def _row_from_binding(
             full_path_mid_shell_dp_pa=(
                 Decimal(mid.shell_full_path_dp_pa) if mid.shell_full_path_dp_pa else None
             ),
-            full_path_mid_margin_pa=(
-                Decimal(mid.shell_margin_pa) if mid.shell_margin_pa else None
-            ),
+            full_path_mid_margin_pa=(Decimal(mid.shell_margin_pa) if mid.shell_margin_pa else None),
         )
         if report.scenario_robustness == "PASS":
             blocker = None
@@ -214,7 +214,9 @@ def _scan_bindings(
     return out
 
 
-def _pick_best(rows: tuple[ShellRedirectionCandidateRow, ...]) -> ShellRedirectionCandidateRow | None:
+def _pick_best(
+    rows: tuple[ShellRedirectionCandidateRow, ...],
+) -> ShellRedirectionCandidateRow | None:
     feasible = [r for r in rows if r.first_hydraulic_blocker is None and r.hydraulic_report]
     if feasible:
         return feasible[0]
@@ -224,9 +226,7 @@ def _pick_best(rows: tuple[ShellRedirectionCandidateRow, ...]) -> ShellRedirecti
         return Decimal(mid.shell_bell_internal_dp_pa)
 
     ranked = [
-        r
-        for r in rows
-        if r.mid_shell_excess_pa is not None and r.hydraulic_report is not None
+        r for r in rows if r.mid_shell_excess_pa is not None and r.hydraulic_report is not None
     ]
     if ranked:
         return min(ranked, key=lambda r: Decimal(r.mid_shell_excess_pa or "1e12"))
@@ -262,17 +262,27 @@ def run_shell_hydraulic_redirection(
     def _rows_from(bindings_list: list[Any], space: Literal["R1_APPROVED", "EXPERIMENTAL_COOPT"]):
         return [_row_from_binding(b, geometry_space=space) for b in bindings_list]
 
-    rows = tuple(_rows_from(r1_bindings, "R1_APPROVED") + _rows_from(exp_bindings, "EXPERIMENTAL_COOPT"))
+    rows = tuple(
+        _rows_from(r1_bindings, "R1_APPROVED") + _rows_from(exp_bindings, "EXPERIMENTAL_COOPT")
+    )
     geom_hashes = {r.geometry_projection_hash for r in rows}
     r1_hashes = {r.geometry_projection_hash for r in rows if r.geometry_space == "R1_APPROVED"}
-    exp_hashes = {r.geometry_projection_hash for r in rows if r.geometry_space == "EXPERIMENTAL_COOPT"}
+    exp_hashes = {
+        r.geometry_projection_hash for r in rows if r.geometry_space == "EXPERIMENTAL_COOPT"
+    }
     new_exp = exp_hashes - r1_hashes
 
-    baseline_row = next((r for r in rows if r.candidate_id == baseline_candidate_id), rows[0] if rows else None)
+    baseline_row = next(
+        (r for r in rows if r.candidate_id == baseline_candidate_id), rows[0] if rows else None
+    )
     assert baseline_row is not None
 
     ref_binding = next(
-        (b for b in r1_bindings + exp_bindings if b.rating_request.candidate_id == baseline_candidate_id),
+        (
+            b
+            for b in r1_bindings + exp_bindings
+            if b.rating_request.candidate_id == baseline_candidate_id
+        ),
         r1_bindings[0] if r1_bindings else exp_bindings[0],
     )
     upstream_ok, dup_count = _upstream_authority_ok(ref_binding)
@@ -288,9 +298,7 @@ def run_shell_hydraulic_redirection(
         == "PASS"
     )
     all_ok = sum(
-        1
-        for r in rows
-        if r.hydraulic_report and r.hydraulic_report.scenario_robustness == "PASS"
+        1 for r in rows if r.hydraulic_report and r.hydraulic_report.scenario_robustness == "PASS"
     )
 
     gaps: list[str] = []
@@ -304,7 +312,9 @@ def run_shell_hydraulic_redirection(
         "(BFG hole/cut at 0.52 m, tube-side Re transition at 0.62 m, etc.), not template envelope."
     )
     if mid_ok == 0:
-        gaps.append("No mid_band full-path feasible geometry in R1+verified experimental enumeration.")
+        gaps.append(
+            "No mid_band full-path feasible geometry in R1+verified experimental enumeration."
+        )
 
     return ShellHydraulicRedirectionReport(
         baseline_candidate_id=baseline_row.candidate_id,

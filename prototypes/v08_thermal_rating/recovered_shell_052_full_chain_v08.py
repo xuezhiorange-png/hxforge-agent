@@ -37,9 +37,7 @@ from prototypes.v08_thermal_rating.thermal_prescreen_v08 import (
 )
 
 FROZEN_SHELL_052_CANDIDATE_ID = "6d78897b-77b7-545d-8b49-38a569b1c86e"
-FROZEN_SHELL_052_GEOMETRY_V2 = (
-    "aba3161014a6a9f16c47797eb2e23b63203e8ccf2a5fe70e80ec869d6b00d98e"
-)
+FROZEN_SHELL_052_GEOMETRY_V2 = "aba3161014a6a9f16c47797eb2e23b63203e8ccf2a5fe70e80ec869d6b00d98e"
 
 DesignDecision = Literal["MID_FEASIBLE_FOUND", "RECOVERED_LAYOUT_HYDRAULIC_BLOCKED"]
 MidHydraulic = Literal["PASS", "BLOCKED", "NOT_RUN_PROVEN_INFEASIBLE"]
@@ -210,7 +208,9 @@ def run_recovered_shell_052_full_chain(
         hydraulic_report = run_autonomous_nozzle_full_path(bindings)
         v2_bound = hydraulic_report.structural_geometry_hash == v2
         mid = next(s for s in hydraulic_report.scenarios if s.scenario_key == "mid_band")
-        high = next(s for s in hydraulic_report.scenarios if s.scenario_key == "high_loss_sensitivity")
+        high = next(
+            s for s in hydraulic_report.scenarios if s.scenario_key == "high_loss_sensitivity"
+        )
         tube_fp = mid.tube_full_path_dp_pa
         shell_fp = mid.shell_full_path_dp_pa
         nozzle_check = str(hydraulic_report.nozzle_velocity_check)

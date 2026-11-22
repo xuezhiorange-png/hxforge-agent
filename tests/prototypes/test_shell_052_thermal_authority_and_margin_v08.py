@@ -23,9 +23,7 @@ from prototypes.v08_thermal_rating.v08_shell_052_task037_authority_v08 import (
 
 
 def test_frozen_shell_052_task037_success() -> None:
-    normalized, handoff, _ = load_case_bindings(
-        FIXTURE_330, provider=CoolPropProvider()
-    )
+    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=CoolPropProvider())
     recovered = resolve_recovered_shell_052_bundle(normalized, handoff)
     assert recovered is not None
     assert recovered.structural_bundle.candidate.candidate_id == FROZEN_SHELL_052_CANDIDATE_ID

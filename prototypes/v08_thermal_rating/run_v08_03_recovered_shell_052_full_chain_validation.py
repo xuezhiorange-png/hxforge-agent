@@ -86,9 +86,7 @@ def main() -> None:
         "MERGE_AUTHORIZED": False,
     }
     if report.hydraulic_report:
-        mid = next(
-            s for s in report.hydraulic_report.scenarios if s.scenario_key == "mid_band"
-        )
+        mid = next(s for s in report.hydraulic_report.scenarios if s.scenario_key == "mid_band")
         payload["MID_SHELL_BREAKDOWN"] = dict(mid.shell_breakdown)
         payload["MID_TUBE_BREAKDOWN"] = dict(mid.tube_breakdown)
         payload["TASK174_PARTIAL"] = {

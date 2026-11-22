@@ -33,9 +33,7 @@ from prototypes.v08_thermal_rating.v08_shell_052_task037_authority_v08 import (
     evaluate_shell_052_task037,
 )
 
-DesignDecision = Literal[
-    "THERMAL_HYDRAULIC_PRESCREEN_PASS", "THERMAL_OR_MARGIN_BLOCKED"
-]
+DesignDecision = Literal["THERMAL_HYDRAULIC_PRESCREEN_PASS", "THERMAL_OR_MARGIN_BLOCKED"]
 HydraulicRobustness = Literal["UNPROVEN", "MID_MATHEMATICAL_PASS_ONLY"]
 
 
@@ -130,7 +128,7 @@ def run_shell_052_thermal_authority_and_margin(
         else "BLOCKED"
     )
 
-    task037_eval = evaluate_shell_052_task037(recovered)
+    task037_eval = evaluate_shell_052_task037(recovered, fouling_scenario="T039_DEMO_FOULING")
     bindings = build_candidate_rating_bindings(
         bundle,
         space_hash=recovered.candidate_space_hash,
@@ -183,10 +181,7 @@ def run_shell_052_thermal_authority_and_margin(
     hydraulic_robustness: HydraulicRobustness = (
         "MID_MATHEMATICAL_PASS_ONLY" if mid_pass else "UNPROVEN"
     )
-    at_limit = (
-        Decimal(tube_margin) <= Decimal("0.01")
-        and Decimal(shell_margin) <= Decimal("0.01")
-    )
+    at_limit = Decimal(tube_margin) <= Decimal("0.01") and Decimal(shell_margin) <= Decimal("0.01")
     design_robustness: HydraulicRobustness = (
         "UNPROVEN" if at_limit or not mid_pass else "MID_MATHEMATICAL_PASS_ONLY"
     )
@@ -196,18 +191,24 @@ def run_shell_052_thermal_authority_and_margin(
     if task037_eval.raw and thermal.ua_w_per_k:
         t_ti = Decimal(str(normalized.tube_side.inlet_temperature_k))
         t_si = Decimal(str(normalized.shell_side.inlet_temperature_k))
-        c_t = _cp_kg_s(
-            active,
-            _fluid="",
-            t_k=t_ti,
-            p_pa=Decimal(str(normalized.tube_side.inlet_pressure_pa)),
-        ) * normalized.tube_side.mass_flow_kg_s
-        c_s = _cp_kg_s(
-            active,
-            _fluid="",
-            t_k=t_si,
-            p_pa=Decimal(str(normalized.shell_side.inlet_pressure_pa)),
-        ) * normalized.shell_side.mass_flow_kg_s
+        c_t = (
+            _cp_kg_s(
+                active,
+                _fluid="",
+                t_k=t_ti,
+                p_pa=Decimal(str(normalized.tube_side.inlet_pressure_pa)),
+            )
+            * normalized.tube_side.mass_flow_kg_s
+        )
+        c_s = (
+            _cp_kg_s(
+                active,
+                _fluid="",
+                t_k=t_si,
+                p_pa=Decimal(str(normalized.shell_side.inlet_pressure_pa)),
+            )
+            * normalized.shell_side.mass_flow_kg_s
+        )
         c_min = min(c_t, c_s)
         c_max = max(c_t, c_s)
         ua = Decimal(thermal.ua_w_per_k)

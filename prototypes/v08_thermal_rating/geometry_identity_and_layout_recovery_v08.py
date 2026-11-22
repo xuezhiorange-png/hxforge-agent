@@ -38,9 +38,7 @@ from prototypes.v08_thermal_rating.thermal_prescreen_v08 import (
     run_thermal_prescreen,
 )
 
-DesignDecision = Literal[
-    "MID_FEASIBLE_FOUND", "SINGLE_SEGMENTAL_MODEL_SPACE_EXHAUSTED"
-]
+DesignDecision = Literal["MID_FEASIBLE_FOUND", "SINGLE_SEGMENTAL_MODEL_SPACE_EXHAUSTED"]
 
 
 @dataclass(frozen=True)
@@ -102,7 +100,9 @@ def _collect_rows(
                 continue
             baffle = resolve_baffle_authority(candidate=bundle.candidate, bundle=bundle.bundle)
             br = _row_from_bindings(bindings, baffle_cut=cut, geometry_space=label)
-            br = replace(br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative)
+            br = replace(
+                br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative
+            )
             thermal = run_thermal_prescreen(bindings, normalized, provider=provider)
             enriched.append(
                 GeometryRecoveryCandidateRow(
@@ -136,7 +136,9 @@ def _collect_rows(
             baffle_cut=Decimal("0.25"),
             geometry_space="APPROVED_R1_SEARCH_ONLY",
         )
-        br = replace(br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative)
+        br = replace(
+            br, geometry_projection_hash=v2, baffle_count=baffle.baffle_count_authoritative
+        )
         thermal = run_thermal_prescreen(bindings, normalized, provider=provider)
         enriched.append(
             GeometryRecoveryCandidateRow(
@@ -180,9 +182,7 @@ def run_geometry_identity_and_layout_recovery(
 
     v1_v2 = [(r.geometry_projection_hash_v1, r.geometry_identity_v2) for r in rows]
     legacy_aliases = legacy_geometry_projection_aliases(tuple(v1_v2))
-    cut_distinct = (
-        cut_sample[0] != cut_sample[1] and cut_sample[0] != "" and cut_sample[1] != ""
-    )
+    cut_distinct = cut_sample[0] != cut_sample[1] and cut_sample[0] != "" and cut_sample[1] != ""
     legacy_resolved = bool(legacy_aliases) and cut_distinct
 
     best_row: GeometryRecoveryCandidateRow | None = None

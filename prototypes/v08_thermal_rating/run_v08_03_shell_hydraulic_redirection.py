@@ -88,16 +88,12 @@ def main() -> None:
     best_row = best
     if best and best.candidate_id == BASELINE_ID:
         others = [
-            r
-            for r in report.rows
-            if r.geometry_projection_hash != report.baseline_geometry_hash
+            r for r in report.rows if r.geometry_projection_hash != report.baseline_geometry_hash
         ]
         best_row = others[0] if others else best
 
     def _transition_sum(s: Any) -> str:
-        return str(
-            float(s.shell_inlet_transition_dp_pa) + float(s.shell_outlet_transition_dp_pa)
-        )
+        return str(float(s.shell_inlet_transition_dp_pa) + float(s.shell_outlet_transition_dp_pa))
 
     payload: dict[str, Any] = {
         "TASK_ID": "V08_03_SHELL_HYDRAULIC_REDIRECTION",

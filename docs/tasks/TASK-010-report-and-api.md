@@ -68,20 +68,20 @@ All DTOs are `frozen`, `extra="forbid"`.
 
 ```python
 class FluidStreamSpec(StrictBaseModel):
-    fluid: FluidSpec                                    # backend + name + composition
+    fluid: FluidSpec  # backend + name + composition
     # phase_hint is already on FluidSpec — NOT duplicated here
-    inlet: TPStateSpec                                  # temperature + pressure (unit-bearing)
-    mass_flow: MassFlow                                  # kg/s
-    fouling: FoulingResistanceSpec                       # with provenance
+    inlet: TPStateSpec  # temperature + pressure (unit-bearing)
+    mass_flow: MassFlow  # kg/s
+    fouling: FoulingResistanceSpec  # with provenance
 
 
 class ValidationApiRequest(StrictBaseModel):
     api_schema_version: Literal["1"]
-    case_name: str                                       # non-empty, trimmed
+    case_name: str  # non-empty, trimmed
     hot_stream: FluidStreamSpec
     cold_stream: FluidStreamSpec
-    target_duty: Power                                   # REQUIRED — unit-bearing
-    minimum_terminal_delta_t: TemperatureDifference      # K with unit metadata
+    target_duty: Power  # REQUIRED — unit-bearing
+    minimum_terminal_delta_t: TemperatureDifference  # K with unit metadata
     design_pressure_hot: AbsolutePressure
     design_pressure_cold: AbsolutePressure
     design_temperature_hot: AbsoluteTemperature
@@ -117,14 +117,14 @@ class ValidationApiRequest(StrictBaseModel):
 ```python
 class RatingApiRequest(StrictBaseModel):
     api_schema_version: Literal["1"]
-    case: ValidationApiRequest            # full case validated upstream
-    geometry: DoublePipeGeometrySpec      # explicit geometry DTO
+    case: ValidationApiRequest  # full case validated upstream
+    geometry: DoublePipeGeometrySpec  # explicit geometry DTO
     tube_in_hot: bool = True
     flow_arrangement: Literal["counterflow", "parallel"]
     tube_boundary_condition: Literal["constant_wall_temperature", "inner_wall_heated"]
     annulus_boundary_condition: Literal["inner_wall_heated", "constant_wall_temperature"]
     solver_params: SolverParamsSpec | None = None
-    provider_ref: str                     # key into configured provider registry
+    provider_ref: str  # key into configured provider registry
 
 
 class DoublePipeGeometrySpec(StrictBaseModel):
@@ -141,6 +141,7 @@ class DoublePipeGeometrySpec(StrictBaseModel):
 
 class ThermalConductivitySpec(StrictBaseModel):
     """Unit-bearing thermal conductivity."""
+
     value: float = Field(allow_inf_nan=False, gt=0)
     unit: Literal["W/(m*K)"]
 
@@ -176,9 +177,9 @@ Omitting `solver_params` or passing `{}` produces the same result and same canon
 
 ```python
 class ResolvedProviderAuthority(StrictBaseModel):
-    provider_ref: str                           # original lookup key
-    identity: ProviderIdentitySnapshot          # full immutable identity
-    identity_digest: str                        # sha256 of identity payload
+    provider_ref: str  # original lookup key
+    identity: ProviderIdentitySnapshot  # full immutable identity
+    identity_digest: str  # sha256 of identity payload
 ```
 
 Resolution chain:
@@ -208,9 +209,10 @@ RatingApiRequest.provider_ref
 ```python
 class CatalogSnapshotReference(StrictBaseModel):
     """Server-side immutable catalog reference — NOT raw production catalog."""
+
     catalog_id: str
     catalog_version: str
-    catalog_content_hash: str                    # sha256:[0-9a-f]{64}
+    catalog_content_hash: str  # sha256:[0-9a-f]{64}
     source_identity: str
     schema_version: str
 
@@ -238,7 +240,8 @@ class SizingApiRequest(StrictBaseModel):
     # SizingRequestIdentity.required_duty_w = case.target_duty.si_value
     duty_absolute_tolerance: Power = Field(default=Power(value=0, unit="W"))
     duty_relative_tolerance: Dimensionless = Field(
-        default=Dimensionless(value=0, unit="dimensionless"))
+        default=Dimensionless(value=0, unit="dimensionless")
+    )
 
     # Optimization
     optimization_objective: OptimizationObjective
@@ -269,16 +272,18 @@ class SizingApiRequest(StrictBaseModel):
 `catalog_refs` are sorted before resolution, digest computation, and domain projection:
 
 ```python
-catalog_refs = tuple(sorted(
-    catalog_refs,
-    key=lambda r: (
-        r.catalog_id,
-        r.catalog_version,
-        r.catalog_content_hash,
-        r.source_identity,
-        r.schema_version,
-    ),
-))
+catalog_refs = tuple(
+    sorted(
+        catalog_refs,
+        key=lambda r: (
+            r.catalog_id,
+            r.catalog_version,
+            r.catalog_content_hash,
+            r.source_identity,
+            r.schema_version,
+        ),
+    )
+)
 ```
 
 Uniqueness key: `catalog_id + catalog_version + source_identity + schema_version`. Same key with different `content_hash` → reject. Completely duplicate reference → reject (no silent dedup). Resolved catalogs follow the same canonical order into `SizingRequest.catalogs`, `SizingRequestIdentity.catalog_snapshot_identities`, canonical request snapshot, and artifact bundle.
@@ -439,9 +444,9 @@ class ValidationRunEnvelope(StrictBaseModel):
     run_id: UUID
     request_digest: str
     result_kind: Literal["validation"]
-    result: None                                          # MUST be None
+    result: None  # MUST be None
     validation_receipt_hash: str
-    report_links: None = None                             # validation runs have no report
+    report_links: None = None  # validation runs have no report
 ```
 
 Validation runs do NOT support report generation. `GET /v1/runs/{validation_run_id}/report.html` returns `404`.
@@ -463,7 +468,7 @@ class RatingRunEnvelope(StrictBaseModel):
     failure: RunFailure | None
     provenance: ProvenanceGraph
     provenance_digest: str
-    artifact_bundle: RatingRunArtifacts                   # REQUIRED for self-verification
+    artifact_bundle: RatingRunArtifacts  # REQUIRED for self-verification
     artifact_bundle_digest: str
     report_links: ReportLinks
 
@@ -490,7 +495,10 @@ class RatingRunEnvelope(StrictBaseModel):
             raise ValueError("bundle.provider_identity != result.provider_identity")
         if self.artifact_bundle.provenance_graph != self.result.provenance_graph:
             raise ValueError("bundle.provenance_graph != result.provenance_graph")
-        if compute_rating_artifact_bundle_digest(self.artifact_bundle) != self.artifact_bundle_digest:
+        if (
+            compute_rating_artifact_bundle_digest(self.artifact_bundle)
+            != self.artifact_bundle_digest
+        ):
             raise ValueError("artifact_bundle_digest mismatch")
 
         recomputed = self.provenance.compute_hash()
@@ -519,7 +527,7 @@ class SizingRunEnvelope(StrictBaseModel):
     failure: RunFailure | None
     provenance: ProvenanceGraph
     provenance_digest: str
-    artifact_bundle: SizingRunArtifacts                    # REQUIRED
+    artifact_bundle: SizingRunArtifacts  # REQUIRED
     artifact_bundle_digest: str
     report_links: ReportLinks
 
@@ -578,6 +586,7 @@ def reconstruct_sizing_warnings(bundle: SizingRunArtifacts) -> tuple[Engineering
         binding_tuples=artifacts.warning_binding_tuples,
         descriptor_tuples=artifacts.warning_descriptor_tuples,
     )
+
 
 def reconstruct_sizing_blockers(bundle: SizingRunArtifacts) -> tuple[EngineeringMessage, ...]:
     artifacts = bundle.phase3_authoritative_artifacts
@@ -731,6 +740,7 @@ class ClaimOutcome(StrEnum):
     STALE_REJECTED = "stale_rejected"
     STALE_TAKEOVER = "stale_takeover"
 
+
 @dataclass(frozen=True)
 class ClaimResult:
     outcome: ClaimOutcome
@@ -788,7 +798,9 @@ class RunRepository(Protocol):
     ) -> ClaimResult: ...
     def start(self, *, owner_token, expected_version) -> RunRecord: ...
     def heartbeat(self, *, owner_token, expected_version) -> RunRecord: ...
-    def complete(self, *, owner_token, expected_version, envelope, artifact_bundle) -> RunRecord: ...
+    def complete(
+        self, *, owner_token, expected_version, envelope, artifact_bundle
+    ) -> RunRecord: ...
     def fail(self, *, owner_token, expected_version, failure) -> RunRecord: ...
     def get_by_run_id(self, run_id: UUID) -> RunRecord | None: ...
     def get_by_namespace(self, namespace_digest: str) -> RunRecord | None: ...
@@ -888,6 +900,7 @@ def canonical_decimal_string(value: Decimal) -> str:
     mantissa = parts[0]
     exp = int(parts[1])
     return f"{mantissa}E{exp:+d}"
+
 
 def canonical_quantity_payload(q: Quantity) -> dict[str, str]:
     """Quantity → {"value": "<canonical SI string>", "unit": "<SI symbol>"}
@@ -1091,8 +1104,12 @@ def verify_rating_canonical_request_parity(
     # (snapshot stores canonical Decimal strings, not raw floats)
     solver_canonical = {
         "absolute_residual_w": canonical_decimal_string(Decimal(repr(solver.absolute_residual_w))),
-        "relative_residual_fraction": canonical_decimal_string(Decimal(repr(solver.relative_residual_fraction))),
-        "bracket_temperature_tolerance_k": canonical_decimal_string(Decimal(repr(solver.bracket_temperature_tolerance_k))),
+        "relative_residual_fraction": canonical_decimal_string(
+            Decimal(repr(solver.relative_residual_fraction))
+        ),
+        "bracket_temperature_tolerance_k": canonical_decimal_string(
+            Decimal(repr(solver.bracket_temperature_tolerance_k))
+        ),
         "max_iterations": solver.max_iterations,  # int → JSON number
     }
     if snapshot.get("solver") != solver_canonical:
@@ -1149,11 +1166,20 @@ def verify_rating_artifact_bundle(bundle: RatingRunArtifacts) -> None:
         raise ValueError("geometry snapshot mismatch")
 
     # P0-4: Solver settings binding (all four controls)
-    if bundle.solver_settings.absolute_residual_w != bundle.request_identity.solver_absolute_residual_w:
+    if (
+        bundle.solver_settings.absolute_residual_w
+        != bundle.request_identity.solver_absolute_residual_w
+    ):
         raise ValueError("solver absolute residual mismatch")
-    if bundle.solver_settings.relative_residual_fraction != bundle.request_identity.solver_relative_residual_fraction:
+    if (
+        bundle.solver_settings.relative_residual_fraction
+        != bundle.request_identity.solver_relative_residual_fraction
+    ):
         raise ValueError("solver relative residual mismatch")
-    if bundle.solver_settings.bracket_temperature_tolerance_k != bundle.request_identity.solver_bracket_temperature_tolerance_k:
+    if (
+        bundle.solver_settings.bracket_temperature_tolerance_k
+        != bundle.request_identity.solver_bracket_temperature_tolerance_k
+    ):
         raise ValueError("solver bracket tolerance mismatch")
     if bundle.solver_settings.max_iterations != bundle.request_identity.solver_max_iterations:
         raise ValueError("solver max iterations mismatch")
@@ -1279,8 +1305,10 @@ class OutOfScopeReportArtifact(StrictBaseModel):
 
 
 ReportArtifact = Annotated[
-    PresentReportArtifact | UnavailableReportArtifact
-    | NotImplementedReportArtifact | OutOfScopeReportArtifact,
+    PresentReportArtifact
+    | UnavailableReportArtifact
+    | NotImplementedReportArtifact
+    | OutOfScopeReportArtifact,
     Discriminator("kind"),
 ]
 ```
@@ -1535,6 +1563,7 @@ class ReportArtifactId(StrEnum):
 
 class CanonicalBlockerItem(StrictBaseModel):
     """Deterministic ordered item in a blocker collection artifact."""
+
     occurrence_index: int
     code: str
     severity: str
@@ -1544,6 +1573,7 @@ class CanonicalBlockerItem(StrictBaseModel):
 
 class CanonicalWarningItem(StrictBaseModel):
     """Deterministic ordered item in a warning collection artifact."""
+
     occurrence_index: int
     code: str
     severity: str
@@ -1553,6 +1583,7 @@ class CanonicalWarningItem(StrictBaseModel):
 
 class CanonicalRankedCandidateItem(StrictBaseModel):
     """Deterministic ordered item in a Top-N collection artifact."""
+
     rank: int
     source_qualified_candidate_id: str
     ranked_record_digest: str
@@ -1566,13 +1597,15 @@ class CanonicalRankedCandidateItem(StrictBaseModel):
 # Prohibited: reordering by display text.
 
 
-MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset({
-    ReportArtifactId.STATUS,
-    ReportArtifactId.RUN_ID,
-    ReportArtifactId.REQUEST_DIGEST,
-    ReportArtifactId.RESULT_HASH,
-    ReportArtifactId.BUNDLE_HASH,
-})
+MANDATORY_ARTIFACT_IDS: frozenset[ReportArtifactId] = frozenset(
+    {
+        ReportArtifactId.STATUS,
+        ReportArtifactId.RUN_ID,
+        ReportArtifactId.REQUEST_DIGEST,
+        ReportArtifactId.RESULT_HASH,
+        ReportArtifactId.BUNDLE_HASH,
+    }
+)
 
 
 MANDATORY_ARTIFACT_OWNERS: dict[ReportArtifactId, ReportSectionId] = {
@@ -1594,13 +1627,15 @@ MANDATORY_ARTIFACT_OWNERS: dict[ReportArtifactId, ReportSectionId] = {
 
 ```python
 def verify_report_section_status_matrix(
-    *, report_model: DoublePipeReportModel,
+    *,
+    report_model: DoublePipeReportModel,
     source_envelope: RatingRunEnvelope | SizingRunEnvelope,
 ) -> None:
     source_state = derive_source_state(source_envelope)
     for sid in ReportSectionId:
         expected = SECTION_STATUS_MATRIX[source_state].get(sid)
-        if expected is None: continue
+        if expected is None:
+            continue
         section = _find_section(report_model, sid)
         if section is None:
             if expected != ReportSectionStatus.NOT_APPLICABLE:
@@ -1699,7 +1734,7 @@ class ApiError(StrictBaseModel):
     operation: str | None
     status_code: int
     error_code: ApiErrorCode
-    error_message: str                              # no traceback/path/token
+    error_message: str  # no traceback/path/token
     request_digest: str | None
     details: tuple[ErrorDetail, ...]
     MAX_DISPLAYED_VALUE_LENGTH: ClassVar[int] = 200

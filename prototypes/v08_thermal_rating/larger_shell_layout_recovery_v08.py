@@ -202,7 +202,11 @@ def run_larger_shell_layout_recovery(
                         placement_envelope_diameter_m=outcome.placement_envelope_diameter_m,
                         task168_structurally_valid=bool(outcome.valid_structural),
                         physical_tube_count=(
-                            int(outcome.valid_structural[0].bundle.task021_layout.physical_tube_count)
+                            int(
+                                outcome.valid_structural[
+                                    0
+                                ].bundle.task021_layout.physical_tube_count
+                            )
                             if outcome.valid_structural
                             else None
                         ),
