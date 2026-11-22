@@ -1,0 +1,15 @@
+{
+  "blocked_scenario_classes": [
+    "tube_mdot_minus_1pct",
+    "tube_mdot_minus_3pct",
+    "tube_mdot_plus_3pct",
+    "shell_mdot_minus_3pct",
+    "shell_mdot_plus_3pct"
+  ],
+  "experimental_replay_feasible": false,
+  "production_contract_change_required": true,
+  "proposal": "Wire R19A-style live_thermal_state_hydraulic_postpass with rebinding Task026 to equipment mass per scenario, or extend CandidateRatingBindings with a fresh Task026 result before post-pass \u2014 requires explicit experimental authority; not permitted inside production Task173 integrated rating contract or numerical acceptance tolerances in this task.",
+  "root_cause": "V08 run_autonomous_nozzle_full_path builds equipment mass from bindings.normalized (perturbed case) but hydraulic post-pass and Task174 decomposition are frozen to the Task168 enumeration bundle (Task026/Task029 at nominal 12/20 kg/s). Mass-flow sensitivity sweeps raise ValueError/ValidationError in the R27 full-path bridge when equipment totals diverge from admitted structural hydraulic templates. Temperature-only sweeps retain nominal mass and may compute high-K prescreen dp.",
+  "schema": "hxforge.task173-mass-binding-boundary.v1",
+  "task_id": "V08_03_R2_GATE_CORRECTION_AND_TASK173_MASS_BINDING_BOUNDARY"
+}

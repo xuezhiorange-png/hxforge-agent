@@ -11,18 +11,16 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindi
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
 from prototypes.v08_thermal_rating.larger_shell_layout_recovery_v08 import (
     SHELL_052_PROBE_M,
+    _with_envelope_override,
     enumerate_shell_052_bounded_local_combos,
 )
 from prototypes.v08_thermal_rating.task168_rejection_diagnostics_v08 import (
+    BREAKTHROUGH_DISCRETE_SPACE_PATH,
     baffle_spacing_for_length_m,
     find_rejection_for_candidate_spec,
 )
 from prototypes.v08_thermal_rating.tube_side_replay_root_cause_v08 import (
     run_tube_side_replay_root_cause_analysis,
-)
-from prototypes.v08_thermal_rating.larger_shell_layout_recovery_v08 import _with_envelope_override
-from prototypes.v08_thermal_rating.task168_rejection_diagnostics_v08 import (
-    BREAKTHROUGH_DISCRETE_SPACE_PATH,
 )
 
 

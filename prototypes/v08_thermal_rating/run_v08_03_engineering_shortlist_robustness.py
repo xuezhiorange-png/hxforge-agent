@@ -21,12 +21,16 @@ from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
     run_engineering_shortlist_robustness,
     write_shortlist_artifacts,
 )
+from prototypes.v08_thermal_rating.task173_mass_binding_boundary_v08 import (
+    task173_mass_binding_boundary_report,
+)
 from prototypes.v08_thermal_rating.v08_ci_status import ci_status_for_head
 
 PR_NUMBER = 325
-ARTIFACT_JSON = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json")
-ARTIFACT_MD = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.md")
-TASK_ID = "V08_03_SENSITIVITY_BINDING_INTEGRITY_AND_ROBUSTNESS_EVIDENCE_CORRECTION"
+ARTIFACT_JSON = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r3.json")
+ARTIFACT_MD = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r3.md")
+TASK173_JSON = Path("docs/tasks/evidence/V08-03-task173-mass-binding-boundary-r1.json")
+TASK_ID = "V08_03_R2_GATE_CORRECTION_AND_TASK173_MASS_BINDING_BOUNDARY"
 
 
 def _choice_key(report: Any, attr: str) -> str | None:
@@ -46,7 +50,20 @@ def main() -> None:
         json_path=artifacts / ARTIFACT_JSON.name,
         md_path=artifacts / ARTIFACT_MD.name,
     )
-    ls = report.layout_status_by_key
+    ls = report.layout_engineering_status_by_key
+    t173 = task173_mass_binding_boundary_report()
+    (_REPO / TASK173_JSON).write_text(
+        json.dumps(
+            {
+                "schema": "hxforge.task173-mass-binding-boundary.v1",
+                "task_id": TASK_ID,
+                **t173.__dict__,
+            },
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
     payload: dict[str, Any] = {
         "TASK_ID": TASK_ID,
         "PR_NUMBER": PR_NUMBER,
@@ -78,6 +95,26 @@ def main() -> None:
         "NEW_TUBE_CATALOG_RECORD_REQUIRED": report.new_tube_catalog_record_required,
         "FINAL_ENGINEERING_DECISION": report.final_engineering_decision,
         "ENGINEERING_ACCEPTANCE_STATUS": report.engineering_acceptance_status,
+        "CI_1614_FAILURE_ROOT_CAUSES": (
+            "lint: E501 test_engineering_shortlist_sensitivity_binding_v08.py; "
+            "I001 test_tube_side_replay_root_cause_v08.py; "
+            "final_gate: lint failure + merge-ref merge-authority git toolchain on benchmark/r23/r24 shards"
+        ),
+        "LINT_FIXED": "true_local",
+        "CI_SHARD_FAILURE_CLASSIFICATION": (
+            "CURRENT_COMMIT_REGRESSION_LINT; MERGE_REF_TOOLCHAIN_BASELINE_FAIL_NOT_V08_REGRESSION"
+        ),
+        "TASK173_MASS_BINDING_ROOT_CAUSE": report.task173_mass_binding_root_cause,
+        "TASK173_EXPERIMENTAL_REPLAY_FEASIBLE": report.task173_experimental_replay_feasible,
+        "NONBASELINE_HIGH_K_DP_COVERAGE": report.nonbaseline_mass_flow_high_k_coverage,
+        "REGIME_RANKING_CORRECTED": "true",
+        "THERMAL_SENSITIVITY_STATUS": report.thermal_sensitivity_status,
+        "T235_L5P5_ENGINEERING_STATUS": ls.get("T235_L5.5"),
+        "T235_L6P0_ENGINEERING_STATUS": ls.get("T235_L6.0"),
+        "T241_L5P5_ENGINEERING_STATUS": ls.get("T241_L5.5"),
+        "T241_L6P0_ENGINEERING_STATUS": ls.get("T241_L6.0"),
+        "ROBUST_CANDIDATE_PROVEN": report.robust_candidate_proven,
+        "PRODUCTION_RATING_VALIDATED": False,
         "T235_L5P5_STATUS": ls.get("T235_L5.5"),
         "T235_L6P0_STATUS": ls.get("T235_L6.0"),
         "T241_L5P5_STATUS": ls.get("T241_L5.5"),
@@ -86,7 +123,9 @@ def main() -> None:
         "MERGE_AUTHORIZED": False,
         "BVP_ROUTE": BVP_PROTOTYPE_ROUTE,
         "artifact_path": str(ARTIFACT_JSON),
-        "supersession_path": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-supersession-r2.json",
+        "supersession_path": (
+            "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2-gate-supersession-r3.json"
+        ),
     }
     out = artifacts / "v08_03_engineering_shortlist_robustness_delivery.json"
     out.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")

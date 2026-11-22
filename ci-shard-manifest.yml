@@ -568,6 +568,7 @@ shards:
       - tests/prototypes/test_intermediate_tube_count_feasibility_v08.py
       - tests/prototypes/test_engineering_shortlist_robustness_v08.py
       - tests/prototypes/test_engineering_shortlist_sensitivity_binding_v08.py
+      - tests/prototypes/test_engineering_shortlist_r2_gate_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
       - tests/prototypes/test_joint_bvp_wall_closure_e1.py
       - tests/prototypes/test_float_lattice_bracket.py

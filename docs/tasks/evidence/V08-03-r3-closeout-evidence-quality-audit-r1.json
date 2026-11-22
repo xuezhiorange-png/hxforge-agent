@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "candidate_c_frozen": true,
+    "engineering_recommended_null": true,
+    "frozen_catalog_unchanged": true,
+    "mass_flow_high_k_all_false": true,
+    "production_physics_unchanged": true,
+    "r241_task027_bl_t027_on_minus_flow": true,
+    "r2_ranking_corrected_in_r3": true,
+    "robust_candidate_proven_false": true,
+    "supersession_chain_includes_r1_r2": true,
+    "t235_thermal_fail_on_mdot_sweep": true
+  },
+  "ci_1614_note": "HEAD 8ee0962 CI not valid for R3; local ruff/tests run on working tree only",
+  "r3_local_evidence_valid": true,
+  "r3_supersession_valid": true,
+  "schema": "hxforge.v08-03-closeout-audit.v1",
+  "task_id": "V08_03_R3_CLOSEOUT_AND_TASK173_ARCHITECTURE_DECISION"
+}

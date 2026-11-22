@@ -67,6 +67,9 @@ from prototypes.v08_thermal_rating.task168_rejection_diagnostics_v08 import (
     BREAKTHROUGH_DISCRETE_SPACE_PATH,
     baffle_spacing_for_length_m,
 )
+from prototypes.v08_thermal_rating.task173_mass_binding_boundary_v08 import (
+    task173_mass_binding_boundary_report,
+)
 from prototypes.v08_thermal_rating.thermal_prescreen_v08 import run_thermal_prescreen
 from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evaluate_binding_task037
 from prototypes.v08_thermal_rating.v08_task037_experimental_authority_v08 import (
@@ -87,7 +90,9 @@ _SHORTLIST: tuple[tuple[int, Decimal], ...] = (
     (241, Decimal("6.0")),
 )
 
-_SCALES_241_ALIAS = tuple(s for s in FINITE_ENVELOPE_SCALES if s > Decimal("0.815") and s <= Decimal("0.835"))
+_SCALES_241_ALIAS = tuple(
+    s for s in FINITE_ENVELOPE_SCALES if s > Decimal("0.815") and s <= Decimal("0.835")
+)
 
 
 @dataclass(frozen=True)
@@ -116,10 +121,21 @@ class PortVelocityRow:
 
 RobustnessEvidenceStatus = Literal[
     "VERIFIED_ROBUST",
+    "REPLAY_TASK026_TASK027_VERIFIED",
     "VERIFIED_NOT_ROBUST",
     "REPLAY_BINDING_BLOCKED",
     "PHYSICAL_MODEL_APPLICABILITY_BLOCKED",
+    "HYDRAULIC_SENSITIVITY_NOT_VERIFIED",
     "INSUFFICIENT_EVIDENCE",
+]
+
+LayoutEngineeringStatus = Literal[
+    "BASELINE_PRESCREEN_PASS",
+    "OPERATING_RANGE_THERMAL_FAIL",
+    "PHYSICAL_MODEL_APPLICABILITY_BLOCKED",
+    "HYDRAULIC_SENSITIVITY_NOT_VERIFIED",
+    "ROBUST_CANDIDATE_PROVEN",
+    "NO_ROBUST_CANDIDATE_PROVEN",
 ]
 
 
@@ -202,6 +218,10 @@ class ShortlistLayoutReport:
     min_high_k_margin_pa: str
     min_re_margin_sensitivity: str | None
     regime_blocked_in_sensitivity: bool
+    min_verified_clean_q_w: str | None
+    mass_flow_high_k_computed_count: int
+    thermal_operating_range_status: str
+    engineering_layout_status: LayoutEngineeringStatus
 
 
 @dataclass(frozen=True)
@@ -243,7 +263,13 @@ class EngineeringShortlistRobustnessReport:
     nonbaseline_scenarios_blocked: int
     nonbaseline_high_k_dp_computed: int
     layout_status_by_key: dict[str, str]
+    layout_engineering_status_by_key: dict[str, LayoutEngineeringStatus]
     engineering_acceptance_status: str
+    robust_candidate_proven: bool
+    thermal_sensitivity_status: str
+    task173_mass_binding_root_cause: str
+    task173_experimental_replay_feasible: bool
+    nonbaseline_mass_flow_high_k_coverage: str
 
 
 def _handoff_for_case(
@@ -284,7 +310,9 @@ def _resolve_structural(
         if not _decimal_match(item.candidate.baffle_spacing_m, spacing):
             continue
         return item, outcome
-    raise RuntimeError(f"no structural match tubes={tube_count} L={tube_length_m} scale={envelope_scale}")
+    raise RuntimeError(
+        f"no structural match tubes={tube_count} L={tube_length_m} scale={envelope_scale}"
+    )
 
 
 def _task027_raw(
@@ -371,7 +399,11 @@ def _fixed_layout_tube_side_replay(
         return t025, None, None, "BLOCKED", "MISSING_TASK026"
     reynolds = str(getattr(t026, "reynolds_number", "")) or None
     status, raw_code = _task027_raw(task025_result=t025, task026_result=t026, t168=t168)
-    if scenario_key.startswith("shell_mdot") and baseline_re is not None and reynolds != baseline_re:
+    if (
+        scenario_key.startswith("shell_mdot")
+        and baseline_re is not None
+        and reynolds != baseline_re
+    ):
         return (
             t025,
             t026,
@@ -475,10 +507,49 @@ def _robustness_status(
     if not bindings_ok:
         return "REPLAY_BINDING_BLOCKED"
     if t027_status == "PASS":
-        if scenario_key == "baseline" and not high_k_computed:
-            return "INSUFFICIENT_EVIDENCE"
-        return "VERIFIED_ROBUST"
+        if high_k_computed:
+            return "VERIFIED_ROBUST"
+        if scenario_key.startswith(("tube_mdot_", "shell_mdot_")):
+            return "HYDRAULIC_SENSITIVITY_NOT_VERIFIED"
+        if scenario_key == "baseline":
+            return "VERIFIED_ROBUST" if high_k_computed else "INSUFFICIENT_EVIDENCE"
+        return "REPLAY_TASK026_TASK027_VERIFIED"
     return "VERIFIED_NOT_ROBUST"
+
+
+_MASS_FLOW_SCENARIOS = frozenset(
+    {
+        "tube_mdot_minus_1pct",
+        "tube_mdot_minus_3pct",
+        "tube_mdot_plus_3pct",
+        "shell_mdot_minus_3pct",
+        "shell_mdot_plus_3pct",
+    }
+)
+
+
+def _layout_engineering_status(
+    row: ShortlistLayoutReport,
+    *,
+    target_q_w: Decimal,
+) -> LayoutEngineeringStatus:
+    if row.regime_blocked_in_sensitivity:
+        return "PHYSICAL_MODEL_APPLICABILITY_BLOCKED"
+    if not row.joint_prescreen_pass:
+        return "NO_ROBUST_CANDIDATE_PROVEN"
+    sweeping_q = [
+        s
+        for s in row.sensitivity
+        if s.scenario_key in _MASS_FLOW_SCENARIOS and s.clean_q_w is not None
+    ]
+    below = [
+        s for s in sweeping_q if Decimal(s.clean_q_w) * THERMODYNAMIC_DUTY_TOLERANCE < target_q_w
+    ]
+    if below:
+        return "OPERATING_RANGE_THERMAL_FAIL"
+    if row.mass_flow_high_k_computed_count == 0:
+        return "HYDRAULIC_SENSITIVITY_NOT_VERIFIED"
+    return "BASELINE_PRESCREEN_PASS"
 
 
 def _perturb_case(
@@ -520,7 +591,9 @@ def _perturb_case(
     if scenario_key == "tube_inlet_plus_2k":
         tk = (base_tt + Decimal("2")).quantize(Decimal("0.001"))
         return normalized.model_copy(
-            update={"tube_side": normalized.tube_side.model_copy(update={"inlet_temperature_k": tk})}
+            update={
+                "tube_side": normalized.tube_side.model_copy(update={"inlet_temperature_k": tk})
+            }
         ), (
             "Exploratory tube inlet +2 K vs fixture 310 K; COOLPROP water at 101325 Pa "
             "(property sensitivity only)."
@@ -528,7 +601,9 @@ def _perturb_case(
     if scenario_key == "shell_inlet_minus_2k":
         tk = (base_st - Decimal("2")).quantize(Decimal("0.001"))
         return normalized.model_copy(
-            update={"shell_side": normalized.shell_side.model_copy(update={"inlet_temperature_k": tk})}
+            update={
+                "shell_side": normalized.shell_side.model_copy(update={"inlet_temperature_k": tk})
+            }
         ), (
             "Exploratory shell inlet −2 K vs fixture 295 K; COOLPROP water at 101325 Pa "
             "(property sensitivity only)."
@@ -673,9 +748,7 @@ def _evaluate_layout_scenario(
             task173_state = "FULL_PATH_COMPUTED"
         except (ValueError, ValidationError):
             task173_state = "TASK173_MASS_BINDING_REJECTED"
-            scenario_label = (
-                f"{scenario_label} High-K full path not available (Task173 case binding holds baseline mass)."
-            )
+            scenario_label = f"{scenario_label} High-K full path not available (Task173 case binding holds baseline mass)."
     audit = _build_binding_audit(
         structural=structural,
         normalized=normalized,
@@ -735,7 +808,11 @@ def _collect_identity_aliases(
     records: list[LayoutIdentityRecord] = []
     for scale in scales:
         structural, outcome = _resolve_structural(
-            normalized, handoff, tube_count=tube_count, tube_length_m=tube_length_m, envelope_scale=scale
+            normalized,
+            handoff,
+            tube_count=tube_count,
+            tube_length_m=tube_length_m,
+            envelope_scale=scale,
         )
         layout = structural.bundle.task021_layout
         records.append(
@@ -795,7 +872,11 @@ def _layout_report(
 ) -> ShortlistLayoutReport:
     scale = _CANONICAL_SCALE[tube_count]
     structural, outcome = _resolve_structural(
-        normalized, handoff, tube_count=tube_count, tube_length_m=tube_length_m, envelope_scale=scale
+        normalized,
+        handoff,
+        tube_count=tube_count,
+        tube_length_m=tube_length_m,
+        envelope_scale=scale,
     )
     recovered = RecoveredShell052Bundle(
         structural_bundle=structural,
@@ -896,7 +977,8 @@ def _layout_report(
     verified_dp = [
         s
         for s in sensitivity
-        if s.high_k_dp_computed
+        if s.robustness_evidence_status == "VERIFIED_ROBUST"
+        and s.high_k_dp_computed
         and s.high_tube_margin_pa is not None
         and s.high_shell_margin_pa is not None
     ]
@@ -917,7 +999,36 @@ def _layout_report(
         for s in sensitivity
         if s.scenario_key != "baseline"
     )
-    return ShortlistLayoutReport(
+    verified_q = [
+        Decimal(s.clean_q_w)
+        for s in sensitivity
+        if s.clean_q_w is not None
+        and s.robustness_evidence_status
+        in (
+            "VERIFIED_ROBUST",
+            "REPLAY_TASK026_TASK027_VERIFIED",
+            "HYDRAULIC_SENSITIVITY_NOT_VERIFIED",
+        )
+    ]
+    min_q = min(verified_q) if verified_q else None
+    mass_hk = sum(
+        1
+        for s in sensitivity
+        if s.scenario_key in _MASS_FLOW_SCENARIOS
+        and s.robustness_evidence_status == "VERIFIED_ROBUST"
+    )
+    tube_sweeps = [
+        s for s in sensitivity if s.scenario_key in _MASS_FLOW_SCENARIOS and s.clean_q_w is not None
+    ]
+    below_330 = any(
+        Decimal(s.clean_q_w) * THERMODYNAMIC_DUTY_TOLERANCE < _TARGET_Q_W for s in tube_sweeps
+    )
+    thermal_range = (
+        "TUBE_OR_SHELL_MDOT_SWEEP_BELOW_330KW"
+        if below_330
+        else "TUBE_OR_SHELL_MDOT_SWEEP_AT_OR_ABOVE_330KW"
+    )
+    draft_row = ShortlistLayoutReport(
         shortlist_key=shortlist_key,
         physical_tube_count=tube_count,
         tube_length_m=str(tube_length_m),
@@ -945,10 +1056,18 @@ def _layout_report(
         min_high_k_margin_pa=str(min_margin),
         min_re_margin_sensitivity=str(min_re) if min_re is not None else None,
         regime_blocked_in_sensitivity=regime_blocked,
+        min_verified_clean_q_w=str(min_q) if min_q is not None else None,
+        mass_flow_high_k_computed_count=mass_hk,
+        thermal_operating_range_status=thermal_range,
+        engineering_layout_status="NO_ROBUST_CANDIDATE_PROVEN",
     )
+    eng_st = _layout_engineering_status(draft_row, target_q_w=_TARGET_Q_W)
+    return ShortlistLayoutReport(**{**draft_row.__dict__, "engineering_layout_status": eng_st})
 
 
-def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
+def _pareto_choices(
+    layouts: tuple[ShortlistLayoutReport, ...],
+) -> tuple[
     ParetoChoice | None,
     ParetoChoice | None,
     ParetoChoice | None,
@@ -963,16 +1082,23 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
     )
     hydraulic = max(
         layouts,
-        key=lambda row: (
-            Decimal(row.min_high_k_margin_pa) if Decimal(row.min_high_k_margin_pa) > 0 else Decimal(
-                row.baseline_high_tube_margin_pa or "0"
-            )
+        key=lambda row: min(
+            Decimal(row.baseline_high_tube_margin_pa or "0"),
+            Decimal(row.baseline_high_shell_margin_pa or "0"),
         ),
     )
-    regime = max(
-        [row for row in layouts if row.min_re_margin_sensitivity is not None],
-        key=lambda row: Decimal(row.min_re_margin_sensitivity or "-1"),
-        default=None,
+    regime_pool = [
+        row
+        for row in layouts
+        if not row.regime_blocked_in_sensitivity and row.min_re_margin_sensitivity is not None
+    ]
+    regime = (
+        max(
+            regime_pool,
+            key=lambda row: Decimal(row.min_re_margin_sensitivity or "-1"),
+        )
+        if regime_pool
+        else None
     )
     thermal_choice = ParetoChoice(
         thermal.shortlist_key,
@@ -983,44 +1109,28 @@ def _pareto_choices(layouts: tuple[ShortlistLayoutReport, ...]) -> tuple[
     hydraulic_choice = ParetoChoice(
         hydraulic.shortlist_key,
         hydraulic.geometry_v2,
-        f"Largest baseline high-K min-side margin ({hydraulic.baseline_high_tube_margin_pa} Pa tube); "
-        f"non-baseline high-K coverage={hydraulic.min_high_k_margin_pa} Pa min among computed sweeps.",
+        (
+            f"Largest baseline high-K min-side margin "
+            f"({hydraulic.baseline_high_tube_margin_pa} Pa tube); "
+            "mass-flow high-K sweeps unverified (Task173 template binding)."
+        ),
     )
     regime_choice = (
         ParetoChoice(
             regime.shortlist_key,
             regime.geometry_v2,
-            f"Best minimum Re margin vs Task027 lower bound across sensitivities "
-            f"({regime.min_re_margin_sensitivity}); blocked in sweep={regime.regime_blocked_in_sensitivity}.",
+            f"Best minimum Re margin among layouts without Task027 physical blocker "
+            f"({regime.min_re_margin_sensitivity}); 241 layouts excluded.",
         )
         if regime is not None
-        else None
+        else ParetoChoice(
+            "NONE",
+            "",
+            "All 241 layouts blocked by Task027 on tube mass-flow sweeps; "
+            "no regime-robustness ranking assigned.",
+        )
     )
-    candidates = [
-        row
-        for row in layouts
-        if row.joint_prescreen_pass
-        and row.baseline_clean_q_w
-        and Decimal(row.baseline_clean_q_w) >= _TARGET_Q_W
-        and not row.regime_blocked_in_sensitivity
-    ]
-    if not candidates:
-        return thermal_choice, hydraulic_choice, regime_choice, None
-    robust = sorted(
-        candidates,
-        key=lambda row: (
-            -Decimal(row.min_re_margin_sensitivity or "0"),
-            -Decimal(row.baseline_high_tube_margin_pa or "0"),
-            -Decimal(row.baseline_clean_q_w or "0"),
-        ),
-    )[0]
-    eng = ParetoChoice(
-        robust.shortlist_key,
-        robust.geometry_v2,
-        "Baseline joint prescreen pass, no Task027 physical blocker on fixed-layout tube-flow sweep; "
-        f"NOT production validated ({robust.baseline_clean_q_w} W clean).",
-    )
-    return thermal_choice, hydraulic_choice, regime_choice, eng
+    return thermal_choice, hydraulic_choice, regime_choice, None
 
 
 def run_engineering_shortlist_robustness(
@@ -1036,7 +1146,11 @@ def run_engineering_shortlist_robustness(
         scale = _CANONICAL_SCALE[tube_count]
         identity_rows.extend(
             _collect_identity_aliases(
-                normalized, handoff, tube_count=tube_count, tube_length_m=length, canonical_scale=scale
+                normalized,
+                handoff,
+                tube_count=tube_count,
+                tube_length_m=length,
+                canonical_scale=scale,
             )
         )
         layouts.append(
@@ -1048,7 +1162,8 @@ def run_engineering_shortlist_robustness(
     thermal, hydraulic, regime, eng = _pareto_choices(layout_tuple)
     threshold = _TARGET_Q_W * THERMODYNAMIC_DUTY_TOLERANCE
     clean_status = all(
-        row.baseline_clean_q_w and Decimal(row.baseline_clean_q_w) >= threshold for row in layout_tuple
+        row.baseline_clean_q_w and Decimal(row.baseline_clean_q_w) >= threshold
+        for row in layout_tuple
     )
     nonbaseline = [
         s for row in layout_tuple for s in row.sensitivity if s.scenario_key != "baseline"
@@ -1073,7 +1188,10 @@ def run_engineering_shortlist_robustness(
         "mass-flow sweeps blocked by Task173 case binding)."
     )
     baseline_margins = [
-        min(Decimal(row.baseline_high_tube_margin_pa or "0"), Decimal(row.baseline_high_shell_margin_pa or "0"))
+        min(
+            Decimal(row.baseline_high_tube_margin_pa or "0"),
+            Decimal(row.baseline_high_shell_margin_pa or "0"),
+        )
         for row in layout_tuple
         if row.baseline_high_tube_margin_pa and row.baseline_high_shell_margin_pa
     ]
@@ -1082,24 +1200,32 @@ def run_engineering_shortlist_robustness(
         next(s for s in row.sensitivity if s.scenario_key == "baseline").task027_status == "PASS"
         for row in layout_tuple
     )
-    layout_status = {}
+    layout_status: dict[str, str] = {}
+    layout_engineering_status_by_key: dict[str, LayoutEngineeringStatus] = {}
     for row in layout_tuple:
-        minus3 = next(s for s in row.sensitivity if s.scenario_key == "tube_mdot_minus_3pct")
-        if minus3.robustness_evidence_status == "PHYSICAL_MODEL_APPLICABILITY_BLOCKED":
-            st = "REGIME_BLOCKED_AT_TUBE_MDOT_MINUS_3PCT"
-        elif row.joint_prescreen_pass:
-            st = "BASELINE_JOINT_PRESCREEN_PASS"
-        else:
-            st = "BASELINE_JOINT_FAIL"
-        layout_status[row.shortlist_key.replace(".", "P")] = st
+        st = row.engineering_layout_status
         layout_status[row.shortlist_key] = st
-    if eng is None:
-        decision = "NO_ROBUST_CANDIDATE_PROVEN: insufficient verified robustness across fixed-layout sensitivities."
-    else:
-        decision = (
-            f"ENGINEERING_AUTHORITY_PENDING: candidate {eng.shortlist_key} for placement-envelope "
-            "review only; not production validated."
-        )
+        layout_status[row.shortlist_key.replace(".", "P")] = st
+        layout_engineering_status_by_key[row.shortlist_key] = st
+        layout_engineering_status_by_key[row.shortlist_key.replace(".", "P")] = st
+    t173 = task173_mass_binding_boundary_report()
+    mass_hk_total = sum(row.mass_flow_high_k_computed_count for row in layout_tuple)
+    mass_hk_cov = (
+        f"0/20 mass-flow sensitivity scenarios with verified high-K dp "
+        f"(total mass-flow high-K={mass_hk_total}); baseline-only hydraulic evidence."
+    )
+    any_thermal_fail = any(
+        row.engineering_layout_status == "OPERATING_RANGE_THERMAL_FAIL" for row in layout_tuple
+    )
+    thermal_sens = (
+        "TUBE_MDOT_SWEEP_CLEAN_Q_BELOW_330KW_ON_T235"
+        if any_thermal_fail
+        else "NO_MDOT_SWEEP_THERMAL_FAIL_RECORDED"
+    )
+    decision = (
+        "NO_ROBUST_CANDIDATE_PROVEN: separated Re/thermal/hydraulic axes; "
+        "mass-flow high-K not verified; Task173 production rating BLOCKED."
+    )
     return EngineeringShortlistRobustnessReport(
         frozen_candidate_c_unchanged=True,
         canonical_shortlist_size=len(_SHORTLIST),
@@ -1118,7 +1244,9 @@ def run_engineering_shortlist_robustness(
             f"{nb_hk} non-baseline temperature sweeps computed high-K; "
             "mass-flow perturbations excluded from hydraulic worst-case until Task173 binding extended."
         ),
-        clean_330kw_status="MET_CLEAN_CONTRACT" if clean_status else "CLEAN_BELOW_CONTRACT_ON_SHORTLIST",
+        clean_330kw_status="MET_CLEAN_CONTRACT"
+        if clean_status
+        else "CLEAN_BELOW_CONTRACT_ON_SHORTLIST",
         fouled_330kw_status="FOULED_BELOW_330KW_T039_DEMO",
         fouling_authority_status=(
             "T039_DEMO_FOULING_SENSITIVITY_ONLY; evidence "
@@ -1138,6 +1266,7 @@ def run_engineering_shortlist_robustness(
             "docs/tasks/evidence/V08-03-high-k-evidence-supersession-r2.json",
             "docs/tasks/evidence/V08-03-tube-side-replay-root-cause-r1.json",
             "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json",
+            "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json",
         ),
         sensitivity_binding_root_cause=root_cause,
         layout_identity_drift_confirmed=True,
@@ -1147,7 +1276,13 @@ def run_engineering_shortlist_robustness(
         nonbaseline_scenarios_blocked=nb_blocked,
         nonbaseline_high_k_dp_computed=nb_hk,
         layout_status_by_key=layout_status,
+        layout_engineering_status_by_key=layout_engineering_status_by_key,
         engineering_acceptance_status="EXPERIMENTAL_PRESCREEN_ONLY",
+        robust_candidate_proven=False,
+        thermal_sensitivity_status=thermal_sens,
+        task173_mass_binding_root_cause=t173.root_cause,
+        task173_experimental_replay_feasible=t173.experimental_replay_feasible,
+        nonbaseline_mass_flow_high_k_coverage=mass_hk_cov,
     )
 
 
@@ -1168,9 +1303,9 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
         }
 
     return {
-        "schema": "hxforge.engineering-shortlist-robustness.v2",
-        "task_id": "V08_03_SENSITIVITY_BINDING_INTEGRITY_AND_ROBUSTNESS_EVIDENCE_CORRECTION",
-        "supersedes": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json",
+        "schema": "hxforge.engineering-shortlist-robustness.v3",
+        "task_id": "V08_03_R2_GATE_CORRECTION_AND_TASK173_MASS_BINDING_BOUNDARY",
+        "supersedes": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json",
         "canonical_shortlist_size": report.canonical_shortlist_size,
         "distinct_audited_layout_hash_count": report.distinct_audited_layout_hash_count,
         "frozen_design_c_reference": frozen_ref,
@@ -1179,9 +1314,17 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
         "identity_records": [row.__dict__ for row in report.identity_records],
         "shortlist_layouts": [
             {
-                **{k: v for k, v in row.__dict__.items() if k not in ("sensitivity", "port_velocities_baseline")},
+                **{
+                    k: v
+                    for k, v in row.__dict__.items()
+                    if k not in ("sensitivity", "port_velocities_baseline")
+                },
                 "port_velocities_baseline": [
-                    {"port_id": p.port_id, "velocity_m_s": p.velocity_m_s, "inside_diameter_m": p.inside_diameter_m}
+                    {
+                        "port_id": p.port_id,
+                        "velocity_m_s": p.velocity_m_s,
+                        "inside_diameter_m": p.inside_diameter_m,
+                    }
                     for p in row.port_velocities_baseline
                 ],
                 "sensitivity": [
@@ -1225,6 +1368,14 @@ def artifact_dict(report: EngineeringShortlistRobustnessReport) -> dict[str, Any
         "engineering_acceptance_status": report.engineering_acceptance_status,
         "supersession_chain": list(report.supersession_chain),
         "engineering_design_status": report.engineering_acceptance_status,
+        "robust_candidate_proven": report.robust_candidate_proven,
+        "thermal_sensitivity_status": report.thermal_sensitivity_status,
+        "task173_mass_binding": {
+            "root_cause": report.task173_mass_binding_root_cause,
+            "experimental_replay_feasible": report.task173_experimental_replay_feasible,
+            "mass_flow_high_k_coverage": report.nonbaseline_mass_flow_high_k_coverage,
+        },
+        "layout_engineering_status_by_key": report.layout_engineering_status_by_key,
     }
 
 

@@ -60,8 +60,9 @@ def test_r2_artifact_supersedes_r1_without_removing_r1() -> None:
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
     payload = artifact_dict(report)
-    assert payload["schema"] == "hxforge.engineering-shortlist-robustness.v2"
-    assert payload["supersedes"] == "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json"
+    assert payload["schema"] == "hxforge.engineering-shortlist-robustness.v3"
+    r1 = "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json"
+    assert payload["supersedes"] == r1
 
 
 def test_nonbaseline_high_k_not_fabricated() -> None:
