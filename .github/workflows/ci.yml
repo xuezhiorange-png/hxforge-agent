@@ -185,7 +185,7 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: [parse-manifest, resolve-authority]
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.name == 'v08-03-live-thermal-rating' && 130 || (matrix.name == 'v07-r26g-authorized-full-path' && 60 || (matrix.name == 'v07-r24-wide-delta-t-rating-solver' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 45 || (matrix.name == 'v07-live-multi-mesh-rating-r16-e2e' && 65 || (matrix.name == 'v07-live-hydraulic-constraint-sizing-r15' && 45 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || 30))))))) }}
+    timeout-minutes: ${{ matrix.name == 'v08-03-thermal-live-mesh' && 100 || (matrix.name == 'v08-03-hydraulic-enthalpy-audit' && 100 || (matrix.name == 'v08-03-engineering-shortlist-r3' && 50 || (matrix.name == 'v08-03-shell-path-hydraulic' && 70 || (matrix.name == 'v08-03-joint-recovered-shell' && 70 || (matrix.name == 'v08-03-provenance-audit-light' && 40 || (matrix.name == 'v07-r26g-authorized-full-path' && 60 || (matrix.name == 'v07-r24-wide-delta-t-rating-solver' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 45 || (matrix.name == 'v07-live-multi-mesh-rating-r16-e2e' && 65 || (matrix.name == 'v07-live-hydraulic-constraint-sizing-r15' && 45 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || 30))))))))))) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
@@ -316,6 +316,9 @@ jobs:
         if: always()
         run: |
           COV_RAW="coverage-raw.pr-head.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
+          if [ ! -f shard-execution-progress.json ]; then
+            echo '{"schema_version":"hxforge.shard-progress.v1","status":"absent","diagnostic_only":true,"completed_count":0}' > shard-execution-progress.json
+          fi
           uv run --locked python -c "
           import json, os
           meta = {
@@ -339,6 +342,7 @@ jobs:
               ('pytest-stderr', 'pytest-stderr.txt'),
               ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
+              ('shard-execution-progress', 'shard-execution-progress.json'),
           ]
           for kind, path in required:
               exists = os.path.exists(path)
@@ -362,6 +366,7 @@ jobs:
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
+            shard-execution-progress.json
           if-no-files-found: error
           retention-days: 7
 
@@ -370,7 +375,7 @@ jobs:
     if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.resolve-authority.outputs.merge-sha != ''
     needs: [parse-manifest, resolve-authority]
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.name == 'v08-03-live-thermal-rating' && 130 || (matrix.name == 'v07-r26g-authorized-full-path' && 60 || (matrix.name == 'v07-r24-wide-delta-t-rating-solver' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 45 || (matrix.name == 'v07-live-multi-mesh-rating-r16-e2e' && 65 || (matrix.name == 'v07-live-hydraulic-constraint-sizing-r15' && 45 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || 30))))))) }}
+    timeout-minutes: ${{ matrix.name == 'v08-03-thermal-live-mesh' && 100 || (matrix.name == 'v08-03-hydraulic-enthalpy-audit' && 100 || (matrix.name == 'v08-03-engineering-shortlist-r3' && 50 || (matrix.name == 'v08-03-shell-path-hydraulic' && 70 || (matrix.name == 'v08-03-joint-recovered-shell' && 70 || (matrix.name == 'v08-03-provenance-audit-light' && 40 || (matrix.name == 'v07-r26g-authorized-full-path' && 60 || (matrix.name == 'v07-r24-wide-delta-t-rating-solver' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-live-cli' && 65 || (matrix.name == 'v07-variable-bundle-geometry-sizing-r13-selection' && 45 || (matrix.name == 'v07-live-multi-mesh-rating-r16-e2e' && 65 || (matrix.name == 'v07-live-hydraulic-constraint-sizing-r15' && 45 || (matrix.name == 'v07-live-thermal-hydraulic-postpass-r14' && 25 || 30))))))))))) }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.parse-manifest.outputs.matrix) }}
@@ -548,6 +553,9 @@ jobs:
         if: always()
         run: |
           COV_RAW="coverage-raw.merge-ref.${{ matrix.name }}.py${{ matrix.python }}.attempt${{ github.run_attempt }}"
+          if [ ! -f shard-execution-progress.json ]; then
+            echo '{"schema_version":"hxforge.shard-progress.v1","status":"absent","diagnostic_only":true,"completed_count":0}' > shard-execution-progress.json
+          fi
           uv run --locked python -c "
           import json, os
           meta = {
@@ -571,6 +579,7 @@ jobs:
               ('pytest-stderr', 'pytest-stderr.txt'),
               ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
+              ('shard-execution-progress', 'shard-execution-progress.json'),
           ]
           for kind, path in required:
               exists = os.path.exists(path)
@@ -594,6 +603,7 @@ jobs:
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
+            shard-execution-progress.json
           if-no-files-found: error
           retention-days: 7
 
