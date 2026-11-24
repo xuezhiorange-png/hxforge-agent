@@ -7,11 +7,8 @@ import pytest
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     CASE_330KW_ID,
-    build_candidate_rating_bindings,
     closeout_one_candidate,
-    enumerate_structural_bundles,
     load_case_bindings,
-    solve_isolated_outer_boundary,
 )
 from prototypes.v08_thermal_rating.case_identity_v08 import (
     CASE_250KW_ID,
@@ -19,6 +16,9 @@ from prototypes.v08_thermal_rating.case_identity_v08 import (
     FIXTURE_330,
     build_case_identity_bundle,
 )
+from tests.prototypes.conftest_v08_axial_330 import Fixture330EngineContext
+
+pytest_plugins = ["tests.prototypes.conftest_v08_axial_330"]
 
 
 def test_330kw_primary_fixture_identity_distinct_from_250kw() -> None:
@@ -32,30 +32,18 @@ def test_330kw_primary_fixture_identity_distinct_from_250kw() -> None:
 
 
 @pytest.mark.timeout(1800)
-def test_330kw_outer_search_direction_and_n1_closeout() -> None:
+def test_330kw_outer_search_direction_and_n1_closeout(
+    fixture_330_engine_context: Fixture330EngineContext,
+) -> None:
     """Corrected outer search must UPDATE_H_HIGH on VALID, not inflate h_low."""
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    assert normalized.engineering_case_id == CASE_330KW_ID
-    space_hash, t168_digest, bundles, geom = enumerate_structural_bundles(
-        normalized, handoff, max_valid=1
-    )
-    bindings = build_candidate_rating_bindings(
-        bundles[0],
-        space_hash=space_hash,
-        t168_digest=t168_digest,
-        normalized=normalized,
-        handoff=handoff,
-        provider=provider,
-        geometry_projection_hash=geom[bundles[0].candidate.candidate_id],
-    )
-    assert bindings is not None
-    n1 = solve_isolated_outer_boundary(bindings, provider, subdivisions=1)
+    ctx = fixture_330_engine_context
+    assert ctx.normalized.engineering_case_id == CASE_330KW_ID
+    n1 = ctx.n1
     decisions = {step.decision_update for step in n1.search_trace}
     assert "UPDATE_H_HIGH" in decisions or "UPDATE_H_HIGH_BINARY64_STEP" in decisions
     assert "INITIAL_HIGH_ENDPOINT" in decisions
     assert not any(d == "UPDATE_H_LOW_VALID" for d in decisions)
-    closeout = closeout_one_candidate(bindings, provider, run_production=False)
+    closeout = closeout_one_candidate(ctx.bindings, ctx.provider, run_production=False)
     phys = closeout.physical
     assert phys.energy_balance_pass is True
     assert phys.task172_numerical_hole_count == 0

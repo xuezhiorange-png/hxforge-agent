@@ -54,6 +54,7 @@ class ShardProgressRecorder:
 
     def mark_running(self, node_id: str) -> None:
         self._running = node_id
+        self._flush()
 
     def mark_finished(self, node_id: str, outcome: str) -> None:
         now = time.monotonic()

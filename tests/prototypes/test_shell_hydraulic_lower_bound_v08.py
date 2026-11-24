@@ -34,13 +34,19 @@ def test_frozen_baseline_proven_infeasible_and_budget_magnitudes() -> None:
     report = analyze_shell_hydraulic_lower_bound(bindings)
     mid = next(s for s in report.scenarios if s.scenario_key == "mid_band")
     assert mid.proven_hydraulic_infeasible_under_assumed_k is True
-    assert Decimal(mid.shell_nozzle_pair_min_dp_pa) == pytest.approx(Decimal("498.904"), rel=1e-3)
-    assert Decimal(mid.remaining_internal_budget_pa) == pytest.approx(Decimal("635.816"), rel=1e-3)
+    assert Decimal(mid.shell_nozzle_pair_min_dp_pa) == pytest.approx(
+        Decimal("498.904"), rel=Decimal("0.001")
+    )
+    assert Decimal(mid.remaining_internal_budget_pa) == pytest.approx(
+        Decimal("635.816"), rel=Decimal("0.001")
+    )
     high = next(s for s in report.scenarios if s.scenario_key == "high_loss_sensitivity")
-    assert Decimal(high.shell_nozzle_pair_min_dp_pa) == pytest.approx(Decimal("598.684"), rel=1e-3)
+    assert Decimal(high.shell_nozzle_pair_min_dp_pa) == pytest.approx(
+        Decimal("598.684"), rel=Decimal("0.001")
+    )
     assert report.bell_reduction_required_for_mid_feasibility_pa is not None
     assert Decimal(report.bell_reduction_required_for_mid_feasibility_pa) == pytest.approx(
-        Decimal("541.285"), rel=1e-3
+        Decimal("541.285"), rel=Decimal("0.001")
     )
 
 

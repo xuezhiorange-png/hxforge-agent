@@ -11,11 +11,13 @@ from prototypes.v08_thermal_rating.recovered_shell_052_full_chain_v08 import (
     FROZEN_SHELL_052_GEOMETRY_V2,
 )
 from prototypes.v08_thermal_rating.recovered_shell_052_pareto_joint_v08 import (
-    run_recovered_shell_052_pareto_joint_optimization,
+    Shell052ParetoJointReport,
 )
 from prototypes.v08_thermal_rating.thermal_hydraulic_joint_cooptimization_v08 import (
     run_thermal_hydraulic_joint_cooptimization,
 )
+
+pytest_plugins = ["tests.prototypes.conftest_v08_joint_pareto"]
 
 
 def test_joint_pool_includes_recovered_shell_052_geometry() -> None:
@@ -28,12 +30,10 @@ def test_joint_pool_includes_recovered_shell_052_geometry() -> None:
     assert FROZEN_SHELL_052_GEOMETRY_V2 in v2s
 
 
-def test_pareto_bounded_search_finds_mid_joint_or_reports_front() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_recovered_shell_052_pareto_joint_optimization(
-        normalized, handoff, provider=provider
-    )
+def test_pareto_bounded_search_finds_mid_joint_or_reports_front(
+    pareto_joint_report_330: Shell052ParetoJointReport,
+) -> None:
+    report = pareto_joint_report_330
     assert report.recovered_shell_052_included is True
     assert report.previous_experimental_count >= 5
     assert any(r.geometry_v2 == FROZEN_SHELL_052_GEOMETRY_V2 for r in report.rows)

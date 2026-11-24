@@ -452,7 +452,7 @@ def run_pytest(
     elif junit_parse_status == "unavailable":
         counts_mismatch_detail = "JUnit unavailable"
 
-    if (
+    if execution_status != "timeout" and (
         exit_code == 2
         and junit_counts["tests_collected"] == 0
         or junit_parse_status == "unavailable"

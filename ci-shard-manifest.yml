@@ -216,6 +216,7 @@ shards:
     python: ["3.11", "3.12"]
     files:
       - tests/ci/test_collect_acceptance.py
+      - tests/ci/test_shard_progress_and_timeout.py
     timeout: 900
 
   - name: pure-unit
@@ -532,8 +533,20 @@ shards:
     files:
       - tests/prototypes/test_v08_geometry_candidate_generation.py
     timeout: 3600
-  - name: v08-03-thermal-live-mesh
-    job: shard-v08-03-thermal-live-mesh
+  - name: v08-03-thermal-live-closeout
+    job: shard-v08-03-thermal-live-closeout
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_thermal_rating_closeout_heavy.py
+    timeout: 7800
+  - name: v08-03-thermal-live-independent
+    job: shard-v08-03-thermal-live-independent
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_v08_thermal_rating_independent_case_heavy.py
+    timeout: 7800
+  - name: v08-03-thermal-live-engine
+    job: shard-v08-03-thermal-live-engine
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_v08_thermal_rating.py
@@ -573,16 +586,21 @@ shards:
       - tests/prototypes/test_four_port_nozzle_correction_and_validation_v08.py
       - tests/prototypes/test_high_k_tube_side_structural_feasibility_v08.py
     timeout: 3600
-  - name: v08-03-joint-recovered-shell
-    job: shard-v08-03-joint-recovered-shell
+  - name: v08-03-joint-pareto-freeze
+    job: shard-v08-03-joint-pareto-freeze
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_recovered_shell_052_pareto_joint_v08.py
+      - tests/prototypes/test_first_joint_candidate_freeze_v08.py
+    timeout: 5400
+  - name: v08-03-joint-recovered-core
+    job: shard-v08-03-joint-recovered-core
     python: ["3.11", "3.12"]
     files:
       - tests/prototypes/test_recovered_shell_052_full_chain_v08.py
       - tests/prototypes/test_shell_052_thermal_authority_and_margin_v08.py
       - tests/prototypes/test_v08_task037_authority_provenance_v08.py
       - tests/prototypes/test_thermal_hydraulic_joint_cooptimization_v08.py
-      - tests/prototypes/test_recovered_shell_052_pareto_joint_v08.py
-      - tests/prototypes/test_first_joint_candidate_freeze_v08.py
       - tests/prototypes/test_joint_boundary_value_solver.py
     timeout: 3600
   - name: v08-03-provenance-audit-light

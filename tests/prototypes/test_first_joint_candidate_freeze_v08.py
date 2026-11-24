@@ -18,9 +18,12 @@ from prototypes.v08_thermal_rating.first_joint_candidate_identity_v08 import (
 )
 from prototypes.v08_thermal_rating.recovered_shell_052_pareto_joint_v08 import (
     PARETO_METRIC_UNAVAILABLE,
+    Shell052ParetoJointReport,
     run_recovered_shell_052_pareto_joint_optimization,
     select_first_joint_frozen_row,
 )
+
+pytest_plugins = ["tests.prototypes.conftest_v08_joint_pareto"]
 
 
 def test_pareto_reads_user_target_duty_not_hardcoded() -> None:
@@ -40,12 +43,10 @@ def test_pareto_reads_user_target_duty_not_hardcoded() -> None:
         assert Decimal(row.q_deficit_w) == expected
 
 
-def test_pareto_front_excludes_incomplete_rows() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_recovered_shell_052_pareto_joint_optimization(
-        normalized, handoff, provider=provider
-    )
+def test_pareto_front_excludes_incomplete_rows(
+    pareto_joint_report_330: Shell052ParetoJointReport,
+) -> None:
+    report = pareto_joint_report_330
     for row in report.pareto_front:
         assert row.q_deficit_w != PARETO_METRIC_UNAVAILABLE
         assert row.tube_dp_excess_pa != PARETO_METRIC_UNAVAILABLE
@@ -70,20 +71,15 @@ def test_first_joint_freeze_replay_identity_and_spec() -> None:
     mid = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "mid_band")
     low = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "low_loss_sensitivity")
     high = next(s for s in freeze.hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
-    # First-joint artifact keeps autonomous nozzle sizing; after outlet-state COOLPROP_TP
-    # hydraulics, low may pass while mid/high remain sensitivity-dependent (not design C).
     assert low.hydraulic_check == "PASS"
     assert mid.hydraulic_check in ("PASS", "BLOCKED")
     assert high.hydraulic_check != "PASS"
 
 
-def test_select_first_joint_frozen_row_matches_geometry() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_recovered_shell_052_pareto_joint_optimization(
-        normalized, handoff, provider=provider
-    )
-    row = select_first_joint_frozen_row(report)
+def test_select_first_joint_frozen_row_matches_geometry(
+    pareto_joint_report_330: Shell052ParetoJointReport,
+) -> None:
+    row = select_first_joint_frozen_row(pareto_joint_report_330)
     assert row is not None
     assert row.geometry_v2 == FROZEN_FIRST_JOINT_GEOMETRY_V2
     assert row.mid_joint_pass is True
