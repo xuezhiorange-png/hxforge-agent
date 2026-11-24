@@ -31,8 +31,7 @@ def test_330kw_primary_fixture_identity_distinct_from_250kw() -> None:
     assert row_330["normalized_input_hash"] != row_250["normalized_input_hash"]
 
 
-@pytest.mark.timeout(1800)
-def test_330kw_outer_search_direction_and_n1_closeout(
+def test_330kw_outer_search_direction_on_isolated_n1(
     fixture_330_engine_context: Fixture330EngineContext,
 ) -> None:
     """Corrected outer search must UPDATE_H_HIGH on VALID, not inflate h_low."""
@@ -43,6 +42,15 @@ def test_330kw_outer_search_direction_and_n1_closeout(
     assert "UPDATE_H_HIGH" in decisions or "UPDATE_H_HIGH_BINARY64_STEP" in decisions
     assert "INITIAL_HIGH_ENDPOINT" in decisions
     assert not any(d == "UPDATE_H_LOW_VALID" for d in decisions)
+
+
+@pytest.mark.timeout(1800)
+def test_330kw_closeout_one_candidate_energy_and_evidence(
+    fixture_330_engine_context: Fixture330EngineContext,
+) -> None:
+    """Live closeout path: physical N1 closure, energy balance, and evidence chain."""
+    ctx = fixture_330_engine_context
+    assert ctx.normalized.engineering_case_id == CASE_330KW_ID
     closeout = closeout_one_candidate(ctx.bindings, ctx.provider, run_production=False)
     phys = closeout.physical
     assert phys.energy_balance_pass is True

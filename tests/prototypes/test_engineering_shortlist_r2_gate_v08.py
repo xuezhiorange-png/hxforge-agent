@@ -2,35 +2,34 @@
 
 from __future__ import annotations
 
-from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindings
-from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
 from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
-    run_engineering_shortlist_robustness,
+    EngineeringShortlistRobustnessReport,
 )
 
+pytest_plugins = ["tests.prototypes.conftest_v08_engineering_shortlist"]
 
-def test_no_engineering_recommended_and_no_robust_proven() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+
+def test_no_engineering_recommended_and_no_robust_proven(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     assert report.engineering_recommended is None
     assert report.robust_candidate_proven is False
     assert "NO_ROBUST_CANDIDATE_PROVEN" in report.final_engineering_decision
 
 
-def test_regime_priority_excludes_241_blocked_layouts() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+def test_regime_priority_excludes_241_blocked_layouts(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     assert report.regime_robustness_priority is not None
     assert report.regime_robustness_priority.shortlist_key.startswith("T235")
 
 
-def test_layout_engineering_status_axes() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+def test_layout_engineering_status_axes(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     eng = report.layout_engineering_status_by_key
     assert eng["T235_L5.5"] == "OPERATING_RANGE_THERMAL_FAIL"
     assert eng["T235_L6.0"] == "HYDRAULIC_SENSITIVITY_NOT_VERIFIED"

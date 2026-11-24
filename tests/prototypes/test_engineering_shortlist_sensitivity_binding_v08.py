@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
-from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindings
-from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
 from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
+    EngineeringShortlistRobustnessReport,
     artifact_dict,
-    run_engineering_shortlist_robustness,
 )
+
+pytest_plugins = ["tests.prototypes.conftest_v08_engineering_shortlist"]
 
 
 def _scenario(layouts: tuple, key: str, scenario: str):
@@ -18,10 +18,10 @@ def _scenario(layouts: tuple, key: str, scenario: str):
     return next(s for s in row.sensitivity if s.scenario_key == scenario)
 
 
-def test_fixed_layout_tube_flow_re_monotonicity() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+def test_fixed_layout_tube_flow_re_monotonicity(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     assert report.replay_binding_defect_confirmed is True
     assert report.canonical_shortlist_size == 4
     assert report.distinct_audited_layout_hash_count == 10
@@ -40,10 +40,10 @@ def test_fixed_layout_tube_flow_re_monotonicity() -> None:
     assert audit.task021_layout_hash_expected == audit.task021_layout_hash_observed
 
 
-def test_task027_physical_block_on_241_minus_flow() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+def test_task027_physical_block_on_241_minus_flow(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     m3 = _scenario(report.layouts, "T241_L6.0", "tube_mdot_minus_3pct")
     assert m3.robustness_evidence_status == "PHYSICAL_MODEL_APPLICABILITY_BLOCKED"
     assert m3.task027_raw_blocker_code == "BL_T027_UNSUPPORTED_REYNOLDS_REGIME"
@@ -51,24 +51,21 @@ def test_task027_physical_block_on_241_minus_flow() -> None:
     assert m3.high_k_dp_computed is False
 
 
-def test_r2_artifact_supersedes_r1_without_removing_r1() -> None:
-    from pathlib import Path
-
+def test_r2_artifact_supersedes_r1_without_removing_r1(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
     r1 = Path("docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r1.json")
     assert r1.is_file(), "historical r1 evidence must remain on disk"
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
-    payload = artifact_dict(report)
+    payload = artifact_dict(engineering_shortlist_report_330)
     assert payload["schema"] == "hxforge.engineering-shortlist-robustness.v3"
-    r1 = "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json"
-    assert payload["supersedes"] == r1
+    r2 = "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json"
+    assert payload["supersedes"] == r2
 
 
-def test_nonbaseline_high_k_not_fabricated() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+def test_nonbaseline_high_k_not_fabricated(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     nonbaseline = [
         s for row in report.layouts for s in row.sensitivity if s.scenario_key != "baseline"
     ]

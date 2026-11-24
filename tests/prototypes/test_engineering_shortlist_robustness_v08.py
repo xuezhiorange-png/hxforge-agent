@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_thermal_rating.axial_rating_engine_v1 import load_case_bindings
-from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_330
 from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
-    run_engineering_shortlist_robustness,
+    EngineeringShortlistRobustnessReport,
 )
 
+pytest_plugins = ["tests.prototypes.conftest_v08_engineering_shortlist"]
 
-def test_engineering_shortlist_four_physical_layouts() -> None:
-    provider = CoolPropProvider()
-    normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
-    report = run_engineering_shortlist_robustness(normalized, handoff, provider=provider)
+
+def test_engineering_shortlist_four_physical_layouts(
+    engineering_shortlist_report_330: EngineeringShortlistRobustnessReport,
+) -> None:
+    report = engineering_shortlist_report_330
     assert report.frozen_candidate_c_unchanged is True
     assert report.canonical_shortlist_size == 4
     assert len(report.layouts) == 4
