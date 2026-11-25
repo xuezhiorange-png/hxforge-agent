@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """V08-03 LAYERED_ENGINEERING_ACCEPTANCE_IMPLEMENTATION closeout."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import json
@@ -83,7 +85,7 @@ def main() -> int:
     geometries: set[str] = set()
     experimental_success = 0
 
-    for idx, cid in enumerate(CANDIDATES):
+    for _idx, cid in enumerate(CANDIDATES):
         bindings = resolve_candidate_bindings_by_id(
             cid, normalized, handoff, provider, max_valid=32
         )
@@ -115,8 +117,8 @@ def main() -> int:
         frozen330, tp_ph_query_status=frozen330.raw.get("tp_ph_query_status", "PASS")
     )
 
-    last = candidate_rows[-1] if candidate_rows else {}
-    v_last = candidate_rows[0] if candidate_rows else {}
+    candidate_rows[-1] if candidate_rows else {}
+    candidate_rows[0] if candidate_rows else {}
 
     payload: dict[str, Any] = {
         "TASK_ID": "V08-03",

@@ -8,14 +8,22 @@ import json
 from dataclasses import asdict, dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v07_general_rating_sizing_mvp.live_thermal_state_hydraulic_postpass import (
+    Task168CandidateBundle,
+    run_live_thermal_state_hydraulic_postpass_from_ctx,
+)
 from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
 from prototypes.v08_general_user_case.physical_feasibility import THERMODYNAMIC_DUTY_TOLERANCE
+from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
 from prototypes.v08_general_user_case.user_design_case import NormalizedUserDesignCase
+from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
+    geometry_identity_v2_hash,
+    geometry_projection_hash_v1,
+)
 from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 import (
     run_autonomous_nozzle_full_path,
 )
@@ -35,22 +43,18 @@ from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
 )
 from prototypes.v08_thermal_rating.fixed_layout_variable_mdot_hydraulic_replay_v1 import (
     AUTHORITY_ID as REPLAY_AUTHORITY,
+)
+from prototypes.v08_thermal_rating.fixed_layout_variable_mdot_hydraulic_replay_v1 import (
     LossTierRow,
     MdotScenarioReplayRow,
     live_postpass_to_r27_bridge,
     run_replay_matrix_v1,
 )
-from prototypes.v07_general_rating_sizing_mvp.live_thermal_state_hydraulic_postpass import (
-    Task168CandidateBundle,
-    run_live_thermal_state_hydraulic_postpass_from_ctx,
-)
 from prototypes.v08_thermal_rating.thermal_prescreen_v08 import run_thermal_prescreen
-from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import build_engineering_case_v2_from_v08
-from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evaluate_binding_task037
-from prototypes.v08_geometry_candidate_generation.geometry_identity_v2 import (
-    geometry_identity_v2_hash,
-    geometry_projection_hash_v1,
+from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import (
+    build_engineering_case_v2_from_v08,
 )
+from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evaluate_binding_task037
 
 TASK_ID = "V08_AUTONOMOUS_ENGINEERING_SELECTION_MVP"
 ENGINEERING_DESIGN_STATUS = "EXPERIMENTAL_PRESCREEN_ONLY_NOT_PRODUCTION_THERMAL_ACCEPTANCE"

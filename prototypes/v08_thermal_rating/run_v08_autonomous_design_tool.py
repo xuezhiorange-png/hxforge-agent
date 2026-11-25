@@ -1,5 +1,7 @@
 """CLI for V08 autonomous design tool (experimental user-input delivery)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import argparse

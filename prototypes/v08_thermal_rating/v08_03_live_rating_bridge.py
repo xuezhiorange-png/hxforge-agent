@@ -20,11 +20,11 @@ from prototypes.v08_thermal_rating.pipeline import (
 from prototypes.v08_thermal_rating.v08_04_hydraulic_feasibility_gate import (
     evaluate_v08_04_candidate_hydraulics,
 )
-from prototypes.v08_thermal_rating.v08_autonomous_design_tool import _collect_structural_entries
 from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report import (
     V08_05EngineeringReport,
     run_v08_05_qualified_selection,
 )
+from prototypes.v08_thermal_rating.v08_autonomous_design_tool import _collect_structural_entries
 
 TASK_ID = "V08-03"
 EXECUTION_STAGE = "LIVE_RATING_ACCEPTANCE_RECOVERY"
@@ -143,42 +143,41 @@ def run_v08_05_with_live_thermal_rating(
     live_result: V08ThermalRatingResult | None = None
     attempts: list[LiveRatingAttemptRecord] = []
     executed = False
-    if mirror := report.design_tool_mirror:
-        if mirror.ingestion.ok and mirror.ingestion.normalized and mirror.ingestion.handoff:
-            executed = True
-            live_result = run_v08_thermal_rating(
-                mirror.ingestion.normalized,
-                mirror.ingestion.handoff,
-                provider=active,
-                max_valid_geometry=max_live_rating_geometries,
-                min_accepted_distinct_geometries=min_accepted_distinct_geometries,
-                skip_candidate_ids=skip,
+    if (mirror := report.design_tool_mirror) and mirror.ingestion.ok and mirror.ingestion.normalized and mirror.ingestion.handoff:
+        executed = True
+        live_result = run_v08_thermal_rating(
+            mirror.ingestion.normalized,
+            mirror.ingestion.handoff,
+            provider=active,
+            max_valid_geometry=max_live_rating_geometries,
+            min_accepted_distinct_geometries=min_accepted_distinct_geometries,
+            skip_candidate_ids=skip,
+        )
+        rated_by_id = {r.candidate_id: r for r in live_result.candidates_rated}
+        for row in live_result.candidates_rated:
+            attempts.append(
+                LiveRatingAttemptRecord(
+                    candidate_id=row.candidate_id,
+                    attempt_source="EXECUTED",
+                    rating_row=row,
+                    evidence_note=None,
+                )
             )
-            rated_by_id = {r.candidate_id: r for r in live_result.candidates_rated}
-            for row in live_result.candidates_rated:
-                attempts.append(
-                    LiveRatingAttemptRecord(
-                        candidate_id=row.candidate_id,
-                        attempt_source="EXECUTED",
-                        rating_row=row,
-                        evidence_note=None,
-                    )
+        for cid in skip:
+            if cid in rated_by_id:
+                continue
+            meta = KNOWN_RATING_BLOCKER_EVIDENCE.get(cid, {})
+            attempts.append(
+                LiveRatingAttemptRecord(
+                    candidate_id=cid,
+                    attempt_source="EVIDENCE_ONLY_SKIP",
+                    rating_row=None,
+                    evidence_note=(
+                        f"{meta.get('rating_blocked_code', 'KNOWN_BLOCKER')} @ "
+                        f"{meta.get('mesh_terminal', '?')}; {meta.get('evidence', '')}"
+                    ).strip("; "),
                 )
-            for cid in skip:
-                if cid in rated_by_id:
-                    continue
-                meta = KNOWN_RATING_BLOCKER_EVIDENCE.get(cid, {})
-                attempts.append(
-                    LiveRatingAttemptRecord(
-                        candidate_id=cid,
-                        attempt_source="EVIDENCE_ONLY_SKIP",
-                        rating_row=None,
-                        evidence_note=(
-                            f"{meta.get('rating_blocked_code', 'KNOWN_BLOCKER')} @ "
-                            f"{meta.get('mesh_terminal', '?')}; {meta.get('evidence', '')}"
-                        ).strip("; "),
-                    )
-                )
+            )
 
     live_success = 0
     e2e_success = 0

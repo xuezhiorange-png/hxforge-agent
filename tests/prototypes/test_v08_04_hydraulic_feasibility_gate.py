@@ -1,5 +1,7 @@
 """V08-04: full-path budgets, nozzle co-selection, K scenarios, hard gates (targeted)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from decimal import Decimal

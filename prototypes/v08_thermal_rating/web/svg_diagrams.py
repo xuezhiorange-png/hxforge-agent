@@ -1,5 +1,7 @@
 """SVG diagrams derived from computed design_specification (no fixed clipart)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import math

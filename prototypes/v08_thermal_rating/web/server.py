@@ -1,5 +1,7 @@
 """V08 experimental user-trial web server (local only)."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import json
@@ -14,20 +16,20 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
+from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
+from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
+from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330
 from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report import (
     merged_web_api_payload,
     render_v08_05_markdown,
     run_v08_05_qualified_selection,
 )
+from prototypes.v08_thermal_rating.v08_autonomous_design_tool import (
+    render_design_report_markdown,
+)
 from prototypes.v08_thermal_rating.v08_kernel_engineering_report_v1 import (
     kernel_web_payload,
     run_kernel_case_engineering_matrix,
-)
-from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
-from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330
-from prototypes.v08_thermal_rating.v08_autonomous_design_tool import (
-    render_design_report_markdown,
 )
 from prototypes.v08_thermal_rating.web.case_builder import form_to_case_json, preset_fields
 from prototypes.v08_thermal_rating.web.svg_diagrams import diagrams_for_report

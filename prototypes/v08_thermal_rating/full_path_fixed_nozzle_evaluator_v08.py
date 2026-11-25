@@ -353,10 +353,7 @@ def evaluate_fixed_nozzle_all_scenarios(
         elif fp and fp.get("status") == "COMPUTED":
             tube_st = fp.get("FULL_PATH_TUBE_CONSTRAINT_STATUS")
             shell_st = fp.get("FULL_PATH_SHELL_CONSTRAINT_STATUS")
-            if tube_st == "SATISFIED" and shell_st == "SATISFIED":
-                check = "BLOCKED"
-            else:
-                check = "OVER_DP"
+            check = "BLOCKED" if tube_st == "SATISFIED" and shell_st == "SATISFIED" else "OVER_DP"
         else:
             check = "UNRESOLVED"
         blockers = tuple(str(b) for b in (fp or {}).get("blockers") or ())

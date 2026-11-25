@@ -6,16 +6,13 @@ from __future__ import annotations
 
 import json
 import time
-from copy import deepcopy
 from dataclasses import asdict, dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
 from hexagent.canonical_json import canonical_sha256
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330
 from prototypes.v08_thermal_rating.pipeline import run_v08_thermal_rating
 from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report import (

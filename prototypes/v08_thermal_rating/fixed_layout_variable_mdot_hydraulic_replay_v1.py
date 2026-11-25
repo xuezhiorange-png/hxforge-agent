@@ -42,7 +42,9 @@ from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import (
     _resolve_structural,
 )
 from prototypes.v08_thermal_rating.thermal_prescreen_v08 import run_thermal_prescreen
-from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import build_engineering_case_v2_from_v08
+from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import (
+    build_engineering_case_v2_from_v08,
+)
 from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evaluate_binding_task037
 
 AUTHORITY_ID = "FIXED_LAYOUT_VARIABLE_MDOT_HYDRAULIC_REPLAY_V1"
@@ -110,11 +112,10 @@ def live_postpass_to_r27_bridge(
     exp = live.get("experimental_transitional_tube_hydraulic") or {}
     if friction is None and exp.get("tube_friction_dp_pa"):
         friction = exp["tube_friction_dp_pa"]
-    local = "0"
     if tube_total is not None and friction is not None:
-        local = str(Decimal(str(tube_total)) - Decimal(str(friction)))
+        str(Decimal(str(tube_total)) - Decimal(str(friction)))
     elif exp.get("tube_local_loss_dp_pa"):
-        local = str(exp["tube_local_loss_dp_pa"])
+        str(exp["tube_local_loss_dp_pa"])
     shell_parts = live.get("shell_dp_components_pa") or {}
     tube_lim = normalized.max_tube_side_pressure_drop_pa
     shell_lim = normalized.max_shell_side_pressure_drop_pa

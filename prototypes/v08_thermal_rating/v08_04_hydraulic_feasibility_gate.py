@@ -29,22 +29,24 @@ from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
     load_case_bindings,
     resolve_candidate_bindings_by_id,
 )
+from prototypes.v08_thermal_rating.candidate_c_identity_v08 import (
+    CANDIDATE_C_SHELL_NOZZLE_ID_M,
+    CANDIDATE_C_TUBE_NOZZLE_ID_M,
+)
 from prototypes.v08_thermal_rating.case_identity_v08 import (
     CASE_330KW_ID,
     FIXTURE_250,
     FIXTURE_330,
     build_case_identity_bundle,
 )
-from prototypes.v08_thermal_rating.candidate_c_identity_v08 import (
-    CANDIDATE_C_SHELL_NOZZLE_ID_M,
-    CANDIDATE_C_TUBE_NOZZLE_ID_M,
-)
+from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import _SHORTLIST
 from prototypes.v08_thermal_rating.fixed_layout_variable_mdot_hydraulic_replay_v1 import (
     AUTHORITY_ID as VARIABLE_MDOT_REPLAY_AUTHORITY,
+)
+from prototypes.v08_thermal_rating.fixed_layout_variable_mdot_hydraulic_replay_v1 import (
     evaluate_mdot_scenario_v1,
     run_replay_matrix_v1,
 )
-from prototypes.v08_thermal_rating.engineering_shortlist_robustness_v08 import _SHORTLIST
 from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import (
     task174_hydraulic_postpass_from_bindings,
 )
@@ -592,7 +594,7 @@ def run_v08_04_gate_completion_bundle(
     )
     mdot_full = run_replay_matrix_v1(provider=provider, fixture_path=FIXTURE_330)
     shortlist = run_shortlist_layout_hydraulic_matrix(provider=provider)
-    computed_rows = [r for r in mdot_full["rows"] if r.get("outcome") == "COMPUTED"]
+    [r for r in mdot_full["rows"] if r.get("outcome") == "COMPUTED"]
     over_dp_auto = [
         s
         for s in r0_auto.scenarios

@@ -10,34 +10,33 @@ from __future__ import annotations
 
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Iterator, Literal
+from typing import Any, Literal
 
+import hexagent.exchangers.shell_tube.task173_integrated_rating.service as _svc
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import (
     MAX_OUTER_BISECTION_ITERATIONS,
-    TERMINAL_TOLERANCE_K,
 )
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     FluidIdentifier,
     ReferenceStatePolicy,
-    _CellSearchStats,
-    _MeshRun,
-    _OuterTrial,
-    _Stage3Failure,
     _apply_valid_outer_trial_update,
     _assert_outer_classification_order,
     _binary64_enthalpy_step_toward,
+    _CellSearchStats,
     _checked_thermo,
     _d,
+    _MeshRun,
     _outer_shooting_residual_plateau_evidence,
     _outer_trial,
+    _OuterTrial,
+    _Stage3Failure,
     effective_outer_shooting_high_enthalpy_j_kg,
     effective_shell_cold_inlet_enthalpy_j_kg,
-    effective_shell_inlet_temperature_k,
     effective_shell_property_evaluation_pressure_pa,
 )
 from hexagent.properties.base import PropertyProvider
@@ -51,7 +50,6 @@ from prototypes.v08_thermal_rating.outer_shooting_isolated_v1 import (
     _trace_step,
     solve_outer_boundary_from_trial_isolated,
 )
-import hexagent.exchangers.shell_tube.task173_integrated_rating.service as _svc
 
 _PROD_STATE_FROM_ENTHALPY = _svc._state_from_enthalpy
 _PROD_VALID_TRAJECTORY = _svc._valid_trajectory

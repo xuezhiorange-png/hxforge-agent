@@ -5,12 +5,11 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from collections.abc import Callable
 from typing import Any, Literal
 
-from hexagent.exchangers.shell_tube.task173_integrated_rating.models import TERMINAL_TOLERANCE_K
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _terminal_tolerance_pass,
 )

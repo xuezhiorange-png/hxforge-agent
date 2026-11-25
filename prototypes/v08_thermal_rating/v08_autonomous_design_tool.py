@@ -4,11 +4,9 @@
 
 from __future__ import annotations
 
-import json
-import textwrap
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -44,8 +42,8 @@ from prototypes.v08_thermal_rating.autonomous_nozzle_full_path_hydraulics_v08 im
     run_autonomous_nozzle_full_path,
 )
 from prototypes.v08_thermal_rating.axial_rating_engine_v1 import (
-    enumerate_structural_bundles,
     build_candidate_rating_bindings,
+    enumerate_structural_bundles,
 )
 from prototypes.v08_thermal_rating.candidate_c_identity_v08 import (
     CANDIDATE_C_SHELL_NOZZLE_ID_M,
@@ -69,7 +67,9 @@ from prototypes.v08_thermal_rating.v08_autonomous_engineering_selection_mvp impo
     ScenarioJointVerdict,
     verdict_from_row,
 )
-from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import build_engineering_case_v2_from_v08
+from prototypes.v08_thermal_rating.v08_r27_hydraulic_bridge import (
+    build_engineering_case_v2_from_v08,
+)
 from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evaluate_binding_task037
 
 TASK_ID = "V08_AUTONOMOUS_DESIGN_USER_INPUT_DELIVERY"

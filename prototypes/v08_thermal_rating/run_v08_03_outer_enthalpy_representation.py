@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """V08-03 TASK173_OUTER_ENTHALPY_NUMERICAL_REPRESENTATION — before/after isolated run."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import json
 import subprocess
 import sys
 import time
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,9 @@ _REPO = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(_REPO), str(_REPO / "src")]
 
 from hexagent.canonical_json import canonical_sha256
+from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
+    candidate_rating_request_hash,
+)
 from hexagent.exchangers.shell_tube.task173_integrated_rating.models import TERMINAL_TOLERANCE_K
 from hexagent.exchangers.shell_tube.task173_integrated_rating.service import (
     _terminal_tolerance_pass,
@@ -34,9 +38,6 @@ from prototypes.v08_thermal_rating.outer_enthalpy_representation_v08 import (
     conservative_enthalpy_authority_pass,
     property_state_consistency_pass,
     solve_isolated_outer_boundary_experimental,
-)
-from hexagent.exchangers.shell_tube.task173_integrated_rating.candidate_models import (
-    candidate_rating_request_hash,
 )
 
 CANDIDATE_ID = "e1baa795-9cf5-5718-8fa8-0688d2102c5c"
@@ -86,7 +87,7 @@ def _mesh_summary(
     energy = str(obs.energy_balance_residual_w) if obs else None
     duty = str(obs.total_duty_w) if obs else None
     cp = float(run.faces_shell[-1].property_snapshot.cp_j_kg_k) if run else 0.0
-    cold_h = str(run.shooting_enthalpy) if run else None
+    str(run.shooting_enthalpy) if run else None
     allowed_h = None
     if run is not None and obs is not None:
         import math

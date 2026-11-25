@@ -1,5 +1,7 @@
 """V08_AUTONOMOUS_DESIGN_USER_INPUT_DELIVERY targeted tests."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import json

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """V08-03 LIVE_RATING_ACCEPTANCE_RECOVERY — 250 kW terminal closeout (local, no publish)."""
 
+# ruff: noqa: E402
+
 from __future__ import annotations
 
 import json

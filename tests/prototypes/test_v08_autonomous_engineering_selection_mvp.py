@@ -1,8 +1,8 @@
 """Tests for V08_AUTONOMOUS_ENGINEERING_SELECTION_MVP."""
 
-from __future__ import annotations
+# ruff: noqa: E501
 
-from pathlib import Path
+from __future__ import annotations
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330

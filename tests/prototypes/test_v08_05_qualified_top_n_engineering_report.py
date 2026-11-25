@@ -1,5 +1,7 @@
 """V08-05: qualified Top-N, separated formal/experimental, deterministic report hash."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 from pathlib import Path
