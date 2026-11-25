@@ -32,7 +32,7 @@ DpAuthority = Literal[
     "FULL_PATH_NOT_COMPUTED",
 ]
 
-CheckStatus = Literal["PASS", "BLOCKED", "UNRESOLVED", "SCENARIO_DEPENDENT"]
+CheckStatus = Literal["PASS", "OVER_DP", "BLOCKED", "UNRESOLVED", "SCENARIO_DEPENDENT"]
 
 _PI = Decimal("3.1415926535897932384626433832795")
 
@@ -351,7 +351,12 @@ def evaluate_fixed_nozzle_all_scenarios(
         if feasible:
             check: CheckStatus = "PASS"
         elif fp and fp.get("status") == "COMPUTED":
-            check = "BLOCKED"
+            tube_st = fp.get("FULL_PATH_TUBE_CONSTRAINT_STATUS")
+            shell_st = fp.get("FULL_PATH_SHELL_CONSTRAINT_STATUS")
+            if tube_st == "SATISFIED" and shell_st == "SATISFIED":
+                check = "BLOCKED"
+            else:
+                check = "OVER_DP"
         else:
             check = "UNRESOLVED"
         blockers = tuple(str(b) for b in (fp or {}).get("blockers") or ())

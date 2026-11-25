@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HXForge · 壳管换热器自动设计（实验）</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>HXForge 壳管换热器自动设计</h1>
+      <span class="badge">EXPERIMENTAL PRESCREEN · 非生产验收</span>
+    </header>
+    <div class="layout">
+      <aside class="panel panel-left">
+        <h2>设计输入</h2>
+        <div class="preset-row">
+          <button type="button" data-preset="330kw">330 kW</button>
+          <button type="button" data-preset="250kw">250 kW</button>
+          <button type="button" data-preset="constraint_change">约束变化</button>
+          <button type="button" data-preset="infeasible">无解</button>
+        </div>
+        <form id="design-form" onsubmit="return false;">
+          <fieldset>
+            <legend>工况</legend>
+            <label>案例 ID<input name="engineering_case_id" value="HXFORGE_330KW_STRICT_DP" /></label>
+            <div class="grid-2">
+              <label>目标换热量 (kW)<input name="target_duty_kw" value="330" required /></label>
+              <label>备注<input name="notes" value="" /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>管侧</legend>
+            <div class="grid-2">
+              <label>流体
+                <select name="tube_fluid">
+                  <option value="PURE_ORDINARY_WATER">纯水（单相）</option>
+                </select>
+              </label>
+              <label>入口温度 (K)<input name="tube_inlet_temperature_k" value="310" /></label>
+              <label>工作压力 (Pa)<input name="tube_inlet_pressure_pa" value="101325" /></label>
+              <label>质量流量 (kg/s)<input name="tube_mass_flow_kg_s" value="12" /></label>
+              <label>允许压降 (Pa)<input name="max_tube_side_pressure_drop_pa" value="1150" /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>壳侧</legend>
+            <div class="grid-2">
+              <label>流体
+                <select name="shell_fluid">
+                  <option value="PURE_ORDINARY_WATER">纯水（单相）</option>
+                </select>
+              </label>
+              <label>入口温度 (K)<input name="shell_inlet_temperature_k" value="295" /></label>
+              <label>工作压力 (Pa)<input name="shell_inlet_pressure_pa" value="101325" /></label>
+              <label>质量流量 (kg/s)<input name="shell_mass_flow_kg_s" value="20" /></label>
+              <label>允许压降 (Pa)<input name="max_shell_side_pressure_drop_pa" value="1180" /></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>结构限制 / 接管</legend>
+            <div class="grid-2">
+              <label>最大壳径 (m)<input name="max_shell_inside_diameter_m" value="1.2" /></label>
+              <label>最大管长 (m)<input name="max_tube_length_m" value="6.0" /></label>
+            </div>
+            <p class="disclaimer">接管流速判定沿用内核 1–3 m/s（R27 自动接管规则）；相变/非支持流体将在校验阶段阻断。</p>
+          </fieldset>
+          <div class="actions">
+            <button type="button" class="primary" id="btn-run">运行自动设计</button>
+            <button type="button" class="secondary" id="btn-export-json">导出 JSON</button>
+            <button type="button" class="secondary" id="btn-export-md">导出报告 (MD)</button>
+          </div>
+        </form>
+        <div id="progress-log" class="progress-log" aria-live="polite"></div>
+      </aside>
+      <main class="panel panel-right">
+        <h2>计算结果</h2>
+        <div id="results-root">
+          <p class="disclaimer">填写左侧参数并点击「运行自动设计」，或加载预设工况。</p>
+        </div>
+      </main>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -49,6 +49,10 @@ def build_engineering_case_v2_from_v08(
 ) -> GeneralEngineeringCaseV2:
     space = load_v08_discrete_space(DEFAULT_V08_DISCRETE_SPACE_PATH)
     shells = space.shell_inside_diameters_m
+    tube_flow = normalized.tube_side.mass_flow_kg_s
+    shell_flow = normalized.shell_side.mass_flow_kg_s
+    variable_tube = tube_flow != Decimal("12.000000")
+    variable_shell = shell_flow != Decimal("20.000000")
     return GeneralEngineeringCaseV2(
         engineering_case_id=normalized.engineering_case_id,
         exchanger_type="SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
@@ -81,6 +85,8 @@ def build_engineering_case_v2_from_v08(
         solver_budget=SolverBudgetSpec(),
         experimental_transitional_tube_hydraulic=True,
         experimental_live_thermal_hydraulic_postpass=True,
+        experimental_live_variable_tube_mass_flow=variable_tube,
+        experimental_live_variable_shell_mass_flow=variable_shell,
         experimental_variable_water_temperature=True,
         experimental_engineering_tube_local_loss=False,
         notes="V08-03 bridge for autonomous nozzle / full-path hydraulics (R27C reuse).",

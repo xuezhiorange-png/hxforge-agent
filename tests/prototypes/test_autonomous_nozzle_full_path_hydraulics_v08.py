@@ -43,7 +43,9 @@ def test_frozen_candidate_four_nozzles_from_real_mass_flow() -> None:
     assert nozzle_report.status == "VERIFIED"
     assert len(report.scenarios) == 3
     mid = next(s for s in report.scenarios if s.scenario_key == "mid_band")
-    assert mid.hydraulic_check == "BLOCKED"
+    assert mid.hydraulic_check == "OVER_DP"
+    assert report.nozzle_bisect.search_infeasible_notes
+    assert not any("SHELL_NOZZLE_BISECT" in b for b in report.remaining_blockers)
     assert report.task174_partial.tube_dp_pa
     assert Decimal(report.task174_partial.tube_dp_pa) <= Decimal("1150")
     assert report.nozzle_same_geometry_all_scenarios is True

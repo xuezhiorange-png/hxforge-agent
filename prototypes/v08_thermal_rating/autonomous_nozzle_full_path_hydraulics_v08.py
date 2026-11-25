@@ -105,6 +105,15 @@ class Task174PartialHydraulics:
 
 
 @dataclass(frozen=True)
+class NozzleBisectOutcome:
+    tube_select_status: str
+    shell_select_status: str
+    tube_inside_diameter_m: str
+    shell_inside_diameter_m: str
+    search_infeasible_notes: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class AutonomousNozzleFullPathReport:
     case_id: str
     candidate_id: str
@@ -119,6 +128,7 @@ class AutonomousNozzleFullPathReport:
     scenario_robustness: CheckStatus
     scenarios: tuple[FullPathScenarioResult, ...]
     task174_partial: Task174PartialHydraulics
+    nozzle_bisect: NozzleBisectOutcome
     remaining_blockers: tuple[str, ...]
     disclosure: tuple[str, ...]
 
@@ -272,10 +282,15 @@ def run_autonomous_nozzle_full_path(
     tube_outlet_temperature_k: Decimal | None = None,
     shell_outlet_temperature_k: Decimal | None = None,
     provider: CoolPropProvider | None = None,
+    hydraulic_postpass_override: dict[str, Any] | None = None,
 ) -> AutonomousNozzleFullPathReport:
     case = build_engineering_case_v2_from_v08(bindings.normalized)
     record = candidate_selection_record_from_bindings(bindings)
-    postpass = task174_hydraulic_postpass_from_bindings(bindings)
+    postpass = (
+        hydraulic_postpass_override
+        if hydraulic_postpass_override is not None
+        else task174_hydraulic_postpass_from_bindings(bindings)
+    )
     t174 = bindings.rating_request.task174_result
     blockers: list[str] = []
     disclosures_list = [
@@ -312,10 +327,25 @@ def run_autonomous_nozzle_full_path(
         fixed_tube_inside_diameter_m=fixed_tube_inside_diameter_m,
         fixed_shell_inside_diameter_m=fixed_shell_inside_diameter_m,
     )
-    ok_status = frozenset({"FEASIBLE_WITHIN_DESIGN_BOUNDS", "FIXED_OVERRIDE"})
-    if fixed.shell_select_status not in ok_status:
+    _computable_bisect = frozenset(
+        {
+            "FEASIBLE_WITHIN_DESIGN_BOUNDS",
+            "FIXED_OVERRIDE",
+            "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS",
+        }
+    )
+    search_notes: list[str] = []
+    if fixed.shell_select_status == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS":
+        search_notes.append(
+            "SHELL_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND"
+        )
+    elif fixed.shell_select_status not in _computable_bisect:
         blockers.append(f"SHELL_NOZZLE_BISECT:{fixed.shell_select_status}")
-    if fixed.tube_select_status not in ok_status:
+    if fixed.tube_select_status == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS":
+        search_notes.append(
+            "TUBE_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND"
+        )
+    elif fixed.tube_select_status not in _computable_bisect:
         blockers.append(f"TUBE_NOZZLE_BISECT:{fixed.tube_select_status}")
 
     tube_out_state: tuple[Decimal, Decimal] | None = None
@@ -398,6 +428,13 @@ def run_autonomous_nozzle_full_path(
         shell_bell_total_dp_pa=str(shell_dp),
     )
 
+    bisect_outcome = NozzleBisectOutcome(
+        tube_select_status=fixed.tube_select_status,
+        shell_select_status=fixed.shell_select_status,
+        tube_inside_diameter_m=str(fixed.tube_inside_diameter_m),
+        shell_inside_diameter_m=str(fixed.shell_inside_diameter_m),
+        search_infeasible_notes=tuple(search_notes),
+    )
     return AutonomousNozzleFullPathReport(
         case_id=bindings.engineering_case_id,
         candidate_id=bindings.rating_request.candidate_id,
@@ -412,6 +449,7 @@ def run_autonomous_nozzle_full_path(
         scenario_robustness=scenario_robust,
         scenarios=tuple(scenario_rows),
         task174_partial=task174_partial,
+        nozzle_bisect=bisect_outcome,
         remaining_blockers=tuple(blockers),
         disclosure=disclosures,
     )
@@ -527,6 +565,7 @@ __all__ = [
     "FullPathScenarioResult",
     "ManufacturableHydraulicInventory",
     "MechanicalInstallationAuthority",
+    "NozzleBisectOutcome",
     "NozzlePortDesign",
     "Task174PartialHydraulics",
     "run_autonomous_nozzle_full_path",

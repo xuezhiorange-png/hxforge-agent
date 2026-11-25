@@ -378,6 +378,7 @@ def run_v08_thermal_rating(
     min_accepted_distinct_geometries: int = 2,
     acceptance_task_id: V08ThermalRatingTaskId = "V08_03_LIVE_RATING_ACCEPTANCE_CLOSEOUT",
     provider: PropertyProvider | None = None,
+    skip_candidate_ids: frozenset[str] | None = None,
 ) -> V08ThermalRatingResult:
     """Search structural geometry and require ``min_accepted_distinct_geometries`` successful Task173 ratings."""
     active = provider or CoolPropProvider()
@@ -452,6 +453,8 @@ def run_v08_thermal_rating(
     model_blockers: list[str] = []
 
     for item in enum.valid_structural:
+        if skip_candidate_ids and item.candidate.candidate_id in skip_candidate_ids:
+            continue
         base_row = _rate_one_structural_bundle(
             item,
             space_hash=enum.space_hash,

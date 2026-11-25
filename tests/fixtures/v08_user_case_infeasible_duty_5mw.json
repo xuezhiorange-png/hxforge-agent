@@ -1,0 +1,26 @@
+{
+  "schema_version": "hxforge.general-user-design-case.v1",
+  "engineering_case_id": "HXFORGE_INFEASIBLE_TINY_ENVELOPE_PROBE",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "310",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "12"
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature_k": "295",
+    "inlet_pressure_pa": "101325",
+    "mass_flow_kg_s": "20"
+  },
+  "target_duty_w": "330000",
+  "max_tube_side_pressure_drop_pa": "1150",
+  "max_shell_side_pressure_drop_pa": "1180",
+  "design_envelope": {
+    "max_shell_inside_diameter_m": "0.35",
+    "max_tube_length_m": "2.0",
+    "provenance_note": "Envelope too small for manufacturable Task168 candidates — explicit reject path."
+  },
+  "notes": "V08 autonomous design tool — no feasible candidate handling test."
+}

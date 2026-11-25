@@ -43,6 +43,6 @@ def test_full_path_not_filled_with_side_model_estimate() -> None:
     assert bindings is not None
     report = run_autonomous_nozzle_full_path(bindings)
     mid = next(s for s in report.scenarios if s.scenario_key == "mid_band")
-    assert mid.hydraulic_check == "BLOCKED"
+    assert mid.hydraulic_check == "OVER_DP"
     if mid.shell_full_path_dp_pa is None:
         assert mid.shell_dp_authority == "FULL_PATH_NOT_COMPUTED"
