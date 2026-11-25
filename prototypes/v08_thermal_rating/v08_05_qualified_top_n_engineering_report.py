@@ -134,9 +134,7 @@ def _classify_candidate(
         return "PRESSURE_DROP_EXCEEDED", tuple(reasons), False, False
     if baseline.engineering_joint_pass:
         k_rows = hydraulic_payload.get("k_scenarios") if hydraulic_payload else []
-        all_k_pass = bool(
-            k_rows and all(r.get("hydraulic_check") == "PASS" for r in k_rows)
-        )
+        all_k_pass = bool(k_rows and all(r.get("hydraulic_check") == "PASS" for r in k_rows))
         if all_k_pass:
             return (
                 "ASSUMPTION_CONDITIONAL_FEASIBLE",
@@ -164,7 +162,11 @@ def _ranking_scores(
     min_margin: str | None = None
     if hydraulic_payload:
         high = next(
-            (k for k in hydraulic_payload.get("k_scenarios", []) if k.get("scenario_key") == "high_loss_sensitivity"),
+            (
+                k
+                for k in hydraulic_payload.get("k_scenarios", [])
+                if k.get("scenario_key") == "high_loss_sensitivity"
+            ),
             None,
         )
         if high:
@@ -212,6 +214,7 @@ def _sort_ids(
         margin = Decimal(r.ranking_scores.get("min_high_tier_margin_pa") or "-1e9")
         q = Decimal(r.ranking_scores.get("duty_w") or "-1")
         return (r.baseline.thermal_pass, margin, q)
+
     ordered = sorted(records, key=key_fn, reverse=reverse)
     # Stable tie-break
     stable: list[CandidateQualificationRecord] = []
@@ -228,11 +231,7 @@ def _build_top_n(
 ) -> TopNRankedLists:
     formal: list[str] = []
     if PRODUCTION_RATING_VALIDATED:
-        formal = [
-            c.candidate_id
-            for c in candidates
-            if c.formal_engineering_eligible
-        ][:top_n]
+        formal = [c.candidate_id for c in candidates if c.formal_engineering_eligible][:top_n]
     experimental = [c for c in candidates if c.experimental_prescreen_eligible]
     conditional = [
         c.candidate_id
@@ -249,9 +248,7 @@ def _build_top_n(
         axis_key: _dedupe_preserve_order(_sort_ids(experimental, axis=axis_key)[:top_n])
         for axis_key in axis_keys
     }
-    exp_ids = _dedupe_preserve_order(
-        _sort_ids(experimental, axis="composite_engineering")[:top_n]
-    )
+    exp_ids = _dedupe_preserve_order(_sort_ids(experimental, axis="composite_engineering")[:top_n])
     return TopNRankedLists(
         top_n_requested=top_n,
         formal_engineering=tuple(formal),
@@ -307,7 +304,9 @@ def run_v08_05_qualified_selection(
             case_outcome_detail=_case_outcome(False, tool.ingestion.blockers, 0, 0)[1],
             top_n=_build_top_n((), top_n=top_n),
             candidates=(),
-            normalization_hash=canonical_sha256({"ingestion_blockers": [dict(b) for b in tool.ingestion.blockers]}),
+            normalization_hash=canonical_sha256(
+                {"ingestion_blockers": [dict(b) for b in tool.ingestion.blockers]}
+            ),
             design_tool_result_hash=tool.result_hash,
             report_hash=canonical_sha256({"blocked_ingestion": True}),
             design_tool_mirror=tool,
@@ -454,12 +453,12 @@ def render_v08_05_markdown(report: V08_05EngineeringReport) -> str:
         "",
     ]
     for c in report.candidates:
-        lines.append(
-            f"### `{c.layout_key}` ({c.candidate_id[:8]}…)"
-        )
+        lines.append(f"### `{c.layout_key}` ({c.candidate_id[:8]}…)")
         lines.append(f"- Qualification: **{c.qualification_class}**")
         lines.append(f"- Rejection trace: {', '.join(c.rejection_trace) or 'none'}")
-        lines.append(f"- Scores: duty {c.ranking_scores.get('duty_w')} W, margin {c.ranking_scores.get('min_high_tier_margin_pa')} Pa")
+        lines.append(
+            f"- Scores: duty {c.ranking_scores.get('duty_w')} W, margin {c.ranking_scores.get('min_high_tier_margin_pa')} Pa"
+        )
         if c.design_specification:
             th = c.design_specification.get("thermal_experimental_prescreen") or {}
             lines.append(
@@ -472,7 +471,14 @@ def render_v08_05_markdown(report: V08_05EngineeringReport) -> str:
                 f"nozzle={hg.get('four_nozzle_velocity')}"
             )
         lines.append("")
-    lines.extend(["## Applicability", "", f"- Authority: {report.candidates[0].authority_tier if report.candidates else 'N/A'}", f"- Report hash: `{report.report_hash}`"])
+    lines.extend(
+        [
+            "## Applicability",
+            "",
+            f"- Authority: {report.candidates[0].authority_tier if report.candidates else 'N/A'}",
+            f"- Report hash: `{report.report_hash}`",
+        ]
+    )
     return "\n".join(lines)
 
 

@@ -406,7 +406,10 @@ def solve_outer_boundary_delta_coordinate(
             trial.classification,
         )
         run = _apply_valid_outer_trial_update(
-            h_mid=stepped_abs, trial=trial, seen_low=[_absolute_from_delta(cold, x) for x in seen_low], seen_valid=[_absolute_from_delta(cold, x) for x in seen_valid]
+            h_mid=stepped_abs,
+            trial=trial,
+            seen_low=[_absolute_from_delta(cold, x) for x in seen_low],
+            seen_valid=[_absolute_from_delta(cold, x) for x in seen_valid],
         )
         best = run
         seen_valid.append(d_mid)
@@ -438,7 +441,9 @@ def solve_outer_boundary_delta_coordinate(
                 float_h_high_hex=float(_absolute_from_delta(cold, d_hi)).hex(),
             )
         obs = run.observables
-        if obs.terminal_boundary_residual_k > Decimal(0) or obs.terminal_boundary_residual_j_kg > Decimal(0):
+        if obs.terminal_boundary_residual_k > Decimal(
+            0
+        ) or obs.terminal_boundary_residual_j_kg > Decimal(0):
             d_hi = d_mid
         else:
             d_lo = d_mid
@@ -522,6 +527,7 @@ def solve_isolated_outer_boundary_experimental(
     ) -> tuple[IsolatedOuterBoundaryResult, OuterEnthalpyRepresentation]:
         stats = _CellSearchStats()
         with outer_enthalpy_representation_scope() as rep:
+
             def trial_at(enthalpy: Decimal, iteration: int) -> _OuterTrial:
                 return _outer_trial(
                     subdivisions,
@@ -540,9 +546,7 @@ def solve_isolated_outer_boundary_experimental(
             )
         return result, rep
 
-    result, rep = _run_with_rating_context(
-        bindings, provider, subdivisions=subdivisions, body=body
-    )
+    result, rep = _run_with_rating_context(bindings, provider, subdivisions=subdivisions, body=body)
     return result, rep, time.perf_counter() - t0
 
 

@@ -194,11 +194,7 @@ def _tube_breakdown_sum_ok(
         parts = local_sum + internal_friction_pa
     else:
         present = [k for k in _TUBE_SUM_KEYS if k in components]
-        parts = (
-            sum(Decimal(components[k]) for k in present)
-            if present
-            else local_sum
-        )
+        parts = sum(Decimal(components[k]) for k in present) if present else local_sum
     return abs(parts - Decimal(total)) <= Decimal("2.0")
 
 
@@ -254,9 +250,7 @@ def _build_hard_gate(
         "PASS" if report.nozzle_velocity_check == "PASS" else "BLOCKED"
     )
     geom: Literal["PASS", "BLOCKED"] = "PASS" if geometry_legal else "BLOCKED"
-    model: Literal["PASS", "BLOCKED", "UNRESOLVED"] = (
-        "PASS" if model_pass else "BLOCKED"
-    )
+    model: Literal["PASS", "BLOCKED", "UNRESOLVED"] = "PASS" if model_pass else "BLOCKED"
     joint = (
         mid.overall_fp_status == "COMPUTED"
         and nozzle == "PASS"
@@ -376,8 +370,7 @@ def _first_task174_ready_bindings(
         ok = (
             t174.modeled_total_tube_side_pressure_drop_pa
             <= normalized.max_tube_side_pressure_drop_pa
-            and t174.bell_total_shell_pressure_drop_pa
-            <= normalized.max_shell_side_pressure_drop_pa
+            and t174.bell_total_shell_pressure_drop_pa <= normalized.max_shell_side_pressure_drop_pa
         )
         if ok:
             return bindings
@@ -451,9 +444,8 @@ def run_v08_04_acceptance_bundle(
 
     postpass = task174_hydraulic_postpass_from_bindings(r0_bindings)
     exp = postpass.get("experimental_transitional_tube_hydraulic") or {}
-    friction_raw = (
-        postpass.get("task027_straight_tube_friction_pressure_drop_pa")
-        or exp.get("tube_friction_dp_pa")
+    friction_raw = postpass.get("task027_straight_tube_friction_pressure_drop_pa") or exp.get(
+        "tube_friction_dp_pa"
     )
     tube_friction = Decimal(str(friction_raw)) if friction_raw is not None else None
     tube_budget_ok = _tube_breakdown_sum_ok(
@@ -609,14 +601,12 @@ def run_v08_04_gate_completion_bundle(
         "TASK_ID": "V08-04_HYDRAULIC_GATE_COMPLETION",
         "NOZZLE_SEARCH_ROOT_CAUSE": (
             "SHELL_SIDE_BAND_MAX_DIAMETER_STILL_EXCEEDS_CASE_SHELL_DP_LIMIT"
-            if r0_auto.nozzle_bisect.shell_select_status
-            == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS"
+            if r0_auto.nozzle_bisect.shell_select_status == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS"
             else r0_auto.nozzle_bisect.shell_select_status
         ),
         "NOZZLE_SEARCH_CORRECTION_STATUS": (
             "BISECT_NO_FEASIBLE_DECOUPLED_FROM_FULL_PATH_COMPUTE"
-            if not r0_auto.remaining_blockers
-            and r0_auto.nozzle_bisect.search_infeasible_notes
+            if not r0_auto.remaining_blockers and r0_auto.nozzle_bisect.search_infeasible_notes
             else "UNCHANGED"
         ),
         "FULL_PATH_DP_CALCULATION_STATUS": (

@@ -62,9 +62,9 @@ def shell_cross_section_svg(design_spec: dict[str, Any]) -> str:
   <text x="200" y="24" fill="#e2e8f0" font-size="12" text-anchor="middle" font-family="system-ui">{label}</text>
   {baffle_lines}
   <circle cx="{cx}" cy="{cy}" r="{R:.1f}" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
-  {''.join(tubes)}
+  {"".join(tubes)}
   <text x="200" y="300" fill="#94a3b8" font-size="10" text-anchor="middle" font-family="monospace">
-    Computed layout · pitch {g['tube_pitch_m']} m · {g['tube_layout_pattern']}
+    Computed layout · pitch {g["tube_pitch_m"]} m · {g["tube_layout_pattern"]}
   </text>
 </svg>"""
 
@@ -95,10 +95,10 @@ def tube_bundle_plan_svg(design_spec: dict[str, Any]) -> str:
             k += 1
     return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w:.0f} {h:.0f}" role="img" aria-label="Tube sheet pattern">
   <rect width="100%" height="100%" fill="#020617"/>
-  <text x="{w/2:.0f}" y="18" fill="#cbd5e1" font-size="11" text-anchor="middle" font-family="system-ui">
-    Tube sheet ({n_tubes} tubes, triangular pitch {g['tube_pitch_m']} m)
+  <text x="{w / 2:.0f}" y="18" fill="#cbd5e1" font-size="11" text-anchor="middle" font-family="system-ui">
+    Tube sheet ({n_tubes} tubes, triangular pitch {g["tube_pitch_m"]} m)
   </text>
-  {''.join(els)}
+  {"".join(els)}
 </svg>"""
 
 

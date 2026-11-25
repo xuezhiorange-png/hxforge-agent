@@ -76,9 +76,8 @@ def test_r0_frozen_candidate_full_path_budget_and_no_design_feasible(
     assert mid.shell_total_dp_pa is not None
     postpass = task174_hydraulic_postpass_from_bindings(bindings)
     exp = postpass.get("experimental_transitional_tube_hydraulic") or {}
-    friction_raw = (
-        postpass.get("task027_straight_tube_friction_pressure_drop_pa")
-        or exp.get("tube_friction_dp_pa")
+    friction_raw = postpass.get("task027_straight_tube_friction_pressure_drop_pa") or exp.get(
+        "tube_friction_dp_pa"
     )
     assert friction_raw is not None
     assert _tube_breakdown_sum_ok(
@@ -144,4 +143,7 @@ def test_gate_completion_bundle_false_blocked_zero(provider: CoolPropProvider) -
     payload = run_v08_04_gate_completion_bundle(provider=provider)
     assert payload["FALSE_BLOCKED_COUNT"] == 0
     assert payload["FULL_PATH_DP_CALCULATION_STATUS"] == "COMPUTED_ALL_K_TIERS"
-    assert payload["NOZZLE_SEARCH_CORRECTION_STATUS"] == "BISECT_NO_FEASIBLE_DECOUPLED_FROM_FULL_PATH_COMPUTE"
+    assert (
+        payload["NOZZLE_SEARCH_CORRECTION_STATUS"]
+        == "BISECT_NO_FEASIBLE_DECOUPLED_FROM_FULL_PATH_COMPUTE"
+    )

@@ -143,7 +143,12 @@ def run_v08_05_with_live_thermal_rating(
     live_result: V08ThermalRatingResult | None = None
     attempts: list[LiveRatingAttemptRecord] = []
     executed = False
-    if (mirror := report.design_tool_mirror) and mirror.ingestion.ok and mirror.ingestion.normalized and mirror.ingestion.handoff:
+    if (
+        (mirror := report.design_tool_mirror)
+        and mirror.ingestion.ok
+        and mirror.ingestion.normalized
+        and mirror.ingestion.handoff
+    ):
         executed = True
         live_result = run_v08_thermal_rating(
             mirror.ingestion.normalized,
@@ -235,13 +240,11 @@ def bridge_report_to_delivery_fields(
         "LIVE_RATING_ACTUALLY_EXECUTED": bridge.live_rating_actually_executed,
         "FIRST_SUCCESSFUL_LIVE_CASE": engineering_case_id if first_row else None,
         "FIRST_SUCCESSFUL_GEOMETRY": (
-            first_row.geometry_projection_hash if first_row and first_row.geometry_projection_hash else (
-                first_row.candidate_id if first_row else None
-            )
+            first_row.geometry_projection_hash
+            if first_row and first_row.geometry_projection_hash
+            else (first_row.candidate_id if first_row else None)
         ),
-        "N1_N2_N4_CONVERGENCE": (
-            first_row.mesh_convergence_n1_n2_n4 if first_row else "NONE"
-        ),
+        "N1_N2_N4_CONVERGENCE": (first_row.mesh_convergence_n1_n2_n4 if first_row else "NONE"),
         "LIVE_DUTY_W": first_row.total_duty_w if first_row else None,
         "ENERGY_BALANCE_ERROR": first_row.energy_balance_residual_w if first_row else None,
         "TUBE_OUTLET_TEMPERATURE": first_row.tube_outlet_temperature_k if first_row else None,

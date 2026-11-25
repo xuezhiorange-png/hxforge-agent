@@ -13,7 +13,12 @@ from prototypes.v08_thermal_rating.v08_06_kernel_version_acceptance import (
 
 def main() -> int:
     payload = write_v08_06_kernel_artifact()
-    print(json.dumps({k: payload[k] for k in payload if k not in ("r0_shortlist_rows", "slot_records")}, indent=2))
+    print(
+        json.dumps(
+            {k: payload[k] for k in payload if k not in ("r0_shortlist_rows", "slot_records")},
+            indent=2,
+        )
+    )
     return 0
 
 

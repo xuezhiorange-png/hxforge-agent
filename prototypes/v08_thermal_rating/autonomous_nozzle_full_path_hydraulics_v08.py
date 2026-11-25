@@ -336,15 +336,11 @@ def run_autonomous_nozzle_full_path(
     )
     search_notes: list[str] = []
     if fixed.shell_select_status == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS":
-        search_notes.append(
-            "SHELL_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND"
-        )
+        search_notes.append("SHELL_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND")
     elif fixed.shell_select_status not in _computable_bisect:
         blockers.append(f"SHELL_NOZZLE_BISECT:{fixed.shell_select_status}")
     if fixed.tube_select_status == "NO_FEASIBLE_WITHIN_DESIGN_BOUNDS":
-        search_notes.append(
-            "TUBE_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND"
-        )
+        search_notes.append("TUBE_NOZZLE_SEARCH_NO_FEASIBLE_POINT_IN_VELOCITY_BAND")
     elif fixed.tube_select_status not in _computable_bisect:
         blockers.append(f"TUBE_NOZZLE_BISECT:{fixed.tube_select_status}")
 

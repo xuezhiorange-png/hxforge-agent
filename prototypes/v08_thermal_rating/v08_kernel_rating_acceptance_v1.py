@@ -39,6 +39,7 @@ def analytic_parallel_flow_q(
         return 0.0
     q_max = min(c_h, c_c) * (t_hot_in - t_cold_in)
     q_hi = min(q_max, u_w_m2_k * area_m2 * (t_hot_in - t_cold_in))
+
     def q_at(q: float) -> tuple[float, float, float, float]:
         t_ho = t_hot_in - q / c_h
         t_co = t_cold_in + q / c_c

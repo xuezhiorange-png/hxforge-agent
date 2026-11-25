@@ -297,7 +297,9 @@ def _evaluate_baseline_candidate(
         )
         return rec, None, None
     t037 = evaluate_binding_task037(bindings, fouling_scenario="CLEAN")
-    prescreen = run_thermal_prescreen(bindings, normalized, provider=provider, task037_override=t037.raw)
+    prescreen = run_thermal_prescreen(
+        bindings, normalized, provider=provider, task037_override=t037.raw
+    )
     t168 = _t168_handoff(normalized, handoff)
     eng_case = build_engineering_case_v2_from_v08(normalized)
     ctx = Task168CandidateBundle(
@@ -327,9 +329,7 @@ def _evaluate_baseline_candidate(
     task027_pass = live.get("tube_hydraulic_recompute_status") in {
         "SUCCESS",
         "EXPERIMENTAL_TRANSITIONAL_SUCCESS",
-    } and not any(
-        "BL_T027" in str(b.get("code", "")) for b in live.get("blockers") or []
-    )
+    } and not any("BL_T027" in str(b.get("code", "")) for b in live.get("blockers") or [])
     bridge = live_postpass_to_r27_bridge(live, normalized=normalized)
     loss_tiers: list[LossTierRow] = []
     port_vel: dict[str, str] = {}
@@ -434,7 +434,11 @@ def _design_spec_from_parts(
         mid = next(s for s in hydraulic.scenarios if s.scenario_key == "mid_band")
         high = next(s for s in hydraulic.scenarios if s.scenario_key == "high_loss_sensitivity")
         ports = [
-            {"port_id": p.port_id, "inside_diameter_m": str(p.inside_diameter_m), "velocity_m_s": str(p.velocity_m_s)}
+            {
+                "port_id": p.port_id,
+                "inside_diameter_m": str(p.inside_diameter_m),
+                "velocity_m_s": str(p.velocity_m_s),
+            }
             for p in hydraulic.ports
         ]
     return {
@@ -506,7 +510,9 @@ def evaluate_mdot_for_structural(
     layout = structural.bundle.task021_layout
     g2 = geometry_identity_v2_hash(structural)
     case_norm, label = _perturb_case(normalized_baseline, scenario_key=scenario_key)
-    handoff = handoff_baseline if scenario_key == "baseline" else _handoff_for_case(case_norm, provider)
+    handoff = (
+        handoff_baseline if scenario_key == "baseline" else _handoff_for_case(case_norm, provider)
+    )
     bindings = build_candidate_rating_bindings(
         structural,
         space_hash=space_hash,
@@ -543,7 +549,9 @@ def evaluate_mdot_for_structural(
             block_reason="BINDINGS_BLOCKED",
         )
     t037 = evaluate_binding_task037(bindings, fouling_scenario="CLEAN")
-    prescreen = run_thermal_prescreen(bindings, case_norm, provider=provider, task037_override=t037.raw)
+    prescreen = run_thermal_prescreen(
+        bindings, case_norm, provider=provider, task037_override=t037.raw
+    )
     t168 = _t168_handoff(case_norm, handoff)
     eng_case = build_engineering_case_v2_from_v08(case_norm)
     ctx = Task168CandidateBundle(
@@ -559,9 +567,13 @@ def evaluate_mdot_for_structural(
         eng_case,
         ctx,
         tube_inlet_temperature_k=case_norm.tube_side.inlet_temperature_k,
-        tube_outlet_temperature_k=Decimal(str(prescreen.predicted_tube_outlet_k or case_norm.tube_side.inlet_temperature_k)),
+        tube_outlet_temperature_k=Decimal(
+            str(prescreen.predicted_tube_outlet_k or case_norm.tube_side.inlet_temperature_k)
+        ),
         shell_inlet_temperature_k=case_norm.shell_side.inlet_temperature_k,
-        shell_outlet_temperature_k=Decimal(str(prescreen.predicted_shell_outlet_k or case_norm.shell_side.inlet_temperature_k)),
+        shell_outlet_temperature_k=Decimal(
+            str(prescreen.predicted_shell_outlet_k or case_norm.shell_side.inlet_temperature_k)
+        ),
         tube_inlet_pressure_pa=case_norm.tube_side.inlet_pressure_pa,
         shell_inlet_pressure_pa=case_norm.shell_side.inlet_pressure_pa,
         provider=provider,
@@ -747,7 +759,9 @@ def run_autonomous_design_tool(
                 provider=provider,
             )
             mdot_verdicts.append(
-                verdict_from_row(row, target_q=normalized.target_duty_w, layout_geometry_v2=g2, layout_hash=lh)
+                verdict_from_row(
+                    row, target_q=normalized.target_duty_w, layout_geometry_v2=g2, layout_hash=lh
+                )
             )
         if all(v.engineering_joint_pass for v in mdot_verdicts):
             rankings["robust_exploration_layout"] = recommended.layout_key

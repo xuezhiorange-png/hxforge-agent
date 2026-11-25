@@ -35,7 +35,9 @@ MANIFEST_FILES = [
 ]
 
 V08_06_ARTIFACT = Path("/opt/cursor/artifacts/v08_06_kernel_version_acceptance.json")
-V08_04_ARTIFACT = Path("/opt/cursor/artifacts/v08_04_new_rating_kernel_engineering_integration.json")
+V08_04_ARTIFACT = Path(
+    "/opt/cursor/artifacts/v08_04_new_rating_kernel_engineering_integration.json"
+)
 
 
 def _run_pytest(files: list[str], *, timeout: int = 900) -> tuple[str, int, str]:
@@ -110,7 +112,9 @@ def _git_changed_files() -> list[str]:
 def _installation_test() -> str:
     try:
         importlib.import_module("hexagent")
-        importlib.import_module("prototypes.v08_thermal_rating.v08_independent_engineering_rating_kernel_v1")
+        importlib.import_module(
+            "prototypes.v08_thermal_rating.v08_independent_engineering_rating_kernel_v1"
+        )
         importlib.import_module("prototypes.v08_thermal_rating.web.server")
         return "PASS"
     except Exception as exc:
@@ -267,9 +271,16 @@ def main() -> int:
         ),
         "test_log_tail": {"kernel": k_tail, "v07": v07_tail},
     }
-    payload["closeout_hash"] = canonical_sha256({k: v for k, v in payload.items() if k != "closeout_hash"})
+    payload["closeout_hash"] = canonical_sha256(
+        {k: v for k, v in payload.items() if k != "closeout_hash"}
+    )
     ARTIFACT.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    print(json.dumps({k: payload[k] for k in payload if k not in ("CHANGED_FILES", "r0_shortlist_rows")}, indent=2))
+    print(
+        json.dumps(
+            {k: payload[k] for k in payload if k not in ("CHANGED_FILES", "r0_shortlist_rows")},
+            indent=2,
+        )
+    )
     return 0 if integration_complete else 1
 
 

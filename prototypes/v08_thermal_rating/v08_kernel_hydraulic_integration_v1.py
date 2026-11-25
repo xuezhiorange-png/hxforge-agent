@@ -137,9 +137,15 @@ def _reassess_full_path_outlet_domain(
     tube_p_out = Decimal(str(case.tube_side.inlet_pressure_pa)) - tube_dp
     shell_p_out = Decimal(str(case.shell_side.inlet_pressure_pa)) - shell_dp
     tok, tdet = v08_kernel_outlet_domain_ok(provider, temperature_k=tube_t, pressure_pa=tube_p_out)
-    sok, sdet = v08_kernel_outlet_domain_ok(provider, temperature_k=shell_t, pressure_pa=shell_p_out)
-    out["FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS"] = "SATISFIED" if tok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
-    out["FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS"] = "SATISFIED" if sok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+    sok, sdet = v08_kernel_outlet_domain_ok(
+        provider, temperature_k=shell_t, pressure_pa=shell_p_out
+    )
+    out["FULL_PATH_TUBE_OUTLET_DOMAIN_STATUS"] = (
+        "SATISFIED" if tok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+    )
+    out["FULL_PATH_SHELL_OUTLET_DOMAIN_STATUS"] = (
+        "SATISFIED" if sok else "OUTLET_PRESSURE_OUT_OF_DOMAIN"
+    )
     out["FULL_PATH_TUBE_OUTLET_DOMAIN_DETAIL"] = tdet
     out["FULL_PATH_SHELL_OUTLET_DOMAIN_DETAIL"] = sdet
     tube_c = out.get("FULL_PATH_TUBE_CONSTRAINT_STATUS")
@@ -193,8 +199,12 @@ def _search_kernel_nozzle_pair(
     candidates: list[tuple[Decimal, Decimal, tuple[str, ...]]] = []
     for t_frac in (Decimal("0.35"), Decimal("0.55"), Decimal("0.75"), Decimal("1.0")):
         for s_frac in (Decimal("0.35"), Decimal("0.55"), Decimal("0.75"), Decimal("1.0")):
-            t_d = tb.common_feasible_lower_m + t_frac * (tb.common_feasible_upper_m - tb.common_feasible_lower_m)
-            s_d = sb.common_feasible_lower_m + s_frac * (sb.common_feasible_upper_m - sb.common_feasible_lower_m)
+            t_d = tb.common_feasible_lower_m + t_frac * (
+                tb.common_feasible_upper_m - tb.common_feasible_lower_m
+            )
+            s_d = sb.common_feasible_lower_m + s_frac * (
+                sb.common_feasible_upper_m - sb.common_feasible_lower_m
+            )
             hyd = run_autonomous_nozzle_full_path(
                 bindings,
                 fixed_tube_inside_diameter_m=t_d,
@@ -216,9 +226,7 @@ def _search_kernel_nozzle_pair(
             )
             failures = _strict_velocity_failures(records)
             eps_fail = tuple(
-                f
-                for f in failures
-                if not all(_ports_in_band_eps(r.velocity_m_s) for r in records)
+                f for f in failures if not all(_ports_in_band_eps(r.velocity_m_s) for r in records)
             )
             if not eps_fail and all(_ports_in_band_eps(r.velocity_m_s) for r in records):
                 candidates.append((t_d, s_d, ()))
@@ -233,7 +241,7 @@ def _search_kernel_nozzle_pair(
             strict_velocity="BLOCKED",
             velocity_failures=("NO_STRICT_FOUR_PORT_GRID_POINT",),
         )
-    best = max(candidates, key=lambda c: (c[0] + c[1]))
+    best = max(candidates, key=lambda c: c[0] + c[1])
     return KernelNozzleSelection(
         tube_inside_diameter_m=best[0],
         shell_inside_diameter_m=best[1],
@@ -325,10 +333,16 @@ def evaluate_kernel_joint_hydraulics(
             return False
         if sc.tube_full_path_dp_pa is None or sc.shell_full_path_dp_pa is None:
             return False
-        tube_p_out = Decimal(str(case.tube_side.inlet_pressure_pa)) - Decimal(sc.tube_full_path_dp_pa)
-        shell_p_out = Decimal(str(case.shell_side.inlet_pressure_pa)) - Decimal(sc.shell_full_path_dp_pa)
+        tube_p_out = Decimal(str(case.tube_side.inlet_pressure_pa)) - Decimal(
+            sc.tube_full_path_dp_pa
+        )
+        shell_p_out = Decimal(str(case.shell_side.inlet_pressure_pa)) - Decimal(
+            sc.shell_full_path_dp_pa
+        )
         tok, _ = v08_kernel_outlet_domain_ok(active, temperature_k=tube_out, pressure_pa=tube_p_out)
-        sok, _ = v08_kernel_outlet_domain_ok(active, temperature_k=shell_out, pressure_pa=shell_p_out)
+        sok, _ = v08_kernel_outlet_domain_ok(
+            active, temperature_k=shell_out, pressure_pa=shell_p_out
+        )
         return tok and sok
 
     mid = next(s for s in hyd.scenarios if s.scenario_key == "mid_band")

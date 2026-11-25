@@ -70,7 +70,7 @@ class KernelCandidateEngineeringRow:
     failed_constraints: tuple[str, ...]
     thermal_authority_id: str
     hydraulic_authority_id: str
-  # legacy path without kernel outlet / four-port — for E2E=0 explanation
+    # legacy path without kernel outlet / four-port — for E2E=0 explanation
     legacy_v08_04_blockers: tuple[str, ...]
 
 
@@ -110,7 +110,9 @@ def _k_rows(joint: KernelJointHydraulicRecord) -> tuple[dict[str, Any], ...]:
     return tuple(rows)
 
 
-def _qualify(joint: KernelJointHydraulicRecord, thermal_status: str, duty_ok: bool) -> FinalQualification:
+def _qualify(
+    joint: KernelJointHydraulicRecord, thermal_status: str, duty_ok: bool
+) -> FinalQualification:
     if thermal_status != "RATING_SUCCESS":
         return "THERMAL_BLOCKED"
     if joint.joint_class == "FULL_E2E_SUCCESS":
@@ -196,7 +198,11 @@ def run_kernel_case_engineering_matrix(
         )
         qual = _qualify(joint, thermal.status, thermal.duty_meets_target)
         fails: list[str] = []
-        if qual not in ("KERNEL_JOINT_E2E_SUCCESS", "KERNEL_ROBUST_THREE_K", "KERNEL_CONDITIONAL_MID_K"):
+        if qual not in (
+            "KERNEL_JOINT_E2E_SUCCESS",
+            "KERNEL_ROBUST_THREE_K",
+            "KERNEL_CONDITIONAL_MID_K",
+        ):
             fails = list(joint.blockers)
         if not thermal.duty_meets_target:
             fails.append("DUTY_BELOW_TARGET")
@@ -229,7 +235,9 @@ def run_kernel_case_engineering_matrix(
             )
         )
     e2e = [r for r in rows if r.final_qualification == "KERNEL_JOINT_E2E_SUCCESS"]
-    thermal_ok = sum(1 for r in rows if r.actual_q_w and Decimal(r.actual_q_w) >= Decimal(r.target_q_w))
+    thermal_ok = sum(
+        1 for r in rows if r.actual_q_w and Decimal(r.actual_q_w) >= Decimal(r.target_q_w)
+    )
     hyd_ok = sum(
         1
         for r in rows
@@ -241,8 +249,7 @@ def run_kernel_case_engineering_matrix(
         for r in rows
         if r.nozzle_ports
         and not any("NOZZLE" in f for f in r.failed_constraints)
-        and r.joint_class
-        in ("FULL_E2E_SUCCESS", "ROBUST_THREE_K_PASS", "CONDITIONAL_MID_K_ONLY")
+        and r.joint_class in ("FULL_E2E_SUCCESS", "ROBUST_THREE_K_PASS", "CONDITIONAL_MID_K_ONLY")
     )
     joint_ok = len(e2e)
     first_e2e = e2e[0].candidate_id if e2e else None

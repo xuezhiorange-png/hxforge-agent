@@ -146,7 +146,9 @@ def _slot_from_kernel_report(rep: Any) -> tuple[SlotStatus, int]:
     return "MODEL_BLOCKED", 0
 
 
-def _run_r0_shortlist(*, provider: CoolPropProvider) -> tuple[tuple[R0LayoutRecord, ...], SlotStatus]:
+def _run_r0_shortlist(
+    *, provider: CoolPropProvider
+) -> tuple[tuple[R0LayoutRecord, ...], SlotStatus]:
     normalized, handoff, _ = load_case_bindings(FIXTURE_330, provider=provider)
     case_eng = build_engineering_case_v2_from_v08(normalized)
     rows: list[R0LayoutRecord] = []
@@ -297,7 +299,9 @@ def _run_n1(provider: CoolPropProvider) -> SlotRecord:
         case = load_general_user_design_case_json(_N1_JSON)
         pipeline = validate_and_build_solver_handoff(case, provider=provider)
         if not pipeline.ok:
-            return SlotRecord("N1", "INVALID_INPUT", case.engineering_case_id, 0, 0, None, ("ingestion_blocked",))
+            return SlotRecord(
+                "N1", "INVALID_INPUT", case.engineering_case_id, 0, 0, None, ("ingestion_blocked",)
+            )
         return SlotRecord(
             "N1",
             "EXPECTED_BLOCKED",
@@ -331,7 +335,15 @@ def _run_n2(provider: CoolPropProvider) -> SlotRecord:
         notes = ("no_bindings_no_false_e2e",)
     else:
         notes = ("tight_envelope_no_joint_e2e",)
-    return SlotRecord("N2", "NO_FEASIBLE_DESIGN", rep.case_id, 0, rep.thermal_duty_pass_count, rep.report_hash, notes)
+    return SlotRecord(
+        "N2",
+        "NO_FEASIBLE_DESIGN",
+        rep.case_id,
+        0,
+        rep.thermal_duty_pass_count,
+        rep.report_hash,
+        notes,
+    )
 
 
 def _mutate_r0_json(slot: MatrixSlot) -> str:
@@ -366,7 +378,9 @@ def _contract_validation(provider: CoolPropProvider) -> dict[str, Any]:
     )
     prod_dom_fail = True
     return {
-        "NEW_KERNEL_CONTRACT_VALIDATION_STATUS": "PASS" if ok_tp and q > 0 and dom_ok else "BLOCKED",
+        "NEW_KERNEL_CONTRACT_VALIDATION_STATUS": "PASS"
+        if ok_tp and q > 0 and dom_ok
+        else "BLOCKED",
         "CONTRACT_ID": CONTRACT_ID,
         "property_tp_ph_roundtrip": ok_tp,
         "analytic_reference_q_w": q,
@@ -397,9 +411,33 @@ def run_v08_06_kernel_version_acceptance(
     n2 = _run_n2(provider)
     base_hash = p1_rep.report_hash
     meta: dict[MatrixSlot, SlotRecord] = {
-        "P1": SlotRecord("P1", p1_st, p1_rep.case_id, p1_e2e, p1_rep.thermal_duty_pass_count, p1_rep.report_hash, ()),
-        "P2": SlotRecord("P2", p2_st, p2_rep.case_id, p2_e2e, p2_rep.thermal_duty_pass_count, p2_rep.report_hash, ()),
-        "P3": SlotRecord("P3", p3_st, p3_rep.case_id, p3_e2e, p3_rep.thermal_duty_pass_count, p3_rep.report_hash, ("P3_spec=docs/tasks/evidence/V08-06-P3-kernel-acceptance-spec-r1.md",)),
+        "P1": SlotRecord(
+            "P1",
+            p1_st,
+            p1_rep.case_id,
+            p1_e2e,
+            p1_rep.thermal_duty_pass_count,
+            p1_rep.report_hash,
+            (),
+        ),
+        "P2": SlotRecord(
+            "P2",
+            p2_st,
+            p2_rep.case_id,
+            p2_e2e,
+            p2_rep.thermal_duty_pass_count,
+            p2_rep.report_hash,
+            (),
+        ),
+        "P3": SlotRecord(
+            "P3",
+            p3_st,
+            p3_rep.case_id,
+            p3_e2e,
+            p3_rep.thermal_duty_pass_count,
+            p3_rep.report_hash,
+            ("P3_spec=docs/tasks/evidence/V08-06-P3-kernel-acceptance-spec-r1.md",),
+        ),
         "N1": n1,
         "N2": n2,
     }
@@ -432,17 +470,25 @@ def run_v08_06_kernel_version_acceptance(
         )
         path.unlink(missing_ok=True)
     independent_e2e_cases = sum(
-        1 for s in ("R0", "P1", "P2", "P3") if meta[s].kernel_e2e_count >= 1  # type: ignore[index]
+        1
+        for s in ("R0", "P1", "P2", "P3")
+        if meta[s].kernel_e2e_count >= 1  # type: ignore[index]
     )
     successful_e2e = sum(m.kernel_e2e_count for m in meta.values())
-    sum(
-        r.thermal_duty_pass_count
-        for r in (p1_rep, p2_rep, p3_rep)
-    ) + sum(1 for r in r0_rows if r.thermal_status == "RATING_SUCCESS")
+    sum(r.thermal_duty_pass_count for r in (p1_rep, p2_rep, p3_rep)) + sum(
+        1 for r in r0_rows if r.thermal_status == "RATING_SUCCESS"
+    )
     contract = _contract_validation(provider)
     det1 = run_kernel_case_engineering_matrix(FIXTURE_250, provider=provider, max_candidates=3)
     det2 = run_kernel_case_engineering_matrix(FIXTURE_250, provider=provider, max_candidates=3)
-    cmd = [sys.executable, "-m", "pytest", "tests/prototypes/test_v08_kernel_engineering_integration_v1.py", "-q", "--tb=line"]
+    cmd = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "tests/prototypes/test_v08_kernel_engineering_integration_v1.py",
+        "-q",
+        "--tb=line",
+    ]
     proc = subprocess.run(cmd, cwd=_REPO, capture_output=True, text=True, timeout=600)
     v07 = subprocess.run(
         [sys.executable, "-m", "pytest", "tests/prototypes/test_v08_thermal_rating.py", "-q"],
@@ -499,7 +545,9 @@ def run_v08_06_kernel_version_acceptance(
         "p1_report_hash": p1_rep.report_hash,
         "p3_fixture": str(FIXTURE_P3),
     }
-    payload["matrix_hash"] = canonical_sha256({k: v for k, v in payload.items() if k != "matrix_hash"})
+    payload["matrix_hash"] = canonical_sha256(
+        {k: v for k, v in payload.items() if k != "matrix_hash"}
+    )
     return payload
 
 

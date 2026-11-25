@@ -26,9 +26,7 @@ PRODUCTION_RATING_VALIDATED = False
 FORMAL_ACCEPTANCE = False
 V08_07_READY = False
 
-MatrixSlot = Literal[
-    "R0", "P1", "P2", "P3", "N1", "N2", "M1", "M2", "M3", "M4"
-]
+MatrixSlot = Literal["R0", "P1", "P2", "P3", "N1", "N2", "M1", "M2", "M3", "M4"]
 
 _REPO = Path(__file__).resolve().parents[2]
 FIXTURE_P2_P3 = _REPO / "tests/fixtures/v08_user_case_no_geometry_task174_admissible_alt.json"
@@ -70,7 +68,7 @@ class CaseRunRecord:
     fixture_path: str | None
     engineering_case_id: str | None
     wall_time_s: float
-  # prescreen chain
+    # prescreen chain
     v08_05_case_outcome: str
     v08_05_report_hash: str
     experimental_top_n_count: int
@@ -149,9 +147,7 @@ def _run_case(
                 live_success = rating.distinct_converged_geometries
                 live_blockers = list(rating.model_blockers or ())
                 energy_pass = sum(
-                    1
-                    for row in rating.candidates_rated
-                    if row.energy_balance_status == "PASS"
+                    1 for row in rating.candidates_rated if row.energy_balance_status == "PASS"
                 )
             except Exception as exc:  # noqa: BLE001
                 live_blockers.append(type(exc).__name__)
@@ -173,7 +169,12 @@ def _run_case(
     return CaseRunRecord(
         slot=slot,
         fixture_path=str(fixture_path) if fixture_path else None,
-        engineering_case_id=eng_id or (report.design_tool_mirror.ingestion.engineering_case_id if report.design_tool_mirror else None),
+        engineering_case_id=eng_id
+        or (
+            report.design_tool_mirror.ingestion.engineering_case_id
+            if report.design_tool_mirror
+            else None
+        ),
         wall_time_s=round(elapsed, 3),
         v08_05_case_outcome=report.case_outcome,
         v08_05_report_hash=report.report_hash,

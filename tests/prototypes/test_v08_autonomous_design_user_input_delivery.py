@@ -71,7 +71,9 @@ def test_250kw_independent_generation_not_hardcoded_rank(provider: CoolPropProvi
     by250 = {r.layout_key: r.thermal_q_w for r in r250.candidate_records if r.thermal_q_w}
     shared = set(by330) & set(by250)
     assert shared, "expected overlapping manufacturable layouts across cases"
-    assert any(by330[k] != by250[k] for k in shared), "thermal prescreen Q must track case duty/target"
+    assert any(by330[k] != by250[k] for k in shared), (
+        "thermal prescreen Q must track case duty/target"
+    )
 
 
 def test_constraint_change_reduces_or_shifts_candidates(provider: CoolPropProvider) -> None:

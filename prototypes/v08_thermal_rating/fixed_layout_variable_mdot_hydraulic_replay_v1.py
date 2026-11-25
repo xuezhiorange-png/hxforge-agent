@@ -119,20 +119,14 @@ def live_postpass_to_r27_bridge(
     shell_parts = live.get("shell_dp_components_pa") or {}
     tube_lim = normalized.max_tube_side_pressure_drop_pa
     shell_lim = normalized.max_shell_side_pressure_drop_pa
-    tube_margin = (
-        str(tube_lim - Decimal(str(tube_total)))
-        if tube_total is not None
-        else None
-    )
-    shell_margin = (
-        str(shell_lim - Decimal(str(shell_total)))
-        if shell_total is not None
-        else None
-    )
+    tube_margin = str(tube_lim - Decimal(str(tube_total))) if tube_total is not None else None
+    shell_margin = str(shell_lim - Decimal(str(shell_total))) if shell_total is not None else None
     constraint = live.get("hydraulic_constraint_status", "BLOCKED")
     return {
         "authority_id": AUTHORITY_ID,
-        "correlation_applicability_status": live.get("correlation_applicability_status", "NOT_EVALUATED"),
+        "correlation_applicability_status": live.get(
+            "correlation_applicability_status", "NOT_EVALUATED"
+        ),
         "correlation_applicability_detail": (),
         "tube_hydraulic_recompute_status": live.get("tube_hydraulic_recompute_status", "BLOCKED"),
         "shell_hydraulic_recompute_status": live.get("shell_hydraulic_recompute_status", "NOT_RUN"),
@@ -203,7 +197,9 @@ def evaluate_mdot_scenario_v1(
 
     g2 = geometry_identity_v2_hash(structural)
     case_norm, label = _perturb_case(normalized_baseline, scenario_key=scenario_key)
-    handoff = handoff_baseline if scenario_key == "baseline" else _handoff_for_case(case_norm, provider)
+    handoff = (
+        handoff_baseline if scenario_key == "baseline" else _handoff_for_case(case_norm, provider)
+    )
     baseline_re = (
         str(structural.bundle.task026_result.reynolds_number)
         if structural.bundle.task026_result is not None

@@ -102,13 +102,17 @@ def _compute_with_progress(
                 "message": "独立 Rating 内核 + 四接管/全路径水力…",
             },
         )
-        kernel_rep = run_kernel_case_engineering_matrix(fx, provider=_PROVIDER, max_candidates=max_candidates)
+        kernel_rep = run_kernel_case_engineering_matrix(
+            fx, provider=_PROVIDER, max_candidates=max_candidates
+        )
         payload = kernel_web_payload(kernel_rep)
         payload["elapsed_s"] = round(time.time() - t0, 2)
         payload["fixture_used"] = str(fx)
         yield _sse("result", {"report": payload})
         return
-    yield _sse("progress", {"stage": "RUN_DESIGN_TOOL", "message": "调用自动设计内核（结构→热工→水力）…"})
+    yield _sse(
+        "progress", {"stage": "RUN_DESIGN_TOOL", "message": "调用自动设计内核（结构→热工→水力）…"}
+    )
     report = run_v08_05_qualified_selection(
         case_text,
         provider=_PROVIDER,

@@ -58,9 +58,7 @@ from prototypes.v08_thermal_rating.v08_task037_evaluate_binding_v08 import evalu
 
 TASK_ID = "V08_AUTONOMOUS_ENGINEERING_SELECTION_MVP"
 ENGINEERING_DESIGN_STATUS = "EXPERIMENTAL_PRESCREEN_ONLY_NOT_PRODUCTION_THERMAL_ACCEPTANCE"
-HYDRAULIC_VALIDATION_STATUS = (
-    "EXPERIMENTAL_VARIABLE_MDOT_REPLAY_NOT_MANUFACTURING_DESIGN_APPROVAL"
-)
+HYDRAULIC_VALIDATION_STATUS = "EXPERIMENTAL_VARIABLE_MDOT_REPLAY_NOT_MANUFACTURING_DESIGN_APPROVAL"
 
 
 @dataclass(frozen=True)
@@ -209,7 +207,9 @@ def rank_candidates(
     by_layout: dict[str, list[ScenarioJointVerdict]] = {}
     for v in verdicts:
         by_layout.setdefault(v.shortlist_key, []).append(v)
-    baselines = {k: next(x for x in vs if x.scenario_key == "baseline") for k, vs in by_layout.items()}
+    baselines = {
+        k: next(x for x in vs if x.scenario_key == "baseline") for k, vs in by_layout.items()
+    }
     row_by_key = {(r["shortlist_key"], r["scenario_key"]): r for r in rows}
 
     joint_baselines = [b for b in baselines.values() if b.engineering_joint_pass]
@@ -235,7 +235,9 @@ def rank_candidates(
     hyd_candidates = [
         b
         for b in baselines.values()
-        if b.task027_pass and b.hydraulic_all_tiers_pass and (b.shortlist_key, "baseline") in row_by_key
+        if b.task027_pass
+        and b.hydraulic_all_tiers_pass
+        and (b.shortlist_key, "baseline") in row_by_key
     ]
     if hyd_candidates:
         hydraulic_margin_best = max(
@@ -255,7 +257,9 @@ def rank_candidates(
             "ROBUST_EXPLORATION_NONE: no layout passes engineering_joint_pass on all six mdot scenarios."
         )
     if nominal_best is None:
-        notes.append("NOMINAL_BEST_NONE: no baseline satisfies full thermal-hydraulic joint criteria.")
+        notes.append(
+            "NOMINAL_BEST_NONE: no baseline satisfies full thermal-hydraulic joint criteria."
+        )
     notes.append(
         "Hydraulic tier computation alone does not imply engineering_joint_pass "
         "(thermal Q, Task027, nozzles, and identity are evaluated separately)."
@@ -337,7 +341,9 @@ def build_experimental_design_specification(
     if bindings is None:
         return None
     t037 = evaluate_binding_task037(bindings, fouling_scenario="CLEAN")
-    prescreen = run_thermal_prescreen(bindings, normalized, provider=provider, task037_override=t037.raw)
+    prescreen = run_thermal_prescreen(
+        bindings, normalized, provider=provider, task037_override=t037.raw
+    )
     scale = _CANONICAL_SCALE[tube_count]
     t168 = _build_t168_with_envelope(normalized, handoff, scale)
     eng_case = build_engineering_case_v2_from_v08(normalized)
@@ -354,9 +360,13 @@ def build_experimental_design_specification(
         eng_case,
         postpass_ctx,
         tube_inlet_temperature_k=normalized.tube_side.inlet_temperature_k,
-        tube_outlet_temperature_k=Decimal(str(prescreen.predicted_tube_outlet_k or normalized.tube_side.inlet_temperature_k)),
+        tube_outlet_temperature_k=Decimal(
+            str(prescreen.predicted_tube_outlet_k or normalized.tube_side.inlet_temperature_k)
+        ),
         shell_inlet_temperature_k=normalized.shell_side.inlet_temperature_k,
-        shell_outlet_temperature_k=Decimal(str(prescreen.predicted_shell_outlet_k or normalized.shell_side.inlet_temperature_k)),
+        shell_outlet_temperature_k=Decimal(
+            str(prescreen.predicted_shell_outlet_k or normalized.shell_side.inlet_temperature_k)
+        ),
         tube_inlet_pressure_pa=normalized.tube_side.inlet_pressure_pa,
         shell_inlet_pressure_pa=normalized.shell_side.inlet_pressure_pa,
         provider=provider,
@@ -456,7 +466,9 @@ def run_autonomous_engineering_selection(
     layout_meta: dict[str, tuple[str, str]] = {}
     for tube_count, tube_length_m in _SHORTLIST:
         key = f"T{tube_count}_L{tube_length_m}"
-        sample = next(r for r in raw_rows if r["shortlist_key"] == key and r["scenario_key"] == "baseline")
+        sample = next(
+            r for r in raw_rows if r["shortlist_key"] == key and r["scenario_key"] == "baseline"
+        )
         layout_meta[key] = (sample["geometry_v2"], sample["tube_layout_hash"])
 
     replay_rows: list[MdotScenarioReplayRow] = []
@@ -491,7 +503,9 @@ def run_autonomous_engineering_selection(
     verdicts_list: list[ScenarioJointVerdict] = []
     for row in replay_rows:
         g2, lh = layout_meta[row.shortlist_key]
-        verdicts_list.append(verdict_from_row(row, target_q=target_q, layout_geometry_v2=g2, layout_hash=lh))
+        verdicts_list.append(
+            verdict_from_row(row, target_q=target_q, layout_geometry_v2=g2, layout_hash=lh)
+        )
     verdicts = tuple(verdicts_list)
     rankings = rank_candidates(verdicts, raw_rows, target_q=target_q)
 
@@ -547,7 +561,9 @@ def report_to_artifact_dict(report: AutonomousEngineeringSelectionReport) -> dic
 
 def write_selection_artifact(path: Path, report: AutonomousEngineeringSelectionReport) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(report_to_artifact_dict(report), indent=2, sort_keys=True), encoding="utf-8")
+    path.write_text(
+        json.dumps(report_to_artifact_dict(report), indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 if __name__ == "__main__":
@@ -555,13 +571,17 @@ if __name__ == "__main__":
 
     provider = CoolPropProvider()
     for label, fixture in (("330kW", FIXTURE_330), ("250kW_independent", FIXTURE_250)):
-        report = run_autonomous_engineering_selection(fixture.read_text(encoding="utf-8"), provider=provider)
+        report = run_autonomous_engineering_selection(
+            fixture.read_text(encoding="utf-8"), provider=provider
+        )
         out = Path(f"/opt/cursor/artifacts/v08_autonomous_engineering_selection_{label}.json")
         write_selection_artifact(out, report)
         summary = {
             "case": report.engineering_case_id,
             "rankings": asdict(report.rankings),
-            "joint_pass_count": sum(1 for v in report.scenario_verdicts if v.engineering_joint_pass),
+            "joint_pass_count": sum(
+                1 for v in report.scenario_verdicts if v.engineering_joint_pass
+            ),
             "selected_layout": (report.selected_design_spec or {}).get("layout_key"),
         }
         print(label, json.dumps(summary, indent=2))

@@ -309,12 +309,8 @@ def rate_candidate_engineering_kernel_v1(
                 elapsed=time.perf_counter() - t0,
             )
         q_model = float(ua0 * f_fac * lmtd)
-        c_t = mdot_t * float(
-            _state_t(provider, (t_ti + t_to) / 2, p_t).cp_j_kg_k
-        )
-        c_s = mdot_s * float(
-            _state_t(provider, (t_si + t_so) / 2, p_s).cp_j_kg_k
-        )
+        c_t = mdot_t * float(_state_t(provider, (t_ti + t_to) / 2, p_t).cp_j_kg_k)
+        c_s = mdot_s * float(_state_t(provider, (t_si + t_so) / 2, p_s).cp_j_kg_k)
         c_min = min(c_t, c_s)
         c_min_d = Decimal(str(c_min))
         ntu = ua0 / c_min_d if c_min_d > 0 else Decimal(0)
@@ -349,8 +345,10 @@ def rate_candidate_engineering_kernel_v1(
         iterations=iterations,
     )
     status: KernelStatus = "RATING_SUCCESS" if contract == "PASS" and duty_ok else "RATING_BLOCKED"
-    blocked = None if status == "RATING_SUCCESS" else (
-        "ITERATION_OR_ENERGY_OR_DUTY" if contract == "BLOCKED" else "DUTY_BELOW_TARGET"
+    blocked = (
+        None
+        if status == "RATING_SUCCESS"
+        else ("ITERATION_OR_ENERGY_OR_DUTY" if contract == "BLOCKED" else "DUTY_BELOW_TARGET")
     )
     elapsed = time.perf_counter() - t0
     return KernelThermalRatingResult(

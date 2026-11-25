@@ -32,7 +32,9 @@ def main() -> None:
         choices=["330kw", "250kw", "constraint_change", "infeasible", "all"],
         default="all",
     )
-    parser.add_argument("--case-file", type=Path, default=None, help="Path to user design case JSON")
+    parser.add_argument(
+        "--case-file", type=Path, default=None, help="Path to user design case JSON"
+    )
     parser.add_argument("--max-candidates", type=int, default=40)
     parser.add_argument(
         "--artifact-dir",
@@ -45,7 +47,10 @@ def main() -> None:
     if args.case_file is not None:
         text = args.case_file.read_text(encoding="utf-8")
         report = run_v08_05_qualified_selection(
-            text, provider=provider, max_candidates=args.max_candidates, run_mdot_on_recommendation=True
+            text,
+            provider=provider,
+            max_candidates=args.max_candidates,
+            run_mdot_on_recommendation=True,
         )
         artifact_dir = args.artifact_dir
         artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -73,7 +78,10 @@ def main() -> None:
     for key in scenarios:
         text = _FIXTURES[key].read_text(encoding="utf-8")
         report = run_v08_05_qualified_selection(
-            text, provider=provider, max_candidates=args.max_candidates, run_mdot_on_recommendation=key != "infeasible"
+            text,
+            provider=provider,
+            max_candidates=args.max_candidates,
+            run_mdot_on_recommendation=key != "infeasible",
         )
         (artifact_dir / f"v08_autonomous_design_{key}.json").write_text(
             json.dumps(merged_web_api_payload(report), indent=2), encoding="utf-8"
@@ -87,7 +95,8 @@ def main() -> None:
             "case": mirror.ingestion.engineering_case_id if mirror else None,
             "experimental_top_n": list(report.top_n.experimental_prescreen),
             "case_outcome": report.case_outcome,
-            "no_feasible": report.case_outcome in ("NO_FEASIBLE_DESIGN", "OUT_OF_ENVELOPE", "INVALID_INPUT"),
+            "no_feasible": report.case_outcome
+            in ("NO_FEASIBLE_DESIGN", "OUT_OF_ENVELOPE", "INVALID_INPUT"),
         }
         print(json.dumps(summary, indent=2))
 

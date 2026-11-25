@@ -273,7 +273,9 @@ def _layer_l4(
     )
 
 
-def _original_production_verdict(production: ProductionCulpReport | None) -> tuple[AcceptanceStatus, dict[str, Any]]:
+def _original_production_verdict(
+    production: ProductionCulpReport | None,
+) -> tuple[AcceptanceStatus, dict[str, Any]]:
     if production is None:
         return "NOT_RUN", {"mode": ORIGINAL_PRODUCTION_ACCEPTANCE}
     status: AcceptanceStatus = "PASS" if production.outcome == "RATING_SUCCESS" else "BLOCKED"
@@ -291,7 +293,9 @@ def _original_production_verdict(production: ProductionCulpReport | None) -> tup
     return status, detail
 
 
-def _experimental_verdict(layers: tuple[LayerEvidence, ...]) -> tuple[AcceptanceStatus, dict[str, Any]]:
+def _experimental_verdict(
+    layers: tuple[LayerEvidence, ...],
+) -> tuple[AcceptanceStatus, dict[str, Any]]:
     status_map = {layer.layer: layer.status for layer in layers}
     required = ("L1", "L2", "L3", "L4")
     if any(status_map.get(k) == "NOT_EVALUATED" for k in required):
@@ -378,49 +382,55 @@ def run_layered_negative_controls(
         (
             "force_l1_holes",
             "L1",
-            lambda: _experimental_verdict(
-                tuple(
-                    LayerEvidence(
-                        "L1",
-                        "BLOCKED",
-                        {"task172_numerical_holes": 3},
+            lambda: (
+                _experimental_verdict(
+                    tuple(
+                        LayerEvidence(
+                            "L1",
+                            "BLOCKED",
+                            {"task172_numerical_holes": 3},
+                        )
+                        if x.layer == "L1"
+                        else x
+                        for x in template.layers
                     )
-                    if x.layer == "L1"
-                    else x
-                    for x in template.layers
-                )
-            )[0]
-            == "BLOCKED",
+                )[0]
+                == "BLOCKED"
+            ),
         ),
         (
             "force_l2_property_fail",
             "L2",
-            lambda: _experimental_verdict(
-                tuple(
-                    LayerEvidence("L2", "BLOCKED", {"tp_ph_status": "BLOCKED"})
-                    if x.layer == "L2"
-                    else x
-                    for x in template.layers
-                )
-            )[0]
-            == "BLOCKED",
+            lambda: (
+                _experimental_verdict(
+                    tuple(
+                        LayerEvidence("L2", "BLOCKED", {"tp_ph_status": "BLOCKED"})
+                        if x.layer == "L2"
+                        else x
+                        for x in template.layers
+                    )
+                )[0]
+                == "BLOCKED"
+            ),
         ),
         (
             "force_l4_hydraulic_fail",
             "L4",
-            lambda: _experimental_verdict(
-                tuple(
-                    LayerEvidence(
-                        "L4",
-                        "BLOCKED",
-                        {"duty_at_or_above_target": False},
+            lambda: (
+                _experimental_verdict(
+                    tuple(
+                        LayerEvidence(
+                            "L4",
+                            "BLOCKED",
+                            {"duty_at_or_above_target": False},
+                        )
+                        if x.layer == "L4"
+                        else x
+                        for x in template.layers
                     )
-                    if x.layer == "L4"
-                    else x
-                    for x in template.layers
-                )
-            )[0]
-            == "BLOCKED",
+                )[0]
+                == "BLOCKED"
+            ),
         ),
     ]
     false = 0
@@ -436,4 +446,6 @@ def run_layered_negative_controls(
             )
         )
     status: Literal["PASS", "BLOCKED"] = "PASS" if false == 0 else "BLOCKED"
-    return LayeredNegativeControlResult(status=status, false_acceptance_count=false, rows=tuple(rows))
+    return LayeredNegativeControlResult(
+        status=status, false_acceptance_count=false, rows=tuple(rows)
+    )

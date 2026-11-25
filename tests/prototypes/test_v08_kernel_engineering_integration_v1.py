@@ -14,7 +14,10 @@ from prototypes.v08_thermal_rating.v08_kernel_engineering_report_v1 import (
     run_kernel_case_engineering_matrix,
 )
 
-FIX220 = Path(__file__).resolve().parents[2] / "tests/fixtures/v08_user_case_no_geometry_task174_admissible_alt.json"
+FIX220 = (
+    Path(__file__).resolve().parents[2]
+    / "tests/fixtures/v08_user_case_no_geometry_task174_admissible_alt.json"
+)
 
 
 def test_250kw_kernel_joint_e2e_exists() -> None:

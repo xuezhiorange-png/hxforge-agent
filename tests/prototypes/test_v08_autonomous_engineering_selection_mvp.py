@@ -18,7 +18,9 @@ def test_joint_pass_stricter_than_hydraulic_tiers_computed() -> None:
         provider=CoolPropProvider(),
     )
     hydraulic_only = [
-        v for v in report.scenario_verdicts if v.hydraulic_all_tiers_pass and not v.engineering_joint_pass
+        v
+        for v in report.scenario_verdicts
+        if v.hydraulic_all_tiers_pass and not v.engineering_joint_pass
     ]
     assert hydraulic_only, "expected scenarios with hydraulic pass but joint fail"
     assert all(
@@ -53,8 +55,12 @@ def test_robust_exploration_null_on_330kw() -> None:
 
 def test_independent_250kw_changes_hydraulic_ranking() -> None:
     provider = CoolPropProvider()
-    r330 = run_autonomous_engineering_selection(FIXTURE_330.read_text(encoding="utf-8"), provider=provider)
-    r250 = run_autonomous_engineering_selection(FIXTURE_250.read_text(encoding="utf-8"), provider=provider)
+    r330 = run_autonomous_engineering_selection(
+        FIXTURE_330.read_text(encoding="utf-8"), provider=provider
+    )
+    r250 = run_autonomous_engineering_selection(
+        FIXTURE_250.read_text(encoding="utf-8"), provider=provider
+    )
     assert r330.engineering_case_id != r250.engineering_case_id
     assert r330.target_duty_w != r250.target_duty_w
     assert r330.rankings.hydraulic_margin_best != r250.rankings.hydraulic_margin_best
