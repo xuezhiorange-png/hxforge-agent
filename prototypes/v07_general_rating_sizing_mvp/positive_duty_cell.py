@@ -4,8 +4,13 @@
 
 from __future__ import annotations
 
+import contextlib
 import itertools
-import threading
+import json
+import os
+import signal
+import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from decimal import Decimal
@@ -323,6 +328,69 @@ LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE = "BLOCKED_RESOURCE_BUDGET"
 DEFAULT_LEGACY_LOW_MESH_CI_RESOURCE_BUDGET_S = 90.0
 
 
+def _legacy_mesh_budget_worker_pids() -> list[int]:
+    proc = subprocess.run(
+        ["pgrep", "-f", "legacy_mesh_budget_worker"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+    return [int(line) for line in proc.stdout.splitlines() if line.strip().isdigit()]
+
+
+def count_legacy_mesh_budget_worker_processes() -> int:
+    """Return live legacy mesh budget worker subprocess count (test/diagnostic)."""
+    return len(_legacy_mesh_budget_worker_pids())
+
+
+def _terminate_budget_worker_process(proc: subprocess.Popen[str]) -> None:
+    if proc.poll() is not None:
+        return
+    with contextlib.suppress(ProcessLookupError, OSError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        proc.wait(timeout=5)
+    if proc.poll() is None:
+        proc.kill()
+        proc.wait(timeout=5)
+
+
+def _serialize_engineering_case(case: EngineeringCase | None) -> dict[str, Any] | None:
+    if case is None:
+        return None
+    if hasattr(case, "model_dump"):
+        return cast(dict[str, Any], case.model_dump(mode="json"))
+    raise TypeError("case must be a pydantic engineering case model")
+
+
+def _legacy_mesh_budget_blocked_mesh(
+    *,
+    subdivisions: int,
+    resource_budget_wall_s: float,
+    elapsed: float,
+    worker_pid: int | None,
+    terminated: bool,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "hxforge.low-mesh-result.v1",
+        "status": "BLOCKED",
+        "mesh_level": subdivisions,
+        "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+        "diagnostics": [
+            f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
+            "legacy_resource_budget_enforcement=SUBPROCESS_HARD_WALL",
+            f"elapsed_wall_s={elapsed:.3f}",
+            f"worker_pid={worker_pid}",
+            f"worker_terminated={terminated}",
+        ],
+        "wall_seconds": round(elapsed, 3),
+        "low_mesh_numeric_valid": False,
+        "full_rating_converged": False,
+    }
+
+
 def run_mesh_numeric_with_profile(
     native: NativeCellContext,
     *,
@@ -333,6 +401,7 @@ def run_mesh_numeric_with_profile(
     tube_property_evaluation_pressure_pa: Decimal | None = None,
     shell_property_evaluation_pressure_pa: Decimal | None = None,
     resource_budget_wall_s: float | None = None,
+    _test_inject_sleep_s: float | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], Any | None]:
     if resource_budget_wall_s is not None and resource_budget_wall_s <= 0:
         raise ValueError("resource_budget_wall_s must be positive when set")
@@ -346,47 +415,54 @@ def run_mesh_numeric_with_profile(
             tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
             shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
         )
-    done = threading.Event()
-    holder: dict[str, Any] = {}
+    job: dict[str, Any] = {
+        "candidate_id": native.candidate_id,
+        "case": _serialize_engineering_case(case),
+        "subdivisions": subdivisions,
+        "enable_ephemeral_tp_cache": enable_ephemeral_tp_cache,
+        "enable_live_thermal_boundary": enable_live_thermal_boundary,
+        "tube_property_evaluation_pressure_pa": (
+            str(tube_property_evaluation_pressure_pa)
+            if tube_property_evaluation_pressure_pa is not None
+            else None
+        ),
+        "shell_property_evaluation_pressure_pa": (
+            str(shell_property_evaluation_pressure_pa)
+            if shell_property_evaluation_pressure_pa is not None
+            else None
+        ),
+    }
+    if _test_inject_sleep_s is not None:
+        job["_test_inject_sleep_s"] = _test_inject_sleep_s
 
-    def _worker() -> None:
-        try:
-            holder["result"] = _run_mesh_numeric_with_profile_impl(
-                native,
-                subdivisions=subdivisions,
-                enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
-                case=case,
-                enable_live_thermal_boundary=enable_live_thermal_boundary,
-                tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
-                shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
-            )
-        except BaseException as exc:
-            holder["error"] = exc
-        finally:
-            done.set()
-
-    # Daemon worker: budget wait does not join a stuck CoolProp thread; pytest subprocess can exit.
-    thread = threading.Thread(target=_worker, name="legacy-mesh-profile-budget", daemon=True)
+    env = os.environ.copy()
+    env.setdefault("PYTHONPATH", os.pathsep.join(("src", ".")))
+    proc = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "prototypes.v07_general_rating_sizing_mvp.legacy_mesh_budget_worker",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+        env=env,
+    )
     t0 = time.perf_counter()
-    thread.start()
-    finished = done.wait(timeout=resource_budget_wall_s)
-    if not finished:
+    terminated = False
+    try:
+        assert proc.stdin is not None
+        assert proc.stdout is not None
+        stdout, stderr = proc.communicate(
+            input=json.dumps(job),
+            timeout=resource_budget_wall_s,
+        )
+    except subprocess.TimeoutExpired as exc:
+        terminated = True
+        _terminate_budget_worker_process(proc)
         elapsed = time.perf_counter() - t0
-        mesh = {
-            "schema_version": "hxforge.low-mesh-result.v1",
-            "status": "BLOCKED",
-            "mesh_level": subdivisions,
-            "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
-            "diagnostics": [
-                f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
-                "legacy_resource_budget_enforcement=SOFT_WALL_DAEMON_THREAD",
-                f"elapsed_wall_s={elapsed:.3f}",
-                "worker_joined=false",
-            ],
-            "wall_seconds": round(elapsed, 3),
-            "low_mesh_numeric_valid": False,
-            "full_rating_converged": False,
-        }
         profile = build_solver_performance_profile(
             stats=t173._CellSearchStats(),
             mesh_run=None,
@@ -395,10 +471,31 @@ def run_mesh_numeric_with_profile(
             subdivisions=subdivisions,
             tp_cache_stats=None,
         )
+        mesh = _legacy_mesh_budget_blocked_mesh(
+            subdivisions=subdivisions,
+            resource_budget_wall_s=resource_budget_wall_s,
+            elapsed=elapsed,
+            worker_pid=proc.pid,
+            terminated=terminated,
+        )
+        stderr_tail = (exc.stderr or "").strip()[-240:]
+        if stderr_tail:
+            mesh["diagnostics"].append(f"worker_stderr_tail={stderr_tail}")
         return mesh, profile, None
-    if "error" in holder:
-        raise holder["error"]
-    return cast(tuple[dict[str, Any], dict[str, Any], Any | None], holder["result"])
+
+    elapsed = time.perf_counter() - t0
+    if proc.returncode != 0:
+        tail = (stderr or "").strip()[-500:]
+        raise RuntimeError(
+            f"legacy_mesh_budget_worker exited {proc.returncode}: {tail or stdout.strip()[-500:]}"
+        )
+    payload = json.loads(stdout)
+    if payload.get("status") == "error":
+        raise RuntimeError(f"{payload.get('error_type')}: {payload.get('error')}")
+    mesh = payload["mesh"]
+    profile = payload["profile"]
+    # Observables are not marshalled across the process boundary; callers use mesh fields.
+    return mesh, profile, None
 
 
 def _run_mesh_numeric_with_profile_impl(
