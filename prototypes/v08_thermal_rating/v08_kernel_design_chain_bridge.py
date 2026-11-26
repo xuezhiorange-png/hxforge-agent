@@ -27,9 +27,14 @@ from prototypes.v08_thermal_rating.v08_independent_engineering_rating_kernel_v1 
     KernelThermalRatingResult,
     rate_candidate_engineering_kernel_v1,
 )
+from prototypes.v08_thermal_rating.v08_kernel_engineering_report_v1 import (
+    KernelCaseEngineeringReport,
+    run_kernel_case_engineering_from_json,
+)
 
 TASK_ID = "V08-03"
 EXECUTION_STAGE = "INDEPENDENT_ENGINEERING_RATING_KERNEL"
+OFFICIAL_RATING_ENGINE = "kernel_v1"
 
 HydraulicPass = Literal["PASS", "FAIL", "ERROR"]
 ThermalPass = Literal["RATING_SUCCESS", "RATING_BLOCKED"]
@@ -193,8 +198,24 @@ def run_kernel_design_chain_for_fixture(
     )
 
 
+def run_official_v08_rating_compute(
+    case_json_text: str,
+    *,
+    provider: CoolPropProvider | None = None,
+    max_candidates: int = 64,
+) -> KernelCaseEngineeringReport:
+    """Single official CLI/API/web thermal rating entry (kernel v1, not Task173 prescreen)."""
+    return run_kernel_case_engineering_from_json(
+        case_json_text,
+        provider=provider,
+        max_candidates=max_candidates,
+    )
+
+
 __all__ = [
+    "OFFICIAL_RATING_ENGINE",
     "KernelChainCandidateRecord",
     "KernelDesignChainReport",
     "run_kernel_design_chain_for_fixture",
+    "run_official_v08_rating_compute",
 ]

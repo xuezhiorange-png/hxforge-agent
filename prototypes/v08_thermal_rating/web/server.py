@@ -16,9 +16,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from hexagent.properties.coolprop_provider import CoolPropProvider
-from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
-from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330
 from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report import (
     merged_web_api_payload,
     render_v08_05_markdown,
@@ -27,9 +24,10 @@ from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report imp
 from prototypes.v08_thermal_rating.v08_autonomous_design_tool import (
     render_design_report_markdown,
 )
+from prototypes.v08_thermal_rating.v08_kernel_design_chain_bridge import OFFICIAL_RATING_ENGINE
 from prototypes.v08_thermal_rating.v08_kernel_engineering_report_v1 import (
     kernel_web_payload,
-    run_kernel_case_engineering_matrix,
+    run_kernel_case_engineering_from_json,
 )
 from prototypes.v08_thermal_rating.web.case_builder import form_to_case_json, preset_fields
 from prototypes.v08_thermal_rating.web.svg_diagrams import diagrams_for_report
@@ -58,8 +56,8 @@ class DesignForm(BaseModel):
     max_candidates: int = Field(default=32, ge=4, le=64)
     run_mdot_verification: bool = True
     rating_engine: str = Field(
-        default="prescreen",
-        description="prescreen (legacy ε-NTU chain) or kernel_v1 (independent rating kernel)",
+        default=OFFICIAL_RATING_ENGINE,
+        description="kernel_v1 (official independent rating kernel) or prescreen (legacy ε-NTU)",
     )
 
 
@@ -67,34 +65,17 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-def _fixture_for_kernel_case(case_json: str) -> Path | None:
-    try:
-        case = load_general_user_design_case_json(case_json)
-        pipeline = validate_and_build_solver_handoff(case, provider=_PROVIDER)
-        duty = float(pipeline.normalized.target_duty_w)
-        if duty >= 320_000:
-            return FIXTURE_330.parent / "v08_user_case_hxforge_330kw_strict_dp.json"
-        if duty <= 225_000:
-            alt = FIXTURE_330.parent / "v08_user_case_no_geometry_task174_admissible_alt.json"
-            if abs(duty - 220_000) < abs(duty - 250_000):
-                return alt
-        return FIXTURE_250
-    except Exception:
-        return None
-
-
 def _compute_with_progress(
     case_json: str,
     *,
     max_candidates: int,
     run_mdot: bool,
-    rating_engine: str = "prescreen",
+    rating_engine: str = OFFICIAL_RATING_ENGINE,
 ) -> Generator[str, None, None]:
     t0 = time.time()
     yield _sse("progress", {"stage": "VALIDATE_INPUT", "message": "校验输入与单位…"})
     case_text = case_json
-    if rating_engine == "kernel_v1":
-        fx = _fixture_for_kernel_case(case_text) or FIXTURE_250
+    if rating_engine == OFFICIAL_RATING_ENGINE:
         yield _sse(
             "progress",
             {
@@ -102,12 +83,12 @@ def _compute_with_progress(
                 "message": "独立 Rating 内核 + 四接管/全路径水力…",
             },
         )
-        kernel_rep = run_kernel_case_engineering_matrix(
-            fx, provider=_PROVIDER, max_candidates=max_candidates
+        kernel_rep = run_kernel_case_engineering_from_json(
+            case_text, provider=_PROVIDER, max_candidates=max_candidates
         )
         payload = kernel_web_payload(kernel_rep)
         payload["elapsed_s"] = round(time.time() - t0, 2)
-        payload["fixture_used"] = str(fx)
+        payload["rating_engine"] = OFFICIAL_RATING_ENGINE
         yield _sse("result", {"report": payload})
         return
     yield _sse(
@@ -168,6 +149,16 @@ def run_design_stream(form: DesignForm) -> StreamingResponse:
 @app.post("/api/design/run")
 def run_design_sync(form: DesignForm) -> dict[str, Any]:
     case_json = form_to_case_json(form.model_dump())
+    if form.rating_engine == OFFICIAL_RATING_ENGINE:
+        kernel_rep = run_kernel_case_engineering_from_json(
+            case_json,
+            provider=_PROVIDER,
+            max_candidates=form.max_candidates,
+        )
+        payload = kernel_web_payload(kernel_rep)
+        payload["case_json_submitted"] = json.loads(case_json)
+        payload["rating_engine"] = OFFICIAL_RATING_ENGINE
+        return payload
     report = run_v08_05_qualified_selection(
         case_json,
         provider=_PROVIDER,
@@ -178,6 +169,7 @@ def run_design_sync(form: DesignForm) -> dict[str, Any]:
     payload["markdown_report"] = render_v08_05_markdown(report)
     payload["case_json_submitted"] = json.loads(case_json)
     payload["diagrams"] = diagrams_for_report(payload)
+    payload["rating_engine"] = "prescreen"
     return payload
 
 

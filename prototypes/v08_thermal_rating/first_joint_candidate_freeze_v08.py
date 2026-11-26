@@ -477,6 +477,7 @@ def run_first_joint_candidate_freeze(
     hydraulic = run_autonomous_nozzle_full_path(
         bindings,
         tube_nozzle_objective="MAX_MARGIN_WITHIN_VELOCITY_BAND",
+        shell_nozzle_objective="MAX_MARGIN_WITHIN_VELOCITY_BAND",
         tube_outlet_temperature_k=tube_out,
         shell_outlet_temperature_k=shell_out,
         provider=active,

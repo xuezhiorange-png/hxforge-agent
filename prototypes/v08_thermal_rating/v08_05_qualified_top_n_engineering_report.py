@@ -285,7 +285,11 @@ def run_v08_05_qualified_selection(
     top_n: int = 5,
     run_mdot_on_recommendation: bool = True,
 ) -> V08_05EngineeringReport:
-    """Canonical V08-05 pipeline: same chain for CLI, API, and web backend."""
+    """V08-05 prescreen Top-N pipeline (legacy experimental ranking).
+
+    Official thermal rating for V08-07 RC is `kernel_v1` via
+    `run_official_v08_rating_compute` in `v08_kernel_design_chain_bridge`.
+    """
     provider = provider or CoolPropProvider()
     tool: AutonomousDesignToolReport = run_autonomous_design_tool(
         case_json_text,

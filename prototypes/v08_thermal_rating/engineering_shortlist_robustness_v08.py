@@ -726,7 +726,12 @@ def _evaluate_layout_scenario(
     four_port = "BLOCKED"
     high_k_computed = False
     task173_state = "BINDINGS_OK"
-    if clean.predicted_tube_outlet_k is not None and clean.predicted_shell_outlet_k is not None:
+    may_compute_high_k = t027_status == "PASS" and scenario_key not in _MASS_FLOW_SCENARIOS
+    if (
+        may_compute_high_k
+        and clean.predicted_tube_outlet_k is not None
+        and clean.predicted_shell_outlet_k is not None
+    ):
         try:
             hydraulic = run_autonomous_nozzle_full_path(
                 bindings,

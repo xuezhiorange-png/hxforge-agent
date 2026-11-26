@@ -2,6 +2,8 @@
 
 Status: `PRE_REGISTERED_PENDING_FORMAL_REVIEW` (not retrofitted from solver outputs)
 
+**V08-07 RC official thermal authority:** CLI/API/web default `kernel_v1` via `run_official_v08_rating_compute` (`V08_INDEPENDENT_KERNEL_V1`). R0/P3 rows below are acceptance fixtures for that kernel matrix (`v08_06_kernel_version_acceptance.py`), not legacy ε-NTU prescreen.
+
 | Slot | Fixture | Engineering case ID | Duty | Flows (kg/s) | Tin tube/shell (K) | Δp limits (Pa) | Intent |
 |------|---------|---------------------|------|--------------|-------------------|----------------|--------|
 | R0 | `tests/fixtures/v08_user_case_hxforge_330kw_strict_dp.json` | `HXFORGE_330KW_STRICT_DP` | 330 kW | 13.9 / 26.21 | 303.15 / 333.15 | 1150 / 1180 | Frozen regression; V07 golden cousin, not generality proof |

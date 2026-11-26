@@ -15,6 +15,11 @@ from prototypes.v08_thermal_rating.v08_05_qualified_top_n_engineering_report imp
     render_v08_05_markdown,
     run_v08_05_qualified_selection,
 )
+from prototypes.v08_thermal_rating.v08_kernel_design_chain_bridge import (
+    OFFICIAL_RATING_ENGINE,
+    run_official_v08_rating_compute,
+)
+from prototypes.v08_thermal_rating.v08_kernel_engineering_report_v1 import kernel_web_payload
 
 _REPO = Path(__file__).resolve().parents[2]
 _FIXTURES = {
@@ -41,11 +46,40 @@ def main() -> None:
         type=Path,
         default=Path("/opt/cursor/artifacts"),
     )
+    parser.add_argument(
+        "--rating-engine",
+        choices=[OFFICIAL_RATING_ENGINE, "prescreen"],
+        default=OFFICIAL_RATING_ENGINE,
+        help="Official kernel v1 (default) or legacy prescreen Top-N chain",
+    )
     args = parser.parse_args()
     provider = CoolPropProvider()
     scenarios = list(_FIXTURES.keys()) if args.scenario == "all" else [args.scenario]
     if args.case_file is not None:
         text = args.case_file.read_text(encoding="utf-8")
+        if args.rating_engine == OFFICIAL_RATING_ENGINE:
+            kernel_rep = run_official_v08_rating_compute(
+                text, provider=provider, max_candidates=args.max_candidates
+            )
+            artifact_dir = args.artifact_dir
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            stem = args.case_file.stem
+            payload = kernel_web_payload(kernel_rep)
+            (artifact_dir / f"v08_official_kernel_{stem}.json").write_text(
+                json.dumps(payload, indent=2), encoding="utf-8"
+            )
+            print(
+                json.dumps(
+                    {
+                        "rating_engine": OFFICIAL_RATING_ENGINE,
+                        "case": kernel_rep.case_id,
+                        "e2e_count": kernel_rep.successful_e2e_count,
+                        "report_hash": kernel_rep.report_hash,
+                    },
+                    indent=2,
+                )
+            )
+            return
         report = run_v08_05_qualified_selection(
             text,
             provider=provider,
@@ -77,6 +111,25 @@ def main() -> None:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     for key in scenarios:
         text = _FIXTURES[key].read_text(encoding="utf-8")
+        if args.rating_engine == OFFICIAL_RATING_ENGINE:
+            kernel_rep = run_official_v08_rating_compute(
+                text, provider=provider, max_candidates=args.max_candidates
+            )
+            payload = kernel_web_payload(kernel_rep)
+            (artifact_dir / f"v08_official_kernel_{key}.json").write_text(
+                json.dumps(payload, indent=2), encoding="utf-8"
+            )
+            print(
+                json.dumps(
+                    {
+                        "scenario": key,
+                        "rating_engine": OFFICIAL_RATING_ENGINE,
+                        "e2e_count": kernel_rep.successful_e2e_count,
+                    },
+                    indent=2,
+                )
+            )
+            continue
         report = run_v08_05_qualified_selection(
             text,
             provider=provider,

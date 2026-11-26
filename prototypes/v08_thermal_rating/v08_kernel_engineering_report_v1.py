@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import asdict, dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -126,6 +125,30 @@ def _qualify(
     return "HYDRAULIC_OR_NOZZLE_BLOCKED"
 
 
+def run_kernel_case_engineering_from_json(
+    case_json_text: str,
+    *,
+    provider: CoolPropProvider | None = None,
+    max_candidates: int = 64,
+) -> KernelCaseEngineeringReport:
+    """Official V08 rating path: kernel matrix from arbitrary validated case JSON."""
+    from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
+    from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
+
+    active = provider or CoolPropProvider()
+    case = load_general_user_design_case_json(case_json_text)
+    pipeline = validate_and_build_solver_handoff(case, provider=active)
+    if not pipeline.ok or pipeline.normalized is None or pipeline.handoff is None:
+        raise ValueError("KERNEL_CASE_INGESTION_BLOCKED")
+    return _run_kernel_case_engineering_matrix_core(
+        pipeline.normalized,
+        pipeline.handoff,
+        source_label="INLINE_CASE_JSON",
+        provider=active,
+        max_candidates=max_candidates,
+    )
+
+
 def run_kernel_case_engineering_matrix(
     fixture: Path,
     *,
@@ -134,14 +157,27 @@ def run_kernel_case_engineering_matrix(
 ) -> KernelCaseEngineeringReport:
     active = provider or CoolPropProvider()
     normalized, handoff, _ = load_case_bindings(fixture, provider=active)
+    return _run_kernel_case_engineering_matrix_core(
+        normalized,
+        handoff,
+        source_label=str(fixture),
+        provider=active,
+        max_candidates=max_candidates,
+    )
+
+
+def _run_kernel_case_engineering_matrix_core(
+    normalized: Any,
+    handoff: Any,
+    *,
+    source_label: str,
+    provider: CoolPropProvider,
+    max_candidates: int,
+) -> KernelCaseEngineeringReport:
     space_hash, t168_digest, bundles, geom_hashes = enumerate_structural_bundles(
         normalized, handoff, max_valid=max_candidates
     )
-    norm_hash = canonical_sha256(
-        json.loads(fixture.read_text(encoding="utf-8"))
-        if False
-        else {"engineering_case_id": normalized.engineering_case_id}
-    )
+    norm_hash = canonical_sha256({"engineering_case_id": normalized.engineering_case_id})
     rows: list[KernelCandidateEngineeringRow] = []
     for bundle in bundles:
         cid = bundle.candidate.candidate_id
@@ -152,7 +188,7 @@ def run_kernel_case_engineering_matrix(
             t168_digest=t168_digest,
             normalized=normalized,
             handoff=handoff,
-            provider=active,
+            provider=provider,
             geometry_projection_hash=gh,
         )
         if bindings is None:
@@ -183,9 +219,9 @@ def run_kernel_case_engineering_matrix(
                 )
             )
             continue
-        thermal = rate_candidate_engineering_kernel_v1(bindings, normalized, provider=active)
-        joint = evaluate_kernel_joint_hydraulics(bindings, thermal, provider=active)
-        legacy = evaluate_v08_04_candidate_hydraulics(bindings, provider=active)
+        thermal = rate_candidate_engineering_kernel_v1(bindings, normalized, provider=provider)
+        joint = evaluate_kernel_joint_hydraulics(bindings, thermal, provider=provider)
+        legacy = evaluate_v08_04_candidate_hydraulics(bindings, provider=provider)
         legacy_blockers = tuple(legacy.hard_gate.blockers or ())
         res = thermal.resistance
         ports = tuple(
@@ -259,7 +295,7 @@ def run_kernel_case_engineering_matrix(
         "rows": [asdict(r) for r in rows],
     }
     return KernelCaseEngineeringReport(
-        fixture_path=str(fixture),
+        fixture_path=source_label,
         case_id=normalized.engineering_case_id,
         normalization_hash=norm_hash,
         candidate_space_hash=space_hash,
@@ -307,6 +343,7 @@ def kernel_web_payload(case_report: KernelCaseEngineeringReport) -> dict[str, An
 __all__ = [
     "KernelCandidateEngineeringRow",
     "KernelCaseEngineeringReport",
+    "run_kernel_case_engineering_from_json",
     "run_kernel_case_engineering_matrix",
     "kernel_web_payload",
     "RATING_AUTHORITY_TIER",
