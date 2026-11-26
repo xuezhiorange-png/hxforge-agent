@@ -11,6 +11,5 @@ def test_r25c_scalar_profile_id() -> None:
 
 
 def test_wide_scalar_two_budget_constants_are_bounded() -> None:
-    assert task172_service._WIDE_SCALAR_TWO_UPPER_BISECTION_MAX <= 32
-    assert task172_service._WIDE_SCALAR_TWO_MAX_BRENT_ITER <= 64
+    assert task172_service._WIDE_EXPERIMENTAL_MAX_NFEV <= 32
     assert task172_service._WIDE_EXPERIMENTAL_CALLBACK_CAP <= 64

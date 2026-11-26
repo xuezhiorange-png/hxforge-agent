@@ -5,9 +5,8 @@
 from __future__ import annotations
 
 import itertools
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, cast
@@ -347,49 +346,59 @@ def run_mesh_numeric_with_profile(
             tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
             shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
         )
-    t0 = time.perf_counter()
-    pool = ThreadPoolExecutor(max_workers=1)
-    future = pool.submit(
-        _run_mesh_numeric_with_profile_impl,
-        native,
-        subdivisions=subdivisions,
-        enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
-        case=case,
-        enable_live_thermal_boundary=enable_live_thermal_boundary,
-        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
-        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
-    )
-    try:
+    done = threading.Event()
+    holder: dict[str, Any] = {}
+
+    def _worker() -> None:
         try:
-            return future.result(timeout=resource_budget_wall_s)
-        except FuturesTimeoutError:
-            elapsed = time.perf_counter() - t0
-            mesh = {
-                "schema_version": "hxforge.low-mesh-result.v1",
-                "status": "BLOCKED",
-                "mesh_level": subdivisions,
-                "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
-                "diagnostics": [
-                    f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
-                    "legacy_resource_budget_enforcement=SOFT_WALL_TIMEOUT_THREAD_POOL",
-                    f"elapsed_wall_s={elapsed:.3f}",
-                ],
-                "wall_seconds": round(elapsed, 3),
-                "low_mesh_numeric_valid": False,
-                "full_rating_converged": False,
-            }
-            profile = build_solver_performance_profile(
-                stats=t173._CellSearchStats(),
-                mesh_run=None,
-                property_provider_state_lookup_count=0,
-                total_wall_seconds=elapsed,
+            holder["result"] = _run_mesh_numeric_with_profile_impl(
+                native,
                 subdivisions=subdivisions,
-                tp_cache_stats=None,
+                enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+                case=case,
+                enable_live_thermal_boundary=enable_live_thermal_boundary,
+                tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+                shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
             )
-            return mesh, profile, None
-    finally:
-        # Do not join a stuck CoolProp worker after budget expiry (pytest would hang).
-        pool.shutdown(wait=False, cancel_futures=True)
+        except BaseException as exc:
+            holder["error"] = exc
+        finally:
+            done.set()
+
+    # Daemon worker: budget wait does not join a stuck CoolProp thread; pytest subprocess can exit.
+    thread = threading.Thread(target=_worker, name="legacy-mesh-profile-budget", daemon=True)
+    t0 = time.perf_counter()
+    thread.start()
+    finished = done.wait(timeout=resource_budget_wall_s)
+    if not finished:
+        elapsed = time.perf_counter() - t0
+        mesh = {
+            "schema_version": "hxforge.low-mesh-result.v1",
+            "status": "BLOCKED",
+            "mesh_level": subdivisions,
+            "failure_code": LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+            "diagnostics": [
+                f"legacy_low_mesh_resource_budget_wall_s={resource_budget_wall_s}",
+                "legacy_resource_budget_enforcement=SOFT_WALL_DAEMON_THREAD",
+                f"elapsed_wall_s={elapsed:.3f}",
+                "worker_joined=false",
+            ],
+            "wall_seconds": round(elapsed, 3),
+            "low_mesh_numeric_valid": False,
+            "full_rating_converged": False,
+        }
+        profile = build_solver_performance_profile(
+            stats=t173._CellSearchStats(),
+            mesh_run=None,
+            property_provider_state_lookup_count=0,
+            total_wall_seconds=elapsed,
+            subdivisions=subdivisions,
+            tp_cache_stats=None,
+        )
+        return mesh, profile, None
+    if "error" in holder:
+        raise holder["error"]
+    return cast(tuple[dict[str, Any], dict[str, Any], Any | None], holder["result"])
 
 
 def _run_mesh_numeric_with_profile_impl(
