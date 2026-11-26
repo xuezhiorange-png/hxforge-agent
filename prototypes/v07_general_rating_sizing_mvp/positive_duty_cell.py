@@ -348,17 +348,18 @@ def run_mesh_numeric_with_profile(
             shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
         )
     t0 = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(
-            _run_mesh_numeric_with_profile_impl,
-            native,
-            subdivisions=subdivisions,
-            enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
-            case=case,
-            enable_live_thermal_boundary=enable_live_thermal_boundary,
-            tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
-            shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
-        )
+    pool = ThreadPoolExecutor(max_workers=1)
+    future = pool.submit(
+        _run_mesh_numeric_with_profile_impl,
+        native,
+        subdivisions=subdivisions,
+        enable_ephemeral_tp_cache=enable_ephemeral_tp_cache,
+        case=case,
+        enable_live_thermal_boundary=enable_live_thermal_boundary,
+        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+    )
+    try:
         try:
             return future.result(timeout=resource_budget_wall_s)
         except FuturesTimeoutError:
@@ -386,6 +387,9 @@ def run_mesh_numeric_with_profile(
                 tp_cache_stats=None,
             )
             return mesh, profile, None
+    finally:
+        # Do not join a stuck CoolProp worker after budget expiry (pytest would hang).
+        pool.shutdown(wait=False, cancel_futures=True)
 
 
 def _run_mesh_numeric_with_profile_impl(

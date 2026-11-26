@@ -209,7 +209,9 @@ shards:
       - tests/release_demo/test_v0_2_task020_to_task029.py
       - tests/release_demo/test_v0_3_task020_to_task035.py
       - tests/release_demo/test_v0_4_task020_to_task038.py
-    timeout: 600
+    # Runner subprocess cap (tests.ci.run_test_shard), not per-test engineering budget.
+    # CI 45764324314: pr-head py3.11 junit wall ~540s; merge-ref py3.12 hit 600s runner TIMEOUT.
+    timeout: 900
 
   - name: ci-acceptance
     job: shard-ci-acceptance
@@ -579,9 +581,15 @@ shards:
     files:
       - tests/prototypes/test_v08_autonomous_design_user_input_delivery.py
       - tests/prototypes/test_v08_autonomous_engineering_selection_mvp.py
-      - tests/prototypes/test_fixed_layout_variable_mdot_hydraulic_replay_v1.py
       - tests/prototypes/test_v08_experimental_user_trial_web.py
-    timeout: 3600
+    # CI 45764324314: py3.12 runner killed at 3600s (10/17 nodes); py3.11 wall ~768s.
+    timeout: 1800
+  - name: v08-autonomous-hydraulic-replay
+    job: shard-v08-autonomous-hydraulic-replay
+    python: ["3.11", "3.12"]
+    files:
+      - tests/prototypes/test_fixed_layout_variable_mdot_hydraulic_replay_v1.py
+    timeout: 5400
   - name: v08-04-hydraulic-feasibility-gate
     job: shard-v08-04-hydraulic-feasibility-gate
     python: ["3.11", "3.12"]
@@ -610,6 +618,7 @@ shards:
       - tests/prototypes/test_v08_independent_engineering_rating_kernel_v1.py
       - tests/prototypes/test_v08_kernel_engineering_integration_v1.py
       - tests/prototypes/test_v08_06_kernel_version_acceptance.py
+      - tests/prototypes/test_v08_07_legacy_supersession_governance.py
     timeout: 5400
   - name: v08-03-shell-path-hydraulic
     job: shard-v08-03-shell-path-hydraulic

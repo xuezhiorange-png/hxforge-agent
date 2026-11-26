@@ -2462,7 +2462,8 @@ def validate_request(
     *,
     loaded_rule_pack: LoadedRulePackView | None = None,
     validation_report: RulePackValidationReport | None = None,
-) -> ConfigurationValidationResult: ...
+) -> ConfigurationValidationResult:
+    ...
 ```
 
 Explicit rules:

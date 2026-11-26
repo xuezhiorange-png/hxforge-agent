@@ -213,7 +213,6 @@ def verify_file_completeness(manifest, test_root):
 ```python
 PythonVersion = Literal["3.11", "3.12"]
 
-
 def verify_per_version(G_v, S_v_i, manifest):
     for version in ("3.11", "3.12"):
         applicable = [s for s in manifest["shards"] if version in s["python"]]
@@ -249,7 +248,6 @@ class PropertyProvider(Protocol):
     version: str
     git_revision: str
     reference_state_policy: ReferenceStatePolicy
-
     def state_tp(self, fluid, temperature_k, pressure_pa) -> FluidState: ...
     def state_ph(self, fluid, pressure_pa, enthalpy_j_kg, *, reference_state) -> FluidState: ...
     def saturation_at_pressure(self, fluid, pressure_pa) -> SaturationState: ...
@@ -317,18 +315,15 @@ If any required producer job did not execute in current attempt: overall workflo
 Each aggregate job generates expected identity set:
 
 ```python
-ExpectedIdentity = NamedTuple(
-    "ExpectedIdentity",
-    [
-        ("run_id", str),
-        ("run_attempt", int),
-        ("track", str),
-        ("shard", str),
-        ("python_version", str),
-        ("commit_sha", str),
-        ("artifact_kind", str),
-    ],
-)
+ExpectedIdentity = NamedTuple("ExpectedIdentity", [
+    ("run_id", str),
+    ("run_attempt", int),
+    ("track", str),
+    ("shard", str),
+    ("python_version", str),
+    ("commit_sha", str),
+    ("artifact_kind", str),
+])
 ```
 
 Proves: `downloaded identities == expected identities`. Fails if any artifact from old attempt, any required producer missing, any identity missing/duplicated, SHA/track mismatch.

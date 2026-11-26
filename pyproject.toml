@@ -53,6 +53,12 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Frozen TASK contract docs (byte-stable; hash-pinned in tests/ci governance).
+exclude = [
+  "docs/tasks/TASK-010-report-and-api.md",
+  "docs/tasks/TASK-015A-deterministic-test-environment-and-ci-sharding.md",
+  "docs/tasks/TASK-020-shell-and-tube-configuration-schema.md",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]

@@ -1,6 +1,14 @@
-"""V08-03 independent-case live rating (isolated CI shard; 7200s pytest timeout preserved)."""
+"""V08-03 independent-case live Task173 rating (legacy experimental path).
+
+Formal PR CI: skipped — superseded by kernel V1 P2 (`v08_06_kernel_version_acceptance`).
+Historical execution: workflow `v08-legacy-task173-experimental.yml` with
+`HXFORGE_LEGACY_EXPERIMENTAL_V08_TASK173=1`.
+Evidence: `docs/tasks/evidence/V08-07-task173-independent-heavy-supersession-r1.md`
+"""
 
 from __future__ import annotations
+
+import os
 
 import pytest
 
@@ -16,9 +24,20 @@ from tests.prototypes.v08_thermal_rating_test_support import (
 # Node migration: from tests/prototypes/test_v08_thermal_rating.py (pre-partition)
 
 
+_LEGACY_TASK173_EXPERIMENTAL = (
+    os.environ.get("HXFORGE_LEGACY_EXPERIMENTAL_V08_TASK173", "").strip() == "1"
+)
+
+
 @pytest.mark.timeout(7200)
 def test_v08_03_independent_case_input_delta() -> None:
     """Non-reference case: target duty and tube inlet differ; handoff carries thermal binding."""
+    if not _LEGACY_TASK173_EXPERIMENTAL:
+        pytest.skip(
+            "SUPERSEDED_BY_V08_KERNEL_P2: independent-case Task173 live rating replaced by "
+            "FIXTURE_P2 kernel matrix (see V08-07-task173-independent-heavy-supersession-r1.md); "
+            "set HXFORGE_LEGACY_EXPERIMENTAL_V08_TASK173=1 for historical replay"
+        )
     n1, h1 = ready_handoff(FIXTURE)
     n2, h2 = ready_handoff(FIXTURE_ALT)
     assert h1.downstream_readiness == "THERMAL_HYDRAULIC_PARAMETERS_READY"

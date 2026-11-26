@@ -4,19 +4,34 @@
 
 from __future__ import annotations
 
+import pytest
+
 from hexagent.properties.coolprop_provider import CoolPropProvider
 from prototypes.v08_thermal_rating.case_identity_v08 import FIXTURE_250, FIXTURE_330
 from prototypes.v08_thermal_rating.v08_autonomous_engineering_selection_mvp import (
     ENGINEERING_DESIGN_STATUS,
+    AutonomousEngineeringSelectionReport,
     run_autonomous_engineering_selection,
 )
 
 
-def test_joint_pass_stricter_than_hydraulic_tiers_computed() -> None:
-    report = run_autonomous_engineering_selection(
+@pytest.fixture(scope="module")
+def provider() -> CoolPropProvider:
+    return CoolPropProvider()
+
+
+@pytest.fixture(scope="module")
+def report_330(provider: CoolPropProvider) -> AutonomousEngineeringSelectionReport:
+    return run_autonomous_engineering_selection(
         FIXTURE_330.read_text(encoding="utf-8"),
-        provider=CoolPropProvider(),
+        provider=provider,
     )
+
+
+def test_joint_pass_stricter_than_hydraulic_tiers_computed(
+    report_330: AutonomousEngineeringSelectionReport,
+) -> None:
+    report = report_330
     hydraulic_only = [
         v
         for v in report.scenario_verdicts
@@ -30,11 +45,10 @@ def test_joint_pass_stricter_than_hydraulic_tiers_computed() -> None:
     )
 
 
-def test_t235_l5p5_three_sweeps_below_330kw_target() -> None:
-    report = run_autonomous_engineering_selection(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=CoolPropProvider(),
-    )
+def test_t235_l5p5_three_sweeps_below_330kw_target(
+    report_330: AutonomousEngineeringSelectionReport,
+) -> None:
+    report = report_330
     audit = report.t235_l5p5_thermal_audit
     assert audit["scenarios_below_target_count"] == 3
     keys = {row["scenario_key"] for row in audit["below_target_rows"]}
@@ -45,19 +59,18 @@ def test_t235_l5p5_three_sweeps_below_330kw_target() -> None:
     }
 
 
-def test_robust_exploration_null_on_330kw() -> None:
-    report = run_autonomous_engineering_selection(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=CoolPropProvider(),
-    )
+def test_robust_exploration_null_on_330kw(
+    report_330: AutonomousEngineeringSelectionReport,
+) -> None:
+    report = report_330
     assert report.rankings.robust_exploration is None
 
 
-def test_independent_250kw_changes_hydraulic_ranking() -> None:
-    provider = CoolPropProvider()
-    r330 = run_autonomous_engineering_selection(
-        FIXTURE_330.read_text(encoding="utf-8"), provider=provider
-    )
+def test_independent_250kw_changes_hydraulic_ranking(
+    provider: CoolPropProvider,
+    report_330: AutonomousEngineeringSelectionReport,
+) -> None:
+    r330 = report_330
     r250 = run_autonomous_engineering_selection(
         FIXTURE_250.read_text(encoding="utf-8"), provider=provider
     )
@@ -67,11 +80,10 @@ def test_independent_250kw_changes_hydraulic_ranking() -> None:
     assert r330.engineering_design_status == ENGINEERING_DESIGN_STATUS
 
 
-def test_selected_design_spec_has_required_fields() -> None:
-    report = run_autonomous_engineering_selection(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=CoolPropProvider(),
-    )
+def test_selected_design_spec_has_required_fields(
+    report_330: AutonomousEngineeringSelectionReport,
+) -> None:
+    report = report_330
     spec = report.selected_design_spec
     assert spec is not None
     g = spec["geometry"]

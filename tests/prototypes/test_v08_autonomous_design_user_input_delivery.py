@@ -27,6 +27,16 @@ def provider() -> CoolPropProvider:
     return CoolPropProvider()
 
 
+@pytest.fixture(scope="module")
+def report_330_32(provider: CoolPropProvider):
+    return run_autonomous_design_tool(
+        FIXTURE_330.read_text(encoding="utf-8"),
+        provider=provider,
+        max_candidates=32,
+        run_mdot_on_recommendation=False,
+    )
+
+
 def test_unsupported_fluid_blocked_at_schema(provider: CoolPropProvider) -> None:
     base = json.loads(FIXTURE_330.read_text(encoding="utf-8"))
     base["tube_side"]["fluid"] = "NOT_A_SUPPORTED_FLUID"
@@ -35,13 +45,8 @@ def test_unsupported_fluid_blocked_at_schema(provider: CoolPropProvider) -> None
     assert ingestion.blockers
 
 
-def test_330kw_dynamic_generation_exceeds_fixed_shortlist(provider: CoolPropProvider) -> None:
-    report = run_autonomous_design_tool(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=provider,
-        max_candidates=32,
-        run_mdot_on_recommendation=False,
-    )
+def test_330kw_dynamic_generation_exceeds_fixed_shortlist(report_330_32) -> None:
+    report = report_330_32
     assert report.ingestion.ok
     assert report.structural_candidates_generated >= 7
     assert report.engineering_design_status == ENGINEERING_DESIGN_STATUS
@@ -52,13 +57,11 @@ def test_330kw_dynamic_generation_exceeds_fixed_shortlist(provider: CoolPropProv
     assert len(spec.get("nozzles_four_port", [])) == 4
 
 
-def test_250kw_independent_generation_not_hardcoded_rank(provider: CoolPropProvider) -> None:
-    r330 = run_autonomous_design_tool(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=provider,
-        max_candidates=24,
-        run_mdot_on_recommendation=False,
-    )
+def test_250kw_independent_generation_not_hardcoded_rank(
+    provider: CoolPropProvider,
+    report_330_32,
+) -> None:
+    r330 = report_330_32
     r250 = run_autonomous_design_tool(
         FIXTURE_250.read_text(encoding="utf-8"),
         provider=provider,
@@ -76,13 +79,11 @@ def test_250kw_independent_generation_not_hardcoded_rank(provider: CoolPropProvi
     )
 
 
-def test_constraint_change_reduces_or_shifts_candidates(provider: CoolPropProvider) -> None:
-    wide = run_autonomous_design_tool(
-        FIXTURE_330.read_text(encoding="utf-8"),
-        provider=provider,
-        max_candidates=32,
-        run_mdot_on_recommendation=False,
-    )
+def test_constraint_change_reduces_or_shifts_candidates(
+    provider: CoolPropProvider,
+    report_330_32,
+) -> None:
+    wide = report_330_32
     tight = run_autonomous_design_tool(
         FIXTURE_TIGHT.read_text(encoding="utf-8"),
         provider=provider,
