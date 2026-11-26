@@ -133,13 +133,17 @@ def run_kernel_case_engineering_from_json(
 ) -> KernelCaseEngineeringReport:
     """Official V08 rating path: kernel matrix from arbitrary validated case JSON."""
     from prototypes.v08_general_user_case.loader import load_general_user_design_case_json
-    from prototypes.v08_general_user_case.pipeline import validate_and_build_solver_handoff
+    from prototypes.v08_general_user_case.pipeline import (
+        V08UserCaseValidationError,
+        validate_and_build_solver_handoff,
+    )
 
     active = provider or CoolPropProvider()
     case = load_general_user_design_case_json(case_json_text)
-    pipeline = validate_and_build_solver_handoff(case, provider=active)
-    if not pipeline.ok or pipeline.normalized is None or pipeline.handoff is None:
-        raise ValueError("KERNEL_CASE_INGESTION_BLOCKED")
+    try:
+        pipeline = validate_and_build_solver_handoff(case, provider=active)
+    except V08UserCaseValidationError as exc:
+        raise ValueError("KERNEL_CASE_INGESTION_BLOCKED") from exc
     return _run_kernel_case_engineering_matrix_core(
         pipeline.normalized,
         pipeline.handoff,

@@ -28,5 +28,6 @@ def test_sync_design_330kw_smoke() -> None:
     r = client.post("/api/design/run", json=preset)
     assert r.status_code == 200
     body = r.json()
-    assert body["ingestion"]["ok"] is True
-    assert body["structural_candidates_generated"] >= 7
+    assert body.get("rating_engine") == "kernel_v1"
+    assert body.get("schema") == "hxforge.kernel-engineering-report.v1"
+    assert len(body.get("all_candidates") or []) >= 3

@@ -297,11 +297,7 @@ def _run_r0_shortlist(
 def _run_n1(provider: CoolPropProvider) -> SlotRecord:
     try:
         case = load_general_user_design_case_json(_N1_JSON)
-        pipeline = validate_and_build_solver_handoff(case, provider=provider)
-        if not pipeline.ok:
-            return SlotRecord(
-                "N1", "INVALID_INPUT", case.engineering_case_id, 0, 0, None, ("ingestion_blocked",)
-            )
+        validate_and_build_solver_handoff(case, provider=provider)
         return SlotRecord(
             "N1",
             "EXPECTED_BLOCKED",
