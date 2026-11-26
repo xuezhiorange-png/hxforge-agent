@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import subprocess
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -480,9 +481,6 @@ def test_no_upstream_mutation_required_or_performed() -> None:
     time, or simply: the file mtimes for upstream modules are all
     older than the adapter file mtime)."""
     import importlib
-    import inspect
-
-    from hexagent.validation_report import chain_adapter
 
     upstream_modules = [
         "hexagent.exchangers.double_pipe.rating",
@@ -500,23 +498,29 @@ def test_no_upstream_mutation_required_or_performed() -> None:
         "hexagent.properties.base",
         "hexagent.correlations.flow",
     ]
-    adapter_path = Path(inspect.getfile(chain_adapter))
-    adapter_mtime = adapter_path.stat().st_mtime
+    repo_root = Path(__file__).resolve().parents[2]
+    rel_sources: list[str] = []
     for mod_name in upstream_modules:
         mod = importlib.import_module(mod_name)
         mod_file = getattr(mod, "__file__", None)
         if mod_file is None:
-            mod_file = str(adapter_path)
-        mod_path = Path(mod_file)
-        if mod_path.exists():
-            mod_mtime = mod_path.stat().st_mtime
-            # Each upstream module's mtime must NOT be newer than the
-            # adapter's mtime (which would indicate upstream was
-            # modified by the adapter).
-            assert mod_mtime <= adapter_mtime, (
-                f"upstream module {mod_name} mtime {mod_mtime} > adapter mtime "
-                f"{adapter_mtime}; the adapter may have modified upstream code"
-            )
+            continue
+        mod_path = Path(mod_file).resolve()
+        try:
+            rel_sources.append(mod_path.relative_to(repo_root).as_posix())
+        except ValueError:
+            continue
+    proc = subprocess.run(
+        ["git", "diff", "--quiet", "HEAD", "--", *rel_sources],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        "upstream production sources differ from HEAD; the adapter or test run may have "
+        f"mutated them: stderr={proc.stderr.strip()!r}"
+    )
 
 
 # Additional helper test: the chain-wired case block's actual_output_sha256

@@ -248,7 +248,9 @@ shards:
       - tests/unit/test_task016_geometry_catalog_pipe_refs.py
       - tests/unit/test_thermal.py
       - tests/unit/test_tube_annulus_correlations.py
-    timeout: 120
+    # CI 45794028808: runner cap 120s killed pure-unit (pytest_exit -9) after ~1689 outcomes;
+    # local run_test_shard+cov wall ~67s; merge-ref/py3.12 runners need headroom.
+    timeout: 240
 
   - name: coolprop-unit
     job: shard-coolprop-unit

@@ -128,6 +128,41 @@ def _run_live_cli(case_path: Path, output_dir: Path) -> dict[str, Any]:
     return json.loads((output_dir / "RAW_RESULT.json").read_text())
 
 
+@pytest.mark.timeout(150)
+def test_legacy_resource_budget_consecutive_calls_bounded_and_reentrant() -> None:
+    """Budget enforcement must return without joining abandoned daemon workers."""
+    import threading
+    import time
+
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+        build_native_cell_context,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    threads_before = threading.active_count()
+    t0 = time.perf_counter()
+    budget_s = 25.0
+    for _ in range(3):
+        mesh, _, _ = run_mesh_numeric_with_profile(
+            native,
+            subdivisions=1,
+            case=case,
+            enable_live_thermal_boundary=True,
+            resource_budget_wall_s=budget_s,
+        )
+        assert mesh.get("status") == "BLOCKED"
+        assert mesh.get("failure_code") == LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE
+        assert mesh.get("diagnostics")
+        assert any("SOFT_WALL_DAEMON_THREAD" in d for d in mesh["diagnostics"])
+    elapsed = time.perf_counter() - t0
+    # Three independent budget waits; must not join stuck CoolProp threads between calls.
+    assert elapsed < budget_s * 3 + 45.0
+    assert threading.active_count() <= threads_before + 3
+
+
 @pytest.mark.timeout(300)
 def test_r23_primary_310_295_k_reports_honest_outcome() -> None:
     from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
