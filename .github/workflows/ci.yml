@@ -121,6 +121,7 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
+          bash tests/ci/disable_optional_apt_sources.sh
           for attempt in 1 2 3 4 5; do
             if sudo apt-get update; then
               break
@@ -411,6 +412,7 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
+          bash tests/ci/disable_optional_apt_sources.sh
           for attempt in 1 2 3 4 5; do
             if sudo apt-get update; then
               break
@@ -910,6 +912,7 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
+          bash tests/ci/disable_optional_apt_sources.sh
           for attempt in 1 2 3 4 5; do
             if sudo apt-get update; then
               break
@@ -1209,6 +1212,7 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
+          bash tests/ci/disable_optional_apt_sources.sh
           for attempt in 1 2 3 4 5; do
             if sudo apt-get update; then
               break
@@ -1483,6 +1487,7 @@ jobs:
             echo "/usr/local/bin" >> "${GITHUB_PATH}"
             exit 0
           fi
+          bash tests/ci/disable_optional_apt_sources.sh
           for attempt in 1 2 3 4 5; do
             if sudo apt-get update; then
               break

@@ -2765,6 +2765,7 @@ class TestMergeAuthorityCIMA:
             '${HXFORGE_MERGE_AUTHORITY_GIT_SOURCE_VERSION}"',
             'export PATH="/usr/local/bin:${PATH}"',
             'echo "/usr/local/bin" >> "${GITHUB_PATH}"',
+            "tests/ci/disable_optional_apt_sources.sh",
             "merge-authority-error: git toolchain normalization failed",
             "merge-authority-git-version=",
         )
