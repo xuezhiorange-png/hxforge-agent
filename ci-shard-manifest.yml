@@ -1,7 +1,7 @@
 version: "1"
 shards:
 - name: ci-governance
-  job: shard-ci
+  job: shard-ci-governance
   python: ["3.11", "3.12"]
   files:
   - tests/ci/test_benchmark_authority.py
@@ -58,9 +58,8 @@ shards:
   - tests/validation_report/test_materialization_contract.py
   - tests/validation_report/test_chain_wiring_adapter.py
   timeout: 900
-
-  - name: ci-engineering-regression
-  job: shard-ci
+- name: ci-engineering-regression
+  job: shard-ci-engineering-regression
   python: ["3.11", "3.12"]
   files:
   - tests/exchangers/shell_tube/test_task020_authority.py

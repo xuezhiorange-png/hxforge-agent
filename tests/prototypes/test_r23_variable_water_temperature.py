@@ -237,8 +237,6 @@ def test_legacy_resource_budget_consecutive_calls_bounded_and_reentrant() -> Non
 @pytest.mark.timeout(200)
 def test_legacy_mesh_budget_ipc_observables_not_marshalled_parent_gets_mesh_fields() -> None:
     """Budget subprocess completes: parent returns mesh+profile; observables stay in worker."""
-    import time
-
     from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
         build_native_cell_context,
         run_mesh_numeric_with_profile,
