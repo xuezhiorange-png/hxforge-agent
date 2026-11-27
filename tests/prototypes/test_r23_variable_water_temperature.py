@@ -234,6 +234,33 @@ def test_legacy_resource_budget_consecutive_calls_bounded_and_reentrant() -> Non
     assert count_legacy_mesh_budget_worker_processes() == 0
 
 
+@pytest.mark.timeout(200)
+def test_legacy_mesh_budget_ipc_observables_not_marshalled_parent_gets_mesh_fields() -> None:
+    """Budget subprocess completes: parent returns mesh+profile; observables stay in worker."""
+    import time
+
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    mesh, profile, obs = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+        resource_budget_wall_s=120.0,
+        _test_inject_sleep_s=0.05,
+    )
+    assert obs is None
+    assert isinstance(mesh, dict)
+    assert "status" in mesh
+    assert isinstance(profile, dict)
+    assert mesh.get("schema_version") == "hxforge.low-mesh-result.v1"
+
+
 @pytest.mark.timeout(300)
 def test_r23_primary_310_295_k_reports_honest_outcome() -> None:
     from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (

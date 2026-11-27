@@ -1,699 +1,665 @@
 version: "1"
 shards:
-  - name: ci
-    job: shard-ci
-    python: ["3.11", "3.12"]
-    files:
-      - tests/ci/test_benchmark_authority.py
-      - tests/benchmark/test_task011_corpus.py
-      - tests/ci/test_node_inventory.py
-      - tests/ci/test_outcome_plugin.py
-      - tests/ci/test_shard_manifest.py
-      - tests/ci/test_shared_infrastructure.py
-      - tests/governance/test_errors.py
-      - tests/governance/test_spec_validator.py
-      - tests/governance/test_11_2_8_frozen_contract_reference.py
-      - tests/governance/test_11_3_13_branch_protection_assertion.py
-      - tests/governance/test_11_3_14_release_gate_assertion.py
-      - tests/governance/test_9_2_provenance_chain.py
-      - tests/support/test_mypy_doubles.py
-      - tests/support/test_property_provider_doubles.py
-      - tests/canonical_json/test_shared_canonical_json.py
-      - tests/rule_packs/test_canonical_json_integration.py
-      - tests/rule_packs/test_license_boundary.py
-      - tests/rule_packs/test_provenance.py
-      - tests/rule_packs/test_schema.py
-      - tests/rule_packs/test_seed_rule_pack.py
-      - tests/rule_packs/test_validation.py
-      - tests/material_costs/test_material_record_schema.py
-      - tests/material_costs/test_cost_record_schema.py
-      - tests/material_costs/test_license_boundary.py
-      - tests/material_costs/test_selection.py
-      - tests/material_costs/test_validation.py
-      - tests/material_costs/test_frozen_contract_unchanged.py
-      - tests/costing/test_cost_model_selector.py
-      - tests/costing/test_cost_calculator.py
-      - tests/costing/test_life_cycle_energy_estimator.py
-      - tests/costing/test_frozen_contract_unchanged.py
-      - tests/material_mass_mechanical/test_material_selector.py
-      - tests/material_mass_mechanical/test_mass_calculator.py
-      - tests/material_mass_mechanical/test_preliminary_checker.py
-      - tests/material_mass_mechanical/test_preliminary_checker_slice_d.py
-      - tests/case_revisions/test_canonical.py
-      - tests/case_revisions/test_concurrency.py
-      - tests/case_revisions/test_errors.py
-      - tests/case_revisions/test_frozen_contract_unchanged.py
-      - tests/case_revisions/test_identity.py
-      - tests/case_revisions/test_immutability.py
-      - tests/case_revisions/test_lifecycle.py
-      - tests/case_revisions/test_parent_chain.py
-      - tests/case_revisions/test_persistence.py
-      - tests/case_revisions/test_remediation_p01_to_p1.py
-      - tests/case_revisions/test_restricted_content.py
-      - tests/case_revisions/test_validation.py
-      - tests/validation_report/test_double_pipe_validation_report.py
-      - tests/validation_report/test_golden_case_reproducibility.py
-      - tests/validation_report/test_no_upstream_mutation.py
-      - tests/validation_report/test_excluded_scopes_negative.py
-      - tests/validation_report/test_materialization_contract.py
-      - tests/validation_report/test_chain_wiring_adapter.py
-      - tests/exchangers/shell_tube/test_task020_authority.py
-      - tests/exchangers/shell_tube/test_task020_blockers.py
-      - tests/exchangers/shell_tube/test_task020_canonical.py
-      - tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py
-      - tests/exchangers/shell_tube/test_task020_models.py
-      - tests/exchangers/shell_tube/test_task020_no_upstream_mutation.py
-      - tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py
-      - tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py
-      - tests/exchangers/shell_tube/test_task020_rule_pack_fixtures.py
-      - tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py
-      - tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py
-      - tests/exchangers/shell_tube/test_task020_schema.py
-      - tests/exchangers/shell_tube/test_task029_authority.py
-      - tests/exchangers/shell_tube/test_task029_blocker_reachability.py
-      - tests/exchangers/shell_tube/test_task029_composition.py
-      - tests/exchangers/shell_tube/test_task029_identity.py
-      - tests/exchangers/shell_tube/test_task029_ledger.py
-      - tests/exchangers/shell_tube/test_task029_path.py
-      - tests/exchangers/shell_tube/test_task029_raw.py
-      - tests/exchangers/shell_tube/test_task029_upstream.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_ingress_models.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_adapters.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_validation_service.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_canonical.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_provenance.py
-      - tests/exchangers/shell_tube/thermal_stream_state/test_boundaries.py
-      - tests/exchangers/shell_tube/tube_side/test_a01_upstream_closure.py
-      - tests/exchangers/shell_tube/tube_side/test_a02_task025_enums.py
-      - tests/exchangers/shell_tube/tube_side/test_a03_raw_projection.py
-      - tests/exchangers/shell_tube/tube_side/test_a04_decimal_identity.py
-      - tests/exchangers/shell_tube/tube_side/test_a05_dual_length_isolation.py
-      - tests/exchangers/shell_tube/tube_side/test_a06_reference_planes.py
-      - tests/exchangers/shell_tube/tube_side/test_a07_blocker_registry.py
-      - tests/exchangers/shell_tube/tube_side/test_a08_dag_mutation_isolation.py
-      - tests/exchangers/shell_tube/tube_side/test_a09_scheduler.py
-      - tests/exchangers/shell_tube/tube_side/test_a10_valid_result.py
-      - tests/exchangers/shell_tube/tube_side/test_a11_to_a14_dispositions.py
-      - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
-      - tests/exchangers/shell_tube/tube_side/test_task027_canonical.py
-      - tests/exchangers/shell_tube/tube_side/test_task027_production_boundary.py
-      - tests/test_task028_local_loss.py
-      - tests/exchangers/shell_tube/tube_side/test_hydraulic_geometry.py
-      - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
-      - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
-      - tests/exchangers/shell_tube/tube_side/test_software_version_provenance.py
-      - tests/exchangers/shell_tube/tube_layout/test_models.py
-      - tests/exchangers/shell_tube/tube_layout/test_schema.py
-      - tests/exchangers/shell_tube/tube_layout/test_authority.py
-      - tests/exchangers/shell_tube/tube_layout/test_enumeration.py
-      - tests/exchangers/shell_tube/tube_layout/test_geometry.py
-      - tests/exchangers/shell_tube/tube_layout/test_exclusion_audit.py
-      - tests/exchangers/shell_tube/tube_layout/test_pairing.py
-      - tests/exchangers/shell_tube/tube_layout/test_canonical.py
-      - tests/exchangers/shell_tube/tube_layout/test_validation.py
-      - tests/exchangers/shell_tube/tube_layout/test_warnings_blockers_provenance.py
-      - tests/exchangers/shell_tube/tube_layout/test_architecture_and_boundaries.py
-      - tests/exchangers/shell_tube/tube_layout/test_frozen_design_contract_unchanged.py
-      - tests/exchangers/shell_tube/tube_layout/test_geometry_adapter.py
-      - tests/exchangers/shell_tube/tube_layout/test_rule_pack_adapter.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_models.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_schema.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_authority.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_geometry.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_canonical.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_validation.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_warnings_blockers_provenance.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_architecture_and_boundaries.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_frozen_design_contract_unchanged.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_adapter_blockers.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter.py
-      - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter_architecture.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_models.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_schema.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_authority.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_geometry.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_validation.py
-      - tests/exchangers/shell_tube/baffle_geometry/test_architecture.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_models.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_schema.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_authority.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_formulas.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_validation.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_canonical.py
-      - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_architecture.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_models.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_schema.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_authority.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_canonical.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_formulas.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_validation.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_architecture.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_property_snapshot_binding.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_mass_flow_authority.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_determinism.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_python311_python312_byte_identical.py
-      - tests/exchangers/shell_tube/shell_side_flow_state/test_external_vectors.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_architecture.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_authority.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_canonical.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_decimal_quantization.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_determinism.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_external_vectors.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_formulas.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_models.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_python311_python312_byte_identical.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_schema.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_single_phase.py
-      - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_validation.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_public_upstream_replay_integration.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py
-      - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py
-      - tests/exchangers/shell_tube/shell_side_thermal_hydraulic_composition/test_task035_contract.py
-      - tests/exchangers/shell_tube/overall_heat_transfer_resistance/test_task037_contract.py
-      - tests/exchangers/shell_tube/overall_heat_transfer_coefficient_ua/test_task038_contract.py
-      - tests/exchangers/shell_tube/test_task161_flow_arrangement_performance_method_authority.py
-      - tests/exchangers/shell_tube/test_task162_thermal_performance_closure.py
-      - tests/exchangers/shell_tube/test_task160_162_v06_thermal_closure_authority.py
-      - tests/exchangers/shell_tube/test_task163_thermal_rating_composition.py
-      - tests/exchangers/shell_tube/test_task166_bell_delaware.py
-      - tests/exchangers/shell_tube/test_task167_engineering_screening.py
-      - tests/exchangers/shell_tube/segmented_thermal_state_topology/test_engine.py
-      - tests/exchangers/shell_tube/test_task169_selection_release.py
-      - tests/exchangers/shell_tube/test_task174_hydraulic_orchestration.py
-      - tests/test_release_version_alignment.py
-      - tests/release_demo/test_task164_integration_release_acceptance.py
-      - tests/shell_geometry_catalogs/test_models.py
-      - tests/shell_geometry_catalogs/test_catalog.py
-      - tests/shell_geometry_catalogs/test_architecture.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_blocker_registry.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_canonical.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_decimal_primitives.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_determinism.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_nusselt_selector.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_property_snapshot.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_provenance.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_python311_python312_byte_identical.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_request.py
-      - tests/exchangers/shell_tube/tube_side_thermal/test_single_phase.py
-      - tests/release_demo/test_v0_1_task020_to_task026.py
-      - tests/release_demo/test_v0_2_task020_to_task029.py
-      - tests/release_demo/test_v0_3_task020_to_task035.py
-      - tests/release_demo/test_v0_4_task020_to_task038.py
-    # Runner subprocess cap (tests.ci.run_test_shard), not per-test engineering budget.
-    # CI 45764324314: pr-head py3.11 junit wall ~540s; merge-ref py3.12 hit 600s runner TIMEOUT.
-    timeout: 900
+- name: ci-governance
+  job: shard-ci
+  python: ["3.11", "3.12"]
+  files:
+  - tests/ci/test_benchmark_authority.py
+  - tests/benchmark/test_task011_corpus.py
+  - tests/ci/test_node_inventory.py
+  - tests/ci/test_outcome_plugin.py
+  - tests/ci/test_shard_manifest.py
+  - tests/ci/test_shared_infrastructure.py
+  - tests/governance/test_errors.py
+  - tests/governance/test_spec_validator.py
+  - tests/governance/test_11_2_8_frozen_contract_reference.py
+  - tests/governance/test_11_3_13_branch_protection_assertion.py
+  - tests/governance/test_11_3_14_release_gate_assertion.py
+  - tests/governance/test_9_2_provenance_chain.py
+  - tests/support/test_mypy_doubles.py
+  - tests/support/test_property_provider_doubles.py
+  - tests/canonical_json/test_shared_canonical_json.py
+  - tests/rule_packs/test_canonical_json_integration.py
+  - tests/rule_packs/test_license_boundary.py
+  - tests/rule_packs/test_provenance.py
+  - tests/rule_packs/test_schema.py
+  - tests/rule_packs/test_seed_rule_pack.py
+  - tests/rule_packs/test_validation.py
+  - tests/material_costs/test_material_record_schema.py
+  - tests/material_costs/test_cost_record_schema.py
+  - tests/material_costs/test_license_boundary.py
+  - tests/material_costs/test_selection.py
+  - tests/material_costs/test_validation.py
+  - tests/material_costs/test_frozen_contract_unchanged.py
+  - tests/costing/test_cost_model_selector.py
+  - tests/costing/test_cost_calculator.py
+  - tests/costing/test_life_cycle_energy_estimator.py
+  - tests/costing/test_frozen_contract_unchanged.py
+  - tests/material_mass_mechanical/test_material_selector.py
+  - tests/material_mass_mechanical/test_mass_calculator.py
+  - tests/material_mass_mechanical/test_preliminary_checker.py
+  - tests/material_mass_mechanical/test_preliminary_checker_slice_d.py
+  - tests/case_revisions/test_canonical.py
+  - tests/case_revisions/test_concurrency.py
+  - tests/case_revisions/test_errors.py
+  - tests/case_revisions/test_frozen_contract_unchanged.py
+  - tests/case_revisions/test_identity.py
+  - tests/case_revisions/test_immutability.py
+  - tests/case_revisions/test_lifecycle.py
+  - tests/case_revisions/test_parent_chain.py
+  - tests/case_revisions/test_persistence.py
+  - tests/case_revisions/test_remediation_p01_to_p1.py
+  - tests/case_revisions/test_restricted_content.py
+  - tests/case_revisions/test_validation.py
+  - tests/validation_report/test_double_pipe_validation_report.py
+  - tests/validation_report/test_golden_case_reproducibility.py
+  - tests/validation_report/test_no_upstream_mutation.py
+  - tests/validation_report/test_excluded_scopes_negative.py
+  - tests/validation_report/test_materialization_contract.py
+  - tests/validation_report/test_chain_wiring_adapter.py
+  timeout: 900
 
-  - name: ci-acceptance
-    job: shard-ci-acceptance
-    python: ["3.11", "3.12"]
-    files:
-      - tests/ci/test_collect_acceptance.py
-      - tests/ci/test_shard_progress_and_timeout.py
-    timeout: 900
-
-  - name: pure-unit
-    job: shard-pure-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/unit/test_calculation_runs.py
-      - tests/unit/test_canonical_serialization.py
-      - tests/unit/test_correlation_applicability.py
-      - tests/unit/test_correlation_models.py
-      - tests/unit/test_correlation_registry.py
-      - tests/unit/test_correlation_usage.py
-      - tests/unit/test_design_case_revisions.py
-      - tests/unit/test_double_pipe_geometry.py
-      - tests/unit/test_double_pipe_solver.py
-      - tests/unit/test_double_pipe_thermal.py
-      - tests/unit/test_geometry_catalog.py
-      - tests/unit/test_provenance_graph.py
-      - tests/unit/test_task009_catalog_hash.py
-      - tests/unit/test_task009_phase1.py
-      - tests/unit/test_task009_phase2_contract.py
-      - tests/unit/test_task009_phase3.py
-      - tests/unit/test_task010_final.py
-      - tests/unit/test_task010_phase1.py
-      - tests/unit/test_task010_phase2.py
-      - tests/unit/test_task016_geometry_catalog.py
-      - tests/unit/test_task016_geometry_catalog_pipe_refs.py
-      - tests/unit/test_thermal.py
-      - tests/unit/test_tube_annulus_correlations.py
-    # CI 45794028808: runner cap 120s killed pure-unit (pytest_exit -9) after ~1689 outcomes;
-    # local run_test_shard+cov wall ~67s; merge-ref/py3.12 runners need headroom.
-    timeout: 240
-
-  - name: coolprop-unit
-    job: shard-coolprop-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/unit/test_double_pipe_correction_r5.py
-      - tests/unit/test_double_pipe_correction_r6.py
-      - tests/unit/test_double_pipe_correction_r8.py
-      - tests/unit/test_double_pipe_correction_r10.py
-      - tests/unit/test_double_pipe_correction_r12.py
-      - tests/unit/test_double_pipe_correction_r13.py
-      - tests/unit/test_double_pipe_rating_kernel.py
-      - tests/unit/test_engineering_messages.py
-      - tests/unit/test_heat_balance.py
-      - tests/unit/test_properties.py
-      - tests/unit/test_provider_snapshot.py
-      - tests/unit/test_review02.py
-      - tests/unit/test_review03.py
-      - tests/unit/test_review_items.py
-      - tests/unit/test_units.py
-    timeout: 300
-
-  - name: provider-unit
-    job: shard-provider-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/unit/test_task009_phase2_adapter.py
-      - tests/unit/test_task009_phase2_canonicalization.py
-    timeout: 120
-
-  - name: golden
-    job: shard-golden
-    python: ["3.11", "3.12"]
-    files:
-      - tests/golden/double_pipe_rating/test_golden_double_pipe.py
-      - tests/golden/double_pipe_rating/test_independent_references.py
-      - tests/golden/heat_balance/test_golden.py
-      - tests/golden/task016_alpha_preview_v0_1/test_trial005_alpha_preview.py
-    timeout: 300
-
-  - name: integration
-    job: shard-integration
-    python: ["3.11", "3.12"]
-    files:
-      - tests/integration/test_api.py
-      - tests/integration/test_correlation_registry_workflow.py
-      - tests/integration/test_double_pipe_rating.py
-      - tests/integration/test_heat_balance_property_provider.py
-      - tests/integration/test_revision_run_workflow.py
-      - tests/integration/test_task002_round3.py
-    timeout: 120
-
-  - name: task173-rating
-    job: shard-task173-rating
-    python: ["3.11", "3.12"]
-    files:
-      - tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py
-      - tests/exchangers/shell_tube/test_task172_local_runtime.py
-      - tests/exchangers/shell_tube/test_task172_coupled_local_closure_kernel.py
-      - tests/exchangers/shell_tube/test_task172_scalar_two_diagnostics.py
-      - tests/exchangers/shell_tube/test_task172_ulp_polish.py
-      - tests/exchangers/shell_tube/test_task173_integrated_rating.py
-      - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
-      - tests/exchangers/shell_tube/test_task173_outer_shooting_refine.py
-      - tests/prototypes/test_fatal_cell_identity.py
-      - tests/prototypes/test_true_three_equation_cell_coupling.py
-      - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
-      - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
-    timeout: 600
-
-  - name: v07-experimental-live-rating-r8
-    job: shard-v07-experimental-live-rating-r8
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r8_live_n1_mesh_e2e.py
-    timeout: 900
-
-  - name: v07-experimental-live-rating-r9
-    job: shard-v07-experimental-live-rating-r9
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r9_experimental_live_cli.py
-    timeout: 900
-
-  - name: v07-experimental-live-rating-r10
-    job: shard-v07-experimental-live-rating-r10
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r10_multi_candidate_live_cli.py
-    timeout: 1200
-
-  - name: v07-constraint-aware-sizing-r11
-    job: shard-v07-constraint-aware-sizing-r11
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r11_constraint_aware_sizing.py
-    timeout: 1200
-
-  - name: v07-target-directed-live-sizing-r12
-    job: shard-v07-target-directed-live-sizing-r12
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r12_target_directed_selection.py
-      - tests/prototypes/test_r12_target_directed_live_cli.py
-    timeout: 2400
-
-  - name: v07-variable-bundle-geometry-sizing-r13-selection
-    job: shard-v07-variable-bundle-geometry-sizing-r13-selection
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r13_variable_bundle_selection.py
-    timeout: 2400
-
-  - name: v07-variable-bundle-geometry-sizing-r13-live-cli
-    job: shard-v07-variable-bundle-geometry-sizing-r13-live-cli
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r13_variable_bundle_live_cli.py
-    timeout: 3600
-
-  - name: v07-live-thermal-hydraulic-postpass-r14
-    job: shard-v07-live-thermal-hydraulic-postpass-r14
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r14_live_thermal_hydraulic_postpass.py
-    timeout: 900
-
-  - name: v07-live-hydraulic-constraint-sizing-r15
-    job: shard-v07-live-hydraulic-constraint-sizing-r15
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r15_hydraulic_constraint_sizing.py
-    timeout: 2400
-
-  - name: v07-live-multi-mesh-rating-r16-unit
-    job: shard-v07-live-multi-mesh-rating-r16-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r16_live_multi_mesh_rating.py
-    timeout: 300
-
-  - name: v07-live-multi-mesh-rating-r16-e2e
-    job: shard-v07-live-multi-mesh-rating-r16-e2e
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r16_live_multi_mesh_rating_e2e.py
-    timeout: 3600
-
-  - name: v07-variable-tube-mass-flow-r18-unit
-    job: shard-v07-variable-tube-mass-flow-r18-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r18_variable_tube_mass_flow.py
-    timeout: 300
-
-  - name: v07-variable-tube-mass-flow-r18-e2e
-    job: shard-v07-variable-tube-mass-flow-r18-e2e
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r18_variable_tube_mass_flow_e2e.py
-    timeout: 3600
-
-  - name: v07-variable-shell-mass-flow-r19-unit
-    job: shard-v07-variable-shell-mass-flow-r19-unit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r19_variable_shell_mass_flow.py
-    timeout: 300
-
-  - name: v07-variable-shell-mass-flow-r19-e2e
-    job: shard-v07-variable-shell-mass-flow-r19-e2e
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r19_variable_shell_mass_flow_e2e.py
-    timeout: 3600
-
-  - name: v07-r19a-live-hydraulic-mass-flow-rebind
-    job: shard-v07-r19a-live-hydraulic-mass-flow-rebind
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r19a_live_hydraulic_mass_flow_rebind.py
-    timeout: 600
-
-  - name: v07-r20-experimental-transitional-tube-hydraulic
-    job: shard-v07-r20-experimental-transitional-tube-hydraulic
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r20_experimental_transitional_tube_hydraulic.py
-    timeout: 900
-
-  - name: v07-r21-engineering-tube-local-loss-geometry
-    job: shard-v07-r21-engineering-tube-local-loss-geometry
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r21_engineering_tube_local_loss_geometry.py
-    timeout: 2400
-
-  - name: v07-r22-two-way-bulk-pressure-feedback
-    job: shard-v07-r22-two-way-bulk-pressure-feedback
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r22_two_way_bulk_pressure_feedback.py
-    timeout: 2400
-
-  - name: v07-r23-variable-water-temperature
-    job: shard-v07-r23-variable-water-temperature
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r23_variable_water_temperature.py
-    timeout: 2400
-
-  - name: v07-r24-wide-delta-t-rating-solver
-    job: shard-v07-r24-wide-delta-t-rating-solver
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r24_wide_delta_t_rating_solver.py
-      - tests/prototypes/test_r25_task172_wide_delta_t_closure.py
-      - tests/prototypes/test_r25a_task172_jacobian_and_wall_network.py
-      - tests/prototypes/test_r25b_task172_uv_wall_network.py
-      - tests/prototypes/test_r25c_scalar_u_wall_closure.py
-      - tests/prototypes/test_r25d_physical_two_scalar_bracket.py
-      - tests/prototypes/test_r26_engineering_rating_core.py
-      - tests/prototypes/test_r26c_engineering_rating_live_hydraulic_bridge.py
-      - tests/prototypes/test_r26ca_engineering_delivery_hydraulic_margin.py
-      - tests/prototypes/test_r26d_multi_candidate_engineering_sizing.py
-      - tests/prototypes/test_r26e_multi_candidate_engineering_sizing.py
-    timeout: 3600
-
-  - name: v07-r27a-calculation-first-sizing
-    job: shard-v07-r27a-calculation-first-sizing
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27a_calculation_first_automatic_sizing.py
-    timeout: 7200
-
-  - name: v07-r27b-full-path-constraint-aware-sizing
-    job: shard-v07-r27b-full-path-constraint-aware-sizing
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27b_full_path_constraint_aware_sizing.py
-    timeout: 7200
-
-  - name: v07-r27c-nozzle-cooptimization
-    job: shard-v07-r27c-nozzle-cooptimization
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27c_nozzle_cooptimization_sizing.py
-      - tests/prototypes/test_r27c_p0_nozzle_bisect.py
-    timeout: 7200
-
-  - name: v07-r27d-thermal-hydraulic-geometry-cooptimization
-    job: shard-v07-r27d-thermal-hydraulic-geometry-cooptimization
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27d_thermal_hydraulic_geometry_cooptimization_sizing.py
-    timeout: 7200
-
-  - name: v07-r27e-thermal-regime-n1-recovery
-    job: shard-v07-r27e-thermal-regime-n1-recovery
-    python: ["3.11", "3.12"]
-    files:
-      - tests/exchangers/shell_tube/test_task172_tube_regime_isolation_r27e.py
-      - tests/prototypes/test_r27e_physical_model_isolation.py
-      - tests/prototypes/test_r27e_reference_regression.py
-      - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
-      - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
-    timeout: 7200
-  - name: v07-version-delivery-acceptance
-    job: shard-v07-version-delivery-acceptance
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v07_version_delivery_classification.py
-      - tests/prototypes/test_v07_final_live_e2e_delivery.py
-    timeout: 7200
-  - name: v08-01-general-user-case
-    job: shard-v08-01-general-user-case
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_general_user_case.py
-    timeout: 900
-  - name: v08-02-geometry-candidate-generation
-    job: shard-v08-02-geometry-candidate-generation
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_geometry_candidate_generation.py
-    timeout: 3600
-  - name: v08-03-thermal-live-closeout
-    job: shard-v08-03-thermal-live-closeout
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_thermal_rating_closeout_heavy.py
-    timeout: 7800
-  - name: v08-03-thermal-live-independent
-    job: shard-v08-03-thermal-live-independent
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_thermal_rating_independent_case_heavy.py
-    timeout: 7800
-  - name: v08-03-thermal-live-engine
-    job: shard-v08-03-thermal-live-engine
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_thermal_rating.py
-      - tests/prototypes/test_v08_axial_rating_engine.py
-      - tests/prototypes/test_v08_330kw_terminal_mesh_closeout.py
-    timeout: 5400
-  - name: v08-03-hydraulic-enthalpy-audit
-    job: shard-v08-03-hydraulic-enthalpy-audit
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_hydraulic_feasibility.py
-      - tests/prototypes/test_enthalpy_audit_context_v08.py
-      - tests/prototypes/test_enthalpy_authority_experiment_v08.py
-      - tests/prototypes/test_outer_enthalpy_representation_v08.py
-    timeout: 5400
-  - name: v08-03-engineering-shortlist-r3
-    job: shard-v08-03-engineering-shortlist-r3
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_engineering_shortlist_robustness_v08.py
-      - tests/prototypes/test_engineering_shortlist_sensitivity_binding_v08.py
-      - tests/prototypes/test_engineering_shortlist_r2_gate_v08.py
-      - tests/prototypes/test_tube_side_replay_root_cause_v08.py
-      - tests/prototypes/test_intermediate_tube_count_feasibility_v08.py
-      - tests/prototypes/test_candidate_c_engineering_evidence_closure_v08.py
-    timeout: 2400
-  - name: v08-autonomous-design-tool
-    job: shard-v08-autonomous-design-tool
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_autonomous_design_user_input_delivery.py
-      - tests/prototypes/test_v08_autonomous_engineering_selection_mvp.py
-      - tests/prototypes/test_v08_experimental_user_trial_web.py
-    # CI 45764324314: py3.12 runner killed at 3600s (10/17 nodes); py3.11 wall ~768s.
-    timeout: 1800
-  - name: v08-autonomous-hydraulic-replay
-    job: shard-v08-autonomous-hydraulic-replay
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_fixed_layout_variable_mdot_hydraulic_replay_v1.py
-    timeout: 5400
-  - name: v08-04-hydraulic-feasibility-gate
-    job: shard-v08-04-hydraulic-feasibility-gate
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_04_hydraulic_feasibility_gate.py
-      - tests/prototypes/test_autonomous_nozzle_full_path_hydraulics_v08.py
-      - tests/prototypes/test_full_path_fixed_nozzle_v08.py
-    timeout: 5400
-  - name: v08-05-qualified-top-n-report
-    job: shard-v08-05-qualified-top-n-report
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_05_qualified_top_n_engineering_report.py
-    timeout: 5400
-  - name: v08-06-independent-e2e-acceptance
-    job: shard-v08-06-independent-e2e-acceptance
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_06_independent_e2e_acceptance.py
-      - tests/prototypes/test_v08_layered_engineering_acceptance_v1.py
-    timeout: 7200
-  - name: v08-kernel-rating-integration
-    job: shard-v08-kernel-rating-integration
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_independent_engineering_rating_kernel_v1.py
-      - tests/prototypes/test_v08_kernel_engineering_integration_v1.py
-      - tests/prototypes/test_v08_06_kernel_version_acceptance.py
-      - tests/prototypes/test_v08_07_legacy_supersession_governance.py
-    timeout: 5400
-  - name: v08-03-shell-path-hydraulic
-    job: shard-v08-03-shell-path-hydraulic
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_full_path_geometry_cooptimization_v08.py
-      - tests/prototypes/test_shell_hydraulic_lower_bound_v08.py
-      - tests/prototypes/test_shell_structural_feasibility_breakthrough_v08.py
-      - tests/prototypes/test_geometry_identity_v2_v08.py
-      - tests/prototypes/test_frozen_nozzle_margin_and_port_validation_v08.py
-      - tests/prototypes/test_four_port_nozzle_correction_and_validation_v08.py
-      - tests/prototypes/test_high_k_tube_side_structural_feasibility_v08.py
-    timeout: 3600
-  - name: v08-03-joint-pareto-freeze
-    job: shard-v08-03-joint-pareto-freeze
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_recovered_shell_052_pareto_joint_v08.py
-      - tests/prototypes/test_first_joint_candidate_freeze_v08.py
-    timeout: 5400
-  - name: v08-03-joint-recovered-core
-    job: shard-v08-03-joint-recovered-core
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_recovered_shell_052_full_chain_v08.py
-      - tests/prototypes/test_shell_052_thermal_authority_and_margin_v08.py
-      - tests/prototypes/test_v08_task037_authority_provenance_v08.py
-      - tests/prototypes/test_thermal_hydraulic_joint_cooptimization_v08.py
-      - tests/prototypes/test_joint_boundary_value_solver.py
-    timeout: 3600
-  - name: v08-03-provenance-audit-light
-    job: shard-v08-03-provenance-audit-light
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_v08_feasible_candidate_thermal_bridge.py
-      - tests/prototypes/test_v08_frozen_candidate_resolve.py
-      - tests/prototypes/test_v08_counterflow_bvp_recovery.py
-      - tests/prototypes/test_tp_ph_property_audit_v08.py
-      - tests/prototypes/test_propagation_defect_verdict_v08.py
-      - tests/prototypes/test_engineering_acceptance_decision_v08.py
-      - tests/prototypes/test_joint_bvp_wall_closure_e1.py
-      - tests/prototypes/test_float_lattice_bracket.py
-    timeout: 1800
-  - name: v07-r27h-candidate-space-extension
-    job: shard-v07-r27h-candidate-space-extension
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27h_candidate_space_extension.py
-    timeout: 7200
-  - name: v07-r27g-shell-geometry-local-pareto
-    job: shard-v07-r27g-shell-geometry-local-pareto
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27g_shell_geometry_local_pareto.py
-    timeout: 7200
-  - name: v07-r27f-full-path-pressure-budget
-    job: shard-v07-r27f-full-path-pressure-budget
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r27f_full_path_pressure_budget.py
-    timeout: 7200
-
-  - name: v07-r26f-hydraulic-path
-    job: shard-v07-r26f-hydraulic-path
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r26f_engineering_hydraulic_path.py
-    timeout: 7200
-
-  - name: v07-r26g-authorized-full-path
-    job: shard-v07-r26g-authorized-full-path
-    python: ["3.11", "3.12"]
-    files:
-      - tests/prototypes/test_r26g_authorized_full_path_hydraulic.py
-      - tests/prototypes/test_r26ga_full_path_physical_consistency.py
-    timeout: 7200
+  - name: ci-engineering-regression
+  job: shard-ci
+  python: ["3.11", "3.12"]
+  files:
+  - tests/exchangers/shell_tube/test_task020_authority.py
+  - tests/exchangers/shell_tube/test_task020_blockers.py
+  - tests/exchangers/shell_tube/test_task020_canonical.py
+  - tests/exchangers/shell_tube/test_task020_frozen_contract_unchanged.py
+  - tests/exchangers/shell_tube/test_task020_models.py
+  - tests/exchangers/shell_tube/test_task020_no_upstream_mutation.py
+  - tests/exchangers/shell_tube/test_task020_rule_pack_canonical.py
+  - tests/exchangers/shell_tube/test_task020_rule_pack_adapter.py
+  - tests/exchangers/shell_tube/test_task020_rule_pack_fixtures.py
+  - tests/exchangers/shell_tube/test_task020_rule_pack_hash_integration.py
+  - tests/exchangers/shell_tube/test_task020_rule_profile_adapter.py
+  - tests/exchangers/shell_tube/test_task020_schema.py
+  - tests/exchangers/shell_tube/test_task029_authority.py
+  - tests/exchangers/shell_tube/test_task029_blocker_reachability.py
+  - tests/exchangers/shell_tube/test_task029_composition.py
+  - tests/exchangers/shell_tube/test_task029_identity.py
+  - tests/exchangers/shell_tube/test_task029_ledger.py
+  - tests/exchangers/shell_tube/test_task029_path.py
+  - tests/exchangers/shell_tube/test_task029_raw.py
+  - tests/exchangers/shell_tube/test_task029_upstream.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_ingress_models.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_adapters.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_validation_service.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_canonical.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_provenance.py
+  - tests/exchangers/shell_tube/thermal_stream_state/test_boundaries.py
+  - tests/exchangers/shell_tube/tube_side/test_a01_upstream_closure.py
+  - tests/exchangers/shell_tube/tube_side/test_a02_task025_enums.py
+  - tests/exchangers/shell_tube/tube_side/test_a03_raw_projection.py
+  - tests/exchangers/shell_tube/tube_side/test_a04_decimal_identity.py
+  - tests/exchangers/shell_tube/tube_side/test_a05_dual_length_isolation.py
+  - tests/exchangers/shell_tube/tube_side/test_a06_reference_planes.py
+  - tests/exchangers/shell_tube/tube_side/test_a07_blocker_registry.py
+  - tests/exchangers/shell_tube/tube_side/test_a08_dag_mutation_isolation.py
+  - tests/exchangers/shell_tube/tube_side/test_a09_scheduler.py
+  - tests/exchangers/shell_tube/tube_side/test_a10_valid_result.py
+  - tests/exchangers/shell_tube/tube_side/test_a11_to_a14_dispositions.py
+  - tests/exchangers/shell_tube/tube_side/test_task027_friction.py
+  - tests/exchangers/shell_tube/tube_side/test_task027_canonical.py
+  - tests/exchangers/shell_tube/tube_side/test_task027_production_boundary.py
+  - tests/test_task028_local_loss.py
+  - tests/exchangers/shell_tube/tube_side/test_hydraulic_geometry.py
+  - tests/exchangers/shell_tube/tube_side/test_hydraulic_participation_authority.py
+  - tests/exchangers/shell_tube/tube_side/test_blocked_result_from_raw_invalid.py
+  - tests/exchangers/shell_tube/tube_side/test_software_version_provenance.py
+  - tests/exchangers/shell_tube/tube_layout/test_models.py
+  - tests/exchangers/shell_tube/tube_layout/test_schema.py
+  - tests/exchangers/shell_tube/tube_layout/test_authority.py
+  - tests/exchangers/shell_tube/tube_layout/test_enumeration.py
+  - tests/exchangers/shell_tube/tube_layout/test_geometry.py
+  - tests/exchangers/shell_tube/tube_layout/test_exclusion_audit.py
+  - tests/exchangers/shell_tube/tube_layout/test_pairing.py
+  - tests/exchangers/shell_tube/tube_layout/test_canonical.py
+  - tests/exchangers/shell_tube/tube_layout/test_validation.py
+  - tests/exchangers/shell_tube/tube_layout/test_warnings_blockers_provenance.py
+  - tests/exchangers/shell_tube/tube_layout/test_architecture_and_boundaries.py
+  - tests/exchangers/shell_tube/tube_layout/test_frozen_design_contract_unchanged.py
+  - tests/exchangers/shell_tube/tube_layout/test_geometry_adapter.py
+  - tests/exchangers/shell_tube/tube_layout/test_rule_pack_adapter.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_models.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_schema.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_authority.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_geometry.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_canonical.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_validation.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_warnings_blockers_provenance.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_architecture_and_boundaries.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_frozen_design_contract_unchanged.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_adapter_blockers.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter.py
+  - tests/exchangers/shell_tube/shell_bundle_geometry/test_rule_pack_adapter_architecture.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_models.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_schema.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_authority.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_geometry.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_validation.py
+  - tests/exchangers/shell_tube/baffle_geometry/test_architecture.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_models.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_schema.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_authority.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_formulas.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_validation.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_canonical.py
+  - tests/exchangers/shell_tube/shell_side_hydraulic_geometry/test_architecture.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_models.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_schema.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_authority.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_canonical.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_formulas.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_validation.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_architecture.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_property_snapshot_binding.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_mass_flow_authority.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_determinism.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_python311_python312_byte_identical.py
+  - tests/exchangers/shell_tube/shell_side_flow_state/test_external_vectors.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_architecture.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_authority.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_canonical.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_decimal_quantization.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_determinism.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_external_vectors.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_formulas.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_models.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_python311_python312_byte_identical.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_schema.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_single_phase.py
+  - tests/exchangers/shell_tube/shell_side_heat_transfer/test_task033_validation.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_raw_boundary.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_schema.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_upstream_replay.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_identity.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_applicability.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_formula.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_quantization.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_provenance.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_blocker_registry.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_success_contract.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_public_upstream_replay_integration.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_external_oracle.py
+  - tests/exchangers/shell_tube/shell_side_pressure_drop/test_task034_cross_python.py
+  - tests/exchangers/shell_tube/shell_side_thermal_hydraulic_composition/test_task035_contract.py
+  - tests/exchangers/shell_tube/overall_heat_transfer_resistance/test_task037_contract.py
+  - tests/exchangers/shell_tube/overall_heat_transfer_coefficient_ua/test_task038_contract.py
+  - tests/exchangers/shell_tube/test_task161_flow_arrangement_performance_method_authority.py
+  - tests/exchangers/shell_tube/test_task162_thermal_performance_closure.py
+  - tests/exchangers/shell_tube/test_task160_162_v06_thermal_closure_authority.py
+  - tests/exchangers/shell_tube/test_task163_thermal_rating_composition.py
+  - tests/exchangers/shell_tube/test_task166_bell_delaware.py
+  - tests/exchangers/shell_tube/test_task167_engineering_screening.py
+  - tests/exchangers/shell_tube/segmented_thermal_state_topology/test_engine.py
+  - tests/exchangers/shell_tube/test_task169_selection_release.py
+  - tests/exchangers/shell_tube/test_task174_hydraulic_orchestration.py
+  - tests/test_release_version_alignment.py
+  - tests/release_demo/test_task164_integration_release_acceptance.py
+  - tests/shell_geometry_catalogs/test_models.py
+  - tests/shell_geometry_catalogs/test_catalog.py
+  - tests/shell_geometry_catalogs/test_architecture.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_blocker_registry.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_canonical.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_decimal_primitives.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_determinism.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_nusselt_selector.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_property_snapshot.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_provenance.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_python311_python312_byte_identical.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_request.py
+  - tests/exchangers/shell_tube/tube_side_thermal/test_single_phase.py
+  - tests/release_demo/test_v0_1_task020_to_task026.py
+  - tests/release_demo/test_v0_2_task020_to_task029.py
+  - tests/release_demo/test_v0_3_task020_to_task035.py
+  - tests/release_demo/test_v0_4_task020_to_task038.py
+  timeout: 900
+- name: ci-acceptance
+  job: shard-ci-acceptance
+  python: ["3.11", "3.12"]
+  files:
+  - tests/ci/test_collect_acceptance.py
+  - tests/ci/test_shard_progress_and_timeout.py
+  timeout: 900
+- name: pure-unit
+  job: shard-pure-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/unit/test_calculation_runs.py
+  - tests/unit/test_canonical_serialization.py
+  - tests/unit/test_correlation_applicability.py
+  - tests/unit/test_correlation_models.py
+  - tests/unit/test_correlation_registry.py
+  - tests/unit/test_correlation_usage.py
+  - tests/unit/test_design_case_revisions.py
+  - tests/unit/test_double_pipe_geometry.py
+  - tests/unit/test_double_pipe_solver.py
+  - tests/unit/test_double_pipe_thermal.py
+  - tests/unit/test_geometry_catalog.py
+  - tests/unit/test_provenance_graph.py
+  - tests/unit/test_task009_catalog_hash.py
+  - tests/unit/test_task009_phase1.py
+  - tests/unit/test_task009_phase2_contract.py
+  - tests/unit/test_task009_phase3.py
+  - tests/unit/test_task010_final.py
+  - tests/unit/test_task010_phase1.py
+  - tests/unit/test_task010_phase2.py
+  - tests/unit/test_task016_geometry_catalog.py
+  - tests/unit/test_task016_geometry_catalog_pipe_refs.py
+  - tests/unit/test_thermal.py
+  - tests/unit/test_tube_annulus_correlations.py
+  timeout: 240
+- name: coolprop-unit
+  job: shard-coolprop-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/unit/test_double_pipe_correction_r5.py
+  - tests/unit/test_double_pipe_correction_r6.py
+  - tests/unit/test_double_pipe_correction_r8.py
+  - tests/unit/test_double_pipe_correction_r10.py
+  - tests/unit/test_double_pipe_correction_r12.py
+  - tests/unit/test_double_pipe_correction_r13.py
+  - tests/unit/test_double_pipe_rating_kernel.py
+  - tests/unit/test_engineering_messages.py
+  - tests/unit/test_heat_balance.py
+  - tests/unit/test_properties.py
+  - tests/unit/test_provider_snapshot.py
+  - tests/unit/test_review02.py
+  - tests/unit/test_review03.py
+  - tests/unit/test_review_items.py
+  - tests/unit/test_units.py
+  timeout: 300
+- name: provider-unit
+  job: shard-provider-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/unit/test_task009_phase2_adapter.py
+  - tests/unit/test_task009_phase2_canonicalization.py
+  timeout: 120
+- name: golden
+  job: shard-golden
+  python: ["3.11", "3.12"]
+  files:
+  - tests/golden/double_pipe_rating/test_golden_double_pipe.py
+  - tests/golden/double_pipe_rating/test_independent_references.py
+  - tests/golden/heat_balance/test_golden.py
+  - tests/golden/task016_alpha_preview_v0_1/test_trial005_alpha_preview.py
+  timeout: 300
+- name: integration
+  job: shard-integration
+  python: ["3.11", "3.12"]
+  files:
+  - tests/integration/test_api.py
+  - tests/integration/test_correlation_registry_workflow.py
+  - tests/integration/test_double_pipe_rating.py
+  - tests/integration/test_heat_balance_property_provider.py
+  - tests/integration/test_revision_run_workflow.py
+  - tests/integration/test_task002_round3.py
+  timeout: 120
+- name: task173-rating
+  job: shard-task173-rating
+  python: ["3.11", "3.12"]
+  files:
+  - tests/exchangers/shell_tube/test_task168_manufacturable_candidates.py
+  - tests/exchangers/shell_tube/test_task172_local_runtime.py
+  - tests/exchangers/shell_tube/test_task172_coupled_local_closure_kernel.py
+  - tests/exchangers/shell_tube/test_task172_scalar_two_diagnostics.py
+  - tests/exchangers/shell_tube/test_task172_ulp_polish.py
+  - tests/exchangers/shell_tube/test_task173_integrated_rating.py
+  - tests/exchangers/shell_tube/test_task173_integrated_sizing.py
+  - tests/exchangers/shell_tube/test_task173_outer_shooting_refine.py
+  - tests/prototypes/test_fatal_cell_identity.py
+  - tests/prototypes/test_true_three_equation_cell_coupling.py
+  - tests/prototypes/test_r7_thermal_boundary_and_tp_cache.py
+  - tests/prototypes/test_r8_cold_boundary_ph_reconstruction.py
+  timeout: 600
+- name: v07-experimental-live-rating-r8
+  job: shard-v07-experimental-live-rating-r8
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r8_live_n1_mesh_e2e.py
+  timeout: 900
+- name: v07-experimental-live-rating-r9
+  job: shard-v07-experimental-live-rating-r9
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r9_experimental_live_cli.py
+  timeout: 900
+- name: v07-experimental-live-rating-r10
+  job: shard-v07-experimental-live-rating-r10
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r10_multi_candidate_live_cli.py
+  timeout: 1200
+- name: v07-constraint-aware-sizing-r11
+  job: shard-v07-constraint-aware-sizing-r11
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r11_constraint_aware_sizing.py
+  timeout: 1200
+- name: v07-target-directed-live-sizing-r12
+  job: shard-v07-target-directed-live-sizing-r12
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r12_target_directed_selection.py
+  - tests/prototypes/test_r12_target_directed_live_cli.py
+  timeout: 2400
+- name: v07-variable-bundle-geometry-sizing-r13-selection
+  job: shard-v07-variable-bundle-geometry-sizing-r13-selection
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r13_variable_bundle_selection.py
+  timeout: 2400
+- name: v07-variable-bundle-geometry-sizing-r13-live-cli
+  job: shard-v07-variable-bundle-geometry-sizing-r13-live-cli
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r13_variable_bundle_live_cli.py
+  timeout: 3600
+- name: v07-live-thermal-hydraulic-postpass-r14
+  job: shard-v07-live-thermal-hydraulic-postpass-r14
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r14_live_thermal_hydraulic_postpass.py
+  timeout: 900
+- name: v07-live-hydraulic-constraint-sizing-r15
+  job: shard-v07-live-hydraulic-constraint-sizing-r15
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r15_hydraulic_constraint_sizing.py
+  timeout: 2400
+- name: v07-live-multi-mesh-rating-r16-unit
+  job: shard-v07-live-multi-mesh-rating-r16-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r16_live_multi_mesh_rating.py
+  timeout: 300
+- name: v07-live-multi-mesh-rating-r16-e2e
+  job: shard-v07-live-multi-mesh-rating-r16-e2e
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r16_live_multi_mesh_rating_e2e.py
+  timeout: 3600
+- name: v07-variable-tube-mass-flow-r18-unit
+  job: shard-v07-variable-tube-mass-flow-r18-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r18_variable_tube_mass_flow.py
+  timeout: 300
+- name: v07-variable-tube-mass-flow-r18-e2e
+  job: shard-v07-variable-tube-mass-flow-r18-e2e
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r18_variable_tube_mass_flow_e2e.py
+  timeout: 3600
+- name: v07-variable-shell-mass-flow-r19-unit
+  job: shard-v07-variable-shell-mass-flow-r19-unit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r19_variable_shell_mass_flow.py
+  timeout: 300
+- name: v07-variable-shell-mass-flow-r19-e2e
+  job: shard-v07-variable-shell-mass-flow-r19-e2e
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r19_variable_shell_mass_flow_e2e.py
+  timeout: 3600
+- name: v07-r19a-live-hydraulic-mass-flow-rebind
+  job: shard-v07-r19a-live-hydraulic-mass-flow-rebind
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r19a_live_hydraulic_mass_flow_rebind.py
+  timeout: 600
+- name: v07-r20-experimental-transitional-tube-hydraulic
+  job: shard-v07-r20-experimental-transitional-tube-hydraulic
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r20_experimental_transitional_tube_hydraulic.py
+  timeout: 900
+- name: v07-r21-engineering-tube-local-loss-geometry
+  job: shard-v07-r21-engineering-tube-local-loss-geometry
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r21_engineering_tube_local_loss_geometry.py
+  timeout: 2400
+- name: v07-r22-two-way-bulk-pressure-feedback
+  job: shard-v07-r22-two-way-bulk-pressure-feedback
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r22_two_way_bulk_pressure_feedback.py
+  timeout: 2400
+- name: v07-r23-variable-water-temperature
+  job: shard-v07-r23-variable-water-temperature
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r23_variable_water_temperature.py
+  timeout: 2400
+- name: v07-r24-wide-delta-t-rating-solver
+  job: shard-v07-r24-wide-delta-t-rating-solver
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r24_wide_delta_t_rating_solver.py
+  - tests/prototypes/test_r25_task172_wide_delta_t_closure.py
+  - tests/prototypes/test_r25a_task172_jacobian_and_wall_network.py
+  - tests/prototypes/test_r25b_task172_uv_wall_network.py
+  - tests/prototypes/test_r25c_scalar_u_wall_closure.py
+  - tests/prototypes/test_r25d_physical_two_scalar_bracket.py
+  - tests/prototypes/test_r26_engineering_rating_core.py
+  - tests/prototypes/test_r26c_engineering_rating_live_hydraulic_bridge.py
+  - tests/prototypes/test_r26ca_engineering_delivery_hydraulic_margin.py
+  - tests/prototypes/test_r26d_multi_candidate_engineering_sizing.py
+  - tests/prototypes/test_r26e_multi_candidate_engineering_sizing.py
+  timeout: 3600
+- name: v07-r27a-calculation-first-sizing
+  job: shard-v07-r27a-calculation-first-sizing
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27a_calculation_first_automatic_sizing.py
+  timeout: 7200
+- name: v07-r27b-full-path-constraint-aware-sizing
+  job: shard-v07-r27b-full-path-constraint-aware-sizing
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27b_full_path_constraint_aware_sizing.py
+  timeout: 7200
+- name: v07-r27c-nozzle-cooptimization
+  job: shard-v07-r27c-nozzle-cooptimization
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27c_nozzle_cooptimization_sizing.py
+  - tests/prototypes/test_r27c_p0_nozzle_bisect.py
+  timeout: 7200
+- name: v07-r27d-thermal-hydraulic-geometry-cooptimization
+  job: shard-v07-r27d-thermal-hydraulic-geometry-cooptimization
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27d_thermal_hydraulic_geometry_cooptimization_sizing.py
+  timeout: 7200
+- name: v07-r27e-thermal-regime-n1-recovery
+  job: shard-v07-r27e-thermal-regime-n1-recovery
+  python: ["3.11", "3.12"]
+  files:
+  - tests/exchangers/shell_tube/test_task172_tube_regime_isolation_r27e.py
+  - tests/prototypes/test_r27e_physical_model_isolation.py
+  - tests/prototypes/test_r27e_reference_regression.py
+  - tests/prototypes/test_r27e_thermal_regime_n1_recovery.py
+  - tests/prototypes/test_r27e_n1_q_initial_enthalpy_fallback.py
+  timeout: 7200
+- name: v07-version-delivery-acceptance
+  job: shard-v07-version-delivery-acceptance
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v07_version_delivery_classification.py
+  - tests/prototypes/test_v07_final_live_e2e_delivery.py
+  timeout: 7200
+- name: v08-01-general-user-case
+  job: shard-v08-01-general-user-case
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_general_user_case.py
+  timeout: 900
+- name: v08-02-geometry-candidate-generation
+  job: shard-v08-02-geometry-candidate-generation
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_geometry_candidate_generation.py
+  timeout: 3600
+- name: v08-03-thermal-live-closeout
+  job: shard-v08-03-thermal-live-closeout
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_thermal_rating_closeout_heavy.py
+  timeout: 7800
+- name: v08-03-thermal-live-independent
+  job: shard-v08-03-thermal-live-independent
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_thermal_rating_independent_case_heavy.py
+  timeout: 7800
+- name: v08-03-thermal-live-engine
+  job: shard-v08-03-thermal-live-engine
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_thermal_rating.py
+  - tests/prototypes/test_v08_axial_rating_engine.py
+  - tests/prototypes/test_v08_330kw_terminal_mesh_closeout.py
+  timeout: 5400
+- name: v08-03-hydraulic-enthalpy-audit
+  job: shard-v08-03-hydraulic-enthalpy-audit
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_hydraulic_feasibility.py
+  - tests/prototypes/test_enthalpy_audit_context_v08.py
+  - tests/prototypes/test_enthalpy_authority_experiment_v08.py
+  - tests/prototypes/test_outer_enthalpy_representation_v08.py
+  timeout: 5400
+- name: v08-03-engineering-shortlist-r3
+  job: shard-v08-03-engineering-shortlist-r3
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_engineering_shortlist_robustness_v08.py
+  - tests/prototypes/test_engineering_shortlist_sensitivity_binding_v08.py
+  - tests/prototypes/test_engineering_shortlist_r2_gate_v08.py
+  - tests/prototypes/test_tube_side_replay_root_cause_v08.py
+  - tests/prototypes/test_intermediate_tube_count_feasibility_v08.py
+  - tests/prototypes/test_candidate_c_engineering_evidence_closure_v08.py
+  timeout: 2400
+- name: v08-autonomous-design-tool
+  job: shard-v08-autonomous-design-tool
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_autonomous_design_user_input_delivery.py
+  - tests/prototypes/test_v08_autonomous_engineering_selection_mvp.py
+  - tests/prototypes/test_v08_experimental_user_trial_web.py
+  timeout: 1800
+- name: v08-autonomous-hydraulic-replay
+  job: shard-v08-autonomous-hydraulic-replay
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_fixed_layout_variable_mdot_hydraulic_replay_v1.py
+  timeout: 5400
+- name: v08-04-hydraulic-feasibility-gate
+  job: shard-v08-04-hydraulic-feasibility-gate
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_04_hydraulic_feasibility_gate.py
+  - tests/prototypes/test_autonomous_nozzle_full_path_hydraulics_v08.py
+  - tests/prototypes/test_full_path_fixed_nozzle_v08.py
+  timeout: 5400
+- name: v08-05-qualified-top-n-report
+  job: shard-v08-05-qualified-top-n-report
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_05_qualified_top_n_engineering_report.py
+  timeout: 5400
+- name: v08-06-independent-e2e-acceptance
+  job: shard-v08-06-independent-e2e-acceptance
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_06_independent_e2e_acceptance.py
+  - tests/prototypes/test_v08_layered_engineering_acceptance_v1.py
+  timeout: 7200
+- name: v08-kernel-rating-integration
+  job: shard-v08-kernel-rating-integration
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_independent_engineering_rating_kernel_v1.py
+  - tests/prototypes/test_v08_kernel_engineering_integration_v1.py
+  - tests/prototypes/test_v08_06_kernel_version_acceptance.py
+  - tests/prototypes/test_v08_07_legacy_supersession_governance.py
+  timeout: 5400
+- name: v08-03-shell-path-hydraulic
+  job: shard-v08-03-shell-path-hydraulic
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_full_path_geometry_cooptimization_v08.py
+  - tests/prototypes/test_shell_hydraulic_lower_bound_v08.py
+  - tests/prototypes/test_shell_structural_feasibility_breakthrough_v08.py
+  - tests/prototypes/test_geometry_identity_v2_v08.py
+  - tests/prototypes/test_frozen_nozzle_margin_and_port_validation_v08.py
+  - tests/prototypes/test_four_port_nozzle_correction_and_validation_v08.py
+  - tests/prototypes/test_high_k_tube_side_structural_feasibility_v08.py
+  timeout: 3600
+- name: v08-03-joint-pareto-freeze
+  job: shard-v08-03-joint-pareto-freeze
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_recovered_shell_052_pareto_joint_v08.py
+  - tests/prototypes/test_first_joint_candidate_freeze_v08.py
+  timeout: 5400
+- name: v08-03-joint-recovered-core
+  job: shard-v08-03-joint-recovered-core
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_recovered_shell_052_full_chain_v08.py
+  - tests/prototypes/test_shell_052_thermal_authority_and_margin_v08.py
+  - tests/prototypes/test_v08_task037_authority_provenance_v08.py
+  - tests/prototypes/test_thermal_hydraulic_joint_cooptimization_v08.py
+  - tests/prototypes/test_joint_boundary_value_solver.py
+  timeout: 3600
+- name: v08-03-provenance-audit-light
+  job: shard-v08-03-provenance-audit-light
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_v08_feasible_candidate_thermal_bridge.py
+  - tests/prototypes/test_v08_frozen_candidate_resolve.py
+  - tests/prototypes/test_v08_counterflow_bvp_recovery.py
+  - tests/prototypes/test_tp_ph_property_audit_v08.py
+  - tests/prototypes/test_propagation_defect_verdict_v08.py
+  - tests/prototypes/test_engineering_acceptance_decision_v08.py
+  - tests/prototypes/test_joint_bvp_wall_closure_e1.py
+  - tests/prototypes/test_float_lattice_bracket.py
+  timeout: 1800
+- name: v07-r27h-candidate-space-extension
+  job: shard-v07-r27h-candidate-space-extension
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27h_candidate_space_extension.py
+  timeout: 7200
+- name: v07-r27g-shell-geometry-local-pareto
+  job: shard-v07-r27g-shell-geometry-local-pareto
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27g_shell_geometry_local_pareto.py
+  timeout: 7200
+- name: v07-r27f-full-path-pressure-budget
+  job: shard-v07-r27f-full-path-pressure-budget
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r27f_full_path_pressure_budget.py
+  timeout: 7200
+- name: v07-r26f-hydraulic-path
+  job: shard-v07-r26f-hydraulic-path
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r26f_engineering_hydraulic_path.py
+  timeout: 7200
+- name: v07-r26g-authorized-full-path
+  job: shard-v07-r26g-authorized-full-path
+  python: ["3.11", "3.12"]
+  files:
+  - tests/prototypes/test_r26g_authorized_full_path_hydraulic.py
+  - tests/prototypes/test_r26ga_full_path_physical_consistency.py
+  timeout: 7200

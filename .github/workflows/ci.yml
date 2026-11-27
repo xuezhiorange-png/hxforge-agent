@@ -211,7 +211,7 @@ jobs:
           fi
           git cat-file -e "${{ needs.resolve-authority.outputs.pr-head-sha }}^{commit}"
       - name: Assert TASK164 predecessor history
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         run: |
           git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
           git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
@@ -223,7 +223,7 @@ jobs:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
       - name: Install TASK029 cross-version runtimes
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           uv python install 3.11 3.12
@@ -240,7 +240,7 @@ jobs:
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
       - name: Provision TASK164 dual-runtime observation environments
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           set -euo pipefail
@@ -342,7 +342,6 @@ jobs:
               ('pytest-stderr', 'pytest-stderr.txt'),
               ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
-              ('shard-execution-progress', 'shard-execution-progress.json'),
           ]
           for kind, path in required:
               exists = os.path.exists(path)
@@ -366,7 +365,14 @@ jobs:
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
-            shard-execution-progress.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload shard execution progress (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-head-${{ needs.resolve-authority.outputs.pr-head-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-${{ matrix.name }}-shard-progress-diagnostic
+          path: shard-execution-progress.json
           if-no-files-found: error
           retention-days: 7
 
@@ -447,7 +453,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "${{ needs.resolve-authority.outputs.merge-sha }}"
       - name: Assert TASK164 predecessor history
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         run: |
           git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
           git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
@@ -460,7 +466,7 @@ jobs:
           echo "uv-runtime=${ACTUAL_PYTHON}"
           test "${ACTUAL_PYTHON}" = "${{ matrix.python }}"
       - name: Install TASK029 cross-version runtimes
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           uv python install 3.11 3.12
@@ -477,7 +483,7 @@ jobs:
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
       - name: Provision TASK164 dual-runtime observation environments
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           set -euo pipefail
@@ -579,7 +585,6 @@ jobs:
               ('pytest-stderr', 'pytest-stderr.txt'),
               ('pytest-outcomes', 'pytest-outcomes.json'),
               ('resource-telemetry', 'resource-telemetry.json'),
-              ('shard-execution-progress', 'shard-execution-progress.json'),
           ]
           for kind, path in required:
               exists = os.path.exists(path)
@@ -603,7 +608,14 @@ jobs:
             resource-telemetry.json
             node-marker-inventory.json
             behavior-environment.json
-            shard-execution-progress.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload shard execution progress (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: merge-ref-${{ needs.resolve-authority.outputs.merge-sha }}-${{ github.run_id }}-attempt${{ github.run_attempt }}-py${{ matrix.python }}-${{ matrix.name }}-shard-progress-diagnostic
+          path: shard-execution-progress.json
           if-no-files-found: error
           retention-days: 7
 
@@ -628,7 +640,7 @@ jobs:
       - name: Assert main-push checkout SHA
         run: test "$(git rev-parse HEAD)" = "${{ github.sha }}"
       - name: Assert TASK164 predecessor history
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         run: |
           git cat-file -e 66dabc275bcf1a35d97e4d57fc70c2ccf05697e9^{commit}
           git cat-file -e 5ff628f1327873dfd3eb195a672bb2a2c706cbdb^{tree}
@@ -640,7 +652,7 @@ jobs:
           version: "0.11.25"
       - run: uv sync --locked --all-extras
       - name: Install TASK029 cross-version runtimes
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           uv python install 3.11 3.12
@@ -657,7 +669,7 @@ jobs:
           echo "TASK029_PY311_EXECUTABLE=${PY311}" >> "${GITHUB_ENV}"
           echo "TASK029_PY312_EXECUTABLE=${PY312}" >> "${GITHUB_ENV}"
       - name: Provision TASK164 dual-runtime observation environments
-        if: matrix.name == 'ci'
+        if: matrix.name == 'ci-governance' || matrix.name == 'ci-engineering-regression'
         shell: bash
         run: |
           set -euo pipefail

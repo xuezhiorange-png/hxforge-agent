@@ -45,6 +45,11 @@ GLOBAL_REQUIRED_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset(
 # Backward compat alias
 REQUIRED_ARTIFACT_KINDS = SHARD_REQUIRED_ARTIFACT_KINDS
 
+# Uploaded outside producer-bundle (separate GitHub Actions artifact). Must not appear in
+# artifact-metadata.json or on disk inside a verified producer bundle directory.
+DIAGNOSTIC_ARTIFACT_KINDS: Final[frozenset[str]] = frozenset({"shard-execution-progress"})
+DIAGNOSTIC_ARTIFACT_DEFAULT_PATH: Final[str] = "shard-execution-progress.json"
+
 # P0-1: Per-kind policy
 ARTIFACT_KIND_POLICIES: Final[dict[str, dict[str, bool]]] = {
     "node-inventory": {"required": True, "allow_empty": False},

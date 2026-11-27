@@ -806,6 +806,75 @@ class TestArtifactIdentity:
                 expected_run_attempt=1,
             )
 
+    def test_reject_diagnostic_progress_kind_in_producer_metadata(self, tmp_path: Path) -> None:
+        """Diagnostic shard progress must not appear in producer bundle metadata."""
+        from tests.ci.artifact_identity import DIAGNOSTIC_ARTIFACT_KINDS
+
+        assert "shard-execution-progress" in DIAGNOSTIC_ARTIFACT_KINDS
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="pr-head",
+            shard="ci-governance",
+            python_version="3.11",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        meta_path = bundle_dir / "artifact-metadata.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["artifacts"].append(
+            {
+                "kind": "shard-execution-progress",
+                "path": "shard-execution-progress.json",
+                "present": True,
+            }
+        )
+        meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+        (bundle_dir / "shard-execution-progress.json").write_text(
+            '{"schema_version":"hxforge.shard-progress.v1","diagnostic_only":true}',
+            encoding="utf-8",
+        )
+        with pytest.raises(ArtifactError, match="EXTRA KINDS"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="pr-head",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
+    def test_reject_undeclared_shard_progress_file_in_producer_bundle(self, tmp_path: Path) -> None:
+        """Diagnostic progress file must not ship inside the producer bundle directory."""
+        manifest = _make_manifest(tmp_path)
+        root = tmp_path / "artifacts"
+        root.mkdir()
+        bundle_dir = _make_artifact_bundle(
+            root,
+            track="merge-ref",
+            shard="ci-engineering-regression",
+            python_version="3.12",
+            commit_sha=_SHA40,
+            run_id="100",
+            run_attempt=1,
+        )
+        (bundle_dir / "shard-execution-progress.json").write_text(
+            '{"schema_version":"hxforge.shard-progress.v1","diagnostic_only":true}',
+            encoding="utf-8",
+        )
+        with pytest.raises(ArtifactError, match="UNDECLARED FILES"):
+            verify_artifacts(
+                artifact_root=root,
+                manifest_path=manifest,
+                expected_track="merge-ref",
+                expected_commit_sha=_SHA40,
+                expected_run_id="100",
+                expected_run_attempt=1,
+            )
+
     # ── Behavior-environment digest recomputation tests (P0-2) ──────────────
 
     def test_reject_behavior_environment_digest_mismatch(self, tmp_path: Path) -> None:
