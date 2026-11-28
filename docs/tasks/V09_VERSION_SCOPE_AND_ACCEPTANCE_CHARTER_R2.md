@@ -5,7 +5,7 @@
 | **Document status** | `DRAFT_PR_PENDING` — **FROZEN** effective only after this docs-only PR is **merged**; `SCOPE_FREEZE_AUTHORIZED` set at merge approval |
 | **Charter revision** | **R2** (corrects R1 per `V09-00-CHARTER_FINAL_CORRECTION_R2`) |
 | **Planning TASK_ID** | `V09-00-VERSION_SCOPE_AND_ACCEPTANCE_FREEZE` |
-| **Correction TASK_ID** | `V09-00-CHARTER_FINAL_CORRECTION_R2` |
+| **Correction TASK_ID** | `V09-00-CHARTER_FINAL_CORRECTION_R2`; PR #326 amendments `V09-00-PR326_FINAL_GATE_CORRECTION` (P1-07…P1-09) |
 | **Repository** | `xuezhiorange-png/hxforge-agent` |
 | **Baseline tag** | `v0.8.0-rc.1` |
 | **Baseline SHA** | `cdd48e361205dd3df1f24007aca36ca3ee048488` |
@@ -94,21 +94,22 @@ A2 validates the **implemented** F model against `LIT` table points — not the 
 
 ## 4. P1-02 — Independent engineering accuracy (A1–A5)
 
-Evidence taxonomy: `REG`, `ANL`, `LIT`, `COM`, `DEV` (see R1 §3). **Thresholds SHALL be frozen in V09-00 ε annex before the owning model code merges** — each threshold cites source (standard, textbook equation, or instrument uncertainty).
+Evidence taxonomy: `REG`, `ANL`, `LIT`, `COM`, `DEV` (see R1 §3). **External reference data, ε thresholds, and calculation basis SHALL be frozen before the corresponding model/function code development begins** — not merely before charter merge. V09-02 MAY publish a **专项精度验收附件** (accuracy annex) prior to formal implementation coding; this charter PR is **not** required to contain all engineering numbers.
 
-### 4.1 A1 — Analytical reference (enhanced)
+### 4.1 A1 — Analytical reference (P1-08)
 
 | Element | Requirement |
 |---------|-------------|
-| Reference | **Independent** closed-form: true **countercurrent** LMTD Q = U·A·ΔT_lm·F with F=1 or registered F from hand calc |
-| Semantic audit | Verify `analytic_parallel_flow_q` / kernel pairing: document whether reference is counterflow, parallel, or mixed; **A1 FAIL** if implementation label contradicts reference physics |
-| Compare | Kernel scalar/toy geometry fixture frozen **before** code |
-| ε_Q, ε_energy | Inherit `V08_KERNEL_RATING_ACCEPTANCE_V1` until annex supersedes with citation |
+| Reference | **Independent** closed-form **ε-NTU** and/or equivalent analytical rating equations with **declared arrangement** (countercurrent, parallel, crossflow limits as applicable) |
+| Physical meaning | Each arrangement used in A1 MUST state inlet/outlet pairing, effectiveness definition, and temperature driving force; **FAIL** if kernel arrangement label contradicts reference physics (including legacy `analytic_parallel_flow_q` naming audit) |
+| Compare | Toy fixtures frozen **before** implementation; no HXForge output as expected value |
+| ε_Q, ε_energy | Frozen in V09-02 accuracy annex with citation; default inherit `V08_KERNEL_RATING_ACCEPTANCE_V1` until superseded |
 
-### 4.2 A2 — F model (covers P1-01)
+### 4.2 A2 — F model and P/R coverage (P1-01 + P1-08)
 
-| Compare | Implemented F vs **LIT** table at ≥3 registered {(N_shell, N_tube_pass)} points in supported envelope |
-| ε_F | From cited table uncertainty or **0.02** absolute max — whichever is **stricter**; source recorded |
+| Compare | Implemented F vs **LIT**; **≥3** distinct **P/R temperature relations** (including boundary / near-boundary points) within formally supported flow arrangement envelope |
+| Coverage | Multiple tube-pass/shell-pass combos in supported catalog; document blocked points outside envelope |
+| ε_F | From cited table uncertainty or **0.02** absolute max — whichever is **stricter**; frozen in annex **before** F model code |
 
 ### 4.3 A3 — Full thermal audit
 
@@ -154,7 +155,7 @@ Evidence taxonomy: `REG`, `ANL`, `LIT`, `COM`, `DEV` (see R1 §3). **Thresholds 
 
 ### 5.2 New independent V0.9 cases (P4–P7)
 
-**Four** new cases MUST be pre-registered (fixtures created in V09-06, not retrofitted from solver):
+**Four** new **positive engineering** cases MUST be pre-registered **before** V09-02/V09-03 model and candidate-selection work (registry owned by V09-06):
 
 | ID | Coverage obligation (each case differs from others) |
 |----|---------------------------------------------------|
@@ -163,13 +164,26 @@ Evidence taxonomy: `REG`, `ANL`, `LIT`, `COM`, `DEV` (see R1 §3). **Thresholds 
 | **P6** | Distinct **temperature approach** / ΔT |
 | **P7** | Distinct **pressure + geometry** limits (tight Δp and/or max shell/length) |
 
-Each P4–P7: live kernel joint E2E; ≥1 qualified or honest blocked outcome with trace; **independent** of P1–P3 inputs.
+Each registry row MUST include **frozen**: inputs (SI), thermodynamic feasibility justification, allowed geometry envelope, expected **hard-constraint** set, and pass observables — **not** retrofitted after implementation.
+
+### 5.2.1 P1-07 — Positive engineering acceptance (P4–P7)
+
+| Rule | Requirement |
+|------|-------------|
+| **PASS** | Each of P4–P7 MUST yield **≥1 real computed candidate** satisfying **all applicable hard constraints** (duty, both full-path Δp, nozzle band, declared geometry limits, model applicability) under kernel joint authority |
+| **BLOCKED** | Valid for **N-tier** cases only; **`BLOCKED` SHALL NOT count as PASS** for P4–P7 |
+| Anti-gaming | Fixtures SHALL NOT be reverse-engineered from implemented catalog/solver outputs to force success |
+| Execution | **V09-06** runs P4–P7 as **independent acceptance** with pre-registered expected observables; V09-03 provides capability but does not author case intent |
 
 `NEW_INDEPENDENT_CASE_COUNT = 4` (P4–P7).
 
-### 5.3 R0-V09 (engineering regression)
+### 5.3 R0-V09 (engineering acceptance on 330 kW)
 
-After legitimate V0.9 model changes, new pin hash on same 330 kW fixture under **`R0-V09`** track; does not replace `R0-V08` artifacts.
+| Track | Requirement |
+|-------|-------------|
+| Pin update | May update canonical hash after legitimate V0.9 model change; **never** overwrites `R0-V08` pins |
+| **P1-07** | `R0-V09` PASS requires **engineering observables** (duty, energy balance, hard constraints, declared margins) meeting same criteria as P-tier — **hash equality alone is insufficient** |
+| Basis | Pre-registered acceptance sheet for 330 kW V0.9 engineering track, distinct from historical replay |
 
 ### 5.4 Negative (N1, N2) — unchanged
 
@@ -216,32 +230,36 @@ After legitimate V0.9 model changes, new pin hash on same 330 kW fixture under *
 
 ---
 
-## 7. P1-05 — Software delivery (V09-05)
+## 7. P1-05 + P1-09 — Software delivery (V09-05)
 
 ### 7.1 G-04 closure (mandatory)
 
 Wheel/sdist MUST ship **official engineering entry modules** (or documented namespace package) so customer install does **not** require a checkout `prototypes/` tree. `pyproject` packages list updated in V09-05 — acceptance = **artifact contents test**, not prose only.
 
-### 7.2 I5 — Clean install
+### 7.2 I5 — Candidate artifact install (P1-09)
 
-| Step | Requirement |
-|------|-------------|
-| Environment | **Fresh venv** on supported Python; **no** repo checkout; **no** `PYTHONPATH` |
-| Install | `pip install` wheel from release artifact at tag |
-| Smoke | Import official entry; run version check == `0.9.0rc1` |
-| Functional smoke | Sizing, Rating, Off-design minimal case from bundled example JSON |
+| Phase | Requirement |
+|-------|-------------|
+| **Pre-release (mandatory)** | Build wheel/sdist from **release candidate commit** (same tree intended for tag); install in **isolated** env: **no** source checkout, **no** `PYTHONPATH` |
+| Start | **Formal CLI** and **formal Web** (packaged entry points, not dev-only module paths) |
+| Modes | Execute **Sizing**, **Rating**, **Off-design** each to completion on bundled example inputs |
+| Exports | **JSON**, **HTML**, and **PDF** report outputs verified (file hash + schema smoke) |
+| **Post-release (tag only)** | Verify tag SHA, package version, and **published artifact digest** consistency — **no** re-run of full I5 on customer site to certify engineering (avoids circular dependency) |
 
 ### 7.3 Export surfaces (V09-05 / V09-06)
 
-CLI, Web, Sizing, Rating, Off-design each produce **JSON**; report chain produces **HTML** and **PDF** sample — automated export tests in I5/V09-06.
+CLI and Web for all three engineering modes; export tests are part of **I5 pre-release**, not optional smoke.
 
-### 7.4 I4 — Browser full loop (P1-05)
+### 7.4 I4 — Browser full loop (P1-05 + P1-09)
 
 | Step | Requirement |
 |------|-------------|
-| Real browser | Automated UI drive (not curl-only) |
-| Flow | Load preset → run design → **see kernel thermal/hydraulic panels** → export JSON → export report |
-| FAIL | HTTP 200 alone, static HTML without compute, or prescreen-only blanks |
+| Real browser | Automated UI drive on **candidate install** or CI-staged equivalent (not curl-only) |
+| **Sizing** | Full form → run → kernel panels → JSON export |
+| **Rating** | Fixed-geometry rating flow via UI or documented UI entry → results + export |
+| **Off-design** | Same geometry, perturbed boundary → results + export |
+| Reports | HTML and PDF download paths exercised |
+| FAIL | HTTP 200 alone, static page, prescreen-only blanks, or skipping any of the three modes |
 
 ---
 
@@ -271,9 +289,9 @@ CLI, Web, Sizing, Rating, Off-design each produce **JSON**; report chain produce
 | ID | Mandatory | Pass summary |
 |----|-----------|--------------|
 | R0-V08 | Yes | Exact replay vs `v0.8.0-rc.1` pin |
-| R0-V09 | Yes | V0.9 engineering pin on 330 kW fixture |
+| R0-V09 | Yes | Engineering observables on 330 kW §5.3 — not hash-only |
 | P1–P3 | Yes | V0.8 historical cases |
-| P4–P7 | Yes | New independent cases §5.2 |
+| P4–P7 | Yes | Each **≥1 hard-qualified candidate** §5.2.1 — **BLOCKED = FAIL** |
 | N1, N2 | Yes | Blocked outcomes |
 | M1–M4 | Yes | Physics observables §5.5 |
 
@@ -303,7 +321,7 @@ Sizing, Rating, Off-design, multi-objective, JSON/HTML/PDF exports — **all PAS
 | Gate | Condition |
 |------|-----------|
 | MG-1 | Charter `FROZEN` |
-| MG-2 | R0-V08, R0-V09, P1–P7, N1–N2, M1–M4 PASS |
+| MG-2 | R0-V08, R0-V09 (engineering observables), P1–P7 (P4–P7 each **hard-qualified**), N1–N2, M1–M4 PASS |
 | MG-3 | A1–A4 PASS |
 | MG-4 | I1–I5 PASS |
 | MG-5 | G-01–06, G-08–10 **resolved**; G-07, G-11 **documented**; G-12 **documented** |
@@ -334,6 +352,15 @@ Sizing, Rating, Off-design, multi-objective, JSON/HTML/PDF exports — **all PAS
 
 §8 R1 retained. Add: register `BENCH-001…003` bibliography before V09-02 coding. Hydrostatic tests excluded from A4/A5 Δp.
 
+### 11.1 Retained from R1 (not weakened)
+
+The following R1 provisions remain in force unchanged in V0.9:
+
+- **Performance budgets** (V09-06 full matrix ~30 min local initial; V09-02 A-suite ~10 min; browser manual ~15 min; CI shard timeouts unchanged).
+- **Engineering applicability domain** (single-phase water/water shell-and-tube within declared catalog; no silent extrapolation).
+- **Historical evidence protection** (V07 Golden immutable; `R0-V08` exact replay; no HXForge-as-reference for A-tier).
+- **Task kill switches** (§2 global termination; unauthorized scope; self-reference rejection).
+
 ---
 
 ## 12. Document control
@@ -355,6 +382,9 @@ Sizing, Rating, Off-design, multi-objective, JSON/HTML/PDF exports — **all PAS
 | **P1-04** | G-10 optional defer | Sizing/Rating/Off-design/MOO **mandatory**; Top-N filter-then-rank; G-10 **must** close |
 | **P1-05** | G-04 "document or entry points" | G-04 **package ship**; I5 clean install; exports; I4 **browser** E2E |
 | **P1-06** | MG-5 subset gaps; mixed defer | Unified G table; split **eligibility** vs **tag/release**; A5 blocks RC only, not R&D |
+| **P1-07** | P4–P7 allowed BLOCKED pass | Each P4–P7 requires **≥1** hard-qualified candidate; registry freeze; R0-V09 not hash-only |
+| **P1-08** | ε at merge; LMTD-only A1 | ε-NTU A1; A2 P/R set; freeze **before model code**; V09-02 annex allowed pre-coding |
+| **P1-09** | Generic `pip install` at tag | Pre-release **candidate** wheel I5 + three modes; I4 all modes; post-release digest verify only |
 
 ---
 
