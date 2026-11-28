@@ -591,6 +591,45 @@ def run_live_thermal_state_hydraulic_postpass(
     equipment_shell_mass_flow_kg_s_override: Decimal | None = None,
 ) -> dict[str, Any]:
     """One-way hydraulic post-pass; does not mutate Task174 reference preview semantics."""
+    ctx = materialize_task168_bundle(case, candidate_id)
+    return run_live_thermal_state_hydraulic_postpass_from_ctx(
+        case,
+        ctx,
+        tube_inlet_temperature_k=tube_inlet_temperature_k,
+        tube_outlet_temperature_k=tube_outlet_temperature_k,
+        shell_inlet_temperature_k=shell_inlet_temperature_k,
+        shell_outlet_temperature_k=shell_outlet_temperature_k,
+        tube_inlet_pressure_pa=tube_inlet_pressure_pa,
+        shell_inlet_pressure_pa=shell_inlet_pressure_pa,
+        reference_tube_dp_pa=reference_tube_dp_pa,
+        reference_shell_dp_pa=reference_shell_dp_pa,
+        provider=provider,
+        tube_property_evaluation_pressure_pa=tube_property_evaluation_pressure_pa,
+        shell_property_evaluation_pressure_pa=shell_property_evaluation_pressure_pa,
+        shell_property_evaluation_temperature_k=shell_property_evaluation_temperature_k,
+        equipment_shell_mass_flow_kg_s_override=equipment_shell_mass_flow_kg_s_override,
+    )
+
+
+def run_live_thermal_state_hydraulic_postpass_from_ctx(
+    case: EngineeringCase,
+    ctx: Task168CandidateBundle,
+    *,
+    tube_inlet_temperature_k: Decimal,
+    tube_outlet_temperature_k: Decimal,
+    shell_inlet_temperature_k: Decimal,
+    shell_outlet_temperature_k: Decimal,
+    tube_inlet_pressure_pa: Decimal,
+    shell_inlet_pressure_pa: Decimal,
+    reference_tube_dp_pa: Decimal | None = None,
+    reference_shell_dp_pa: Decimal | None = None,
+    provider: CoolPropProvider | None = None,
+    tube_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_pressure_pa: Decimal | None = None,
+    shell_property_evaluation_temperature_k: Decimal | None = None,
+    equipment_shell_mass_flow_kg_s_override: Decimal | None = None,
+) -> dict[str, Any]:
+    """R19A postpass when the Task168 candidate bundle is already materialized (e.g. V08 structural)."""
     provider = provider or CoolPropProvider()
     tube_inlet_temperature_k = _decimal_field(tube_inlet_temperature_k)
     tube_outlet_temperature_k = _decimal_field(tube_outlet_temperature_k)
@@ -598,7 +637,6 @@ def run_live_thermal_state_hydraulic_postpass(
     shell_outlet_temperature_k = _decimal_field(shell_outlet_temperature_k)
     tube_inlet_pressure_pa = _decimal_field(tube_inlet_pressure_pa)
     shell_inlet_pressure_pa = _decimal_field(shell_inlet_pressure_pa)
-    ctx = materialize_task168_bundle(case, candidate_id)
     authority = ctx.authority
     bundle = ctx.bundle
     if reference_tube_dp_pa is None:

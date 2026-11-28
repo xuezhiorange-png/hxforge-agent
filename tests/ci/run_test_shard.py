@@ -7,6 +7,7 @@ P0-7: Cross-validates outcomes vs JUnit vs node inventory.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import resource
@@ -253,6 +254,40 @@ def _aggregate_outcomes(outcomes_data: dict[str, Any]) -> dict[str, int]:
     return counts
 
 
+def _annotate_progress_timeout(progress_path: Path, timeout_s: int) -> None:
+    """Append timeout metadata to diagnostic progress file after runner kill."""
+    if not progress_path.is_file():
+        return
+    try:
+        raw = json.loads(progress_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    if not isinstance(raw, dict):
+        return
+    raw["status"] = "runner_timeout"
+    raw["timeout_seconds"] = timeout_s
+    raw["diagnostic_only"] = True
+    with contextlib.suppress(OSError):
+        progress_path.write_text(json.dumps(raw, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _read_progress_summary(progress_path: Path) -> dict[str, Any] | None:
+    if not progress_path.is_file():
+        return None
+    try:
+        raw = json.loads(progress_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    return {
+        "completed_count": raw.get("completed_count"),
+        "last_running_node_id": raw.get("last_running_node_id"),
+        "progress_status": raw.get("status"),
+        "wall_elapsed_s": raw.get("wall_elapsed_s"),
+    }
+
+
 def run_pytest(
     pytest_args: list[str],
     *,
@@ -282,14 +317,19 @@ def run_pytest(
     if env:
         run_env.update(env)
 
-    # Add outcome plugin
+    progress_path_str = os.environ.get("HX_SHARD_PROGRESS_PATH", "shard-execution-progress.json")
+    progress_path = Path(progress_path_str)
+    # Add outcome + diagnostic progress plugins (progress is NOT formal authority).
     cmd = [
         sys.executable,
         "-m",
         "pytest",
         "-p",
         "tests.ci.outcome_plugin",
+        "-p",
+        "tests.ci.shard_progress_plugin",
         f"--hx-outcome-output={outcomes_path}",
+        f"--hx-progress-output={progress_path_str}",
     ] + pytest_args
 
     exit_code = -1
@@ -322,6 +362,7 @@ def run_pytest(
             stderr_raw = stderr_raw.decode("utf-8", errors="replace")
         result_stdout = stdout_raw
         result_stderr = stderr_raw + f"\nTIMEOUT after {timeout}s"
+        _annotate_progress_timeout(Path(progress_path), timeout)
     except Exception:
         exit_code = -1
         execution_status = "internal-error"
@@ -411,7 +452,7 @@ def run_pytest(
     elif junit_parse_status == "unavailable":
         counts_mismatch_detail = "JUnit unavailable"
 
-    if (
+    if execution_status != "timeout" and (
         exit_code == 2
         and junit_counts["tests_collected"] == 0
         or junit_parse_status == "unavailable"
@@ -499,6 +540,10 @@ def run_pytest(
         "tests_xfailed": final_counts["tests_xfailed"],
         "tests_xpassed": final_counts["tests_xpassed"],
     }
+
+    progress_summary = _read_progress_summary(progress_path)
+    if progress_summary is not None:
+        telemetry_data["shard_progress_diagnostic"] = progress_summary
 
     # Add behavior fingerprint if available
     beh_path = Path("behavior-environment.json")

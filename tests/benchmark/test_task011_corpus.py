@@ -329,7 +329,7 @@ def test_validator_executes_transition_table_per_case() -> None:
     rejects the corpus.
     """
     root = _repo_root()
-    tmp = root.parent / "_tmp_t11"
+    tmp = root / ".ci_tmp_t11"
     if tmp.exists():
         import shutil
 

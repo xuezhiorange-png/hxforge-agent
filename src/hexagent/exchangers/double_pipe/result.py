@@ -2649,10 +2649,9 @@ def _verify_property_call_identity(
                     return False
                 if final_evals[0] != max(eval_indices):
                     return False
-            elif converged is False or status == RatingStatus.FAILED:
+            elif (converged is False or status == RatingStatus.FAILED) and final_evals:
                 # FAILED must NOT have final evaluation
-                if final_evals:
-                    return False
+                return False
 
         # e) Order rule - final_evaluation must come after all other roles
         if final_evals:

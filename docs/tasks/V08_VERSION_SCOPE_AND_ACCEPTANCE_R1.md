@@ -78,7 +78,7 @@ Numerical tolerances, geometry bounds and performance budgets must be **document
 | V08-00 | Freeze this charter, input/output contract, independent case plan and stop rules; docs-only PR. | Published V07 baseline |
 | V08-01 | General-case input/validation/units and user-case-to-solver mapping; no hardcoded 330 kW or forced geometry. | V08-00 |
 | V08-02 | Bounded catalog-driven geometry generation with meaningful candidate diversity, deterministic pruning and reasons. | V08-01 |
-| V08-03 | Unified live thermal sizing/rating and convergence over generated candidates; independent full energy balance and envelope checks. | V08-02 |
+| V08-03 | Unified live thermal sizing/rating and convergence over generated candidates; independent full energy balance and envelope checks. **Authorized architecture change (2026-11):** V08 design-path live thermal for single-phase water–water uses `V08-INDEPENDENT-ENGINEERING-RATING-KERNEL-V1` (LMTD×F, scalar Q, enthalpy audit); V07 Task172/173 remains production/historical only — see `docs/decisions/V08_03_INDEPENDENT_RATING_KERNEL_ARCHITECTURE.md`. | V08-02 |
 | V08-04 | Tube/shell internal + full-path budgets, nozzle velocity/co-selection, assumption-K scenarios, hard feasibility and margins. | V08-03 |
 | V08-05 | Feasible candidate Top-N selection and traceable CLI/API structured engineering report; explicit no-feasible path. | V08-04 |
 | V08-06 | Independent R0/P1–P3/N1/N2/M1–M4 live E2E evidence, reproducibility, performance and regression gates. | V08-05 |

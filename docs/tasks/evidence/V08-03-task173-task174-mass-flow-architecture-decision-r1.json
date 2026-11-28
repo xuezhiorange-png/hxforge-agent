@@ -1,0 +1,39 @@
+{
+  "blocker_class_a": {
+    "acceptance_positive": [
+      "Perturbed mass-flow scenario computes high-K dp with aligned postpass mass",
+      "Task021 layout_hash unchanged",
+      "task026_input_mass_flow_kg_s equals equipment case mass"
+    ],
+    "acceptance_reject": [
+      "Baseline Task029 dp reused under perturbed mass",
+      "VERIFIED_ROBUST without high_k_dp_computed on mass-flow sweeps"
+    ],
+    "authorization": "APPROVAL_REQUIRED: EXPERIMENTAL_VARIABLE_MDOT_FULL_PATH authority",
+    "id": "MASS_FLOW_FULL_PATH_BINDING",
+    "minimal_scope": "Prototype postpass replay (R19A-class) under fixed Task021 geometry; no Task173 production tolerance change",
+    "modules": [
+      "prototypes/v08_thermal_rating/v08_r27_hydraulic_bridge.py",
+      "prototypes/v08_thermal_rating/autonomous_nozzle_full_path_hydraulics_v08.py",
+      "prototypes/v07_general_rating_sizing_mvp/authorized_full_path_hydraulic_calculation.py"
+    ],
+    "rejection_locus": "task174_hydraulic_postpass_from_bindings uses enumeration Task026/029 at 12/20 kg/s while case carries perturbed mass",
+    "reusable_tests": [
+      "tests/prototypes/test_r19a_live_hydraulic_mass_flow_rebind.py",
+      "tests/prototypes/test_engineering_shortlist_sensitivity_binding_v08.py"
+    ],
+    "root_cause": "Hydraulic postpass frozen to Task168 enumeration bundle; R27 full-path mixes scenario case mass with nominal-chain Task029/Task174 decomposition"
+  },
+  "blocker_class_b": {
+    "authorization": "Production Task173 rating contract and golden revision",
+    "id": "PRODUCTION_THERMAL_NUMERICAL_ACCEPTANCE",
+    "minimal_scope": "Out of V08-03 experimental closeout",
+    "modules": [
+      "hexagent.exchangers.shell_tube.task173_integrated_rating"
+    ],
+    "root_cause": "Task172/173 numerical convergence and terminal enthalpy acceptance independent of V08 mass-flow prescreen gap"
+  },
+  "proposed_replay_authority": "FIXED_LAYOUT_VARIABLE_MDOT_HYDRAULIC_REPLAY_V1",
+  "schema": "hxforge.task173-architecture-decision.v1",
+  "task_id": "V08_03_R3_CLOSEOUT_AND_TASK173_ARCHITECTURE_DECISION"
+}

@@ -1,0 +1,35 @@
+{
+  "schema_version": "hxforge.v08-shell-ladder-discrete-authority.v1",
+  "authority_id": "V08-BREAKTHROUGH-SHELL-LADDER-CUT049-R1",
+  "authority_version": "R1-STRUCTURAL-FEASIBILITY-BREAKTHROUGH",
+  "authorization_class": "V08_PROJECT_EXPERIMENTAL_DISCRETE_SEARCH",
+  "approval_status": "APPROVED_FOR_V08_03_STRUCTURAL_BREAKTHROUGH_PROTOTYPE_ONLY",
+  "disclosure": "Breakthrough search variant baffle_cut=0.49 (SINGLE_SEGMENTAL Task166 applicable); near-miss shell full-path on 0.45 m shell.",
+  "evidence_refs": [
+    "docs/tasks/evidence/V08-03-breakthrough-shell-ladder-authority-r1.json"
+  ],
+  "shell_inside_diameters_m": [
+    {"value_m": "0.45", "nominal_label": "V08-breakthrough-shell-ID-450mm", "source_id": "V08-SHELL-BREAKTHROUGH-450", "source_type": "V08_BREAKTHROUGH_PROTOTYPE"}
+  ],
+  "tube_baffle_ladder_rule_id": "V08-TBAFFLE-BREAKTHROUGH-HIGH-SPACING-R1",
+  "tube_baffle_ladder_rule": {
+    "description": "Two high-spacing steps (length/spacing ratio 5).",
+    "baffle_count_fixed": 4,
+    "length_to_spacing_ratio": "5",
+    "allowed_steps": [
+      {"tube_length_m": "5.50", "baffle_spacing_m": "1.10", "baffle_count": 4},
+      {"tube_length_m": "6.00", "baffle_spacing_m": "1.20", "baffle_count": 4}
+    ]
+  },
+  "baffle_segmental": {
+    "baffle_type": "SINGLE_SEGMENTAL",
+    "baffle_cut": "0.49",
+    "source_id": "V08-BAFFLE-CUT-049-BREAKTHROUGH-R1",
+    "source_type": "V08_BREAKTHROUGH_PROTOTYPE"
+  },
+  "construction_family": {
+    "value": "FIXED_TUBESHEET",
+    "source_id": "V08-CONSTRUCTION-FIXED_TUBESHEET-R1",
+    "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+  }
+}

@@ -422,6 +422,8 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
     loss_scenario_key: str = "mid_band",
     tube_nozzle_inside_diameter_m: Decimal | None = None,
     shell_nozzle_inside_diameter_m: Decimal | None = None,
+    tube_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
+    shell_outlet_state_k_pa: tuple[Decimal, Decimal] | None = None,
 ) -> EngineeringHydraulicPathInputV1:
     """R27B/R27C: bundle areas + assumed K values; nozzles from sizing or explicit diameters."""
     scenario = R27B_ASSUMPTION_LOSS_COEFFICIENT_SCENARIOS.get(loss_scenario_key)
@@ -432,6 +434,24 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
     shell_mass = Decimal(str(case.shell_side.mass_flow_kg_s))
     tube_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="TUBE_SIDE")
     shell_density = FluidDensitySourceV1(kind="CASE_SIDE_INLET", fluid_role="SHELL_SIDE")
+    tube_outlet_density = (
+        FluidDensitySourceV1(
+            kind="COOLPROP_TP",
+            temperature_k=tube_outlet_state_k_pa[0],
+            pressure_pa=tube_outlet_state_k_pa[1],
+        )
+        if tube_outlet_state_k_pa is not None
+        else tube_density
+    )
+    shell_outlet_density = (
+        FluidDensitySourceV1(
+            kind="COOLPROP_TP",
+            temperature_k=shell_outlet_state_k_pa[0],
+            pressure_pa=shell_outlet_state_k_pa[1],
+        )
+        if shell_outlet_state_k_pa is not None
+        else shell_density
+    )
 
     if tube_nozzle_inside_diameter_m is None or shell_nozzle_inside_diameter_m is None:
         if preliminary_nozzle_sizing is None:
@@ -519,7 +539,7 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
             path_sequence_index=3,
             reference_flow_area_m2=bundle_area,
             mass_flow_kg_s=tube_mass,
-            fluid_density_source=tube_density,
+            fluid_density_source=tube_outlet_density,
             loss_coefficient=scenario["tube_bundle_exit_k"],
             **common_coeff,
         ),
@@ -531,7 +551,7 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
             path_sequence_index=4,
             nozzle_inside_diameter_m=tube_nozzle_d,
             mass_flow_kg_s=tube_mass,
-            fluid_density_source=tube_density,
+            fluid_density_source=tube_outlet_density,
             loss_coefficient=scenario["tube_nozzle_k"],
             **common_coeff,
         ),
@@ -569,7 +589,7 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
             path_sequence_index=2,
             reference_flow_area_m2=shell_transition_area,
             mass_flow_kg_s=shell_mass,
-            fluid_density_source=shell_density,
+            fluid_density_source=shell_outlet_density,
             loss_coefficient=scenario["shell_transition_k"],
             **common_coeff,
         ),
@@ -581,7 +601,7 @@ def build_r27b_assumption_based_hydraulic_path_input_v1(
             path_sequence_index=3,
             nozzle_inside_diameter_m=shell_nozzle_d,
             mass_flow_kg_s=shell_mass,
-            fluid_density_source=shell_density,
+            fluid_density_source=shell_outlet_density,
             loss_coefficient=scenario["shell_nozzle_k"],
             **common_coeff,
         ),

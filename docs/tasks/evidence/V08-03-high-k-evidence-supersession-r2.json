@@ -1,0 +1,30 @@
+{
+  "corrected_attribution": [
+    "Root-cause r1: Task021/024/025/026 PASS; Task027 BL_T027_UNSUPPORTED_REYNOLDS_REGIME for Re in transitional band on 0.85/0.90 scales.",
+    "New tube OD/ID authority is NOT_PROVEN; placement-envelope expansion is a separate lever."
+  ],
+  "current_authoritative_artifacts": [
+    "docs/tasks/evidence/V08-03-tube-side-replay-root-cause-r1.json",
+    "docs/tasks/evidence/V08-03-intermediate-tube-count-feasibility-r1.json"
+  ],
+  "engineering_language_correction": "Fewer parallel tubes raise per-tube mass flow and Reynolds; increasing tube count (larger placement envelope) lowers per-tube flow. Larger tube ID is not a direct Re lever in the fixed catalog scan.",
+  "historical_errors": [
+    "V08-03-high-k-tube-side-structural-feasibility-r1.md attributed 0.85/0.90 combo blocks to Task168/Task021 failures.",
+    "r1 JSON set new_tube_geometry_authority_required=true from sole R1 tube catalog count."
+  ],
+  "schema": "hxforge.evidence-supersession.v1",
+  "supersedes": [
+    {
+      "artifact": "docs/tasks/evidence/V08-03-high-k-tube-side-structural-feasibility-r1.json",
+      "preserve_on_disk": true,
+      "revision_superseded": "r1"
+    }
+  ],
+  "supersession_revision": "r2",
+  "task_id": "V08_03_INTERMEDIATE_TUBE_COUNT_FEASIBILITY_AND_EVIDENCE_RECONCILIATION",
+  "tube_geometry_authority": {
+    "new_tube_geometry_authority_required_legacy_r1": true,
+    "new_tube_geometry_authority_tri_state": "not_proven",
+    "proposed_geometry_authority_state": "NOT_PROVEN_FROM_CATALOG_COUNT_ALONE"
+  }
+}

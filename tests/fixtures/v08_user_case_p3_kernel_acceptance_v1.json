@@ -1,0 +1,26 @@
+{
+  "schema_version": "hxforge.general-user-design-case.v1",
+  "engineering_case_id": "V08_06_P3_KERNEL_ACCEPTANCE_V1",
+  "exchanger_type": "SHELL_AND_TUBE_FIXED_TUBESHEET_SINGLE_PHASE",
+  "tube_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 44, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 11, "unit": "kg/s"}
+  },
+  "shell_side": {
+    "fluid": "PURE_ORDINARY_WATER",
+    "inlet_temperature": {"value": 23, "unit": "degC"},
+    "inlet_pressure": {"value": 101.325, "unit": "kPa"},
+    "mass_flow": {"value": 19, "unit": "kg/s"}
+  },
+  "target_heat_duty": {"value": 275, "unit": "kW"},
+  "max_tube_side_pressure_drop": {"value": 40, "unit": "kPa"},
+  "max_shell_side_pressure_drop": {"value": 35, "unit": "kPa"},
+  "design_envelope": {
+    "max_shell_inside_diameter_m": "1.2",
+    "max_tube_length_m": "6.0",
+    "provenance_note": "V08-06 P3 pre-registered spec docs/tasks/evidence/V08-06-P3-kernel-acceptance-spec-r1.md"
+  },
+  "notes": "P3: flows 10/18 kg/s distinct from P1/P2; frozen before kernel matrix run."
+}

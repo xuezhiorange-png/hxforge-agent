@@ -128,6 +128,137 @@ def _run_live_cli(case_path: Path, output_dir: Path) -> dict[str, Any]:
     return json.loads((output_dir / "RAW_RESULT.json").read_text())
 
 
+@pytest.mark.timeout(120)
+def test_legacy_mesh_budget_subprocess_timeout_terminates_worker() -> None:
+    """Controlled sleep worker must be killed; no orphan budget worker processes."""
+    import time
+
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+        build_native_cell_context,
+        count_legacy_mesh_budget_worker_processes,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    budget_s = 2.0
+    t0 = time.perf_counter()
+    mesh, _, _ = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+        resource_budget_wall_s=budget_s,
+        _test_inject_sleep_s=30.0,
+    )
+    elapsed = time.perf_counter() - t0
+    assert elapsed < budget_s + 5.0
+    assert mesh.get("status") == "BLOCKED"
+    assert mesh.get("failure_code") == LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE
+    assert any("SUBPROCESS_HARD_WALL" in d for d in mesh["diagnostics"])
+    assert any("worker_terminated=True" in d for d in mesh["diagnostics"])
+    time.sleep(0.5)
+    assert count_legacy_mesh_budget_worker_processes() == 0
+
+
+@pytest.mark.timeout(120)
+def test_legacy_mesh_budget_post_timeout_normal_completion() -> None:
+    """After a killed worker, a short injected job still completes in-budget."""
+    import time
+
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+        build_native_cell_context,
+        count_legacy_mesh_budget_worker_processes,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+        resource_budget_wall_s=2.0,
+        _test_inject_sleep_s=30.0,
+    )
+    assert count_legacy_mesh_budget_worker_processes() == 0
+    mesh, _, _ = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+        resource_budget_wall_s=15.0,
+        _test_inject_sleep_s=0.1,
+    )
+    assert mesh.get("status") in {"BLOCKED", "NUMERIC_VALID"}
+    if mesh.get("status") == "BLOCKED":
+        assert mesh.get("failure_code") == LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE
+    time.sleep(0.5)
+    assert count_legacy_mesh_budget_worker_processes() == 0
+
+
+@pytest.mark.timeout(180)
+def test_legacy_resource_budget_consecutive_calls_bounded_and_reentrant() -> None:
+    """Three budget kills must not accumulate worker processes or wall time."""
+    import time
+
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE,
+        build_native_cell_context,
+        count_legacy_mesh_budget_worker_processes,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    t0 = time.perf_counter()
+    budget_s = 2.0
+    for _ in range(3):
+        mesh, _, _ = run_mesh_numeric_with_profile(
+            native,
+            subdivisions=1,
+            case=case,
+            enable_live_thermal_boundary=True,
+            resource_budget_wall_s=budget_s,
+            _test_inject_sleep_s=30.0,
+        )
+        assert mesh.get("status") == "BLOCKED"
+        assert mesh.get("failure_code") == LEGACY_LOW_MESH_RESOURCE_BUDGET_FAILURE
+        assert any("SUBPROCESS_HARD_WALL" in d for d in mesh["diagnostics"])
+        assert count_legacy_mesh_budget_worker_processes() == 0
+    elapsed = time.perf_counter() - t0
+    assert elapsed < budget_s * 3 + 20.0
+    assert count_legacy_mesh_budget_worker_processes() == 0
+
+
+@pytest.mark.timeout(200)
+def test_legacy_mesh_budget_ipc_observables_not_marshalled_parent_gets_mesh_fields() -> None:
+    """Budget subprocess completes: parent returns mesh+profile; observables stay in worker."""
+    from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (
+        build_native_cell_context,
+        run_mesh_numeric_with_profile,
+    )
+
+    case = load_general_engineering_case_json(_R23_E2E.read_text(encoding="utf-8"))
+    native = build_native_cell_context(case)
+    mesh, profile, obs = run_mesh_numeric_with_profile(
+        native,
+        subdivisions=1,
+        case=case,
+        enable_live_thermal_boundary=True,
+        resource_budget_wall_s=120.0,
+        _test_inject_sleep_s=0.05,
+    )
+    assert obs is None
+    assert isinstance(mesh, dict)
+    assert "status" in mesh
+    assert isinstance(profile, dict)
+    assert mesh.get("schema_version") == "hxforge.low-mesh-result.v1"
+
+
 @pytest.mark.timeout(300)
 def test_r23_primary_310_295_k_reports_honest_outcome() -> None:
     from prototypes.v07_general_rating_sizing_mvp.positive_duty_cell import (

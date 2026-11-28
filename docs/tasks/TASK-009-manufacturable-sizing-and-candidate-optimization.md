@@ -199,6 +199,7 @@ Valid: `"1"`, `"0.1"`, `"0.01"`, `"0.001"`. Invalid: `"0.025"`, `"0.333"`, `"10"
 
 ```python
 from decimal import Decimal
+
 quantum = Decimal(length_quantum_m)
 if not quantum.is_finite() or quantum <= 0:
     raise InvalidLengthQuantum()
@@ -218,14 +219,15 @@ Freeze canonical quantum string: `str(quantum.normalize())` (e.g. `"0.001"` rath
 def to_tick(value_m: float | str | Decimal, quantum: Decimal) -> int:
     raw = Decimal(str(value_m))
     if not raw.is_finite() or raw <= 0:
-        raise InvalidLengthError(...)   # structured, not assert
+        raise InvalidLengthError(...)  # structured, not assert
     if raw < quantum:
-        raise InvalidLengthError(...)   # sub-quantum rejected before quantization
+        raise InvalidLengthError(...)  # sub-quantum rejected before quantization
     qty = raw.quantize(quantum, rounding=ROUND_HALF_EVEN)
     tick = int((qty / quantum).to_integral_exact())
     if tick <= 0:
-        raise InvalidLengthError(...)   # should not happen after < quantum guard
+        raise InvalidLengthError(...)  # should not happen after < quantum guard
     return tick
+
 
 def from_tick(tick: int, quantum: Decimal) -> Decimal:
     return Decimal(tick) * quantum
@@ -309,14 +311,12 @@ if maximum_effective_length_m is not None:
 first_idx = 0
 if request_min_tick is not None:
     # ceil division: smallest i with lo + i*step >= request_min_tick
-    first_idx = max(first_idx,
-                    -((- (request_min_tick - lo_tick)) // step_tick))
+    first_idx = max(first_idx, -((-(request_min_tick - lo_tick)) // step_tick))
 
 last_idx = catalog_count - 1
 if request_max_tick is not None:
     # floor division: largest i with lo + i*step <= request_max_tick
-    last_idx = min(last_idx,
-                   (request_max_tick - lo_tick) // step_tick)
+    last_idx = min(last_idx, (request_max_tick - lo_tick) // step_tick)
 
 intersection_count = max(0, last_idx - first_idx + 1)
 ```
@@ -326,7 +326,8 @@ intersection_count = max(0, last_idx - first_idx + 1)
 ```python
 catalog_ticks = sorted({to_tick(v, quantum) for v in allowed_effective_lengths_m})
 filtered_ticks = tuple(
-    tick for tick in catalog_ticks
+    tick
+    for tick in catalog_ticks
     if (request_min_tick is None or tick >= request_min_tick)
     and (request_max_tick is None or tick <= request_max_tick)
 )
@@ -566,13 +567,15 @@ calculation_run_id: UUID | None
 TASK-009 verified evidence digest:
 
 ```python
-rating_execution_context_digest = sha256_digest({
-    "request_id": str(request_id) if request_id is not None else None,
-    "design_case_revision_id": str(design_case_revision_id)
-        if design_case_revision_id is not None else None,
-    "calculation_run_id": str(calculation_run_id)
-        if calculation_run_id is not None else None,
-})
+rating_execution_context_digest = sha256_digest(
+    {
+        "request_id": str(request_id) if request_id is not None else None,
+        "design_case_revision_id": str(design_case_revision_id)
+        if design_case_revision_id is not None
+        else None,
+        "calculation_run_id": str(calculation_run_id) if calculation_run_id is not None else None,
+    }
+)
 ```
 
 All three fields enter the verified evidence digest and JSON round-trip.
@@ -884,17 +887,19 @@ Must not copy trusted thermal metrics from an unverified `RatingResult`.
 ### 14.4 InvalidEvidenceDigest
 
 ```python
-invalid_evidence_digest = sha256_digest({
-    "candidate_id": ...,
-    "claimed_rating_status": ... | None,
-    "claimed_result_hash": ... | None,
-    "claimed_provenance_digest": ... | None,
-    "hash_verification_outcome": hash_verification_outcome.value,
-    "provenance_verification_outcome": provenance_verification_outcome.value,
-    "rating_request_identity_digest": ... | None,
-    "claimed_provider_identity_digest": ... | None,
-    "failure_reason": ...,
-})
+invalid_evidence_digest = sha256_digest(
+    {
+        "candidate_id": ...,
+        "claimed_rating_status": ... | None,
+        "claimed_result_hash": ... | None,
+        "claimed_provenance_digest": ... | None,
+        "hash_verification_outcome": hash_verification_outcome.value,
+        "provenance_verification_outcome": provenance_verification_outcome.value,
+        "rating_request_identity_digest": ... | None,
+        "claimed_provider_identity_digest": ... | None,
+        "failure_reason": ...,
+    }
+)
 ```
 
 - Explicit `None` values enter the payload.
@@ -997,9 +1002,7 @@ Available only when value is an exact TASK-008 `RatingRequestIdentity`.
 
 ```python
 safe_canonical_value = rating_request_identity_payload  # §14.7.1 exact 21-field payload
-claimed_request_identity_digest = sha256_digest(
-    rating_request_identity_payload
-)
+claimed_request_identity_digest = sha256_digest(rating_request_identity_payload)
 ```
 
 **`execution_context`:**
@@ -1008,20 +1011,15 @@ Available only when value is an exact `ExecutionContextSnapshot`.
 
 ```python
 execution_context_payload = {
-    "request_id":
-        str(value.request_id) if value.request_id is not None else None,
-    "design_case_revision_id":
-        str(value.design_case_revision_id)
-        if value.design_case_revision_id is not None
-        else None,
-    "calculation_run_id":
-        str(value.calculation_run_id)
-        if value.calculation_run_id is not None
-        else None,
+    "request_id": str(value.request_id) if value.request_id is not None else None,
+    "design_case_revision_id": str(value.design_case_revision_id)
+    if value.design_case_revision_id is not None
+    else None,
+    "calculation_run_id": str(value.calculation_run_id)
+    if value.calculation_run_id is not None
+    else None,
 }
-claimed_execution_context_digest = sha256_digest(
-    execution_context_payload
-)
+claimed_execution_context_digest = sha256_digest(execution_context_payload)
 safe_canonical_value = execution_context_payload
 ```
 
@@ -1038,9 +1036,7 @@ provider_identity_payload = {
     "configuration_fingerprint": value.configuration_fingerprint,
     "cache_policy_version": value.cache_policy_version,
 }
-claimed_provider_identity_digest = sha256_digest(
-    provider_identity_payload
-)
+claimed_provider_identity_digest = sha256_digest(provider_identity_payload)
 safe_canonical_value = provider_identity_payload
 ```
 
@@ -1049,10 +1045,12 @@ safe_canonical_value = provider_identity_payload
 Use the real public source field name:
 
 ```python
-field_digest = sha256_digest({
-    "field_name": field_name,
-    "canonical_value": safe_canonical_value,
-})
+field_digest = sha256_digest(
+    {
+        "field_name": field_name,
+        "canonical_value": safe_canonical_value,
+    }
+)
 ```
 
 Store:
@@ -1248,16 +1246,13 @@ rating_request_identity_payload = {
     "geometry": snapshot.geometry,
     "solver_absolute_residual_w": snapshot.solver_absolute_residual_w,
     "solver_relative_residual_fraction": snapshot.solver_relative_residual_fraction,
-    "solver_bracket_temperature_tolerance_k":
-        snapshot.solver_bracket_temperature_tolerance_k,
+    "solver_bracket_temperature_tolerance_k": snapshot.solver_bracket_temperature_tolerance_k,
     "solver_max_iterations": snapshot.solver_max_iterations,
     "tube_boundary_condition": snapshot.tube_boundary_condition,
     "annulus_boundary_condition": snapshot.annulus_boundary_condition,
     "minimum_terminal_delta_t": snapshot.minimum_terminal_delta_t,
 }
-rating_request_identity_digest = sha256_digest(
-    rating_request_identity_payload
-)
+rating_request_identity_digest = sha256_digest(rating_request_identity_payload)
 ```
 
 Rules:
@@ -1275,9 +1270,9 @@ Rules:
 execution_context_payload = {
     "request_id": str(request_id) if request_id is not None else None,
     "design_case_revision_id": str(design_case_revision_id)
-        if design_case_revision_id is not None else None,
-    "calculation_run_id": str(calculation_run_id)
-        if calculation_run_id is not None else None,
+    if design_case_revision_id is not None
+    else None,
+    "calculation_run_id": str(calculation_run_id) if calculation_run_id is not None else None,
 }
 rating_execution_context_digest = sha256_digest(execution_context_payload)
 ```
@@ -1347,19 +1342,17 @@ NON_STRING_MAPPING_KEY_MARKER = "<non-string-mapping-key>"
 
 
 CanonicalValue: TypeAlias = (
-    None
-    | bool
-    | int
-    | float
-    | str
-    | list["CanonicalValue"]
-    | dict[str, "CanonicalValue"]
+    None | bool | int | float | str | list["CanonicalValue"] | dict[str, "CanonicalValue"]
 )
 
 
 ContextCanonicalizationFailureKind: TypeAlias = Literal[
-    "unsupported_type", "non_finite_float", "cyclic_reference",
-    "naive_datetime", "non_string_key", "canonicalization_exception",
+    "unsupported_type",
+    "non_finite_float",
+    "cyclic_reference",
+    "naive_datetime",
+    "non_string_key",
+    "canonicalization_exception",
 ]
 
 
@@ -1396,19 +1389,16 @@ def qualified_type_name(value: object) -> str:
 
 class QuantityKindProtocol(Protocol):
     @property
-    def value(self) -> str:
-        ...
+    def value(self) -> str: ...
 
 
 class QuantitySIResultProtocol(Protocol):
     @property
-    def value(self) -> object:
-        ...
+    def value(self) -> object: ...
 
 
 class QuantityToSIProtocol(Protocol):
-    def __call__(self) -> QuantitySIResultProtocol:
-        ...
+    def __call__(self) -> QuantitySIResultProtocol: ...
 
 
 _REQUIRED_QUANTITY_ATTRIBUTES = (
@@ -1421,8 +1411,7 @@ _REQUIRED_QUANTITY_ATTRIBUTES = (
 
 def has_all_repository_quantity_attributes(value: object) -> bool:
     return all(
-        getattr_static(value, attribute_name, _MISSING_ATTRIBUTE)
-        is not _MISSING_ATTRIBUTE
+        getattr_static(value, attribute_name, _MISSING_ATTRIBUTE) is not _MISSING_ATTRIBUTE
         for attribute_name in _REQUIRED_QUANTITY_ATTRIBUTES
     )
 
@@ -1473,7 +1462,10 @@ def try_read_repository_quantity_adapter(
     typed_kind = cast(QuantityKindProtocol | None, kind)
     typed_to_si = cast(QuantityToSIProtocol, to_si)
     return RepositoryQuantityAdapter(
-        raw_value=raw_value, unit=unit, kind=typed_kind, to_si=typed_to_si,
+        raw_value=raw_value,
+        unit=unit,
+        kind=typed_kind,
+        to_si=typed_to_si,
     )
 
 
@@ -1626,11 +1618,14 @@ def canonicalize_trusted_context_value(
             updated_ancestors = ancestor_ids | {id(value)}
             list_result: list[CanonicalValue] = []
             for index, item in enumerate(value):
-                list_result.append(canonicalize_trusted_context_value(
-                    item, context_key,
-                    context_path + (f"[{index}]",),
-                    updated_ancestors,
-                ))
+                list_result.append(
+                    canonicalize_trusted_context_value(
+                        item,
+                        context_key,
+                        context_path + (f"[{index}]",),
+                        updated_ancestors,
+                    )
+                )
             return list_result
 
         # Mapping → recursive (str keys only)
@@ -1667,7 +1662,9 @@ def canonicalize_trusted_context_value(
 
         # repository Quantity-like (canonical.py)
         adapter = try_read_repository_quantity_adapter(
-            value, context_key=context_key, context_path=context_path,
+            value,
+            context_key=context_key,
+            context_path=context_path,
         )
         if adapter is not None:
             try:
@@ -1676,28 +1673,28 @@ def canonicalize_trusted_context_value(
                     si_value = adapter.to_si().value
                 return {
                     "si_value": canonicalize_trusted_context_value(
-                        si_value, context_key=context_key,
+                        si_value,
+                        context_key=context_key,
                         context_path=context_path + ("si_value",),
                         ancestor_ids=ancestor_ids,
                     ),
-                    "kind": (
-                        adapter.kind.value
-                        if adapter.kind is not None
-                        else None
-                    ),
+                    "kind": (adapter.kind.value if adapter.kind is not None else None),
                 }
             except ContextCanonicalizationError:
                 raise
             except Exception as exc:
                 raise ContextCanonicalizationError(
                     failure_kind="canonicalization_exception",
-                    context_key=context_key, context_path=context_path,
+                    context_key=context_key,
+                    context_path=context_path,
                     offending_type=qualified_type_name(value),
                 ) from exc
 
         # Pydantic model - field-level traversal
         pydantic_adapter = try_read_pydantic_model_adapter(
-            value, context_key=context_key, context_path=context_path,
+            value,
+            context_key=context_key,
+            context_path=context_path,
         )
         if pydantic_adapter is not None:
             updated_ancestors = ancestor_ids | {id(value)}
@@ -1705,7 +1702,8 @@ def canonicalize_trusted_context_value(
             for field_name in pydantic_adapter.model_fields:
                 try:
                     field_value = getattr(
-                        pydantic_adapter.model, field_name,
+                        pydantic_adapter.model,
+                        field_name,
                     )
                 except ContextCanonicalizationError:
                     raise
@@ -1717,7 +1715,8 @@ def canonicalize_trusted_context_value(
                         offending_type=qualified_type_name(value),
                     ) from exc
                 pydantic_result[field_name] = canonicalize_trusted_context_value(
-                    field_value, context_key=context_key,
+                    field_value,
+                    context_key=context_key,
                     context_path=context_path + (field_name,),
                     ancestor_ids=updated_ancestors,
                 )
@@ -1781,11 +1780,13 @@ def build_canonical_context_entries(
             ancestor_ids=frozenset(),
         )
         value_digest = sha256_digest({"value": canonical_value})
-        entries.append(CanonicalContextEntry(
-            key=key,
-            value=canonical_value,
-            value_digest=value_digest,
-        ))
+        entries.append(
+            CanonicalContextEntry(
+                key=key,
+                value=canonical_value,
+                value_digest=value_digest,
+            )
+        )
     entries.sort(key=lambda e: (e.key, e.value_digest))
     return tuple(entries)
 
@@ -1809,8 +1810,11 @@ def digest_run_failure(failure: RunFailure) -> str:
 
 
 def build_context_canonicalization_fallback(
-    *, failure_stage: FailureStage, owner_kind: MessageOwnerKind,
-    owner_id: str, original_code: ErrorCode,
+    *,
+    failure_stage: FailureStage,
+    owner_kind: MessageOwnerKind,
+    owner_id: str,
+    original_code: ErrorCode,
     error: ContextCanonicalizationError,
 ) -> RunFailure:
     safe_marker_payload = {
@@ -1873,10 +1877,7 @@ from hashlib import sha256
 from pathlib import Path
 
 
-DOCUMENT_PATH = Path(
-    "docs/tasks/"
-    "TASK-009-manufacturable-sizing-and-candidate-optimization.md"
-)
+DOCUMENT_PATH = Path("docs/tasks/TASK-009-manufacturable-sizing-and-candidate-optimization.md")
 BLOCK_ID = b"TASK009_CANONICALIZATION_CORE_PY"
 BEGIN_MARKER = b"<!-- BEGIN " + BLOCK_ID + b" -->\n"
 END_MARKER = b"<!-- END " + BLOCK_ID + b" -->"
@@ -1888,42 +1889,24 @@ OUTPUT_PATH = Path("/tmp/task009_canonicalization_core.py")
 
 def extract_exact_block(document_bytes: bytes) -> bytes:
     if document_bytes.count(BEGIN_MARKER) != 1:
-        raise RuntimeError(
-            "core BEGIN marker count must equal 1"
-        )
+        raise RuntimeError("core BEGIN marker count must equal 1")
     if document_bytes.count(END_MARKER) != 1:
-        raise RuntimeError(
-            "core END marker count must equal 1"
-        )
-    begin_index = (
-        document_bytes.index(BEGIN_MARKER)
-        + len(BEGIN_MARKER)
-    )
+        raise RuntimeError("core END marker count must equal 1")
+    begin_index = document_bytes.index(BEGIN_MARKER) + len(BEGIN_MARKER)
     end_index = document_bytes.index(
         END_MARKER,
         begin_index,
     )
     region = document_bytes[begin_index:end_index]
     if not region.startswith(OPENING_FENCE):
-        raise RuntimeError(
-            "BEGIN marker must be followed immediately "
-            "by a python fence"
-        )
+        raise RuntimeError("BEGIN marker must be followed immediately by a python fence")
     if not region.endswith(CLOSING_FENCE):
-        raise RuntimeError(
-            "END marker must be preceded immediately "
-            "by a closing fence"
-        )
+        raise RuntimeError("END marker must be preceded immediately by a closing fence")
     if region.count(FENCE_TOKEN) != 2:
-        raise RuntimeError(
-            "marked core region must contain exactly "
-            "one python code fence"
-        )
-    code = region[len(OPENING_FENCE):-len(CLOSING_FENCE)]
+        raise RuntimeError("marked core region must contain exactly one python code fence")
+    code = region[len(OPENING_FENCE) : -len(CLOSING_FENCE)]
     if not code:
-        raise RuntimeError(
-            "extracted core block must not be empty"
-        )
+        raise RuntimeError("extracted core block must not be empty")
     return code
 
 
@@ -1932,9 +1915,7 @@ extracted_bytes = extract_exact_block(document_bytes)
 OUTPUT_PATH.write_bytes(extracted_bytes)
 written_bytes = OUTPUT_PATH.read_bytes()
 if written_bytes != extracted_bytes:
-    raise RuntimeError(
-        "written extraction differs from source bytes"
-    )
+    raise RuntimeError("written extraction differs from source bytes")
 digest = sha256(extracted_bytes).hexdigest()
 print(f"path={OUTPUT_PATH}")
 print(f"size={len(extracted_bytes)}")
@@ -2199,12 +2180,14 @@ Usage:
 
 ```python
 canonical_context_entries = build_canonical_context_entries(context)
-context_digest = sha256_digest({
-    "entries": [
-        {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
-        for entry in canonical_context_entries
-    ],
-})
+context_digest = sha256_digest(
+    {
+        "entries": [
+            {"key": entry.key, "value": entry.value, "value_digest": entry.value_digest}
+            for entry in canonical_context_entries
+        ],
+    }
+)
 ```
 
 ### 14.7.3 EngineeringMessage exact payload
@@ -2222,9 +2205,7 @@ engineering_message_payload = {
         for entry in canonical_context_entries
     ],
 }
-engineering_message_digest = sha256_digest(
-    engineering_message_payload
-)
+engineering_message_digest = sha256_digest(engineering_message_payload)
 ```
 
 `allows_continuation` is excluded from the digest because it is derived from severity. Before digesting, verify:
@@ -2395,21 +2376,36 @@ def build_candidate_evaluation_payload(
     return {
         "source_qualified_candidate_identity_digest": evaluation.source_qualified_candidate_identity.identity_digest,
         "candidate_evaluation_state": evaluation.candidate_evaluation_state.value,
-        "candidate_evaluation_identity_digest": evaluation.candidate_evaluation_identity.identity_digest if evaluation.candidate_evaluation_identity is not None else None,
+        "candidate_evaluation_identity_digest": evaluation.candidate_evaluation_identity.identity_digest
+        if evaluation.candidate_evaluation_identity is not None
+        else None,
         "evaluation_order_index": evaluation.evaluation_order_index,
-        "rating_status": evaluation.rating_status.value if evaluation.rating_status is not None else None,
+        "rating_status": evaluation.rating_status.value
+        if evaluation.rating_status is not None
+        else None,
         "feasibility_status": evaluation.feasibility_status.value,
         "feasible": evaluation.feasible,
-        "verified_rating_evidence_digest": evaluation.verified_rating_evidence.evidence_digest if evaluation.verified_rating_evidence is not None else None,
-        "invalid_rating_evidence_digest": evaluation.invalid_rating_evidence.invalid_evidence_digest if evaluation.invalid_rating_evidence is not None else None,
-        "evaluation_failure_digest": digest_run_failure(evaluation.evaluation_failure) if evaluation.evaluation_failure is not None else None,
-        "diagnostic_digests": [build_diagnostic_digest(d) for d in evaluation.diagnostics] if evaluation.diagnostics else [],
-        "primary_diagnostic_digest": build_diagnostic_digest(evaluation.primary_diagnostic) if evaluation.primary_diagnostic is not None else None,
+        "verified_rating_evidence_digest": evaluation.verified_rating_evidence.evidence_digest
+        if evaluation.verified_rating_evidence is not None
+        else None,
+        "invalid_rating_evidence_digest": evaluation.invalid_rating_evidence.invalid_evidence_digest
+        if evaluation.invalid_rating_evidence is not None
+        else None,
+        "evaluation_failure_digest": digest_run_failure(evaluation.evaluation_failure)
+        if evaluation.evaluation_failure is not None
+        else None,
+        "diagnostic_digests": [build_diagnostic_digest(d) for d in evaluation.diagnostics]
+        if evaluation.diagnostics
+        else [],
+        "primary_diagnostic_digest": build_diagnostic_digest(evaluation.primary_diagnostic)
+        if evaluation.primary_diagnostic is not None
+        else None,
         "duty_margin_w": evaluation.duty_margin_w,
         "duty_shortfall_w": evaluation.duty_shortfall_w,
         "duty_overshoot_w": evaluation.duty_overshoot_w,
         "meets_target_without_tolerance": evaluation.meets_target_without_tolerance,
     }
+
 
 candidate_evaluation_digest = sha256_digest(build_candidate_evaluation_payload(evaluation))
 ```
@@ -2656,10 +2652,7 @@ built-in dict with pre-collided equivalent keys.
 **Finite float key value type:**
 
 ```python
-{
-    "key_kind": "finite_float",
-    "value": float_value
-}
+{"key_kind": "finite_float", "value": float_value}
 ```
 
 The value is the Python float, not a JSON string. In JSON, `value` is serialized via `canonical_json(float_value)`.
@@ -2684,7 +2677,7 @@ Each entry carries canonical key payload, key digest, value, and value digest:
 Where:
 
 ```python
-key_payload_digest = sha256_digest(key_payload)    # full CanonicalRawKey dict
+key_payload_digest = sha256_digest(key_payload)  # full CanonicalRawKey dict
 value_digest = sha256_digest({"value": canonical_value})
 ```
 
@@ -2919,11 +2912,7 @@ The merged TASK-008 `verify_provenance()` contract catches its internal exceptio
 ```python
 def safe_verify_hash(result) -> VerificationOutcome:
     try:
-        return (
-            VerificationOutcome.PASSED
-            if result.verify_hash()
-            else VerificationOutcome.FAILED
-        )
+        return VerificationOutcome.PASSED if result.verify_hash() else VerificationOutcome.FAILED
     except Exception:
         return VerificationOutcome.ERROR
 ```
@@ -2932,9 +2921,7 @@ def safe_verify_hash(result) -> VerificationOutcome:
 def safe_verify_provenance(result) -> VerificationOutcome:
     try:
         return (
-            VerificationOutcome.PASSED
-            if result.verify_provenance()
-            else VerificationOutcome.FAILED
+            VerificationOutcome.PASSED if result.verify_provenance() else VerificationOutcome.FAILED
         )
     except Exception:
         return VerificationOutcome.ERROR
@@ -3326,6 +3313,7 @@ from typing import (
 )
 from uuid import UUID
 
+
 class ProvenanceConcept(StrEnum):
     ROOT_CASE_REVISION = "root_case_revision"
     ROOT_EXTERNAL = "root_external"
@@ -3386,7 +3374,9 @@ ProvenanceOutgoingRelation = tuple[str, ProvenanceConcept]  # (label, target_con
 
 # TypeAlias definitions
 CanonicalPrimitive: TypeAlias = None | bool | int | float | str
-CanonicalValue: TypeAlias = CanonicalPrimitive | list["CanonicalValue"] | dict[str, "CanonicalValue"]
+CanonicalValue: TypeAlias = (
+    CanonicalPrimitive | list["CanonicalValue"] | dict[str, "CanonicalValue"]
+)
 CanonicalPayload: TypeAlias = dict[str, CanonicalValue]
 CanonicalMetadata: TypeAlias = tuple[tuple[str, str], ...]
 ContextT = TypeVar("ContextT")
@@ -3429,9 +3419,7 @@ def root_label(
 ) -> str:
     if root_concept is ProvenanceConcept.ROOT_CASE_REVISION:
         if effective_design_case_revision_id is None:
-            raise ValueError(
-                "case-revision root requires revision id"
-            )
+            raise ValueError("case-revision root requires revision id")
         return f"revision_{effective_design_case_revision_id}"
     if root_concept is ProvenanceConcept.ROOT_EXTERNAL:
         return "external_root"
@@ -3455,12 +3443,16 @@ class RootTopologySelection:
         # Concept ↔ count consistency
         if self.root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
             if self.root_case_revision_count != 1 or self.root_external_count != 0:
-                raise ValueError("ROOT_CASE_REVISION requires root_case_revision_count=1, root_external_count=0")
+                raise ValueError(
+                    "ROOT_CASE_REVISION requires root_case_revision_count=1, root_external_count=0"
+                )
             if self.design_case_revision_id is None:
                 raise ValueError("ROOT_CASE_REVISION requires non-None design_case_revision_id")
         elif self.root_concept == ProvenanceConcept.ROOT_EXTERNAL:
             if self.root_case_revision_count != 0 or self.root_external_count != 1:
-                raise ValueError("ROOT_EXTERNAL requires root_case_revision_count=0, root_external_count=1")
+                raise ValueError(
+                    "ROOT_EXTERNAL requires root_case_revision_count=0, root_external_count=1"
+                )
             if self.design_case_revision_id is not None:
                 raise ValueError("ROOT_EXTERNAL requires design_case_revision_id=None")
         else:
@@ -3472,14 +3464,18 @@ class RootTopologySelection:
             else ProvenanceNodeType.EXTERNAL
         )
         if self.root_node_type is not expected_node_type:
-            raise ValueError(f"root_node_type mismatch: expected {expected_node_type}, got {self.root_node_type}")
+            raise ValueError(
+                f"root_node_type mismatch: expected {expected_node_type}, got {self.root_node_type}"
+            )
         # Concept ↔ label consistency
         if self.root_concept == ProvenanceConcept.ROOT_CASE_REVISION:
             expected_label = f"revision_{self.design_case_revision_id}"
         else:
             expected_label = "external_root"
         if self.root_label != expected_label:
-            raise ValueError(f"root_label mismatch: expected '{expected_label}', got '{self.root_label}'")
+            raise ValueError(
+                f"root_label mismatch: expected '{expected_label}', got '{self.root_label}'"
+            )
         # Edge invariants
         if self.initiates_edge.source_concept is not self.root_concept:
             raise ValueError("root edge source must equal root concept")
@@ -3498,9 +3494,7 @@ def derive_root_topology(
 ) -> RootTopologySelection:
     root_concept = select_root_concept(request_kind, design_case_revision_id)
     effective_design_case_revision_id = (
-        design_case_revision_id
-        if root_concept is ProvenanceConcept.ROOT_CASE_REVISION
-        else None
+        design_case_revision_id if root_concept is ProvenanceConcept.ROOT_CASE_REVISION else None
     )
     ntype = root_node_type(root_concept)
     label = root_label(root_concept, effective_design_case_revision_id)
@@ -3511,7 +3505,9 @@ def derive_root_topology(
         root_label=label,
         root_case_revision_count=1 if is_case else 0,
         root_external_count=0 if is_case else 1,
-        initiates_edge=ProvenanceRelationSpec(root_concept, "initiates", ProvenanceConcept.SIZING_RUN),
+        initiates_edge=ProvenanceRelationSpec(
+            root_concept, "initiates", ProvenanceConcept.SIZING_RUN
+        ),
         design_case_revision_id=effective_design_case_revision_id,
     )
 ```
@@ -3568,15 +3564,18 @@ from dataclasses import dataclass, field
 class RootCaseRevisionConstructionContext:
     design_case_revision_id: UUID
 
+
 @dataclass(frozen=True, slots=True)
 class RootExternalConstructionContext:
     request_kind: SizingRunRequestKind
     request_digest: str
 
+
 @dataclass(frozen=True, slots=True)
 class SizingRunConstructionContext:
     request_kind: SizingRunRequestKind
     request_digest: str
+
 
 @dataclass(frozen=True, slots=True)
 class CatalogSnapshotConstructionContext:
@@ -3586,10 +3585,12 @@ class CatalogSnapshotConstructionContext:
     source_identity: str
     schema_version: str
 
+
 @dataclass(frozen=True, slots=True)
 class CandidateConstructionContext:
     source_qualified_candidate_id: str
     source_qualified_candidate_identity_digest: str
+
 
 @dataclass(frozen=True, slots=True)
 class RatingResultConstructionContext:
@@ -3597,34 +3598,41 @@ class RatingResultConstructionContext:
     rating_result_hash: str
     rating_provenance_digest: str
 
+
 @dataclass(frozen=True, slots=True)
 class ClaimedRatingConstructionContext:
     source_qualified_candidate_id: str
     evaluation_order_index: int
     audit_digest: str
 
+
 @dataclass(frozen=True, slots=True)
 class SizingResultConstructionContext:
     result_hash: str
+
 
 @dataclass(frozen=True, slots=True)
 class SizingRunFailureConstructionContext:
     failure_result_hash: str
     failure_stage: FailureStage
 
+
 @dataclass(frozen=True, slots=True)
 class InvalidEvidenceConstructionContext:
     source_qualified_candidate_id: str
     invalid_evidence_digest: str
 
+
 @dataclass(frozen=True, slots=True)
 class RuntimeFailureConstructionContext:
     failure_digest: str
+
 
 @dataclass(frozen=True, slots=True)
 class OptimizerConstructionContext:
     request_kind: SizingRunRequestKind
     request_digest: str
+
 
 @dataclass(frozen=True, slots=True)
 class WarningOccurrenceConstructionContext:
@@ -3636,6 +3644,7 @@ class WarningOccurrenceConstructionContext:
         default=MessageOccurrenceKind.WARNING,
         init=False,
     )
+
 
 @dataclass(frozen=True, slots=True)
 class BlockerOccurrenceConstructionContext:
@@ -3660,6 +3669,7 @@ Each concept has its own typed context. Multiplicity is handled by `NODE_MULTIPL
 
 # --- ROOT_CASE_REVISION ---
 
+
 def build_revision_label(context: RootCaseRevisionConstructionContext) -> str:
     return f"revision_{context.design_case_revision_id}"
 
@@ -3668,15 +3678,20 @@ def build_root_case_revision_uuid5(context: RootCaseRevisionConstructionContext)
     return f"root-case-revision:{context.design_case_revision_id}"
 
 
-def build_root_case_revision_payload(context: RootCaseRevisionConstructionContext) -> CanonicalPayload:
+def build_root_case_revision_payload(
+    context: RootCaseRevisionConstructionContext,
+) -> CanonicalPayload:
     return {"design_case_revision_id": str(context.design_case_revision_id)}
 
 
-def build_root_case_revision_metadata(context: RootCaseRevisionConstructionContext) -> CanonicalMetadata:
+def build_root_case_revision_metadata(
+    context: RootCaseRevisionConstructionContext,
+) -> CanonicalMetadata:
     return (("design_case_revision_id", str(context.design_case_revision_id)),)
 
 
 # --- ROOT_EXTERNAL ---
+
 
 def build_external_label(context: RootExternalConstructionContext) -> str:
     return "external_root"
@@ -3698,6 +3713,7 @@ def build_root_external_metadata(context: RootExternalConstructionContext) -> Ca
 
 
 # --- SIZING_RUN ---
+
 
 def build_sizing_run_label(context: SizingRunConstructionContext) -> str:
     return f"sizing_run_{context.request_digest}"
@@ -3723,6 +3739,7 @@ def build_sizing_run_metadata(context: SizingRunConstructionContext) -> Canonica
 
 # --- SIZING_OPTIMIZER ---
 
+
 def build_optimizer_label(context: OptimizerConstructionContext) -> str:
     return "sizing_optimizer"
 
@@ -3746,6 +3763,7 @@ def build_optimizer_metadata(context: OptimizerConstructionContext) -> Canonical
 
 
 # --- CATALOG_SNAPSHOT ---
+
 
 def build_catalog_label(context: CatalogSnapshotConstructionContext) -> str:
     return f"catalog_{context.catalog_id}"
@@ -3777,6 +3795,7 @@ def build_catalog_metadata(context: CatalogSnapshotConstructionContext) -> Canon
 
 # --- CANDIDATE ---
 
+
 def build_candidate_label(context: CandidateConstructionContext) -> str:
     return f"candidate_{context.source_qualified_candidate_id}"
 
@@ -3786,7 +3805,9 @@ def build_candidate_uuid5(context: CandidateConstructionContext) -> str:
 
 
 def build_candidate_payload(context: CandidateConstructionContext) -> CanonicalPayload:
-    return {"source_qualified_candidate_identity_digest": context.source_qualified_candidate_identity_digest}
+    return {
+        "source_qualified_candidate_identity_digest": context.source_qualified_candidate_identity_digest
+    }
 
 
 def build_candidate_metadata(context: CandidateConstructionContext) -> CanonicalMetadata:
@@ -3794,6 +3815,7 @@ def build_candidate_metadata(context: CandidateConstructionContext) -> Canonical
 
 
 # --- TASK008_RATING_RESULT ---
+
 
 def build_rating_result_label(context: RatingResultConstructionContext) -> str:
     return f"rating_{context.rating_result_hash}"
@@ -3821,6 +3843,7 @@ def build_rating_result_metadata(context: RatingResultConstructionContext) -> Ca
 
 # --- CLAIMED_TASK008_RATING_RESULT ---
 
+
 def build_claimed_rating_label(context: ClaimedRatingConstructionContext) -> str:
     return f"claimed_rating_{context.source_qualified_candidate_id}"
 
@@ -3847,6 +3870,7 @@ def build_claimed_rating_metadata(context: ClaimedRatingConstructionContext) -> 
 
 # --- SIZING_RESULT ---
 
+
 def build_sizing_result_label(context: SizingResultConstructionContext) -> str:
     return "sizing_result"
 
@@ -3865,6 +3889,7 @@ def build_sizing_result_metadata(context: SizingResultConstructionContext) -> Ca
 
 # --- SIZING_RUN_FAILURE_RESULT ---
 
+
 def build_sizing_run_failure_label(context: SizingRunFailureConstructionContext) -> str:
     return "sizing_run_failure"
 
@@ -3873,14 +3898,18 @@ def build_sizing_run_failure_uuid5(context: SizingRunFailureConstructionContext)
     return f"sizing-run-failure:{context.failure_result_hash}"
 
 
-def build_sizing_run_failure_payload(context: SizingRunFailureConstructionContext) -> CanonicalPayload:
+def build_sizing_run_failure_payload(
+    context: SizingRunFailureConstructionContext,
+) -> CanonicalPayload:
     return {
         "failure_result_hash": context.failure_result_hash,
         "failure_stage": context.failure_stage.value,
     }
 
 
-def build_sizing_run_failure_metadata(context: SizingRunFailureConstructionContext) -> CanonicalMetadata:
+def build_sizing_run_failure_metadata(
+    context: SizingRunFailureConstructionContext,
+) -> CanonicalMetadata:
     return (
         ("failure_result_hash", context.failure_result_hash),
         ("failure_stage", context.failure_stage.value),
@@ -3888,6 +3917,7 @@ def build_sizing_run_failure_metadata(context: SizingRunFailureConstructionConte
 
 
 # --- INVALID_EVIDENCE ---
+
 
 def build_invalid_evidence_label(context: InvalidEvidenceConstructionContext) -> str:
     return f"invalid_evidence_{context.source_qualified_candidate_id}"
@@ -3904,7 +3934,9 @@ def build_invalid_evidence_payload(context: InvalidEvidenceConstructionContext) 
     }
 
 
-def build_invalid_evidence_metadata(context: InvalidEvidenceConstructionContext) -> CanonicalMetadata:
+def build_invalid_evidence_metadata(
+    context: InvalidEvidenceConstructionContext,
+) -> CanonicalMetadata:
     return (
         ("source_qualified_candidate_id", context.source_qualified_candidate_id),
         ("invalid_evidence_digest", context.invalid_evidence_digest),
@@ -3912,6 +3944,7 @@ def build_invalid_evidence_metadata(context: InvalidEvidenceConstructionContext)
 
 
 # --- RUNTIME_FAILURE ---
+
 
 def build_runtime_failure_label(context: RuntimeFailureConstructionContext) -> str:
     return "runtime_failure"
@@ -3930,6 +3963,7 @@ def build_runtime_failure_metadata(context: RuntimeFailureConstructionContext) -
 
 
 # --- WARNING ---
+
 
 def build_warning_label(context: WarningOccurrenceConstructionContext) -> str:
     return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
@@ -3960,6 +3994,7 @@ def build_warning_metadata(context: WarningOccurrenceConstructionContext) -> Can
 
 
 # --- BLOCKER ---
+
 
 def build_blocker_label(context: BlockerOccurrenceConstructionContext) -> str:
     return f"{context.owner_kind.value}:{context.owner_id}:{context.occurrence_kind.value}:{context.message_digest}:{context.occurrence_index}"
@@ -4004,6 +4039,7 @@ class ConstructedProvenanceNodeParts:
 
 class ProvenanceConstructionContextMismatch(Exception):
     """Raised when the provided context type does not match the spec's context_type."""
+
     pass
 
 
@@ -4013,8 +4049,7 @@ def construct_provenance_node_parts(
 ) -> ConstructedProvenanceNodeParts:
     if type(context) is not spec.context_type:
         raise ProvenanceConstructionContextMismatch(
-            f"expected context type {spec.context_type.__name__}, "
-            f"got {type(context).__name__}"
+            f"expected context type {spec.context_type.__name__}, got {type(context).__name__}"
         )
     return ConstructedProvenanceNodeParts(
         label=spec.label_constructor(context),
@@ -4063,7 +4098,9 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
         ),
         allowed_incoming=(),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4078,7 +4115,9 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
         ),
         allowed_incoming=(),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4092,16 +4131,34 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_sizing_run_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN),
-            ProvenanceRelationSpec(ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.ROOT_CASE_REVISION, "initiates", ProvenanceConcept.SIZING_RUN
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.ROOT_EXTERNAL, "initiates", ProvenanceConcept.SIZING_RUN
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN,
+                "produces_failure_record",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4115,14 +4172,30 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_optimizer_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER,
+                "precedes_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4136,12 +4209,20 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_catalog_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4155,12 +4236,24 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_candidate_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "rated_as_claimed",
+                ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "produced_unverified",
+                ProvenanceConcept.INVALID_EVIDENCE,
+            ),
             ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
             ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
         ),
@@ -4176,10 +4269,16 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_rating_result_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4193,7 +4292,11 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_claimed_rating_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "rated_as_claimed",
+                ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ),
         ),
         allowed_outgoing=(),
     ),
@@ -4208,11 +4311,21 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_sizing_result_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
         allowed_outgoing=(),
     ),
@@ -4227,11 +4340,31 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_sizing_run_failure_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER,
+                "precedes_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE,
+                "fails",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.BLOCKER,
+                "annotates_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.WARNING,
+                "annotates_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN,
+                "produces_failure_record",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
         ),
         allowed_outgoing=(),
     ),
@@ -4246,10 +4379,16 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_invalid_evidence_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "produced_unverified",
+                ProvenanceConcept.INVALID_EVIDENCE,
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4264,8 +4403,14 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
         ),
         allowed_incoming=(),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE,
+                "fails",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4279,14 +4424,26 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_warning_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.WARNING
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.WARNING
+            ),
             ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.WARNING),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.WARNING
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.WARNING, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.WARNING, "annotates", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.WARNING,
+                "annotates_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
         ),
     ),
     ProvenanceConceptSpec(
@@ -4300,14 +4457,26 @@ PROVENANCE_CONCEPT_REGISTRY: tuple[ProvenanceConceptSpec, ...] = (
             metadata_constructor=build_blocker_metadata,
         ),
         allowed_incoming=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "emits", ProvenanceConcept.BLOCKER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "emits", ProvenanceConcept.BLOCKER
+            ),
             ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "emits", ProvenanceConcept.BLOCKER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "emits", ProvenanceConcept.BLOCKER
+            ),
         ),
         allowed_outgoing=(
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.BLOCKER, "annotates_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.BLOCKER, "blocks", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.BLOCKER,
+                "annotates_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
         ),
     ),
 )
@@ -4391,12 +4560,16 @@ def invariant_catalog_count_ge_1(ctx: TopologyConstructionContext) -> None:
 
 def invariant_unique_candidate_count_eq_0(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.unique_candidate_count != 0:
-        raise ValueError(f"expected unique_candidate_count=0, got {ctx.counters.unique_candidate_count}")
+        raise ValueError(
+            f"expected unique_candidate_count=0, got {ctx.counters.unique_candidate_count}"
+        )
 
 
 def invariant_unique_candidate_count_ge_1(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.unique_candidate_count < 1:
-        raise ValueError(f"expected unique_candidate_count>=1, got {ctx.counters.unique_candidate_count}")
+        raise ValueError(
+            f"expected unique_candidate_count>=1, got {ctx.counters.unique_candidate_count}"
+        )
 
 
 def invariant_no_candidate_nodes(ctx: TopologyConstructionContext) -> None:
@@ -4406,7 +4579,9 @@ def invariant_no_candidate_nodes(ctx: TopologyConstructionContext) -> None:
 
 def invariant_verified_rating_eq_unique(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.verified_rating_count != ctx.counters.unique_candidate_count:
-        raise ValueError(f"verified_rating_count ({ctx.counters.verified_rating_count}) != unique_candidate_count ({ctx.counters.unique_candidate_count})")
+        raise ValueError(
+            f"verified_rating_count ({ctx.counters.verified_rating_count}) != unique_candidate_count ({ctx.counters.unique_candidate_count})"
+        )
 
 
 def invariant_run_failure_present(ctx: TopologyConstructionContext) -> None:
@@ -4442,14 +4617,9 @@ def invariant_feasible_le_verified(ctx: TopologyConstructionContext) -> None:
 
 def invariant_standard_result_node_present(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.sizing_result_count != 1:
-        raise ValueError(
-            f"expected sizing_result_count=1, got {ctx.counters.sizing_result_count}"
-        )
+        raise ValueError(f"expected sizing_result_count=1, got {ctx.counters.sizing_result_count}")
     if ctx.counters.sizing_run_failure_result_count != 0:
-        raise ValueError(
-            "sizing_run_failure_result must be absent "
-            "for a standard-result topology"
-        )
+        raise ValueError("sizing_run_failure_result must be absent for a standard-result topology")
 
 
 def invariant_cap_exceeded_before_materialization(ctx: TopologyConstructionContext) -> None:
@@ -4484,19 +4654,27 @@ def invariant_standard_result_absent(ctx: TopologyConstructionContext) -> None:
 
 def invariant_evaluated_eq_unique_eq_verified(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.evaluated_candidate_count != ctx.counters.unique_candidate_count:
-        raise ValueError(f"evaluated ({ctx.counters.evaluated_candidate_count}) != unique ({ctx.counters.unique_candidate_count})")
+        raise ValueError(
+            f"evaluated ({ctx.counters.evaluated_candidate_count}) != unique ({ctx.counters.unique_candidate_count})"
+        )
     if ctx.counters.verified_rating_count != ctx.counters.unique_candidate_count:
-        raise ValueError(f"verified ({ctx.counters.verified_rating_count}) != unique ({ctx.counters.unique_candidate_count})")
+        raise ValueError(
+            f"verified ({ctx.counters.verified_rating_count}) != unique ({ctx.counters.unique_candidate_count})"
+        )
 
 
 def invariant_attempted_eq_completed_plus_1(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.attempted_rating_count != ctx.counters.completed_rating_count + 1:
-        raise ValueError(f"attempted ({ctx.counters.attempted_rating_count}) != completed ({ctx.counters.completed_rating_count}) + 1")
+        raise ValueError(
+            f"attempted ({ctx.counters.attempted_rating_count}) != completed ({ctx.counters.completed_rating_count}) + 1"
+        )
 
 
 def invariant_completed_eq_verified_plus_1(ctx: TopologyConstructionContext) -> None:
     if ctx.counters.completed_rating_count != ctx.counters.verified_rating_count + 1:
-        raise ValueError(f"completed ({ctx.counters.completed_rating_count}) != verified ({ctx.counters.verified_rating_count}) + 1")
+        raise ValueError(
+            f"completed ({ctx.counters.completed_rating_count}) != verified ({ctx.counters.verified_rating_count}) + 1"
+        )
 
 
 def invariant_claimed_node_count_1(ctx: TopologyConstructionContext) -> None:
@@ -4516,7 +4694,9 @@ def invariant_failed_candidate_no_rating_result(ctx: TopologyConstructionContext
 
 def invariant_0_le_materialized_le_unique(ctx: TopologyConstructionContext) -> None:
     if not (0 <= ctx.counters.materialized_candidate_count <= ctx.counters.unique_candidate_count):
-        raise ValueError(f"materialized ({ctx.counters.materialized_candidate_count}) not in [0, unique ({ctx.counters.unique_candidate_count})]")
+        raise ValueError(
+            f"materialized ({ctx.counters.materialized_candidate_count}) not in [0, unique ({ctx.counters.unique_candidate_count})]"
+        )
 ```
 
 > **NON-NORMATIVE GENERATED SUMMARY.** All constructor function names are resolved via `PROVENANCE_CONCEPT_REGISTRY` (14 typed entries, each with direct callable references). Allowed/forbidden termination classes are derived from `TERMINATION_TOPOLOGY_REGISTRY`. Node multiplicity is resolved via `NODE_MULTIPLICITY_CONSTRUCTORS`. This table is for human reference only and is not an authoritative contract.
@@ -4572,9 +4752,20 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CATALOG_SNAPSHOT, ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        forbidden_concepts=(
+            ProvenanceConcept.CATALOG_SNAPSHOT,
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
@@ -4597,11 +4788,26 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        forbidden_concepts=(
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4623,11 +4829,26 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        forbidden_concepts=(
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4649,11 +4870,26 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        forbidden_concepts=(
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4675,11 +4911,26 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        forbidden_concepts=(
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4704,16 +4955,42 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        forbidden_concepts=(
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+            MessageOwnerKind.OPTIMIZER,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4741,16 +5018,42 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        forbidden_concepts=(
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+            MessageOwnerKind.OPTIMIZER,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4777,13 +5080,31 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4807,15 +5128,38 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "produced_unverified", ProvenanceConcept.INVALID_EVIDENCE),
-            ProvenanceRelationSpec(ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "produced_unverified",
+                ProvenanceConcept.INVALID_EVIDENCE,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.INVALID_EVIDENCE, "invalidates", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.RUNTIME_FAILURE),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.RUNTIME_FAILURE,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=1,
         counter_invariants=(
@@ -4835,10 +5179,22 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CATALOG_SNAPSHOT, ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
+        forbidden_concepts=(
+            ProvenanceConcept.CATALOG_SNAPSHOT,
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
         allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN,),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
@@ -4862,12 +5218,28 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.CANDIDATE, ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT),
+        forbidden_concepts=(
+            ProvenanceConcept.CANDIDATE,
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4891,13 +5263,31 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4921,13 +5311,31 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.TASK008_RATING_RESULT, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.TASK008_RATING_RESULT,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4952,14 +5360,33 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -4985,15 +5412,37 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as_claimed", ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE,
+                "rated_as_claimed",
+                ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.SIZING_OPTIMIZER, ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE),
+        forbidden_concepts=(
+            ProvenanceConcept.SIZING_OPTIMIZER,
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -5018,17 +5467,44 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "produces", ProvenanceConcept.SIZING_RESULT
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        forbidden_concepts=(
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+            MessageOwnerKind.OPTIMIZER,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -5054,17 +5530,50 @@ TERMINATION_TOPOLOGY_REGISTRY: tuple[TerminationTopologySpec, ...] = (
             (ProvenanceConcept.SIZING_RUN_FAILURE_RESULT, "1"),
         ),
         static_base_edges=(
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT),
-            ProvenanceRelationSpec(ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE),
-            ProvenanceRelationSpec(ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.TASK008_RATING_RESULT, "evaluated_by", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_OPTIMIZER, "precedes_failure", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.RUNTIME_FAILURE, "fails", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
-            ProvenanceRelationSpec(ProvenanceConcept.SIZING_RUN, "produces_failure_record", ProvenanceConcept.SIZING_RUN_FAILURE_RESULT),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "consumes", ProvenanceConcept.CATALOG_SNAPSHOT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CATALOG_SNAPSHOT, "generates", ProvenanceConcept.CANDIDATE
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.CANDIDATE, "rated_as", ProvenanceConcept.TASK008_RATING_RESULT
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.TASK008_RATING_RESULT,
+                "evaluated_by",
+                ProvenanceConcept.SIZING_OPTIMIZER,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN, "executes", ProvenanceConcept.SIZING_OPTIMIZER
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_OPTIMIZER,
+                "precedes_failure",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.RUNTIME_FAILURE,
+                "fails",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
+            ProvenanceRelationSpec(
+                ProvenanceConcept.SIZING_RUN,
+                "produces_failure_record",
+                ProvenanceConcept.SIZING_RUN_FAILURE_RESULT,
+            ),
         ),
-        forbidden_concepts=(ProvenanceConcept.INVALID_EVIDENCE, ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT, ProvenanceConcept.SIZING_RESULT),
-        allowed_message_owner_kinds=(MessageOwnerKind.SIZING_RUN, MessageOwnerKind.CATALOG_SNAPSHOT, MessageOwnerKind.CANDIDATE, MessageOwnerKind.OPTIMIZER),
+        forbidden_concepts=(
+            ProvenanceConcept.INVALID_EVIDENCE,
+            ProvenanceConcept.CLAIMED_TASK008_RATING_RESULT,
+            ProvenanceConcept.SIZING_RESULT,
+        ),
+        allowed_message_owner_kinds=(
+            MessageOwnerKind.SIZING_RUN,
+            MessageOwnerKind.CATALOG_SNAPSHOT,
+            MessageOwnerKind.CANDIDATE,
+            MessageOwnerKind.OPTIMIZER,
+        ),
         minimum_warning_occurrences=0,
         minimum_blocker_occurrences=0,
         counter_invariants=(
@@ -5148,12 +5657,20 @@ def resolve_termination_topology(
     # Build edge set with dedup
     edges = [root_selection.initiates_edge]
     seen_edges: set[tuple[ProvenanceConcept, str, ProvenanceConcept]] = set()
-    seen_edges.add((root_selection.initiates_edge.source_concept, root_selection.initiates_edge.relation, root_selection.initiates_edge.target_concept))
+    seen_edges.add(
+        (
+            root_selection.initiates_edge.source_concept,
+            root_selection.initiates_edge.relation,
+            root_selection.initiates_edge.target_concept,
+        )
+    )
 
     for edge in spec.static_base_edges:
         key = (edge.source_concept, edge.relation, edge.target_concept)
         if key in seen_edges:
-            raise ValueError(f"duplicate edge: {edge.source_concept} --{edge.relation}--> {edge.target_concept}")
+            raise ValueError(
+                f"duplicate edge: {edge.source_concept} --{edge.relation}--> {edge.target_concept}"
+            )
         seen_edges.add(key)
         # Edge endpoint checks
         source_count = multiplicity_by_concept.get(edge.source_concept, 0)
@@ -5231,7 +5748,9 @@ occurrence_digest = sha256_digest(message_occurrence_payload)
 **Provenance node UUID5 for WARNING/BLOCKER:**
 
 ```python
-uuid5_name = f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"
+uuid5_name = (
+    f"{occurrence_kind.value}:{owner_kind.value}:{owner_id}:{message_digest}:{occurrence_index}"
+)
 node_uuid = uuid5(TASK009_PROVENANCE_NAMESPACE, uuid5_name)
 ```
 
@@ -5478,9 +5997,7 @@ BLOCKER = 3
 Context digest:
 
 ```python
-sha256_digest({
-    "entries": canonical_context_entries
-})
+sha256_digest({"entries": canonical_context_entries})
 ```
 
 This ensures insertion-order independence for all identity digests and provenance graphs.

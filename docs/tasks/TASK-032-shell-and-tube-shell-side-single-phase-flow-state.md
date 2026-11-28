@@ -800,8 +800,7 @@ PUBLIC_CALCULATION_OPERATION_COUNT=1
 ```
 
 ```python
-def validate_request(raw_request: Any) -> ShellSideFlowStateValidationResult:
-    ...
+def validate_request(raw_request: Any) -> ShellSideFlowStateValidationResult: ...
 ```
 
 ## 15. Result models

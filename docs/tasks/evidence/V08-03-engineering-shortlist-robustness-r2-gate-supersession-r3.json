@@ -1,0 +1,12 @@
+{
+  "corrected_gate_issues": [
+    "Task027 PASS separated from VERIFIED_ROBUST",
+    "No ENGINEERING_RECOMMENDED without proven robustness",
+    "Regime ranking excludes 241 Task027-blocked layouts",
+    "Mass-flow high-K coverage documented as baseline-only"
+  ],
+  "schema": "hxforge.engineering-shortlist-supersession.v1",
+  "superseded_artifact": "docs/tasks/evidence/V08-03-engineering-shortlist-robustness-r2.json",
+  "supersession_revision": "r3",
+  "task_id": "V08_03_R2_GATE_CORRECTION_AND_TASK173_MASS_BINDING_BOUNDARY"
+}

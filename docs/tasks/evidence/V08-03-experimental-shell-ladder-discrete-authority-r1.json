@@ -1,0 +1,44 @@
+{
+  "schema_version": "hxforge.v08-shell-ladder-discrete-authority.v1",
+  "authority_id": "V08-EXPERIMENTAL-SHELL-LADDER-DISCRETE-AUTHORITY-R1-COOPT",
+  "authority_version": "R1-COOPT-PROTOTYPE",
+  "authorization_class": "V08_PROJECT_EXPERIMENTAL_DISCRETE_SEARCH",
+  "approval_status": "APPROVED_FOR_V08_03_COOPT_PROTOTYPE_ONLY",
+  "disclosure": "EXPERIMENTAL_GEOMETRY_NOT_MANUFACTURING_APPROVED. Extends R1 shell/ladder for V08-03 hydraulic co-optimization prototype only.",
+  "evidence_refs": [
+    "docs/tasks/evidence/V08-02-shell-and-ladder-discrete-authority-r1.json",
+    "docs/tasks/evidence/V08-03-experimental-geometry-discrete-space-r1.json"
+  ],
+  "shell_inside_diameters_m": [
+    {"value_m": "0.45", "nominal_label": "V08-experimental-shell-ID-450mm", "source_id": "V08-SHELL-DISCRETE-450-R1", "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"},
+    {"value_m": "0.52", "nominal_label": "V08-experimental-shell-ID-520mm", "source_id": "V08-SHELL-DISCRETE-520-R1", "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"},
+    {"value_m": "0.58", "nominal_label": "V08-experimental-shell-ID-580mm", "source_id": "V08-SHELL-DISCRETE-580-R1", "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"},
+    {"value_m": "0.62", "nominal_label": "V08-experimental-shell-ID-620mm-COOPT", "source_id": "V08-SHELL-DISCRETE-620-COOPT", "source_type": "V08_COOPT_PROTOTYPE_DISCRETE"},
+    {"value_m": "0.65", "nominal_label": "V08-experimental-shell-ID-650mm-COOPT", "source_id": "V08-SHELL-DISCRETE-650-COOPT", "source_type": "V08_COOPT_PROTOTYPE_DISCRETE"}
+  ],
+  "tube_baffle_ladder_rule_id": "V08-TBAFFLE-LADDER-RULE-FIVE-SPACING-COOPT-R1",
+  "tube_baffle_ladder_rule": {
+    "description": "5× spacing ladder with co-optimization extensions (4.0–6.0 m).",
+    "baffle_count_fixed": 4,
+    "length_to_spacing_ratio": "5",
+    "allowed_steps": [
+      {"tube_length_m": "4.00", "baffle_spacing_m": "0.80", "baffle_count": 4},
+      {"tube_length_m": "4.50", "baffle_spacing_m": "0.90", "baffle_count": 4},
+      {"tube_length_m": "5.00", "baffle_spacing_m": "1.00", "baffle_count": 4},
+      {"tube_length_m": "5.50", "baffle_spacing_m": "1.10", "baffle_count": 4},
+      {"tube_length_m": "5.75", "baffle_spacing_m": "1.15", "baffle_count": 4},
+      {"tube_length_m": "6.00", "baffle_spacing_m": "1.20", "baffle_count": 4}
+    ]
+  },
+  "baffle_segmental": {
+    "baffle_type": "SINGLE_SEGMENTAL",
+    "baffle_cut": "0.25",
+    "source_id": "V08-BAFFLE-SEGMENTAL-DEFAULT-R1",
+    "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+  },
+  "construction_family": {
+    "value": "FIXED_TUBESHEET",
+    "source_id": "V08-CONSTRUCTION-FIXED-TUBESHEET-R1",
+    "source_type": "V08_PROJECT_DEFINED_EXPERIMENTAL_DISCRETE"
+  }
+}
